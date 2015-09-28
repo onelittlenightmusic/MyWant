@@ -1,0 +1,262 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+Add	chain/chain.go	/^func (c *C_chain) Add (f func(Chan, Chan)(bool)) {$/;"	f	language:Go
+Add	chain_old1/chain.go	/^func (c *C_chain) Add (f func(Chan, Chan)(bool)) {$/;"	f	language:Go
+C_chain	chain/chain.go	/^type C_chain struct {$/;"	t	language:Go
+C_chain	chain_old1/chain.go	/^type C_chain struct {$/;"	t	language:Go
+Chain	chain.go	/^func Chain()	 ( start_func func(func(chan Tupple)),$/;"	f	language:Go
+Chain	chain/chain.go	/^func Chain()	 ( start_func func(func(Chan)(bool)),$/;"	f	language:Go
+Chain	chain_old1/chain.go	/^func Chain()	 ( start_func func(func(Chan)(bool)),$/;"	f	language:Go
+Chan	chain/chain.go	/^type Chan chan Tupple$/;"	t	language:Go
+Chan	chain_old1/chain.go	/^type Chan chan Tupple$/;"	t	language:Go
+End	chain/chain.go	/^func (c *C_chain) End (f func(Chan)(bool)) {$/;"	f	language:Go
+End	chain_old1/chain.go	/^func (c *C_chain) End (f func(Chan)(bool)) {$/;"	f	language:Go
+GOARCH	g.bat	/^set GOARCH=386/;"	v	language:DosBatch
+GOFILES	chain/Makefile	/^GOFILES=\\$/;"	m	language:Make
+GOFILES	chain_old1/Makefile	/^GOFILES=\\$/;"	m	language:Make
+GOOS	g.bat	/^set GOOS=mingw$/;"	v	language:DosBatch
+GOROOT	g.bat	/^set GOROOT=C:\\Users\\hiro\\Downloads\\go$/;"	v	language:DosBatch
+Merge	chain/chain.go	/^func (c1 *C_chain) Merge (c2 C_chain, f func(_, _, _ Chan)(bool)) {$/;"	f	language:Go
+Merge	chain/chain.go	/^func Merge(c1, c2 Chan) {$/;"	f	language:Go
+Merge	chain_old1/chain.go	/^func (c1 *C_chain) Merge (c2 C_chain, f func(_, _, _ Chan)(bool)) {$/;"	f	language:Go
+Merge	chain_old1/chain.go	/^func Merge(c1, c2 Chan) {$/;"	f	language:Go
+Run	chain/chain.go	/^func Run() {$/;"	f	language:Go
+Run	chain_old1/chain.go	/^func Run() {$/;"	f	language:Go
+Split	chain/chain.go	/^func (c1 *C_chain) Split (f func(_, _, _ Chan)(bool)) (c2 C_chain) {$/;"	f	language:Go
+Split	chain_old1/chain.go	/^func (c1 *C_chain) Split (f func(_, _, _ Chan)(bool)) (c2 C_chain) {$/;"	f	language:Go
+Start	chain/chain.go	/^func (c *C_chain) Start (f func(Chan)(bool)) {$/;"	f	language:Go
+Start	chain_old1/chain.go	/^func (c *C_chain) Start (f func(Chan)(bool)) {$/;"	f	language:Go
+TARG	chain/Makefile	/^TARG=chain$/;"	m	language:Make
+TARG	chain_old1/Makefile	/^TARG=chain$/;"	m	language:Make
+Tupple	chain.go	/^type Tupple struct {$/;"	t	language:Go
+Tupple	chain/chain.go	/^type Tupple interface{}$/;"	t	language:Go
+Tupple	chain_old1/chain.go	/^type Tupple interface{}$/;"	t	language:Go
+a	test5.go	/^var ($/;"	v	language:Go
+area	logical.go	/^type area struct {$/;"	t	language:Go
+async	qnet5.go	/^func async(in path, n int) (path) {$/;"	f	language:Go
+async	qnet6.go	/^func async(in path, n int) (path) {$/;"	f	language:Go
+ch	pathtest1.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+ch	test2.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+ch	test3.go	/^var ch, ch2, ch3 = make(chan int), make(chan int), make(chan int);$/;"	v	language:Go
+ch	test4.go	/^var ch= make(chan packet, 1);$/;"	v	language:Go
+ch2	pathtest1.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+ch2	test2.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+ch2	test3.go	/^var ch, ch2, ch3 = make(chan int), make(chan int), make(chan int);$/;"	v	language:Go
+ch3	test3.go	/^var ch, ch2, ch3 = make(chan int), make(chan int), make(chan int);$/;"	v	language:Go
+ch_end	chain/chain.go	/^	ch_start chan int = make(chan int,1)$/;"	v	language:Go
+ch_end	chain_old1/chain.go	/^	ch_start chan int = make(chan int,1)$/;"	v	language:Go
+ch_make	test1.go	/^func ch_make () chan float {$/;"	f	language:Go
+ch_start	chain/chain.go	/^var ($/;"	v	language:Go
+ch_start	chain_old1/chain.go	/^var ($/;"	v	language:Go
+chain	chain.go	/^package chain$/;"	p	language:Go
+chain	chain/chain.go	/^package chain$/;"	p	language:Go
+chain	chain_old1/chain.go	/^package chain$/;"	p	language:Go
+chain	closure_channel.go	/^func chain() (in chan tupple, add_func func(func(tupple) tupple) chan tupple) {$/;"	f	language:Go
+chain	closure_ortho_array2.go	/^func chain() (in chan tupple, add_func func(func(tupple) tupple) chan tupple) {$/;"	f	language:Go
+combine	chain_qnet.go	/^func combine () (func(_, _, _ chain.Chan) (bool)) {$/;"	f	language:Go
+combine	qnet.go	/^func combine (out chan<- float, in []<-chan float, i int) {$/;"	f	language:Go
+combine	qnet2.go	/^func combine (out chan<- packet, in []<-chan packet, i int) {$/;"	f	language:Go
+combine	qnet5.go	/^func combine (in []path) (path) {$/;"	f	language:Go
+combine	qnet6.go	/^func combine (in []path) (path) {$/;"	f	language:Go
+combine2	qnet.go	/^func combine2(out chan<- float, in []<-chan float, i int) {$/;"	f	language:Go
+combine2	qnet2.go	/^func combine2(out chan<- packet, in []<-chan packet, i int) {$/;"	f	language:Go
+combine2	qnet3.go	/^func combine2(in []<-chan float, i int) (<-chan float) {$/;"	f	language:Go
+combine2	qnet4.go	/^func combine2(in []<-chan float, i int) (<-chan float) {$/;"	f	language:Go
+couple	qnet5.go	/^func couple(in, out path) {$/;"	f	language:Go
+couple	qnet6.go	/^func couple(in, out path) {$/;"	f	language:Go
+default_merge	chain/chain.go	/^func default_merge(a, b, c Chan) (bool) {$/;"	f	language:Go
+default_merge	chain_old1/chain.go	/^func default_merge(a, b, c Chan) (bool) {$/;"	f	language:Go
+default_split	chain/chain.go	/^func default_split(a, b, c Chan) (bool) {$/;"	f	language:Go
+default_split	chain_old1/chain.go	/^func default_split(a, b, c Chan) (bool) {$/;"	f	language:Go
+delay_count	qnet.go	/^func (qs *stat) delay_count (end chan<- bool, in_base, in <-chan float, i int) {$/;"	f	language:Go
+delay_count	qnet2.go	/^func (qs *stat) delay_count (end chan<- bool, in_base, in <-chan packet, i int) {$/;"	f	language:Go
+delay_count	qnet3.go	/^func (qs *stat) delay_count (in_base, in <-chan float, i int) (chan bool) {$/;"	f	language:Go
+delay_count	qnet4.go	/^func (qs *stat) delay_count (in_base, in <-chan float, i int) (chan bool) {$/;"	f	language:Go
+delay_count	qnet5.go	/^func (qs *stat) delay_count (in_base, in path) (path) {$/;"	f	language:Go
+delay_count	qnet6.go	/^func (qs *stat) delay_count (in_base, in path) (path) {$/;"	f	language:Go
+delay_count2	qnet.go	/^func (qs *stat) delay_count2 (end chan<- bool, in <-chan float, i int) {$/;"	f	language:Go
+delay_count2	qnet2.go	/^func (qs *stat) delay_count2 (end chan<- bool, in <-chan float, i int) {$/;"	f	language:Go
+delay_count2	qnet3.go	/^func (qs *stat) delay_count2 (end chan<- bool, in <-chan float, i int) {$/;"	f	language:Go
+delay_count2	qnet4.go	/^func (qs *stat) delay_count2 (end chan<- bool, in <-chan float, i int) {$/;"	f	language:Go
+display_log	qnet5.go	/^func display_log (q *queue) () {$/;"	f	language:Go
+display_log	qnet6.go	/^func display_log (q *queue) () {$/;"	f	language:Go
+double	chain_ortho_array.go	/^func double	(in, out chain.Chan)(fin bool) {$/;"	f	language:Go
+double	chain_slice_ortho.go	/^func double	(in, out chain.Chan)(fin bool) {$/;"	f	language:Go
+double	closure_channel.go	/^func double(x tupple) tupple {$/;"	f	language:Go
+double	closure_ortho_array2.go	/^func double(in chan tupple) (out chan tupple) {$/;"	f	language:Go
+double	ortho_array.go	/^func double(in, out chan tupple) {$/;"	f	language:Go
+double	qnet.go	/^func double (out []chan<- float, in <-chan float, i int) {$/;"	f	language:Go
+double	qnet2.go	/^func double (out []chan<- packet, in <-chan packet, i int) {$/;"	f	language:Go
+double	qnet3.go	/^func double (out []chan<- float, in <-chan float, i int) {$/;"	f	language:Go
+double	qnet4.go	/^func double (in <-chan float, i int) (chan float, chan float) {$/;"	f	language:Go
+end	pathtest1.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+end	test2.go	/^var ch, ch2, end = make(chan int), make(chan int), make(chan bool,1);$/;"	v	language:Go
+end_func	chain_ortho_array.go	/^func end_func (cend chain.Chan)(fin bool) {$/;"	f	language:Go
+end_func	chain_qnet.go	/^func end_func (cend chain.Chan) (fin bool) {$/;"	f	language:Go
+end_func	chain_slice_ortho.go	/^func end_func (cend chain.Chan)(fin bool) {$/;"	f	language:Go
+fib	closure_test.go	/^func fib() func() int {$/;"	f	language:Go
+filter	chain_qnet.go	/^func filter() (func(_, _ chain.Chan)) {$/;"	f	language:Go
+filter	prime.go	/^func filter(src <-chan int, dst chan<- int, prime int) {$/;"	f	language:Go
+filter	qnet5.go	/^func filter(in path, p float) (path) {$/;"	f	language:Go
+filter	qnet6.go	/^func filter(in path, p float64) (path) {$/;"	f	language:Go
+generate	prime.go	/^func generate(ch chan<- int) {$/;"	f	language:Go
+generate	qnet.go	/^func generate(ch chan float, i int) {$/;"	f	language:Go
+generate	qnet2.go	/^func generate(i int) (out chan packet) {$/;"	f	language:Go
+generate	qnet3.go	/^func generate(i int) (chan float) {$/;"	f	language:Go
+generate	qnet4.go	/^func generate(i int) (chan float) {$/;"	f	language:Go
+generate	qnet5.go	/^func generate(i int, d float) (path) {$/;"	f	language:Go
+generate	qnet6.go	/^func generate(i int, d float64) (path) {$/;"	f	language:Go
+hello	myapp/hello/hello.go	/^package hello$/;"	p	language:Go
+init	myapp/hello/hello.go	/^func init() {$/;"	f	language:Go
+init_end	chain/chain.go	/^	init_start chan int = ch_start$/;"	v	language:Go
+init_end	chain_old1/chain.go	/^	init_start chan int = ch_start$/;"	v	language:Go
+init_func	chain_ortho_array.go	/^func init_func (in chain.Chan)(fin bool) {$/;"	f	language:Go
+init_func	chain_qnet.go	/^func init_func(d float, i int) (func(_, _ chain.Chan)(bool)) {$/;"	f	language:Go
+init_func	chain_slice_ortho.go	/^func init_func (in chain.Chan)(fin bool) {$/;"	f	language:Go
+init_start	chain/chain.go	/^	ch_end chan int = make(chan int,1)$/;"	v	language:Go
+init_start	chain_old1/chain.go	/^	ch_end chan int = make(chan int,1)$/;"	v	language:Go
+junction	qnet.go	/^func junction (out chan<- float, in1, in2 <-chan float, i int) {$/;"	f	language:Go
+junction	qnet2.go	/^func junction (out chan<- packet, in1, in2 <-chan packet, i int) {$/;"	f	language:Go
+junction	qnet3.go	/^func junction (out chan<- float, in1, in2 <-chan float, i int) {$/;"	f	language:Go
+junction	qnet4.go	/^func junction (in1, in2 <-chan float, i int) (chan float) {$/;"	f	language:Go
+junction	qnet5.go	/^func junction (in1, in2 path) (path) {$/;"	f	language:Go
+junction	qnet6.go	/^func junction(in1, in2 path) (path) {$/;"	f	language:Go
+load	logical.go	/^func load() {$/;"	f	language:Go
+log	qnet.go	/^func (qs *stat) log (interval float) {$/;"	f	language:Go
+log	qnet2.go	/^func (qs *stat) log (interval float) {$/;"	f	language:Go
+log	qnet3.go	/^func (qs *stat) log (interval float) {$/;"	f	language:Go
+log	qnet4.go	/^func (qs *stat) log (interval float) {$/;"	f	language:Go
+log	qnet5.go	/^func (qs *stat) log (interval float) {$/;"	f	language:Go
+log	qnet6.go	/^func (qs *stat) log (interval float64) {$/;"	f	language:Go
+m	logical.go	/^type m struct {$/;"	t	language:Go
+main	chain_ortho_array.go	/^func main() {$/;"	f	language:Go
+main	chain_ortho_array.go	/^package main$/;"	p	language:Go
+main	chain_qnet.go	/^func main() {$/;"	f	language:Go
+main	chain_qnet.go	/^package main$/;"	p	language:Go
+main	chain_slice_ortho.go	/^func main() {$/;"	f	language:Go
+main	chain_slice_ortho.go	/^package main$/;"	p	language:Go
+main	closure_channel.go	/^func main() {$/;"	f	language:Go
+main	closure_channel.go	/^package main$/;"	p	language:Go
+main	closure_ortho_array2.go	/^func main() {$/;"	f	language:Go
+main	closure_ortho_array2.go	/^package main$/;"	p	language:Go
+main	closure_test.go	/^func main() {$/;"	f	language:Go
+main	closure_test.go	/^package main$/;"	p	language:Go
+main	hello.go	/^func main() {$/;"	f	language:Go
+main	hello.go	/^package main$/;"	p	language:Go
+main	hi.go	/^func main() {$/;"	f	language:Go
+main	hi.go	/^package main$/;"	p	language:Go
+main	hi2.go	/^func main() {$/;"	f	language:Go
+main	hi2.go	/^package main$/;"	p	language:Go
+main	interface_test.go	/^func main() {$/;"	f	language:Go
+main	interface_test.go	/^package main$/;"	p	language:Go
+main	logical.go	/^func main() {$/;"	f	language:Go
+main	logical.go	/^package main$/;"	p	language:Go
+main	ortho_array.go	/^func main() {$/;"	f	language:Go
+main	ortho_array.go	/^package main$/;"	p	language:Go
+main	pathtest1.go	/^package main$/;"	p	language:Go
+main	prime.go	/^func main() {$/;"	f	language:Go
+main	prime.go	/^package main$/;"	p	language:Go
+main	qnet.go	/^func main() {$/;"	f	language:Go
+main	qnet.go	/^package main$/;"	p	language:Go
+main	qnet2.go	/^func main() {$/;"	f	language:Go
+main	qnet2.go	/^package main$/;"	p	language:Go
+main	qnet3.go	/^func main() {$/;"	f	language:Go
+main	qnet3.go	/^package main$/;"	p	language:Go
+main	qnet4.go	/^func main() {$/;"	f	language:Go
+main	qnet4.go	/^package main$/;"	p	language:Go
+main	qnet5.go	/^func main() {$/;"	f	language:Go
+main	qnet5.go	/^package main$/;"	p	language:Go
+main	qnet6.go	/^func main() {$/;"	f	language:Go
+main	qnet6.go	/^package main$/;"	p	language:Go
+main	randtest.go	/^func main() {$/;"	f	language:Go
+main	randtest.go	/^package main$/;"	p	language:Go
+main	test1.go	/^func main() {$/;"	f	language:Go
+main	test1.go	/^package main$/;"	p	language:Go
+main	test2.go	/^package main$/;"	p	language:Go
+main	test3.go	/^func main() {$/;"	f	language:Go
+main	test3.go	/^package main$/;"	p	language:Go
+main	test4.go	/^func main() {$/;"	f	language:Go
+main	test4.go	/^package main$/;"	p	language:Go
+main	test5.go	/^package main$/;"	p	language:Go
+main	test_ubuntu.go	/^func main() {$/;"	f	language:Go
+main	test_ubuntu.go	/^package main$/;"	p	language:Go
+max	qnet5.go	/^var max = 1000000.0$/;"	v	language:Go
+max	qnet6.go	/^var max = 1000000.0$/;"	v	language:Go
+mece	logical.go	/^func mece(ideas []area, target area) ([]area) {$/;"	f	language:Go
+mkq	qnet5.go	/^func mkq(ins []path) (*queue, path) {$/;"	f	language:Go
+mkq	qnet6.go	/^func mkq(ins []path) (*queue, path) {$/;"	f	language:Go
+newasyncpath	qnet5.go	/^func newasyncpath(n int) (path) {$/;"	f	language:Go
+newasyncpath	qnet6.go	/^func newasyncpath(n int) (path) {$/;"	f	language:Go
+newpath	qnet5.go	/^func newpath () (path) {$/;"	f	language:Go
+newpath	qnet6.go	/^func newpath() (path) {$/;"	f	language:Go
+next_end	chain/chain.go	/^func next_end() (func()) {$/;"	f	language:Go
+next_end	chain_old1/chain.go	/^func next_end() (func()) {$/;"	f	language:Go
+next_start	chain/chain.go	/^func next_start() (func()) {$/;"	f	language:Go
+next_start	chain_old1/chain.go	/^func next_start() (func()) {$/;"	f	language:Go
+num	randtest.go	/^var num int = 1000$/;"	v	language:Go
+p	pathtest1.go	/^var p = path {$/;"	v	language:Go
+packet	qnet.go	/^type packet struct { time float; end bool }$/;"	t	language:Go
+packet	qnet2.go	/^type packet struct { time float; end bool }$/;"	t	language:Go
+packet	qnet3.go	/^type packet struct { time float; end bool }$/;"	t	language:Go
+packet	randtest.go	/^type packet struct {$/;"	t	language:Go
+packet	test4.go	/^type packet struct {$/;"	t	language:Go
+pass	qnet.go	/^func (q *queue) pass (out chan<- float, middle <-chan float, i int) {$/;"	f	language:Go
+pass	qnet2.go	/^func (q *queue) pass (out chan<- packet, middle <-chan packet, i int) {$/;"	f	language:Go
+pass	qnet3.go	/^func (q *queue) pass (out chan<- float, middle <-chan float, i int) {$/;"	f	language:Go
+pass	qnet4.go	/^func (q *queue) pass (middle <-chan float, i int) (chan float) {$/;"	f	language:Go
+pass	qnet5.go	/^func (q *queue) pass (in path) (path) {$/;"	f	language:Go
+pass	qnet6.go	/^func (q *queue) pass (in path) (path) {$/;"	f	language:Go
+path	pathtest1.go	/^type path struct { vpath chan int; end chan bool; }$/;"	t	language:Go
+path	qnet3.go	/^type path struct { vpath chan int; end chan bool; }$/;"	t	language:Go
+path	qnet4.go	/^type path struct { vpath chan int; end chan bool; }$/;"	t	language:Go
+path	qnet5.go	/^type path struct { vpath chan float; end chan bool; }$/;"	t	language:Go
+path	qnet6.go	/^type path struct { vpath chan float64; end chan bool; }$/;"	t	language:Go
+path	test2.go	/^type path struct { vpath chan int; end chan bool; }$/;"	t	language:Go
+plus	chain_ortho_array.go	/^func plus (in, out chain.Chan)(fin bool) {$/;"	f	language:Go
+plus	chain_slice_ortho.go	/^func plus (in, out chain.Chan)(fin bool) {$/;"	f	language:Go
+plus	closure_channel.go	/^func plus(x tupple) tupple {$/;"	f	language:Go
+plus	closure_ortho_array2.go	/^func plus(in chan tupple) (out chan tupple) {$/;"	f	language:Go
+plus	ortho_array.go	/^func plus(in, out chan tupple) {$/;"	f	language:Go
+qstat	hi.go	/^type qstat struct { out_num int; interval_ave float; interval_var float }$/;"	t	language:Go
+queue	chain_qnet.go	/^func queue(t_ave float) (func(_, _ chain.Chan)(bool)) {$/;"	f	language:Go
+queue	qnet.go	/^type queue struct { time_last_out float; in chan float; out chan float; qs *stat }$/;"	t	language:Go
+queue	qnet2.go	/^type queue struct { time_last_out float; in chan float; out chan float; qs *stat }$/;"	t	language:Go
+queue	qnet3.go	/^type queue struct { time_last_out float; in chan float; out chan float; qs *stat }$/;"	t	language:Go
+queue	qnet4.go	/^type queue struct { time_last_out float; in chan float; out chan float; qs *stat }$/;"	t	language:Go
+queue	qnet5.go	/^type queue struct { time_last_out float; in chan float; out chan float; stat }$/;"	t	language:Go
+queue	qnet6.go	/^type queue struct { time_last_out float64; in chan float64; out chan float64; stat }$/;"	t	language:Go
+recv	pathtest1.go	/^func recv(a path) int {$/;"	f	language:Go
+recv	qnet3.go	/^func recv(a path) int {$/;"	f	language:Go
+recv	qnet4.go	/^func recv(a path) int {$/;"	f	language:Go
+send	pathtest1.go	/^func send(b path, n int) {$/;"	f	language:Go
+send	qnet3.go	/^func send(b path, n int) {$/;"	f	language:Go
+send	qnet4.go	/^func send(b path, n int) {$/;"	f	language:Go
+session	interface_test.go	/^type session struct{$/;"	t	language:Go
+sieve	prime.go	/^func sieve() {$/;"	f	language:Go
+stat	qnet.go	/^type stat struct { out_num int; interval_sum float; interval_sqsum float; queued_num int }$/;"	t	language:Go
+stat	qnet2.go	/^type stat struct { out_num int; interval_sum float; interval_sqsum float; queued_num int }$/;"	t	language:Go
+stat	qnet3.go	/^type stat struct { out_num int; interval_sum float; interval_sqsum float; queued_num int }$/;"	t	language:Go
+stat	qnet4.go	/^type stat struct { out_num int; interval_sum float; interval_sqsum float; queued_num int }$/;"	t	language:Go
+stat	qnet5.go	/^type stat struct { out_num int; interval_sum float; interval_sqsum float; queued_num int }$/;"	t	language:Go
+stat	qnet6.go	/^type stat struct { out_num int; interval_sum float64; interval_sqsum float64; queued_num int }$/;"	t	language:Go
+terminate	qnet5.go	/^func terminate(in path) (path){$/;"	f	language:Go
+terminate	qnet6.go	/^func terminate(in path) (path){$/;"	f	language:Go
+test_print	interface_test.go	/^func test_print(a interface{}) {$/;"	f	language:Go
+test_print2	interface_test.go	/^func test_print2(a chan interface{}) {$/;"	f	language:Go
+test_print3	interface_test.go	/^func test_print3(a session) {$/;"	f	language:Go
+tested	ortho_array.go	/^func tested(p [32]int) bool {$/;"	f	language:Go
+theta	randtest.go	/^var theta float64 = 0.1$/;"	v	language:Go
+tnode	hi.go	/^type tnode struct { time float }$/;"	t	language:Go
+tupple	chain_ortho_array.go	/^type tupple struct {$/;"	t	language:Go
+tupple	chain_qnet.go	/^type tupple struct {$/;"	t	language:Go
+tupple	chain_slice_ortho.go	/^type tupple struct {$/;"	t	language:Go
+tupple	closure_channel.go	/^type tupple struct {$/;"	t	language:Go
+tupple	closure_ortho_array2.go	/^type tupple struct {$/;"	t	language:Go
+tupple	ortho_array.go	/^type tupple struct {$/;"	t	language:Go
+twice	qnet5.go	/^func twice (in path) (path, path) {$/;"	f	language:Go
+twice	qnet6.go	/^func twice (in path) (path, path) {$/;"	f	language:Go
+write	logical.go	/^func write() {$/;"	f	language:Go
