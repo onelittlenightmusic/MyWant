@@ -6,8 +6,8 @@ import (
 //	"os";
 )
 
-type tnode struct { time float }
-type qstat struct { out_num int; interval_ave float; interval_var float }
+type tnode struct { time float64 }
+type qstat struct { out_num int; interval_ave float64; interval_var float64 }
 
 func main() {
 //1	fmt.Printf("こんにちは、世界!!\n")

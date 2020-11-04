@@ -6,84 +6,55 @@ import (
 //	"runtime"
 )
 
-type tupple struct {
+type QueuePacketTuple struct {
 	Num int
 	Time float64
 }
-//type tupple chain.Tupple
-func queue(t_ave float64) (func(_, _ chain.Chan)(bool)) {
+
+func (t *QueuePacketTuple) isEnded() bool {
+	return t.Num < 0
+}
+
+type xfunc func(in, out chain.Chan) bool
+
+//type QueuePacketTuple chain.Tupple
+func queue(t_ave float64) (xfunc) {
 	t_buf, t_sum := 0.0, 0.0
 	n_buf := 0
-	return func(in_t, out_t chain.Chan) (fin bool) {
-		t := (<- in_t).(tupple)
-		if t.Num < 0 {
+	return func(in, out chain.Chan) bool {
+		t := (<- in).(QueuePacketTuple)
+		if t.isEnded() {
 			fmt.Printf("[QUEUE STAT] %f [AVERAGE] %f\n", t_ave, t_sum/float64(n_buf))
-			out_t <- t
-			fin = true 
-			return
+			out <- t
+			return true
 		}
 		if t.Time > t_buf { t_buf = t.Time }
 		t_buf += t_ave*float64(rand.ExpFloat64())
-		out_t <- tupple{ t.Num, t_buf }
+		out <- QueuePacketTuple{ t.Num, t_buf }
 		t_sum += t_buf - t.Time
 		n_buf = t.Num
-		fin = false
-		return
+		return false
 	}
 }
-func filter() (func(_, _ chain.Chan)) {
+func filter() (xfunc) {
 	p := 0.5
-	return func(in_t, out_t chain.Chan) {
-		if p >= rand.Float64() { out_t <- <- in_t }
+	return func(in, out chain.Chan) bool {
+		if p >= rand.Float64() { out <- <- in }
+		return true
 	}
-}
-/*
-func async(in chain.Chan) (path) {
-	out := newasyncpath(n)
-	return out
 }
 
-func couple(in, out chain.Chan) {
-	ain := async(in,100)
-	go func() {
-		t, a_buf := 0.0, 0.0
-		recv_cnt:= 0
-		L1 : for {
-			a, b := <- ain.vpath
-			if b {
-				t += a - a_buf
-				a_buf = a
-//				fmt.Printf("couple recv %d %f\n", recv_cnt, a);
-				recv_cnt++
-			} else {
-				t += 3.0*float64(rand.ExpFloat64())
-			}
-//			fmt.Printf("couple send %f\n", t);
-			select {
-			case <- ain.end: break L1
-			case <- out.end: break L1
-			case out.vpath <- t:
-			}
-		}
-		fmt.Printf("closed couple\n")
-		close(in.end)
-		close(out.end)
-	}()
-}
-*/
-func init_func(d float64, i int) (func(_, _ chain.Chan)(bool)) {
+func init_func(d float64, i int) (xfunc) {
 	t, j := 0.0, 0
-	return func(_, in chain.Chan) (fin bool) {
+	return func(_, in chain.Chan) bool {
 		if j++; j >= i {
-			in <- tupple{ -1, 0 }
+			in <- QueuePacketTuple{ -1, 0 }
 			fmt.Printf("[END] generate\n")
-			fin = true
-			return
+			return true
 		}
 		t += d*float64(rand.ExpFloat64())
-		in <- tupple{ j, t }
-		fin = false
-		return
+		in <- QueuePacketTuple{ j, t }
+		return false
 	}
 }
 
@@ -92,18 +63,17 @@ func combine () (func(_, _, _ chain.Chan) (bool)) {
 	t_buf := 0.0
 	close_either := false
 	var in_last, in_other chain.Chan = nil, nil
-	return func(in, in2, out chain.Chan) (fin bool) {
+	return func(in, in2, out chain.Chan) bool {
 		if in_last == nil { in_last, in_other = in, in2 }
-		t := (<- in_last).(tupple)
-		if t.Num < 0 {
+		t := (<- in_last).(QueuePacketTuple)
+		if t.isEnded() {
 			if close_either {
 				out <- t
-				fin = true
-				return
+				return true
 			} else {
 				close_either = true
 				in_last, in_other = in_other, in_last
-				return
+				return false
 			}
 		}
 		if !close_either && t.Time > t_buf {
@@ -113,15 +83,13 @@ func combine () (func(_, _, _ chain.Chan) (bool)) {
 		t.Num = i
 		out <- t
 		i++
-		fin = false
-		return
+		return false
 	}
 }
 
-func end_func (cend chain.Chan) (fin bool) {
-	t := (<- cend).(tupple)
-	fin = t.Num < 0
-	return
+func end_func (cend chain.Chan) bool {
+	t := (<- cend).(QueuePacketTuple)
+	return t.Num < 0
 }
 	
 func main() {

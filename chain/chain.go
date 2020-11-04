@@ -1,15 +1,15 @@
 package chain
 /*
-type Tupple struct {
+type Tuple struct {
 	Num int
 	Rownum int
 	Row[32]int
 }
 */
-//Tupple Interface is the object type which Chain module can deal with
-type Tupple interface{}
+//Tuple Interface is the object type which Chain module can deal with
+type Tuple interface{}
 //Chan is the channel type which Chain module can deal with
-type Chan chan Tupple
+type Chan chan Tuple
 
 //Initializing variances which changed in calling function Chain()
 var (
@@ -38,7 +38,7 @@ func next_end() (func()) {
 type C_chain struct {
 //	start, end func(func(Chan)(bool))
 //	add func(func(_, _ Chan)(bool))
-	In, Ch_start chan Tupple
+	In, Ch_start chan Tuple
 
 }
 func (c *C_chain) Start (f func(Chan)(bool)) {
@@ -46,7 +46,7 @@ func (c *C_chain) Start (f func(Chan)(bool)) {
 		return
 	}
 	start := next_start()
-	c.In = make(chan Tupple)
+	c.In = make(chan Tuple)
 	c.Ch_start = c.In
 	go func(ch1 Chan) {
 		start()
@@ -57,7 +57,7 @@ func (c *C_chain) Add (f func(Chan, Chan)(bool)) {
 	if c.In == nil {
 	//Start
 		start := next_start()
-		c.In = make(chan Tupple)
+		c.In = make(chan Tuple)
 		c.Ch_start = c.In
 		go func(ch1 Chan) {
 			start()
@@ -89,7 +89,7 @@ func Chain()	 ( start_func func(func(Chan)(bool)),
 		add_func func(func(_,_ Chan)(bool)),
 		end_func func(func(Chan)(bool)),
 		get_chan func()(Chan)) {
-	var in, cstart chan Tupple
+	var in, cstart chan Tuple
 	in = nil
 //	defer close(in)
 	start_func = func(f func(Chan)(bool)) {
@@ -97,7 +97,7 @@ func Chain()	 ( start_func func(func(Chan)(bool)),
 			return
 		}
 		start := next_start()
-		in = make(chan Tupple)
+		in = make(chan Tuple)
 		cstart = in
 		go func(ch1 Chan) {
 			start()
