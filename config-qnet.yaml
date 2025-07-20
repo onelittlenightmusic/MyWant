@@ -10,7 +10,7 @@ nodes:
     spec:
       params:
         rate: 3.0
-        count: 100000
+        count: 10000
 
   # Secondary packet generator  
   - metadata:
@@ -23,7 +23,7 @@ nodes:
     spec:
       params:
         rate: 4.0
-        count: 75000
+        count: 7500
 
   # Main queue processing primary stream
   - metadata:
