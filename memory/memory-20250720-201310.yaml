@@ -1,0 +1,32 @@
+timestamp: "2025-07-20T20:13:10+09:00"
+execution_id: exec-20250720-201310
+nodes:
+    - metadata:
+        name: prime-collector
+        type: prime_sink
+        labels:
+            role: sink
+            type: collector
+      spec:
+        params: {}
+      status: running
+    - metadata:
+        name: number-generator
+        type: prime_generator
+        labels:
+            role: source
+            type: numbers
+      spec:
+        params:
+            end: 10
+            start: 2
+      status: completed
+    - metadata:
+        name: prime-filter
+        type: prime_filter
+        labels:
+            role: processor
+            type: filter
+      spec:
+        params: {}
+      status: completed

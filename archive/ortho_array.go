@@ -14,16 +14,16 @@ func double(in, out chan tupple) {
 	for {
 		select {
 		case x := <- in:
-			if x.num<0 { _ = out <- x; break; }
+			if x.num<0 { out <- x; break; }
 			x.rownum++;
 			x.num = n;
 			n++;
 			x.row[x.rownum-1] = 0;
-			_ =  out <- x;
+			out <- x;
 			x.num = n;
 			n++;
 			x.row[x.rownum-1] = 1;
-			_ = out <- x;
+			out <- x;
 		}
 	}
 };
@@ -32,7 +32,7 @@ func plus(in, out chan tupple) {
 	for {
 		select {
 		case x := <- in:
-			if x.num<0 { _ = out <- x; break;}
+			if x.num<0 { out <- x; break;}
 			_row_max := x.rownum -1;
 			for i := 0; i < _row_max; i++ {
 				x.rownum++;

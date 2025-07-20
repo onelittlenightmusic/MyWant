@@ -1,0 +1,85 @@
+timestamp: "2025-07-20T15:31:23+09:00"
+execution_id: exec-20250720-153123
+nodes:
+    - metadata:
+        name: generator
+        type: prime_generator
+        labels:
+            role: source
+      spec:
+        params:
+            end: 100
+            start: 1
+      status: completed
+      state:
+        completion_time: "1752993083"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 0
+            totalwaittime: 0
+    - metadata:
+        name: prime_filter
+        type: prime_filter
+        labels:
+            role: filter
+      spec:
+        params: {}
+      stats:
+        averagewaittime: 0
+        totalprocessed: 100
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1752993083"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 100
+            totalwaittime: 0
+    - metadata:
+        name: sink
+        type: prime_sink
+        labels:
+            role: collector
+      spec:
+        params: {}
+      stats:
+        averagewaittime: 0
+        totalprocessed: 25
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1752993083"
+        count: 25
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 25
+            totalwaittime: 0
+        primes:
+            - 2
+            - 3
+            - 5
+            - 7
+            - 11
+            - 13
+            - 17
+            - 19
+            - 23
+            - 29
+            - 31
+            - 37
+            - 41
+            - 43
+            - 47
+            - 53
+            - 59
+            - 61
+            - 67
+            - 71
+            - 73
+            - 79
+            - 83
+            - 89
+            - 97

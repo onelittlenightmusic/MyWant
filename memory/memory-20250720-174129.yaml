@@ -1,0 +1,158 @@
+timestamp: "2025-07-20T17:41:29+09:00"
+execution_id: exec-20250720-174129
+nodes:
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            role: merger
+            stage: second
+      spec:
+        params: {}
+      stats:
+        averagewaittime: 0
+        totalprocessed: 3498
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 3498
+            totalwaittime: 0
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            path: output
+            role: processor
+            stage: final
+      spec:
+        params:
+            service_time: 0.3
+      stats:
+        averagewaittime: 1.3031071543800783
+        totalprocessed: 1499
+        totalwaittime: 1953.3576244157375
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 1.3031071543800783
+            totalprocessed: 1499
+            totalwaittime: 1953.3576244157375
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: terminal
+            stage: end
+      spec:
+        params: {}
+      stats:
+        averagewaittime: 0
+        totalprocessed: 3498
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 3498
+            totalwaittime: 0
+    - metadata:
+        name: gen-primary
+        type: generator
+        labels:
+            priority: high
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 2000
+            rate: 3
+      stats:
+        averagewaittime: 0
+        totalprocessed: 1999
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 1999
+            totalwaittime: 0
+    - metadata:
+        name: gen-secondary
+        type: generator
+        labels:
+            priority: medium
+            role: source
+            stream: secondary
+      spec:
+        params:
+            count: 1500
+            rate: 4
+      stats:
+        averagewaittime: 0
+        totalprocessed: 1499
+        totalwaittime: 0
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0
+            totalprocessed: 1499
+            totalwaittime: 0
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+      spec:
+        params:
+            service_time: 0.5
+      stats:
+        averagewaittime: 0.5946175631115287
+        totalprocessed: 1999
+        totalwaittime: 1188.640508659946
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0.5946175631115287
+            totalprocessed: 1999
+            totalwaittime: 1188.640508659946
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+      spec:
+        params:
+            service_time: 0.7
+      stats:
+        averagewaittime: 0.7935899021321488
+        totalprocessed: 1499
+        totalwaittime: 1189.591263296091
+      status: completed
+      state:
+        completion_time: "1753000889"
+        execution_completed: true
+        final_stats:
+            averagewaittime: 0.7935899021321488
+            totalprocessed: 1499
+            totalwaittime: 1189.591263296091

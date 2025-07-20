@@ -1,0 +1,76 @@
+timestamp: "2025-07-20T21:13:04+09:00"
+execution_id: exec-20250720-211304
+nodes:
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: sink
+            type: collector
+      spec:
+        params: {}
+      status: running
+    - metadata:
+        name: gen-primary
+        type: dummy-wait-generator
+        labels:
+            role: generator
+            stream: primary
+      spec:
+        params:
+            count: 50
+            rate: 2
+            wait_time: 100
+      status: running
+    - metadata:
+        name: gen-secondary
+        type: dummy-wait-generator
+        labels:
+            role: generator
+            stream: secondary
+      spec:
+        params:
+            count: 40
+            rate: 1.5
+            wait_time: 150
+      status: running
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            role: queue
+            stage: primary
+      spec:
+        params:
+            service_time: 0.5
+      status: completed
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            role: queue
+            stage: secondary
+      spec:
+        params:
+            service_time: 0.7
+      status: completed
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: merge
+            role: combiner
+      spec:
+        params:
+            operation: merge
+      status: completed
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            role: queue
+            stage: final
+      spec:
+        params:
+            service_time: 0.3
+      status: completed

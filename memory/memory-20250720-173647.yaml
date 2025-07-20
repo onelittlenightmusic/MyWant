@@ -1,0 +1,31 @@
+timestamp: "2025-07-20T17:36:47+09:00"
+execution_id: exec-20250720-173647
+nodes:
+    - metadata:
+        name: source
+        type: dummy-wait-generator
+        labels:
+            role: source
+      spec:
+        params:
+            count: 20
+            rate: 0.5
+            wait_time: 500
+      status: failed
+    - metadata:
+        name: processor
+        type: queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.2
+      status: completed
+    - metadata:
+        name: sink
+        type: sink
+        labels:
+            role: sink
+      spec:
+        params: {}
+      status: failed

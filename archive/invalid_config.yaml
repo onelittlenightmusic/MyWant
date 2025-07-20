@@ -1,0 +1,33 @@
+nodes:
+  # Generator
+  - metadata:
+      name: gen-primary
+      type: generator
+      labels:
+        role: source
+    spec:
+      params:
+        rate: 3.0
+        count: 100
+
+  # Invalid combiner with only one input (should fail validation)
+  - metadata:
+      name: combiner-invalid
+      type: combiner
+      labels:
+        role: merger
+    spec:
+      params: {}
+      inputs:
+        - role: source
+
+  # Sink
+  - metadata:
+      name: collector-end
+      type: sink
+      labels:
+        role: terminal
+    spec:
+      params: {}
+      inputs:
+        - role: merger

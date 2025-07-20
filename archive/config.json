@@ -1,0 +1,133 @@
+{
+  "nodes": [
+    {
+      "metadata": {
+        "name": "gen-primary",
+        "type": "generator",
+        "labels": {
+          "role": "primary-source",
+          "priority": "high"
+        }
+      },
+      "spec": {
+        "params": {
+          "rate": 3.0,
+          "count": 1000
+        },
+        "inputs": []
+      }
+    },
+    {
+      "metadata": {
+        "name": "gen-secondary",
+        "type": "generator",
+        "labels": {
+          "role": "secondary-source",
+          "priority": "medium"
+        }
+      },
+      "spec": {
+        "params": {
+          "rate": 4.0,
+          "count": 1000
+        },
+        "inputs": []
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-main-1",
+        "type": "queue",
+        "labels": {
+          "stage": "first",
+          "path": "main"
+        }
+      },
+      "spec": {
+        "params": {
+          "service_time": 0.5
+        },
+        "inputs": [
+          {
+            "role": "primary-source"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-alt-1",
+        "type": "queue",
+        "labels": {
+          "stage": "first",
+          "path": "alt"
+        }
+      },
+      "spec": {
+        "params": {
+          "service_time": 0.7
+        },
+        "inputs": [
+          {
+            "role": "secondary-source"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "combiner-main",
+        "type": "combiner",
+        "labels": {
+          "role": "merger",
+          "operation": "combine"
+        }
+      },
+      "spec": {
+        "params": {},
+        "inputs": [
+          {
+            "stage": "first"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "queue-final",
+        "type": "queue",
+        "labels": {
+          "stage": "final",
+          "role": "output"
+        }
+      },
+      "spec": {
+        "params": {
+          "service_time": 0.3
+        },
+        "inputs": [
+          {
+            "operation": "combine"
+          }
+        ]
+      }
+    },
+    {
+      "metadata": {
+        "name": "collector-end",
+        "type": "collector",
+        "labels": {
+          "role": "sink"
+        }
+      },
+      "spec": {
+        "params": {},
+        "inputs": [
+          {
+            "stage": "final"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+nodes:
+  # Primary generator - produces packets
+  - metadata:
+      name: gen-primary
+      type: generator
+      labels:
+        role: source
+        stream: primary
+        priority: high
+      connectivity:
+        description: "Primary packet generator"
+    spec:
+      params:
+        rate: 2.0
+        count: 5
+      connections:
+        outputs:
+          - selector:
+              role: processor
+              stream: primary
+
+  # Secondary generator - produces packets  
+  - metadata:
+      name: gen-secondary
+      type: generator
+      labels:
+        role: source
+        stream: secondary
+        priority: medium
+      connectivity:
+        description: "Secondary packet generator"
+    spec:
+      params:
+        rate: 1.5
+        count: 4
+      connections:
+        outputs:
+          - selector:
+              role: processor
+              stream: secondary
+
+  # First stage queue - processes primary stream
+  - metadata:
+      name: queue-primary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: primary
+      connectivity:
+        description: "Primary stream processing queue"
+    spec:
+      params:
+        service_time: 0.8
+      connections:
+        inputs:
+          - selector:
+              role: source
+              stream: primary
+        outputs:
+          - selector:
+              role: merger
+              stage: combine
+
+  # Second stage queue - processes secondary stream
+  - metadata:
+      name: queue-secondary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: secondary
+      connectivity:
+        description: "Secondary stream processing queue"
+    spec:
+      params:
+        service_time: 1.2
+      connections:
+        inputs:
+          - selector:
+              role: source
+              stream: secondary
+        outputs:
+          - selector:
+              role: merger
+              stage: combine
+
+  # Stream combiner - merges processed streams
+  - metadata:
+      name: combiner-main
+      type: combiner
+      labels:
+        role: merger
+        stage: combine
+        operation: chronological
+      connectivity:
+        description: "Multi-stream chronological combiner"
+    spec:
+      params: {}
+      connections:
+        inputs:
+          - selector:
+              role: processor
+              stage: first
+        outputs:
+          - selector:
+              role: terminal
+
+  # Final sink - collects all packets
+  - metadata:
+      name: sink-final
+      type: sink
+      labels:
+        role: terminal
+        stage: final
+      connectivity:
+        description: "Final packet collector with statistics"
+    spec:
+      params: {}
+      connections:
+        inputs:
+          - selector:
+              role: merger

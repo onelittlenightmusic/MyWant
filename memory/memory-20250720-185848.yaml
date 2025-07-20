@@ -1,0 +1,32 @@
+timestamp: "2025-07-20T18:58:48+09:00"
+execution_id: exec-20250720-185848
+nodes:
+    - metadata:
+        name: fib-generator
+        type: fibonacci_generator
+        labels:
+            role: source
+            type: fibonacci
+      spec:
+        params:
+            count: 5
+      status: completed
+    - metadata:
+        name: fib-filter
+        type: fibonacci_filter
+        labels:
+            role: processor
+            type: filter
+      spec:
+        params:
+            threshold: 100
+      status: completed
+    - metadata:
+        name: fib-collector
+        type: fibonacci_sink
+        labels:
+            role: sink
+            type: collector
+      spec:
+        params: {}
+      status: failed

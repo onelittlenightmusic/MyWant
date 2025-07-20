@@ -1,0 +1,165 @@
+timestamp: "2025-07-20T14:20:41+09:00"
+execution_id: exec-20250720-142041
+nodes:
+    collector-end:
+        metadata:
+            name: collector-end
+            type: sink
+            labels:
+                role: terminal
+                stage: end
+        spec:
+            params: {}
+        stats:
+            averagewaittime: 0
+            totalprocessed: 3498
+            totalwaittime: 0
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0
+                totalprocessed: 3498
+                totalwaittime: 0
+    combiner-main:
+        metadata:
+            name: combiner-main
+            type: combiner
+            labels:
+                operation: combine
+                role: merger
+                stage: second
+        spec:
+            params: {}
+        stats:
+            averagewaittime: 0
+            totalprocessed: 3498
+            totalwaittime: 0
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0
+                totalprocessed: 3498
+                totalwaittime: 0
+    gen-primary:
+        metadata:
+            name: gen-primary
+            type: generator
+            labels:
+                priority: high
+                role: source
+                stream: primary
+        spec:
+            params:
+                count: 2000
+                rate: 3
+        stats:
+            averagewaittime: 0
+            totalprocessed: 1999
+            totalwaittime: 0
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0
+                totalprocessed: 1999
+                totalwaittime: 0
+    gen-secondary:
+        metadata:
+            name: gen-secondary
+            type: generator
+            labels:
+                priority: medium
+                role: source
+                stream: secondary
+        spec:
+            params:
+                count: 1500
+                rate: 4
+        stats:
+            averagewaittime: 0
+            totalprocessed: 1499
+            totalwaittime: 0
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0
+                totalprocessed: 1499
+                totalwaittime: 0
+    queue-final:
+        metadata:
+            name: queue-final
+            type: queue
+            labels:
+                path: output
+                role: processor
+                stage: final
+        spec:
+            params:
+                service_time: 0.3
+        stats:
+            averagewaittime: 2.2022729888127612
+            totalprocessed: 1999
+            totalwaittime: 4402.34370463671
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 2.2022729888127612
+                totalprocessed: 1999
+                totalwaittime: 4402.34370463671
+    queue-primary:
+        metadata:
+            name: queue-primary
+            type: queue
+            labels:
+                path: main
+                role: processor
+                stage: first
+                stream: primary
+        spec:
+            params:
+                service_time: 0.5
+        stats:
+            averagewaittime: 0.6109364946031721
+            totalprocessed: 1999
+            totalwaittime: 1221.262052711741
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0.6109364946031721
+                totalprocessed: 1999
+                totalwaittime: 1221.262052711741
+    queue-secondary:
+        metadata:
+            name: queue-secondary
+            type: queue
+            labels:
+                path: alt
+                role: processor
+                stage: first
+                stream: secondary
+        spec:
+            params:
+                service_time: 0.7
+        stats:
+            averagewaittime: 0.8976941755419042
+            totalprocessed: 1499
+            totalwaittime: 1345.6435691373144
+        status: completed
+        state:
+            completion_time: "1752988841"
+            execution_completed: true
+            final_stats:
+                averagewaittime: 0.8976941755419042
+                totalprocessed: 1499
+                totalwaittime: 1345.6435691373144

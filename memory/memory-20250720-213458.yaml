@@ -1,0 +1,81 @@
+timestamp: "2025-07-20T21:34:58+09:00"
+execution_id: exec-20250720-213458
+nodes:
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            path: output
+            role: processor
+            stage: final
+      spec:
+        params:
+            service_time: 0.3
+      status: completed
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: terminal
+            stage: end
+      spec:
+        params: {}
+      status: running
+    - metadata:
+        name: gen-primary
+        type: generator
+        labels:
+            priority: high
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 2000
+            rate: 3
+      status: running
+    - metadata:
+        name: gen-secondary
+        type: generator
+        labels:
+            priority: medium
+            role: source
+            stream: secondary
+      spec:
+        params:
+            count: 1500
+            rate: 4
+      status: running
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+      spec:
+        params:
+            service_time: 0.5
+      status: completed
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+      spec:
+        params:
+            service_time: 0.7
+      status: completed
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            role: merger
+            stage: second
+      spec:
+        params: {}
+      status: completed
