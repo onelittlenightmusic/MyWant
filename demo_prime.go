@@ -23,16 +23,7 @@ func main() {
 	// Register prime node types
 	RegisterPrimeNodeTypes(builder)
 
-	fmt.Println("\nBuilding prime sieve chain...")
-	err = builder.Build()
-	if err != nil {
-		fmt.Printf("❌ Build failed: %v\n", err)
-		return
-	}
-	
-	fmt.Println("✅ Build successful!")
-
-	fmt.Println("\nExecuting prime sieve...")
+	fmt.Println("\nExecuting prime sieve with reconcile loop...")
 	builder.Execute()
 
 	fmt.Println("\n📊 Final Node States:")

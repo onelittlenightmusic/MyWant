@@ -23,16 +23,7 @@ func main() {
 	// Register qnet node types
 	RegisterQNetNodeTypes(builder)
 	
-	fmt.Println("\nBuilding chain with validation...")
-	err = builder.Build()
-	if err != nil {
-		fmt.Printf("❌ Build failed: %v\n", err)
-		return
-	}
-	
-	fmt.Println("✅ Validation passed - all connectivity requirements satisfied!")
-	
-	fmt.Println("\nExecuting qnet simulation...")
+	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()
 	
 	fmt.Println("\n📊 Final Node States:")

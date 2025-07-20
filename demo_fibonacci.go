@@ -23,16 +23,7 @@ func main() {
 	// Register fibonacci node types
 	RegisterFibonacciNodeTypes(builder)
 
-	fmt.Println("\nBuilding fibonacci chain...")
-	err = builder.Build()
-	if err != nil {
-		fmt.Printf("❌ Build failed: %v\n", err)
-		return
-	}
-	
-	fmt.Println("✅ Build successful!")
-
-	fmt.Println("\nExecuting fibonacci sequence...")
+	fmt.Println("\nExecuting fibonacci sequence with reconcile loop...")
 	builder.Execute()
 
 	fmt.Println("\n📊 Final Node States:")

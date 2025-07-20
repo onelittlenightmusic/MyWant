@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"gochain/chain"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
+	"crypto/md5"
+	"io"
 	
 	"gopkg.in/yaml.v3"
 )
@@ -231,12 +234,42 @@ func getCurrentTimestamp() int64 {
 // NodeFactory defines the interface for creating node functions
 type NodeFactory func(metadata Metadata, params map[string]interface{}) interface{}
 
-// ChainBuilder builds and executes chains from declarative configuration
+// ChangeEventType represents the type of change detected
+type ChangeEventType string
+
+const (
+	ChangeEventAdd    ChangeEventType = "ADD"
+	ChangeEventUpdate ChangeEventType = "UPDATE"
+	ChangeEventDelete ChangeEventType = "DELETE"
+)
+
+// ChangeEvent represents a configuration change
+type ChangeEvent struct {
+	Type     ChangeEventType
+	NodeName string
+	Node     *Node
+}
+
+// ChainBuilder builds and executes chains from declarative configuration with reconcile loop
 type ChainBuilder struct {
-	config    Config
-	nodes     map[string]*runtimeNode
-	registry  map[string]NodeFactory
-	waitGroup *sync.WaitGroup
+	configPath     string                    // Path to original config file
+	memoryPath     string                    // Path to memory file (watched for changes)
+	nodes          map[string]*runtimeNode   // Runtime node registry
+	registry       map[string]NodeFactory    // Node type factories
+	waitGroup      *sync.WaitGroup           // Execution synchronization
+	config         Config                    // Current configuration
+	
+	// Reconcile loop fields
+	reconcileStop  chan bool                 // Stop signal for reconcile loop
+	reconcileMutex sync.RWMutex             // Protect concurrent access
+	running        bool                      // Execution state
+	lastConfig     Config                    // Last known config state
+	lastConfigHash string                    // Hash of last config for change detection
+	
+	// Path and channel management
+	pathMap        map[string]Paths          // Node path mapping
+	channels       map[string]chain.Chan     // Inter-node channels
+	channelMutex   sync.RWMutex             // Protect channel access
 }
 
 // runtimeNode holds the runtime state of a node
@@ -250,10 +283,23 @@ type runtimeNode struct {
 
 // NewChainBuilder creates a new builder from configuration
 func NewChainBuilder(config Config) *ChainBuilder {
+	builder := NewChainBuilderWithPaths("", "")
+	builder.config = config
+	return builder
+}
+
+// NewChainBuilderWithPaths creates a new builder with config and memory file paths
+func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
-		config:   config,
-		nodes:    make(map[string]*runtimeNode),
-		registry: make(map[string]NodeFactory),
+		configPath:     configPath,
+		memoryPath:     memoryPath,
+		nodes:          make(map[string]*runtimeNode),
+		registry:       make(map[string]NodeFactory),
+		reconcileStop:  make(chan bool),
+		pathMap:        make(map[string]Paths),
+		channels:       make(map[string]chain.Chan),
+		running:        false,
+		waitGroup:      &sync.WaitGroup{},
 	}
 	
 	// Register built-in node types
@@ -379,175 +425,475 @@ func (cb *ChainBuilder) createNodeFunction(node Node) interface{} {
 	return factory(node.Metadata, node.Spec.Params)
 }
 
-// Build constructs the chain network from the configuration
-func (cb *ChainBuilder) Build() error {
-	// First pass: create all nodes
-	for _, nodeConfig := range cb.config.Nodes {
-		// Create the function/node and extract the Node from it
-		nodeFunction := cb.createNodeFunction(nodeConfig)
-		
-		var nodePtr *Node
-		// Try to extract the Node from the created function/object
-		if nodeWithGetNode, ok := nodeFunction.(interface{ GetNode() *Node }); ok {
-			nodePtr = nodeWithGetNode.GetNode()
-		} else {
-			// If we can't extract the Node, create a basic one
-			nodePtr = &Node{
-				Metadata: nodeConfig.Metadata,
-				Spec:     nodeConfig.Spec,
-				Stats:    NodeStats{},
-				Status:   NodeStatusIdle,
-				State:    make(map[string]interface{}),
-			}
-		}
-		
-		runtimeNode := &runtimeNode{
-			metadata: nodeConfig.Metadata,
-			spec:     nodeConfig.Spec,
-			function: nodeFunction,
-			node:     nodePtr,
-		}
-		cb.nodes[nodeConfig.Metadata.Name] = runtimeNode
+// copyConfigToMemory copies the current config to memory file for watching
+func (cb *ChainBuilder) copyConfigToMemory() error {
+	if cb.memoryPath == "" {
+		return nil
 	}
-
-	// Generate paths from label-based connections
-	pathMap := cb.generatePathsFromConnections()
 	
-	// Validate connectivity requirements
-	err := cb.validateConnections(pathMap)
+	// Ensure memory directory exists
+	memoryDir := filepath.Dir(cb.memoryPath)
+	if err := os.MkdirAll(memoryDir, 0755); err != nil {
+		return fmt.Errorf("failed to create memory directory: %w", err)
+	}
+	
+	// Marshal config to YAML
+	data, err := yaml.Marshal(cb.config)
 	if err != nil {
-		return err
-	}
-
-	// Path-based chain building using validated connections
-	// Create channel map for inter-node communication
-	channels := make(map[string]chain.Chan)
-	
-	// Debug: Print pathMap
-	fmt.Println("\n📍 Path Mapping:")
-	for nodeName, paths := range pathMap {
-		fmt.Printf("  %s:\n", nodeName)
-		fmt.Printf("    Inputs: %v\n", paths.In)
-		fmt.Printf("    Outputs: %v\n", paths.Out)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 	
-	// Create channels for each connection in pathMap
-	for _, paths := range pathMap {
-		for _, outputPath := range paths.Out {
-			if outputPath.Active {
-				// Use the path name directly as the channel key
-				channelKey := outputPath.Name
-				channels[channelKey] = make(chain.Chan, 10)
-				fmt.Printf("📡 Created channel: %s\n", channelKey)
-			}
-		}
+	// Write to memory file
+	err = os.WriteFile(cb.memoryPath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write memory file: %w", err)
 	}
 	
-	// Build execution functions for each node with proper input/output channels
-	nodeExecutors := make(map[string]func())
-	
-	for nodeName, node := range cb.nodes {
-		paths := pathMap[nodeName]
-		
-		// Prepare input channels
-		var inputChans []chain.Chan
-		for _, inputPath := range paths.In {
-			if inputPath.Active {
-				// Use the path name directly as the channel key
-				channelKey := inputPath.Name
-				if ch, exists := channels[channelKey]; exists {
-					inputChans = append(inputChans, ch)
-					fmt.Printf("🔗 Found input channel for %s: %s\n", nodeName, channelKey)
-				} else {
-					fmt.Printf("❌ Missing input channel for %s: %s\n", nodeName, channelKey)
-				}
-			}
-		}
-		
-		// Prepare output channels
-		var outputChans []chain.Chan
-		for _, outputPath := range paths.Out {
-			if outputPath.Active {
-				// Use the path name directly as the channel key
-				channelKey := outputPath.Name
-				if ch, exists := channels[channelKey]; exists {
-					outputChans = append(outputChans, ch)
-					fmt.Printf("🔗 Found output channel for %s: %s\n", nodeName, channelKey)
-				} else {
-					fmt.Printf("❌ Missing output channel for %s: %s\n", nodeName, channelKey)
-				}
-			}
-		}
-		
-		// Create executor function for this node
-		if chainNode, ok := node.function.(ChainNode); ok {
-			generalizedFn := chainNode.CreateFunction()
-			// Capture channels in closure to avoid variable scope issues
-			capturedInputs := make([]chain.Chan, len(inputChans))
-			capturedOutputs := make([]chain.Chan, len(outputChans))
-			copy(capturedInputs, inputChans)
-			copy(capturedOutputs, outputChans)
-			
-			nodeExecutors[nodeName] = func() {
-				fmt.Printf("[EXEC] Starting node %s with %d inputs, %d outputs\n", 
-					nodeName, len(capturedInputs), len(capturedOutputs))
-				for {
-					if generalizedFn(capturedInputs, capturedOutputs) {
-						fmt.Printf("[EXEC] Node %s finished\n", nodeName)
-						break
-					}
-				}
-			}
-		}
-	}
-	
-	// Execute all nodes concurrently
-	var wg sync.WaitGroup
-	for nodeName, executor := range nodeExecutors {
-		wg.Add(1)
-		go func(name string, exec func()) {
-			defer wg.Done()
-			fmt.Printf("[STARTING] Node %s\n", name)
-			exec()
-			fmt.Printf("[FINISHED] Node %s\n", name)
-		}(nodeName, executor)
-	}
-	
-	// Store for cleanup
-	cb.waitGroup = &wg
-
 	return nil
 }
 
-// Execute runs the built chain network
-func (cb *ChainBuilder) Execute() {
-	// Set all nodes to running status before execution
-	for _, node := range cb.nodes {
-		node.node.SetStatus(NodeStatusRunning)
+// calculateFileHash calculates MD5 hash of a file
+func (cb *ChainBuilder) calculateFileHash(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
 	}
 	
-	// Wait for all goroutines to complete if using path-based execution
-	if cb.waitGroup != nil {
-		cb.waitGroup.Wait()
-	} else {
-		// Fallback to legacy chain.Run() for backward compatibility
-		chain.Run()
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+// hasMemoryFileChanged checks if memory file has changed
+func (cb *ChainBuilder) hasMemoryFileChanged() bool {
+	if cb.memoryPath == "" {
+		return false
 	}
 	
-	// After execution, mark all nodes as completed if they haven't failed
-	for _, node := range cb.nodes {
-		if node.node.GetStatus() == NodeStatusRunning {
-			node.node.OnProcessEnd(map[string]interface{}{
-				"execution_completed": true,
+	currentHash, err := cb.calculateFileHash(cb.memoryPath)
+	if err != nil {
+		return false
+	}
+	
+	return currentHash != cb.lastConfigHash
+}
+
+// loadMemoryConfig loads configuration from memory file
+func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
+	return loadConfigFromYAML(cb.memoryPath)
+}
+
+// reconcileLoop main reconcile loop that watches for changes
+func (cb *ChainBuilder) reconcileLoop() {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	statsTicker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	defer statsTicker.Stop()
+	
+	for {
+		select {
+		case <-cb.reconcileStop:
+			fmt.Println("[RECONCILE] Stopping reconcile loop")
+			return
+		case <-ticker.C:
+			if cb.hasMemoryFileChanged() {
+				fmt.Println("[RECONCILE] Detected config change")
+				cb.reconcileNodes()
+			}
+		case <-statsTicker.C:
+			cb.writeStatsToMemory()
+		}
+	}
+}
+
+// reconcileNodes performs reconciliation when config changes
+func (cb *ChainBuilder) reconcileNodes() {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+	
+	// Load new config
+	newConfig, err := cb.loadMemoryConfig()
+	if err != nil {
+		fmt.Printf("[RECONCILE] Failed to load memory config: %v\n", err)
+		return
+	}
+	
+	// Detect changes
+	changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
+	if len(changes) == 0 {
+		return
+	}
+	
+	fmt.Printf("[RECONCILE] Applying %d changes\n", len(changes))
+	
+	// Apply changes in reverse dependency order (sink to generator)
+	cb.applyChangesInReverseOrder(changes)
+	
+	// Update last config and hash
+	cb.lastConfig = newConfig
+	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
+}
+
+// detectConfigChanges compares configs and returns change events
+func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
+	var changes []ChangeEvent
+	
+	// Create maps for easier comparison
+	oldNodes := make(map[string]Node)
+	for _, node := range oldConfig.Nodes {
+		oldNodes[node.Metadata.Name] = node
+	}
+	
+	newNodes := make(map[string]Node)
+	for _, node := range newConfig.Nodes {
+		newNodes[node.Metadata.Name] = node
+	}
+	
+	// Find additions and updates
+	for name, newNode := range newNodes {
+		if oldNode, exists := oldNodes[name]; exists {
+			// Check if node changed
+			if !cb.nodesEqual(oldNode, newNode) {
+				changes = append(changes, ChangeEvent{
+					Type:     ChangeEventUpdate,
+					NodeName: name,
+					Node:     &newNode,
+				})
+			}
+		} else {
+			// New node
+			changes = append(changes, ChangeEvent{
+				Type:     ChangeEventAdd,
+				NodeName: name,
+				Node:     &newNode,
 			})
 		}
 	}
 	
-	// Dump all node information to YAML file
+	// Find deletions
+	for name := range oldNodes {
+		if _, exists := newNodes[name]; !exists {
+			changes = append(changes, ChangeEvent{
+				Type:     ChangeEventDelete,
+				NodeName: name,
+				Node:     nil,
+			})
+		}
+	}
+	
+	return changes
+}
+
+// nodesEqual compares two nodes for equality
+func (cb *ChainBuilder) nodesEqual(a, b Node) bool {
+	// Simple comparison - could be enhanced
+	return a.Metadata.Type == b.Metadata.Type &&
+		fmt.Sprintf("%v", a.Spec.Params) == fmt.Sprintf("%v", b.Spec.Params) &&
+		fmt.Sprintf("%v", a.Spec.Inputs) == fmt.Sprintf("%v", b.Spec.Inputs)
+}
+
+// applyChangesInReverseOrder applies changes in sink-to-generator order
+func (cb *ChainBuilder) applyChangesInReverseOrder(changes []ChangeEvent) {
+	// Sort changes by dependency level (sink nodes first)
+	sortedChanges := cb.sortChangesByDependency(changes)
+	
+	for _, change := range sortedChanges {
+		switch change.Type {
+		case ChangeEventAdd:
+			cb.addNode(*change.Node)
+		case ChangeEventUpdate:
+			cb.updateNode(*change.Node)
+		case ChangeEventDelete:
+			cb.deleteNode(change.NodeName)
+		}
+	}
+	
+	// Rebuild connections after all changes
+	cb.rebuildConnections()
+}
+
+// sortChangesByDependency sorts changes by dependency level
+func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeEvent {
+	// Calculate dependency levels for all nodes
+	depLevels := cb.calculateDependencyLevels()
+	
+	// Sort changes by dependency level (higher level = closer to sink)
+	sortedChanges := make([]ChangeEvent, len(changes))
+	copy(sortedChanges, changes)
+	
+	// Simple sort by dependency level
+	for i := 0; i < len(sortedChanges)-1; i++ {
+		for j := i + 1; j < len(sortedChanges); j++ {
+			levelI := depLevels[sortedChanges[i].NodeName]
+			levelJ := depLevels[sortedChanges[j].NodeName]
+			if levelI < levelJ {
+				sortedChanges[i], sortedChanges[j] = sortedChanges[j], sortedChanges[i]
+			}
+		}
+	}
+	
+	return sortedChanges
+}
+
+// calculateDependencyLevels calculates dependency levels for nodes
+func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
+	levels := make(map[string]int)
+	
+	// Simple heuristic: sinks have highest level, generators have lowest
+	for name, node := range cb.nodes {
+		if isSinkNode(node.metadata.Type) {
+			levels[name] = 100
+		} else if node.metadata.Type == "generator" {
+			levels[name] = 1
+		} else {
+			levels[name] = 50 // Middle nodes
+		}
+	}
+	
+	return levels
+}
+
+// addNode adds a new node to the runtime
+func (cb *ChainBuilder) addNode(nodeConfig Node) {
+	fmt.Printf("[RECONCILE] Adding node: %s\n", nodeConfig.Metadata.Name)
+	
+	// Create the function/node
+	nodeFunction := cb.createNodeFunction(nodeConfig)
+	
+	var nodePtr *Node
+	if nodeWithGetNode, ok := nodeFunction.(interface{ GetNode() *Node }); ok {
+		nodePtr = nodeWithGetNode.GetNode()
+	} else {
+		nodePtr = &Node{
+			Metadata: nodeConfig.Metadata,
+			Spec:     nodeConfig.Spec,
+			Stats:    NodeStats{},
+			Status:   NodeStatusIdle,
+			State:    make(map[string]interface{}),
+		}
+	}
+	
+	runtimeNode := &runtimeNode{
+		metadata: nodeConfig.Metadata,
+		spec:     nodeConfig.Spec,
+		function: nodeFunction,
+		node:     nodePtr,
+	}
+	cb.nodes[nodeConfig.Metadata.Name] = runtimeNode
+}
+
+// updateNode updates an existing node
+func (cb *ChainBuilder) updateNode(nodeConfig Node) {
+	fmt.Printf("[RECONCILE] Updating node: %s\n", nodeConfig.Metadata.Name)
+	
+	// For now, delete and recreate
+	cb.deleteNode(nodeConfig.Metadata.Name)
+	cb.addNode(nodeConfig)
+}
+
+// deleteNode removes a node from runtime
+func (cb *ChainBuilder) deleteNode(nodeName string) {
+	fmt.Printf("[RECONCILE] Deleting node: %s\n", nodeName)
+	
+	delete(cb.nodes, nodeName)
+}
+
+// rebuildConnections rebuilds all connections after changes
+func (cb *ChainBuilder) rebuildConnections() {
+	fmt.Println("[RECONCILE] Rebuilding connections")
+	
+	// Generate new paths
+	cb.pathMap = cb.generatePathsFromConnections()
+	
+	// Validate connectivity
+	if err := cb.validateConnections(cb.pathMap); err != nil {
+		fmt.Printf("[RECONCILE] Validation failed: %v\n", err)
+		return
+	}
+	
+	// Rebuild channels
+	cb.channelMutex.Lock()
+	cb.channels = make(map[string]chain.Chan)
+	
+	for _, paths := range cb.pathMap {
+		for _, outputPath := range paths.Out {
+			if outputPath.Active {
+				channelKey := outputPath.Name
+				cb.channels[channelKey] = make(chain.Chan, 10)
+			}
+		}
+	}
+	cb.channelMutex.Unlock()
+	
+	// Start new nodes if system is running
+	if cb.running {
+		cb.startNewNodes()
+	}
+}
+
+// startNewNodes starts newly added nodes
+func (cb *ChainBuilder) startNewNodes() {
+	for nodeName, node := range cb.nodes {
+		if node.node.GetStatus() == NodeStatusIdle {
+			cb.startNode(nodeName, node)
+		}
+	}
+}
+
+// startNode starts a single node
+func (cb *ChainBuilder) startNode(nodeName string, node *runtimeNode) {
+	paths := cb.pathMap[nodeName]
+	
+	// Prepare input channels
+	var inputChans []chain.Chan
+	for _, inputPath := range paths.In {
+		if inputPath.Active {
+			channelKey := inputPath.Name
+			cb.channelMutex.RLock()
+			if ch, exists := cb.channels[channelKey]; exists {
+				inputChans = append(inputChans, ch)
+			}
+			cb.channelMutex.RUnlock()
+		}
+	}
+	
+	// Prepare output channels
+	var outputChans []chain.Chan
+	for _, outputPath := range paths.Out {
+		if outputPath.Active {
+			channelKey := outputPath.Name
+			cb.channelMutex.RLock()
+			if ch, exists := cb.channels[channelKey]; exists {
+				outputChans = append(outputChans, ch)
+			}
+			cb.channelMutex.RUnlock()
+		}
+	}
+	
+	// Start node execution
+	if chainNode, ok := node.function.(ChainNode); ok {
+		generalizedFn := chainNode.CreateFunction()
+		node.node.SetStatus(NodeStatusRunning)
+		
+		cb.waitGroup.Add(1)
+		go func() {
+			defer cb.waitGroup.Done()
+			defer func() {
+				if node.node.GetStatus() == NodeStatusRunning {
+					node.node.SetStatus(NodeStatusCompleted)
+				}
+			}()
+			
+			fmt.Printf("[EXEC] Starting node %s with %d inputs, %d outputs\n", 
+				nodeName, len(inputChans), len(outputChans))
+			
+			for {
+				if generalizedFn(inputChans, outputChans) {
+					fmt.Printf("[EXEC] Node %s finished\n", nodeName)
+					break
+				}
+			}
+		}()
+	}
+}
+
+// writeStatsToMemory writes current stats to memory file
+func (cb *ChainBuilder) writeStatsToMemory() {
+	if cb.memoryPath == "" {
+		return
+	}
+	
+	// Update config with current stats
+	updatedConfig := cb.config
+	for i, node := range updatedConfig.Nodes {
+		if runtimeNode, exists := cb.nodes[node.Metadata.Name]; exists {
+			updatedConfig.Nodes[i].Stats = runtimeNode.node.Stats
+			updatedConfig.Nodes[i].Status = runtimeNode.node.Status
+			updatedConfig.Nodes[i].State = runtimeNode.node.State
+		}
+	}
+	
+	// Write updated config to memory file
+	data, err := yaml.Marshal(updatedConfig)
+	if err != nil {
+		return
+	}
+	
+	os.WriteFile(cb.memoryPath, data, 0644)
+}
+
+// Execute starts the reconcile loop and initial node execution
+func (cb *ChainBuilder) Execute() {
+	fmt.Println("[RECONCILE] Starting reconcile loop execution")
+	
+	// Initialize memory file if configured
+	if cb.memoryPath != "" {
+		if err := cb.copyConfigToMemory(); err != nil {
+			fmt.Printf("Warning: Failed to copy config to memory: %v\n", err)
+		} else {
+			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
+		}
+	}
+	
+	// Set initial config
+	cb.lastConfig = cb.config
+	
+	// Initial build of all nodes
+	cb.buildInitialNodes()
+	
+	// Mark as running
+	cb.reconcileMutex.Lock()
+	cb.running = true
+	cb.reconcileMutex.Unlock()
+	
+	// Start reconcile loop in background
+	go cb.reconcileLoop()
+	
+	// Start all initial nodes
+	for nodeName, node := range cb.nodes {
+		cb.startNode(nodeName, node)
+	}
+	
+	// Wait for all nodes to complete
+	cb.waitGroup.Wait()
+	
+	// Stop reconcile loop
+	cb.reconcileStop <- true
+	
+	// Mark as not running
+	cb.reconcileMutex.Lock()
+	cb.running = false
+	cb.reconcileMutex.Unlock()
+	
+	// Final memory dump - ensure it completes before returning
+	fmt.Println("[RECONCILE] Writing final memory dump...")
 	err := cb.dumpNodeMemoryToYAML()
 	if err != nil {
 		fmt.Printf("Warning: Failed to dump node memory to YAML: %v\n", err)
+	} else {
+		fmt.Println("[RECONCILE] Memory dump completed successfully")
 	}
+	
+	fmt.Println("[RECONCILE] Execution completed")
+}
+
+// buildInitialNodes builds all nodes from initial configuration
+func (cb *ChainBuilder) buildInitialNodes() {
+	fmt.Println("[RECONCILE] Building initial nodes")
+	
+	// Create all nodes
+	for _, nodeConfig := range cb.config.Nodes {
+		cb.addNode(nodeConfig)
+	}
+	
+	// Rebuild connections
+	cb.rebuildConnections()
+	
+	fmt.Printf("[RECONCILE] Built %d initial nodes\n", len(cb.nodes))
 }
 
 // GetNodeState returns the state of a specific node
@@ -592,11 +938,24 @@ type NodeMemoryDump struct {
 	Nodes       []Node `yaml:"nodes"`
 }
 
-// dumpNodeMemoryToYAML dumps all node information to a timestamped YAML file
+// dumpNodeMemoryToYAML dumps all node information to a timestamped YAML file in memory directory
 func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 	// Create timestamp-based filename
 	timestamp := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("memory-%s.yaml", timestamp)
+	
+	// Use memory directory if available
+	var filename string
+	if cb.memoryPath != "" {
+		memoryDir := filepath.Dir(cb.memoryPath)
+		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
+	} else {
+		// Fallback to current directory with memory subdirectory
+		memoryDir := "memory"
+		if err := os.MkdirAll(memoryDir, 0755); err != nil {
+			return fmt.Errorf("failed to create memory directory: %w", err)
+		}
+		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
+	}
 	
 	// Convert node map to slice to match config format
 	nodeStates := cb.GetAllNodeStates()
@@ -618,10 +977,17 @@ func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 		return fmt.Errorf("failed to marshal node memory to YAML: %w", err)
 	}
 	
-	// Write to file
+	// Write to file with explicit sync
 	err = os.WriteFile(filename, data, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write memory dump to file %s: %w", filename, err)
+	}
+	
+	// Ensure file is written to disk by opening and syncing
+	file, err := os.OpenFile(filename, os.O_WRONLY, 0644)
+	if err == nil {
+		file.Sync()
+		file.Close()
 	}
 	
 	fmt.Printf("📝 Node memory dumped to: %s\n", filename)
