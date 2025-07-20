@@ -1,0 +1,33 @@
+nodes:
+  # Prime number generator
+  - metadata:
+      name: generator
+      type: prime_generator
+      labels:
+        role: source
+    spec:
+      params:
+        start: 1
+        end: 100
+
+  # Prime filter that sifts out non-prime numbers
+  - metadata:
+      name: prime_filter
+      type: prime_filter
+      labels:
+        role: filter
+    spec:
+      params: {}
+      inputs:
+        - role: source
+
+  # Sink that collects and displays prime numbers
+  - metadata:
+      name: sink
+      type: prime_sink
+      labels:
+        role: collector
+    spec:
+      params: {}
+      inputs:
+        - role: filter

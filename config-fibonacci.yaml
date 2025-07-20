@@ -1,0 +1,34 @@
+nodes:
+  # Fibonacci sequence generator
+  - metadata:
+      name: generator
+      type: fibonacci_generator
+      labels:
+        role: source
+    spec:
+      params:
+        count: 15
+
+  # Fibonacci filter that filters numbers based on min/max values
+  - metadata:
+      name: filter
+      type: fibonacci_filter
+      labels:
+        role: filter
+    spec:
+      params:
+        min_value: 1
+        max_value: 100
+      inputs:
+        - role: source
+
+  # Sink that collects and displays fibonacci numbers
+  - metadata:
+      name: sink
+      type: fibonacci_sink
+      labels:
+        role: collector
+    spec:
+      params: {}
+      inputs:
+        - role: filter

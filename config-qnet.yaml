@@ -1,0 +1,100 @@
+nodes:
+  # Primary packet generator
+  - metadata:
+      name: gen-primary
+      type: generator
+      labels:
+        role: source
+        stream: primary
+        priority: high
+    spec:
+      params:
+        rate: 3.0
+        count: 2000
+
+  # Secondary packet generator  
+  - metadata:
+      name: gen-secondary
+      type: generator
+      labels:
+        role: source
+        stream: secondary
+        priority: medium
+    spec:
+      params:
+        rate: 4.0
+        count: 1500
+
+  # Main queue processing primary stream
+  - metadata:
+      name: queue-primary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: primary
+        path: main
+    spec:
+      params:
+        service_time: 0.5
+      inputs:
+        - role: source
+          stream: primary
+
+  # Alt queue processing secondary stream
+  - metadata:
+      name: queue-secondary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: secondary
+        path: alt
+    spec:
+      params:
+        service_time: 0.7
+      inputs:
+        - role: source
+          stream: secondary
+
+  # Stream combiner
+  - metadata:
+      name: combiner-main
+      type: combiner
+      labels:
+        role: merger
+        operation: combine
+        stage: second
+    spec:
+      params: {}
+      inputs:
+        - role: processor
+          stage: first
+
+  # Final processing queue
+  - metadata:
+      name: queue-final
+      type: queue
+      labels:
+        role: processor
+        stage: final
+        path: output
+    spec:
+      params:
+        service_time: 0.3
+      inputs:
+        - role: merger
+          operation: combine
+
+  # Final collector
+  - metadata:
+      name: collector-end
+      type: sink
+      labels:
+        role: terminal
+        stage: end
+    spec:
+      params: {}
+      inputs:
+        - role: processor
+          stage: final
