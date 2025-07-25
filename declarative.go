@@ -482,13 +482,25 @@ func (cb *ChainBuilder) hasMemoryFileChanged() bool {
 	return currentHash != cb.lastConfigHash
 }
 
-// loadMemoryConfig loads configuration from memory file
+// loadMemoryConfig loads configuration from memory file or original config
 func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
-	return loadConfigFromYAML(cb.memoryPath)
+	// If memory path is configured and file exists, load from memory
+	if cb.memoryPath != "" {
+		if _, err := os.Stat(cb.memoryPath); err == nil {
+			return loadConfigFromYAML(cb.memoryPath)
+		}
+	}
+	
+	// Otherwise, return the original config
+	return cb.config, nil
 }
 
-// reconcileLoop main reconcile loop that watches for changes
+// reconcileLoop main reconcile loop that handles both initial config load and dynamic changes
 func (cb *ChainBuilder) reconcileLoop() {
+	// Initial configuration load
+	fmt.Println("[RECONCILE] Loading initial configuration")
+	cb.reconcileNodes()
+	
 	ticker := time.NewTicker(100 * time.Millisecond)
 	statsTicker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -510,7 +522,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 	}
 }
 
-// reconcileNodes performs reconciliation when config changes
+// reconcileNodes performs reconciliation when config changes or during initial load
 func (cb *ChainBuilder) reconcileNodes() {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
@@ -522,16 +534,29 @@ func (cb *ChainBuilder) reconcileNodes() {
 		return
 	}
 	
-	// Detect changes
-	changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
-	if len(changes) == 0 {
-		return
+	// Check if this is initial load (no lastConfig set)
+	isInitialLoad := len(cb.lastConfig.Nodes) == 0
+	
+	if isInitialLoad {
+		fmt.Printf("[RECONCILE] Initial load: creating %d nodes\n", len(newConfig.Nodes))
+		// For initial load, treat all nodes as new additions
+		for _, nodeConfig := range newConfig.Nodes {
+			cb.addNode(nodeConfig)
+		}
+		// Rebuild connections after all nodes are created
+		cb.rebuildConnections()
+	} else {
+		// Detect changes for ongoing updates
+		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
+		if len(changes) == 0 {
+			return
+		}
+		
+		fmt.Printf("[RECONCILE] Applying %d changes\n", len(changes))
+		
+		// Apply changes in reverse dependency order (sink to generator)
+		cb.applyChangesInReverseOrder(changes)
 	}
-	
-	fmt.Printf("[RECONCILE] Applying %d changes\n", len(changes))
-	
-	// Apply changes in reverse dependency order (sink to generator)
-	cb.applyChangesInReverseOrder(changes)
 	
 	// Update last config and hash
 	cb.lastConfig = newConfig
@@ -746,6 +771,11 @@ func (cb *ChainBuilder) startNewNodes() {
 
 // startNode starts a single node
 func (cb *ChainBuilder) startNode(nodeName string, node *runtimeNode) {
+	// Check if node is already running or completed to prevent duplicate starts
+	if node.node.GetStatus() == NodeStatusRunning || node.node.GetStatus() == NodeStatusCompleted {
+		return
+	}
+	
 	paths := cb.pathMap[nodeName]
 	
 	// Prepare input channels
@@ -839,19 +869,28 @@ func (cb *ChainBuilder) Execute() {
 		}
 	}
 	
-	// Set initial config
-	cb.lastConfig = cb.config
-	
-	// Initial build of all nodes
-	cb.buildInitialNodes()
+	// Initialize empty lastConfig so reconcileLoop can detect initial load
+	cb.lastConfig = Config{Nodes: []Node{}}
 	
 	// Mark as running
 	cb.reconcileMutex.Lock()
 	cb.running = true
 	cb.reconcileMutex.Unlock()
 	
-	// Start reconcile loop in background
+	// Start reconcile loop in background - it will handle initial node creation
 	go cb.reconcileLoop()
+	
+	// Wait for initial nodes to be created by reconcileLoop
+	for {
+		cb.reconcileMutex.Lock()
+		nodeCount := len(cb.nodes)
+		cb.reconcileMutex.Unlock()
+		
+		if nodeCount > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	
 	// Start all initial nodes
 	for nodeName, node := range cb.nodes {
@@ -881,20 +920,6 @@ func (cb *ChainBuilder) Execute() {
 	fmt.Println("[RECONCILE] Execution completed")
 }
 
-// buildInitialNodes builds all nodes from initial configuration
-func (cb *ChainBuilder) buildInitialNodes() {
-	fmt.Println("[RECONCILE] Building initial nodes")
-	
-	// Create all nodes
-	for _, nodeConfig := range cb.config.Nodes {
-		cb.addNode(nodeConfig)
-	}
-	
-	// Rebuild connections
-	cb.rebuildConnections()
-	
-	fmt.Printf("[RECONCILE] Built %d initial nodes\n", len(cb.nodes))
-}
 
 // GetNodeState returns the state of a specific node
 func (cb *ChainBuilder) GetNodeState(nodeName string) (*Node, bool) {

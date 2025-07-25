@@ -1,0 +1,58 @@
+nodes:
+  # Seed generator provides initial fibonacci values (0, 1)
+  - metadata:
+      name: seed-generator
+      type: seed_generator
+      labels:
+        role: source
+        stage: initial
+        component: seed
+    spec:
+      params:
+        max_count: 20
+
+  # Fibonacci computer calculates next fibonacci numbers
+  - metadata:
+      name: fibonacci-computer
+      type: fibonacci_computer
+      labels:
+        role: processor
+        stage: computation
+        component: calculator
+    spec:
+      params: {}
+      inputs:
+        - role: merger
+          stage: combine
+          stream: fibonacci
+
+  # Merger combines seed values with computed values creating feedback loop
+  - metadata:
+      name: fibonacci-merger
+      type: fibonacci_merger
+      labels:
+        role: merger
+        stage: combine
+        stream: fibonacci
+    spec:
+      params: {}
+      inputs:
+        - role: source
+          stage: initial
+        - role: processor
+          stage: computation
+
+  # Sink collects and displays the complete fibonacci sequence
+  - metadata:
+      name: fibonacci-sink
+      type: fibonacci_sink
+      labels:
+        role: terminal
+        stage: output
+        component: display
+    spec:
+      params: {}
+      inputs:
+        - role: merger
+          stage: combine
+          stream: fibonacci
