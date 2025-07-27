@@ -7,8 +7,8 @@ nodes:
         category: display
     spec:
       params:
-        max_display: 1000
-  # Sink node (parent) - displays number array from 0 to 999
+        max_display: 100
+  # Sink node (child) - displays number array from 0 to 99
   - metadata:
       name: number-sink
       type: sink
@@ -24,7 +24,8 @@ nodes:
     spec:
       params:
         display_format: "Number: %d"
-        max_display: 1000
+      inputs:
+        - role: processor  # Gets input from queue
 
   # Generator node (child) - generates numbers from 0 to 999
   # Uses ownerReference pointing to the sink node (similar to Kubernetes Pod ownership)
@@ -43,12 +44,9 @@ nodes:
           blockOwnerDeletion: true
     spec:
       params:
-        start: 0
-        end: 50
+        count: 100
         rate: 10.0
-      # Using outputs field for output-based channel connection
-      outputs:
-        - role: collector  # Points to sink node by label selector
+      # Generator is a source node - no inputs needed
 
   # Additional example: Queue node owned by generator
   - metadata:
@@ -70,6 +68,3 @@ nodes:
       # Using inputs field for input-based channel connection
       inputs:
         - category: producer  # Gets input from generator
-      # Using outputs field for output-based channel connection  
-      outputs:
-        - role: collector  # Sends processed output to sink

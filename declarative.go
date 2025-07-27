@@ -56,11 +56,21 @@ func isSinkNode(nodeType string) bool {
 	return false
 }
 
+// OwnerReference represents a reference to an owner object
+type OwnerReference struct {
+	APIVersion          string `json:"apiVersion" yaml:"apiVersion"`
+	Kind                string `json:"kind" yaml:"kind"`
+	Name                string `json:"name" yaml:"name"`
+	Controller          bool   `json:"controller,omitempty" yaml:"controller,omitempty"`
+	BlockOwnerDeletion  bool   `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
+}
+
 // Metadata contains node identification and classification info
 type Metadata struct {
-	Name   string            `json:"name" yaml:"name"`
-	Type   string            `json:"type" yaml:"type"`
-	Labels map[string]string `json:"labels" yaml:"labels"`
+	Name            string            `json:"name" yaml:"name"`
+	Type            string            `json:"type" yaml:"type"`
+	Labels          map[string]string `json:"labels" yaml:"labels"`
+	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 }
 
 // NodeSpec contains the desired state configuration for a node
@@ -248,6 +258,11 @@ type ChangeEvent struct {
 	Type     ChangeEventType
 	NodeName string
 	Node     *Node
+}
+
+// ParentNotifier interface for nodes that can receive child completion notifications
+type ParentNotifier interface {
+	NotifyChildrenComplete()
 }
 
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop
@@ -824,6 +839,10 @@ func (cb *ChainBuilder) startNode(nodeName string, node *runtimeNode) {
 			for {
 				if generalizedFn(inputChans, outputChans) {
 					fmt.Printf("[EXEC] Node %s finished\n", nodeName)
+					
+					// Check if this node completion should notify parent targets
+					cb.notifyParentTargetsOfChildCompletion(nodeName)
+					
 					break
 				}
 			}
@@ -854,6 +873,9 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	}
 	
 	os.WriteFile(cb.memoryPath, data, 0644)
+	
+	// Update lastConfigHash to prevent stats updates from triggering reconciliation
+	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 }
 
 // Execute starts the reconcile loop and initial node execution
@@ -939,6 +961,11 @@ func (cb *ChainBuilder) GetAllNodeStates() map[string]*Node {
 	return states
 }
 
+// SetMemoryPath sets the memory file path for snapshots
+func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
+	cb.memoryPath = memoryPath
+}
+
 // loadConfigFromYAML loads configuration from a YAML file
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config
@@ -1017,4 +1044,67 @@ func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 	
 	fmt.Printf("📝 Node memory dumped to: %s\n", filename)
 	return nil
+}
+
+// notifyParentTargetsOfChildCompletion checks if a completed node has owner references
+// and notifies parent Target nodes when all their children have completed
+func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedNodeName string) {
+	// Find the config node for this completed node
+	var completedNodeConfig *Node
+	for _, nodeConfig := range cb.config.Nodes {
+		if nodeConfig.Metadata.Name == completedNodeName {
+			completedNodeConfig = &nodeConfig
+			break
+		}
+	}
+	
+	if completedNodeConfig == nil || len(completedNodeConfig.Metadata.OwnerReferences) == 0 {
+		return // No owner references
+	}
+	
+	// For each owner reference, check if all siblings are complete
+	for _, ownerRef := range completedNodeConfig.Metadata.OwnerReferences {
+		parentName := ownerRef.Name
+		
+		// Check if parent is a Target node
+		parentRuntimeNode, exists := cb.nodes[parentName]
+		if !exists {
+			continue
+		}
+		
+		// Check if it implements child completion notification
+		if notifier, ok := parentRuntimeNode.function.(ParentNotifier); ok {
+			// Find all child nodes with this parent
+			allChildrenComplete := true
+			for _, nodeConfig := range cb.config.Nodes {
+				if nodeConfig.Metadata.Name == parentName {
+					continue // Skip the parent itself
+				}
+				
+				// Check if this node has ownerRef to this parent
+				hasOwnerRef := false
+				for _, childOwnerRef := range nodeConfig.Metadata.OwnerReferences {
+					if childOwnerRef.Name == parentName {
+						hasOwnerRef = true
+						break
+					}
+				}
+				
+				if hasOwnerRef {
+					// This is a child - check if it's completed
+					if childRuntimeNode, exists := cb.nodes[nodeConfig.Metadata.Name]; exists {
+						if childRuntimeNode.node.GetStatus() != NodeStatusCompleted {
+							allChildrenComplete = false
+							break
+						}
+					}
+				}
+			}
+			
+			if allChildrenComplete {
+				fmt.Printf("🎯 All children of target %s have completed, notifying...\n", parentName)
+				notifier.NotifyChildrenComplete()
+			}
+		}
+	}
 }
