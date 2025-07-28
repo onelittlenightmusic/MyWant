@@ -15,11 +15,6 @@ run-fibonacci-loop:
 run-sample-owner:
 	go run demo_qnet_owner.go declarative.go owner_types.go qnet_types.go
 
-prime:
-	go run prime.go declarative.go
-
-fibonacci:
-	go run fibonacci.go declarative.go
 clean:
 	rm -f qnet
 

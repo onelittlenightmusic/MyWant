@@ -556,7 +556,7 @@ func (cb *ChainBuilder) reconcileNodes() {
 		fmt.Printf("[RECONCILE] Initial load: creating %d nodes\n", len(newConfig.Nodes))
 		// For initial load, treat all nodes as new additions
 		for _, nodeConfig := range newConfig.Nodes {
-			cb.addNode(nodeConfig)
+			cb.addDynamicNodeUnsafe(nodeConfig)
 		}
 		// Rebuild connections after all nodes are created
 		cb.rebuildConnections()
@@ -644,7 +644,7 @@ func (cb *ChainBuilder) applyChangesInReverseOrder(changes []ChangeEvent) {
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			cb.addNode(*change.Node)
+			cb.addDynamicNodeUnsafe(*change.Node)
 		case ChangeEventUpdate:
 			cb.updateNode(*change.Node)
 		case ChangeEventDelete:
@@ -697,7 +697,7 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 	return levels
 }
 
-// addNode adds a new node to the runtime
+// addNode adds a new node to the runtime (private method)
 func (cb *ChainBuilder) addNode(nodeConfig Node) {
 	fmt.Printf("[RECONCILE] Adding node: %s\n", nodeConfig.Metadata.Name)
 	
@@ -732,7 +732,7 @@ func (cb *ChainBuilder) updateNode(nodeConfig Node) {
 	
 	// For now, delete and recreate
 	cb.deleteNode(nodeConfig.Metadata.Name)
-	cb.addNode(nodeConfig)
+	cb.addDynamicNodeUnsafe(nodeConfig)
 }
 
 // deleteNode removes a node from runtime
@@ -970,7 +970,11 @@ func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
 func (cb *ChainBuilder) AddDynamicNode(node Node) {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
-	
+	cb.addDynamicNodeUnsafe(node)
+}
+
+// addDynamicNodeUnsafe adds a node without acquiring the mutex (internal use)
+func (cb *ChainBuilder) addDynamicNodeUnsafe(node Node) {
 	// Add node to the configuration
 	cb.config.Nodes = append(cb.config.Nodes, node)
 	
