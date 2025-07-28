@@ -17,7 +17,7 @@ func main() {
 	
 	start := time.Now()
 	
-	generator := NewGenerator(map[string]interface{}{
+	generator := PacketSequence(map[string]interface{}{
 		"rate":  2.0,
 		"count": 1000,
 	})
@@ -26,7 +26,7 @@ func main() {
 		"service_time": 0.5,
 	})
 	
-	sink := NewSink(map[string]interface{}{})
+	sink := Goal(map[string]interface{}{})
 	
 	ch := chain.C_chain{}
 	ch.Add(generator.CreateFunction())

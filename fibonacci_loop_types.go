@@ -190,7 +190,20 @@ func (c *FibonacciComputer) CreateFunction() func(inputs []chain.Chan, outputs [
 		if seed.IsEnd {
 			maxCount = seed.Value
 			fmt.Printf("[COMPUTER] Received max count: %d\n", maxCount)
-			return false
+			// After getting max count, start computing all remaining fibonacci numbers
+			for position < maxCount {
+				next := prev + current
+				out <- FibonacciSeed{Value: next, Position: position, IsEnd: false}
+				prev = current
+				current = next
+				position++
+				processed++
+			}
+			// Send end signal
+			out <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
+			c.Stats.TotalProcessed = processed
+			fmt.Printf("[COMPUTER] Computed %d fibonacci numbers\n", processed)
+			return true
 		}
 		
 		// Initialize with first two seeds
@@ -201,34 +214,8 @@ func (c *FibonacciComputer) CreateFunction() func(inputs []chain.Chan, outputs [
 			} else if seed.Position == 1 {
 				current = seed.Value
 				initialized = true
-				// Start computing immediately after receiving both seeds
-				if position < maxCount {
-					next := prev + current
-					out <- FibonacciSeed{Value: next, Position: position, IsEnd: false}
-					prev = current
-					current = next
-					position++
-					processed++
-				}
 				return false
 			}
-		}
-		
-		// Continue computing based on feedback (seed.Value is the previous computed value)
-		if seed.Position >= 0 && position < maxCount {
-			next := prev + current  // Use stored prev and current, not the feedback value
-			out <- FibonacciSeed{Value: next, Position: position, IsEnd: false}
-			
-			prev = current
-			current = next
-			position++
-			processed++
-		} else if position >= maxCount {
-			// Send end signal
-			out <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
-			c.Stats.TotalProcessed = processed
-			fmt.Printf("[COMPUTER] Computed %d fibonacci numbers\n", processed)
-			return true
 		}
 		
 		return false
@@ -314,7 +301,7 @@ func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []c
 		computerOut := outputs[0] // To fibonacci computer
 		sinkOut := outputs[1]     // To sink
 		
-		// First, handle seed input (non-blocking check)
+		// Handle both inputs with blocking select
 		select {
 		case seed := <-seedIn:
 			fibSeed := seed.(FibonacciSeed)
@@ -330,27 +317,15 @@ func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []c
 				sinkOut <- fibSeed      // Send to sink for display
 				processed++
 			}
-			return false
-		default:
-			// No seed data, continue to check computed input
-		}
-		
-		// Then handle computed input (blocking if no seed data)
-		if !seedInputClosed || !computedInputClosed {
-			select {
-			case computed := <-computedIn:
-				fibSeed := computed.(FibonacciSeed)
-				if fibSeed.IsEnd {
-					computedInputClosed = true
-				} else {
-					computerOut <- fibSeed  // Feedback to computer
-					sinkOut <- fibSeed      // Send to sink for display
-					processed++
-				}
-				return false
-			default:
-				// No computed data available
-				return false
+			
+		case computed := <-computedIn:
+			fibSeed := computed.(FibonacciSeed)
+			if fibSeed.IsEnd {
+				computedInputClosed = true
+			} else {
+				// Send computed values to sink for display
+				sinkOut <- fibSeed
+				processed++
 			}
 		}
 		

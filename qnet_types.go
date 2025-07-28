@@ -25,8 +25,8 @@ type Generator struct {
 	paths Paths
 }
 
-// NewGenerator creates a new generator node
-func NewGenerator(metadata Metadata, params map[string]interface{}) *Generator {
+// PacketSequence creates a new generator node
+func PacketSequence(metadata Metadata, params map[string]interface{}) *Generator {
 	gen := &Generator{
 		Node: Node{
 			Metadata: metadata,
@@ -419,8 +419,8 @@ type Sink struct {
 	paths    Paths
 }
 
-// NewSink creates a new sink node
-func NewSink(metadata Metadata, params map[string]interface{}) *Sink {
+// Goal creates a new sink node
+func Goal(metadata Metadata, params map[string]interface{}) *Sink {
 	return &Sink{
 		Node: Node{
 			Metadata: metadata,
@@ -507,7 +507,7 @@ func (s *Sink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) 
 func RegisterQNetNodeTypes(builder *ChainBuilder) {
 	// Register generator type - return the enhanced node itself for validation
 	builder.RegisterNodeType("generator", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewGenerator(metadata, params)
+		return PacketSequence(metadata, params)
 	})
 	
 	// Register queue type - return the enhanced node itself for validation
@@ -522,12 +522,12 @@ func RegisterQNetNodeTypes(builder *ChainBuilder) {
 	
 	// Register sink type - return the enhanced node itself for validation
 	builder.RegisterNodeType("sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewSink(metadata, params)
+		return Goal(metadata, params)
 	})
 	
 	// Register collector type (alias for sink) - return the enhanced node itself for validation
 	builder.RegisterNodeType("collector", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewSink(metadata, params)
+		return Goal(metadata, params)
 	})
 }
 
