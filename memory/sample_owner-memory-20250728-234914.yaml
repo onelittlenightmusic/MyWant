@@ -1,0 +1,62 @@
+nodes:
+    - metadata:
+        name: number-target
+        type: target
+        labels:
+            category: display
+            owner: parent
+      spec:
+        params:
+            max_display: 100
+    - metadata:
+        name: number-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        inputs:
+            - role: processor
+    - metadata:
+        name: number-generator
+        type: sequence
+        labels:
+            category: producer
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 100
+            rate: 10
+    - metadata:
+        name: number-queue
+        type: queue
+        labels:
+            category: queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: 0.1
+        inputs:
+            - category: producer

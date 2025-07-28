@@ -134,7 +134,7 @@ func Sink() func(chain.Chan) bool {
 
 // Register all simple node types
 func RegisterSimpleQNetNodeTypes(builder *ChainBuilder) {
-	builder.RegisterNodeType("generator", func(params map[string]interface{}) interface{} {
+	builder.RegisterNodeType("sequence", func(params map[string]interface{}) interface{} {
 		rate := params["rate"].(float64)
 		// Handle both int and float64 for count
 		var count int

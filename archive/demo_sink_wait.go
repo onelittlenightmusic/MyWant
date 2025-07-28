@@ -15,7 +15,7 @@ func main() {
 			{
 				Metadata: Metadata{
 					Name: "fast-generator",
-					Type: "generator",
+					Type: "sequence",
 					Labels: map[string]string{
 						"role": "source",
 					},

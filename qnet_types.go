@@ -68,7 +68,7 @@ func (g *Generator) GetConnectivityMetadata() ConnectivityMetadata {
 		RequiredOutputs: 1, // Must have at least one output
 		MaxInputs:       0, // No inputs allowed
 		MaxOutputs:      -1, // Unlimited outputs
-		NodeType:        "generator",
+		NodeType:        "sequence",
 		Description:     "Packet generator node",
 	}
 }
@@ -90,7 +90,7 @@ func (g *Generator) Process(paths Paths) bool {
 
 // GetType returns the node type
 func (g *Generator) GetType() string {
-	return "generator"
+	return "sequence"
 }
 
 // GetNode returns the embedded Node
@@ -506,7 +506,7 @@ func (s *Sink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) 
 // RegisterQNetNodeTypes registers the qnet-specific node types with a ChainBuilder
 func RegisterQNetNodeTypes(builder *ChainBuilder) {
 	// Register generator type - return the enhanced node itself for validation
-	builder.RegisterNodeType("generator", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterNodeType("sequence", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return PacketSequence(metadata, params)
 	})
 	

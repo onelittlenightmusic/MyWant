@@ -56,7 +56,7 @@ func (t *Target) CreateChildNodes() []Node {
 	generatorNode := Node{
 		Metadata: Metadata{
 			Name: "number-generator",
-			Type: "generator",
+			Type: "sequence",
 			Labels: map[string]string{
 				"role":     "source",
 				"owner":    "child",
@@ -267,8 +267,8 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	})
 	
 	// Override all node types to use OwnerAwareNode wrapper for nodes with owner references
-	originalGeneratorFactory := builder.registry["generator"]
-	builder.RegisterNodeType("generator", func(metadata Metadata, params map[string]interface{}) interface{} {
+	originalGeneratorFactory := builder.registry["sequence"]
+	builder.RegisterNodeType("sequence", func(metadata Metadata, params map[string]interface{}) interface{} {
 		baseNode := originalGeneratorFactory(metadata, params)
 		if len(metadata.OwnerReferences) > 0 {
 			return NewOwnerAwareNode(baseNode, metadata)

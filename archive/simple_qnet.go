@@ -21,7 +21,7 @@ func (p *QueuePacket) isEnded() bool {
 type NodeType string
 
 const (
-	GeneratorNode NodeType = "generator"
+	GeneratorNode NodeType = "sequence"
 	QueueNode     NodeType = "queue"
 	SinkNode      NodeType = "sink"
 )

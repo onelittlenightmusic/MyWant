@@ -25,7 +25,7 @@ func main() {
 			Name: "gen-primary",
 			Type: "dummy-wait-generator",
 			Labels: map[string]string{
-				"role":   "generator",
+				"role":   "sequence",
 				"stream": "primary",
 			},
 		},
@@ -54,7 +54,7 @@ func main() {
 			Name: "gen-secondary",
 			Type: "dummy-wait-generator",
 			Labels: map[string]string{
-				"role":   "generator",
+				"role":   "sequence",
 				"stream": "secondary",
 			},
 		},

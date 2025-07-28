@@ -2,7 +2,7 @@ nodes:
   # Two generators
   - metadata:
       name: gen1
-      type: generator
+      type: sequence
       labels:
         role: source1
     spec:
@@ -12,7 +12,7 @@ nodes:
 
   - metadata:
       name: gen2
-      type: generator
+      type: sequence
       labels:
         role: source2
     spec:

@@ -2,7 +2,7 @@ nodes:
   # Primary generator - produces packets
   - metadata:
       name: gen-primary
-      type: generator
+      type: sequence
       labels:
         role: source
         stream: primary
@@ -22,7 +22,7 @@ nodes:
   # Secondary generator - produces packets  
   - metadata:
       name: gen-secondary
-      type: generator
+      type: sequence
       labels:
         role: source
         stream: secondary

@@ -12,7 +12,7 @@ nodes:
       status: failed
     - metadata:
         name: gen-primary
-        type: generator
+        type: sequence
         labels:
             role: generator
             stream: primary
@@ -23,7 +23,7 @@ nodes:
       status: completed
     - metadata:
         name: gen-secondary
-        type: generator
+        type: sequence
         labels:
             role: generator
             stream: secondary

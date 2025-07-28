@@ -23,7 +23,7 @@ nodes:
             totalwaittime: 0
     - metadata:
         name: gen-primary
-        type: generator
+        type: sequence
         labels:
             priority: high
             role: source
@@ -46,7 +46,7 @@ nodes:
             totalwaittime: 0
     - metadata:
         name: gen-secondary
-        type: generator
+        type: sequence
         labels:
             priority: medium
             role: source

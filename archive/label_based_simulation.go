@@ -33,7 +33,7 @@ func main() {
 	builder := NewChainBuilder(config)
 	
 	// Register node factories with proper parameter handling
-	builder.RegisterNodeType("generator", func(params map[string]interface{}) interface{} {
+	builder.RegisterNodeType("sequence", func(params map[string]interface{}) interface{} {
 		rate := 1.0
 		count := 5
 		

@@ -3,7 +3,7 @@ execution_id: exec-20250720-151205
 nodes:
     - metadata:
         name: gen-source
-        type: generator
+        type: sequence
         labels:
             role: source
       spec:

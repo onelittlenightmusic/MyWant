@@ -13,7 +13,7 @@ var (
 		RequiredOutputs: 0,
 		MaxInputs:       0,
 		MaxOutputs:      1,
-		NodeType:        "generator",
+		NodeType:        "sequence",
 		Description:     "Generates packets at specified rate",
 	}
 	
@@ -79,7 +79,7 @@ func ValidateConnectivity(node EnhancedBaseNode, inCount, outCount int) error {
 // GetNodeConnectivityInfo returns connectivity info for a given node type
 func GetNodeConnectivityInfo(nodeType string) (ConnectivityMetadata, error) {
 	switch nodeType {
-	case "generator":
+	case "sequence":
 		return GeneratorConnectivity, nil
 	case "queue":
 		return QueueConnectivity, nil
@@ -110,7 +110,7 @@ type EnhancedGeneratorNode struct {
 }
 
 func (g *EnhancedGeneratorNode) GetType() string {
-	return "generator"
+	return "sequence"
 }
 
 func (g *EnhancedGeneratorNode) GetConnectivityMetadata() ConnectivityMetadata {

@@ -50,7 +50,7 @@ func createGeneratorNode(name string, count int, rate float64) *DynamicNode {
 		return nil
 	}
 	
-	node := NewDynamicNode(name, "generator", processFunc)
+	node := NewDynamicNode(name, "sequence", processFunc)
 	node.AddOutputChannel("out", 50) // Buffer capacity of 50
 	return node
 }

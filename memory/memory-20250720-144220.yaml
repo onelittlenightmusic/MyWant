@@ -3,7 +3,7 @@ execution_id: exec-20250720-144220
 nodes:
     - metadata:
         name: gen-primary
-        type: generator
+        type: sequence
         labels:
             role: source
             stream: primary

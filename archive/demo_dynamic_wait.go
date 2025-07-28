@@ -15,7 +15,7 @@ func main() {
 			{
 				Metadata: Metadata{
 					Name: "gen-patient",
-					Type: "generator",
+					Type: "sequence",
 					Labels: map[string]string{
 						"role": "source",
 						"mode": "patient", // Special mode that waits

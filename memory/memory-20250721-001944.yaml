@@ -3,7 +3,7 @@ execution_id: exec-20250721-001944
 nodes:
     - metadata:
         name: gen-primary
-        type: generator
+        type: sequence
         labels:
             priority: high
             role: source
@@ -19,7 +19,7 @@ nodes:
       status: completed
     - metadata:
         name: gen-secondary
-        type: generator
+        type: sequence
         labels:
             priority: medium
             role: source

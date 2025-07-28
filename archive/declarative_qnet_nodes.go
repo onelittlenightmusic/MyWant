@@ -31,7 +31,7 @@ type GeneratorNode struct {
 }
 
 func (g *GeneratorNode) GetType() string {
-	return "generator"
+	return "sequence"
 }
 
 func (g *GeneratorNode) GetStats() map[string]interface{} {
@@ -256,7 +256,7 @@ func CombinerToChainFunc(combiner *CombinerNode) func(chain.Chan, chain.Chan, ch
 
 // Register node-based types with the chain builder
 func RegisterNodeBasedQNetTypes(builder *ChainBuilder) {
-	builder.RegisterNodeType("generator", func(params map[string]interface{}) interface{} {
+	builder.RegisterNodeType("sequence", func(params map[string]interface{}) interface{} {
 		rate := params["rate"].(float64)
 		var count int
 		switch v := params["count"].(type) {

@@ -51,7 +51,7 @@ func main() {
 	sourceNode := Node{
 		Metadata: Metadata{
 			Name: "data-provider",
-			Type: "generator",
+			Type: "sequence",
 			Labels: map[string]string{
 				"role": "source",
 			},

@@ -410,7 +410,7 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
 			}
 			
 			// Check required outputs - modified to not require outputs for generators
-			if meta.NodeType != "generator" && outCount < meta.RequiredOutputs {
+			if meta.NodeType != "sequence" && outCount < meta.RequiredOutputs {
 				return fmt.Errorf("validation failed for node %s: node %s requires %d outputs, got %d", 
 					nodeName, meta.NodeType, meta.RequiredOutputs, outCount)
 			}
@@ -687,7 +687,7 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 	for name, node := range cb.nodes {
 		if isSinkNode(node.metadata.Type) {
 			levels[name] = 100
-		} else if node.metadata.Type == "generator" {
+		} else if node.metadata.Type == "sequence" {
 			levels[name] = 1
 		} else {
 			levels[name] = 50 // Middle nodes

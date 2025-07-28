@@ -12,7 +12,7 @@ nodes:
       status: running
     - metadata:
         name: gen-primary
-        type: generator
+        type: sequence
         labels:
             priority: high
             role: source
@@ -24,7 +24,7 @@ nodes:
       status: running
     - metadata:
         name: gen-secondary
-        type: generator
+        type: sequence
         labels:
             priority: medium
             role: source

@@ -1,7 +1,7 @@
 nodes:
   - metadata:
       name: gen
-      type: generator
+      type: sequence
       labels:
         role: source
     spec:

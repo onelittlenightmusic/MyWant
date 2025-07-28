@@ -2,7 +2,7 @@ nodes:
   # Generator
   - metadata:
       name: gen-primary
-      type: generator
+      type: sequence
       labels:
         role: source
     spec:

@@ -1,7 +1,7 @@
 nodes:
   - metadata:
       name: gen-primary
-      type: generator
+      type: sequence
       labels:
         role: primary-source
         priority: high
@@ -12,7 +12,7 @@ nodes:
 
   - metadata:
       name: gen-secondary
-      type: generator
+      type: sequence
       labels:
         role: secondary-source
         priority: medium

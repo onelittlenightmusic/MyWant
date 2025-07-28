@@ -16,7 +16,7 @@ func main() {
 			{
 				Metadata: Metadata{
 					Name: "gen-test",
-					Type: "generator",
+					Type: "sequence",
 					Labels: map[string]string{
 						"role": "source",
 					},

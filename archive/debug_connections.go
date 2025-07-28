@@ -50,7 +50,7 @@ func main() {
 	builder := NewChainBuilder(config)
 	
 	// Simple factories that just create the objects without using params yet
-	builder.RegisterNodeType("generator", func(params map[string]interface{}) interface{} {
+	builder.RegisterNodeType("sequence", func(params map[string]interface{}) interface{} {
 		return CreateEnhancedGeneratorNode(1.0, 5)
 	})
 	

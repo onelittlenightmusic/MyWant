@@ -11,7 +11,7 @@ nodes:
       status: failed
     - metadata:
         name: data-provider
-        type: generator
+        type: sequence
         labels:
             role: source
       spec:

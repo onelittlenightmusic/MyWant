@@ -12,7 +12,7 @@ func main() {
 	fmt.Println("\n1. DOMAIN-SPECIFIC CONNECTIVITY DEFINITIONS:")
 	fmt.Println("============================================")
 	
-	nodeTypes := []string{"generator", "queue", "combiner", "sink"}
+	nodeTypes := []string{"sequence", "queue", "combiner", "sink"}
 	
 	for _, nodeType := range nodeTypes {
 		if meta, err := GetNodeConnectivityInfo(nodeType); err == nil {

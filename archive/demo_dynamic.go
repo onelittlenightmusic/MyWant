@@ -15,7 +15,7 @@ func main() {
 			{
 				Metadata: Metadata{
 					Name: "gen-primary",
-					Type: "generator",
+					Type: "sequence",
 					Labels: map[string]string{
 						"role": "source",
 						"stream": "primary",

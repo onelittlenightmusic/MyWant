@@ -202,7 +202,7 @@ func main() {
 		Nodes: []Node{
 			{
 				Metadata: Metadata{
-					Name: "generator",
+					Name: "sequence",
 					Type: "fibonacci_generator",
 					Labels: map[string]string{
 						"role": "source",

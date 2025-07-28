@@ -1,0 +1,73 @@
+nodes:
+  - metadata:
+      name: number-target
+      type: target
+      labels:
+        owner: parent
+        category: display
+    spec:
+      params:
+        max_display: 100
+  # Sink node (child) - displays number array from 0 to 99
+  - metadata:
+      name: number-sink
+      type: sink
+      labels:
+        role: collector
+        category: display
+      ownerReferences:
+        - apiVersion: "gochain/v1"
+          kind: "Node"
+          name: "number-target"
+          controller: true
+          blockOwnerDeletion: true
+    spec:
+      params:
+        display_format: "Number: %d"
+
+  # Generator node (child) - generates numbers from 0 to 999
+  # Uses ownerReference pointing to the sink node (similar to Kubernetes Pod ownership)
+  - metadata:
+      name: number-generator
+      type: sequence
+      labels:
+        role: source
+        owner: child
+        category: producer
+      ownerReferences:
+        - apiVersion: "gochain/v1"
+          kind: "Node"
+          name: "number-target"
+          controller: true
+          blockOwnerDeletion: true
+    spec:
+      params:
+        count: 100
+        rate: 10.0
+      # Using inputs field for input-based channel connection
+      inputs:
+        - role: collector  # Points to sink node by label selector
+
+  # Additional example: Queue node owned by generator
+  - metadata:
+      name: number-queue
+      type: queue
+      labels:
+        role: processor
+        owner: child
+        category: queue
+      ownerReferences:
+        - apiVersion: "gochain/v1"
+          kind: "Node"
+          name: "number-target"
+          controller: true
+          blockOwnerDeletion: true
+    spec:
+      params:
+        service_time: 0.1
+      # Using inputs field for input-based channel connection
+      inputs:
+        - category: producer  # Gets input from generator
+      # Using outputs field for output-based channel connection  
+      outputs:
+        - role: collector  # Sends processed output to sink
