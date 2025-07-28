@@ -1,0 +1,10 @@
+nodes:
+  - metadata:
+      name: number-target
+      type: target
+      labels:
+        owner: parent
+        category: display
+    spec:
+      params:
+        max_display: 100

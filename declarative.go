@@ -966,6 +966,21 @@ func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
 	cb.memoryPath = memoryPath
 }
 
+// AddDynamicNode adds a node to the configuration at runtime
+func (cb *ChainBuilder) AddDynamicNode(node Node) {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+	
+	// Add node to the configuration
+	cb.config.Nodes = append(cb.config.Nodes, node)
+	
+	// Create runtime node if it doesn't exist
+	if _, exists := cb.nodes[node.Metadata.Name]; !exists {
+		cb.addNode(node)
+	}
+}
+
+
 // loadConfigFromYAML loads configuration from a YAML file
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config

@@ -17,6 +17,7 @@ type Target struct {
 	paths      Paths
 	childNodes []Node
 	childrenDone chan bool
+	builder    *ChainBuilder // Reference to builder for dynamic node creation
 }
 
 // NewTarget creates a new target node
@@ -50,6 +51,11 @@ func NewTarget(metadata Metadata, params map[string]interface{}) *Target {
 	return target
 }
 
+// SetBuilder sets the ChainBuilder reference for dynamic node creation
+func (t *Target) SetBuilder(builder *ChainBuilder) {
+	t.builder = builder
+}
+
 // CreateChildNodes dynamically creates child nodes based on the target configuration
 func (t *Target) CreateChildNodes() []Node {
 	// Create generator node
@@ -77,9 +83,7 @@ func (t *Target) CreateChildNodes() []Node {
 				"count": t.MaxDisplay,
 				"rate":  10.0,
 			},
-			Inputs: []map[string]string{
-				{"role": "collector"},
-			},
+			// Generator is a source node - no inputs needed
 		},
 	}
 
@@ -136,6 +140,9 @@ func (t *Target) CreateChildNodes() []Node {
 			Params: map[string]interface{}{
 				"display_format": "Number: %d",
 			},
+			Inputs: []map[string]string{
+				{"role": "processor"}, // Gets input from queue
+			},
 		},
 	}
 
@@ -148,8 +155,23 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
 		fmt.Printf("🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 		
+		// Dynamically create child nodes
+		if t.builder != nil {
+			fmt.Printf("🎯 Target %s: Creating child nodes dynamically...\n", t.Metadata.Name)
+			childNodes := t.CreateChildNodes()
+			
+			// Add child nodes to the builder's configuration
+			for _, childNode := range childNodes {
+				fmt.Printf("🔧 Adding child node: %s (type: %s)\n", childNode.Metadata.Name, childNode.Metadata.Type)
+				t.builder.AddDynamicNode(childNode)
+			}
+			
+			// Rebuild connections to include new nodes
+			fmt.Printf("🔧 Rebuilding connections with dynamic nodes...\n")
+			t.builder.rebuildConnections()
+		}
+		
 		// Target waits for signal that all children have finished
-		// Children are already defined in the config with ownerReferences
 		fmt.Printf("🎯 Target %s: Waiting for all child nodes to complete...\n", t.Metadata.Name)
 		<-t.childrenDone
 		fmt.Printf("🎯 Target %s: All child nodes completed, target finishing\n", t.Metadata.Name)
@@ -263,7 +285,9 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	
 	// Register target type
 	builder.RegisterNodeType("target", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewTarget(metadata, params)
+		target := NewTarget(metadata, params)
+		target.SetBuilder(builder) // Set builder reference for dynamic node creation
+		return target
 	})
 	
 	// Override all node types to use OwnerAwareNode wrapper for nodes with owner references

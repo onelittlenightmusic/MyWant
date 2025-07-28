@@ -10,9 +10,9 @@ func main() {
 	fmt.Println("=====================")
 	
 	// Load YAML configuration with owner references
-	config, err := loadConfigFromYAML("sample-owner-config.yaml")
+	config, err := loadConfigFromYAML("sample-owner-config-input.yaml")
 	if err != nil {
-		fmt.Printf("Error loading sample-owner-config.yaml: %v\n", err)
+		fmt.Printf("Error loading sample-owner-config-input.yaml: %v\n", err)
 		return
 	}
 
