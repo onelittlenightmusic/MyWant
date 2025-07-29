@@ -163,8 +163,8 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 			// Add child nodes to the builder's configuration
 			for _, childNode := range childNodes {
 				fmt.Printf("🔧 Adding child node: %s (type: %s)\n", childNode.Metadata.Name, childNode.Metadata.Type)
-				t.builder.AddDynamicNode(childNode)
 			}
+			t.builder.AddDynamicNodes(childNodes)
 			
 			// Rebuild connections to include new nodes
 			fmt.Printf("🔧 Rebuilding connections with dynamic nodes...\n")

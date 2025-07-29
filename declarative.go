@@ -856,13 +856,35 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 	
-	// Update config with current stats
-	updatedConfig := cb.config
-	for i, node := range updatedConfig.Nodes {
+	// Create a comprehensive config that includes ALL nodes (both config and runtime)
+	updatedConfig := Config{
+		Nodes: make([]Node, 0),
+	}
+	
+	// First, add all nodes from config and update with current stats
+	configNodeMap := make(map[string]bool)
+	for _, node := range cb.config.Nodes {
+		configNodeMap[node.Metadata.Name] = true
 		if runtimeNode, exists := cb.nodes[node.Metadata.Name]; exists {
-			updatedConfig.Nodes[i].Stats = runtimeNode.node.Stats
-			updatedConfig.Nodes[i].Status = runtimeNode.node.Status
-			updatedConfig.Nodes[i].State = runtimeNode.node.State
+			node.Stats = runtimeNode.node.Stats
+			node.Status = runtimeNode.node.Status
+			node.State = runtimeNode.node.State
+		}
+		updatedConfig.Nodes = append(updatedConfig.Nodes, node)
+	}
+	
+	// Then, add any runtime nodes that might not be in config (e.g., dynamically created and completed)
+	for nodeName, runtimeNode := range cb.nodes {
+		if !configNodeMap[nodeName] {
+			// This node exists in runtime but not in config - include it
+			nodeConfig := Node{
+				Metadata: runtimeNode.metadata,
+				Spec:     runtimeNode.spec,
+				Stats:    runtimeNode.node.Stats,
+				Status:   runtimeNode.node.Status,
+				State:    runtimeNode.node.State,
+			}
+			updatedConfig.Nodes = append(updatedConfig.Nodes, nodeConfig)
 		}
 	}
 	
@@ -939,6 +961,7 @@ func (cb *ChainBuilder) Execute() {
 		fmt.Println("[RECONCILE] Memory dump completed successfully")
 	}
 	
+	
 	fmt.Println("[RECONCILE] Execution completed")
 }
 
@@ -966,7 +989,16 @@ func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
 	cb.memoryPath = memoryPath
 }
 
-// AddDynamicNode adds a node to the configuration at runtime
+// AddDynamicNodes adds multiple nodes to the configuration at runtime
+func (cb *ChainBuilder) AddDynamicNodes(nodes []Node) {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+	for _, node := range nodes {
+		cb.addDynamicNodeUnsafe(node)
+	}
+}
+
+// AddDynamicNode adds a single node to the configuration at runtime
 func (cb *ChainBuilder) AddDynamicNode(node Node) {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()

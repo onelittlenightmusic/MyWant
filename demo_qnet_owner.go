@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 )
 
 func main() {
@@ -26,10 +25,7 @@ func main() {
 	
 	fmt.Println("\nExecuting owner-based chain with dynamic node creation...")
 	
-	// Set memory file for snapshot creation
-	memoryFile := fmt.Sprintf("memory/sample_owner-memory-%s.yaml", 
-		time.Now().Format("20060102-150405"))
-	builder.SetMemoryPath(memoryFile)
+	// Memory dump will be automatically created as memory-*.yaml by the system
 	
 	// Execute using existing reconcile loop system
 	builder.Execute()
@@ -41,6 +37,6 @@ func main() {
 			name, state.Status, state.Stats.TotalProcessed)
 	}
 	
-	fmt.Printf("\n💾 Memory snapshot saved to: %s\n", memoryFile)
+	// Memory snapshot is automatically saved to memory/memory-TIMESTAMP.yaml
 	fmt.Println("✅ Owner-based execution completed successfully!")
 }
