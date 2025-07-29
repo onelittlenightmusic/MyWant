@@ -1,3 +1,5 @@
+timestamp: "2025-07-29T07:27:16+09:00"
+execution_id: exec-20250729-072716
 nodes:
     - metadata:
         name: number-target
@@ -8,23 +10,7 @@ nodes:
       spec:
         params:
             max_display: 100
-    - metadata:
-        name: number-sink
-        type: sink
-        labels:
-            category: display
-            role: collector
-        ownerReferences:
-            - apiVersion: gochain/v1
-              kind: Node
-              name: number-target
-              controller: true
-              blockOwnerDeletion: true
-      spec:
-        params:
-            display_format: 'Number: %d'
-        inputs:
-            - role: processor
+      status: completed
     - metadata:
         name: number-generator
         type: sequence
@@ -42,6 +28,11 @@ nodes:
         params:
             count: 100
             rate: 10
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
     - metadata:
         name: number-queue
         type: queue
@@ -58,5 +49,28 @@ nodes:
       spec:
         params:
             service_time: 0.1
-        inputs:
-            - category: producer
+      stats:
+        averagewaittime: 0.09552982387334376
+        totalprocessed: 99
+        totalwaittime: 9.457452563461032
+      status: completed
+    - metadata:
+        name: number-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed

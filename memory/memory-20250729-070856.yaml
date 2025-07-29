@@ -1,3 +1,5 @@
+timestamp: "2025-07-29T07:08:56+09:00"
+execution_id: exec-20250729-070856
 nodes:
     - metadata:
         name: number-target
@@ -8,6 +10,7 @@ nodes:
       spec:
         params:
             max_display: 100
+      status: completed
     - metadata:
         name: number-sink
         type: sink
@@ -23,8 +26,11 @@ nodes:
       spec:
         params:
             display_format: 'Number: %d'
-        inputs:
-            - role: processor
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
     - metadata:
         name: number-generator
         type: sequence
@@ -42,6 +48,11 @@ nodes:
         params:
             count: 100
             rate: 10
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
     - metadata:
         name: number-queue
         type: queue
@@ -58,5 +69,8 @@ nodes:
       spec:
         params:
             service_time: 0.1
-        inputs:
-            - category: producer
+      stats:
+        averagewaittime: 0.10508292324438478
+        totalprocessed: 99
+        totalwaittime: 10.403209401194093
+      status: completed

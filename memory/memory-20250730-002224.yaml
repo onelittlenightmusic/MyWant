@@ -1,13 +1,26 @@
+timestamp: "2025-07-30T00:22:24+09:00"
+execution_id: exec-20250730-002224
 nodes:
     - metadata:
-        name: number-target
-        type: target
+        name: number-queue
+        type: queue
         labels:
-            category: display
-            owner: parent
+            category: queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
       spec:
         params:
-            max_display: 100
+            service_time: 0.1
+      stats:
+        averagewaittime: 0.09551877100283752
+        totalprocessed: 99
+        totalwaittime: 9.456358329280915
       status: completed
     - metadata:
         name: number-sink
@@ -24,6 +37,20 @@ nodes:
       spec:
         params:
             display_format: 'Number: %d'
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: number-target
+        type: target
+        labels:
+            category: display
+            owner: parent
+      spec:
+        params:
+            max_display: 100
       status: completed
     - metadata:
         name: number-generator
@@ -42,27 +69,8 @@ nodes:
         params:
             count: 100
             rate: 10
-        inputs:
-            - role: collector
-      status: running
-    - metadata:
-        name: number-queue
-        type: queue
-        labels:
-            category: queue
-            owner: child
-            role: processor
-        ownerReferences:
-            - apiVersion: gochain/v1
-              kind: Node
-              name: number-target
-              controller: true
-              blockOwnerDeletion: true
-      spec:
-        params:
-            service_time: 0.1
-        inputs:
-            - category: producer
-        outputs:
-            - role: collector
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
       status: completed
