@@ -19,17 +19,7 @@ GoChain is a Go library implementing functional chain programming patterns with 
 
 ### Key Types and Concepts
 
-#### Legacy Chain API
-- `Tuple interface{}`: Generic data type that flows through chains
-- `Chan chan Tuple`: Channel type for chain communication
-- `C_chain struct`: Main chain object with methods:
-  - `Start()`: Initialize chain with starting function
-  - `Add()`: Add processing function to chain
-  - `End()`: Terminate chain with ending function
-  - `Merge()`: Combine two chains
-  - `Split()`: Split chain into two parallel paths
-
-#### Enhanced Declarative API
+#### Declarative API
 - `Metadata`: Node identification with `Name`, `Type`, `Labels`, and `Connectivity`
 - `NodeSpec`: Node configuration with `Params`, legacy `Inputs`, and new `Paths`
 - `Config`: Complete network configuration with array of `Node`s
@@ -86,16 +76,6 @@ go run example_yaml.go declarative.go
 
 ## Code Patterns
 
-### Legacy Chain Usage (Imperative)
-```go
-var c chain.C_chain
-c.Add(init_func(3.0, 1000))    // Start with data generator
-c.Add(queue(0.5))              // Add processing stage
-c.Add(queue(0.9))              // Add another stage
-c.End(end_func)                // Terminate chain
-chain.Run()                    // Execute the chain
-```
-
 ### Declarative Configuration Usage
 
 #### JSON Configuration
@@ -114,40 +94,117 @@ builder.Build()
 builder.Execute()
 ```
 
-#### Configuration Structure
+#### Queueing Network Configuration (config-qnet.yaml)
 ```yaml
 nodes:
+  # Primary packet generator
   - metadata:
       name: gen-primary
-      type: generator
+      type: sequence
       labels:
-        role: primary-source
+        role: source
+        stream: primary
+        priority: high
     spec:
       params:
         rate: 3.0
-        count: 1000
-      # inputs field is optional for source nodes
-  
+        count: 10000
+
+  # Main queue processing primary stream
   - metadata:
-      name: queue-1
+      name: queue-primary
       type: queue
       labels:
+        role: processor
         stage: first
+        stream: primary
+        path: main
     spec:
       params:
         service_time: 0.5
       inputs:
-        - role: primary-source  # Label-based selector
+        - role: source
+          stream: primary
+
+  # Stream combiner
+  - metadata:
+      name: combiner-main
+      type: combiner
+      labels:
+        role: merger
+        operation: combine
+        stage: second
+    spec:
+      params: {}
+      inputs:
+        - role: processor
+          stage: first
+
+  # Final collector
+  - metadata:
+      name: collector-end
+      type: sink
+      labels:
+        role: terminal
+        stage: end
+    spec:
+      params: {}
+      inputs:
+        - role: processor
+          stage: final
 ```
 
-### Advanced Chain Operations
+### Dynamic Node Addition
+
+Nodes can be added to a running chain dynamically using the `AddDynamicNode` and `AddDynamicNodes` methods:
+
 ```go
-// Merging chains (legacy)
-c.Merge(c2, combine_func)
+// Add a single dynamic node
+builder.AddDynamicNode(Node{
+    Metadata: Metadata{
+        Name: "dynamic-processor",
+        Type: "queue",
+        Labels: map[string]string{
+            "role": "processor",
+            "stage": "dynamic",
+        },
+    },
+    Spec: NodeSpec{
+        Params: map[string]interface{}{
+            "service_time": 0.4,
+        },
+        Inputs: []InputSelector{{
+            "role": "source",
+        }},
+    },
+})
 
-// Splitting chains (legacy)
-c3 := c.Split(split_func)
+// Add multiple dynamic nodes
+builder.AddDynamicNodes([]Node{node1, node2, node3})
 ```
+
+Dynamic nodes are automatically connected based on their label selectors and integrate seamlessly with the existing chain topology.
+
+### Memory Reconciliation
+
+The system supports memory reconciliation for persistent state management across chain executions:
+
+```go
+// Memory is automatically loaded from YAML files at startup
+// and saved during chain execution for state persistence
+
+// Example memory configuration structure:
+// - Node states and statistics
+// - Connection topology
+// - Processing parameters
+// - Runtime metrics
+```
+
+Memory reconciliation enables:
+- **State Persistence**: Node states survive chain restarts
+- **Configuration Recovery**: Automatic reload of previous configurations
+- **Statistics Continuity**: Processing metrics maintained across executions
+- **Dynamic Topology**: Preserved connections for dynamically added nodes
 
 ## Dependencies
 
