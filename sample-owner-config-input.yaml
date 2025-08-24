@@ -8,3 +8,8 @@ nodes:
     spec:
       params:
         max_display: 100
+        template: "number-processing-pipeline"
+        template_params:
+          count: 100
+          rate: 50.0
+          service_time: 0.01

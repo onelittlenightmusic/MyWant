@@ -1,0 +1,171 @@
+templates:
+  # Basic number processing pipeline - default template
+  number-processing-pipeline:
+    description: "Basic number processing pipeline with generator, queue, and sink"
+    parameters:
+      - name: count
+        type: int
+        default: 1000
+        description: "Number of items to generate"
+      - name: rate
+        type: float
+        default: 10.0
+        description: "Generation rate per second"
+      - name: service_time
+        type: float
+        default: 0.1
+        description: "Queue processing time"
+    children:
+      - metadata:
+          name: "{{.targetName}}-generator"
+          type: "sequence"
+          labels:
+            role: "source"
+            owner: "child"
+            category: "producer"
+        spec:
+          params:
+            count: "{{.count}}"
+            rate: "{{.rate}}"
+      - metadata:
+          name: "{{.targetName}}-queue"
+          type: "queue"
+          labels:
+            role: "processor"
+            owner: "child"
+            category: "queue"
+        spec:
+          params:
+            service_time: "{{.service_time}}"
+          inputs:
+            - category: "producer"
+      - metadata:
+          name: "{{.targetName}}-sink"
+          type: "sink"
+          labels:
+            role: "collector"
+            category: "display"
+        spec:
+          params:
+            display_format: "Number: %d"
+          inputs:
+            - role: "processor"
+
+  # High-throughput processing pipeline
+  high-throughput-pipeline:
+    description: "High-throughput pipeline with multiple parallel queues"
+    parameters:
+      - name: count
+        type: int
+        default: 10000
+        description: "Number of items to generate"
+      - name: rate
+        type: float
+        default: 100.0
+        description: "Generation rate per second"
+      - name: service_time
+        type: float
+        default: 0.01
+        description: "Queue processing time"
+      - name: parallel_queues
+        type: int
+        default: 3
+        description: "Number of parallel processing queues"
+    children:
+      - metadata:
+          name: "{{.targetName}}-generator"
+          type: "sequence"
+          labels:
+            role: "source"
+            owner: "child"
+            category: "producer"
+        spec:
+          params:
+            count: "{{.count}}"
+            rate: "{{.rate}}"
+      - metadata:
+          name: "{{.targetName}}-queue-1"
+          type: "queue"
+          labels:
+            role: "processor"
+            owner: "child"
+            category: "parallel-queue"
+            queue_id: "1"
+        spec:
+          params:
+            service_time: "{{.service_time}}"
+          inputs:
+            - category: "producer"
+      - metadata:
+          name: "{{.targetName}}-queue-2"
+          type: "queue"
+          labels:
+            role: "processor"
+            owner: "child"
+            category: "parallel-queue"
+            queue_id: "2"
+        spec:
+          params:
+            service_time: "{{.service_time}}"
+          inputs:
+            - category: "producer"
+      - metadata:
+          name: "{{.targetName}}-queue-3"
+          type: "queue"
+          labels:
+            role: "processor"
+            owner: "child"
+            category: "parallel-queue"
+            queue_id: "3"
+        spec:
+          params:
+            service_time: "{{.service_time}}"
+          inputs:
+            - category: "producer"
+      - metadata:
+          name: "{{.targetName}}-sink"
+          type: "sink"
+          labels:
+            role: "collector"
+            category: "display"
+        spec:
+          params:
+            display_format: "Processed: %d"
+          inputs:
+            - category: "parallel-queue"
+
+  # Fibonacci processing pipeline
+  fibonacci-pipeline:
+    description: "Specialized fibonacci number processing pipeline"
+    parameters:
+      - name: max_number
+        type: int
+        default: 100
+        description: "Maximum fibonacci number to generate"
+      - name: delay
+        type: float
+        default: 0.5
+        description: "Delay between generations"
+    children:
+      - metadata:
+          name: "{{.targetName}}-fib-gen"
+          type: "fibonacci_generator"
+          labels:
+            role: "source"
+            owner: "child"
+            category: "fibonacci-producer"
+        spec:
+          params:
+            max_number: "{{.max_number}}"
+            delay: "{{.delay}}"
+      - metadata:
+          name: "{{.targetName}}-fib-sink"
+          type: "fibonacci_sink"
+          labels:
+            role: "collector"
+            category: "fibonacci-display"
+        spec:
+          params:
+            display_format: "Fibonacci: %d"
+          inputs:
+            - category: "fibonacci-producer"

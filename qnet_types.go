@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gochain/chain"
 	"math/rand"
+	"strconv"
 )
 
 // QueuePacket represents data flowing through the chain
@@ -49,6 +50,10 @@ func PacketSequence(metadata Metadata, params map[string]interface{}) *Generator
 			gen.Count = ci
 		} else if cf, ok := c.(float64); ok {
 			gen.Count = int(cf)
+		} else if cs, ok := c.(string); ok {
+			if parsed, err := strconv.Atoi(cs); err == nil {
+				gen.Count = parsed
+			}
 		}
 	}
 	
@@ -107,16 +112,17 @@ func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.C
 		}
 		out := outputs[0]
 		
-		if j++; j >= g.Count {
+		if j >= g.Count {
 			// Store generation stats
-			g.Stats.TotalProcessed = j - 1
+			g.Stats.TotalProcessed = j
 			g.Stats.AverageWaitTime = 0.0 // Generators don't have wait time
 			g.Stats.TotalWaitTime = 0.0
 			
 			out <- QueuePacket{-1, 0}
-			fmt.Printf("[GENERATOR] Generated %d packets\n", j-1)
+			fmt.Printf("[GENERATOR] Generated %d packets\n", j)
 			return true
 		}
+		j++
 		t += g.Rate * rand.ExpFloat64()
 		out <- QueuePacket{j, t}
 		return false

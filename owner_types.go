@@ -13,11 +13,14 @@ var targetRegistryMutex sync.RWMutex
 // Target represents a parent node that creates and manages child nodes
 type Target struct {
 	Node
-	MaxDisplay int
-	paths      Paths
-	childNodes []Node
-	childrenDone chan bool
-	builder    *ChainBuilder // Reference to builder for dynamic node creation
+	MaxDisplay     int
+	TemplateName   string // Name of the template to use for child creation
+	TemplateParams map[string]interface{} // Parameters to pass to template
+	paths          Paths
+	childNodes     []Node
+	childrenDone   chan bool
+	builder        *ChainBuilder    // Reference to builder for dynamic node creation
+	templateLoader *TemplateLoader  // Reference to template loader
 }
 
 // NewTarget creates a new target node
@@ -30,17 +33,43 @@ func NewTarget(metadata Metadata, params map[string]interface{}) *Target {
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
 		},
-		MaxDisplay: 1000,
-		childNodes: make([]Node, 0),
-		childrenDone: make(chan bool, 1),
+		MaxDisplay:     1000,
+		TemplateName:   "number-processing-pipeline", // Default template
+		TemplateParams: make(map[string]interface{}),
+		childNodes:     make([]Node, 0),
+		childrenDone:   make(chan bool, 1),
 	}
 	
+	// Extract configuration from params
 	if max, ok := params["max_display"]; ok {
 		if maxInt, ok := max.(int); ok {
 			target.MaxDisplay = maxInt
 		} else if maxFloat, ok := max.(float64); ok {
 			target.MaxDisplay = int(maxFloat)
 		}
+	}
+	
+	// Extract template name if specified
+	if templateName, ok := params["template"]; ok {
+		if templateNameStr, ok := templateName.(string); ok {
+			target.TemplateName = templateNameStr
+		}
+	}
+	
+	// Extract template parameters
+	if templateParams, ok := params["template_params"]; ok {
+		if templateParamsMap, ok := templateParams.(map[string]interface{}); ok {
+			target.TemplateParams = templateParamsMap
+		}
+	}
+	
+	// Set default template parameters
+	target.TemplateParams["count"] = target.MaxDisplay
+	if rate, ok := params["rate"]; ok {
+		target.TemplateParams["rate"] = rate
+	}
+	if serviceTime, ok := params["service_time"]; ok {
+		target.TemplateParams["service_time"] = serviceTime
 	}
 	
 	// Register the target instance for child notification
@@ -56,12 +85,32 @@ func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
 
-// CreateChildNodes dynamically creates child nodes based on the target configuration
+// SetTemplateLoader sets the TemplateLoader reference for template-based child creation
+func (t *Target) SetTemplateLoader(loader *TemplateLoader) {
+	t.templateLoader = loader
+}
+
+// CreateChildNodes dynamically creates child nodes based on external templates
 func (t *Target) CreateChildNodes() []Node {
-	// Create generator node
+	// Use template loader if available
+	if t.templateLoader != nil {
+		nodes, err := t.templateLoader.InstantiateTemplate(t.TemplateName, t.Metadata.Name, t.TemplateParams)
+		if err != nil {
+			fmt.Printf("⚠️  Failed to instantiate template %s: %v, falling back to hardcoded creation\n", t.TemplateName, err)
+		} else {
+			fmt.Printf("✅ Successfully instantiated template %s with %d nodes\n", t.TemplateName, len(nodes))
+			t.childNodes = nodes
+			return t.childNodes
+		}
+	}
+
+	// Fallback to hardcoded template creation
+	fmt.Printf("⚠️  Using hardcoded template creation for target %s\n", t.Metadata.Name)
+	
+	// Create generator node (hardcoded fallback)
 	generatorNode := Node{
 		Metadata: Metadata{
-			Name: "number-generator",
+			Name: t.Metadata.Name + "-generator",
 			Type: "sequence",
 			Labels: map[string]string{
 				"role":     "source",
@@ -83,14 +132,13 @@ func (t *Target) CreateChildNodes() []Node {
 				"count": t.MaxDisplay,
 				"rate":  10.0,
 			},
-			// Generator is a source node - no inputs needed
 		},
 	}
 
-	// Create queue node
+	// Create queue node (hardcoded fallback)
 	queueNode := Node{
 		Metadata: Metadata{
-			Name: "number-queue",
+			Name: t.Metadata.Name + "-queue",
 			Type: "queue",
 			Labels: map[string]string{
 				"role":     "processor",
@@ -117,10 +165,10 @@ func (t *Target) CreateChildNodes() []Node {
 		},
 	}
 
-	// Create sink node
+	// Create sink node (hardcoded fallback)
 	sinkNode := Node{
 		Metadata: Metadata{
-			Name: "number-sink",
+			Name: t.Metadata.Name + "-sink",
 			Type: "sink",
 			Labels: map[string]string{
 				"role":     "collector",
@@ -141,7 +189,7 @@ func (t *Target) CreateChildNodes() []Node {
 				"display_format": "Number: %d",
 			},
 			Inputs: []map[string]string{
-				{"role": "processor"}, // Gets input from queue
+				{"role": "processor"},
 			},
 		},
 	}
@@ -283,10 +331,17 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	// Register existing qnet types first
 	RegisterQNetNodeTypes(builder)
 	
-	// Register target type
+	// Initialize template loader
+	templateLoader := NewTemplateLoader("templates")
+	if err := templateLoader.LoadTemplates(); err != nil {
+		fmt.Printf("⚠️  Failed to load templates: %v, using defaults\n", err)
+	}
+	
+	// Register target type with template support
 	builder.RegisterNodeType("target", func(metadata Metadata, params map[string]interface{}) interface{} {
 		target := NewTarget(metadata, params)
-		target.SetBuilder(builder) // Set builder reference for dynamic node creation
+		target.SetBuilder(builder)           // Set builder reference for dynamic node creation
+		target.SetTemplateLoader(templateLoader) // Set template loader for external templates
 		return target
 	})
 	
