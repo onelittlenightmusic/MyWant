@@ -10,6 +10,18 @@ import (
 var targetRegistry = make(map[string]*Target)
 var targetRegistryMutex sync.RWMutex
 
+// extractIntParam extracts an integer parameter with type conversion and default fallback
+func extractIntParam(params map[string]interface{}, key string, defaultValue int) int {
+	if value, ok := params[key]; ok {
+		if intVal, ok := value.(int); ok {
+			return intVal
+		} else if floatVal, ok := value.(float64); ok {
+			return int(floatVal)
+		}
+	}
+	return defaultValue
+}
+
 // Target represents a parent node that creates and manages child nodes
 type Target struct {
 	Node
@@ -24,11 +36,11 @@ type Target struct {
 }
 
 // NewTarget creates a new target node
-func NewTarget(metadata Metadata, params map[string]interface{}) *Target {
+func NewTarget(metadata Metadata, spec NodeSpec) *Target {
 	target := &Target{
 		Node: Node{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
+			Spec:     spec,
 			Stats:    NodeStats{},
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
@@ -40,36 +52,25 @@ func NewTarget(metadata Metadata, params map[string]interface{}) *Target {
 		childrenDone:   make(chan bool, 1),
 	}
 	
-	// Extract configuration from params
-	if max, ok := params["max_display"]; ok {
-		if maxInt, ok := max.(int); ok {
-			target.MaxDisplay = maxInt
-		} else if maxFloat, ok := max.(float64); ok {
-			target.MaxDisplay = int(maxFloat)
-		}
+	// Extract target-specific configuration from params
+	target.MaxDisplay = extractIntParam(spec.Params, "max_display", target.MaxDisplay)
+	
+	// Extract template name from spec.template field
+	if spec.Template != "" {
+		target.TemplateName = spec.Template
 	}
 	
-	// Extract template name if specified
-	if templateName, ok := params["template"]; ok {
-		if templateNameStr, ok := templateName.(string); ok {
-			target.TemplateName = templateNameStr
-		}
+	// Separate template parameters from target-specific parameters
+	targetSpecificParams := map[string]bool{
+		"max_display": true,
 	}
 	
-	// Extract template parameters
-	if templateParams, ok := params["template_params"]; ok {
-		if templateParamsMap, ok := templateParams.(map[string]interface{}); ok {
-			target.TemplateParams = templateParamsMap
+	// Collect template parameters (excluding target-specific ones)
+	target.TemplateParams = make(map[string]interface{})
+	for key, value := range spec.Params {
+		if !targetSpecificParams[key] {
+			target.TemplateParams[key] = value
 		}
-	}
-	
-	// Set default template parameters
-	target.TemplateParams["count"] = target.MaxDisplay
-	if rate, ok := params["rate"]; ok {
-		target.TemplateParams["rate"] = rate
-	}
-	if serviceTime, ok := params["service_time"]; ok {
-		target.TemplateParams["service_time"] = serviceTime
 	}
 	
 	// Register the target instance for child notification
@@ -88,6 +89,44 @@ func (t *Target) SetBuilder(builder *ChainBuilder) {
 // SetTemplateLoader sets the TemplateLoader reference for template-based child creation
 func (t *Target) SetTemplateLoader(loader *TemplateLoader) {
 	t.templateLoader = loader
+	// Resolve template parameters using template defaults when loader is available
+	t.resolveTemplateParameters()
+}
+
+// resolveTemplateParameters uses the template system to resolve parameters with proper defaults
+func (t *Target) resolveTemplateParameters() {
+	if t.templateLoader == nil {
+		return
+	}
+	
+	// Get template to access its parameter definitions
+	template, err := t.templateLoader.GetTemplate(t.TemplateName)
+	if err != nil {
+		fmt.Printf("⚠️  Could not resolve template parameters for %s: %v\n", t.TemplateName, err)
+		return
+	}
+	
+	// Create resolved parameters map starting with template defaults
+	resolvedParams := make(map[string]interface{})
+	
+	// Set default values from template parameter definitions
+	for _, param := range template.Parameters {
+		resolvedParams[param.Name] = param.Default
+	}
+	
+	// Override with provided template parameters
+	for key, value := range t.TemplateParams {
+		resolvedParams[key] = value
+	}
+	
+	// Add target-specific parameters that may be referenced by templates
+	resolvedParams["targetName"] = t.Metadata.Name
+	if _, hasCount := resolvedParams["count"]; !hasCount {
+		resolvedParams["count"] = t.MaxDisplay
+	}
+	
+	// Update template parameters with resolved values
+	t.TemplateParams = resolvedParams
 }
 
 // CreateChildNodes dynamically creates child nodes based on external templates
@@ -338,8 +377,8 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	}
 	
 	// Register target type with template support
-	builder.RegisterNodeType("target", func(metadata Metadata, params map[string]interface{}) interface{} {
-		target := NewTarget(metadata, params)
+	builder.RegisterNodeType("target", func(metadata Metadata, spec NodeSpec) interface{} {
+		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic node creation
 		target.SetTemplateLoader(templateLoader) // Set template loader for external templates
 		return target
@@ -347,8 +386,8 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	
 	// Override all node types to use OwnerAwareNode wrapper for nodes with owner references
 	originalGeneratorFactory := builder.registry["sequence"]
-	builder.RegisterNodeType("sequence", func(metadata Metadata, params map[string]interface{}) interface{} {
-		baseNode := originalGeneratorFactory(metadata, params)
+	builder.RegisterNodeType("sequence", func(metadata Metadata, spec NodeSpec) interface{} {
+		baseNode := originalGeneratorFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
 			return NewOwnerAwareNode(baseNode, metadata)
 		}
@@ -356,8 +395,8 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	})
 	
 	originalQueueFactory := builder.registry["queue"]
-	builder.RegisterNodeType("queue", func(metadata Metadata, params map[string]interface{}) interface{} {
-		baseNode := originalQueueFactory(metadata, params)
+	builder.RegisterNodeType("queue", func(metadata Metadata, spec NodeSpec) interface{} {
+		baseNode := originalQueueFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
 			return NewOwnerAwareNode(baseNode, metadata)
 		}
@@ -365,8 +404,8 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	})
 	
 	originalSinkFactory := builder.registry["sink"]
-	builder.RegisterNodeType("sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		baseNode := originalSinkFactory(metadata, params)
+	builder.RegisterNodeType("sink", func(metadata Metadata, spec NodeSpec) interface{} {
+		baseNode := originalSinkFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
 			return NewOwnerAwareNode(baseNode, metadata)
 		}

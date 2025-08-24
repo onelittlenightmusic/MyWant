@@ -27,11 +27,11 @@ type Generator struct {
 }
 
 // PacketSequence creates a new generator node
-func PacketSequence(metadata Metadata, params map[string]interface{}) *Generator {
+func PacketSequence(metadata Metadata, spec NodeSpec) *Generator {
 	gen := &Generator{
 		Node: Node{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
+			Spec:     spec,
 			Stats:    NodeStats{},
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
@@ -40,12 +40,12 @@ func PacketSequence(metadata Metadata, params map[string]interface{}) *Generator
 		Count: 100,
 	}
 	
-	if r, ok := params["rate"]; ok {
+	if r, ok := spec.Params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
 			gen.Rate = rf
 		}
 	}
-	if c, ok := params["count"]; ok {
+	if c, ok := spec.Params["count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.Count = ci
 		} else if cf, ok := c.(float64); ok {
@@ -137,11 +137,11 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue node
-func NewQueue(metadata Metadata, params map[string]interface{}) *Queue {
+func NewQueue(metadata Metadata, spec NodeSpec) *Queue {
 	queue := &Queue{
 		Node: Node{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
+			Spec:     spec,
 			Stats:    NodeStats{},
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
@@ -149,7 +149,7 @@ func NewQueue(metadata Metadata, params map[string]interface{}) *Queue {
 		ServiceTime: 1.0,
 	}
 	
-	if st, ok := params["service_time"]; ok {
+	if st, ok := spec.Params["service_time"]; ok {
 		if stf, ok := st.(float64); ok {
 			queue.ServiceTime = stf
 		}
@@ -252,11 +252,11 @@ type Combiner struct {
 }
 
 // NewCombiner creates a new combiner node
-func NewCombiner(metadata Metadata, params map[string]interface{}) *Combiner {
+func NewCombiner(metadata Metadata, spec NodeSpec) *Combiner {
 	combiner := &Combiner{
 		Node: Node{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
+			Spec:     spec,
 			Stats:    NodeStats{},
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
@@ -264,7 +264,7 @@ func NewCombiner(metadata Metadata, params map[string]interface{}) *Combiner {
 		Operation: "merge",
 	}
 	
-	if op, ok := params["operation"]; ok {
+	if op, ok := spec.Params["operation"]; ok {
 		if ops, ok := op.(string); ok {
 			combiner.Operation = ops
 		}
@@ -426,11 +426,11 @@ type Sink struct {
 }
 
 // Goal creates a new sink node
-func Goal(metadata Metadata, params map[string]interface{}) *Sink {
+func Goal(metadata Metadata, spec NodeSpec) *Sink {
 	return &Sink{
 		Node: Node{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
+			Spec:     spec,
 			Stats:    NodeStats{},
 			Status:   NodeStatusIdle,
 			State:    make(map[string]interface{}),
@@ -512,28 +512,28 @@ func (s *Sink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) 
 // RegisterQNetNodeTypes registers the qnet-specific node types with a ChainBuilder
 func RegisterQNetNodeTypes(builder *ChainBuilder) {
 	// Register generator type - return the enhanced node itself for validation
-	builder.RegisterNodeType("sequence", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return PacketSequence(metadata, params)
+	builder.RegisterNodeType("sequence", func(metadata Metadata, spec NodeSpec) interface{} {
+		return PacketSequence(metadata, spec)
 	})
 	
 	// Register queue type - return the enhanced node itself for validation
-	builder.RegisterNodeType("queue", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewQueue(metadata, params)
+	builder.RegisterNodeType("queue", func(metadata Metadata, spec NodeSpec) interface{} {
+		return NewQueue(metadata, spec)
 	})
 	
 	// Register combiner type - return the enhanced node itself for validation
-	builder.RegisterNodeType("combiner", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewCombiner(metadata, params)
+	builder.RegisterNodeType("combiner", func(metadata Metadata, spec NodeSpec) interface{} {
+		return NewCombiner(metadata, spec)
 	})
 	
 	// Register sink type - return the enhanced node itself for validation
-	builder.RegisterNodeType("sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return Goal(metadata, params)
+	builder.RegisterNodeType("sink", func(metadata Metadata, spec NodeSpec) interface{} {
+		return Goal(metadata, spec)
 	})
 	
 	// Register collector type (alias for sink) - return the enhanced node itself for validation
-	builder.RegisterNodeType("collector", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return Goal(metadata, params)
+	builder.RegisterNodeType("collector", func(metadata Metadata, spec NodeSpec) interface{} {
+		return Goal(metadata, spec)
 	})
 }
 

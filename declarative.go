@@ -75,8 +75,9 @@ type Metadata struct {
 
 // NodeSpec contains the desired state configuration for a node
 type NodeSpec struct {
-	Params map[string]interface{} `json:"params" yaml:"params"`
-	Inputs []map[string]string    `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Template string                 `json:"template,omitempty" yaml:"template,omitempty"`
+	Params   map[string]interface{} `json:"params" yaml:"params"`
+	Inputs   []map[string]string    `json:"inputs,omitempty" yaml:"inputs,omitempty"`
 }
 
 // Node represents a processing unit in the chain
@@ -242,7 +243,7 @@ func getCurrentTimestamp() int64 {
 }
 
 // NodeFactory defines the interface for creating node functions
-type NodeFactory func(metadata Metadata, params map[string]interface{}) interface{}
+type NodeFactory func(metadata Metadata, spec NodeSpec) interface{}
 
 // ChangeEventType represents the type of change detected
 type ChangeEventType string
@@ -437,7 +438,7 @@ func (cb *ChainBuilder) createNodeFunction(node Node) interface{} {
 	if !exists {
 		panic(fmt.Sprintf("Unknown node type: %s", node.Metadata.Type))
 	}
-	return factory(node.Metadata, node.Spec.Params)
+	return factory(node.Metadata, node.Spec)
 }
 
 // copyConfigToMemory copies the current config to memory file for watching
@@ -701,6 +702,7 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 func (cb *ChainBuilder) addNode(nodeConfig Node) {
 	fmt.Printf("[RECONCILE] Adding node: %s\n", nodeConfig.Metadata.Name)
 	
+	
 	// Create the function/node
 	nodeFunction := cb.createNodeFunction(nodeConfig)
 	
@@ -866,6 +868,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	for _, node := range cb.config.Nodes {
 		configNodeMap[node.Metadata.Name] = true
 		if runtimeNode, exists := cb.nodes[node.Metadata.Name]; exists {
+			// Update with runtime data including spec inputs
+			node.Spec = runtimeNode.spec  // Preserve inputs from runtime spec
 			node.Stats = runtimeNode.node.Stats
 			node.Status = runtimeNode.node.Status
 			node.State = runtimeNode.node.State
@@ -1031,6 +1035,7 @@ func loadConfigFromYAML(filename string) (Config, error) {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 	
+	
 	return config, nil
 }
 
@@ -1060,11 +1065,18 @@ func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
 	}
 	
-	// Convert node map to slice to match config format
-	nodeStates := cb.GetAllNodeStates()
-	nodes := make([]Node, 0, len(nodeStates))
-	for _, nodeState := range nodeStates {
-		nodes = append(nodes, *nodeState)
+	// Convert node map to slice to match config format, preserving runtime spec
+	nodes := make([]Node, 0, len(cb.nodes))
+	for _, runtimeNode := range cb.nodes {
+		// Use runtime spec to preserve inputs, but node state for stats/status
+		node := Node{
+			Metadata: runtimeNode.metadata,
+			Spec:     runtimeNode.spec,  // This preserves inputs
+			Stats:    runtimeNode.node.Stats,
+			Status:   runtimeNode.node.Status,
+			State:    runtimeNode.node.State,
+		}
+		nodes = append(nodes, node)
 	}
 	
 	// Prepare memory dump structure
