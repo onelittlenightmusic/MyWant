@@ -64,7 +64,13 @@ type TemplateResult struct {
 // ChildTemplate defines a complete template for creating child nodes
 type ChildTemplate struct {
 	Description string              `yaml:"description"`
-	Parameters  []TemplateParameter `yaml:"parameters"`
+	
+	// Legacy parameter format support
+	Parameters  []TemplateParameter `yaml:"parameters,omitempty"`
+	
+	// New minimized parameter format support
+	Params      map[string]interface{} `yaml:"params,omitempty"`
+	
 	Result      *TemplateResult     `yaml:"result,omitempty"` // Optional result fetching configuration
 	
 	// Legacy format support
@@ -384,9 +390,17 @@ func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName st
 	templateParams := make(map[string]interface{})
 	templateParams["targetName"] = targetName
 
-	// Set default values
-	for _, param := range childTemplate.Parameters {
-		templateParams[param.Name] = param.Default
+	// Set default values - support both legacy and new parameter formats
+	if len(childTemplate.Parameters) > 0 {
+		// Legacy format: parameters array
+		for _, param := range childTemplate.Parameters {
+			templateParams[param.Name] = param.Default
+		}
+	} else if childTemplate.Params != nil {
+		// New format: params map
+		for paramName, defaultValue := range childTemplate.Params {
+			templateParams[paramName] = defaultValue
+		}
 	}
 
 	// Override with provided parameters

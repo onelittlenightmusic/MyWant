@@ -2,15 +2,11 @@ templates:
   # DRY template format - minimal differentiation approach
   "wait time in queue system":
     description: "Wait time analysis in queue system with generator, queue, and sink"
-    parameters:
-      - name: count
-        default: !int 1000
-      - name: rate
-        default: !float 10.0
-      - name: service_time
-        default: !float 0.1
-      - name: deterministic
-        default: !bool false
+    params:
+      count: !int 1000
+      rate: !float 10.0
+      service_time: !float 0.1
+      deterministic: !bool false
         
     result:
       node: "{{.targetName}}-queue"
@@ -59,13 +55,10 @@ templates:
   # High-throughput pipeline using DRY format
   "high-throughput-pipeline":
     description: "High-throughput pipeline with multiple parallel queues"
-    parameters:
-      - name: count
-        default: !int 10000
-      - name: rate
-        default: !float 100.0
-      - name: service_time
-        default: !float 0.01
+    params:
+      count: !int 10000
+      rate: !float 100.0
+      service_time: !float 0.01
         
     result:
       node: "parallel-queue"
@@ -134,11 +127,9 @@ templates:
   # Fibonacci pipeline using DRY format
   "fibonacci-pipeline":
     description: "Specialized fibonacci number processing pipeline"
-    parameters:
-      - name: max_number
-        default: !int 100
-      - name: delay
-        default: !float 0.5
+    params:
+      max_number: !int 100
+      delay: !float 0.5
         
     defaults:
       metadata:
