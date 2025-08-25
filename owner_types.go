@@ -46,7 +46,7 @@ func NewTarget(metadata Metadata, spec NodeSpec) *Target {
 			State:    make(map[string]interface{}),
 		},
 		MaxDisplay:     1000,
-		TemplateName:   "number-processing-pipeline", // Default template
+		TemplateName:   "wait time in queue system", // Default template
 		TemplateParams: make(map[string]interface{}),
 		childNodes:     make([]Node, 0),
 		childrenDone:   make(chan bool, 1),
@@ -261,8 +261,12 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 		// Target waits for signal that all children have finished
 		fmt.Printf("🎯 Target %s: Waiting for all child nodes to complete...\n", t.Metadata.Name)
 		<-t.childrenDone
-		fmt.Printf("🎯 Target %s: All child nodes completed, target finishing\n", t.Metadata.Name)
+		fmt.Printf("🎯 Target %s: All child nodes completed, computing result...\n", t.Metadata.Name)
 		
+		// Compute and store template result
+		t.computeTemplateResult()
+		
+		fmt.Printf("🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 		return true
 	}
 }
@@ -279,6 +283,48 @@ func (t *Target) NotifyChildrenComplete() {
 		// Signal sent successfully
 	default:
 		// Channel already has signal, ignore
+	}
+}
+
+// computeTemplateResult computes the result from child nodes and stores it
+func (t *Target) computeTemplateResult() {
+	if t.templateLoader == nil {
+		fmt.Printf("⚠️  Target %s: No template loader available for result computation\n", t.Metadata.Name)
+		return
+	}
+
+	// Get all nodes that might be child nodes for this target
+	allNodeStates := t.builder.GetAllNodeStates()
+	var childNodes []Node
+	
+	// Filter to only nodes owned by this target
+	for _, node := range allNodeStates {
+		for _, ownerRef := range node.Metadata.OwnerReferences {
+			if ownerRef.Controller && ownerRef.Kind == "Node" && ownerRef.Name == t.Metadata.Name {
+				childNodes = append(childNodes, *node)
+				break
+			}
+		}
+	}
+
+	fmt.Printf("🧮 Target %s: Found %d child nodes for result computation\n", t.Metadata.Name, len(childNodes))
+
+	// Compute template result
+	result, err := t.templateLoader.GetTemplateResult(t.TemplateName, t.Metadata.Name, childNodes)
+	if err != nil {
+		fmt.Printf("⚠️  Target %s: Failed to compute template result: %v\n", t.Metadata.Name, err)
+		return
+	}
+
+	// Store result in target's state
+	t.State["templateResult"] = result
+	fmt.Printf("✅ Target %s: Template result computed: %v\n", t.Metadata.Name, result)
+
+	// Also store result in a standardized format for memory dumps
+	if resultFloat, ok := result.(float64); ok {
+		t.State["result"] = fmt.Sprintf("%.6f", resultFloat)
+	} else {
+		t.State["result"] = fmt.Sprintf("%v", result)
 	}
 }
 

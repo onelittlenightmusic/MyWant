@@ -1,7 +1,7 @@
 templates:
-  # Basic number processing pipeline - default template
-  number-processing-pipeline:
-    description: "Basic number processing pipeline with generator, queue, and sink"
+  # Wait time in queue system - default template
+  "wait time in queue system":
+    description: "Wait time analysis in queue system with generator, queue, and sink"
     parameters:
       - name: count
         type: int
@@ -15,6 +15,13 @@ templates:
         type: float
         default: 0.1
         description: "Queue processing time"
+      - name: deterministic
+        type: bool
+        default: false
+        description: "Use deterministic timing instead of exponential"
+    result:
+      node: "{{.targetName}}-queue"
+      statName: "AverageWaitTime"
     children:
       - metadata:
           name: "{{.targetName}}-generator"
@@ -25,8 +32,9 @@ templates:
             category: "producer"
         spec:
           params:
-            count: "{{.count}}"
-            rate: "{{.rate}}"
+            count: !int "{{.count}}"
+            rate: !float "{{.rate}}"
+            deterministic: !bool "{{.deterministic}}"
       - metadata:
           name: "{{.targetName}}-queue"
           type: "queue"
@@ -36,7 +44,8 @@ templates:
             category: "queue"
         spec:
           params:
-            service_time: "{{.service_time}}"
+            service_time: !float "{{.service_time}}"
+            deterministic: !bool "{{.deterministic}}"
           inputs:
             - category: "producer"
       - metadata:
@@ -71,6 +80,9 @@ templates:
         type: int
         default: 3
         description: "Number of parallel processing queues"
+    result:
+      node: "parallel-queue"
+      statName: "TotalProcessed"
     children:
       - metadata:
           name: "{{.targetName}}-generator"
@@ -81,8 +93,8 @@ templates:
             category: "producer"
         spec:
           params:
-            count: "{{.count}}"
-            rate: "{{.rate}}"
+            count: !int "{{.count}}"
+            rate: !float "{{.rate}}"
       - metadata:
           name: "{{.targetName}}-queue-1"
           type: "queue"
@@ -93,7 +105,7 @@ templates:
             queue_id: "1"
         spec:
           params:
-            service_time: "{{.service_time}}"
+            service_time: !float "{{.service_time}}"
           inputs:
             - category: "producer"
       - metadata:
@@ -106,7 +118,7 @@ templates:
             queue_id: "2"
         spec:
           params:
-            service_time: "{{.service_time}}"
+            service_time: !float "{{.service_time}}"
           inputs:
             - category: "producer"
       - metadata:
@@ -119,7 +131,7 @@ templates:
             queue_id: "3"
         spec:
           params:
-            service_time: "{{.service_time}}"
+            service_time: !float "{{.service_time}}"
           inputs:
             - category: "producer"
       - metadata:
@@ -156,8 +168,8 @@ templates:
             category: "fibonacci-producer"
         spec:
           params:
-            max_number: "{{.max_number}}"
-            delay: "{{.delay}}"
+            max_number: !int "{{.max_number}}"
+            delay: !float "{{.delay}}"
       - metadata:
           name: "{{.targetName}}-fib-sink"
           type: "fibonacci_sink"

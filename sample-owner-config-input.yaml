@@ -6,10 +6,11 @@ nodes:
         owner: parent
         category: display
     spec:
-      template: "number-processing-pipeline"
+      template: "wait time in queue system"
       params:
         max_display: 200
-        count: 150
-        rate: 25.0
-        service_time: 0.05
+        count: 1000
+        rate: 50
+        service_time: 0.01
+        deterministic: false
         custom_param: "test_value"

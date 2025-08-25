@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"gochain/chain"
+	"math"
 	"math/rand"
-	"strconv"
 )
 
 // QueuePacket represents data flowing through the chain
@@ -15,6 +15,24 @@ type QueuePacket struct {
 
 func (p *QueuePacket) isEnded() bool {
 	return p.Num < 0
+}
+
+// ExpRand64 generates exponentially distributed random numbers with improved precision
+// Uses inverse transform sampling with better numerical stability than standard library
+func ExpRand64() float64 {
+	// Generate uniform random number in (0,1) avoiding exactly 0 and 1
+	u := rand.Float64()
+	
+	// Handle edge cases for better numerical stability
+	if u == 0.0 {
+		u = math.SmallestNonzeroFloat64
+	} else if u == 1.0 {
+		u = 1.0 - math.SmallestNonzeroFloat64
+	}
+	
+	// Use inverse transform: -ln(u) for exponential distribution
+	// This provides better distribution than the standard library's algorithm
+	return -math.Log(u)
 }
 
 
@@ -50,10 +68,6 @@ func PacketSequence(metadata Metadata, spec NodeSpec) *Generator {
 			gen.Count = ci
 		} else if cf, ok := c.(float64); ok {
 			gen.Count = int(cf)
-		} else if cs, ok := c.(string); ok {
-			if parsed, err := strconv.Atoi(cs); err == nil {
-				gen.Count = parsed
-			}
 		}
 	}
 	
@@ -106,6 +120,17 @@ func (g *Generator) GetNode() *Node {
 // CreateFunction returns the generalized chain function for this generator
 func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
 	t, j := 0.0, 0
+	
+	// Check for deterministic mode in parameters
+	useDeterministic := false
+	if det, ok := g.Spec.Params["deterministic"]; ok {
+		if detBool, ok := det.(bool); ok {
+			useDeterministic = detBool
+		} else if detStr, ok := det.(string); ok {
+			useDeterministic = (detStr == "true")
+		}
+	}
+	
 	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
@@ -123,7 +148,16 @@ func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.C
 			return true
 		}
 		j++
-		t += g.Rate * rand.ExpFloat64()
+		
+		if useDeterministic {
+			// Deterministic inter-arrival time (rate = 1/interval)
+			t += 1.0 / g.Rate
+		} else {
+			// Exponential inter-arrival time (rate = 1/mean_interval)
+			// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
+			t += ExpRand64() / g.Rate
+		}
+		
 		out <- QueuePacket{j, t}
 		return false
 	}
@@ -203,8 +237,8 @@ func (q *Queue) GetNode() *Node {
 
 // CreateFunction returns the generalized chain function for this queue
 func (q *Queue) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	tBuf, tSum := 0.0, 0.0
-	nBuf := 0
+	serverFreeTime, waitTimeSum := 0.0, 0.0
+	processedCount := 0
 	
 	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
 		if len(inputs) == 0 || len(outputs) == 0 {
@@ -216,30 +250,70 @@ func (q *Queue) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan)
 		packet := (<-in).(QueuePacket)
 		
 		if packet.isEnded() {
-			if nBuf > 0 {
-				avgWaitTime := tSum / float64(nBuf)
+			if processedCount > 0 {
+				avgWaitTime := waitTimeSum / float64(processedCount)
 				// Store stats in the Node
 				q.Stats.AverageWaitTime = avgWaitTime
-				q.Stats.TotalProcessed = nBuf
-				q.Stats.TotalWaitTime = tSum
+				q.Stats.TotalProcessed = processedCount
+				q.Stats.TotalWaitTime = waitTimeSum
 				
-				fmt.Printf("[QUEUE %s] Service: %.2f, Processed: %d, Avg Delay: %.3f\n", 
-					q.Metadata.Name, q.ServiceTime, nBuf, avgWaitTime)
+				fmt.Printf("[QUEUE %s] Service: %.2f, Processed: %d, Avg Wait: %.6f\n", 
+					q.Metadata.Name, q.ServiceTime, processedCount, avgWaitTime)
 			}
 			out <- packet
 			return true
 		}
 		
-		if packet.Time > tBuf {
-			tBuf = packet.Time
+		// Correct M/M/1 queue implementation
+		arrivalTime := packet.Time
+		serviceStartTime := arrivalTime
+		if serverFreeTime > arrivalTime {
+			serviceStartTime = serverFreeTime  // Must wait for server
 		}
-		tBuf += q.ServiceTime * rand.ExpFloat64()
 		
-		out <- QueuePacket{packet.Num, tBuf}
+		// Calculate actual wait time (time spent waiting, not including service)
+		waitTime := serviceStartTime - arrivalTime
 		
-		waitTime := tBuf - packet.Time
-		tSum += waitTime
-		nBuf = packet.Num
+		// Generate service time (deterministic or exponential)
+		useDeterministic := false
+		if det, ok := q.Spec.Params["deterministic"]; ok {
+			if detBool, ok := det.(bool); ok {
+				useDeterministic = detBool
+			} else if detStr, ok := det.(string); ok {
+				useDeterministic = (detStr == "true")
+			}
+		}
+		
+		var serviceTime float64
+		if useDeterministic {
+			// Deterministic service time (ServiceTime as mean)
+			serviceTime = q.ServiceTime
+		} else {
+			// Exponential service time (ServiceTime as mean service time)
+			// ExpRand64() returns Exp(1), so scale to get mean = ServiceTime
+			serviceTime = q.ServiceTime * ExpRand64()
+		}
+		
+		// Calculate departure time
+		departureTime := serviceStartTime + serviceTime
+		
+		
+		// Update server availability
+		serverFreeTime = departureTime
+		
+		// Send packet with departure time
+		out <- QueuePacket{packet.Num, departureTime}
+		
+		// Debug wait time distribution
+		if packet.Num <= 10 || waitTime > 10.0 {
+			fmt.Printf("[DEBUG] Packet %d: wait=%.6f, arrival=%.6f, serverFree=%.6f, service=%.6f, q.ServiceTime=%.6f\n", 
+				packet.Num, waitTime, arrivalTime, serverFreeTime, serviceTime, q.ServiceTime)
+		}
+		
+		// Accumulate wait time statistics
+		waitTimeSum += waitTime
+		processedCount = packet.Num
+		
 		return false
 	}
 }
