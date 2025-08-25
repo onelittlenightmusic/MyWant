@@ -4,21 +4,13 @@ templates:
     description: "Wait time analysis in queue system with generator, queue, and sink"
     parameters:
       - name: count
-        type: int
-        default: 1000
-        description: "Number of items to generate"
+        default: !int 1000
       - name: rate
-        type: float
-        default: 10.0
-        description: "Generation rate per second"
+        default: !float 10.0
       - name: service_time
-        type: float
-        default: 0.1
-        description: "Queue processing time"
+        default: !float 0.1
       - name: deterministic
-        type: bool
-        default: false
-        description: "Use deterministic timing instead of exponential"
+        default: !bool false
         
     result:
       node: "{{.targetName}}-queue"
@@ -69,21 +61,11 @@ templates:
     description: "High-throughput pipeline with multiple parallel queues"
     parameters:
       - name: count
-        type: int
-        default: 10000
-        description: "Number of items to generate"
+        default: !int 10000
       - name: rate
-        type: float
-        default: 100.0
-        description: "Generation rate per second"
+        default: !float 100.0
       - name: service_time
-        type: float
-        default: 0.01
-        description: "Queue processing time"
-      - name: parallel_queues
-        type: int
-        default: 3
-        description: "Number of parallel processing queues"
+        default: !float 0.01
         
     result:
       node: "parallel-queue"
@@ -154,13 +136,9 @@ templates:
     description: "Specialized fibonacci number processing pipeline"
     parameters:
       - name: max_number
-        type: int
-        default: 100
-        description: "Maximum fibonacci number to generate"
+        default: !int 100
       - name: delay
-        type: float
-        default: 0.5
-        description: "Delay between generations"
+        default: !float 0.5
         
     defaults:
       metadata:

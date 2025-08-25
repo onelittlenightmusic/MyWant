@@ -1,0 +1,10 @@
+nodes:
+  - metadata:
+      name: test-defaults
+      type: target
+      labels:
+        owner: parent
+        category: display
+    spec:
+      template: "wait time in queue system"
+      params: {} # Use all defaults from the template
