@@ -19,7 +19,7 @@ type TemplateParameter struct {
 	Description string      `yaml:"description"`
 }
 
-// NodeTemplate defines a template for creating child nodes
+// NodeTemplate defines a template for creating child nodes (legacy format)
 type NodeTemplate struct {
 	Metadata struct {
 		Name   string            `yaml:"name"`
@@ -34,6 +34,27 @@ type NodeTemplate struct {
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
 
+// DRYNodeSpec defines minimal node specification in DRY format
+type DRYNodeSpec struct {
+	Name   string                    `yaml:"name"`
+	Type   string                    `yaml:"type"`
+	Labels map[string]string         `yaml:"labels,omitempty"`
+	Params map[string]interface{}    `yaml:"params,omitempty"`
+	Inputs []map[string]string       `yaml:"inputs,omitempty"`
+	// Store type tag information separately
+	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
+}
+
+// DRYTemplateDefaults defines common defaults for all nodes in a template
+type DRYTemplateDefaults struct {
+	Metadata struct {
+		Labels map[string]string `yaml:"labels,omitempty"`
+	} `yaml:"metadata,omitempty"`
+	Spec struct {
+		Params map[string]interface{} `yaml:"params,omitempty"`
+	} `yaml:"spec,omitempty"`
+}
+
 // TemplateResult defines how to fetch a result from child nodes
 type TemplateResult struct {
 	Node     string `yaml:"node"`     // Name pattern or label selector for the child node
@@ -44,8 +65,14 @@ type TemplateResult struct {
 type ChildTemplate struct {
 	Description string              `yaml:"description"`
 	Parameters  []TemplateParameter `yaml:"parameters"`
-	Children    []NodeTemplate      `yaml:"children"`
 	Result      *TemplateResult     `yaml:"result,omitempty"` // Optional result fetching configuration
+	
+	// Legacy format support
+	Children    []NodeTemplate      `yaml:"children,omitempty"`
+	
+	// New DRY format support  
+	Defaults    *DRYTemplateDefaults `yaml:"defaults,omitempty"`
+	Nodes       []DRYNodeSpec        `yaml:"nodes,omitempty"`
 }
 
 // TemplateConfig holds all available templates
@@ -143,8 +170,9 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 		return TemplateConfig{}, err
 	}
 	
-	// Apply the extracted type hints to the NodeTemplate structures
+	// Apply the extracted type hints to both legacy and DRY templates
 	for templateName, template := range config.Templates {
+		// Handle legacy Children templates
 		for i := range template.Children {
 			if config.Templates[templateName].Children[i].TypeHints == nil {
 				config.Templates[templateName].Children[i].TypeHints = make(map[string]string)
@@ -154,6 +182,20 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 			if globalHints, exists := typeHints["global"]; exists {
 				for paramName, typeTag := range globalHints {
 					config.Templates[templateName].Children[i].TypeHints[paramName] = typeTag
+				}
+			}
+		}
+		
+		// Handle DRY Nodes templates
+		for i := range template.Nodes {
+			if config.Templates[templateName].Nodes[i].TypeHints == nil {
+				config.Templates[templateName].Nodes[i].TypeHints = make(map[string]string)
+			}
+			
+			// Copy global type hints (we use global for simplicity)
+			if globalHints, exists := typeHints["global"]; exists {
+				for paramName, typeTag := range globalHints {
+					config.Templates[templateName].Nodes[i].TypeHints[paramName] = typeTag
 				}
 			}
 		}
@@ -353,15 +395,101 @@ func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName st
 	}
 
 	var nodes []Node
-	for _, nodeTemplate := range childTemplate.Children {
-		node, err := tl.instantiateNodeFromTemplate(nodeTemplate, templateParams, targetName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to instantiate node template: %w", err)
+	
+	// Check if this is a DRY template (has Nodes field) or legacy template (has Children field)
+	if len(childTemplate.Nodes) > 0 {
+		// New DRY template format
+		for _, dryNodeSpec := range childTemplate.Nodes {
+			node, err := tl.instantiateDRYNode(dryNodeSpec, childTemplate.Defaults, templateParams, targetName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to instantiate DRY node template: %w", err)
+			}
+			nodes = append(nodes, node)
 		}
-		nodes = append(nodes, node)
+	} else {
+		// Legacy template format
+		for _, nodeTemplate := range childTemplate.Children {
+			node, err := tl.instantiateNodeFromTemplate(nodeTemplate, templateParams, targetName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to instantiate node template: %w", err)
+			}
+			nodes = append(nodes, node)
+		}
 	}
 
 	return nodes, nil
+}
+
+// instantiateDRYNode creates a single Node from a DRY node spec merged with defaults
+func (tl *TemplateLoader) instantiateDRYNode(dryNode DRYNodeSpec, defaults *DRYTemplateDefaults, params map[string]interface{}, targetName string) (Node, error) {
+	// Merge defaults with node-specific values to create a complete NodeTemplate
+	mergedTemplate := tl.mergeDRYDefaults(dryNode, defaults, targetName)
+	
+	// Now use the existing instantiation logic
+	return tl.instantiateNodeFromTemplate(mergedTemplate, params, targetName)
+}
+
+// mergeDRYDefaults merges DRY template defaults with individual node specifications
+func (tl *TemplateLoader) mergeDRYDefaults(dryNode DRYNodeSpec, defaults *DRYTemplateDefaults, targetName string) NodeTemplate {
+	// Create a complete NodeTemplate by merging defaults with the DRY node spec
+	nodeTemplate := NodeTemplate{
+		Metadata: struct {
+			Name   string            `yaml:"name"`
+			Type   string            `yaml:"type"`
+			Labels map[string]string `yaml:"labels"`
+		}{
+			Name: dryNode.Name,
+			Type: dryNode.Type,
+			Labels: make(map[string]string),
+		},
+		Spec: struct {
+			Params map[string]interface{}   `yaml:"params"`
+			Inputs []map[string]string      `yaml:"inputs,omitempty"`
+		}{
+			Params: make(map[string]interface{}),
+			Inputs: dryNode.Inputs, // Copy inputs directly
+		},
+		TypeHints: make(map[string]string),
+	}
+	
+	// Merge default labels first, then override with node-specific labels
+	if defaults != nil && defaults.Metadata.Labels != nil {
+		for key, value := range defaults.Metadata.Labels {
+			nodeTemplate.Metadata.Labels[key] = value
+		}
+	}
+	
+	// Override with node-specific labels
+	if dryNode.Labels != nil {
+		for key, value := range dryNode.Labels {
+			nodeTemplate.Metadata.Labels[key] = value
+		}
+	}
+	
+	// Merge default params first, then override with node-specific params
+	if defaults != nil && defaults.Spec.Params != nil {
+		for key, value := range defaults.Spec.Params {
+			nodeTemplate.Spec.Params[key] = value
+		}
+	}
+	
+	// Override with node-specific params
+	if dryNode.Params != nil {
+		for key, value := range dryNode.Params {
+			nodeTemplate.Spec.Params[key] = value
+		}
+	}
+	
+	// Copy type hints from DRY node
+	if dryNode.TypeHints != nil {
+		for key, value := range dryNode.TypeHints {
+			nodeTemplate.TypeHints[key] = value
+		}
+	}
+	
+	fmt.Printf("[DRY-MERGE] Merged node '%s' with defaults, final params: %+v\n", dryNode.Name, nodeTemplate.Spec.Params)
+	
+	return nodeTemplate
 }
 
 // instantiateNodeFromTemplate creates a single Node from a NodeTemplate with type tag support

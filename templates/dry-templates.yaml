@@ -1,0 +1,190 @@
+templates:
+  # DRY template format - minimal differentiation approach
+  "wait time in queue system":
+    description: "Wait time analysis in queue system with generator, queue, and sink"
+    parameters:
+      - name: count
+        type: int
+        default: 1000
+        description: "Number of items to generate"
+      - name: rate
+        type: float
+        default: 10.0
+        description: "Generation rate per second"
+      - name: service_time
+        type: float
+        default: 0.1
+        description: "Queue processing time"
+      - name: deterministic
+        type: bool
+        default: false
+        description: "Use deterministic timing instead of exponential"
+        
+    result:
+      node: "{{.targetName}}-queue"
+      statName: "AverageWaitTime"
+      
+    # Define common defaults once - no more repetition!
+    defaults:
+      metadata:
+        labels:
+          owner: "child"
+      spec:
+        params:
+          deterministic: !bool "{{.deterministic}}"
+    
+    # Only specify what's actually different between nodes
+    nodes:
+      - name: "{{.targetName}}-generator"
+        type: sequence
+        labels:
+          role: source
+          category: producer
+        params:
+          count: !int "{{.count}}"
+          rate: !float "{{.rate}}"
+          
+      - name: "{{.targetName}}-queue"
+        type: queue
+        labels:
+          role: processor
+          category: queue
+        params:
+          service_time: !float "{{.service_time}}"
+        inputs:
+          - category: producer
+          
+      - name: "{{.targetName}}-sink"
+        type: sink
+        labels:
+          role: collector
+          category: display
+        params:
+          display_format: "Number: %d"
+        inputs:
+          - role: processor
+
+  # High-throughput pipeline using DRY format
+  "high-throughput-pipeline":
+    description: "High-throughput pipeline with multiple parallel queues"
+    parameters:
+      - name: count
+        type: int
+        default: 10000
+        description: "Number of items to generate"
+      - name: rate
+        type: float
+        default: 100.0
+        description: "Generation rate per second"
+      - name: service_time
+        type: float
+        default: 0.01
+        description: "Queue processing time"
+      - name: parallel_queues
+        type: int
+        default: 3
+        description: "Number of parallel processing queues"
+        
+    result:
+      node: "parallel-queue"
+      statName: "TotalProcessed"
+      
+    defaults:
+      metadata:
+        labels:
+          owner: "child"
+      spec:
+        params: {}
+    
+    nodes:
+      - name: "{{.targetName}}-generator"
+        type: sequence
+        labels:
+          role: source
+          category: producer
+        params:
+          count: !int "{{.count}}"
+          rate: !float "{{.rate}}"
+          
+      - name: "{{.targetName}}-queue-1"
+        type: queue
+        labels:
+          role: processor
+          category: parallel-queue
+          queue_id: "1"
+        params:
+          service_time: !float "{{.service_time}}"
+        inputs:
+          - category: producer
+          
+      - name: "{{.targetName}}-queue-2"
+        type: queue
+        labels:
+          role: processor
+          category: parallel-queue
+          queue_id: "2"
+        params:
+          service_time: !float "{{.service_time}}"
+        inputs:
+          - category: producer
+          
+      - name: "{{.targetName}}-queue-3"
+        type: queue
+        labels:
+          role: processor
+          category: parallel-queue
+          queue_id: "3"
+        params:
+          service_time: !float "{{.service_time}}"
+        inputs:
+          - category: producer
+          
+      - name: "{{.targetName}}-sink"
+        type: sink
+        labels:
+          role: collector
+          category: display
+        params:
+          display_format: "Processed: %d"
+        inputs:
+          - category: parallel-queue
+
+  # Fibonacci pipeline using DRY format
+  "fibonacci-pipeline":
+    description: "Specialized fibonacci number processing pipeline"
+    parameters:
+      - name: max_number
+        type: int
+        default: 100
+        description: "Maximum fibonacci number to generate"
+      - name: delay
+        type: float
+        default: 0.5
+        description: "Delay between generations"
+        
+    defaults:
+      metadata:
+        labels:
+          owner: "child"
+      spec:
+        params: {}
+    
+    nodes:
+      - name: "{{.targetName}}-fib-gen"
+        type: fibonacci_generator
+        labels:
+          role: source
+          category: fibonacci-producer
+        params:
+          max_number: !int "{{.max_number}}"
+          delay: !float "{{.delay}}"
+          
+      - name: "{{.targetName}}-fib-sink"
+        type: fibonacci_sink
+        labels:
+          role: collector
+          category: fibonacci-display
+        params:
+          display_format: "Fibonacci: %d"
+        inputs:
+          - category: fibonacci-producer
