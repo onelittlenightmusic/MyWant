@@ -14,19 +14,19 @@ type FibonacciSeed struct {
 
 // SeedGenerator provides initial fibonacci seeds (0, 1)
 type SeedGenerator struct {
-	Node
+	Want
 	MaxCount int
 	paths    Paths
 }
 
-// NewSeedGenerator creates a new seed generator node
+// NewSeedGenerator creates a new seed generator want
 func NewSeedGenerator(metadata Metadata, params map[string]interface{}) *SeedGenerator {
 	gen := &SeedGenerator{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		MaxCount: 15,
@@ -52,11 +52,11 @@ func (g *SeedGenerator) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for seed generator
 func (g *SeedGenerator) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  0,
+		RequiredUsing:   0,
 		RequiredOutputs: 1,
-		MaxInputs:       0,
+		MaxUsing:        0,
 		MaxOutputs:      -1,
-		NodeType:        "seed_generator",
+		WantType:        "seed_generator",
 		Description:     "Fibonacci seed generator",
 	}
 }
@@ -76,19 +76,19 @@ func (g *SeedGenerator) Process(paths Paths) bool {
 	return false
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (g *SeedGenerator) GetType() string {
 	return "seed_generator"
 }
 
-// GetNode returns the embedded Node
-func (g *SeedGenerator) GetNode() *Node {
-	return &g.Node
+// GetWant returns the embedded Want
+func (g *SeedGenerator) GetWant() *Want {
+	return &g.Want
 }
 
 // CreateFunction returns the generalized chain function for the seed generator
-func (g *SeedGenerator) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (g *SeedGenerator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -107,20 +107,20 @@ func (g *SeedGenerator) CreateFunction() func(inputs []chain.Chan, outputs []cha
 	}
 }
 
-// FibonacciComputer computes the next fibonacci number from two inputs
+// FibonacciComputer computes the next fibonacci number from two using
 type FibonacciComputer struct {
-	Node
+	Want
 	paths Paths
 }
 
-// NewFibonacciComputer creates a new fibonacci computer node
+// NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *FibonacciComputer {
 	return &FibonacciComputer{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 	}
@@ -135,11 +135,11 @@ func (c *FibonacciComputer) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci computer
 func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  1,
+		RequiredUsing:   1,
 		RequiredOutputs: 1,
-		MaxInputs:       1,
+		MaxUsing:        1,
 		MaxOutputs:      -1,
-		NodeType:        "fibonacci_computer",
+		WantType:        "fibonacci_computer",
 		Description:     "Fibonacci number computer",
 	}
 }
@@ -159,18 +159,18 @@ func (c *FibonacciComputer) Process(paths Paths) bool {
 	return false
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (c *FibonacciComputer) GetType() string {
 	return "fibonacci_computer"
 }
 
-// GetNode returns the embedded Node
-func (c *FibonacciComputer) GetNode() *Node {
-	return &c.Node
+// GetWant returns the embedded Want
+func (c *FibonacciComputer) GetWant() *Want {
+	return &c.Want
 }
 
 // CreateFunction returns the generalized chain function for the fibonacci computer
-func (c *FibonacciComputer) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (c *FibonacciComputer) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	prev := 0
 	current := 1
 	position := 2
@@ -178,11 +178,11 @@ func (c *FibonacciComputer) CreateFunction() func(inputs []chain.Chan, outputs [
 	processed := 0
 	initialized := false
 	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 || len(outputs) == 0 {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		out := outputs[0]
 		
 		seed := (<-in).(FibonacciSeed)
@@ -224,18 +224,18 @@ func (c *FibonacciComputer) CreateFunction() func(inputs []chain.Chan, outputs [
 
 // FibonacciMerger merges seed values with computed values
 type FibonacciMerger struct {
-	Node
+	Want
 	paths Paths
 }
 
-// NewFibonacciMerger creates a new fibonacci merger node
+// NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *FibonacciMerger {
 	return &FibonacciMerger{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 	}
@@ -250,11 +250,11 @@ func (m *FibonacciMerger) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci merger
 func (m *FibonacciMerger) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  2,
+		RequiredUsing:   2,
 		RequiredOutputs: 2, // One to computer, one to sink
-		MaxInputs:       2,
+		MaxUsing:        2,
 		MaxOutputs:      -1,
-		NodeType:        "fibonacci_merger",
+		WantType:        "fibonacci_merger",
 		Description:     "Fibonacci sequence merger",
 	}
 }
@@ -274,39 +274,39 @@ func (m *FibonacciMerger) Process(paths Paths) bool {
 	return false
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (m *FibonacciMerger) GetType() string {
 	return "fibonacci_merger"
 }
 
-// GetNode returns the embedded Node
-func (m *FibonacciMerger) GetNode() *Node {
-	return &m.Node
+// GetWant returns the embedded Want
+func (m *FibonacciMerger) GetWant() *Want {
+	return &m.Want
 }
 
 // CreateFunction returns the generalized chain function for the fibonacci merger
-func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	seedInputClosed := false
-	computedInputClosed := false
+func (m *FibonacciMerger) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	seedUsingClosed := false
+	computedUsingClosed := false
 	processed := 0
 	maxCountReceived := false
 	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) < 2 || len(outputs) < 2 {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) < 2 || len(outputs) < 2 {
 			return true
 		}
 		
-		seedIn := inputs[0]      // From seed generator
-		computedIn := inputs[1]  // From fibonacci computer (feedback loop)
+		seedIn := using[0]       // From seed generator
+		computedIn := using[1]   // From fibonacci computer (feedback loop)
 		computerOut := outputs[0] // To fibonacci computer
 		sinkOut := outputs[1]     // To sink
 		
-		// Handle both inputs with blocking select
+		// Handle both using with blocking select
 		select {
 		case seed := <-seedIn:
 			fibSeed := seed.(FibonacciSeed)
 			if fibSeed.IsEnd {
-				seedInputClosed = true
+				seedUsingClosed = true
 				if !maxCountReceived {
 					// Forward end signal to computer to set max count
 					computerOut <- fibSeed
@@ -321,7 +321,7 @@ func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []c
 		case computed := <-computedIn:
 			fibSeed := computed.(FibonacciSeed)
 			if fibSeed.IsEnd {
-				computedInputClosed = true
+				computedUsingClosed = true
 			} else {
 				// Send computed values to sink for display
 				sinkOut <- fibSeed
@@ -329,8 +329,8 @@ func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []c
 			}
 		}
 		
-		// End when both inputs are closed
-		if seedInputClosed && computedInputClosed {
+		// End when both using are closed
+		if seedUsingClosed && computedUsingClosed {
 			// Send end signals to outputs
 			sinkOut <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
 			
@@ -345,19 +345,19 @@ func (m *FibonacciMerger) CreateFunction() func(inputs []chain.Chan, outputs []c
 
 // FibonacciSink collects and displays fibonacci sequence
 type FibonacciSink struct {
-	Node
+	Want
 	Sequence []int
 	paths    Paths
 }
 
-// NewFibonacciSink creates a new fibonacci sink node
+// NewFibonacciSink creates a new fibonacci sink want
 func NewFibonacciSink(metadata Metadata, params map[string]interface{}) *FibonacciSink {
 	return &FibonacciSink{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Sequence: make([]int, 0),
@@ -373,11 +373,11 @@ func (s *FibonacciSink) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci sink
 func (s *FibonacciSink) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  1,
+		RequiredUsing:   1,
 		RequiredOutputs: 0,
-		MaxInputs:       1,
+		MaxUsing:        1,
 		MaxOutputs:      0,
-		NodeType:        "fibonacci_sink",
+		WantType:        "fibonacci_sink",
 		Description:     "Fibonacci sequence collector",
 	}
 }
@@ -398,23 +398,23 @@ func (s *FibonacciSink) Process(paths Paths) bool {
 	return false
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (s *FibonacciSink) GetType() string {
 	return "fibonacci_sink"
 }
 
-// GetNode returns the embedded Node
-func (s *FibonacciSink) GetNode() *Node {
-	return &s.Node
+// GetWant returns the embedded Want
+func (s *FibonacciSink) GetWant() *Want {
+	return &s.Want
 }
 
 // CreateFunction returns the generalized chain function for the fibonacci sink
-func (s *FibonacciSink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 {
+func (s *FibonacciSink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		
 		seed := (<-in).(FibonacciSeed)
 		
@@ -437,25 +437,25 @@ func (s *FibonacciSink) CreateFunction() func(inputs []chain.Chan, outputs []cha
 	}
 }
 
-// RegisterFibonacciLoopNodeTypes registers the fibonacci loop node types with a ChainBuilder
-func RegisterFibonacciLoopNodeTypes(builder *ChainBuilder) {
+// RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
+func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
 	// Register seed generator type
-	builder.RegisterNodeType("seed_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("seed_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewSeedGenerator(metadata, params)
 	})
 	
 	// Register fibonacci computer type
-	builder.RegisterNodeType("fibonacci_computer", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciComputer(metadata, params)
 	})
 	
 	// Register fibonacci merger type
-	builder.RegisterNodeType("fibonacci_merger", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciMerger(metadata, params)
 	})
 	
 	// Register fibonacci sink type
-	builder.RegisterNodeType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciSink(metadata, params)
 	})
 }

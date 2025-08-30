@@ -22,33 +22,33 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 	return defaultValue
 }
 
-// Target represents a parent node that creates and manages child nodes
+// Target represents a parent want that creates and manages child wants
 type Target struct {
-	Node
+	Want
 	MaxDisplay     int
 	TemplateName   string // Name of the template to use for child creation
 	TemplateParams map[string]interface{} // Parameters to pass to template
 	paths          Paths
-	childNodes     []Node
+	childWants     []Want
 	childrenDone   chan bool
-	builder        *ChainBuilder    // Reference to builder for dynamic node creation
+	builder        *ChainBuilder    // Reference to builder for dynamic want creation
 	templateLoader *TemplateLoader  // Reference to template loader
 }
 
-// NewTarget creates a new target node
-func NewTarget(metadata Metadata, spec NodeSpec) *Target {
+// NewTarget creates a new target want
+func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	target := &Target{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		MaxDisplay:     1000,
 		TemplateName:   "wait time in queue system", // Default template
 		TemplateParams: make(map[string]interface{}),
-		childNodes:     make([]Node, 0),
+		childWants:     make([]Want, 0),
 		childrenDone:   make(chan bool, 1),
 	}
 	
@@ -81,7 +81,7 @@ func NewTarget(metadata Metadata, spec NodeSpec) *Target {
 	return target
 }
 
-// SetBuilder sets the ChainBuilder reference for dynamic node creation
+// SetBuilder sets the ChainBuilder reference for dynamic want creation
 func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
@@ -129,25 +129,25 @@ func (t *Target) resolveTemplateParameters() {
 	t.TemplateParams = resolvedParams
 }
 
-// CreateChildNodes dynamically creates child nodes based on external templates
-func (t *Target) CreateChildNodes() []Node {
+// CreateChildWants dynamically creates child wants based on external templates
+func (t *Target) CreateChildWants() []Want {
 	// Use template loader if available
 	if t.templateLoader != nil {
-		nodes, err := t.templateLoader.InstantiateTemplate(t.TemplateName, t.Metadata.Name, t.TemplateParams)
+		wants, err := t.templateLoader.InstantiateTemplate(t.TemplateName, t.Metadata.Name, t.TemplateParams)
 		if err != nil {
 			fmt.Printf("⚠️  Failed to instantiate template %s: %v, falling back to hardcoded creation\n", t.TemplateName, err)
 		} else {
-			fmt.Printf("✅ Successfully instantiated template %s with %d nodes\n", t.TemplateName, len(nodes))
-			t.childNodes = nodes
-			return t.childNodes
+			fmt.Printf("✅ Successfully instantiated template %s with %d wants\n", t.TemplateName, len(wants))
+			t.childWants = wants
+			return t.childWants
 		}
 	}
 
 	// Fallback to hardcoded template creation
 	fmt.Printf("⚠️  Using hardcoded template creation for target %s\n", t.Metadata.Name)
 	
-	// Create generator node (hardcoded fallback)
-	generatorNode := Node{
+	// Create generator want (hardcoded fallback)
+	generatorWant := Want{
 		Metadata: Metadata{
 			Name: t.Metadata.Name + "-generator",
 			Type: "sequence",
@@ -159,14 +159,14 @@ func (t *Target) CreateChildNodes() []Node {
 			OwnerReferences: []OwnerReference{
 				{
 					APIVersion:         "gochain/v1",
-					Kind:               "Node",
+					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
 					BlockOwnerDeletion: true,
 				},
 			},
 		},
-		Spec: NodeSpec{
+		Spec: WantSpec{
 			Params: map[string]interface{}{
 				"count": t.MaxDisplay,
 				"rate":  10.0,
@@ -174,8 +174,8 @@ func (t *Target) CreateChildNodes() []Node {
 		},
 	}
 
-	// Create queue node (hardcoded fallback)
-	queueNode := Node{
+	// Create queue want (hardcoded fallback)
+	queueWant := Want{
 		Metadata: Metadata{
 			Name: t.Metadata.Name + "-queue",
 			Type: "queue",
@@ -187,25 +187,25 @@ func (t *Target) CreateChildNodes() []Node {
 			OwnerReferences: []OwnerReference{
 				{
 					APIVersion:         "gochain/v1",
-					Kind:               "Node",
+					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
 					BlockOwnerDeletion: true,
 				},
 			},
 		},
-		Spec: NodeSpec{
+		Spec: WantSpec{
 			Params: map[string]interface{}{
 				"service_time": 0.1,
 			},
-			Inputs: []map[string]string{
+			Using: []map[string]string{
 				{"category": "producer"},
 			},
 		},
 	}
 
-	// Create sink node (hardcoded fallback)
-	sinkNode := Node{
+	// Create sink want (hardcoded fallback)
+	sinkWant := Want{
 		Metadata: Metadata{
 			Name: t.Metadata.Name + "-sink",
 			Type: "sink",
@@ -216,25 +216,25 @@ func (t *Target) CreateChildNodes() []Node {
 			OwnerReferences: []OwnerReference{
 				{
 					APIVersion:         "gochain/v1",
-					Kind:               "Node",
+					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
 					BlockOwnerDeletion: true,
 				},
 			},
 		},
-		Spec: NodeSpec{
+		Spec: WantSpec{
 			Params: map[string]interface{}{
 				"display_format": "Number: %d",
 			},
-			Inputs: []map[string]string{
+			Using: []map[string]string{
 				{"role": "processor"},
 			},
 		},
 	}
 
-	t.childNodes = []Node{generatorNode, queueNode, sinkNode}
-	return t.childNodes
+	t.childWants = []Want{generatorWant, queueWant, sinkWant}
+	return t.childWants
 }
 
 // CreateFunction implements the ChainNode interface for Target
@@ -242,26 +242,26 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
 		fmt.Printf("🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 		
-		// Dynamically create child nodes
+		// Dynamically create child wants
 		if t.builder != nil {
-			fmt.Printf("🎯 Target %s: Creating child nodes dynamically...\n", t.Metadata.Name)
-			childNodes := t.CreateChildNodes()
+			fmt.Printf("🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
+			childWants := t.CreateChildWants()
 			
-			// Add child nodes to the builder's configuration
-			for _, childNode := range childNodes {
-				fmt.Printf("🔧 Adding child node: %s (type: %s)\n", childNode.Metadata.Name, childNode.Metadata.Type)
+			// Add child wants to the builder's configuration
+			for _, childWant := range childWants {
+				fmt.Printf("🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
 			}
-			t.builder.AddDynamicNodes(childNodes)
+			t.builder.AddDynamicWants(childWants)
 			
-			// Rebuild connections to include new nodes
-			fmt.Printf("🔧 Rebuilding connections with dynamic nodes...\n")
+			// Rebuild connections to include new wants
+			fmt.Printf("🔧 Rebuilding connections with dynamic wants...\n")
 			t.builder.rebuildConnections()
 		}
 		
 		// Target waits for signal that all children have finished
-		fmt.Printf("🎯 Target %s: Waiting for all child nodes to complete...\n", t.Metadata.Name)
+		fmt.Printf("🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
 		<-t.childrenDone
-		fmt.Printf("🎯 Target %s: All child nodes completed, computing result...\n", t.Metadata.Name)
+		fmt.Printf("🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
 		
 		// Compute and store template result
 		t.computeTemplateResult()
@@ -271,12 +271,12 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 	}
 }
 
-// GetNode returns the underlying node
-func (t *Target) GetNode() *Node {
-	return &t.Node
+// GetWant returns the underlying want
+func (t *Target) GetWant() *Want {
+	return &t.Want
 }
 
-// NotifyChildrenComplete signals that all child nodes have completed
+// NotifyChildrenComplete signals that all child wants have completed
 func (t *Target) NotifyChildrenComplete() {
 	select {
 	case t.childrenDone <- true:
@@ -286,31 +286,31 @@ func (t *Target) NotifyChildrenComplete() {
 	}
 }
 
-// computeTemplateResult computes the result from child nodes and stores it
+// computeTemplateResult computes the result from child wants and stores it
 func (t *Target) computeTemplateResult() {
 	if t.templateLoader == nil {
 		fmt.Printf("⚠️  Target %s: No template loader available for result computation\n", t.Metadata.Name)
 		return
 	}
 
-	// Get all nodes that might be child nodes for this target
-	allNodeStates := t.builder.GetAllNodeStates()
-	var childNodes []Node
+	// Get all wants that might be child wants for this target
+	allWantStates := t.builder.GetAllWantStates()
+	var childWants []Want
 	
-	// Filter to only nodes owned by this target
-	for _, node := range allNodeStates {
-		for _, ownerRef := range node.Metadata.OwnerReferences {
-			if ownerRef.Controller && ownerRef.Kind == "Node" && ownerRef.Name == t.Metadata.Name {
-				childNodes = append(childNodes, *node)
+	// Filter to only wants owned by this target
+	for _, want := range allWantStates {
+		for _, ownerRef := range want.Metadata.OwnerReferences {
+			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
+				childWants = append(childWants, *want)
 				break
 			}
 		}
 	}
 
-	fmt.Printf("🧮 Target %s: Found %d child nodes for result computation\n", t.Metadata.Name, len(childNodes))
+	fmt.Printf("🧮 Target %s: Found %d child wants for result computation\n", t.Metadata.Name, len(childWants))
 
 	// Compute template result
-	result, err := t.templateLoader.GetTemplateResult(t.TemplateName, t.Metadata.Name, childNodes)
+	result, err := t.templateLoader.GetTemplateResult(t.TemplateName, t.Metadata.Name, childWants)
 	if err != nil {
 		fmt.Printf("⚠️  Target %s: Failed to compute template result: %v\n", t.Metadata.Name, err)
 		return
@@ -328,12 +328,12 @@ func (t *Target) computeTemplateResult() {
 	}
 }
 
-// addChildNodesToMemory adds child nodes to the memory configuration
-func (t *Target) addChildNodesToMemory() error {
+// addChildWantsToMemory adds child wants to the memory configuration
+func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would
-	// interact with the ChainBuilder to add nodes to the memory file
-	// For now, we'll assume the reconcile loop will pick up the nodes
-	fmt.Printf("🔧 Adding %d child nodes to memory configuration\n", len(t.childNodes))
+	// interact with the ChainBuilder to add wants to the memory file
+	// For now, we'll assume the reconcile loop will pick up the wants
+	fmt.Printf("🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
 	return nil
 }
 
@@ -349,42 +349,42 @@ func NotifyTargetCompletion(targetName string, childName string) {
 	}
 }
 
-// OwnerAwareNode wraps any node type to add parent notification capability
-type OwnerAwareNode struct {
-	BaseNode   interface{} // The original node (Generator, Queue, Sink, etc.)
+// OwnerAwareWant wraps any want type to add parent notification capability
+type OwnerAwareWant struct {
+	BaseWant   interface{} // The original want (Generator, Queue, Sink, etc.)
 	TargetName string
-	NodeName   string
+	WantName   string
 }
 
-// NewOwnerAwareNode creates a wrapper that adds parent notification to any node
-func NewOwnerAwareNode(baseNode interface{}, metadata Metadata) *OwnerAwareNode {
+// NewOwnerAwareWant creates a wrapper that adds parent notification to any want
+func NewOwnerAwareWant(baseWant interface{}, metadata Metadata) *OwnerAwareWant {
 	// Find target name from owner references
 	targetName := ""
 	for _, ownerRef := range metadata.OwnerReferences {
-		if ownerRef.Controller && ownerRef.Kind == "Node" {
+		if ownerRef.Controller && ownerRef.Kind == "Want" {
 			targetName = ownerRef.Name
 			break
 		}
 	}
 	
-	return &OwnerAwareNode{
-		BaseNode:   baseNode,
+	return &OwnerAwareWant{
+		BaseWant:   baseWant,
 		TargetName: targetName,
-		NodeName:   metadata.Name,
+		WantName:   metadata.Name,
 	}
 }
 
-// CreateFunction wraps the base node's function to add completion notification
-func (oan *OwnerAwareNode) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	// Get the original function from the base node
+// CreateFunction wraps the base want's function to add completion notification
+func (oaw *OwnerAwareWant) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
+	// Get the original function from the base want
 	var originalFunc func(inputs []chain.Chan, outputs []chain.Chan) bool
 	
-	if chainNode, ok := oan.BaseNode.(ChainNode); ok {
-		originalFunc = chainNode.CreateFunction()
+	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
+		originalFunc = chainWant.CreateFunction()
 	} else {
-		// Fallback for non-ChainNode types
+		// Fallback for non-ChainWant types
 		return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-			fmt.Printf("⚠️  Node %s: No CreateFunction available\n", oan.NodeName)
+			fmt.Printf("⚠️  Want %s: No CreateFunction available\n", oaw.WantName)
 			return true
 		}
 	}
@@ -393,28 +393,28 @@ func (oan *OwnerAwareNode) CreateFunction() func(inputs []chain.Chan, outputs []
 		// Call the original function
 		result := originalFunc(inputs, outputs)
 		
-		// If node completed successfully and we have a target, notify it
-		if result && oan.TargetName != "" {
-			fmt.Printf("💬 Child %s completed, notifying target %s\n", oan.NodeName, oan.TargetName)
-			NotifyTargetCompletion(oan.TargetName, oan.NodeName)
+		// If want completed successfully and we have a target, notify it
+		if result && oaw.TargetName != "" {
+			fmt.Printf("💬 Child %s completed, notifying target %s\n", oaw.WantName, oaw.TargetName)
+			NotifyTargetCompletion(oaw.TargetName, oaw.WantName)
 		}
 		
 		return result
 	}
 }
 
-// GetNode returns the underlying node from the base node
-func (oan *OwnerAwareNode) GetNode() *Node {
-	if chainNode, ok := oan.BaseNode.(ChainNode); ok {
-		return chainNode.GetNode()
+// GetWant returns the underlying want from the base want
+func (oaw *OwnerAwareWant) GetWant() *Want {
+	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
+		return chainWant.GetWant()
 	}
 	return nil
 }
 
-// RegisterOwnerNodeTypes registers the owner-based node types with a ChainBuilder
-func RegisterOwnerNodeTypes(builder *ChainBuilder) {
+// RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
+func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Register existing qnet types first
-	RegisterQNetNodeTypes(builder)
+	RegisterQNetWantTypes(builder)
 	
 	// Initialize template loader
 	templateLoader := NewTemplateLoader("templates")
@@ -423,38 +423,38 @@ func RegisterOwnerNodeTypes(builder *ChainBuilder) {
 	}
 	
 	// Register target type with template support
-	builder.RegisterNodeType("target", func(metadata Metadata, spec NodeSpec) interface{} {
+	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
 		target := NewTarget(metadata, spec)
-		target.SetBuilder(builder)           // Set builder reference for dynamic node creation
+		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
 		target.SetTemplateLoader(templateLoader) // Set template loader for external templates
 		return target
 	})
 	
-	// Override all node types to use OwnerAwareNode wrapper for nodes with owner references
+	// Override all want types to use OwnerAwareWant wrapper for wants with owner references
 	originalGeneratorFactory := builder.registry["sequence"]
-	builder.RegisterNodeType("sequence", func(metadata Metadata, spec NodeSpec) interface{} {
-		baseNode := originalGeneratorFactory(metadata, spec)
+	builder.RegisterWantType("sequence", func(metadata Metadata, spec WantSpec) interface{} {
+		baseWant := originalGeneratorFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareNode(baseNode, metadata)
+			return NewOwnerAwareWant(baseWant, metadata)
 		}
-		return baseNode
+		return baseWant
 	})
 	
 	originalQueueFactory := builder.registry["queue"]
-	builder.RegisterNodeType("queue", func(metadata Metadata, spec NodeSpec) interface{} {
-		baseNode := originalQueueFactory(metadata, spec)
+	builder.RegisterWantType("queue", func(metadata Metadata, spec WantSpec) interface{} {
+		baseWant := originalQueueFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareNode(baseNode, metadata)
+			return NewOwnerAwareWant(baseWant, metadata)
 		}
-		return baseNode
+		return baseWant
 	})
 	
 	originalSinkFactory := builder.registry["sink"]
-	builder.RegisterNodeType("sink", func(metadata Metadata, spec NodeSpec) interface{} {
-		baseNode := originalSinkFactory(metadata, spec)
+	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
+		baseWant := originalSinkFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareNode(baseNode, metadata)
+			return NewOwnerAwareWant(baseWant, metadata)
 		}
-		return baseNode
+		return baseWant
 	})
 }

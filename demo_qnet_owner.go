@@ -15,23 +15,23 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Nodes))
+	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
 	
-	// Register owner-based node types
-	RegisterOwnerNodeTypes(builder)
+	// Register owner-based want types
+	RegisterOwnerWantTypes(builder)
 	
-	fmt.Println("\nExecuting owner-based chain with dynamic node creation...")
+	fmt.Println("\nExecuting owner-based chain with dynamic want creation...")
 	
 	// Memory dump will be automatically created as memory-*.yaml by the system
 	
 	// Execute using existing reconcile loop system
 	builder.Execute()
 	
-	fmt.Println("\n📊 Final Node States:")
-	states := builder.GetAllNodeStates()
+	fmt.Println("\n📊 Final Want States:")
+	states := builder.GetAllWantStates()
 	for name, state := range states {
 		fmt.Printf("  %s: %s (processed: %d)\n", 
 			name, state.Status, state.Stats.TotalProcessed)

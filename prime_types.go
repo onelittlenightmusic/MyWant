@@ -7,20 +7,20 @@ import (
 
 // PrimeGenerator creates numbers and sends them downstream
 type PrimeGenerator struct {
-	Node
+	Want
 	Start int
 	End   int
 	paths Paths
 }
 
-// NewPrimeGenerator creates a new prime generator node
+// NewPrimeGenerator creates a new prime generator want
 func NewPrimeGenerator(metadata Metadata, params map[string]interface{}) *PrimeGenerator {
 	gen := &PrimeGenerator{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Start: 2,
@@ -46,8 +46,8 @@ func NewPrimeGenerator(metadata Metadata, params map[string]interface{}) *PrimeG
 }
 
 // CreateFunction returns the generalized chain function for the generator
-func (g *PrimeGenerator) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (g *PrimeGenerator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -60,27 +60,27 @@ func (g *PrimeGenerator) CreateFunction() func(inputs []chain.Chan, outputs []ch
 	}
 }
 
-// GetNode returns the underlying Node
-func (g *PrimeGenerator) GetNode() *Node {
-	return &g.Node
+// GetWant returns the underlying Want
+func (g *PrimeGenerator) GetWant() *Want {
+	return &g.Want
 }
 
 // PrimeFilter filters out multiples of a prime number
 type PrimeFilter struct {
-	Node
+	Want
 	Prime int
 	foundPrimes []int
 	paths Paths
 }
 
-// NewPrimeFilter creates a new prime filter node
+// NewPrimeFilter creates a new prime filter want
 func NewPrimeFilter(metadata Metadata, params map[string]interface{}) *PrimeFilter {
 	filter := &PrimeFilter{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Prime: 2,
@@ -99,12 +99,12 @@ func NewPrimeFilter(metadata Metadata, params map[string]interface{}) *PrimeFilt
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *PrimeFilter) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 || len(outputs) == 0 {
+func (f *PrimeFilter) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		out := outputs[0]
 		
 		for i := range in {
@@ -143,26 +143,26 @@ func (f *PrimeFilter) CreateFunction() func(inputs []chain.Chan, outputs []chain
 	}
 }
 
-// GetNode returns the underlying Node
-func (f *PrimeFilter) GetNode() *Node {
-	return &f.Node
+// GetWant returns the underlying Want
+func (f *PrimeFilter) GetWant() *Want {
+	return &f.Want
 }
 
 // PrimeSink collects and displays prime numbers
 type PrimeSink struct {
-	Node
+	Want
 	primes []int
 	paths  Paths
 }
 
-// NewPrimeSink creates a new prime sink node
+// NewPrimeSink creates a new prime sink want
 func NewPrimeSink(metadata Metadata, params map[string]interface{}) *PrimeSink {
 	sink := &PrimeSink{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		primes: make([]int, 0),
@@ -172,12 +172,12 @@ func NewPrimeSink(metadata Metadata, params map[string]interface{}) *PrimeSink {
 }
 
 // CreateFunction returns the generalized chain function for the sink
-func (s *PrimeSink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 {
+func (s *PrimeSink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		
 		for i := range in {
 			if val, ok := i.(int); ok {
@@ -192,22 +192,22 @@ func (s *PrimeSink) CreateFunction() func(inputs []chain.Chan, outputs []chain.C
 	}
 }
 
-// GetNode returns the underlying Node
-func (s *PrimeSink) GetNode() *Node {
-	return &s.Node
+// GetWant returns the underlying Want
+func (s *PrimeSink) GetWant() *Want {
+	return &s.Want
 }
 
-// RegisterPrimeNodeTypes registers the prime-specific node types with a ChainBuilder
-func RegisterPrimeNodeTypes(builder *ChainBuilder) {
-	builder.RegisterNodeType("prime_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
+// RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
+func RegisterPrimeWantTypes(builder *ChainBuilder) {
+	builder.RegisterWantType("prime_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewPrimeGenerator(metadata, params)
 	})
 	
-	builder.RegisterNodeType("prime_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("prime_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewPrimeFilter(metadata, params)
 	})
 	
-	builder.RegisterNodeType("prime_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("prime_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewPrimeSink(metadata, params)
 	})
 }

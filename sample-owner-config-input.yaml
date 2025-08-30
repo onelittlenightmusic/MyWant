@@ -1,4 +1,4 @@
-nodes:
+wants:
   - metadata:
       name: number-target
       type: target
@@ -8,9 +8,5 @@ nodes:
     spec:
       template: "wait time in queue system"
       params:
-        max_display: 200
-        count: 1000
         rate: 50
         service_time: 0.01
-        deterministic: false
-        custom_param: "test_value"

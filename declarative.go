@@ -15,41 +15,41 @@ import (
 
 // ChainFunction represents a generalized chain function interface
 type ChainFunction interface {
-	CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool
+	CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool
 }
 
-// ChainNode represents a node that can create chain functions
-type ChainNode interface {
-	CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool
-	GetNode() *Node
+// ChainWant represents a want that can create chain functions
+type ChainWant interface {
+	CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool
+	GetWant() *Want
 }
 
 // createStartFunction converts generalized function to start function
-func createStartFunction(generalizedFn func(inputs []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
+func createStartFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
 	return func(out chain.Chan) bool {
 		return generalizedFn([]chain.Chan{}, []chain.Chan{out})
 	}
 }
 
 // createProcessFunction converts generalized function to process function
-func createProcessFunction(generalizedFn func(inputs []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan, chain.Chan) bool {
+func createProcessFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan, chain.Chan) bool {
 	return func(in chain.Chan, out chain.Chan) bool {
 		return generalizedFn([]chain.Chan{in}, []chain.Chan{out})
 	}
 }
 
 // createEndFunction converts generalized function to end function
-func createEndFunction(generalizedFn func(inputs []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
+func createEndFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
 	return func(in chain.Chan) bool {
 		return generalizedFn([]chain.Chan{in}, []chain.Chan{})
 	}
 }
 
-// isSinkNode checks if a node type is a sink node
-func isSinkNode(nodeType string) bool {
+// isSinkWant checks if a want type is a sink want
+func isSinkWant(wantType string) bool {
 	sinkTypes := []string{"collector", "sink", "prime_sink", "fibonacci_sink"}
 	for _, sinkType := range sinkTypes {
-		if nodeType == sinkType {
+		if wantType == sinkType {
 			return true
 		}
 	}
@@ -65,7 +65,7 @@ type OwnerReference struct {
 	BlockOwnerDeletion  bool   `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
 }
 
-// Metadata contains node identification and classification info
+// Metadata contains want identification and classification info
 type Metadata struct {
 	Name            string            `json:"name" yaml:"name"`
 	Type            string            `json:"type" yaml:"type"`
@@ -73,42 +73,42 @@ type Metadata struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 }
 
-// NodeSpec contains the desired state configuration for a node
-type NodeSpec struct {
+// WantSpec contains the desired state configuration for a want
+type WantSpec struct {
 	Template string                 `json:"template,omitempty" yaml:"template,omitempty"`
 	Params   map[string]interface{} `json:"params" yaml:"params"`
-	Inputs   []map[string]string    `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Using   []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 }
 
-// Node represents a processing unit in the chain
-type Node struct {
+// Want represents a processing unit in the chain
+type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`
-	Spec     NodeSpec               `json:"spec" yaml:"spec"`
-	Stats    NodeStats              `json:"stats,omitempty" yaml:"stats,omitempty"`
-	Status   NodeStatus             `json:"status,omitempty" yaml:"status,omitempty"`
+	Spec     WantSpec               `json:"spec" yaml:"spec"`
+	Stats    WantStats              `json:"stats,omitempty" yaml:"stats,omitempty"`
+	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
 	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
 }
 
-// SetStatus updates the node's status
-func (n *Node) SetStatus(status NodeStatus) {
+// SetStatus updates the want's status
+func (n *Want) SetStatus(status WantStatus) {
 	n.Status = status
 }
 
-// GetStatus returns the current node status
-func (n *Node) GetStatus() NodeStatus {
+// GetStatus returns the current want status
+func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
 
-// StoreState stores a key-value pair in the node's state
-func (n *Node) StoreState(key string, value interface{}) {
+// StoreState stores a key-value pair in the want's state
+func (n *Want) StoreState(key string, value interface{}) {
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
 }
 
-// GetState retrieves a value from the node's state
-func (n *Node) GetState(key string) (interface{}, bool) {
+// GetState retrieves a value from the want's state
+func (n *Want) GetState(key string) (interface{}, bool) {
 	if n.State == nil {
 		return nil, false
 	}
@@ -116,9 +116,9 @@ func (n *Node) GetState(key string) (interface{}, bool) {
 	return value, exists
 }
 
-// OnProcessEnd handles state storage when the node process ends
-func (n *Node) OnProcessEnd(finalState map[string]interface{}) {
-	n.SetStatus(NodeStatusCompleted)
+// OnProcessEnd handles state storage when the want process ends
+func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
+	n.SetStatus(WantStatusCompleted)
 	
 	// Store final state
 	for key, value := range finalState {
@@ -132,9 +132,9 @@ func (n *Node) OnProcessEnd(finalState map[string]interface{}) {
 	n.StoreState("final_stats", n.Stats)
 }
 
-// OnProcessFail handles state storage when the node process fails
-func (n *Node) OnProcessFail(errorState map[string]interface{}, err error) {
-	n.SetStatus(NodeStatusFailed)
+// OnProcessFail handles state storage when the want process fails
+func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
+	n.SetStatus(WantStatusFailed)
 	
 	// Store error state
 	for key, value := range errorState {
@@ -151,7 +151,7 @@ func (n *Node) OnProcessFail(errorState map[string]interface{}, err error) {
 
 // Config holds the complete declarative configuration
 type Config struct {
-	Nodes []Node `json:"nodes" yaml:"nodes"`
+	Wants []Want `json:"wants" yaml:"wants"`
 }
 
 // PathInfo represents connection information for a single path
@@ -161,7 +161,7 @@ type PathInfo struct {
 	Active  bool
 }
 
-// Paths manages all input and output connections for a node
+// Paths manages all input and output connections for a want
 type Paths struct {
 	In  []PathInfo
 	Out []PathInfo
@@ -199,18 +199,18 @@ func (p *Paths) GetActiveOutCount() int {
 	return count
 }
 
-// ConnectivityMetadata defines node connectivity requirements and constraints
+// ConnectivityMetadata defines want connectivity requirements and constraints
 type ConnectivityMetadata struct {
 	RequiredInputs  int
 	RequiredOutputs int
 	MaxInputs       int    // -1 for unlimited
 	MaxOutputs      int    // -1 for unlimited
-	NodeType        string
+	WantType        string
 	Description     string
 }
 
-// EnhancedBaseNode interface for path-aware nodes with connectivity validation
-type EnhancedBaseNode interface {
+// EnhancedBaseWant interface for path-aware wants with connectivity validation
+type EnhancedBaseWant interface {
 	InitializePaths(inCount, outCount int)
 	GetConnectivityMetadata() ConnectivityMetadata
 	GetStats() map[string]interface{}
@@ -218,22 +218,22 @@ type EnhancedBaseNode interface {
 	GetType() string
 }
 
-// NodeStats holds statistical information for a node
-type NodeStats struct {
+// WantStats holds statistical information for a want
+type WantStats struct {
 	AverageWaitTime float64 `json:"average_wait_time"`
 	TotalProcessed  int     `json:"total_processed"`
 	TotalWaitTime   float64 `json:"total_wait_time"`
 }
 
-// NodeStatus represents the current state of a node
-type NodeStatus string
+// WantStatus represents the current state of a want
+type WantStatus string
 
 const (
-	NodeStatusIdle       NodeStatus = "idle"
-	NodeStatusRunning    NodeStatus = "running"
-	NodeStatusCompleted  NodeStatus = "completed"
-	NodeStatusFailed     NodeStatus = "failed"
-	NodeStatusTerminated NodeStatus = "terminated"
+	WantStatusIdle       WantStatus = "idle"
+	WantStatusRunning    WantStatus = "running"
+	WantStatusCompleted  WantStatus = "completed"
+	WantStatusFailed     WantStatus = "failed"
+	WantStatusTerminated WantStatus = "terminated"
 )
 
 
@@ -242,8 +242,8 @@ func getCurrentTimestamp() int64 {
 	return time.Now().Unix()
 }
 
-// NodeFactory defines the interface for creating node functions
-type NodeFactory func(metadata Metadata, spec NodeSpec) interface{}
+// WantFactory defines the interface for creating want functions
+type WantFactory func(metadata Metadata, spec WantSpec) interface{}
 
 // ChangeEventType represents the type of change detected
 type ChangeEventType string
@@ -257,11 +257,11 @@ const (
 // ChangeEvent represents a configuration change
 type ChangeEvent struct {
 	Type     ChangeEventType
-	NodeName string
-	Node     *Node
+	WantName string
+	Want     *Want
 }
 
-// ParentNotifier interface for nodes that can receive child completion notifications
+// ParentNotifier interface for wants that can receive child completion notifications
 type ParentNotifier interface {
 	NotifyChildrenComplete()
 }
@@ -270,8 +270,8 @@ type ParentNotifier interface {
 type ChainBuilder struct {
 	configPath     string                    // Path to original config file
 	memoryPath     string                    // Path to memory file (watched for changes)
-	nodes          map[string]*runtimeNode   // Runtime node registry
-	registry       map[string]NodeFactory    // Node type factories
+	wants          map[string]*runtimeWant   // Runtime want registry
+	registry       map[string]WantFactory    // Want type factories
 	waitGroup      *sync.WaitGroup           // Execution synchronization
 	config         Config                    // Current configuration
 	
@@ -283,18 +283,18 @@ type ChainBuilder struct {
 	lastConfigHash string                    // Hash of last config for change detection
 	
 	// Path and channel management
-	pathMap        map[string]Paths          // Node path mapping
-	channels       map[string]chain.Chan     // Inter-node channels
+	pathMap        map[string]Paths          // Want path mapping
+	channels       map[string]chain.Chan     // Inter-want channels
 	channelMutex   sync.RWMutex             // Protect channel access
 }
 
-// runtimeNode holds the runtime state of a node
-type runtimeNode struct {
+// runtimeWant holds the runtime state of a want
+type runtimeWant struct {
 	metadata Metadata
-	spec     NodeSpec
+	spec     WantSpec
 	chain    chain.C_chain
 	function interface{}
-	node     *Node
+	want     *Want
 }
 
 // NewChainBuilder creates a new builder from configuration
@@ -309,8 +309,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
 		configPath:     configPath,
 		memoryPath:     memoryPath,
-		nodes:          make(map[string]*runtimeNode),
-		registry:       make(map[string]NodeFactory),
+		wants:          make(map[string]*runtimeWant),
+		registry:       make(map[string]WantFactory),
 		reconcileStop:  make(chan bool),
 		pathMap:        make(map[string]Paths),
 		channels:       make(map[string]chain.Chan),
@@ -318,26 +318,26 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		waitGroup:      &sync.WaitGroup{},
 	}
 	
-	// Register built-in node types
-	builder.registerBuiltinNodeTypes()
+	// Register built-in want types
+	builder.registerBuiltinWantTypes()
 	
 	return builder
 }
 
-// registerBuiltinNodeTypes registers the default node type factories
-func (cb *ChainBuilder) registerBuiltinNodeTypes() {
+// registerBuiltinWantTypes registers the default want type factories
+func (cb *ChainBuilder) registerBuiltinWantTypes() {
 	// No built-in types by default - they should be registered by domain-specific modules
 }
 
-// RegisterNodeType allows registering custom node types
-func (cb *ChainBuilder) RegisterNodeType(nodeType string, factory NodeFactory) {
-	cb.registry[nodeType] = factory
+// RegisterWantType allows registering custom want types
+func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
+	cb.registry[wantType] = factory
 }
 
-// matchesSelector checks if node labels match the selector criteria
-func (cb *ChainBuilder) matchesSelector(nodeLabels map[string]string, selector map[string]string) bool {
+// matchesSelector checks if want labels match the selector criteria
+func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
 	for key, value := range selector {
-		if nodeLabels[key] != value {
+		if wantLabels[key] != value {
 			return false
 		}
 	}
@@ -345,36 +345,36 @@ func (cb *ChainBuilder) matchesSelector(nodeLabels map[string]string, selector m
 }
 
 
-// generatePathsFromConnections creates paths based on labels and inputs, eliminating output requirements
+// generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	pathMap := make(map[string]Paths)
 	
-	// Initialize empty paths for all nodes
-	for nodeName := range cb.nodes {
-		pathMap[nodeName] = Paths{
+	// Initialize empty paths for all wants
+	for wantName := range cb.wants {
+		pathMap[wantName] = Paths{
 			In:  []PathInfo{},
 			Out: []PathInfo{},
 		}
 	}
 	
-	// Create connections based on input selectors
-	for nodeName, node := range cb.nodes {
-		paths := pathMap[nodeName]
+	// Create connections based on using selectors
+	for wantName, want := range cb.wants {
+		paths := pathMap[wantName]
 		
-		// Process input connections for this node
-		for _, inputSelector := range node.spec.Inputs {
-			// Find nodes that match this input selector
-			for otherName, otherNode := range cb.nodes {
-				if cb.matchesSelector(otherNode.metadata.Labels, inputSelector) {
-					// Create input path for current node
+		// Process using connections for this want
+		for _, usingSelector := range want.spec.Using {
+			// Find wants that match this using selector
+			for otherName, otherWant := range cb.wants {
+				if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
+					// Create using path for current want
 					inPath := PathInfo{
 						Channel: make(chan interface{}, 10),
-						Name:    fmt.Sprintf("%s_to_%s", otherName, nodeName),
+						Name:    fmt.Sprintf("%s_to_%s", otherName, wantName),
 						Active:  true,
 					}
 					paths.In = append(paths.In, inPath)
 					
-					// Create corresponding output path for the matching node
+					// Create corresponding output path for the matching want
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
 						Channel: inPath.Channel, // Same channel, shared connection
@@ -386,59 +386,59 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 				}
 			}
 		}
-		pathMap[nodeName] = paths
+		pathMap[wantName] = paths
 	}
 	
 	return pathMap
 }
 
-// validateConnections validates that all nodes have their connectivity requirements satisfied
+// validateConnections validates that all wants have their connectivity requirements satisfied
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
-	for nodeName, node := range cb.nodes {
-		paths := pathMap[nodeName]
+	for wantName, want := range cb.wants {
+		paths := pathMap[wantName]
 		
-		// Check if this is an enhanced node that has connectivity requirements
-		if enhancedNode, ok := node.function.(EnhancedBaseNode); ok {
-			meta := enhancedNode.GetConnectivityMetadata()
+		// Check if this is an enhanced want that has connectivity requirements
+		if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
+			meta := enhancedWant.GetConnectivityMetadata()
 			
 			inCount := len(paths.In)
 			outCount := len(paths.Out)
 			
-			// Check required inputs
+			// Check required using
 			if inCount < meta.RequiredInputs {
-				return fmt.Errorf("validation failed for node %s: node %s requires %d inputs, got %d", 
-					nodeName, meta.NodeType, meta.RequiredInputs, inCount)
+				return fmt.Errorf("validation failed for want %s: want %s requires %d using, got %d", 
+					wantName, meta.WantType, meta.RequiredInputs, inCount)
 			}
 			
 			// Check required outputs - modified to not require outputs for generators
-			if meta.NodeType != "sequence" && outCount < meta.RequiredOutputs {
-				return fmt.Errorf("validation failed for node %s: node %s requires %d outputs, got %d", 
-					nodeName, meta.NodeType, meta.RequiredOutputs, outCount)
+			if meta.WantType != "sequence" && outCount < meta.RequiredOutputs {
+				return fmt.Errorf("validation failed for want %s: want %s requires %d outputs, got %d", 
+					wantName, meta.WantType, meta.RequiredOutputs, outCount)
 			}
 			
-			// Check maximum inputs
+			// Check maximum using
 			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-				return fmt.Errorf("validation failed for node %s: node %s allows max %d inputs, got %d", 
-					nodeName, meta.NodeType, meta.MaxInputs, inCount)
+				return fmt.Errorf("validation failed for want %s: want %s allows max %d using, got %d", 
+					wantName, meta.WantType, meta.MaxInputs, inCount)
 			}
 			
 			// Check maximum outputs
 			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-				return fmt.Errorf("validation failed for node %s: node %s allows max %d outputs, got %d", 
-					nodeName, meta.NodeType, meta.MaxOutputs, outCount)
+				return fmt.Errorf("validation failed for want %s: want %s allows max %d outputs, got %d", 
+					wantName, meta.WantType, meta.MaxOutputs, outCount)
 			}
 		}
 	}
 	return nil
 }
 
-// createNodeFunction creates the appropriate function based on node type using registry
-func (cb *ChainBuilder) createNodeFunction(node Node) interface{} {
-	factory, exists := cb.registry[node.Metadata.Type]
+// createWantFunction creates the appropriate function based on want type using registry
+func (cb *ChainBuilder) createWantFunction(want Want) interface{} {
+	factory, exists := cb.registry[want.Metadata.Type]
 	if !exists {
-		panic(fmt.Sprintf("Unknown node type: %s", node.Metadata.Type))
+		panic(fmt.Sprintf("Unknown want type: %s", want.Metadata.Type))
 	}
-	return factory(node.Metadata, node.Spec)
+	return factory(want.Metadata, want.Spec)
 }
 
 // copyConfigToMemory copies the current config to memory file for watching
@@ -515,7 +515,7 @@ func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
 func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
 	fmt.Println("[RECONCILE] Loading initial configuration")
-	cb.reconcileNodes()
+	cb.reconcileWants()
 	
 	ticker := time.NewTicker(100 * time.Millisecond)
 	statsTicker := time.NewTicker(1 * time.Second)
@@ -530,7 +530,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
 				fmt.Println("[RECONCILE] Detected config change")
-				cb.reconcileNodes()
+				cb.reconcileWants()
 			}
 		case <-statsTicker.C:
 			cb.writeStatsToMemory()
@@ -538,8 +538,8 @@ func (cb *ChainBuilder) reconcileLoop() {
 	}
 }
 
-// reconcileNodes performs reconciliation when config changes or during initial load
-func (cb *ChainBuilder) reconcileNodes() {
+// reconcileWants performs reconciliation when config changes or during initial load
+func (cb *ChainBuilder) reconcileWants() {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
 	
@@ -551,15 +551,15 @@ func (cb *ChainBuilder) reconcileNodes() {
 	}
 	
 	// Check if this is initial load (no lastConfig set)
-	isInitialLoad := len(cb.lastConfig.Nodes) == 0
+	isInitialLoad := len(cb.lastConfig.Wants) == 0
 	
 	if isInitialLoad {
-		fmt.Printf("[RECONCILE] Initial load: creating %d nodes\n", len(newConfig.Nodes))
-		// For initial load, treat all nodes as new additions
-		for _, nodeConfig := range newConfig.Nodes {
-			cb.addDynamicNodeUnsafe(nodeConfig)
+		fmt.Printf("[RECONCILE] Initial load: creating %d wants\n", len(newConfig.Wants))
+		// For initial load, treat all wants as new additions
+		for _, wantConfig := range newConfig.Wants {
+			cb.addDynamicWantUnsafe(wantConfig)
 		}
-		// Rebuild connections after all nodes are created
+		// Rebuild connections after all wants are created
 		cb.rebuildConnections()
 	} else {
 		// Detect changes for ongoing updates
@@ -584,44 +584,44 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	var changes []ChangeEvent
 	
 	// Create maps for easier comparison
-	oldNodes := make(map[string]Node)
-	for _, node := range oldConfig.Nodes {
-		oldNodes[node.Metadata.Name] = node
+	oldWants := make(map[string]Want)
+	for _, want := range oldConfig.Wants {
+		oldWants[want.Metadata.Name] = want
 	}
 	
-	newNodes := make(map[string]Node)
-	for _, node := range newConfig.Nodes {
-		newNodes[node.Metadata.Name] = node
+	newWants := make(map[string]Want)
+	for _, want := range newConfig.Wants {
+		newWants[want.Metadata.Name] = want
 	}
 	
 	// Find additions and updates
-	for name, newNode := range newNodes {
-		if oldNode, exists := oldNodes[name]; exists {
-			// Check if node changed
-			if !cb.nodesEqual(oldNode, newNode) {
+	for name, newWant := range newWants {
+		if oldWant, exists := oldWants[name]; exists {
+			// Check if want changed
+			if !cb.wantsEqual(oldWant, newWant) {
 				changes = append(changes, ChangeEvent{
 					Type:     ChangeEventUpdate,
-					NodeName: name,
-					Node:     &newNode,
+					WantName: name,
+					Want:     &newWant,
 				})
 			}
 		} else {
-			// New node
+			// New want
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventAdd,
-				NodeName: name,
-				Node:     &newNode,
+				WantName: name,
+				Want:     &newWant,
 			})
 		}
 	}
 	
 	// Find deletions
-	for name := range oldNodes {
-		if _, exists := newNodes[name]; !exists {
+	for name := range oldWants {
+		if _, exists := newWants[name]; !exists {
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventDelete,
-				NodeName: name,
-				Node:     nil,
+				WantName: name,
+				Want:     nil,
 			})
 		}
 	}
@@ -629,27 +629,27 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	return changes
 }
 
-// nodesEqual compares two nodes for equality
-func (cb *ChainBuilder) nodesEqual(a, b Node) bool {
+// wantsEqual compares two wants for equality
+func (cb *ChainBuilder) wantsEqual(a, b Want) bool {
 	// Simple comparison - could be enhanced
 	return a.Metadata.Type == b.Metadata.Type &&
 		fmt.Sprintf("%v", a.Spec.Params) == fmt.Sprintf("%v", b.Spec.Params) &&
-		fmt.Sprintf("%v", a.Spec.Inputs) == fmt.Sprintf("%v", b.Spec.Inputs)
+		fmt.Sprintf("%v", a.Spec.Using) == fmt.Sprintf("%v", b.Spec.Using)
 }
 
 // applyChangesInReverseOrder applies changes in sink-to-generator order
 func (cb *ChainBuilder) applyChangesInReverseOrder(changes []ChangeEvent) {
-	// Sort changes by dependency level (sink nodes first)
+	// Sort changes by dependency level (sink wants first)
 	sortedChanges := cb.sortChangesByDependency(changes)
 	
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			cb.addDynamicNodeUnsafe(*change.Node)
+			cb.addDynamicWantUnsafe(*change.Want)
 		case ChangeEventUpdate:
-			cb.updateNode(*change.Node)
+			cb.updateWant(*change.Want)
 		case ChangeEventDelete:
-			cb.deleteNode(change.NodeName)
+			cb.deleteWant(change.WantName)
 		}
 	}
 	
@@ -659,7 +659,7 @@ func (cb *ChainBuilder) applyChangesInReverseOrder(changes []ChangeEvent) {
 
 // sortChangesByDependency sorts changes by dependency level
 func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeEvent {
-	// Calculate dependency levels for all nodes
+	// Calculate dependency levels for all wants
 	depLevels := cb.calculateDependencyLevels()
 	
 	// Sort changes by dependency level (higher level = closer to sink)
@@ -669,8 +669,8 @@ func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeE
 	// Simple sort by dependency level
 	for i := 0; i < len(sortedChanges)-1; i++ {
 		for j := i + 1; j < len(sortedChanges); j++ {
-			levelI := depLevels[sortedChanges[i].NodeName]
-			levelJ := depLevels[sortedChanges[j].NodeName]
+			levelI := depLevels[sortedChanges[i].WantName]
+			levelJ := depLevels[sortedChanges[j].WantName]
 			if levelI < levelJ {
 				sortedChanges[i], sortedChanges[j] = sortedChanges[j], sortedChanges[i]
 			}
@@ -680,68 +680,68 @@ func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeE
 	return sortedChanges
 }
 
-// calculateDependencyLevels calculates dependency levels for nodes
+// calculateDependencyLevels calculates dependency levels for wants
 func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 	levels := make(map[string]int)
 	
 	// Simple heuristic: sinks have highest level, generators have lowest
-	for name, node := range cb.nodes {
-		if isSinkNode(node.metadata.Type) {
+	for name, want := range cb.wants {
+		if isSinkWant(want.metadata.Type) {
 			levels[name] = 100
-		} else if node.metadata.Type == "sequence" {
+		} else if want.metadata.Type == "sequence" {
 			levels[name] = 1
 		} else {
-			levels[name] = 50 // Middle nodes
+			levels[name] = 50 // Middle wants
 		}
 	}
 	
 	return levels
 }
 
-// addNode adds a new node to the runtime (private method)
-func (cb *ChainBuilder) addNode(nodeConfig Node) {
-	fmt.Printf("[RECONCILE] Adding node: %s\n", nodeConfig.Metadata.Name)
+// addWant adds a new want to the runtime (private method)
+func (cb *ChainBuilder) addWant(wantConfig Want) {
+	fmt.Printf("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
 	
 	
-	// Create the function/node
-	nodeFunction := cb.createNodeFunction(nodeConfig)
+	// Create the function/want
+	wantFunction := cb.createWantFunction(wantConfig)
 	
-	var nodePtr *Node
-	if nodeWithGetNode, ok := nodeFunction.(interface{ GetNode() *Node }); ok {
-		nodePtr = nodeWithGetNode.GetNode()
+	var wantPtr *Want
+	if wantWithGetWant, ok := wantFunction.(interface{ GetWant() *Want }); ok {
+		wantPtr = wantWithGetWant.GetWant()
 	} else {
-		nodePtr = &Node{
-			Metadata: nodeConfig.Metadata,
-			Spec:     nodeConfig.Spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+		wantPtr = &Want{
+			Metadata: wantConfig.Metadata,
+			Spec:     wantConfig.Spec,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		}
 	}
 	
-	runtimeNode := &runtimeNode{
-		metadata: nodeConfig.Metadata,
-		spec:     nodeConfig.Spec,
-		function: nodeFunction,
-		node:     nodePtr,
+	runtimeWant := &runtimeWant{
+		metadata: wantConfig.Metadata,
+		spec:     wantConfig.Spec,
+		function: wantFunction,
+		want:     wantPtr,
 	}
-	cb.nodes[nodeConfig.Metadata.Name] = runtimeNode
+	cb.wants[wantConfig.Metadata.Name] = runtimeWant
 }
 
-// updateNode updates an existing node
-func (cb *ChainBuilder) updateNode(nodeConfig Node) {
-	fmt.Printf("[RECONCILE] Updating node: %s\n", nodeConfig.Metadata.Name)
+// updateWant updates an existing want
+func (cb *ChainBuilder) updateWant(wantConfig Want) {
+	fmt.Printf("[RECONCILE] Updating want: %s\n", wantConfig.Metadata.Name)
 	
 	// For now, delete and recreate
-	cb.deleteNode(nodeConfig.Metadata.Name)
-	cb.addDynamicNodeUnsafe(nodeConfig)
+	cb.deleteWant(wantConfig.Metadata.Name)
+	cb.addDynamicWantUnsafe(wantConfig)
 }
 
-// deleteNode removes a node from runtime
-func (cb *ChainBuilder) deleteNode(nodeName string) {
-	fmt.Printf("[RECONCILE] Deleting node: %s\n", nodeName)
+// deleteWant removes a want from runtime
+func (cb *ChainBuilder) deleteWant(wantName string) {
+	fmt.Printf("[RECONCILE] Deleting want: %s\n", wantName)
 	
-	delete(cb.nodes, nodeName)
+	delete(cb.wants, wantName)
 }
 
 // rebuildConnections rebuilds all connections after changes
@@ -771,38 +771,38 @@ func (cb *ChainBuilder) rebuildConnections() {
 	}
 	cb.channelMutex.Unlock()
 	
-	// Start new nodes if system is running
+	// Start new wants if system is running
 	if cb.running {
-		cb.startNewNodes()
+		cb.startNewWants()
 	}
 }
 
-// startNewNodes starts newly added nodes
-func (cb *ChainBuilder) startNewNodes() {
-	for nodeName, node := range cb.nodes {
-		if node.node.GetStatus() == NodeStatusIdle {
-			cb.startNode(nodeName, node)
+// startNewWants starts newly added wants
+func (cb *ChainBuilder) startNewWants() {
+	for wantName, want := range cb.wants {
+		if want.want.GetStatus() == WantStatusIdle {
+			cb.startWant(wantName, want)
 		}
 	}
 }
 
-// startNode starts a single node
-func (cb *ChainBuilder) startNode(nodeName string, node *runtimeNode) {
-	// Check if node is already running or completed to prevent duplicate starts
-	if node.node.GetStatus() == NodeStatusRunning || node.node.GetStatus() == NodeStatusCompleted {
+// startWant starts a single want
+func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
+	// Check if want is already running or completed to prevent duplicate starts
+	if want.want.GetStatus() == WantStatusRunning || want.want.GetStatus() == WantStatusCompleted {
 		return
 	}
 	
-	paths := cb.pathMap[nodeName]
+	paths := cb.pathMap[wantName]
 	
-	// Prepare input channels
-	var inputChans []chain.Chan
-	for _, inputPath := range paths.In {
-		if inputPath.Active {
-			channelKey := inputPath.Name
+	// Prepare using channels
+	var usingChans []chain.Chan
+	for _, usingPath := range paths.In {
+		if usingPath.Active {
+			channelKey := usingPath.Name
 			cb.channelMutex.RLock()
 			if ch, exists := cb.channels[channelKey]; exists {
-				inputChans = append(inputChans, ch)
+				usingChans = append(usingChans, ch)
 			}
 			cb.channelMutex.RUnlock()
 		}
@@ -821,29 +821,29 @@ func (cb *ChainBuilder) startNode(nodeName string, node *runtimeNode) {
 		}
 	}
 	
-	// Start node execution
-	if chainNode, ok := node.function.(ChainNode); ok {
-		generalizedFn := chainNode.CreateFunction()
-		node.node.SetStatus(NodeStatusRunning)
+	// Start want execution
+	if chainWant, ok := want.function.(ChainWant); ok {
+		generalizedFn := chainWant.CreateFunction()
+		want.want.SetStatus(WantStatusRunning)
 		
 		cb.waitGroup.Add(1)
 		go func() {
 			defer cb.waitGroup.Done()
 			defer func() {
-				if node.node.GetStatus() == NodeStatusRunning {
-					node.node.SetStatus(NodeStatusCompleted)
+				if want.want.GetStatus() == WantStatusRunning {
+					want.want.SetStatus(WantStatusCompleted)
 				}
 			}()
 			
-			fmt.Printf("[EXEC] Starting node %s with %d inputs, %d outputs\n", 
-				nodeName, len(inputChans), len(outputChans))
+			fmt.Printf("[EXEC] Starting want %s with %d using, %d outputs\n", 
+				wantName, len(usingChans), len(outputChans))
 			
 			for {
-				if generalizedFn(inputChans, outputChans) {
-					fmt.Printf("[EXEC] Node %s finished\n", nodeName)
+				if generalizedFn(usingChans, outputChans) {
+					fmt.Printf("[EXEC] Want %s finished\n", wantName)
 					
-					// Check if this node completion should notify parent targets
-					cb.notifyParentTargetsOfChildCompletion(nodeName)
+					// Check if this want completion should notify parent targets
+					cb.notifyParentTargetsOfChildCompletion(wantName)
 					
 					break
 				}
@@ -858,37 +858,37 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 	
-	// Create a comprehensive config that includes ALL nodes (both config and runtime)
+	// Create a comprehensive config that includes ALL wants (both config and runtime)
 	updatedConfig := Config{
-		Nodes: make([]Node, 0),
+		Wants: make([]Want, 0),
 	}
 	
-	// First, add all nodes from config and update with current stats
-	configNodeMap := make(map[string]bool)
-	for _, node := range cb.config.Nodes {
-		configNodeMap[node.Metadata.Name] = true
-		if runtimeNode, exists := cb.nodes[node.Metadata.Name]; exists {
-			// Update with runtime data including spec inputs
-			node.Spec = runtimeNode.spec  // Preserve inputs from runtime spec
-			node.Stats = runtimeNode.node.Stats
-			node.Status = runtimeNode.node.Status
-			node.State = runtimeNode.node.State
+	// First, add all wants from config and update with current stats
+	configWantMap := make(map[string]bool)
+	for _, want := range cb.config.Wants {
+		configWantMap[want.Metadata.Name] = true
+		if runtimeWant, exists := cb.wants[want.Metadata.Name]; exists {
+			// Update with runtime data including spec using
+			want.Spec = runtimeWant.spec  // Preserve using from runtime spec
+			want.Stats = runtimeWant.want.Stats
+			want.Status = runtimeWant.want.Status
+			want.State = runtimeWant.want.State
 		}
-		updatedConfig.Nodes = append(updatedConfig.Nodes, node)
+		updatedConfig.Wants = append(updatedConfig.Wants, want)
 	}
 	
-	// Then, add any runtime nodes that might not be in config (e.g., dynamically created and completed)
-	for nodeName, runtimeNode := range cb.nodes {
-		if !configNodeMap[nodeName] {
-			// This node exists in runtime but not in config - include it
-			nodeConfig := Node{
-				Metadata: runtimeNode.metadata,
-				Spec:     runtimeNode.spec,
-				Stats:    runtimeNode.node.Stats,
-				Status:   runtimeNode.node.Status,
-				State:    runtimeNode.node.State,
+	// Then, add any runtime wants that might not be in config (e.g., dynamically created and completed)
+	for wantName, runtimeWant := range cb.wants {
+		if !configWantMap[wantName] {
+			// This want exists in runtime but not in config - include it
+			wantConfig := Want{
+				Metadata: runtimeWant.metadata,
+				Spec:     runtimeWant.spec,
+				Stats:    runtimeWant.want.Stats,
+				Status:   runtimeWant.want.Status,
+				State:    runtimeWant.want.State,
 			}
-			updatedConfig.Nodes = append(updatedConfig.Nodes, nodeConfig)
+			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
 		}
 	}
 	
@@ -904,7 +904,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 }
 
-// Execute starts the reconcile loop and initial node execution
+// Execute starts the reconcile loop and initial want execution
 func (cb *ChainBuilder) Execute() {
 	fmt.Println("[RECONCILE] Starting reconcile loop execution")
 	
@@ -918,34 +918,34 @@ func (cb *ChainBuilder) Execute() {
 	}
 	
 	// Initialize empty lastConfig so reconcileLoop can detect initial load
-	cb.lastConfig = Config{Nodes: []Node{}}
+	cb.lastConfig = Config{Wants: []Want{}}
 	
 	// Mark as running
 	cb.reconcileMutex.Lock()
 	cb.running = true
 	cb.reconcileMutex.Unlock()
 	
-	// Start reconcile loop in background - it will handle initial node creation
+	// Start reconcile loop in background - it will handle initial want creation
 	go cb.reconcileLoop()
 	
-	// Wait for initial nodes to be created by reconcileLoop
+	// Wait for initial wants to be created by reconcileLoop
 	for {
 		cb.reconcileMutex.Lock()
-		nodeCount := len(cb.nodes)
+		wantCount := len(cb.wants)
 		cb.reconcileMutex.Unlock()
 		
-		if nodeCount > 0 {
+		if wantCount > 0 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	
-	// Start all initial nodes
-	for nodeName, node := range cb.nodes {
-		cb.startNode(nodeName, node)
+	// Start all initial wants
+	for wantName, want := range cb.wants {
+		cb.startWant(wantName, want)
 	}
 	
-	// Wait for all nodes to complete
+	// Wait for all wants to complete
 	cb.waitGroup.Wait()
 	
 	// Stop reconcile loop
@@ -958,9 +958,9 @@ func (cb *ChainBuilder) Execute() {
 	
 	// Final memory dump - ensure it completes before returning
 	fmt.Println("[RECONCILE] Writing final memory dump...")
-	err := cb.dumpNodeMemoryToYAML()
+	err := cb.dumpWantMemoryToYAML()
 	if err != nil {
-		fmt.Printf("Warning: Failed to dump node memory to YAML: %v\n", err)
+		fmt.Printf("Warning: Failed to dump want memory to YAML: %v\n", err)
 	} else {
 		fmt.Println("[RECONCILE] Memory dump completed successfully")
 	}
@@ -970,20 +970,20 @@ func (cb *ChainBuilder) Execute() {
 }
 
 
-// GetNodeState returns the state of a specific node
-func (cb *ChainBuilder) GetNodeState(nodeName string) (*Node, bool) {
-	node, exists := cb.nodes[nodeName]
+// GetWantState returns the state of a specific want
+func (cb *ChainBuilder) GetWantState(wantName string) (*Want, bool) {
+	want, exists := cb.wants[wantName]
 	if !exists {
 		return nil, false
 	}
-	return node.node, true
+	return want.want, true
 }
 
-// GetAllNodeStates returns the states of all nodes
-func (cb *ChainBuilder) GetAllNodeStates() map[string]*Node {
-	states := make(map[string]*Node)
-	for name, node := range cb.nodes {
-		states[name] = node.node
+// GetAllWantStates returns the states of all wants
+func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
+	states := make(map[string]*Want)
+	for name, want := range cb.wants {
+		states[name] = want.want
 	}
 	return states
 }
@@ -993,30 +993,30 @@ func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
 	cb.memoryPath = memoryPath
 }
 
-// AddDynamicNodes adds multiple nodes to the configuration at runtime
-func (cb *ChainBuilder) AddDynamicNodes(nodes []Node) {
+// AddDynamicWants adds multiple wants to the configuration at runtime
+func (cb *ChainBuilder) AddDynamicWants(wants []Want) {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
-	for _, node := range nodes {
-		cb.addDynamicNodeUnsafe(node)
+	for _, want := range wants {
+		cb.addDynamicWantUnsafe(want)
 	}
 }
 
-// AddDynamicNode adds a single node to the configuration at runtime
-func (cb *ChainBuilder) AddDynamicNode(node Node) {
+// AddDynamicWant adds a single want to the configuration at runtime
+func (cb *ChainBuilder) AddDynamicWant(want Want) {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
-	cb.addDynamicNodeUnsafe(node)
+	cb.addDynamicWantUnsafe(want)
 }
 
-// addDynamicNodeUnsafe adds a node without acquiring the mutex (internal use)
-func (cb *ChainBuilder) addDynamicNodeUnsafe(node Node) {
-	// Add node to the configuration
-	cb.config.Nodes = append(cb.config.Nodes, node)
+// addDynamicWantUnsafe adds a want without acquiring the mutex (internal use)
+func (cb *ChainBuilder) addDynamicWantUnsafe(want Want) {
+	// Add want to the configuration
+	cb.config.Wants = append(cb.config.Wants, want)
 	
-	// Create runtime node if it doesn't exist
-	if _, exists := cb.nodes[node.Metadata.Name]; !exists {
-		cb.addNode(node)
+	// Create runtime want if it doesn't exist
+	if _, exists := cb.wants[want.Metadata.Name]; !exists {
+		cb.addWant(want)
 	}
 }
 
@@ -1039,15 +1039,15 @@ func loadConfigFromYAML(filename string) (Config, error) {
 	return config, nil
 }
 
-// NodeMemoryDump represents the complete state of all nodes for dumping
-type NodeMemoryDump struct {
+// WantMemoryDump represents the complete state of all wants for dumping
+type WantMemoryDump struct {
 	Timestamp   string `yaml:"timestamp"`
 	ExecutionID string `yaml:"execution_id"`
-	Nodes       []Node `yaml:"nodes"`
+	Wants       []Want `yaml:"wants"`
 }
 
-// dumpNodeMemoryToYAML dumps all node information to a timestamped YAML file in memory directory
-func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
+// dumpWantMemoryToYAML dumps all want information to a timestamped YAML file in memory directory
+func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 	// Create timestamp-based filename
 	timestamp := time.Now().Format("20060102-150405")
 	
@@ -1065,31 +1065,31 @@ func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
 	}
 	
-	// Convert node map to slice to match config format, preserving runtime spec
-	nodes := make([]Node, 0, len(cb.nodes))
-	for _, runtimeNode := range cb.nodes {
-		// Use runtime spec to preserve inputs, but node state for stats/status
-		node := Node{
-			Metadata: runtimeNode.metadata,
-			Spec:     runtimeNode.spec,  // This preserves inputs
-			Stats:    runtimeNode.node.Stats,
-			Status:   runtimeNode.node.Status,
-			State:    runtimeNode.node.State,
+	// Convert want map to slice to match config format, preserving runtime spec
+	wants := make([]Want, 0, len(cb.wants))
+	for _, runtimeWant := range cb.wants {
+		// Use runtime spec to preserve using, but want state for stats/status
+		want := Want{
+			Metadata: runtimeWant.metadata,
+			Spec:     runtimeWant.spec,  // This preserves using
+			Stats:    runtimeWant.want.Stats,
+			Status:   runtimeWant.want.Status,
+			State:    runtimeWant.want.State,
 		}
-		nodes = append(nodes, node)
+		wants = append(wants, want)
 	}
 	
 	// Prepare memory dump structure
-	memoryDump := NodeMemoryDump{
+	memoryDump := WantMemoryDump{
 		Timestamp:   time.Now().Format(time.RFC3339),
 		ExecutionID: fmt.Sprintf("exec-%s", timestamp),
-		Nodes:       nodes,
+		Wants:       wants,
 	}
 	
 	// Marshal to YAML
 	data, err := yaml.Marshal(memoryDump)
 	if err != nil {
-		return fmt.Errorf("failed to marshal node memory to YAML: %w", err)
+		return fmt.Errorf("failed to marshal want memory to YAML: %w", err)
 	}
 	
 	// Write to file with explicit sync
@@ -1105,48 +1105,48 @@ func (cb *ChainBuilder) dumpNodeMemoryToYAML() error {
 		file.Close()
 	}
 	
-	fmt.Printf("📝 Node memory dumped to: %s\n", filename)
+	fmt.Printf("📝 Want memory dumped to: %s\n", filename)
 	return nil
 }
 
-// notifyParentTargetsOfChildCompletion checks if a completed node has owner references
-// and notifies parent Target nodes when all their children have completed
-func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedNodeName string) {
-	// Find the config node for this completed node
-	var completedNodeConfig *Node
-	for _, nodeConfig := range cb.config.Nodes {
-		if nodeConfig.Metadata.Name == completedNodeName {
-			completedNodeConfig = &nodeConfig
+// notifyParentTargetsOfChildCompletion checks if a completed want has owner references
+// and notifies parent Target wants when all their children have completed
+func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedWantName string) {
+	// Find the config want for this completed want
+	var completedWantConfig *Want
+	for _, wantConfig := range cb.config.Wants {
+		if wantConfig.Metadata.Name == completedWantName {
+			completedWantConfig = &wantConfig
 			break
 		}
 	}
 	
-	if completedNodeConfig == nil || len(completedNodeConfig.Metadata.OwnerReferences) == 0 {
+	if completedWantConfig == nil || len(completedWantConfig.Metadata.OwnerReferences) == 0 {
 		return // No owner references
 	}
 	
 	// For each owner reference, check if all siblings are complete
-	for _, ownerRef := range completedNodeConfig.Metadata.OwnerReferences {
+	for _, ownerRef := range completedWantConfig.Metadata.OwnerReferences {
 		parentName := ownerRef.Name
 		
-		// Check if parent is a Target node
-		parentRuntimeNode, exists := cb.nodes[parentName]
+		// Check if parent is a Target want
+		parentRuntimeWant, exists := cb.wants[parentName]
 		if !exists {
 			continue
 		}
 		
 		// Check if it implements child completion notification
-		if notifier, ok := parentRuntimeNode.function.(ParentNotifier); ok {
-			// Find all child nodes with this parent
+		if notifier, ok := parentRuntimeWant.function.(ParentNotifier); ok {
+			// Find all child wants with this parent
 			allChildrenComplete := true
-			for _, nodeConfig := range cb.config.Nodes {
-				if nodeConfig.Metadata.Name == parentName {
+			for _, wantConfig := range cb.config.Wants {
+				if wantConfig.Metadata.Name == parentName {
 					continue // Skip the parent itself
 				}
 				
-				// Check if this node has ownerRef to this parent
+				// Check if this want has ownerRef to this parent
 				hasOwnerRef := false
-				for _, childOwnerRef := range nodeConfig.Metadata.OwnerReferences {
+				for _, childOwnerRef := range wantConfig.Metadata.OwnerReferences {
 					if childOwnerRef.Name == parentName {
 						hasOwnerRef = true
 						break
@@ -1155,8 +1155,8 @@ func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedNodeName s
 				
 				if hasOwnerRef {
 					// This is a child - check if it's completed
-					if childRuntimeNode, exists := cb.nodes[nodeConfig.Metadata.Name]; exists {
-						if childRuntimeNode.node.GetStatus() != NodeStatusCompleted {
+					if childRuntimeWant, exists := cb.wants[wantConfig.Metadata.Name]; exists {
+						if childRuntimeWant.want.GetStatus() != WantStatusCompleted {
 							allChildrenComplete = false
 							break
 						}

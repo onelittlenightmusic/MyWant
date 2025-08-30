@@ -1,4 +1,4 @@
-nodes:
+wants:
   # Seed generator provides initial fibonacci values (0, 1)
   - metadata:
       name: seed-generator
@@ -21,7 +21,7 @@ nodes:
         component: calculator
     spec:
       params: {}
-      inputs:
+      using:
         - role: merger
           stage: combine
           stream: fibonacci
@@ -36,7 +36,7 @@ nodes:
         stream: fibonacci
     spec:
       params: {}
-      inputs:
+      using:
         - role: source
           stage: initial
         - role: processor
@@ -52,7 +52,7 @@ nodes:
         component: display
     spec:
       params: {}
-      inputs:
+      using:
         - role: merger
           stage: combine
           stream: fibonacci

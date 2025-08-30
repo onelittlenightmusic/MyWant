@@ -1,4 +1,4 @@
-nodes:
+wants:
   - metadata:
       name: number-target-dry
       type: target

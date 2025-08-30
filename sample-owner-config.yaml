@@ -1,4 +1,4 @@
-nodes:
+wants:
   - metadata:
       name: number-target
       type: target
@@ -24,7 +24,7 @@ nodes:
     spec:
       params:
         display_format: "Number: %d"
-      inputs:
+      using:
         - role: processor  # Gets input from queue
 
   # Generator node (child) - generates numbers from 0 to 999
@@ -66,5 +66,5 @@ nodes:
       params:
         service_time: 0.1
       # Using inputs field for input-based channel connection
-      inputs:
+      using:
         - category: producer  # Gets input from generator

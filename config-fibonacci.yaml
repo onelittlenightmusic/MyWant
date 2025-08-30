@@ -1,4 +1,4 @@
-nodes:
+wants:
   # Fibonacci sequence generator
   - metadata:
       name: generator
@@ -19,7 +19,7 @@ nodes:
       params:
         min_value: 1
         max_value: 100
-      inputs:
+      using:
         - role: source
 
   # Sink that collects and displays fibonacci numbers
@@ -30,5 +30,5 @@ nodes:
         role: collector
     spec:
       params: {}
-      inputs:
+      using:
         - role: filter

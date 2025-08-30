@@ -7,19 +7,19 @@ import (
 
 // FibonacciGenerator generates fibonacci sequence numbers
 type FibonacciGenerator struct {
-	Node
+	Want
 	Count int
 	paths Paths
 }
 
-// NewFibonacciGenerator creates a new fibonacci generator node
+// NewFibonacciGenerator creates a new fibonacci generator want
 func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *FibonacciGenerator {
 	gen := &FibonacciGenerator{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Count: 20,
@@ -37,8 +37,8 @@ func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *Fi
 }
 
 // CreateFunction returns the generalized chain function for the generator
-func (g *FibonacciGenerator) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (g *FibonacciGenerator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -53,27 +53,27 @@ func (g *FibonacciGenerator) CreateFunction() func(inputs []chain.Chan, outputs 
 	}
 }
 
-// GetNode returns the underlying Node
-func (g *FibonacciGenerator) GetNode() *Node {
-	return &g.Node
+// GetWant returns the underlying Want
+func (g *FibonacciGenerator) GetWant() *Want {
+	return &g.Want
 }
 
 // FibonacciFilter filters fibonacci numbers based on criteria
 type FibonacciFilter struct {
-	Node
+	Want
 	MinValue int
 	MaxValue int
 	paths    Paths
 }
 
-// NewFibonacciFilter creates a new fibonacci filter node
+// NewFibonacciFilter creates a new fibonacci filter want
 func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *FibonacciFilter {
 	filter := &FibonacciFilter{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		MinValue: 0,
@@ -100,12 +100,12 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *FibonacciFilter) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 || len(outputs) == 0 {
+func (f *FibonacciFilter) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		out := outputs[0]
 		
 		for i := range in {
@@ -122,26 +122,26 @@ func (f *FibonacciFilter) CreateFunction() func(inputs []chain.Chan, outputs []c
 	}
 }
 
-// GetNode returns the underlying Node
-func (f *FibonacciFilter) GetNode() *Node {
-	return &f.Node
+// GetWant returns the underlying Want
+func (f *FibonacciFilter) GetWant() *Want {
+	return &f.Want
 }
 
 // FibonacciSink collects and displays fibonacci numbers
 type FibonacciSink struct {
-	Node
+	Want
 	numbers []int
 	paths   Paths
 }
 
-// NewFibonacciSink creates a new fibonacci sink node
+// NewFibonacciSink creates a new fibonacci sink want
 func NewFibonacciSink(metadata Metadata, params map[string]interface{}) *FibonacciSink {
 	sink := &FibonacciSink{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
-			Spec:     NodeSpec{Params: params},
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Spec:     WantSpec{Params: params},
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		numbers: make([]int, 0),
@@ -151,12 +151,12 @@ func NewFibonacciSink(metadata Metadata, params map[string]interface{}) *Fibonac
 }
 
 // CreateFunction returns the generalized chain function for the sink
-func (s *FibonacciSink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 {
+func (s *FibonacciSink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		
 		fmt.Println("Fibonacci numbers:")
 		for i := range in {
@@ -173,22 +173,22 @@ func (s *FibonacciSink) CreateFunction() func(inputs []chain.Chan, outputs []cha
 	}
 }
 
-// GetNode returns the underlying Node
-func (s *FibonacciSink) GetNode() *Node {
-	return &s.Node
+// GetWant returns the underlying Want
+func (s *FibonacciSink) GetWant() *Want {
+	return &s.Want
 }
 
-// RegisterFibonacciNodeTypes registers the fibonacci-specific node types with a ChainBuilder
-func RegisterFibonacciNodeTypes(builder *ChainBuilder) {
-	builder.RegisterNodeType("fibonacci_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
+// RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
+func RegisterFibonacciWantTypes(builder *ChainBuilder) {
+	builder.RegisterWantType("fibonacci_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciGenerator(metadata, params)
 	})
 	
-	builder.RegisterNodeType("fibonacci_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("fibonacci_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciFilter(metadata, params)
 	})
 	
-	builder.RegisterNodeType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
+	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciSink(metadata, params)
 	})
 }

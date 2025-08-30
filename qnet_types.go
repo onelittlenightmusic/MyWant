@@ -38,20 +38,20 @@ func ExpRand64() float64 {
 
 // Generator creates packets and sends them downstream
 type Generator struct {
-	Node
+	Want
 	Rate  float64
 	Count int
 	paths Paths
 }
 
-// PacketSequence creates a new generator node
-func PacketSequence(metadata Metadata, spec NodeSpec) *Generator {
+// PacketSequence creates a new generator want
+func PacketSequence(metadata Metadata, spec WantSpec) *Generator {
 	gen := &Generator{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Rate:  1.0,
@@ -83,12 +83,12 @@ func (g *Generator) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for generator
 func (g *Generator) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  0, // Generators don't need inputs
+		RequiredInputs:  0, // Generators don't need using
 		RequiredOutputs: 1, // Must have at least one output
-		MaxInputs:       0, // No inputs allowed
+		MaxInputs:       0, // No using allowed
 		MaxOutputs:      -1, // Unlimited outputs
-		NodeType:        "sequence",
-		Description:     "Packet generator node",
+		WantType:        "sequence",
+		Description:     "Packet generator want",
 	}
 }
 
@@ -107,18 +107,18 @@ func (g *Generator) Process(paths Paths) bool {
 	return false // Not used in current implementation
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (g *Generator) GetType() string {
 	return "sequence"
 }
 
-// GetNode returns the embedded Node
-func (g *Generator) GetNode() *Node {
-	return &g.Node
+// GetWant returns the embedded Want
+func (g *Generator) GetWant() *Want {
+	return &g.Want
 }
 
 // CreateFunction returns the generalized chain function for this generator
-func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (g *Generator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	t, j := 0.0, 0
 	
 	// Check for deterministic mode in parameters
@@ -131,7 +131,7 @@ func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.C
 		}
 	}
 	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -165,19 +165,19 @@ func (g *Generator) CreateFunction() func(inputs []chain.Chan, outputs []chain.C
 
 // Queue processes packets with a service time
 type Queue struct {
-	Node
+	Want
 	ServiceTime float64
 	paths       Paths
 }
 
-// NewQueue creates a new queue node
-func NewQueue(metadata Metadata, spec NodeSpec) *Queue {
+// NewQueue creates a new queue want
+func NewQueue(metadata Metadata, spec WantSpec) *Queue {
 	queue := &Queue{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		ServiceTime: 1.0,
@@ -201,12 +201,12 @@ func (q *Queue) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for queue
 func (q *Queue) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  1, // Queues need at least one input
+		RequiredInputs:  1, // Queues need at least one using
 		RequiredOutputs: 1, // Must have at least one output
-		MaxInputs:       1, // Only one input supported
+		MaxInputs:       1, // Only one using supported
 		MaxOutputs:      -1, // Unlimited outputs
-		NodeType:        "queue",
-		Description:     "Queue processing node",
+		WantType:        "queue",
+		Description:     "Queue processing want",
 	}
 }
 
@@ -225,26 +225,26 @@ func (q *Queue) Process(paths Paths) bool {
 	return false // Not used in current implementation
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (q *Queue) GetType() string {
 	return "queue"
 }
 
-// GetNode returns the embedded Node
-func (q *Queue) GetNode() *Node {
-	return &q.Node
+// GetWant returns the embedded Want
+func (q *Queue) GetWant() *Want {
+	return &q.Want
 }
 
 // CreateFunction returns the generalized chain function for this queue
-func (q *Queue) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	serverFreeTime, waitTimeSum := 0.0, 0.0
 	processedCount := 0
 	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 || len(outputs) == 0 {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		out := outputs[0]
 		
 		packet := (<-in).(QueuePacket)
@@ -252,7 +252,7 @@ func (q *Queue) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan)
 		if packet.isEnded() {
 			if processedCount > 0 {
 				avgWaitTime := waitTimeSum / float64(processedCount)
-				// Store stats in the Node
+				// Store stats in the Want
 				q.Stats.AverageWaitTime = avgWaitTime
 				q.Stats.TotalProcessed = processedCount
 				q.Stats.TotalWaitTime = waitTimeSum
@@ -318,21 +318,21 @@ func (q *Queue) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan)
 	}
 }
 
-// Combiner merges multiple input streams
+// Combiner merges multiple using streams
 type Combiner struct {
-	Node
+	Want
 	Operation string
 	paths     Paths
 }
 
-// NewCombiner creates a new combiner node
-func NewCombiner(metadata Metadata, spec NodeSpec) *Combiner {
+// NewCombiner creates a new combiner want
+func NewCombiner(metadata Metadata, spec WantSpec) *Combiner {
 	combiner := &Combiner{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Operation: "merge",
@@ -356,12 +356,12 @@ func (c *Combiner) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for combiner
 func (c *Combiner) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  2, // Combiners need at least two inputs
+		RequiredInputs:  2, // Combiners need at least two using
 		RequiredOutputs: 1, // Must have at least one output
-		MaxInputs:       -1, // Unlimited inputs
+		MaxInputs:       -1, // Unlimited using
 		MaxOutputs:      -1, // Unlimited outputs
-		NodeType:        "combiner",
-		Description:     "Stream combiner node",
+		WantType:        "combiner",
+		Description:     "Stream combiner want",
 	}
 }
 
@@ -380,36 +380,36 @@ func (c *Combiner) Process(paths Paths) bool {
 	return false // Not used in current implementation
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (c *Combiner) GetType() string {
 	return "combiner"
 }
 
-// GetNode returns the embedded Node
-func (c *Combiner) GetNode() *Node {
-	return &c.Node
+// GetWant returns the embedded Want
+func (c *Combiner) GetWant() *Want {
+	return &c.Want
 }
 
 // CreateFunction returns the generalized chain function for this combiner
-func (c *Combiner) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	processed := 0
-	inputsClosed := make([]bool, 0) // Track which inputs are closed
+	usingsClosed := make([]bool, 0) // Track which using are closed
 	packetBuffer := make([]QueuePacket, 0) // Buffer to store packets not yet sent
 	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		if len(inputs) == 0 || len(outputs) == 0 {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
 		out := outputs[0]
 		
 		// Initialize closed tracking if needed
-		if len(inputsClosed) != len(inputs) {
-			inputsClosed = make([]bool, len(inputs))
+		if len(usingsClosed) != len(using) {
+			usingsClosed = make([]bool, len(using))
 		}
 		
-		// Check if all inputs are closed and buffer is empty
+		// Check if all using are closed and buffer is empty
 		allClosed := true
-		for _, closed := range inputsClosed {
+		for _, closed := range usingsClosed {
 			if !closed {
 				allClosed = false
 				break
@@ -426,37 +426,37 @@ func (c *Combiner) CreateFunction() func(inputs []chain.Chan, outputs []chain.Ch
 			return true
 		}
 		
-		// Collect available packets from all open inputs and add to buffer
-		for i, input := range inputs {
-			if inputsClosed[i] {
-				continue // Skip closed inputs
+		// Collect available packets from all open using and add to buffer
+		for i, input := range using {
+			if usingsClosed[i] {
+				continue // Skip closed using
 			}
 			
 			select {
 			case packet := <-input:
 				qPacket := packet.(QueuePacket)
 				if qPacket.isEnded() {
-					inputsClosed[i] = true // Mark this input as closed
+					usingsClosed[i] = true // Mark this using as closed
 				} else {
 					packetBuffer = append(packetBuffer, qPacket)
 				}
 			default:
-				// No packet available on this input right now
+				// No packet available on this using right now
 			}
 		}
 		
-		// If buffer is empty and not all inputs closed, wait for at least one packet
+		// If buffer is empty and not all using closed, wait for at least one packet
 		if len(packetBuffer) == 0 && !allClosed {
-			// Wait for next packet from any open input
-			for i, input := range inputs {
-				if inputsClosed[i] {
+			// Wait for next packet from any open using
+			for i, input := range using {
+				if usingsClosed[i] {
 					continue
 				}
 				select {
 				case packet := <-input:
 					qPacket := packet.(QueuePacket)
 					if qPacket.isEnded() {
-						inputsClosed[i] = true
+						usingsClosed[i] = true
 					} else {
 						packetBuffer = append(packetBuffer, qPacket)
 					}
@@ -494,19 +494,19 @@ func (c *Combiner) CreateFunction() func(inputs []chain.Chan, outputs []chain.Ch
 
 // Sink collects and terminates the packet stream
 type Sink struct {
-	Node
+	Want
 	Received int
 	paths    Paths
 }
 
-// Goal creates a new sink node
-func Goal(metadata Metadata, spec NodeSpec) *Sink {
+// Goal creates a new sink want
+func Goal(metadata Metadata, spec WantSpec) *Sink {
 	return &Sink{
-		Node: Node{
+		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    NodeStats{},
-			Status:   NodeStatusIdle,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Received: 0,
@@ -522,12 +522,12 @@ func (s *Sink) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for sink
 func (s *Sink) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredInputs:  1, // Sinks need at least one input
+		RequiredInputs:  1, // Sinks need at least one using
 		RequiredOutputs: 0, // Sinks don't need outputs
-		MaxInputs:       -1, // Unlimited inputs
+		MaxInputs:       -1, // Unlimited using
 		MaxOutputs:      0, // No outputs allowed
-		NodeType:        "sink",
-		Description:     "Data sink/collector node",
+		WantType:        "sink",
+		Description:     "Data sink/collector want",
 	}
 }
 
@@ -546,26 +546,26 @@ func (s *Sink) Process(paths Paths) bool {
 	return false // Not used in current implementation
 }
 
-// GetType returns the node type
+// GetType returns the want type
 func (s *Sink) GetType() string {
 	return "sink"
 }
 
-// GetNode returns the embedded Node
-func (s *Sink) GetNode() *Node {
-	return &s.Node
+// GetWant returns the embedded Want
+func (s *Sink) GetWant() *Want {
+	return &s.Want
 }
 
 // CreateFunction returns the generalized chain function for this sink
-func (s *Sink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		// If no inputs configured, this sink shouldn't run
-		if len(inputs) == 0 {
+func (s *Sink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []chain.Chan, outputs []chain.Chan) bool {
+		// If no using configured, this sink shouldn't run
+		if len(using) == 0 {
 			return true
 		}
-		in := inputs[0]
+		in := using[0]
 		
-		// Block waiting for data from input channel
+		// Block waiting for data from using channel
 		packet := (<-in).(QueuePacket)
 		
 		if packet.isEnded() {
@@ -583,30 +583,30 @@ func (s *Sink) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) 
 	}
 }
 
-// RegisterQNetNodeTypes registers the qnet-specific node types with a ChainBuilder
-func RegisterQNetNodeTypes(builder *ChainBuilder) {
-	// Register generator type - return the enhanced node itself for validation
-	builder.RegisterNodeType("sequence", func(metadata Metadata, spec NodeSpec) interface{} {
+// RegisterQNetWantTypes registers the qnet-specific want types with a ChainBuilder
+func RegisterQNetWantTypes(builder *ChainBuilder) {
+	// Register generator type - return the enhanced want itself for validation
+	builder.RegisterWantType("sequence", func(metadata Metadata, spec WantSpec) interface{} {
 		return PacketSequence(metadata, spec)
 	})
 	
-	// Register queue type - return the enhanced node itself for validation
-	builder.RegisterNodeType("queue", func(metadata Metadata, spec NodeSpec) interface{} {
+	// Register queue type - return the enhanced want itself for validation
+	builder.RegisterWantType("queue", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewQueue(metadata, spec)
 	})
 	
-	// Register combiner type - return the enhanced node itself for validation
-	builder.RegisterNodeType("combiner", func(metadata Metadata, spec NodeSpec) interface{} {
+	// Register combiner type - return the enhanced want itself for validation
+	builder.RegisterWantType("combiner", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewCombiner(metadata, spec)
 	})
 	
-	// Register sink type - return the enhanced node itself for validation
-	builder.RegisterNodeType("sink", func(metadata Metadata, spec NodeSpec) interface{} {
+	// Register sink type - return the enhanced want itself for validation
+	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
 	
-	// Register collector type (alias for sink) - return the enhanced node itself for validation
-	builder.RegisterNodeType("collector", func(metadata Metadata, spec NodeSpec) interface{} {
+	// Register collector type (alias for sink) - return the enhanced want itself for validation
+	builder.RegisterWantType("collector", func(metadata Metadata, spec WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
 }

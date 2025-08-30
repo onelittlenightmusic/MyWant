@@ -19,8 +19,8 @@ type TemplateParameter struct {
 	Description string      `yaml:"description"`
 }
 
-// NodeTemplate defines a template for creating child nodes (legacy format)
-type NodeTemplate struct {
+// WantTemplate defines a template for creating child wants (legacy format)
+type WantTemplate struct {
 	Metadata struct {
 		Name   string            `yaml:"name"`
 		Type   string            `yaml:"type"`
@@ -28,24 +28,24 @@ type NodeTemplate struct {
 	} `yaml:"metadata"`
 	Spec struct {
 		Params map[string]interface{}   `yaml:"params"`
-		Inputs []map[string]string      `yaml:"inputs,omitempty"`
+		Using []map[string]string      `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
 
-// DRYNodeSpec defines minimal node specification in DRY format
-type DRYNodeSpec struct {
+// DRYWantSpec defines minimal want specification in DRY format
+type DRYWantSpec struct {
 	Name   string                    `yaml:"name"`
 	Type   string                    `yaml:"type"`
 	Labels map[string]string         `yaml:"labels,omitempty"`
 	Params map[string]interface{}    `yaml:"params,omitempty"`
-	Inputs []map[string]string       `yaml:"inputs,omitempty"`
+	Using []map[string]string       `yaml:"using,omitempty"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
 
-// DRYTemplateDefaults defines common defaults for all nodes in a template
+// DRYTemplateDefaults defines common defaults for all wants in a template
 type DRYTemplateDefaults struct {
 	Metadata struct {
 		Labels map[string]string `yaml:"labels,omitempty"`
@@ -55,13 +55,13 @@ type DRYTemplateDefaults struct {
 	} `yaml:"spec,omitempty"`
 }
 
-// TemplateResult defines how to fetch a result from child nodes
+// TemplateResult defines how to fetch a result from child wants
 type TemplateResult struct {
-	Node     string `yaml:"node"`     // Name pattern or label selector for the child node
+	Want     string `yaml:"want"`     // Name pattern or label selector for the child want
 	StatName string `yaml:"statName"` // Name of the statistic to fetch (e.g., "AverageWaitTime", "TotalProcessed")
 }
 
-// ChildTemplate defines a complete template for creating child nodes
+// ChildTemplate defines a complete template for creating child wants
 type ChildTemplate struct {
 	Description string              `yaml:"description"`
 	
@@ -74,11 +74,11 @@ type ChildTemplate struct {
 	Result      *TemplateResult     `yaml:"result,omitempty"` // Optional result fetching configuration
 	
 	// Legacy format support
-	Children    []NodeTemplate      `yaml:"children,omitempty"`
+	Children    []WantTemplate      `yaml:"children,omitempty"`
 	
 	// New DRY format support  
 	Defaults    *DRYTemplateDefaults `yaml:"defaults,omitempty"`
-	Nodes       []DRYNodeSpec        `yaml:"nodes,omitempty"`
+	Wants       []DRYWantSpec        `yaml:"wants,omitempty"`
 }
 
 // TemplateConfig holds all available templates
@@ -86,7 +86,7 @@ type TemplateConfig struct {
 	Templates map[string]ChildTemplate `yaml:"templates"`
 }
 
-// TemplateLoader manages loading and instantiating node templates
+// TemplateLoader manages loading and instantiating want templates
 type TemplateLoader struct {
 	templates   map[string]ChildTemplate
 	templateDir string
@@ -192,16 +192,16 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 			}
 		}
 		
-		// Handle DRY Nodes templates
-		for i := range template.Nodes {
-			if config.Templates[templateName].Nodes[i].TypeHints == nil {
-				config.Templates[templateName].Nodes[i].TypeHints = make(map[string]string)
+		// Handle DRY Wants templates
+		for i := range template.Wants {
+			if config.Templates[templateName].Wants[i].TypeHints == nil {
+				config.Templates[templateName].Wants[i].TypeHints = make(map[string]string)
 			}
 			
 			// Copy global type hints (we use global for simplicity)
 			if globalHints, exists := typeHints["global"]; exists {
 				for paramName, typeTag := range globalHints {
-					config.Templates[templateName].Nodes[i].TypeHints[paramName] = typeTag
+					config.Templates[templateName].Wants[i].TypeHints[paramName] = typeTag
 				}
 			}
 		}
@@ -223,7 +223,7 @@ func (tl *TemplateLoader) extractTypeHints(node *yaml.Node, typeHints map[string
 			key := node.Content[i]
 			value := node.Content[i+1]
 			
-			// Look for parameter nodes with type tags
+			// Look for parameter wants with type tags
 			if key.Value == "params" && value.Kind == yaml.MappingNode {
 				tl.extractParamTypeHints(value, typeHints)
 			} else {
@@ -273,10 +273,10 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 			{Name: "service_time", Type: "float", Default: 0.1, Description: "Queue processing time"},
 		},
 		Result: &TemplateResult{
-			Node:     "{{.targetName}}-queue",
+			Want:     "{{.targetName}}-queue",
 			StatName: "AverageWaitTime",
 		},
-		Children: []NodeTemplate{
+		Children: []WantTemplate{
 			{
 				Metadata: struct {
 					Name   string            `yaml:"name"`
@@ -293,7 +293,7 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Inputs []map[string]string    `yaml:"inputs,omitempty"`
+					Using []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"count": "{{.count}}",
@@ -317,12 +317,12 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Inputs []map[string]string    `yaml:"inputs,omitempty"`
+					Using []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"service_time": "{{.service_time}}",
 					},
-					Inputs: []map[string]string{
+					Using: []map[string]string{
 						{"category": "producer"},
 					},
 				},
@@ -342,12 +342,12 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Inputs []map[string]string    `yaml:"inputs,omitempty"`
+					Using []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"display_format": "Number: %d",
 					},
-					Inputs: []map[string]string{
+					Using: []map[string]string{
 						{"role": "processor"},
 					},
 				},
@@ -379,8 +379,8 @@ func (tl *TemplateLoader) ListTemplates() []string {
 	return names
 }
 
-// InstantiateTemplate creates actual Node instances from a template
-func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName string, params map[string]interface{}) ([]Node, error) {
+// InstantiateTemplate creates actual Want instances from a template
+func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName string, params map[string]interface{}) ([]Want, error) {
 	childTemplate, err := tl.GetTemplate(templateName)
 	if err != nil {
 		return nil, err
@@ -408,60 +408,60 @@ func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName st
 		templateParams[key] = value
 	}
 
-	var nodes []Node
+	var wants []Want
 	
-	// Check if this is a DRY template (has Nodes field) or legacy template (has Children field)
-	if len(childTemplate.Nodes) > 0 {
+	// Check if this is a DRY template (has Wants field) or legacy template (has Children field)
+	if len(childTemplate.Wants) > 0 {
 		// New DRY template format
-		for _, dryNodeSpec := range childTemplate.Nodes {
-			node, err := tl.instantiateDRYNode(dryNodeSpec, childTemplate.Defaults, templateParams, targetName)
+		for _, dryWantSpec := range childTemplate.Wants {
+			want, err := tl.instantiateDRYWant(dryWantSpec, childTemplate.Defaults, templateParams, targetName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to instantiate DRY node template: %w", err)
+				return nil, fmt.Errorf("failed to instantiate DRY want template: %w", err)
 			}
-			nodes = append(nodes, node)
+			wants = append(wants, want)
 		}
 	} else {
 		// Legacy template format
-		for _, nodeTemplate := range childTemplate.Children {
-			node, err := tl.instantiateNodeFromTemplate(nodeTemplate, templateParams, targetName)
+		for _, wantTemplate := range childTemplate.Children {
+			want, err := tl.instantiateWantFromTemplate(wantTemplate, templateParams, targetName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to instantiate node template: %w", err)
+				return nil, fmt.Errorf("failed to instantiate want template: %w", err)
 			}
-			nodes = append(nodes, node)
+			wants = append(wants, want)
 		}
 	}
 
-	return nodes, nil
+	return wants, nil
 }
 
-// instantiateDRYNode creates a single Node from a DRY node spec merged with defaults
-func (tl *TemplateLoader) instantiateDRYNode(dryNode DRYNodeSpec, defaults *DRYTemplateDefaults, params map[string]interface{}, targetName string) (Node, error) {
-	// Merge defaults with node-specific values to create a complete NodeTemplate
-	mergedTemplate := tl.mergeDRYDefaults(dryNode, defaults, targetName)
+// instantiateDRYWant creates a single Want from a DRY want spec merged with defaults
+func (tl *TemplateLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYTemplateDefaults, params map[string]interface{}, targetName string) (Want, error) {
+	// Merge defaults with want-specific values to create a complete WantTemplate
+	mergedTemplate := tl.mergeDRYDefaults(dryWant, defaults, targetName)
 	
 	// Now use the existing instantiation logic
-	return tl.instantiateNodeFromTemplate(mergedTemplate, params, targetName)
+	return tl.instantiateWantFromTemplate(mergedTemplate, params, targetName)
 }
 
-// mergeDRYDefaults merges DRY template defaults with individual node specifications
-func (tl *TemplateLoader) mergeDRYDefaults(dryNode DRYNodeSpec, defaults *DRYTemplateDefaults, targetName string) NodeTemplate {
-	// Create a complete NodeTemplate by merging defaults with the DRY node spec
-	nodeTemplate := NodeTemplate{
+// mergeDRYDefaults merges DRY template defaults with individual want specifications
+func (tl *TemplateLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYTemplateDefaults, targetName string) WantTemplate {
+	// Create a complete WantTemplate by merging defaults with the DRY want spec
+	wantTemplate := WantTemplate{
 		Metadata: struct {
 			Name   string            `yaml:"name"`
 			Type   string            `yaml:"type"`
 			Labels map[string]string `yaml:"labels"`
 		}{
-			Name: dryNode.Name,
-			Type: dryNode.Type,
+			Name: dryWant.Name,
+			Type: dryWant.Type,
 			Labels: make(map[string]string),
 		},
 		Spec: struct {
 			Params map[string]interface{}   `yaml:"params"`
-			Inputs []map[string]string      `yaml:"inputs,omitempty"`
+			Using []map[string]string      `yaml:"using,omitempty"`
 		}{
 			Params: make(map[string]interface{}),
-			Inputs: dryNode.Inputs, // Copy inputs directly
+			Using: dryWant.Using, // Copy using directly
 		},
 		TypeHints: make(map[string]string),
 	}
@@ -469,49 +469,49 @@ func (tl *TemplateLoader) mergeDRYDefaults(dryNode DRYNodeSpec, defaults *DRYTem
 	// Merge default labels first, then override with node-specific labels
 	if defaults != nil && defaults.Metadata.Labels != nil {
 		for key, value := range defaults.Metadata.Labels {
-			nodeTemplate.Metadata.Labels[key] = value
+			wantTemplate.Metadata.Labels[key] = value
 		}
 	}
 	
 	// Override with node-specific labels
-	if dryNode.Labels != nil {
-		for key, value := range dryNode.Labels {
-			nodeTemplate.Metadata.Labels[key] = value
+	if dryWant.Labels != nil {
+		for key, value := range dryWant.Labels {
+			wantTemplate.Metadata.Labels[key] = value
 		}
 	}
 	
 	// Merge default params first, then override with node-specific params
 	if defaults != nil && defaults.Spec.Params != nil {
 		for key, value := range defaults.Spec.Params {
-			nodeTemplate.Spec.Params[key] = value
+			wantTemplate.Spec.Params[key] = value
 		}
 	}
 	
 	// Override with node-specific params
-	if dryNode.Params != nil {
-		for key, value := range dryNode.Params {
-			nodeTemplate.Spec.Params[key] = value
+	if dryWant.Params != nil {
+		for key, value := range dryWant.Params {
+			wantTemplate.Spec.Params[key] = value
 		}
 	}
 	
 	// Copy type hints from DRY node
-	if dryNode.TypeHints != nil {
-		for key, value := range dryNode.TypeHints {
-			nodeTemplate.TypeHints[key] = value
+	if dryWant.TypeHints != nil {
+		for key, value := range dryWant.TypeHints {
+			wantTemplate.TypeHints[key] = value
 		}
 	}
 	
-	fmt.Printf("[DRY-MERGE] Merged node '%s' with defaults, final params: %+v\n", dryNode.Name, nodeTemplate.Spec.Params)
+	fmt.Printf("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantTemplate.Spec.Params)
 	
-	return nodeTemplate
+	return wantTemplate
 }
 
-// instantiateNodeFromTemplate creates a single Node from a NodeTemplate with type tag support
-func (tl *TemplateLoader) instantiateNodeFromTemplate(nodeTemplate NodeTemplate, params map[string]interface{}, targetName string) (Node, error) {
+// instantiateWantFromTemplate creates a single Want from a WantTemplate with type tag support
+func (tl *TemplateLoader) instantiateWantFromTemplate(wantTemplate WantTemplate, params map[string]interface{}, targetName string) (Want, error) {
 	// Convert template to YAML for processing
-	templateBytes, err := yaml.Marshal(nodeTemplate)
+	templateBytes, err := yaml.Marshal(wantTemplate)
 	if err != nil {
-		return Node{}, fmt.Errorf("failed to marshal node template: %w", err)
+		return Want{}, fmt.Errorf("failed to marshal want template: %w", err)
 	}
 	
 	fmt.Printf("[TEMPLATE-DEBUG] Raw template YAML:\n%s\n", string(templateBytes))
@@ -519,22 +519,22 @@ func (tl *TemplateLoader) instantiateNodeFromTemplate(nodeTemplate NodeTemplate,
 	// Apply template parameters using Go text/template
 	tmpl, err := template.New("node").Parse(string(templateBytes))
 	if err != nil {
-		return Node{}, fmt.Errorf("failed to parse template: %w", err)
+		return Want{}, fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, params); err != nil {
-		return Node{}, fmt.Errorf("failed to execute template: %w", err)
+		return Want{}, fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	// Parse with type hints from the original template
-	instantiatedTemplate, err := tl.parseTemplateWithTypeHints(buf.Bytes(), nodeTemplate.TypeHints)
+	instantiatedTemplate, err := tl.parseTemplateWithTypeHints(buf.Bytes(), wantTemplate.TypeHints)
 	if err != nil {
-		return Node{}, fmt.Errorf("failed to parse instantiated template: %w", err)
+		return Want{}, fmt.Errorf("failed to parse instantiated template: %w", err)
 	}
 
-	// Create the actual Node with owner references
-	node := Node{
+	// Create the actual Want with owner references
+	want := Want{
 		Metadata: Metadata{
 			Name:   instantiatedTemplate.Metadata.Name,
 			Type:   instantiatedTemplate.Metadata.Type,
@@ -542,39 +542,39 @@ func (tl *TemplateLoader) instantiateNodeFromTemplate(nodeTemplate NodeTemplate,
 			OwnerReferences: []OwnerReference{
 				{
 					APIVersion:         "gochain/v1",
-					Kind:               "Node",
+					Kind:               "Want",
 					Name:               targetName,
 					Controller:         true,
 					BlockOwnerDeletion: true,
 				},
 			},
 		},
-		Spec: NodeSpec{
+		Spec: WantSpec{
 			Params: instantiatedTemplate.Spec.Params, // Now contains properly typed values!
-			Inputs: instantiatedTemplate.Spec.Inputs,
+			Using: instantiatedTemplate.Spec.Using,
 		},
-		Stats:  NodeStats{},
-		Status: NodeStatusIdle,
+		Stats:  WantStats{},
+		Status: WantStatusIdle,
 		State:  make(map[string]interface{}),
 	}
 
-	return node, nil
+	return want, nil
 }
 
 // parseTemplateWithTypeHints parses YAML and applies type conversion based on stored hints
-func (tl *TemplateLoader) parseTemplateWithTypeHints(data []byte, typeHints map[string]string) (NodeTemplate, error) {
+func (tl *TemplateLoader) parseTemplateWithTypeHints(data []byte, typeHints map[string]string) (WantTemplate, error) {
 	// First parse normally
-	var nodeTemplate NodeTemplate
-	if err := yaml.Unmarshal(data, &nodeTemplate); err != nil {
-		return NodeTemplate{}, err
+	var wantTemplate WantTemplate
+	if err := yaml.Unmarshal(data, &wantTemplate); err != nil {
+		return WantTemplate{}, err
 	}
 
 	// Apply type conversions based on hints
 	if typeHints != nil {
-		tl.applyTypeConversions(nodeTemplate.Spec.Params, typeHints)
+		tl.applyTypeConversions(wantTemplate.Spec.Params, typeHints)
 	}
 
-	return nodeTemplate, nil
+	return wantTemplate, nil
 }
 
 // applyTypeConversions converts parameter values based on type hints
@@ -676,7 +676,7 @@ func (tl *TemplateLoader) resolveScalarTypeTag(node *yaml.Node) error {
 }
 
 // GetTemplateResult fetches a result value from child nodes based on template configuration
-func (tl *TemplateLoader) GetTemplateResult(templateName string, targetName string, nodes []Node) (interface{}, error) {
+func (tl *TemplateLoader) GetTemplateResult(templateName string, targetName string, wants []Want) (interface{}, error) {
 	childTemplate, err := tl.GetTemplate(templateName)
 	if err != nil {
 		return nil, err
@@ -686,30 +686,30 @@ func (tl *TemplateLoader) GetTemplateResult(templateName string, targetName stri
 		return nil, fmt.Errorf("template %s does not define a result configuration", templateName)
 	}
 
-	// Find the target node based on the result configuration
-	var targetNode *Node
-	for i := range nodes {
-		node := &nodes[i]
+	// Find the target want based on the result configuration
+	var targetWant *Want
+	for i := range wants {
+		want := &wants[i]
 		
-		// Check if this node matches the result configuration
-		if tl.matchesResultNode(node, childTemplate.Result.Node, targetName) {
-			targetNode = node
+		// Check if this want matches the result configuration
+		if tl.matchesResultWant(want, childTemplate.Result.Want, targetName) {
+			targetWant = want
 			break
 		}
 	}
 
-	if targetNode == nil {
-		return nil, fmt.Errorf("no node found matching result selector '%s' for template %s", childTemplate.Result.Node, templateName)
+	if targetWant == nil {
+		return nil, fmt.Errorf("no want found matching result selector '%s' for template %s", childTemplate.Result.Want, templateName)
 	}
 
-	// Extract the requested statistic from the node
-	return tl.extractNodeStat(targetNode, childTemplate.Result.StatName)
+	// Extract the requested statistic from the want
+	return tl.extractWantStat(targetWant, childTemplate.Result.StatName)
 }
 
-// matchesResultNode checks if a node matches the result node selector
-func (tl *TemplateLoader) matchesResultNode(node *Node, nodeSelector string, targetName string) bool {
+// matchesResultWant checks if a want matches the result want selector
+func (tl *TemplateLoader) matchesResultWant(want *Want, wantSelector string, targetName string) bool {
 	// Replace template variables in the selector
-	tmpl, err := template.New("selector").Parse(nodeSelector)
+	tmpl, err := template.New("selector").Parse(wantSelector)
 	if err != nil {
 		return false
 	}
@@ -725,13 +725,13 @@ func (tl *TemplateLoader) matchesResultNode(node *Node, nodeSelector string, tar
 	
 	resolvedSelector := buf.String()
 	
-	// Check if it matches the node name exactly
-	if node.Metadata.Name == resolvedSelector {
+	// Check if it matches the want name exactly
+	if want.Metadata.Name == resolvedSelector {
 		return true
 	}
 	
 	// Check if it matches based on labels (category, role, etc.)
-	for key, value := range node.Metadata.Labels {
+	for key, value := range want.Metadata.Labels {
 		if key == resolvedSelector || value == resolvedSelector {
 			return true
 		}
@@ -740,15 +740,15 @@ func (tl *TemplateLoader) matchesResultNode(node *Node, nodeSelector string, tar
 	return false
 }
 
-// extractNodeStat extracts a specific statistic from a node
-func (tl *TemplateLoader) extractNodeStat(node *Node, statName string) (interface{}, error) {
+// extractWantStat extracts a specific statistic from a want
+func (tl *TemplateLoader) extractWantStat(want *Want, statName string) (interface{}, error) {
 	switch statName {
 	case "AverageWaitTime", "averagewaittime":
-		return node.Stats.AverageWaitTime, nil
+		return want.Stats.AverageWaitTime, nil
 	case "TotalProcessed", "totalprocessed":
-		return node.Stats.TotalProcessed, nil
+		return want.Stats.TotalProcessed, nil
 	case "TotalWaitTime", "totalwaittime":
-		return node.Stats.TotalWaitTime, nil
+		return want.Stats.TotalWaitTime, nil
 	default:
 		return nil, fmt.Errorf("unknown stat name: %s", statName)
 	}

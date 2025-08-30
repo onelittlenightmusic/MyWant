@@ -22,7 +22,7 @@ templates:
           deterministic: !bool "{{.deterministic}}"
     
     # Only specify what's actually different between nodes
-    nodes:
+    wants:
       - name: "{{.targetName}}-generator"
         type: sequence
         labels:
@@ -39,7 +39,7 @@ templates:
           category: queue
         params:
           service_time: !float "{{.service_time}}"
-        inputs:
+        using:
           - category: producer
           
       - name: "{{.targetName}}-sink"
@@ -49,7 +49,7 @@ templates:
           category: display
         params:
           display_format: "Number: %d"
-        inputs:
+        using:
           - role: processor
 
   # High-throughput pipeline using DRY format
@@ -71,7 +71,7 @@ templates:
       spec:
         params: {}
     
-    nodes:
+    wants:
       - name: "{{.targetName}}-generator"
         type: sequence
         labels:
@@ -89,7 +89,7 @@ templates:
           queue_id: "1"
         params:
           service_time: !float "{{.service_time}}"
-        inputs:
+        using:
           - category: producer
           
       - name: "{{.targetName}}-queue-2"
@@ -100,7 +100,7 @@ templates:
           queue_id: "2"
         params:
           service_time: !float "{{.service_time}}"
-        inputs:
+        using:
           - category: producer
           
       - name: "{{.targetName}}-queue-3"
@@ -111,7 +111,7 @@ templates:
           queue_id: "3"
         params:
           service_time: !float "{{.service_time}}"
-        inputs:
+        using:
           - category: producer
           
       - name: "{{.targetName}}-sink"
@@ -121,7 +121,7 @@ templates:
           category: display
         params:
           display_format: "Processed: %d"
-        inputs:
+        using:
           - category: parallel-queue
 
   # Fibonacci pipeline using DRY format
@@ -138,7 +138,7 @@ templates:
       spec:
         params: {}
     
-    nodes:
+    wants:
       - name: "{{.targetName}}-fib-gen"
         type: fibonacci_generator
         labels:
@@ -155,5 +155,5 @@ templates:
           category: fibonacci-display
         params:
           display_format: "Fibonacci: %d"
-        inputs:
+        using:
           - category: fibonacci-producer

@@ -1,4 +1,4 @@
-nodes:
+wants:
   - metadata:
       name: test-defaults
       type: target

@@ -1,4 +1,4 @@
-nodes:
+wants:
   # Primary packet generator
   - metadata:
       name: gen-primary
@@ -37,7 +37,7 @@ nodes:
     spec:
       params:
         service_time: 0.5
-      inputs:
+      using:
         - role: source
           stream: primary
 
@@ -53,7 +53,7 @@ nodes:
     spec:
       params:
         service_time: 0.7
-      inputs:
+      using:
         - role: source
           stream: secondary
 
@@ -67,7 +67,7 @@ nodes:
         stage: second
     spec:
       params: {}
-      inputs:
+      using:
         - role: processor
           stage: first
 
@@ -82,7 +82,7 @@ nodes:
     spec:
       params:
         service_time: 0.3
-      inputs:
+      using:
         - role: merger
           operation: combine
 
@@ -95,6 +95,6 @@ nodes:
         stage: end
     spec:
       params: {}
-      inputs:
+      using:
         - role: processor
           stage: final

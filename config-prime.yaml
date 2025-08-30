@@ -1,4 +1,4 @@
-nodes:
+wants:
   # Prime number generator
   - metadata:
       name: generator
@@ -18,7 +18,7 @@ nodes:
         role: filter
     spec:
       params: {}
-      inputs:
+      using:
         - role: source
 
   # Sink that collects and displays prime numbers
@@ -29,5 +29,5 @@ nodes:
         role: collector
     spec:
       params: {}
-      inputs:
+      using:
         - role: filter
