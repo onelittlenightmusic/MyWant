@@ -1,0 +1,11 @@
+# Travel configuration using recipe system
+recipe:
+  path: "recipes/travel-itinerary.yaml"
+  parameters:
+    prefix: "vacation"
+    recipe_name: "travel itinerary"
+    display_name: "Weekend Vacation Itinerary" 
+    restaurant_type: "michelin starred"
+    hotel_type: "boutique"
+    buffet_type: "continental"
+    dinner_duration: 2.5

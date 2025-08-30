@@ -1,0 +1,86 @@
+timestamp: "2025-08-25T22:56:21+09:00"
+execution_id: exec-20250825-225621
+nodes:
+    - metadata:
+        name: number-target
+        type: target
+        labels:
+            category: display
+            owner: parent
+      spec:
+        template: wait time in queue system
+        params:
+            count: 1000
+            custom_param: test_value
+            deterministic: false
+            max_display: 200
+            rate: 50
+            service_time: 0.01
+      status: completed
+    - metadata:
+        name: number-target-generator
+        type: sequence
+        labels:
+            category: producer
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 200
+            rate: 10
+      stats:
+        averagewaittime: 0
+        totalprocessed: 200
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: number-target-queue
+        type: queue
+        labels:
+            category: queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: 0.1
+        inputs:
+            - category: producer
+      stats:
+        averagewaittime: 1.1011143668954964
+        totalprocessed: 200
+        totalwaittime: 220.22287337909927
+      status: completed
+    - metadata:
+        name: number-target-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        inputs:
+            - role: processor
+      stats:
+        averagewaittime: 0
+        totalprocessed: 200
+        totalwaittime: 0
+      status: completed

@@ -1,0 +1,91 @@
+timestamp: "2025-08-30T21:09:36+09:00"
+execution_id: exec-20250830-210936
+wants:
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: terminal
+            stage: end
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+    - metadata:
+        name: gen-primary
+        type: sequence
+        labels:
+            priority: high
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 10000
+            rate: 3
+      status: completed
+    - metadata:
+        name: gen-secondary
+        type: sequence
+        labels:
+            priority: medium
+            role: source
+            stream: secondary
+      spec:
+        params:
+            count: 7500
+            rate: 4
+      status: completed
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+      spec:
+        params:
+            service_time: 0.5
+        using:
+            - stream: primary
+      status: completed
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+      spec:
+        params:
+            service_time: 0.7
+        using:
+            - stream: secondary
+      status: completed
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            role: merger
+            stage: second
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            path: output
+            role: processor
+            stage: final
+      spec:
+        params:
+            service_time: 0.3
+        using:
+            - role: merger
+      status: completed

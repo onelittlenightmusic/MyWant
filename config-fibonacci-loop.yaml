@@ -23,8 +23,6 @@ wants:
       params: {}
       using:
         - role: merger
-          stage: combine
-          stream: fibonacci
 
   # Merger combines seed values with computed values creating feedback loop
   - metadata:
@@ -38,9 +36,7 @@ wants:
       params: {}
       using:
         - role: source
-          stage: initial
         - role: processor
-          stage: computation
 
   # Sink collects and displays the complete fibonacci sequence
   - metadata:
@@ -54,5 +50,3 @@ wants:
       params: {}
       using:
         - role: merger
-          stage: combine
-          stream: fibonacci

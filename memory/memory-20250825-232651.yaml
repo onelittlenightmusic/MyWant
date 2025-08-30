@@ -1,0 +1,91 @@
+timestamp: "2025-08-25T23:26:51+09:00"
+execution_id: exec-20250825-232651
+nodes:
+    - metadata:
+        name: number-target
+        type: target
+        labels:
+            category: display
+            owner: parent
+      spec:
+        template: wait time in queue system
+        params:
+            count: 1000
+            custom_param: test_value
+            deterministic: false
+            max_display: 200
+            rate: 50
+            service_time: 0.01
+      status: completed
+      state:
+        result: "0.012048"
+        templateResult: 0.012047932252296603
+    - metadata:
+        name: number-target-generator
+        type: sequence
+        labels:
+            category: producer
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 1000
+            deterministic: false
+            rate: 50
+      stats:
+        averagewaittime: 0
+        totalprocessed: 1000
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: number-target-queue
+        type: queue
+        labels:
+            category: queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            deterministic: false
+            service_time: 0.01
+        inputs:
+            - category: producer
+      stats:
+        averagewaittime: 0.012047932252296603
+        totalprocessed: 1000
+        totalwaittime: 12.047932252296603
+      status: completed
+    - metadata:
+        name: number-target-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        inputs:
+            - role: processor
+      stats:
+        averagewaittime: 0
+        totalprocessed: 1000
+        totalwaittime: 0
+      status: completed

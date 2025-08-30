@@ -1,0 +1,56 @@
+wants:
+  # Dinner restaurant reservation
+  - metadata:
+      name: dinner-reservation
+      type: restaurant
+      labels:
+        role: scheduler
+        category: dining
+        priority: high
+        template: travel_itinerary
+    spec:
+      params:
+        restaurant_type: "fine dining"
+        duration_hours: 2.0
+
+  # Hotel accommodation booking
+  - metadata:
+      name: hotel-booking
+      type: hotel
+      labels:
+        role: scheduler
+        category: accommodation
+        priority: high
+        template: travel_itinerary
+    spec:
+      params:
+        hotel_type: "luxury"
+
+  # Morning breakfast buffet
+  - metadata:
+      name: breakfast-buffet
+      type: buffet
+      labels:
+        role: scheduler
+        category: dining
+        priority: medium
+        template: travel_itinerary
+    spec:
+      params:
+        buffet_type: "international"
+
+  # Travel coordinator (parent want) - "get one day travel"
+  - metadata:
+      name: get-one-day-travel
+      type: travel_coordinator
+      labels:
+        role: coordinator
+        category: travel
+        priority: critical
+        template: travel_itinerary
+    spec:
+      params:
+        template: "One Day Travel Itinerary"
+      using:
+        - role: scheduler
+          template: travel_itinerary

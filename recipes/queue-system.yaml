@@ -1,0 +1,55 @@
+template:
+  name: "wait time in queue system"
+  description: "Wait time analysis in queue system with generator, queue, and sink"
+  version: "1.0"
+  type: "queue-system"
+  
+wants:
+  # Generator want
+  - metadata:
+      name: "{{.targetName}}-generator"
+      type: sequence
+      labels:
+        role: source
+        owner: child
+        category: producer
+    spec:
+      params:
+        count: "{{.count}}"
+        rate: "{{.rate}}"
+        deterministic: "{{.deterministic}}"
+
+  # Queue want  
+  - metadata:
+      name: "{{.targetName}}-queue"
+      type: queue
+      labels:
+        role: processor
+        owner: child
+        category: queue
+    spec:
+      params:
+        service_time: "{{.service_time}}"
+        deterministic: "{{.deterministic}}"
+      using:
+        - category: producer
+
+  # Sink want
+  - metadata:
+      name: "{{.targetName}}-sink"
+      type: sink
+      labels:
+        role: collector
+        category: display
+    spec:
+      params:
+        display_format: "Number: %d"
+      using:
+        - role: processor
+
+parameters:
+  targetName: "queue-system"
+  count: 1000
+  rate: 10.0
+  service_time: 0.1
+  deterministic: false

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+
 // TemplateParameter defines a configurable parameter for templates
 type TemplateParameter struct {
 	Name        string      `yaml:"name"`
@@ -81,18 +82,21 @@ type ChildTemplate struct {
 }
 
 // TemplateConfig holds all available templates
-type TemplateConfigLegacy struct {
+type TemplateConfig struct {
 	Templates map[string]ChildTemplate `yaml:"templates"`
 }
 
-// TemplateLoader manages loading and instantiating want templates (legacy compatibility)
+// TemplateLoader manages loading and instantiating want templates
 type TemplateLoader struct {
-	templates     map[string]ChildTemplate
-	templateDir   string
+	templates   map[string]ChildTemplate
+	templateDir string
 }
 
 // NewTemplateLoader creates a new template loader
 func NewTemplateLoader(templateDir string) *TemplateLoader {
+	if templateDir == "" {
+		templateDir = "templates"
+	}
 	return &TemplateLoader{
 		templates:   make(map[string]ChildTemplate),
 		templateDir: templateDir,
@@ -161,15 +165,15 @@ func (tl *TemplateLoader) loadTemplateFile(filename string) error {
 }
 
 // parseTemplateConfigWithTypeTags parses TemplateConfig while preserving type tag information
-func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (TemplateConfigLegacy, error) {
+func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (TemplateConfig, error) {
 	// First extract type hints from the YAML structure
 	typeHints := make(map[string]map[string]string) // template_name -> param_name -> type_tag
 	tl.extractTypeHints(rootNode, typeHints)
 	
 	// Decode to TemplateConfig struct (this loses type tags but gets the structure)
-	var config TemplateConfigLegacy
+	var config TemplateConfig
 	if err := rootNode.Decode(&config); err != nil {
-		return TemplateConfigLegacy{}, err
+		return TemplateConfig{}, err
 	}
 	
 	// Apply the extracted type hints to both legacy and DRY templates
@@ -602,6 +606,73 @@ func (tl *TemplateLoader) convertWithTypeHint(value, typeHint string) (interface
 	default:
 		return value, nil
 	}
+}
+
+// processYAMLNodeForTypes recursively processes YAML nodes to resolve type tags
+func (tl *TemplateLoader) processYAMLNodeForTypes(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.DocumentNode:
+		// Process document content
+		for _, child := range node.Content {
+			if err := tl.processYAMLNodeForTypes(child); err != nil {
+				return err
+			}
+		}
+	case yaml.MappingNode:
+		// Process key-value pairs
+		for i := 0; i < len(node.Content); i += 2 {
+			value := node.Content[i+1]
+			
+			// Process the value node (which may have type tags)
+			if err := tl.processYAMLNodeForTypes(value); err != nil {
+				return err
+			}
+		}
+	case yaml.SequenceNode:
+		// Process array elements
+		for _, child := range node.Content {
+			if err := tl.processYAMLNodeForTypes(child); err != nil {
+				return err
+			}
+		}
+	case yaml.ScalarNode:
+		// Handle type-tagged scalar values
+		if err := tl.resolveScalarTypeTag(node); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// resolveScalarTypeTag converts type-tagged values to their proper types
+func (tl *TemplateLoader) resolveScalarTypeTag(node *yaml.Node) error {
+	switch node.Tag {
+	case "!int":
+		if value, err := strconv.Atoi(node.Value); err == nil {
+			fmt.Printf("[TYPE-TAG] Converting !int '%s' to %d\n", node.Value, value)
+			node.Tag = "tag:yaml.org,2002:int"
+			node.Value = fmt.Sprintf("%d", value)
+		} else {
+			return fmt.Errorf("cannot convert '%s' to int: %w", node.Value, err)
+		}
+	case "!float":
+		if value, err := strconv.ParseFloat(node.Value, 64); err == nil {
+			fmt.Printf("[TYPE-TAG] Converting !float '%s' to %g\n", node.Value, value)
+			node.Tag = "tag:yaml.org,2002:float"
+			node.Value = fmt.Sprintf("%g", value)
+		} else {
+			return fmt.Errorf("cannot convert '%s' to float: %w", node.Value, err)
+		}
+	case "!bool":
+		if value, err := strconv.ParseBool(node.Value); err == nil {
+			fmt.Printf("[TYPE-TAG] Converting !bool '%s' to %t\n", node.Value, value)
+			node.Tag = "tag:yaml.org,2002:bool"
+			node.Value = fmt.Sprintf("%t", value)
+		} else {
+			return fmt.Errorf("cannot convert '%s' to bool: %w", node.Value, err)
+		}
+	}
+	return nil
 }
 
 // GetTemplateResult fetches a result value from child nodes based on template configuration

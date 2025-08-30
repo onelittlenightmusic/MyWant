@@ -1,0 +1,9 @@
+# Queue System configuration using new generic recipe format
+recipe:
+  path: "recipes/queue-system.yaml"
+  parameters:
+    targetName: "my-queue-system"
+    count: 500
+    rate: 20.0
+    service_time: 0.05
+    deterministic: true

@@ -1,0 +1,54 @@
+timestamp: "2025-08-30T22:25:45+09:00"
+execution_id: exec-20250830-222545
+wants:
+    - metadata:
+        name: my-queue-system-generator
+        type: sequence
+        labels:
+            category: producer
+            owner: child
+            role: source
+      spec:
+        params:
+            count: "500"
+            deterministic: "true"
+            rate: "20"
+      stats:
+        averagewaittime: 0
+        totalprocessed: 100
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: my-queue-system-queue
+        type: queue
+        labels:
+            category: queue
+            owner: child
+            role: processor
+      spec:
+        params:
+            deterministic: "true"
+            service_time: "0.05"
+        using:
+            - category: producer
+      stats:
+        averagewaittime: 0
+        totalprocessed: 100
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: my-queue-system-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+      spec:
+        params:
+            display_format: 'Number: %d'
+        using:
+            - role: processor
+      stats:
+        averagewaittime: 0
+        totalprocessed: 100
+        totalwaittime: 0
+      status: completed

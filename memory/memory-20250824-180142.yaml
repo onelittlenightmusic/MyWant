@@ -1,0 +1,81 @@
+timestamp: "2025-08-24T18:01:42+09:00"
+execution_id: exec-20250824-180142
+nodes:
+    - metadata:
+        name: number-target
+        type: target
+        labels:
+            category: display
+            owner: parent
+      spec:
+        params:
+            max_display: 20
+            template: number-processing-pipeline
+            template_params:
+                count: 20
+                rate: 50
+                service_time: 0.01
+      status: completed
+    - metadata:
+        name: number-target-generator
+        type: sequence
+        labels:
+            category: producer
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: "20"
+            rate: "50"
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: number-target-queue
+        type: queue
+        labels:
+            category: queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: "0.01"
+      stats:
+        averagewaittime: 11.57267309790754
+        totalprocessed: 99
+        totalwaittime: 1145.6946366928464
+      status: completed
+    - metadata:
+        name: number-target-sink
+        type: sink
+        labels:
+            category: display
+            role: collector
+        ownerReferences:
+            - apiVersion: gochain/v1
+              kind: Node
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+      stats:
+        averagewaittime: 0
+        totalprocessed: 99
+        totalwaittime: 0
+      status: completed
