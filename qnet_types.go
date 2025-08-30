@@ -304,11 +304,11 @@ func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) 
 		// Send packet with departure time
 		out <- QueuePacket{packet.Num, departureTime}
 		
-		// Debug wait time distribution
-		if packet.Num <= 10 || waitTime > 10.0 {
-			fmt.Printf("[DEBUG] Packet %d: wait=%.6f, arrival=%.6f, serverFree=%.6f, service=%.6f, q.ServiceTime=%.6f\n", 
-				packet.Num, waitTime, arrivalTime, serverFreeTime, serviceTime, q.ServiceTime)
-		}
+		// Debug wait time distribution (commented out to reduce output)
+		// if packet.Num <= 10 || waitTime > 10.0 {
+		//	fmt.Printf("[DEBUG] Packet %d: wait=%.6f, arrival=%.6f, serverFree=%.6f, service=%.6f, q.ServiceTime=%.6f\n", 
+		//		packet.Num, waitTime, arrivalTime, serverFreeTime, serviceTime, q.ServiceTime)
+		// }
 		
 		// Accumulate wait time statistics
 		waitTimeSum += waitTime
@@ -395,6 +395,7 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 	processed := 0
 	usingsClosed := make([]bool, 0) // Track which using are closed
 	packetBuffer := make([]QueuePacket, 0) // Buffer to store packets not yet sent
+	stuckCount := 0 // Track iterations with no progress
 	
 	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(using) == 0 || len(outputs) == 0 {
@@ -427,6 +428,7 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 		}
 		
 		// Collect available packets from all open using and add to buffer
+		madeProgress := false
 		for i, input := range using {
 			if usingsClosed[i] {
 				continue // Skip closed using
@@ -437,34 +439,35 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 				qPacket := packet.(QueuePacket)
 				if qPacket.isEnded() {
 					usingsClosed[i] = true // Mark this using as closed
+					madeProgress = true
 				} else {
 					packetBuffer = append(packetBuffer, qPacket)
+					madeProgress = true
 				}
 			default:
 				// No packet available on this using right now
 			}
 		}
 		
-		// If buffer is empty and not all using closed, wait for at least one packet
-		if len(packetBuffer) == 0 && !allClosed {
-			// Wait for next packet from any open using
-			for i, input := range using {
-				if usingsClosed[i] {
-					continue
+		// If buffer is empty and not all using closed, and no progress was made,
+		// try a blocking read with timeout behavior
+		if len(packetBuffer) == 0 && !allClosed && !madeProgress {
+			stuckCount++
+			
+			// If we've been stuck too many times, force termination
+			if stuckCount > 10000 {
+				fmt.Printf("[COMBINER] Warning: Terminating due to apparent deadlock after %d stuck iterations\n", stuckCount)
+				// Mark all remaining inputs as closed to force termination
+				for i := range usingsClosed {
+					usingsClosed[i] = true
 				}
-				select {
-				case packet := <-input:
-					qPacket := packet.(QueuePacket)
-					if qPacket.isEnded() {
-						usingsClosed[i] = true
-					} else {
-						packetBuffer = append(packetBuffer, qPacket)
-					}
-					break // Got a packet, process it
-				default:
-					continue
-				}
+				// Send end signal
+				c.Stats.TotalProcessed = processed
+				out <- QueuePacket{-1, 0}
+				return true
 			}
+		} else if madeProgress {
+			stuckCount = 0 // Reset stuck counter when progress is made
 		}
 		
 		// Find and send earliest packet from buffer

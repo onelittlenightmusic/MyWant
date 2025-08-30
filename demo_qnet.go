@@ -15,19 +15,19 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Nodes))
+	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Wants))
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
 	
 	// Register qnet node types
-	RegisterQNetNodeTypes(builder)
+	RegisterQNetWantTypes(builder)
 	
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()
 	
 	fmt.Println("\n📊 Final Node States:")
-	states := builder.GetAllNodeStates()
+	states := builder.GetAllWantStates()
 	for name, state := range states {
 		fmt.Printf("  %s: %s (processed: %d)\n", 
 			name, state.Status, state.Stats.TotalProcessed)

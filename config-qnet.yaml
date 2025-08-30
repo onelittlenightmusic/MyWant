@@ -36,7 +36,7 @@ wants:
         path: main
     spec:
       params:
-        service_time: 0.5
+        service_time: 0.1
       using:
         - role: source
           stream: primary
@@ -52,7 +52,7 @@ wants:
         path: alt
     spec:
       params:
-        service_time: 0.7
+        service_time: 0.12
       using:
         - role: source
           stream: secondary
@@ -81,10 +81,9 @@ wants:
         path: output
     spec:
       params:
-        service_time: 0.3
+        service_time: 0.05
       using:
         - role: merger
-          operation: combine
 
   # Final collector
   - metadata:
