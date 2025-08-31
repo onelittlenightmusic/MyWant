@@ -9,9 +9,9 @@ func main() {
 	fmt.Println("===================")
 	
 	// Load YAML configuration
-	config, err := loadConfigFromYAML("config-qnet.yaml")
+	config, err := loadConfigFromYAML("config/config-qnet.yaml")
 	if err != nil {
-		fmt.Printf("Error loading config-qnet.yaml: %v\n", err)
+		fmt.Printf("Error loading config/config-qnet.yaml: %v\n", err)
 		return
 	}
 

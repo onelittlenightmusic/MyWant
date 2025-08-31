@@ -17,7 +17,7 @@ func main() {
 	fmt.Println()
 
 	// Get YAML file from command line argument
-	yamlFile := "config-qnet-recipe.yaml"
+	yamlFile := "config/config-qnet-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

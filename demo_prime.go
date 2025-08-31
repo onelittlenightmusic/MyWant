@@ -10,7 +10,7 @@ func main() {
 	fmt.Println("==============================")
 	
 	// Get YAML file from command line argument
-	yamlFile := "config-prime.yaml"
+	yamlFile := "config/config-prime.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

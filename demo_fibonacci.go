@@ -10,7 +10,7 @@ func main() {
 	fmt.Println("=====================================")
 	
 	// Get YAML file from command line argument
-	yamlFile := "config-fibonacci.yaml"
+	yamlFile := "config/config-fibonacci.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

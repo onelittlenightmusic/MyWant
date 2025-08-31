@@ -10,7 +10,7 @@ GoChain is a Go library implementing functional chain programming patterns with 
 
 ### Configuration System (User Interface)
 
-- **Config Files**: Top-level user interface (`config-*-recipe.yaml`)
+- **Config Files**: Top-level user interface in `config/` directory (`config-*-recipe.yaml`)
 - **Recipe Files**: Reusable components in `recipes/` directory
 - **Demo Programs**: Entry points that load config files (`demo_*_recipe.go`)
 
@@ -53,13 +53,13 @@ go mod tidy
 #### Recipe-Based Examples (Recommended)
 ```sh
 # Independent wants (travel planning)
-make run-travel-recipe        # Uses config-travel-recipe.yaml → recipes/travel-itinerary.yaml
+make run-travel-recipe        # Uses config/config-travel-recipe.yaml → recipes/travel-itinerary.yaml
 
 # Dependent wants (queue system pipeline)  
-make run-queue-system-recipe  # Uses config-queue-system-recipe.yaml → recipes/queue-system.yaml
+make run-queue-system-recipe  # Uses config/config-queue-system-recipe.yaml → recipes/queue-system.yaml
 
 # Complex multi-stream systems
-make run-qnet-recipe         # Uses config-qnet-recipe.yaml → recipes/qnet-pipeline.yaml
+make run-qnet-recipe         # Uses config/config-qnet-recipe.yaml → recipes/qnet-pipeline.yaml
 make run-qnet-using-recipe   # QNet with YAML-defined using connections
 
 # Owner-based dynamic want creation
@@ -69,11 +69,11 @@ make run-sample-owner        # Dynamic wants using recipes from recipes/ directo
 #### Direct Configuration Examples
 ```sh
 # Direct want definitions (no recipes)
-make run-qnet          # Uses config-qnet.yaml  
-make run-prime         # Uses config-prime.yaml
-make run-fibonacci     # Uses config-fibonacci.yaml
-make run-fibonacci-loop # Uses config-fibonacci-loop.yaml
-make run-travel        # Uses config-travel.yaml
+make run-qnet          # Uses config/config-qnet.yaml  
+make run-prime         # Uses config/config-prime.yaml
+make run-fibonacci     # Uses config/config-fibonacci.yaml
+make run-fibonacci-loop # Uses config/config-fibonacci-loop.yaml
+make run-travel        # Uses config/config-travel.yaml
 ```
 
 ## Code Patterns
@@ -83,7 +83,7 @@ make run-travel        # Uses config-travel.yaml
 #### Step 1: Load Recipe with Config
 ```go
 // Load config that references a recipe
-config, params, err := LoadRecipeWithConfig("config-travel-recipe.yaml")
+config, params, err := LoadRecipeWithConfig("config/config-travel-recipe.yaml")
 builder := NewChainBuilder(config)
 RegisterTravelWantTypes(builder)
 builder.Execute()
@@ -92,7 +92,7 @@ builder.Execute()
 #### Step 2: Direct Configuration Loading
 ```go
 // Load config with direct want definitions
-config, err := loadConfigFromYAML("config-travel.yaml")
+config, err := loadConfigFromYAML("config/config-travel.yaml")
 builder := NewChainBuilder(config)
 RegisterTravelWantTypes(builder)
 builder.Execute()
@@ -216,8 +216,8 @@ Memory reconciliation enables:
 ## File Organization
 
 ### Configuration Layer (User Interface)
-- `config-*-recipe.yaml`: Config files that reference recipes
-- `config-*.yaml`: Config files with direct want definitions
+- `config/config-*-recipe.yaml`: Config files that reference recipes
+- `config/config-*.yaml`: Config files with direct want definitions
 - `demo_*_recipe.go`: Demo programs that load recipe-based configs
 - `demo_*.go`: Demo programs that load direct configs
 
@@ -263,4 +263,4 @@ Memory reconciliation enables:
 - Use `declarative.go` for configuration-based chains
 - Want types in separate `*_types.go` files
 - Recipe files in `recipes/` directory
-- Config files in root directory with `config-*` naming
+- Config files in `config/` directory with `config-*` naming

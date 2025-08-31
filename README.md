@@ -81,7 +81,7 @@ recipe:
       - role: scheduler
 ```
 
-**Step 2: Create the config file** (top-level user interface in `config-travel-recipe.yaml`):
+**Step 2: Create the config file** (top-level user interface in `config/config-travel-recipe.yaml`):
 ```yaml
 recipe:
   path: "recipes/travel-itinerary.yaml"
@@ -96,7 +96,7 @@ recipe:
 
 **Step 3: Run with the config file:**
 ```sh
-make run-travel-recipe  # Uses config-travel-recipe.yaml
+make run-travel-recipe  # Uses config/config-travel-recipe.yaml
 ```
 
 ### Example 2: Dependent Wants (Queue System Pipeline)
@@ -150,7 +150,7 @@ recipe:
         - role: processor  # Connect to queue
 ```
 
-**Step 2: Create the config file** (top-level user interface in `config-queue-system-recipe.yaml`):
+**Step 2: Create the config file** (top-level user interface in `config/config-queue-system-recipe.yaml`):
 ```yaml
 recipe:
   path: "recipes/queue-system.yaml"
@@ -163,7 +163,7 @@ recipe:
 
 **Step 3: Run with the config file:**
 ```sh
-make run-queue-system-recipe  # Uses config-queue-system-recipe.yaml
+make run-queue-system-recipe  # Uses config/config-queue-system-recipe.yaml
 ```
 
 ## Available Make Targets
@@ -272,8 +272,8 @@ The system automatically manages persistent state:
 ## Typical Workflow
 
 1. **Create/Choose Recipe**: Define reusable want patterns in `recipes/`
-2. **Create Config File**: Reference recipe and set parameters in `config-*.yaml`
-3. **Execute**: Run with `make` targets or `go run demo_*.go config-*.yaml`
+2. **Create Config File**: Reference recipe and set parameters in `config/config-*.yaml`
+3. **Execute**: Run with `make` targets or `go run demo_*.go config/config-*.yaml`
 4. **Parameterize**: Reuse recipes with different configs for different scenarios
 
 ## Architecture
@@ -296,5 +296,5 @@ The system automatically manages persistent state:
 The codebase follows these patterns:
 - Want types in `*_types.go` files
 - Recipe files in `recipes/` directory
-- Configuration files follow `config-*-recipe.yaml` naming
+- Configuration files in `config/` directory follow `config-*-recipe.yaml` naming
 - Demo programs follow `demo_*_recipe.go` naming

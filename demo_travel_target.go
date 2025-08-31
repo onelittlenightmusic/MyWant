@@ -13,7 +13,7 @@ func main() {
 	fmt.Println()
 	
 	// Get YAML file from command line argument or use default
-	yamlFile := "config-travel-target.yaml"
+	yamlFile := "config/config-travel-target.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
