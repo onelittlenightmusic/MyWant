@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"gochain/chain"
+	"strings"
 	"sync"
 )
 
@@ -26,13 +27,13 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 type Target struct {
 	Want
 	MaxDisplay     int
-	RecipeName     string // Name of the recipe to use for child creation
+	RecipePath     string // Path to the recipe file to use for child creation
 	RecipeParams   map[string]interface{} // Parameters to pass to recipe
 	paths          Paths
 	childWants     []Want
 	childrenDone   chan bool
 	builder        *ChainBuilder    // Reference to builder for dynamic want creation
-	recipeLoader   *RecipeLoader    // Reference to recipe loader
+	recipeLoader   *GenericRecipeLoader    // Reference to generic recipe loader
 }
 
 // NewTarget creates a new target want
@@ -46,7 +47,7 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			State:    make(map[string]interface{}),
 		},
 		MaxDisplay:     1000,
-		RecipeName:     "queue-system", // Default recipe
+		RecipePath:     "recipes/queue-system.yaml", // Default recipe path
 		RecipeParams:   make(map[string]interface{}),
 		childWants:     make([]Want, 0),
 		childrenDone:   make(chan bool, 1),
@@ -55,21 +56,26 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	// Extract target-specific configuration from params
 	target.MaxDisplay = extractIntParam(spec.Params, "max_display", target.MaxDisplay)
 	
-	// Extract recipe name from spec.recipe field
+	// Extract recipe path from spec.Recipe field
 	if spec.Recipe != "" {
-		target.RecipeName = spec.Recipe
+		target.RecipePath = spec.Recipe
 	}
 	
-	// Separate recipe parameters from target-specific parameters
-	targetSpecificParams := map[string]bool{
-		"max_display": true,
-	}
-	
-	// Collect recipe parameters (excluding target-specific ones)
-	target.RecipeParams = make(map[string]interface{})
-	for key, value := range spec.Params {
-		if !targetSpecificParams[key] {
-			target.RecipeParams[key] = value
+	// Extract recipe parameters from spec.RecipeParams or spec.Params
+	if spec.RecipeParams != nil {
+		target.RecipeParams = spec.RecipeParams
+	} else {
+		// Fallback: separate recipe parameters from target-specific parameters
+		targetSpecificParams := map[string]bool{
+			"max_display": true,
+		}
+		
+		// Collect recipe parameters (excluding target-specific ones)
+		target.RecipeParams = make(map[string]interface{})
+		for key, value := range spec.Params {
+			if !targetSpecificParams[key] {
+				target.RecipeParams[key] = value
+			}
 		}
 	}
 	
@@ -86,8 +92,8 @@ func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
 
-// SetRecipeLoader sets the RecipeLoader reference for recipe-based child creation
-func (t *Target) SetRecipeLoader(loader *RecipeLoader) {
+// SetRecipeLoader sets the GenericRecipeLoader reference for recipe-based child creation
+func (t *Target) SetRecipeLoader(loader *GenericRecipeLoader) {
 	t.recipeLoader = loader
 	// Resolve recipe parameters using recipe defaults when loader is available
 	t.resolveRecipeParameters()
@@ -99,10 +105,10 @@ func (t *Target) resolveRecipeParameters() {
 		return
 	}
 	
-	// Get recipe to access its parameter definitions
-	recipe, err := t.recipeLoader.GetRecipe(t.RecipeName)
+	// Get recipe parameters to access default values
+	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
-		fmt.Printf("⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipeName, err)
+		fmt.Printf("⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
 	
@@ -110,8 +116,8 @@ func (t *Target) resolveRecipeParameters() {
 	resolvedParams := make(map[string]interface{})
 	
 	// Set default values from recipe parameter definitions
-	for _, param := range recipe.Parameters {
-		resolvedParams[param.Name] = param.Default
+	for key, value := range recipeParams {
+		resolvedParams[key] = value
 	}
 	
 	// Override with provided recipe parameters
@@ -133,12 +139,31 @@ func (t *Target) resolveRecipeParameters() {
 func (t *Target) CreateChildWants() []Want {
 	// Use recipe loader if available
 	if t.recipeLoader != nil {
-		wants, err := t.recipeLoader.InstantiateRecipe(t.RecipeName, t.Metadata.Name, t.RecipeParams)
+		config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 		if err != nil {
-			fmt.Printf("⚠️  Failed to instantiate recipe %s: %v, falling back to hardcoded creation\n", t.RecipeName, err)
+			fmt.Printf("⚠️  Failed to load config from recipe %s: %v, falling back to hardcoded creation\n", t.RecipePath, err)
 		} else {
-			fmt.Printf("✅ Successfully instantiated recipe %s with %d wants\n", t.RecipeName, len(wants))
-			t.childWants = wants
+			fmt.Printf("✅ Successfully loaded config from recipe %s with %d wants\n", t.RecipePath, len(config.Wants))
+			
+			// Add owner references to all child wants
+			for i := range config.Wants {
+				config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
+					{
+						APIVersion:         "gochain/v1",
+						Kind:               "Want",
+						Name:               t.Metadata.Name,
+						Controller:         true,
+						BlockOwnerDeletion: true,
+					},
+				}
+				// Add owner label for easier identification
+				if config.Wants[i].Metadata.Labels == nil {
+					config.Wants[i].Metadata.Labels = make(map[string]string)
+				}
+				config.Wants[i].Metadata.Labels["owner"] = "child"
+			}
+			
+			t.childWants = config.Wants
 			return t.childWants
 		}
 	}
@@ -286,46 +311,92 @@ func (t *Target) NotifyChildrenComplete() {
 	}
 }
 
-// computeTemplateResult computes the result from child wants and stores it
+// computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
 	if t.recipeLoader == nil {
 		fmt.Printf("⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
+		t.computeFallbackResult()
+		return
+	}
+
+	// Get recipe result definition
+	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
+	if err != nil {
+		fmt.Printf("⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
+		t.computeFallbackResult()
+		return
+	}
+
+	if recipeResult == nil {
+		fmt.Printf("⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
+		t.computeFallbackResult()
 		return
 	}
 
 	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
-	var childWants []Want
+	childWantsByName := make(map[string]*Want)
 	
-	// Filter to only wants owned by this target
+	// Build map of child wants by name
 	for _, want := range allWantStates {
 		for _, ownerRef := range want.Metadata.OwnerReferences {
 			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
-				childWants = append(childWants, *want)
+				// Extract the actual want name without prefix
+				wantName := want.Metadata.Type
+				if want.Metadata.Name != "" {
+					// Try to extract base name from prefixed name (e.g., "vacation-hotel-2" -> "hotel")
+					parts := strings.Split(want.Metadata.Name, "-")
+					if len(parts) >= 2 {
+						wantName = parts[len(parts)-2] // Get the type part before the number
+					}
+				}
+				childWantsByName[wantName] = want
+				// Also store by exact name for recipes that specify exact names
+				if want.Metadata.Name != "" {
+					childWantsByName[want.Metadata.Name] = want
+				}
 				break
 			}
 		}
 	}
 
-	fmt.Printf("🧮 Target %s: Found %d child wants for result computation\n", t.Metadata.Name, len(childWants))
+	fmt.Printf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
 
-	// Compute recipe result
-	result, err := t.recipeLoader.GetRecipeResult(t.RecipeName, t.Metadata.Name, childWants)
-	if err != nil {
-		fmt.Printf("⚠️  Target %s: Failed to compute recipe result: %v\n", t.Metadata.Name, err)
-		return
+	// Compute primary result using recipe specification
+	primaryResult := t.getResultFromSpec(recipeResult.Primary, childWantsByName)
+	
+	// Initialize Stats map if not exists
+	if t.Stats == nil {
+		t.Stats = make(WantStats)
 	}
+	
+	// Store primary result in dynamic stats
+	t.Stats["recipeResult"] = primaryResult
+	t.Stats["primaryResult"] = primaryResult
+	
+	// Also store in State for backward compatibility
+	t.State["recipeResult"] = primaryResult
+	t.State["primaryResult"] = primaryResult
+	fmt.Printf("✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, recipeResult.Primary.StatName, recipeResult.Primary.WantName, primaryResult)
 
-	// Store result in target's state
-	t.State["recipeResult"] = result
-	fmt.Printf("✅ Target %s: Template result computed: %v\n", t.Metadata.Name, result)
-
-	// Also store result in a standardized format for memory dumps
-	if resultFloat, ok := result.(float64); ok {
-		t.State["result"] = fmt.Sprintf("%.6f", resultFloat)
-	} else {
-		t.State["result"] = fmt.Sprintf("%v", result)
+	// Compute additional metrics
+	metrics := make(map[string]interface{})
+	for _, metricSpec := range recipeResult.Metrics {
+		metricValue := t.getResultFromSpec(metricSpec, childWantsByName)
+		metrics[metricSpec.WantName+"_"+metricSpec.StatName] = metricValue
+		t.Stats[metricSpec.WantName+"_"+metricSpec.StatName] = metricValue
+		fmt.Printf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, metricSpec.Description, metricSpec.StatName, metricSpec.WantName, metricValue)
 	}
+	t.State["metrics"] = metrics
+
+	// Store additional metadata
+	t.State["recipePath"] = t.RecipePath
+	t.State["childCount"] = len(childWantsByName)
+
+	// Store result in a standardized format for memory dumps
+	t.State["result"] = fmt.Sprintf("%s: %v", recipeResult.Primary.Description, primaryResult)
+
+	fmt.Printf("✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
 
 // addChildWantsToMemory adds child wants to the memory configuration
@@ -416,11 +487,8 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Register existing qnet types first
 	RegisterQNetWantTypes(builder)
 	
-	// Initialize recipe loader
-	recipeLoader := NewRecipeLoader("recipes")
-	if err := recipeLoader.LoadRecipes(); err != nil {
-		fmt.Printf("⚠️  Failed to load recipes: %v, using defaults\n", err)
-	}
+	// Initialize generic recipe loader
+	recipeLoader := NewGenericRecipeLoader("recipes")
 	
 	// Register target type with recipe support
 	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
@@ -457,4 +525,89 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		}
 		return baseWant
 	})
+}
+
+// getResultFromSpec extracts a specific result value from child wants using recipe specification
+func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
+	want, exists := childWants[spec.WantName]
+	if !exists {
+		fmt.Printf("⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
+		return 0
+	}
+
+	// Try to get the specified stat from the want's dynamic Stats map
+	if want.Stats != nil {
+		// Try exact stat name first
+		if value, ok := want.Stats[spec.StatName]; ok {
+			return value
+		}
+		// Try lowercase version
+		if value, ok := want.Stats[strings.ToLower(spec.StatName)]; ok {
+			return value
+		}
+		// Try common variations
+		if spec.StatName == "TotalProcessed" {
+			if value, ok := want.Stats["total_processed"]; ok {
+				return value
+			}
+			if value, ok := want.Stats["totalprocessed"]; ok {
+				return value
+			}
+		}
+	}
+	
+	// Fallback: try to get from State map
+	if value, ok := want.State[spec.StatName]; ok {
+		return value
+	}
+	if value, ok := want.State[strings.ToLower(spec.StatName)]; ok {
+		return value
+	}
+	
+	fmt.Printf("⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.Stats)
+	return 0
+}
+
+// computeFallbackResult provides simple aggregation when recipe result definition is not available
+func (t *Target) computeFallbackResult() {
+	// Get all wants that might be child wants for this target
+	allWantStates := t.builder.GetAllWantStates()
+	var childWants []Want
+	
+	// Filter to only wants owned by this target
+	for _, want := range allWantStates {
+		for _, ownerRef := range want.Metadata.OwnerReferences {
+			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
+				childWants = append(childWants, *want)
+				break
+			}
+		}
+	}
+
+	fmt.Printf("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
+
+	// Simple aggregate result from child wants using dynamic stats
+	totalProcessed := 0
+	for _, child := range childWants {
+		if child.Stats != nil {
+			if processed, ok := child.Stats["total_processed"]; ok {
+				if processedInt, ok := processed.(int); ok {
+					totalProcessed += processedInt
+				}
+			} else if processed, ok := child.Stats["TotalProcessed"]; ok {
+				if processedInt, ok := processed.(int); ok {
+					totalProcessed += processedInt
+				}
+			}
+		}
+	}
+
+	// Store result in target's state
+	t.State["recipeResult"] = totalProcessed
+	t.State["recipePath"] = t.RecipePath
+	t.State["childCount"] = len(childWants)
+	fmt.Printf("✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+
+	// Store result in a standardized format for memory dumps
+	t.State["result"] = fmt.Sprintf("processed: %d", totalProcessed)
 }

@@ -17,15 +17,34 @@ type RecipeWant struct {
 	Using  []map[string]string    `yaml:"using,omitempty"`
 }
 
-// GenericRecipe represents any recipe structure
+// GenericRecipe represents the top-level recipe structure
 type GenericRecipe struct {
-	Recipe     GenericRecipeMetadata   `yaml:"recipe"`
-	Wants      []RecipeWant            `yaml:"wants,omitempty"`
-	Coordinator *RecipeWant            `yaml:"coordinator,omitempty"`
-	Parameters map[string]interface{}  `yaml:"parameters,omitempty"`
+	Recipe RecipeContent `yaml:"recipe"`
+}
+
+// RecipeResult defines how to compute results from recipe execution
+type RecipeResult struct {
+	Primary RecipeResultSpec   `yaml:"primary"`
+	Metrics []RecipeResultSpec `yaml:"metrics,omitempty"`
+}
+
+// RecipeResultSpec specifies which want and stat to use for result computation
+type RecipeResultSpec struct {
+	WantName    string `yaml:"want_name"`
+	StatName    string `yaml:"stat_name"`
+	Description string `yaml:"description,omitempty"`
+}
+
+// RecipeContent contains the actual recipe data
+type RecipeContent struct {
+	Metadata    GenericRecipeMetadata   `yaml:"metadata,omitempty"`
+	Wants       []RecipeWant            `yaml:"wants,omitempty"`
+	Coordinator *RecipeWant             `yaml:"coordinator,omitempty"`
+	Parameters  map[string]interface{}  `yaml:"parameters,omitempty"`
+	Result      *RecipeResult           `yaml:"result,omitempty"`
 	
 	// Legacy support for existing template formats (placeholder)
-	Templates  map[string]interface{} `yaml:"templates,omitempty"`
+	Templates   map[string]interface{}  `yaml:"templates,omitempty"`
 }
 
 // ConvertToWant converts a RecipeWant to a Want
@@ -63,6 +82,7 @@ type GenericRecipeConfig struct {
 	Config     Config
 	Parameters map[string]interface{}
 	Metadata   GenericRecipeMetadata
+	Result     *RecipeResult
 }
 
 // GenericRecipeLoader manages loading and processing any type of recipe
@@ -99,13 +119,26 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		return nil, fmt.Errorf("failed to parse recipe: %v", err)
 	}
 
+	// Extract recipe content
+	recipeContent := processedRecipe.Recipe
+
 	// Merge provided params with recipe defaults
 	mergedParams := make(map[string]interface{})
-	for k, v := range processedRecipe.Parameters {
+	for k, v := range recipeContent.Parameters {
 		mergedParams[k] = v
 	}
 	for k, v := range params {
 		mergedParams[k] = v
+	}
+
+	// Perform parameter substitution on wants
+	for i := range recipeContent.Wants {
+		recipeContent.Wants[i].Params = grl.substituteParams(recipeContent.Wants[i].Params, mergedParams)
+	}
+
+	// Perform parameter substitution on coordinator if present
+	if recipeContent.Coordinator != nil {
+		recipeContent.Coordinator.Params = grl.substituteParams(recipeContent.Coordinator.Params, mergedParams)
 	}
 
 
@@ -115,7 +148,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 	
 	// Add all wants from recipe, generating names if missing
-	if len(processedRecipe.Wants) > 0 {
+	if len(recipeContent.Wants) > 0 {
 		prefix := "want"
 		if prefixVal, ok := mergedParams["prefix"]; ok {
 			if prefixStr, ok := prefixVal.(string); ok {
@@ -123,7 +156,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 			}
 		}
 		
-		for i, recipeWant := range processedRecipe.Wants {
+		for i, recipeWant := range recipeContent.Wants {
 			// Convert recipe want to Want struct
 			want := recipeWant.ConvertToWant()
 			
@@ -136,9 +169,9 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 	
 	// Add coordinator if present, generating name if missing
-	if processedRecipe.Coordinator != nil {
+	if recipeContent.Coordinator != nil {
 		// Convert recipe coordinator to Want struct
-		coordinator := processedRecipe.Coordinator.ConvertToWant()
+		coordinator := recipeContent.Coordinator.ConvertToWant()
 		if coordinator.Metadata.Name == "" {
 			prefix := "want"
 			if prefixVal, ok := mergedParams["prefix"]; ok {
@@ -152,14 +185,15 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 
 	// Handle legacy templates if present (deprecated)
-	if len(processedRecipe.Templates) > 0 {
+	if len(recipeContent.Templates) > 0 {
 		fmt.Printf("Warning: Legacy template format detected, skipping (deprecated)\n")
 	}
 
 	return &GenericRecipeConfig{
 		Config:     config,
 		Parameters: mergedParams,
-		Metadata:   processedRecipe.Recipe,
+		Metadata:   recipeContent.Metadata,
+		Result:     recipeContent.Result,
 	}, nil
 }
 
@@ -196,7 +230,7 @@ func (grl *GenericRecipeLoader) GetRecipeParameters(recipePath string) (map[stri
 		return nil, err
 	}
 
-	return genericRecipe.Parameters, nil
+	return genericRecipe.Recipe.Parameters, nil
 }
 
 // ListRecipes returns all recipe files in the recipe directory
@@ -237,7 +271,7 @@ func (grl *GenericRecipeLoader) GetRecipeMetadata(recipePath string) (GenericRec
 		return GenericRecipeMetadata{}, err
 	}
 
-	return genericRecipe.Recipe, nil
+	return genericRecipe.Recipe.Metadata, nil
 }
 
 // LoadRecipeWithConfig loads a recipe using a config file that references the recipe
@@ -325,4 +359,47 @@ func ValidateRecipe(recipePath string) error {
 func GetRecipeParameters(recipePath string) (map[string]interface{}, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.GetRecipeParameters(recipePath)
+}
+
+// GetRecipeResult extracts result definition from a recipe
+func (grl *GenericRecipeLoader) GetRecipeResult(recipePath string) (*RecipeResult, error) {
+	data, err := ioutil.ReadFile(recipePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var genericRecipe GenericRecipe
+	if err := yaml.Unmarshal(data, &genericRecipe); err != nil {
+		return nil, err
+	}
+
+	return genericRecipe.Recipe.Result, nil
+}
+
+// GetRecipeResult is a convenience function
+func GetRecipeResult(recipePath string) (*RecipeResult, error) {
+	loader := NewGenericRecipeLoader("")
+	return loader.GetRecipeResult(recipePath)
+}
+
+// substituteParams performs parameter substitution in want params
+func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, mergedParams map[string]interface{}) map[string]interface{} {
+	if params == nil {
+		return nil
+	}
+
+	substituted := make(map[string]interface{})
+	for key, value := range params {
+		if strValue, ok := value.(string); ok {
+			// Check if this string value is a parameter reference
+			if paramValue, exists := mergedParams[strValue]; exists {
+				substituted[key] = paramValue
+			} else {
+				substituted[key] = value
+			}
+		} else {
+			substituted[key] = value
+		}
+	}
+	return substituted
 }

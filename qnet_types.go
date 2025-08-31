@@ -94,11 +94,8 @@ func (g *Generator) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this generator
 func (g *Generator) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":    g.Stats.TotalProcessed,
-		"average_wait_time":  g.Stats.AverageWaitTime,
-		"total_wait_time":    g.Stats.TotalWaitTime,
-	}
+	// Stats are now dynamic, just return the map directly
+	return g.Stats
 }
 
 // Process processes using enhanced paths (for enhanced node compatibility)
@@ -139,9 +136,13 @@ func (g *Generator) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 		
 		if j >= g.Count {
 			// Store generation stats
-			g.Stats.TotalProcessed = j
-			g.Stats.AverageWaitTime = 0.0 // Generators don't have wait time
-			g.Stats.TotalWaitTime = 0.0
+			// Initialize stats map if not exists
+			if g.Stats == nil {
+				g.Stats = make(WantStats)
+			}
+			g.Stats["total_processed"] = j
+			g.Stats["average_wait_time"] = 0.0 // Generators don't have wait time
+			g.Stats["total_wait_time"] = 0.0
 			
 			out <- QueuePacket{-1, 0}
 			fmt.Printf("[GENERATOR] Generated %d packets\n", j)
@@ -212,11 +213,8 @@ func (q *Queue) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this queue
 func (q *Queue) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":    q.Stats.TotalProcessed,
-		"average_wait_time":  q.Stats.AverageWaitTime,
-		"total_wait_time":    q.Stats.TotalWaitTime,
-	}
+	// Stats are now dynamic, just return the map directly
+	return q.Stats
 }
 
 // Process processes using enhanced paths
@@ -253,9 +251,13 @@ func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) 
 			if processedCount > 0 {
 				avgWaitTime := waitTimeSum / float64(processedCount)
 				// Store stats in the Want
-				q.Stats.AverageWaitTime = avgWaitTime
-				q.Stats.TotalProcessed = processedCount
-				q.Stats.TotalWaitTime = waitTimeSum
+				// Initialize stats map if not exists
+				if q.Stats == nil {
+					q.Stats = make(WantStats)
+				}
+				q.Stats["average_wait_time"] = avgWaitTime
+				q.Stats["total_processed"] = processedCount
+				q.Stats["total_wait_time"] = waitTimeSum
 				
 				fmt.Printf("[QUEUE %s] Service: %.2f, Processed: %d, Avg Wait: %.6f\n", 
 					q.Metadata.Name, q.ServiceTime, processedCount, avgWaitTime)
@@ -367,11 +369,8 @@ func (c *Combiner) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this combiner
 func (c *Combiner) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":    c.Stats.TotalProcessed,
-		"average_wait_time":  c.Stats.AverageWaitTime,
-		"total_wait_time":    c.Stats.TotalWaitTime,
-	}
+	// Stats are now dynamic, just return the map directly
+	return c.Stats
 }
 
 // Process processes using enhanced paths
@@ -418,9 +417,13 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 		}
 		if allClosed && len(packetBuffer) == 0 {
 			// Store combiner stats
-			c.Stats.TotalProcessed = processed
-			c.Stats.AverageWaitTime = 0.0 // Combiners don't add wait time
-			c.Stats.TotalWaitTime = 0.0
+			// Initialize stats map if not exists
+			if c.Stats == nil {
+				c.Stats = make(WantStats)
+			}
+			c.Stats["total_processed"] = processed
+			c.Stats["average_wait_time"] = 0.0 // Combiners don't add wait time
+			c.Stats["total_wait_time"] = 0.0
 			
 			fmt.Printf("[COMBINER] Operation: %s, Processed %d packets\n", c.Operation, processed)
 			out <- QueuePacket{-1, 0} // Send end signal
@@ -462,7 +465,11 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 					usingsClosed[i] = true
 				}
 				// Send end signal
-				c.Stats.TotalProcessed = processed
+				// Initialize stats map if not exists
+				if c.Stats == nil {
+					c.Stats = make(WantStats)
+				}
+				c.Stats["total_processed"] = processed
 				out <- QueuePacket{-1, 0}
 				return true
 			}
@@ -536,11 +543,8 @@ func (s *Sink) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this sink
 func (s *Sink) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":    s.Stats.TotalProcessed,
-		"average_wait_time":  s.Stats.AverageWaitTime,
-		"total_wait_time":    s.Stats.TotalWaitTime,
-	}
+	// Stats are now dynamic, just return the map directly
+	return s.Stats
 }
 
 // Process processes using enhanced paths
@@ -573,9 +577,13 @@ func (s *Sink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) b
 		
 		if packet.isEnded() {
 			// Store sink stats
-			s.Stats.TotalProcessed = s.Received
-			s.Stats.AverageWaitTime = 0.0 // Sinks don't add wait time
-			s.Stats.TotalWaitTime = 0.0
+			// Initialize stats map if not exists
+			if s.Stats == nil {
+				s.Stats = make(WantStats)
+			}
+			s.Stats["total_processed"] = s.Received
+			s.Stats["average_wait_time"] = 0.0 // Sinks don't add wait time
+			s.Stats["total_wait_time"] = 0.0
 			
 			fmt.Printf("[SINK] Total received: %d packets\n", s.Received)
 			return true

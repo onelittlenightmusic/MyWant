@@ -1,19 +1,20 @@
-# Recipe parameters - these are the configurable values
-parameters:
-  prefix: "fibonacci"
-  max_number: 100
-  delay: 0.5
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "fibonacci"
+    max_number: 100
+    delay: 0.5
 
-wants:
-  # Fibonacci Generator
-  - type: fibonacci_generator
-    params:
-      max_number: max_number
-      delay: delay
+  wants:
+    # Fibonacci Generator
+    - type: fibonacci_generator
+      params:
+        max_number: max_number
+        delay: delay
 
-  # Fibonacci Sink
-  - type: fibonacci_sink
-    params:
-      display_format: "Fibonacci: %d"
-    using:
-      - category: fibonacci-producer
+    # Fibonacci Sink
+    - type: fibonacci_sink
+      params:
+        display_format: "Fibonacci: %d"
+      using:
+        - category: fibonacci-producer

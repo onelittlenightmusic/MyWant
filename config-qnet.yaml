@@ -1,99 +1,24 @@
 wants:
-  # Primary packet generator
+  # Target want that dynamically generates other wants from qnet-pipeline recipe
   - metadata:
-      name: gen-primary
-      type: sequence
+      name: qnet-target
+      type: target
       labels:
-        role: source
-        stream: primary
-        priority: high
+        role: orchestrator
+        category: dynamic-generator
     spec:
+      # Target-specific parameters
       params:
-        rate: 3.0
-        count: 10000
-
-  # Secondary packet generator  
-  - metadata:
-      name: gen-secondary
-      type: sequence
-      labels:
-        role: source
-        stream: secondary
-        priority: medium
-    spec:
-      params:
-        rate: 4.0
-        count: 7500
-
-  # Main queue processing primary stream
-  - metadata:
-      name: queue-primary
-      type: queue
-      labels:
-        role: processor
-        stage: first
-        stream: primary
-        path: main
-    spec:
-      params:
-        service_time: 0.1
-      using:
-        - role: source
-          stream: primary
-
-  # Alt queue processing secondary stream
-  - metadata:
-      name: queue-secondary
-      type: queue
-      labels:
-        role: processor
-        stage: first
-        stream: secondary
-        path: alt
-    spec:
-      params:
-        service_time: 0.12
-      using:
-        - role: source
-          stream: secondary
-
-  # Stream combiner
-  - metadata:
-      name: combiner-main
-      type: combiner
-      labels:
-        role: merger
-        operation: combine
-        stage: second
-    spec:
-      params: {}
-      using:
-        - role: processor
-          stage: first
-
-  # Final processing queue
-  - metadata:
-      name: queue-final
-      type: queue
-      labels:
-        role: processor
-        stage: final
-        path: output
-    spec:
-      params:
-        service_time: 0.05
-      using:
-        - role: merger
-
-  # Final collector
-  - metadata:
-      name: collector-end
-      type: sink
-      labels:
-        role: terminal
-        stage: end
-    spec:
-      params: {}
-      using:
-        - role: processor
-          stage: final
+        max_display: 10000
+      # Recipe to use for dynamic want generation
+      recipe: "recipes/qnet-pipeline.yaml"
+      # Parameters to pass to the recipe
+      recipe_params:
+        prefix: "qnet-dynamic"
+        primary_count: 5000
+        secondary_count: 4000
+        primary_rate: 2.0
+        secondary_rate: 3.0
+        primary_service_time: 0.05
+        secondary_service_time: 0.05
+        final_service_time: 0.03

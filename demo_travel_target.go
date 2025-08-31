@@ -6,14 +6,14 @@ import (
 )
 
 func main() {
-	fmt.Println("🎯 QNet Target Want Demo with Dynamic Recipe Loading")
+	fmt.Println("🎯 Travel Target Want Demo with Dynamic Recipe Loading")
 	fmt.Println("====================================================")
 	fmt.Println("This demo shows a target want that dynamically generates")
-	fmt.Println("other wants from the qnet-pipeline recipe at runtime.")
+	fmt.Println("travel wants from the travel-itinerary recipe at runtime.")
 	fmt.Println()
 	
 	// Get YAML file from command line argument or use default
-	yamlFile := "config-qnet.yaml"
+	yamlFile := "config-travel-target.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
@@ -39,13 +39,16 @@ func main() {
 	// Create chain builder
 	builder := NewChainBuilder(config)
 	
+	// Register travel want types first
+	RegisterTravelWantTypes(builder)
+	
 	// Register owner-based want types (includes target and child wants)
 	RegisterOwnerWantTypes(builder)
 	
-	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
+	fmt.Println("\n🚀 Executing travel target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")
-	fmt.Println("1. Load the qnet-pipeline recipe")
-	fmt.Println("2. Dynamically create child wants (generators, queues, combiner, sink)")
+	fmt.Println("1. Load the travel-itinerary recipe")
+	fmt.Println("2. Dynamically create child wants (restaurant, hotel, buffet, coordinator)")
 	fmt.Println("3. Add owner references to all child wants")
 	fmt.Println("4. Wait for all children to complete")
 	fmt.Println("5. Compute aggregate results")
@@ -59,16 +62,8 @@ func main() {
 	fmt.Println("\n📊 Final Want States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
-		processed := 0
-		if state.Stats != nil {
-			if val, ok := state.Stats["total_processed"]; ok {
-				if intVal, ok := val.(int); ok {
-					processed = intVal
-				}
-			}
-		}
 		fmt.Printf("  %s: %s (processed: %d)\n", 
-			name, state.Status, processed)
+			name, state.Status, state.Stats.TotalProcessed)
 	}
 	
 	// Show target results
@@ -89,5 +84,5 @@ func main() {
 	}
 	
 	// Memory snapshot is automatically saved to memory/memory-TIMESTAMP.yaml
-	fmt.Println("✅ Target-based dynamic recipe execution completed successfully!")
+	fmt.Println("✅ Travel target-based dynamic recipe execution completed successfully!")
 }

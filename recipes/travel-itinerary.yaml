@@ -1,32 +1,53 @@
-# Recipe parameters - these are the configurable values
-parameters:
-  prefix: "travel"
-  display_name: "One Day Travel Itinerary"
-  restaurant_type: "fine dining"
-  hotel_type: "luxury"
-  buffet_type: "international"
-  dinner_duration: 2.0
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "travel"
+    display_name: "One Day Travel Itinerary"
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    buffet_type: "international"
+    dinner_duration: 2.0
 
-wants:
-  # Dinner restaurant reservation
-  - type: restaurant
+  wants:
+    # Dinner restaurant reservation
+    - type: restaurant
+      params:
+        restaurant_type: restaurant_type
+        duration_hours: dinner_duration
+
+    # Hotel accommodation booking  
+    - type: hotel
+      params:
+        hotel_type: hotel_type
+
+    # Morning breakfast buffet
+    - type: buffet
+      params:
+        buffet_type: buffet_type
+
+  coordinator:
+    type: travel_coordinator
     params:
-      restaurant_type: restaurant_type
-      duration_hours: dinner_duration
+      display_name: display_name
+    using:
+      - role: scheduler
 
-  # Hotel accommodation booking  
-  - type: hotel
-    params:
-      hotel_type: hotel_type
-
-  # Morning breakfast buffet
-  - type: buffet
-    params:
-      buffet_type: buffet_type
-
-coordinator:
-  type: travel_coordinator
-  params:
-    display_name: display_name
-  using:
-    - role: scheduler
+  # Recipe result definition - specifies how to compute travel planning results
+  result:
+    # Primary result from the travel coordinator
+    primary:
+      want_name: "travel_coordinator"
+      stat_name: "TotalProcessed"
+      description: "Total travel bookings coordinated"
+    
+    # Travel-specific metrics
+    metrics:
+      - want_name: "restaurant"
+        stat_name: "TotalProcessed"
+        description: "Restaurant reservations completed"
+      - want_name: "hotel"
+        stat_name: "TotalProcessed"
+        description: "Hotel bookings completed"
+      - want_name: "buffet"
+        stat_name: "TotalProcessed"
+        description: "Buffet reservations completed"

@@ -75,10 +75,11 @@ type Metadata struct {
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Template string                 `json:"template,omitempty" yaml:"template,omitempty"` // Deprecated, use Recipe instead
-	Recipe   string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
-	Params   map[string]interface{} `json:"params" yaml:"params"`
-	Using   []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
+	Template     string                 `json:"template,omitempty" yaml:"template,omitempty"` // Deprecated, use Recipe instead
+	Recipe       string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
+	RecipeParams map[string]interface{} `json:"recipe_params,omitempty" yaml:"recipe_params,omitempty"`
+	Params       map[string]interface{} `json:"params" yaml:"params"`
+	Using        []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 }
 
 // Want represents a processing unit in the chain
@@ -220,11 +221,8 @@ type EnhancedBaseWant interface {
 }
 
 // WantStats holds statistical information for a want
-type WantStats struct {
-	AverageWaitTime float64 `json:"average_wait_time"`
-	TotalProcessed  int     `json:"total_processed"`
-	TotalWaitTime   float64 `json:"total_wait_time"`
-}
+// WantStats represents dynamic statistics as key-value pairs
+type WantStats map[string]interface{}
 
 // WantStatus represents the current state of a want
 type WantStatus string

@@ -1,42 +1,43 @@
-# Recipe parameters - these are the configurable values
-parameters:
-  prefix: "high-throughput"
-  count: 10000
-  rate: 100.0
-  service_time: 0.01
-  parallel_queues: 3
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "high-throughput"
+    count: 10000
+    rate: 100.0
+    service_time: 0.01
+    parallel_queues: 3
 
-wants:
-  # Generator want
-  - type: sequence
-    params:
-      count: count
-      rate: rate
+  wants:
+    # Generator want
+    - type: sequence
+      params:
+        count: count
+        rate: rate
 
-  # Parallel Queue 1
-  - type: queue
-    params:
-      service_time: service_time
-    using:
-      - category: producer
+    # Parallel Queue 1
+    - type: queue
+      params:
+        service_time: service_time
+      using:
+        - category: producer
 
-  # Parallel Queue 2  
-  - type: queue
-    params:
-      service_time: service_time
-    using:
-      - category: producer
+    # Parallel Queue 2  
+    - type: queue
+      params:
+        service_time: service_time
+      using:
+        - category: producer
 
-  # Parallel Queue 3
-  - type: queue
-    params:
-      service_time: service_time
-    using:
-      - category: producer
+    # Parallel Queue 3
+    - type: queue
+      params:
+        service_time: service_time
+      using:
+        - category: producer
 
-  # Sink want
-  - type: sink
-    params:
-      display_format: "Processed: %d"
-    using:
-      - category: parallel-queue
+    # Sink want
+    - type: sink
+      params:
+        display_format: "Processed: %d"
+      using:
+        - category: parallel-queue
