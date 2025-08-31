@@ -4,41 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GoChain is a Go library implementing functional chain programming patterns with channels. The project now supports both imperative chain building and declarative configuration-based approaches, enabling flexible stream processing and pipeline architectures.
+GoChain is a Go library implementing functional chain programming patterns with channels. The project uses a **recipe-based configuration system** where config YAML files serve as the top-level user interface and recipes provide reusable component templates.
 
 ## Core Architecture
 
+### Configuration System (User Interface)
+
+- **Config Files**: Top-level user interface (`config-*-recipe.yaml`)
+- **Recipe Files**: Reusable components in `recipes/` directory
+- **Demo Programs**: Entry points that load config files (`demo_*_recipe.go`)
+
 ### Main Components
 
-- **chain/chain.go**: Primary chain library with `C_chain` struct and functional chain operations
-- **chain.go**: Legacy/alternative implementation of chain functionality  
-- **chain_qnet.go**: Original imperative example demonstrating queueing network simulation
-- **declarative.go**: New declarative configuration system with JSON/YAML support
-- **example_declarative.go**: JSON-based configuration example
-- **example_yaml.go**: YAML-based configuration example
+- **declarative.go**: Core configuration system with Config/Want/Recipe types
+- **recipe_loader_generic.go**: Generic recipe loading and processing
+- **recipe_loader.go**: Owner-based recipe loading for dynamic want creation
+- **\*_types.go**: Want type implementations (qnet_types.go, travel_types.go, etc.)
 
 ### Key Types and Concepts
 
-#### Declarative API
-- `Metadata`: Node identification with `Name`, `Type`, `Labels`, and `Connectivity`
-- `NodeSpec`: Node configuration with `Params`, legacy `Inputs`, and new `Paths`
-- `Config`: Complete network configuration with array of `Node`s
-- `ChainBuilder`: Builds and executes chains from declarative configuration
+#### Configuration API
+- `Config`: Complete execution configuration with array of `Want`s
+- `Want`: Individual processing unit with `Metadata`, `Spec`, `Stats`, `Status`
+- `WantSpec`: Want configuration with `Params`, `Using` selectors, and optional `Recipe` reference
+- `ChainBuilder`: Builds and executes chains from configuration
 
-#### Path Management System
-- `PathInfo`: Connection information for a single path (channel, name, active status)
-- `Paths`: Manages all input and output connections for a node
-- `ConnectivityMetadata`: Defines node connectivity requirements and constraints
-- `EnhancedBaseNode`: Interface for path-aware nodes with connectivity validation
-- `PathSpec`: Path configuration in YAML/JSON with selectors and activity
-- `PathsSpec`: Complete path specifications for inputs and outputs
+#### Recipe System
+- `GenericRecipe`: Recipe template with `Parameters`, `Wants`, and optional `Coordinator`
+- `RecipeWant`: Flattened recipe format (type, labels, params, using at top level)
+- `GenericRecipeLoader`: Loads and processes recipe files
+- Parameter substitution: Recipe parameters referenced by name (e.g., `count: count`)
 
-### Chain Function Signatures
-
-Functions added to chains follow these patterns:
-- Start functions: `func(Chan) bool`
-- Processing functions: `func(Chan, Chan) bool` (input, output channels)
-- End functions: `func(Chan) bool`
+#### Want Types
+- **Independent Wants**: Execute in parallel without dependencies (travel planning)
+- **Dependent Wants**: Connected in pipelines using `using` selectors (queue systems)
+- **Coordinator Wants**: Orchestrate independent wants (travel_coordinator)
 
 ## Development Commands
 
@@ -48,119 +48,124 @@ go mod init gochain
 go mod tidy
 ```
 
-### Building and Running Examples
+### Running Examples
 
-#### Legacy Imperative Examples
+#### Recipe-Based Examples (Recommended)
 ```sh
-# Run original queueing network example
-go run chain_qnet.go
+# Independent wants (travel planning)
+make run-travel-recipe        # Uses config-travel-recipe.yaml → recipes/travel-itinerary.yaml
 
-# Run other examples
-go run closure_test.go
-go run interface_test.go
+# Dependent wants (queue system pipeline)  
+make run-queue-system-recipe  # Uses config-queue-system-recipe.yaml → recipes/queue-system.yaml
+
+# Complex multi-stream systems
+make run-qnet-recipe         # Uses config-qnet-recipe.yaml → recipes/qnet-pipeline.yaml
+make run-qnet-using-recipe   # QNet with YAML-defined using connections
+
+# Owner-based dynamic want creation
+make run-sample-owner        # Dynamic wants using recipes from recipes/ directory
 ```
 
-#### Declarative Configuration Examples
+#### Direct Configuration Examples
 ```sh
-# Run JSON-based configuration
-go run example_declarative.go declarative.go
-
-# Run YAML-based configuration  
-go run example_yaml.go declarative.go
+# Direct want definitions (no recipes)
+make run-qnet          # Uses config-qnet.yaml  
+make run-prime         # Uses config-prime.yaml
+make run-fibonacci     # Uses config-fibonacci.yaml
+make run-fibonacci-loop # Uses config-fibonacci-loop.yaml
+make run-travel        # Uses config-travel.yaml
 ```
-
-### Configuration Files
-- `config.json`: JSON format configuration example
-- `config.yaml`: YAML format configuration example
-- `config_clean.yaml`: Clean YAML format with optional inputs
 
 ## Code Patterns
 
-### Declarative Configuration Usage
+### Recipe-Based Configuration Usage
 
-#### JSON Configuration
+#### Step 1: Load Recipe with Config
 ```go
-config, err := loadConfigFromJSON("config.json")
+// Load config that references a recipe
+config, params, err := LoadRecipeWithConfig("config-travel-recipe.yaml")
 builder := NewChainBuilder(config)
-builder.Build()
+RegisterTravelWantTypes(builder)
 builder.Execute()
 ```
 
-#### YAML Configuration
+#### Step 2: Direct Configuration Loading
 ```go
-config, err := loadConfigFromYAML("config.yaml")
+// Load config with direct want definitions
+config, err := loadConfigFromYAML("config-travel.yaml")
 builder := NewChainBuilder(config)
-builder.Build()
+RegisterTravelWantTypes(builder)
 builder.Execute()
 ```
 
-#### Queueing Network Configuration (config-qnet.yaml)
+### Want Configuration Examples
+
+#### Independent Wants (Travel Recipe)
 ```yaml
-nodes:
-  # Primary packet generator
-  - metadata:
-      name: gen-primary
-      type: sequence
-      labels:
-        role: source
-        stream: primary
-        priority: high
-    spec:
-      params:
-        rate: 3.0
-        count: 10000
+# recipes/travel-itinerary.yaml
+parameters:
+  prefix: "travel"
+  restaurant_type: "fine dining"
+  hotel_type: "luxury"
 
-  # Main queue processing primary stream
-  - metadata:
-      name: queue-primary
-      type: queue
-      labels:
-        role: processor
-        stage: first
-        stream: primary
-        path: main
-    spec:
-      params:
-        service_time: 0.5
-      inputs:
-        - role: source
-          stream: primary
+wants:
+  # No using selectors - independent execution
+  - type: restaurant
+    params:
+      restaurant_type: restaurant_type
+  - type: hotel
+    params:
+      hotel_type: hotel_type
 
-  # Stream combiner
-  - metadata:
-      name: combiner-main
-      type: combiner
-      labels:
-        role: merger
-        operation: combine
-        stage: second
-    spec:
-      params: {}
-      inputs:
-        - role: processor
-          stage: first
-
-  # Final collector
-  - metadata:
-      name: collector-end
-      type: sink
-      labels:
-        role: terminal
-        stage: end
-    spec:
-      params: {}
-      inputs:
-        - role: processor
-          stage: final
+coordinator:
+  type: travel_coordinator
+  params:
+    display_name: display_name
 ```
 
-### Dynamic Node Addition
+#### Dependent Wants (Queue System Recipe)
+```yaml
+# recipes/queue-system.yaml
+parameters:
+  count: 1000
+  rate: 10.0
+  service_time: 0.1
 
-Nodes can be added to a running chain dynamically using the `AddDynamicNode` and `AddDynamicNodes` methods:
+wants:
+  # Generator (no dependencies)
+  - type: sequence
+    labels:
+      role: source
+      category: queue-producer
+    params:
+      count: count
+      rate: rate
+      
+  # Queue (depends on generator)
+  - type: queue
+    labels:
+      role: processor
+      category: queue-processor  
+    params:
+      service_time: service_time
+    using:
+      - category: queue-producer  # Connect to generator
+      
+  # Sink (depends on queue)
+  - type: sink
+    labels:
+      role: collector
+    using:
+      - role: processor  # Connect to queue
+```
+
+### Dynamic Want Addition
+
+Wants can be added to a running chain dynamically:
 
 ```go
-// Add a single dynamic node
-builder.AddDynamicNode(Node{
+// Add a single dynamic want
+builder.AddDynamicNode(Want{
     Metadata: Metadata{
         Name: "dynamic-processor",
         Type: "queue",
@@ -169,21 +174,21 @@ builder.AddDynamicNode(Node{
             "stage": "dynamic",
         },
     },
-    Spec: NodeSpec{
+    Spec: WantSpec{
         Params: map[string]interface{}{
             "service_time": 0.4,
         },
-        Inputs: []InputSelector{{
+        Using: []map[string]string{{
             "role": "source",
         }},
     },
 })
 
-// Add multiple dynamic nodes
-builder.AddDynamicNodes([]Node{node1, node2, node3})
+// Add multiple dynamic wants
+builder.AddDynamicNodes([]Want{want1, want2, want3})
 ```
 
-Dynamic nodes are automatically connected based on their label selectors and integrate seamlessly with the existing chain topology.
+Dynamic wants are automatically connected based on their label selectors and integrate seamlessly with the existing chain topology.
 
 ### Memory Reconciliation
 
@@ -194,39 +199,66 @@ The system supports memory reconciliation for persistent state management across
 // and saved during chain execution for state persistence
 
 // Example memory configuration structure:
-// - Node states and statistics
-// - Connection topology
+// - Want states and statistics
+// - Connection topology  
 // - Processing parameters
 // - Runtime metrics
 ```
 
 Memory reconciliation enables:
-- **State Persistence**: Node states survive chain restarts
+- **State Persistence**: Want states survive chain restarts
 - **Configuration Recovery**: Automatic reload of previous configurations
 - **Statistics Continuity**: Processing metrics maintained across executions
-- **Dynamic Topology**: Preserved connections for dynamically added nodes
+- **Dynamic Topology**: Preserved connections for dynamically added wants
+
+## File Organization
+
+### Configuration Layer (User Interface)
+- `config-*-recipe.yaml`: Config files that reference recipes
+- `config-*.yaml`: Config files with direct want definitions
+- `demo_*_recipe.go`: Demo programs that load recipe-based configs
+- `demo_*.go`: Demo programs that load direct configs
+
+### Recipe Layer (Reusable Components)
+- `recipes/*.yaml`: Recipe template files with parameters
+- `recipe_loader_generic.go`: Generic recipe processing
+- `recipe_loader.go`: Owner-based recipe loading
+
+### Want Implementation Layer
+- `*_types.go`: Want type implementations (qnet_types.go, travel_types.go, etc.)
+- Registration functions: `Register*WantTypes(builder)`
+
+### Core System
+- `declarative.go`: Core types and configuration loading
+- `chain/chain.go`: Low-level chain operations
 
 ## Dependencies
 
-- Go 1.24.5+
+- Go 1.21+
 - `gopkg.in/yaml.v3` for YAML configuration support
 
 ## Important Notes
 
-### Legacy API
-- The library uses Go channels extensively for communication between chain stages
-- Functions in chains should return `true` when processing is complete, `false` to continue
-- The `chain.Run()` function must be called to execute the constructed chains
-- Channel buffer sizes are typically set to 10 for intermediate stages
+### Recipe System
+- **Config files are the user interface** - what you execute with make targets
+- **Recipe files are reusable components** - consumed by config files
+- Parameter substitution uses simple references (e.g., `count: count`)
+- **No Go templating** - uses direct YAML parameter substitution
+- Recipe wants use flattened structure (type, labels, params at top level)
 
-### Declarative API
-- Nodes are connected via label-based selectors, eliminating order dependencies
-- Configuration supports both JSON and YAML formats with same struct definitions
-- `inputs` field is optional - omit for source nodes (generators)
-- Label matching allows flexible topology definition without hardcoded node names
-- ChainBuilder handles the complexity of wiring connections based on selectors
+### Want Connectivity
+- **Independent wants**: No `using` selectors, execute in parallel
+- **Dependent wants**: Use `using` selectors to form processing pipelines
+- **Label-based connections**: Flexible topology without hardcoded names
+- **Automatic name generation**: Recipe loader generates want names if missing
+
+### Legacy Support
+- Old template-based system archived in `archive/` directory
+- Legacy `Template` field deprecated in favor of `Recipe` field
+- Both imperative and declarative APIs supported for different use cases
 
 ### File Structure
-- Use `declarative.go` when working with configuration-based chains
-- Legacy examples demonstrate the original imperative API
-- Both approaches can coexist and serve different use cases
+- Use `declarative.go` for configuration-based chains
+- Want types in separate `*_types.go` files
+- Recipe files in `recipes/` directory
+- Config files in root directory with `config-*` naming
