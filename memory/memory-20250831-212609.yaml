@@ -1,0 +1,65 @@
+timestamp: "2025-08-31T21:26:09+09:00"
+execution_id: exec-20250831-212609
+wants:
+    - metadata:
+        name: generator
+        type: prime_generator
+        labels:
+            role: source
+      spec:
+        params:
+            end: 100
+            start: 1
+      status: completed
+    - metadata:
+        name: prime_filter
+        type: prime_filter
+        labels:
+            role: filter
+      spec:
+        params: {}
+        using:
+            - role: source
+      stats:
+        total_processed: 100
+      status: completed
+    - metadata:
+        name: sink
+        type: prime_sink
+        labels:
+            role: collector
+      spec:
+        params: {}
+        using:
+            - role: filter
+      stats:
+        total_processed: 25
+      status: completed
+      state:
+        count: 25
+        primes:
+            - 2
+            - 3
+            - 5
+            - 7
+            - 11
+            - 13
+            - 17
+            - 19
+            - 23
+            - 29
+            - 31
+            - 37
+            - 41
+            - 43
+            - 47
+            - 53
+            - 59
+            - 61
+            - 67
+            - 71
+            - 73
+            - 79
+            - 83
+            - 89
+            - 97

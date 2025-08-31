@@ -1,24 +1,37 @@
+# Simple QNet configuration for direct execution (no target wants)
+
 wants:
-  # Target want that dynamically generates other wants from qnet-pipeline recipe
+  # Packet generator
   - metadata:
-      name: qnet-target
-      type: target
+      name: gen-primary
+      type: sequence
       labels:
-        role: orchestrator
-        category: dynamic-generator
+        role: source
+        stream: primary
     spec:
-      # Target-specific parameters
       params:
-        max_display: 10000
-      # Recipe to use for dynamic want generation
-      recipe: "recipes/qnet-pipeline.yaml"
-      # Parameters to pass to the recipe
-      recipe_params:
-        prefix: "qnet-dynamic"
-        primary_count: 5000
-        secondary_count: 4000
-        primary_rate: 2.0
-        secondary_rate: 3.0
-        primary_service_time: 0.05
-        secondary_service_time: 0.05
-        final_service_time: 0.03
+        rate: 2.0
+        count: 1000
+
+  # Processing queue
+  - metadata:
+      name: queue-main
+      type: queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 0.05
+      using:
+        - role: source
+
+  # Final collector
+  - metadata:
+      name: sink-main
+      type: sink
+      labels:
+        role: terminal
+    spec:
+      params: {}
+      using:
+        - role: processor

@@ -1,0 +1,49 @@
+timestamp: "2025-08-31T21:07:19+09:00"
+execution_id: exec-20250831-210719
+wants:
+    - metadata:
+        name: vacation-travel_coordinator-4
+        type: travel_coordinator
+        labels: {}
+      spec:
+        params:
+            display_name: Weekend Vacation Itinerary
+        using:
+            - role: scheduler
+      stats:
+        total_processed: 3
+      status: completed
+    - metadata:
+        name: vacation-restaurant-1
+        type: restaurant
+        labels:
+            role: scheduler
+      spec:
+        params:
+            duration_hours: 2.5
+            restaurant_type: michelin starred
+      stats:
+        total_processed: 1
+      status: completed
+    - metadata:
+        name: vacation-hotel-2
+        type: hotel
+        labels:
+            role: scheduler
+      spec:
+        params:
+            hotel_type: boutique
+      stats:
+        total_processed: 1
+      status: completed
+    - metadata:
+        name: vacation-buffet-3
+        type: buffet
+        labels:
+            role: scheduler
+      spec:
+        params:
+            buffet_type: continental
+      stats:
+        total_processed: 1
+      status: completed

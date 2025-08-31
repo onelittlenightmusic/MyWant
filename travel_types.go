@@ -83,9 +83,8 @@ func (r *RestaurantWant) InitializePaths(inCount, outCount int) {
 }
 
 func (r *RestaurantWant) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed": r.Stats.TotalProcessed,
-	}
+	// Stats are now dynamic, just return the map directly
+	return r.Stats
 }
 
 func (r *RestaurantWant) Process(paths Paths) bool {
@@ -171,7 +170,11 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 			newSchedule.Events = append(existingSchedule.Events, newEvent)
 		}
 
-		r.Stats.TotalProcessed = 1
+		// Initialize stats map if not exists
+		if r.Stats == nil {
+			r.Stats = make(WantStats)
+		}
+		r.Stats["total_processed"] = 1
 		fmt.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04"), newEvent.End.Format("15:04"))
 
@@ -230,9 +233,8 @@ func (h *HotelWant) InitializePaths(inCount, outCount int) {
 }
 
 func (h *HotelWant) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed": h.Stats.TotalProcessed,
-	}
+	// Stats are now dynamic, just return the map directly
+	return h.Stats
 }
 
 func (h *HotelWant) Process(paths Paths) bool {
@@ -318,7 +320,11 @@ func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 			newSchedule.Events = append(existingSchedule.Events, newEvent)
 		}
 
-		h.Stats.TotalProcessed = 1
+		// Initialize stats map if not exists
+		if h.Stats == nil {
+			h.Stats = make(WantStats)
+		}
+		h.Stats["total_processed"] = 1
 		fmt.Printf("[HOTEL] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
@@ -374,9 +380,8 @@ func (b *BuffetWant) InitializePaths(inCount, outCount int) {
 }
 
 func (b *BuffetWant) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed": b.Stats.TotalProcessed,
-	}
+	// Stats are now dynamic, just return the map directly
+	return b.Stats
 }
 
 func (b *BuffetWant) Process(paths Paths) bool {
@@ -456,7 +461,11 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 			newSchedule.Events = append(existingSchedule.Events, newEvent)
 		}
 
-		b.Stats.TotalProcessed = 1
+		// Initialize stats map if not exists
+		if b.Stats == nil {
+			b.Stats = make(WantStats)
+		}
+		b.Stats["total_processed"] = 1
 		fmt.Printf("[BUFFET] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
@@ -523,9 +532,8 @@ func (t *TravelCoordinatorWant) InitializePaths(inCount, outCount int) {
 }
 
 func (t *TravelCoordinatorWant) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed": t.Stats.TotalProcessed,
-	}
+	// Stats are now dynamic, just return the map directly
+	return t.Stats
 }
 
 func (t *TravelCoordinatorWant) Process(paths Paths) bool {
@@ -587,7 +595,11 @@ func (t *TravelCoordinatorWant) CreateFunction() func(using []chain.Chan, output
 				fmt.Printf("   %s\n", event.Name)
 			}
 
-			t.Stats.TotalProcessed = len(allEvents)
+			// Initialize stats map if not exists
+			if t.Stats == nil {
+				t.Stats = make(WantStats)
+			}
+			t.Stats["total_processed"] = len(allEvents)
 			fmt.Printf("\n✅ Travel itinerary completed with %d events!\n", len(allEvents))
 			return true
 		}

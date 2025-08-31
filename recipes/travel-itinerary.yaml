@@ -11,26 +11,32 @@ recipe:
   wants:
     # Dinner restaurant reservation
     - type: restaurant
+      labels:
+        role: scheduler
       params:
         restaurant_type: restaurant_type
         duration_hours: dinner_duration
 
     # Hotel accommodation booking  
     - type: hotel
+      labels:
+        role: scheduler
       params:
         hotel_type: hotel_type
 
     # Morning breakfast buffet
     - type: buffet
+      labels:
+        role: scheduler
       params:
         buffet_type: buffet_type
 
-  coordinator:
-    type: travel_coordinator
-    params:
-      display_name: display_name
-    using:
-      - role: scheduler
+    # Travel coordinator that combines all schedules
+    - type: travel_coordinator
+      params:
+        display_name: display_name
+      using:
+        - role: scheduler
 
   # Recipe result definition - specifies how to compute travel planning results
   result:

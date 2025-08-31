@@ -135,7 +135,14 @@ func (f *PrimeFilter) CreateFunction() func(using []chain.Chan, outputs []chain.
 					out <- val
 				}
 				
-				f.Stats.TotalProcessed++
+				if f.Stats == nil {
+					f.Stats = make(WantStats)
+				}
+				if val, exists := f.Stats["total_processed"]; exists {
+					f.Stats["total_processed"] = val.(int) + 1
+				} else {
+					f.Stats["total_processed"] = 1
+				}
 			}
 		}
 		close(out)
@@ -183,7 +190,14 @@ func (s *PrimeSink) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 			if val, ok := i.(int); ok {
 				s.primes = append(s.primes, val)
 				fmt.Printf("%d\n", val)
-				s.Stats.TotalProcessed++
+				if s.Stats == nil {
+					s.Stats = make(WantStats)
+				}
+				if val, exists := s.Stats["total_processed"]; exists {
+					s.Stats["total_processed"] = val.(int) + 1
+				} else {
+					s.Stats["total_processed"] = 1
+				}
 			}
 		}
 		s.StoreState("primes", s.primes)

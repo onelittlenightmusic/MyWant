@@ -103,60 +103,62 @@ builder.Execute()
 #### Independent Wants (Travel Recipe)
 ```yaml
 # recipes/travel-itinerary.yaml
-parameters:
-  prefix: "travel"
-  restaurant_type: "fine dining"
-  hotel_type: "luxury"
+recipe:
+  parameters:
+    prefix: "travel"
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
 
-wants:
-  # No using selectors - independent execution
-  - type: restaurant
-    params:
-      restaurant_type: restaurant_type
-  - type: hotel
-    params:
-      hotel_type: hotel_type
+  wants:
+    # No using selectors - independent execution
+    - type: restaurant
+      params:
+        restaurant_type: restaurant_type
+    - type: hotel
+      params:
+        hotel_type: hotel_type
 
-coordinator:
-  type: travel_coordinator
-  params:
-    display_name: display_name
+  coordinator:
+    type: travel_coordinator
+    params:
+      display_name: display_name
 ```
 
 #### Dependent Wants (Queue System Recipe)
 ```yaml
 # recipes/queue-system.yaml
-parameters:
-  count: 1000
-  rate: 10.0
-  service_time: 0.1
+recipe:
+  parameters:
+    count: 1000
+    rate: 10.0
+    service_time: 0.1
 
-wants:
-  # Generator (no dependencies)
-  - type: sequence
-    labels:
-      role: source
-      category: queue-producer
-    params:
-      count: count
-      rate: rate
-      
-  # Queue (depends on generator)
-  - type: queue
-    labels:
-      role: processor
-      category: queue-processor  
-    params:
-      service_time: service_time
-    using:
-      - category: queue-producer  # Connect to generator
-      
-  # Sink (depends on queue)
-  - type: sink
-    labels:
-      role: collector
-    using:
-      - role: processor  # Connect to queue
+  wants:
+    # Generator (no dependencies)
+    - type: sequence
+      labels:
+        role: source
+        category: queue-producer
+      params:
+        count: count
+        rate: rate
+        
+    # Queue (depends on generator)
+    - type: queue
+      labels:
+        role: processor
+        category: queue-processor  
+      params:
+        service_time: service_time
+      using:
+        - category: queue-producer  # Connect to generator
+        
+    # Sink (depends on queue)
+    - type: sink
+      labels:
+        role: collector
+      using:
+        - role: processor  # Connect to queue
 ```
 
 ### Dynamic Want Addition

@@ -13,7 +13,7 @@ run-fibonacci-loop:
 	go run demo_fibonacci_loop.go declarative.go fibonacci_loop_types.go config-fibonacci-loop.yaml
 
 run-sample-owner:
-	go run demo_qnet_owner.go declarative.go owner_types.go qnet_types.go recipe_loader.go
+	go run demo_qnet_owner.go declarative.go owner_types.go qnet_types.go recipe_loader_generic.go
 
 run-qnet-target:
 	go run demo_qnet_owner.go declarative.go qnet_types.go owner_types.go recipe_loader_generic.go config-qnet.yaml

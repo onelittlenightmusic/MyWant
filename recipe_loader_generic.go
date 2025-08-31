@@ -39,7 +39,6 @@ type RecipeResultSpec struct {
 type RecipeContent struct {
 	Metadata    GenericRecipeMetadata   `yaml:"metadata,omitempty"`
 	Wants       []RecipeWant            `yaml:"wants,omitempty"`
-	Coordinator *RecipeWant             `yaml:"coordinator,omitempty"`
 	Parameters  map[string]interface{}  `yaml:"parameters,omitempty"`
 	Result      *RecipeResult           `yaml:"result,omitempty"`
 	
@@ -136,10 +135,6 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		recipeContent.Wants[i].Params = grl.substituteParams(recipeContent.Wants[i].Params, mergedParams)
 	}
 
-	// Perform parameter substitution on coordinator if present
-	if recipeContent.Coordinator != nil {
-		recipeContent.Coordinator.Params = grl.substituteParams(recipeContent.Coordinator.Params, mergedParams)
-	}
 
 
 	// Build final configuration
@@ -168,21 +163,6 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		}
 	}
 	
-	// Add coordinator if present, generating name if missing
-	if recipeContent.Coordinator != nil {
-		// Convert recipe coordinator to Want struct
-		coordinator := recipeContent.Coordinator.ConvertToWant()
-		if coordinator.Metadata.Name == "" {
-			prefix := "want"
-			if prefixVal, ok := mergedParams["prefix"]; ok {
-				if prefixStr, ok := prefixVal.(string); ok {
-					prefix = prefixStr
-				}
-			}
-			coordinator.Metadata.Name = fmt.Sprintf("%s-coordinator", prefix)
-		}
-		config.Wants = append(config.Wants, coordinator)
-	}
 
 	// Handle legacy templates if present (deprecated)
 	if len(recipeContent.Templates) > 0 {

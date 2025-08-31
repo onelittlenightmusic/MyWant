@@ -63,11 +63,7 @@ func (g *SeedGenerator) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this generator
 func (g *SeedGenerator) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":   g.Stats.TotalProcessed,
-		"average_wait_time": g.Stats.AverageWaitTime,
-		"total_wait_time":   g.Stats.TotalWaitTime,
-	}
+	return g.Stats
 }
 
 // Process processes using enhanced paths
@@ -101,7 +97,10 @@ func (g *SeedGenerator) CreateFunction() func(using []chain.Chan, outputs []chai
 		// Send end marker with max count info
 		out <- FibonacciSeed{Value: g.MaxCount, Position: -1, IsEnd: true}
 		
-		g.Stats.TotalProcessed = 2
+		if g.Stats == nil {
+			g.Stats = make(WantStats)
+		}
+		g.Stats["total_processed"] = 2
 		fmt.Printf("[SEED] Generated initial seeds: 0, 1 (max_count: %d)\n", g.MaxCount)
 		return true
 	}
@@ -146,11 +145,7 @@ func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this computer
 func (c *FibonacciComputer) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":   c.Stats.TotalProcessed,
-		"average_wait_time": c.Stats.AverageWaitTime,
-		"total_wait_time":   c.Stats.TotalWaitTime,
-	}
+	return c.Stats
 }
 
 // Process processes using enhanced paths
@@ -201,7 +196,10 @@ func (c *FibonacciComputer) CreateFunction() func(using []chain.Chan, outputs []
 			}
 			// Send end signal
 			out <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
-			c.Stats.TotalProcessed = processed
+			if c.Stats == nil {
+				c.Stats = make(WantStats)
+			}
+			c.Stats["total_processed"] = processed
 			fmt.Printf("[COMPUTER] Computed %d fibonacci numbers\n", processed)
 			return true
 		}
@@ -261,11 +259,7 @@ func (m *FibonacciMerger) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this merger
 func (m *FibonacciMerger) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":   m.Stats.TotalProcessed,
-		"average_wait_time": m.Stats.AverageWaitTime,
-		"total_wait_time":   m.Stats.TotalWaitTime,
-	}
+	return m.Stats
 }
 
 // Process processes using enhanced paths
@@ -334,7 +328,10 @@ func (m *FibonacciMerger) CreateFunction() func(using []chain.Chan, outputs []ch
 			// Send end signals to outputs
 			sinkOut <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
 			
-			m.Stats.TotalProcessed = processed
+			if m.Stats == nil {
+				m.Stats = make(WantStats)
+			}
+			m.Stats["total_processed"] = processed
 			fmt.Printf("[MERGER] Merged %d fibonacci values\n", processed)
 			return true
 		}
@@ -384,12 +381,11 @@ func (s *FibonacciSink) GetConnectivityMetadata() ConnectivityMetadata {
 
 // GetStats returns the stats for this sink
 func (s *FibonacciSink) GetStats() map[string]interface{} {
-	return map[string]interface{}{
-		"total_processed":   s.Stats.TotalProcessed,
-		"average_wait_time": s.Stats.AverageWaitTime,
-		"total_wait_time":   s.Stats.TotalWaitTime,
-		"sequence_length":   len(s.Sequence),
+	if s.Stats == nil {
+		s.Stats = make(WantStats)
 	}
+	s.Stats["sequence_length"] = len(s.Sequence)
+	return s.Stats
 }
 
 // Process processes using enhanced paths
@@ -419,7 +415,10 @@ func (s *FibonacciSink) CreateFunction() func(using []chain.Chan, outputs []chai
 		seed := (<-in).(FibonacciSeed)
 		
 		if seed.IsEnd {
-			s.Stats.TotalProcessed = len(s.Sequence)
+			if s.Stats == nil {
+				s.Stats = make(WantStats)
+			}
+			s.Stats["total_processed"] = len(s.Sequence)
 			
 			fmt.Printf("\n🔢 Fibonacci Sequence (Loop Architecture):\n")
 			for i, val := range s.Sequence {

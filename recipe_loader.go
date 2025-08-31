@@ -162,7 +162,6 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 type RecipeFile struct {
 	Parameters map[string]interface{} `yaml:"parameters"`
 	Wants      []DRYWantSpec         `yaml:"wants"`
-	Coordinator *DRYWantSpec        `yaml:"coordinator,omitempty"`
 }
 
 
@@ -484,11 +483,11 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 func (rl *RecipeLoader) extractWantStat(want *Want, statName string) (interface{}, error) {
 	switch statName {
 	case "AverageWaitTime", "averagewaittime":
-		return want.Stats.AverageWaitTime, nil
+		return want.Stats["average_wait_time"], nil
 	case "TotalProcessed", "totalprocessed":
-		return want.Stats.TotalProcessed, nil
+		return want.Stats["total_processed"], nil
 	case "TotalWaitTime", "totalwaittime":
-		return want.Stats.TotalWaitTime, nil
+		return want.Stats["total_wait_time"], nil
 	default:
 		return nil, fmt.Errorf("unknown stat name: %s", statName)
 	}

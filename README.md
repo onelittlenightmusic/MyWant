@@ -46,38 +46,39 @@ Independent wants execute in parallel without dependencies - perfect for orchest
 
 **Step 1: Create the recipe** (reusable component in `recipes/travel-itinerary.yaml`):
 ```yaml
-# Recipe parameters - these are the configurable values
-parameters:
-  prefix: "travel"
-  display_name: "One Day Travel Itinerary" 
-  restaurant_type: "fine dining"
-  hotel_type: "luxury"
-  buffet_type: "international"
-  dinner_duration: 2.0
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "travel"
+    display_name: "One Day Travel Itinerary" 
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    buffet_type: "international"
+    dinner_duration: 2.0
 
-wants:
-  # Dinner restaurant reservation (independent)
-  - type: restaurant
+  wants:
+    # Dinner restaurant reservation (independent)
+    - type: restaurant
+      params:
+        restaurant_type: restaurant_type
+        duration_hours: dinner_duration
+
+    # Hotel accommodation booking (independent)
+    - type: hotel  
+      params:
+        hotel_type: hotel_type
+
+    # Morning breakfast buffet (independent)
+    - type: buffet
+      params:
+        buffet_type: buffet_type
+
+  coordinator:
+    type: travel_coordinator
     params:
-      restaurant_type: restaurant_type
-      duration_hours: dinner_duration
-
-  # Hotel accommodation booking (independent)
-  - type: hotel  
-    params:
-      hotel_type: hotel_type
-
-  # Morning breakfast buffet (independent)
-  - type: buffet
-    params:
-      buffet_type: buffet_type
-
-coordinator:
-  type: travel_coordinator
-  params:
-    display_name: display_name
-  using:
-    - role: scheduler
+      display_name: display_name
+    using:
+      - role: scheduler
 ```
 
 **Step 2: Create the config file** (top-level user interface in `config-travel-recipe.yaml`):
@@ -104,48 +105,49 @@ Dependent wants form processing pipelines using `using` selectors to connect out
 
 **Step 1: Create the recipe** (reusable component in `recipes/queue-system.yaml`):
 ```yaml
-# Recipe parameters
-parameters:
-  prefix: "queue-system"
-  count: 1000
-  rate: 10.0
-  service_time: 0.1
-  deterministic: false
+recipe:
+  # Recipe parameters
+  parameters:
+    prefix: "queue-system"
+    count: 1000
+    rate: 10.0
+    service_time: 0.1
+    deterministic: false
 
-wants:
-  # Generator want (no dependencies)
-  - type: sequence
-    labels:
-      role: source
-      category: queue-producer
-      component: generator
-    params:
-      count: count
-      rate: rate
-      deterministic: deterministic
+  wants:
+    # Generator want (no dependencies)
+    - type: sequence
+      labels:
+        role: source
+        category: queue-producer
+        component: generator
+      params:
+        count: count
+        rate: rate
+        deterministic: deterministic
 
-  # Queue want (depends on generator)
-  - type: queue
-    labels:
-      role: processor
-      category: queue-processor
-      component: main-queue
-    params:
-      service_time: service_time
-      deterministic: deterministic
-    using:
-      - category: queue-producer  # Connect to generator
+    # Queue want (depends on generator)
+    - type: queue
+      labels:
+        role: processor
+        category: queue-processor
+        component: main-queue
+      params:
+        service_time: service_time
+        deterministic: deterministic
+      using:
+        - category: queue-producer  # Connect to generator
 
-  # Sink want (depends on queue)
-  - type: sink
-    labels:
-      role: collector
-      category: result-display
-      component: final-sink
-    params:
-      display_format: "Number: %d"
-    using:
-      - role: processor  # Connect to queue
+    # Sink want (depends on queue)
+    - type: sink
+      labels:
+        role: collector
+        category: result-display
+        component: final-sink
+      params:
+        display_format: "Number: %d"
+      using:
+        - role: processor  # Connect to queue
 ```
 
 **Step 2: Create the config file** (top-level user interface in `config-queue-system-recipe.yaml`):
@@ -217,22 +219,23 @@ recipe:
 
 ### Recipe Structure
 ```yaml
-parameters:        # Configurable values
-  param_name: default_value
+recipe:
+  parameters:        # Configurable values
+    param_name: default_value
 
-wants:            # Want definitions
-  - type: want_type
-    labels:       # Optional labels for connections
-      key: value
-    params:       # Parameters (can reference recipe parameters)
-      param: param_name
-    using:        # Optional dependencies
-      - label_selector
+  wants:            # Want definitions
+    - type: want_type
+      labels:       # Optional labels for connections
+        key: value
+      params:       # Parameters (can reference recipe parameters)
+        param: param_name
+      using:        # Optional dependencies
+        - label_selector
 
-coordinator:      # Optional coordinator want
-  type: coordinator_type
-  params: {...}
-  using: [...]
+  coordinator:      # Optional coordinator want
+    type: coordinator_type
+    params: {...}
+    using: [...]
 ```
 
 ### Using Selectors

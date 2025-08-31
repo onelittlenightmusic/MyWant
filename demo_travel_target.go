@@ -62,8 +62,16 @@ func main() {
 	fmt.Println("\n📊 Final Want States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
+		processed := 0
+		if state.Stats != nil {
+			if val, ok := state.Stats["total_processed"]; ok {
+				if intVal, ok := val.(int); ok {
+					processed = intVal
+				}
+			}
+		}
 		fmt.Printf("  %s: %s (processed: %d)\n", 
-			name, state.Status, state.Stats.TotalProcessed)
+			name, state.Status, processed)
 	}
 	
 	// Show target results

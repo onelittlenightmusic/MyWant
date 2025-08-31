@@ -1,0 +1,24 @@
+# Travel configuration using target want with dynamic recipe loading
+wants:
+  # Target want that replaces the direct recipe approach
+  - metadata:
+      name: travel-planner
+      type: target
+      labels:
+        role: orchestrator
+        category: travel-planner
+    spec:
+      # Target-specific parameters
+      params:
+        max_display: 10
+      # Recipe to use for dynamic want generation  
+      recipe: "recipes/travel-itinerary.yaml"
+      # Parameters to pass to the recipe (same as the original config-travel-recipe.yaml)
+      recipe_params:
+        prefix: "vacation"
+        recipe_name: "travel itinerary"
+        display_name: "Weekend Vacation Itinerary" 
+        restaurant_type: "michelin starred"
+        hotel_type: "boutique"
+        buffet_type: "continental"
+        dinner_duration: 2.5
