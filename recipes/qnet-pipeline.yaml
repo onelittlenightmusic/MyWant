@@ -1,0 +1,98 @@
+# QNet Recipe - Dual-stream queueing network with parameterized connections
+# This recipe defines the using field connections declaratively rather than hardcoded
+
+parameters:
+  prefix: "qnet"
+  primary_count: 10000
+  secondary_count: 7500
+  primary_rate: 3.0
+  secondary_rate: 4.0
+  primary_service_time: 0.1
+  secondary_service_time: 0.12
+  final_service_time: 0.05
+
+wants:
+  # Primary packet generator
+  - name: "gen-primary"
+    type: sequence
+    labels:
+      role: source
+      stream: primary
+      priority: high
+    params:
+      rate: primary_rate
+      count: primary_count
+
+  # Secondary packet generator
+  - name: "gen-secondary" 
+    type: sequence
+    labels:
+      role: source
+      stream: secondary
+      priority: medium
+    params:
+      rate: secondary_rate
+      count: secondary_count
+
+  # Main queue processing primary stream
+  - name: "queue-primary"
+    type: queue
+    labels:
+      role: processor
+      stage: first
+      stream: primary
+      path: main
+    params:
+      service_time: primary_service_time
+    using:
+      - role: source
+        stream: primary
+
+  # Alt queue processing secondary stream
+  - name: "queue-secondary"
+    type: queue
+    labels:
+      role: processor
+      stage: first
+      stream: secondary
+      path: alt
+    params:
+      service_time: secondary_service_time
+    using:
+      - role: source
+        stream: secondary
+
+  # Stream combiner - connects to both first-stage processors
+  - name: "combiner-main"
+    type: combiner
+    labels:
+      role: merger
+      operation: combine
+      stage: second
+    params: {}
+    using:
+      - role: processor
+        stage: first
+
+  # Final processing queue - connects to combiner
+  - name: "queue-final"
+    type: queue
+    labels:
+      role: processor
+      stage: final
+      path: output
+    params:
+      service_time: final_service_time
+    using:
+      - role: merger
+
+  # Final collector - connects to final processor
+  - name: "collector-end"
+    type: sink
+    labels:
+      role: terminal
+      stage: end
+    params: {}
+    using:
+      - role: processor
+        stage: final

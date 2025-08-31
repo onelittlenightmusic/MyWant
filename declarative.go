@@ -75,7 +75,8 @@ type Metadata struct {
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Template string                 `json:"template,omitempty" yaml:"template,omitempty"`
+	Template string                 `json:"template,omitempty" yaml:"template,omitempty"` // Deprecated, use Recipe instead
+	Recipe   string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
 	Params   map[string]interface{} `json:"params" yaml:"params"`
 	Using   []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 }

@@ -26,13 +26,13 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 type Target struct {
 	Want
 	MaxDisplay     int
-	TemplateName   string // Name of the template to use for child creation
-	TemplateParams map[string]interface{} // Parameters to pass to template
+	RecipeName     string // Name of the recipe to use for child creation
+	RecipeParams   map[string]interface{} // Parameters to pass to recipe
 	paths          Paths
 	childWants     []Want
 	childrenDone   chan bool
 	builder        *ChainBuilder    // Reference to builder for dynamic want creation
-	templateLoader *TemplateLoader  // Reference to template loader
+	recipeLoader   *RecipeLoader    // Reference to recipe loader
 }
 
 // NewTarget creates a new target want
@@ -46,8 +46,8 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			State:    make(map[string]interface{}),
 		},
 		MaxDisplay:     1000,
-		TemplateName:   "wait time in queue system", // Default template
-		TemplateParams: make(map[string]interface{}),
+		RecipeName:     "queue-system", // Default recipe
+		RecipeParams:   make(map[string]interface{}),
 		childWants:     make([]Want, 0),
 		childrenDone:   make(chan bool, 1),
 	}
@@ -55,21 +55,21 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	// Extract target-specific configuration from params
 	target.MaxDisplay = extractIntParam(spec.Params, "max_display", target.MaxDisplay)
 	
-	// Extract template name from spec.template field
-	if spec.Template != "" {
-		target.TemplateName = spec.Template
+	// Extract recipe name from spec.recipe field
+	if spec.Recipe != "" {
+		target.RecipeName = spec.Recipe
 	}
 	
-	// Separate template parameters from target-specific parameters
+	// Separate recipe parameters from target-specific parameters
 	targetSpecificParams := map[string]bool{
 		"max_display": true,
 	}
 	
-	// Collect template parameters (excluding target-specific ones)
-	target.TemplateParams = make(map[string]interface{})
+	// Collect recipe parameters (excluding target-specific ones)
+	target.RecipeParams = make(map[string]interface{})
 	for key, value := range spec.Params {
 		if !targetSpecificParams[key] {
-			target.TemplateParams[key] = value
+			target.RecipeParams[key] = value
 		}
 	}
 	
@@ -86,65 +86,65 @@ func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
 
-// SetTemplateLoader sets the TemplateLoader reference for template-based child creation
-func (t *Target) SetTemplateLoader(loader *TemplateLoader) {
-	t.templateLoader = loader
-	// Resolve template parameters using template defaults when loader is available
-	t.resolveTemplateParameters()
+// SetRecipeLoader sets the RecipeLoader reference for recipe-based child creation
+func (t *Target) SetRecipeLoader(loader *RecipeLoader) {
+	t.recipeLoader = loader
+	// Resolve recipe parameters using recipe defaults when loader is available
+	t.resolveRecipeParameters()
 }
 
-// resolveTemplateParameters uses the template system to resolve parameters with proper defaults
-func (t *Target) resolveTemplateParameters() {
-	if t.templateLoader == nil {
+// resolveRecipeParameters uses the recipe system to resolve parameters with proper defaults
+func (t *Target) resolveRecipeParameters() {
+	if t.recipeLoader == nil {
 		return
 	}
 	
-	// Get template to access its parameter definitions
-	template, err := t.templateLoader.GetTemplate(t.TemplateName)
+	// Get recipe to access its parameter definitions
+	recipe, err := t.recipeLoader.GetRecipe(t.RecipeName)
 	if err != nil {
-		fmt.Printf("⚠️  Could not resolve template parameters for %s: %v\n", t.TemplateName, err)
+		fmt.Printf("⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipeName, err)
 		return
 	}
 	
-	// Create resolved parameters map starting with template defaults
+	// Create resolved parameters map starting with recipe defaults
 	resolvedParams := make(map[string]interface{})
 	
-	// Set default values from template parameter definitions
-	for _, param := range template.Parameters {
+	// Set default values from recipe parameter definitions
+	for _, param := range recipe.Parameters {
 		resolvedParams[param.Name] = param.Default
 	}
 	
-	// Override with provided template parameters
-	for key, value := range t.TemplateParams {
+	// Override with provided recipe parameters
+	for key, value := range t.RecipeParams {
 		resolvedParams[key] = value
 	}
 	
-	// Add target-specific parameters that may be referenced by templates
+	// Add target-specific parameters that may be referenced by recipes
 	resolvedParams["targetName"] = t.Metadata.Name
 	if _, hasCount := resolvedParams["count"]; !hasCount {
 		resolvedParams["count"] = t.MaxDisplay
 	}
 	
-	// Update template parameters with resolved values
-	t.TemplateParams = resolvedParams
+	// Update recipe parameters with resolved values
+	t.RecipeParams = resolvedParams
 }
 
-// CreateChildWants dynamically creates child wants based on external templates
+// CreateChildWants dynamically creates child wants based on external recipes
 func (t *Target) CreateChildWants() []Want {
-	// Use template loader if available
-	if t.templateLoader != nil {
-		wants, err := t.templateLoader.InstantiateTemplate(t.TemplateName, t.Metadata.Name, t.TemplateParams)
+	// Use recipe loader if available
+	if t.recipeLoader != nil {
+		wants, err := t.recipeLoader.InstantiateRecipe(t.RecipeName, t.Metadata.Name, t.RecipeParams)
 		if err != nil {
-			fmt.Printf("⚠️  Failed to instantiate template %s: %v, falling back to hardcoded creation\n", t.TemplateName, err)
+			fmt.Printf("⚠️  Failed to instantiate recipe %s: %v, falling back to hardcoded creation\n", t.RecipeName, err)
 		} else {
-			fmt.Printf("✅ Successfully instantiated template %s with %d wants\n", t.TemplateName, len(wants))
+			fmt.Printf("✅ Successfully instantiated recipe %s with %d wants\n", t.RecipeName, len(wants))
 			t.childWants = wants
 			return t.childWants
 		}
 	}
 
-	// Fallback to hardcoded template creation
-	fmt.Printf("⚠️  Using hardcoded template creation for target %s\n", t.Metadata.Name)
+	// Fallback to hardcoded recipe creation
+	fmt.Printf("⚠️  Using hardcoded recipe creation for target %s\n", t.Metadata.Name)
 	
 	// Create generator want (hardcoded fallback)
 	generatorWant := Want{
@@ -263,7 +263,7 @@ func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan
 		<-t.childrenDone
 		fmt.Printf("🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
 		
-		// Compute and store template result
+		// Compute and store recipe result
 		t.computeTemplateResult()
 		
 		fmt.Printf("🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
@@ -288,8 +288,8 @@ func (t *Target) NotifyChildrenComplete() {
 
 // computeTemplateResult computes the result from child wants and stores it
 func (t *Target) computeTemplateResult() {
-	if t.templateLoader == nil {
-		fmt.Printf("⚠️  Target %s: No template loader available for result computation\n", t.Metadata.Name)
+	if t.recipeLoader == nil {
+		fmt.Printf("⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
 		return
 	}
 
@@ -309,15 +309,15 @@ func (t *Target) computeTemplateResult() {
 
 	fmt.Printf("🧮 Target %s: Found %d child wants for result computation\n", t.Metadata.Name, len(childWants))
 
-	// Compute template result
-	result, err := t.templateLoader.GetTemplateResult(t.TemplateName, t.Metadata.Name, childWants)
+	// Compute recipe result
+	result, err := t.recipeLoader.GetRecipeResult(t.RecipeName, t.Metadata.Name, childWants)
 	if err != nil {
-		fmt.Printf("⚠️  Target %s: Failed to compute template result: %v\n", t.Metadata.Name, err)
+		fmt.Printf("⚠️  Target %s: Failed to compute recipe result: %v\n", t.Metadata.Name, err)
 		return
 	}
 
 	// Store result in target's state
-	t.State["templateResult"] = result
+	t.State["recipeResult"] = result
 	fmt.Printf("✅ Target %s: Template result computed: %v\n", t.Metadata.Name, result)
 
 	// Also store result in a standardized format for memory dumps
@@ -416,17 +416,17 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Register existing qnet types first
 	RegisterQNetWantTypes(builder)
 	
-	// Initialize template loader
-	templateLoader := NewTemplateLoader("templates")
-	if err := templateLoader.LoadTemplates(); err != nil {
-		fmt.Printf("⚠️  Failed to load templates: %v, using defaults\n", err)
+	// Initialize recipe loader
+	recipeLoader := NewRecipeLoader("recipes")
+	if err := recipeLoader.LoadRecipes(); err != nil {
+		fmt.Printf("⚠️  Failed to load recipes: %v, using defaults\n", err)
 	}
 	
-	// Register target type with template support
+	// Register target type with recipe support
 	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
 		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
-		target.SetTemplateLoader(templateLoader) // Set template loader for external templates
+		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes
 		return target
 	})
 	
