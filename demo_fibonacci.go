@@ -2,36 +2,39 @@ package main
 
 import (
 	"fmt"
+	"os"
 )
 
 func main() {
 	fmt.Println("Fibonacci Sequence Demo (YAML Config)")
 	fmt.Println("=====================================")
 	
+	// Get YAML file from command line argument
+	yamlFile := "config-fibonacci.yaml"
+	if len(os.Args) > 1 {
+		yamlFile = os.Args[1]
+	}
+	
 	// Load YAML configuration
-	config, err := loadConfigFromYAML("config-fibonacci.yaml")
+	config, err := loadConfigFromYAML(yamlFile)
 	if err != nil {
-		fmt.Printf("Error loading config-fibonacci.yaml: %v\n", err)
+		fmt.Printf("Error loading %s: %v\n", yamlFile, err)
 		return
 	}
 
-	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Nodes))
+	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
 	
 	// Register fibonacci node types
-	RegisterFibonacciNodeTypes(builder)
+	RegisterFibonacciWantTypes(builder)
 
 	fmt.Println("\nExecuting fibonacci sequence with reconcile loop...")
 	builder.Execute()
 
-	fmt.Println("\n📊 Final Node States:")
-	states := builder.GetAllNodeStates()
-	for name, state := range states {
-		fmt.Printf("  %s: %s (processed: %d)\n",
-			name, state.Status, state.Stats.TotalProcessed)
-	}
+	fmt.Println("\n📊 Final Execution State:")
+	fmt.Printf("  Fibonacci sequence execution completed")
 
 	fmt.Println("\n✅ Fibonacci sequence execution completed!")
 }

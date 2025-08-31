@@ -1,71 +1,32 @@
-recipe:
-  name: "travel itinerary"
-  description: "Complete one-day travel schedule recipe"
-  version: "1.0"
-  
-wants:
-  # Dinner restaurant reservation
-  - metadata:
-      name: "{{.prefix}}-dinner-reservation"
-      type: restaurant
-      labels:
-        role: scheduler
-        category: dining
-        priority: high
-        template: "{{.template_name}}"
-    spec:
-      params:
-        restaurant_type: "{{.restaurant_type}}"
-        duration_hours: {{.dinner_duration}}
-
-  # Hotel accommodation booking  
-  - metadata:
-      name: "{{.prefix}}-hotel-booking"
-      type: hotel
-      labels:
-        role: scheduler
-        category: accommodation
-        priority: high
-        template: "{{.template_name}}"
-    spec:
-      params:
-        hotel_type: "{{.hotel_type}}"
-
-  # Morning breakfast buffet
-  - metadata:
-      name: "{{.prefix}}-breakfast-buffet"
-      type: buffet
-      labels:
-        role: scheduler
-        category: dining
-        priority: medium
-        template: "{{.template_name}}"
-    spec:
-      params:
-        buffet_type: "{{.buffet_type}}"
-
-coordinator:
-  metadata:
-    name: "{{.prefix}}-coordinator"
-    type: travel_coordinator
-    labels:
-      role: coordinator
-      category: travel
-      priority: critical
-      template: "{{.template_name}}"
-  spec:
-    params:
-      template: "{{.display_name}}"
-    using:
-      - role: scheduler
-        template: "{{.template_name}}"
-
-# Template parameters with defaults
+# Recipe parameters - these are the configurable values
 parameters:
   prefix: "travel"
-  template_name: "travel itinerary" 
   display_name: "One Day Travel Itinerary"
   restaurant_type: "fine dining"
   hotel_type: "luxury"
   buffet_type: "international"
   dinner_duration: 2.0
+
+wants:
+  # Dinner restaurant reservation
+  - type: restaurant
+    params:
+      restaurant_type: restaurant_type
+      duration_hours: dinner_duration
+
+  # Hotel accommodation booking  
+  - type: hotel
+    params:
+      hotel_type: hotel_type
+
+  # Morning breakfast buffet
+  - type: buffet
+    params:
+      buffet_type: buffet_type
+
+coordinator:
+  type: travel_coordinator
+  params:
+    display_name: display_name
+  using:
+    - role: scheduler

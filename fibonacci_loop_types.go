@@ -52,9 +52,9 @@ func (g *SeedGenerator) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for seed generator
 func (g *SeedGenerator) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredUsing:   0,
+		RequiredInputs:  0,
 		RequiredOutputs: 1,
-		MaxUsing:        0,
+		MaxInputs:       0,
 		MaxOutputs:      -1,
 		WantType:        "seed_generator",
 		Description:     "Fibonacci seed generator",
@@ -135,9 +135,9 @@ func (c *FibonacciComputer) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci computer
 func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredUsing:   1,
+		RequiredInputs:  1,
 		RequiredOutputs: 1,
-		MaxUsing:        1,
+		MaxInputs:       1,
 		MaxOutputs:      -1,
 		WantType:        "fibonacci_computer",
 		Description:     "Fibonacci number computer",
@@ -250,9 +250,9 @@ func (m *FibonacciMerger) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci merger
 func (m *FibonacciMerger) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredUsing:   2,
+		RequiredInputs:  2,
 		RequiredOutputs: 2, // One to computer, one to sink
-		MaxUsing:        2,
+		MaxInputs:       2,
 		MaxOutputs:      -1,
 		WantType:        "fibonacci_merger",
 		Description:     "Fibonacci sequence merger",
@@ -373,9 +373,9 @@ func (s *FibonacciSink) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for fibonacci sink
 func (s *FibonacciSink) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
-		RequiredUsing:   1,
+		RequiredInputs:  1,
 		RequiredOutputs: 0,
-		MaxUsing:        1,
+		MaxInputs:       1,
 		MaxOutputs:      0,
 		WantType:        "fibonacci_sink",
 		Description:     "Fibonacci sequence collector",
@@ -440,22 +440,22 @@ func (s *FibonacciSink) CreateFunction() func(using []chain.Chan, outputs []chai
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
 	// Register seed generator type
-	builder.RegisterWantType("seed_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewSeedGenerator(metadata, params)
+	builder.RegisterWantType("seed_generator", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewSeedGenerator(metadata, spec.Params)
 	})
 	
 	// Register fibonacci computer type
-	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciComputer(metadata, params)
+	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciComputer(metadata, spec.Params)
 	})
 	
 	// Register fibonacci merger type
-	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciMerger(metadata, params)
+	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciMerger(metadata, spec.Params)
 	})
 	
 	// Register fibonacci sink type
-	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciSink(metadata, params)
+	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciSink(metadata, spec.Params)
 	})
 }

@@ -1,0 +1,102 @@
+# QNet configuration with using fields defined directly (not hardcoded in Go)
+# This demonstrates the using connections working from YAML configuration
+
+wants:
+  # Primary packet generator
+  - metadata:
+      name: gen-primary
+      type: sequence
+      labels:
+        role: source
+        stream: primary
+        priority: high
+    spec:
+      params:
+        rate: 2.5
+        count: 8000
+
+  # Secondary packet generator
+  - metadata:
+      name: gen-secondary
+      type: sequence
+      labels:
+        role: source
+        stream: secondary
+        priority: medium
+    spec:
+      params:
+        rate: 3.5
+        count: 6000
+
+  # Main queue processing primary stream - using field connects to primary source
+  - metadata:
+      name: queue-primary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: primary
+        path: main
+    spec:
+      params:
+        service_time: 0.08
+      using:
+        - role: source
+          stream: primary
+
+  # Alt queue processing secondary stream - using field connects to secondary source
+  - metadata:
+      name: queue-secondary
+      type: queue
+      labels:
+        role: processor
+        stage: first
+        stream: secondary
+        path: alt
+    spec:
+      params:
+        service_time: 0.10
+      using:
+        - role: source
+          stream: secondary
+
+  # Stream combiner - using field connects to BOTH first-stage processors
+  - metadata:
+      name: combiner-main
+      type: combiner
+      labels:
+        role: merger
+        operation: combine
+        stage: second
+    spec:
+      params: {}
+      using:
+        - role: processor
+          stage: first
+
+  # Final processing queue - using field connects to combiner
+  - metadata:
+      name: queue-final
+      type: queue
+      labels:
+        role: processor
+        stage: final
+        path: output
+    spec:
+      params:
+        service_time: 0.04
+      using:
+        - role: merger
+
+  # Final collector - using field connects to final processor
+  - metadata:
+      name: collector-end
+      type: sink
+      labels:
+        role: terminal
+        stage: end
+    spec:
+      params: {}
+      using:
+        - role: processor
+          stage: final

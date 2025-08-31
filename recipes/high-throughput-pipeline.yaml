@@ -1,84 +1,42 @@
-template:
-  name: "high-throughput-pipeline"
-  description: "High-throughput pipeline with multiple parallel queues"
-  version: "1.0"
-  type: "pipeline"
-  
-wants:
-  # Generator want
-  - metadata:
-      name: "{{.targetName}}-generator"
-      type: sequence
-      labels:
-        role: source
-        owner: child
-        category: producer
-    spec:
-      params:
-        count: "{{.count}}"
-        rate: "{{.rate}}"
-
-  # Parallel Queue 1
-  - metadata:
-      name: "{{.targetName}}-queue-1"
-      type: queue
-      labels:
-        role: processor
-        owner: child
-        category: parallel-queue
-        queue_id: "1"
-    spec:
-      params:
-        service_time: "{{.service_time}}"
-      using:
-        - category: producer
-
-  # Parallel Queue 2  
-  - metadata:
-      name: "{{.targetName}}-queue-2"
-      type: queue
-      labels:
-        role: processor
-        owner: child
-        category: parallel-queue
-        queue_id: "2"
-    spec:
-      params:
-        service_time: "{{.service_time}}"
-      using:
-        - category: producer
-
-  # Parallel Queue 3
-  - metadata:
-      name: "{{.targetName}}-queue-3"
-      type: queue
-      labels:
-        role: processor
-        owner: child
-        category: parallel-queue
-        queue_id: "3"
-    spec:
-      params:
-        service_time: "{{.service_time}}"
-      using:
-        - category: producer
-
-  # Sink want
-  - metadata:
-      name: "{{.targetName}}-sink"
-      type: sink
-      labels:
-        role: collector
-        category: display
-    spec:
-      params:
-        display_format: "Processed: %d"
-      using:
-        - category: parallel-queue
-
+# Recipe parameters - these are the configurable values
 parameters:
-  targetName: "high-throughput"
+  prefix: "high-throughput"
   count: 10000
   rate: 100.0
   service_time: 0.01
   parallel_queues: 3
+
+wants:
+  # Generator want
+  - type: sequence
+    params:
+      count: count
+      rate: rate
+
+  # Parallel Queue 1
+  - type: queue
+    params:
+      service_time: service_time
+    using:
+      - category: producer
+
+  # Parallel Queue 2  
+  - type: queue
+    params:
+      service_time: service_time
+    using:
+      - category: producer
+
+  # Parallel Queue 3
+  - type: queue
+    params:
+      service_time: service_time
+    using:
+      - category: producer
+
+  # Sink want
+  - type: sink
+    params:
+      display_format: "Processed: %d"
+    using:
+      - category: parallel-queue

@@ -1,0 +1,123 @@
+timestamp: "2025-08-31T10:26:51+09:00"
+execution_id: exec-20250831-102651
+wants:
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+      spec:
+        params:
+            service_time: 0.08
+        using:
+            - role: source
+              stream: primary
+      stats:
+        averagewaittime: 0.01854931541077275
+        totalprocessed: 8000
+        totalwaittime: 148.394523286182
+      status: completed
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+              stream: secondary
+      stats:
+        averagewaittime: 0.05039832387630927
+        totalprocessed: 6000
+        totalwaittime: 302.38994325785563
+      status: completed
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            role: merger
+            stage: second
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: first
+      stats:
+        averagewaittime: 0
+        totalprocessed: 14000
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            path: output
+            role: processor
+            stage: final
+      spec:
+        params:
+            service_time: 0.04
+        using:
+            - role: merger
+      stats:
+        averagewaittime: 1.5380047576899813
+        totalprocessed: 8000
+        totalwaittime: 12304.03806151985
+      status: completed
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: terminal
+            stage: end
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: final
+      stats:
+        averagewaittime: 0
+        totalprocessed: 14000
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: gen-primary
+        type: sequence
+        labels:
+            priority: high
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 8000
+            rate: 2.5
+      stats:
+        averagewaittime: 0
+        totalprocessed: 8000
+        totalwaittime: 0
+      status: completed
+    - metadata:
+        name: gen-secondary
+        type: sequence
+        labels:
+            priority: medium
+            role: source
+            stream: secondary
+      spec:
+        params:
+            count: 6000
+            rate: 3.5
+      stats:
+        averagewaittime: 0
+        totalprocessed: 6000
+        totalwaittime: 0
+      status: completed

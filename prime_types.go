@@ -199,15 +199,15 @@ func (s *PrimeSink) GetWant() *Want {
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("prime_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewPrimeGenerator(metadata, params)
+	builder.RegisterWantType("prime_generator", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeGenerator(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("prime_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewPrimeFilter(metadata, params)
+	builder.RegisterWantType("prime_filter", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeFilter(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("prime_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewPrimeSink(metadata, params)
+	builder.RegisterWantType("prime_sink", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeSink(metadata, spec.Params)
 	})
 }

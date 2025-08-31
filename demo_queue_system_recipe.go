@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 )
 
 func main() {
@@ -12,10 +13,16 @@ func main() {
 	fmt.Println("- Uses unified generic recipe structure")
 	fmt.Println()
 
+	// Get YAML file from command line argument
+	yamlFile := "config-queue-system-recipe.yaml"
+	if len(os.Args) > 1 {
+		yamlFile = os.Args[1]
+	}
+
 	// Load configuration using generic recipe loader
-	config, params, err := LoadRecipeWithConfig("config-queue-system-template.yaml")
+	config, params, err := LoadRecipeWithConfig(yamlFile)
 	if err != nil {
-		fmt.Printf("Error loading recipe config: %v\n", err)
+		fmt.Printf("Error loading recipe config %s: %v\n", yamlFile, err)
 		return
 	}
 
@@ -35,12 +42,8 @@ func main() {
 	fmt.Println("🏁 Executing generic recipe-based queue system...")
 	builder.Execute()
 
-	fmt.Println("\n📊 Final Want States:")
-	states := builder.GetAllWantStates()
-	for name, state := range states {
-		fmt.Printf("  %s: %s (processed: %d)\n",
-			name, state.Status, state.Stats.TotalProcessed)
-	}
+	fmt.Println("\n📊 Final Execution State:")
+	fmt.Printf("  Generic recipe queue system completed")
 
 	fmt.Println("\n✅ Generic recipe queue system completed!")
 }

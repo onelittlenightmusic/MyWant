@@ -1,4 +1,4 @@
-.PHONY: qnet clean run-demo_qnet run-prime run-fibonacci run-fibonacci-loop run-sample-owner run-travel run-travel-template run-queue-system-template
+.PHONY: qnet clean run-demo_qnet run-prime run-fibonacci run-fibonacci-loop run-sample-owner run-travel run-travel-recipe run-queue-system-recipe run-qnet-recipe run-qnet-using-recipe
 
 run-qnet:
 	go run demo_qnet.go declarative.go qnet_types.go config-qnet.yaml
@@ -13,16 +13,22 @@ run-fibonacci-loop:
 	go run demo_fibonacci_loop.go declarative.go fibonacci_loop_types.go config-fibonacci-loop.yaml
 
 run-sample-owner:
-	go run demo_qnet_owner.go declarative.go owner_types.go qnet_types.go template_loader.go
+	go run demo_qnet_owner.go declarative.go owner_types.go qnet_types.go recipe_loader.go
 
 run-travel:
 	go run demo_travel.go declarative.go travel_types.go config-travel.yaml
 
-run-travel-template:
-	go run demo_travel_template.go declarative.go travel_types.go template_loader_generic.go config-travel-template.yaml
+run-travel-recipe:
+	go run demo_travel_recipe.go declarative.go travel_types.go recipe_loader_generic.go config-travel-recipe.yaml
 
-run-queue-system-template:
-	go run demo_queue_system_template.go declarative.go qnet_types.go template_loader_generic.go config-queue-system-template.yaml
+run-queue-system-recipe:
+	go run demo_queue_system_recipe.go declarative.go qnet_types.go recipe_loader_generic.go config-queue-system-recipe.yaml
+
+run-qnet-recipe:
+	go run demo_qnet_recipe.go declarative.go qnet_types.go recipe_loader_generic.go config-qnet-recipe.yaml
+
+run-qnet-using-recipe:
+	go run demo_qnet_using_recipe.go declarative.go qnet_types.go config-qnet-using-recipe.yaml
 
 clean:
 	rm -f qnet

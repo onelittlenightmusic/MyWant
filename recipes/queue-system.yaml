@@ -1,55 +1,42 @@
-template:
-  name: "wait time in queue system"
-  description: "Wait time analysis in queue system with generator, queue, and sink"
-  version: "1.0"
-  type: "queue-system"
-  
-wants:
-  # Generator want
-  - metadata:
-      name: "{{.targetName}}-generator"
-      type: sequence
-      labels:
-        role: source
-        owner: child
-        category: producer
-    spec:
-      params:
-        count: "{{.count}}"
-        rate: "{{.rate}}"
-        deterministic: "{{.deterministic}}"
-
-  # Queue want  
-  - metadata:
-      name: "{{.targetName}}-queue"
-      type: queue
-      labels:
-        role: processor
-        owner: child
-        category: queue
-    spec:
-      params:
-        service_time: "{{.service_time}}"
-        deterministic: "{{.deterministic}}"
-      using:
-        - category: producer
-
-  # Sink want
-  - metadata:
-      name: "{{.targetName}}-sink"
-      type: sink
-      labels:
-        role: collector
-        category: display
-    spec:
-      params:
-        display_format: "Number: %d"
-      using:
-        - role: processor
-
+# Recipe parameters - these are the configurable values
 parameters:
-  targetName: "queue-system"
+  prefix: "queue-system"
   count: 1000
   rate: 10.0
   service_time: 0.1
   deterministic: false
+
+wants:
+  # Generator want - explicitly define all labels in recipe
+  - type: sequence
+    labels:
+      role: source               # Explicitly defined, not auto-generated
+      category: queue-producer   # Recipe-specific connection label
+      component: generator       # Additional semantic label
+    params:
+      count: count
+      rate: rate
+      deterministic: deterministic
+
+  # Queue want - explicitly define all labels in recipe
+  - type: queue
+    labels:
+      role: processor           # Explicitly defined, not auto-generated
+      category: queue-processor # Recipe-specific semantic label
+      component: main-queue     # Additional semantic label
+    params:
+      service_time: service_time
+      deterministic: deterministic
+    using:
+      - category: queue-producer  # Connect to generator via recipe-defined label
+
+  # Sink want - explicitly define all labels in recipe
+  - type: sink
+    labels:
+      role: collector           # Explicitly defined, not auto-generated  
+      category: result-display  # Recipe-specific semantic label
+      component: final-sink     # Additional semantic label
+    params:
+      display_format: "Number: %d"
+    using:
+      - role: processor         # Connect to queue via recipe-defined label

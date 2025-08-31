@@ -1,37 +1,19 @@
-template:
-  name: "fibonacci-pipeline"
-  description: "Specialized fibonacci number processing pipeline"
-  version: "1.0"
-  type: "fibonacci"
-  
-wants:
-  # Fibonacci Generator
-  - metadata:
-      name: "{{.targetName}}-fib-gen"
-      type: fibonacci_generator
-      labels:
-        role: source
-        owner: child
-        category: fibonacci-producer
-    spec:
-      params:
-        max_number: "{{.max_number}}"
-        delay: "{{.delay}}"
-
-  # Fibonacci Sink
-  - metadata:
-      name: "{{.targetName}}-fib-sink"
-      type: fibonacci_sink
-      labels:
-        role: collector
-        category: fibonacci-display
-    spec:
-      params:
-        display_format: "Fibonacci: %d"
-      using:
-        - category: fibonacci-producer
-
+# Recipe parameters - these are the configurable values
 parameters:
-  targetName: "fibonacci"
+  prefix: "fibonacci"
   max_number: 100
   delay: 0.5
+
+wants:
+  # Fibonacci Generator
+  - type: fibonacci_generator
+    params:
+      max_number: max_number
+      delay: delay
+
+  # Fibonacci Sink
+  - type: fibonacci_sink
+    params:
+      display_format: "Fibonacci: %d"
+    using:
+      - category: fibonacci-producer

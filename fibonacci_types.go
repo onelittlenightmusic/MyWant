@@ -180,15 +180,15 @@ func (s *FibonacciSink) GetWant() *Want {
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("fibonacci_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciGenerator(metadata, params)
+	builder.RegisterWantType("fibonacci_generator", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciGenerator(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("fibonacci_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciFilter(metadata, params)
+	builder.RegisterWantType("fibonacci_filter", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciFilter(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
-		return NewFibonacciSink(metadata, params)
+	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciSink(metadata, spec.Params)
 	})
 }
