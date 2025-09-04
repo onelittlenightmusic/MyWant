@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"MyWant/chain"
 	"os"
 	"path/filepath"
 	"sync"
@@ -45,16 +45,7 @@ func createEndFunction(generalizedFn func(using []chain.Chan, outputs []chain.Ch
 	}
 }
 
-// isSinkWant checks if a want type is a sink want
-func isSinkWant(wantType string) bool {
-	sinkTypes := []string{"collector", "sink", "prime_sink", "fibonacci_sink"}
-	for _, sinkType := range sinkTypes {
-		if wantType == sinkType {
-			return true
-		}
-	}
-	return false
-}
+
 
 // OwnerReference represents a reference to an owner object
 type OwnerReference struct {
@@ -409,8 +400,8 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
 					wantName, meta.WantType, meta.RequiredInputs, inCount)
 			}
 			
-			// Check required outputs - modified to not require outputs for generators
-			if meta.WantType != "sequence" && outCount < meta.RequiredOutputs {
+			// Check required outputs
+			if outCount < meta.RequiredOutputs {
 				return fmt.Errorf("validation failed for want %s: want %s requires %d outputs, got %d", 
 					wantName, meta.WantType, meta.RequiredOutputs, outCount)
 			}
@@ -679,22 +670,79 @@ func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeE
 	return sortedChanges
 }
 
-// calculateDependencyLevels calculates dependency levels for wants
+// calculateDependencyLevels calculates dependency levels based on using connectivity
 func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 	levels := make(map[string]int)
+	visited := make(map[string]bool)
 	
-	// Simple heuristic: sinks have highest level, generators have lowest
-	for name, want := range cb.wants {
-		if isSinkWant(want.metadata.Type) {
-			levels[name] = 100
-		} else if want.metadata.Type == "sequence" {
-			levels[name] = 1
-		} else {
-			levels[name] = 50 // Middle wants
+	// Calculate dependency levels using topological ordering
+	for name := range cb.wants {
+		if !visited[name] {
+			cb.calculateDependencyLevel(name, levels, visited, make(map[string]bool))
 		}
 	}
 	
 	return levels
+}
+
+// calculateDependencyLevel recursively calculates dependency level for a want
+func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[string]int, visited, inProgress map[string]bool) int {
+	// Check for circular dependency
+	if inProgress[wantName] {
+		return 0 // Break cycles by assigning level 0
+	}
+	
+	// Return cached result
+	if visited[wantName] {
+		return levels[wantName]
+	}
+	
+	inProgress[wantName] = true
+	
+	// Get want config from current runtime or config
+	var wantConfig Want
+	if want, exists := cb.wants[wantName]; exists {
+		wantConfig = *want.want
+	} else {
+		// Look for want in current config
+		found := false
+		for _, configWant := range cb.config.Wants {
+			if configWant.Metadata.Name == wantName {
+				wantConfig = configWant
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Unknown want, assign level 0
+			levels[wantName] = 0
+			visited[wantName] = true
+			delete(inProgress, wantName)
+			return 0
+		}
+	}
+	
+	maxDependencyLevel := 0
+	
+	// Find dependencies from using selectors
+	for _, usingSelector := range wantConfig.Spec.Using {
+		// Find wants that match this selector
+		for _, configWant := range cb.config.Wants {
+			if cb.matchesSelector(configWant.Metadata.Labels, usingSelector) {
+				depLevel := cb.calculateDependencyLevel(configWant.Metadata.Name, levels, visited, inProgress)
+				if depLevel >= maxDependencyLevel {
+					maxDependencyLevel = depLevel + 1
+				}
+			}
+		}
+	}
+	
+	// Assign level based on dependencies
+	levels[wantName] = maxDependencyLevel
+	visited[wantName] = true
+	delete(inProgress, wantName)
+	
+	return maxDependencyLevel
 }
 
 // addWant adds a new want to the runtime (private method)
@@ -969,14 +1017,6 @@ func (cb *ChainBuilder) Execute() {
 }
 
 
-// GetWantState returns the state of a specific want
-func (cb *ChainBuilder) GetWantState(wantName string) (*Want, bool) {
-	want, exists := cb.wants[wantName]
-	if !exists {
-		return nil, false
-	}
-	return want.want, true
-}
 
 // GetAllWantStates returns the states of all wants
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
@@ -987,10 +1027,6 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	return states
 }
 
-// SetMemoryPath sets the memory file path for snapshots
-func (cb *ChainBuilder) SetMemoryPath(memoryPath string) {
-	cb.memoryPath = memoryPath
-}
 
 // AddDynamicWants adds multiple wants to the configuration at runtime
 func (cb *ChainBuilder) AddDynamicWants(wants []Want) {
@@ -1001,12 +1037,6 @@ func (cb *ChainBuilder) AddDynamicWants(wants []Want) {
 	}
 }
 
-// AddDynamicWant adds a single want to the configuration at runtime
-func (cb *ChainBuilder) AddDynamicWant(want Want) {
-	cb.reconcileMutex.Lock()
-	defer cb.reconcileMutex.Unlock()
-	cb.addDynamicWantUnsafe(want)
-}
 
 // addDynamicWantUnsafe adds a want without acquiring the mutex (internal use)
 func (cb *ChainBuilder) addDynamicWantUnsafe(want Want) {

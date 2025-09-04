@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GoChain is a Go library implementing functional chain programming patterns with channels. The project uses a **recipe-based configuration system** where config YAML files serve as the top-level user interface and recipes provide reusable component templates.
+MyWant is a Go library implementing functional chain programming patterns with channels. The project uses a **recipe-based configuration system** where config YAML files serve as the top-level user interface and recipes provide reusable component templates.
 
 ## Core Architecture
 
@@ -44,7 +44,7 @@ GoChain is a Go library implementing functional chain programming patterns with 
 
 ### Module Initialization
 ```sh
-go mod init gochain
+go mod init MyWant
 go mod tidy
 ```
 

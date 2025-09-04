@@ -1,21 +1,20 @@
 package main
 
 import (
-	"fmt"
-	"gochain/chain"
+	"MyWant/chain"
 )
 
-// PrimeGenerator creates numbers and sends them downstream
-type PrimeGenerator struct {
+// PrimeNumbers creates numbers and sends them downstream
+type PrimeNumbers struct {
 	Want
 	Start int
 	End   int
 	paths Paths
 }
 
-// NewPrimeGenerator creates a new prime generator want
-func NewPrimeGenerator(metadata Metadata, params map[string]interface{}) *PrimeGenerator {
-	gen := &PrimeGenerator{
+// NewPrimeNumbers creates a new prime numbers want
+func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNumbers {
+	gen := &PrimeNumbers{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -45,8 +44,8 @@ func NewPrimeGenerator(metadata Metadata, params map[string]interface{}) *PrimeG
 	return gen
 }
 
-// CreateFunction returns the generalized chain function for the generator
-func (g *PrimeGenerator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+// CreateFunction returns the generalized chain function for the numbers generator
+func (g *PrimeNumbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
@@ -61,21 +60,21 @@ func (g *PrimeGenerator) CreateFunction() func(using []chain.Chan, outputs []cha
 }
 
 // GetWant returns the underlying Want
-func (g *PrimeGenerator) GetWant() *Want {
+func (g *PrimeNumbers) GetWant() *Want {
 	return &g.Want
 }
 
-// PrimeFilter filters out multiples of a prime number
-type PrimeFilter struct {
+// PrimeSequence filters out multiples of a prime number
+type PrimeSequence struct {
 	Want
 	Prime int
 	foundPrimes []int
 	paths Paths
 }
 
-// NewPrimeFilter creates a new prime filter want
-func NewPrimeFilter(metadata Metadata, params map[string]interface{}) *PrimeFilter {
-	filter := &PrimeFilter{
+// NewPrimeSequence creates a new prime sequence want
+func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSequence {
+	filter := &PrimeSequence{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -99,13 +98,17 @@ func NewPrimeFilter(metadata Metadata, params map[string]interface{}) *PrimeFilt
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *PrimeFilter) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+func (f *PrimeSequence) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 || len(outputs) == 0 {
+		if len(using) == 0 {
 			return true
 		}
 		in := using[0]
-		out := outputs[0]
+		
+		var out chain.Chan
+		if len(outputs) > 0 {
+			out = outputs[0]
+		}
 		
 		for i := range in {
 			if val, ok := i.(int); ok {
@@ -132,7 +135,9 @@ func (f *PrimeFilter) CreateFunction() func(using []chain.Chan, outputs []chain.
 				// If it's prime, add to memoized primes and pass through
 				if isPrime {
 					f.foundPrimes = append(f.foundPrimes, val)
-					out <- val
+					if out != nil {
+						out <- val
+					}
 				}
 				
 				if f.Stats == nil {
@@ -145,83 +150,65 @@ func (f *PrimeFilter) CreateFunction() func(using []chain.Chan, outputs []chain.
 				}
 			}
 		}
-		close(out)
+		if out != nil {
+			close(out)
+		}
+		
+		// Store found primes in state for collection
+		f.StoreState("foundPrimes", f.foundPrimes)
+		f.StoreState("primeCount", len(f.foundPrimes))
+		
 		return true
 	}
 }
 
+// InitializePaths initializes the paths for this sequence
+func (f *PrimeSequence) InitializePaths(inCount, outCount int) {
+	f.paths.In = make([]PathInfo, inCount)
+	f.paths.Out = make([]PathInfo, outCount)
+}
+
+// GetConnectivityMetadata returns connectivity requirements for prime sequence
+func (f *PrimeSequence) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0, // Optional output
+		MaxInputs:       1,
+		MaxOutputs:      -1,
+		WantType:        "prime_sequence",
+		Description:     "Prime number sequence",
+	}
+}
+
+// GetStats returns the stats for this sequence
+func (f *PrimeSequence) GetStats() map[string]interface{} {
+	return f.Stats
+}
+
+// Process processes using enhanced paths
+func (f *PrimeSequence) Process(paths Paths) bool {
+	f.paths = paths
+	return false
+}
+
+// GetType returns the want type
+func (f *PrimeSequence) GetType() string {
+	return "prime_sequence"
+}
+
 // GetWant returns the underlying Want
-func (f *PrimeFilter) GetWant() *Want {
+func (f *PrimeSequence) GetWant() *Want {
 	return &f.Want
 }
 
-// PrimeSink collects and displays prime numbers
-type PrimeSink struct {
-	Want
-	primes []int
-	paths  Paths
-}
-
-// NewPrimeSink creates a new prime sink want
-func NewPrimeSink(metadata Metadata, params map[string]interface{}) *PrimeSink {
-	sink := &PrimeSink{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
-		primes: make([]int, 0),
-	}
-	
-	return sink
-}
-
-// CreateFunction returns the generalized chain function for the sink
-func (s *PrimeSink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 {
-			return true
-		}
-		in := using[0]
-		
-		for i := range in {
-			if val, ok := i.(int); ok {
-				s.primes = append(s.primes, val)
-				fmt.Printf("%d\n", val)
-				if s.Stats == nil {
-					s.Stats = make(WantStats)
-				}
-				if val, exists := s.Stats["total_processed"]; exists {
-					s.Stats["total_processed"] = val.(int) + 1
-				} else {
-					s.Stats["total_processed"] = 1
-				}
-			}
-		}
-		s.StoreState("primes", s.primes)
-		s.StoreState("count", len(s.primes))
-		return true
-	}
-}
-
-// GetWant returns the underlying Want
-func (s *PrimeSink) GetWant() *Want {
-	return &s.Want
-}
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("prime_generator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeGenerator(metadata, spec.Params)
+	builder.RegisterWantType("prime_numbers", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeNumbers(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("prime_filter", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeFilter(metadata, spec.Params)
-	})
-	
-	builder.RegisterWantType("prime_sink", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeSink(metadata, spec.Params)
+	builder.RegisterWantType("prime_sequence", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeSequence(metadata, spec.Params)
 	})
 }

@@ -2,7 +2,7 @@ wants:
   # Prime number generator
   - metadata:
       name: generator
-      type: prime_generator
+      type: prime_numbers
       labels:
         role: source
     spec:

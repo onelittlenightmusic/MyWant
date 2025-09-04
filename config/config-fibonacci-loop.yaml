@@ -2,7 +2,7 @@ wants:
   # Seed generator provides initial fibonacci values (0, 1)
   - metadata:
       name: seed-generator
-      type: seed_generator
+      type: seed_numbers
       labels:
         role: source
         stage: initial
@@ -38,15 +38,3 @@ wants:
         - role: source
         - role: processor
 
-  # Sink collects and displays the complete fibonacci sequence
-  - metadata:
-      name: fibonacci-sink
-      type: fibonacci_sink
-      labels:
-        role: terminal
-        stage: output
-        component: display
-    spec:
-      params: {}
-      using:
-        - role: merger

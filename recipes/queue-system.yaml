@@ -9,7 +9,7 @@ recipe:
 
   wants:
     # Generator want - explicitly define all labels in recipe
-    - type: sequence
+    - type: numbers
       labels:
         role: source               # Explicitly defined, not auto-generated
         category: queue-producer   # Recipe-specific connection label
@@ -52,7 +52,7 @@ recipe:
     
     # Queue system metrics
     metrics:
-      - want_name: "sequence"
+      - want_name: "numbers"
         stat_name: "TotalProcessed"
         description: "Items generated"
       - want_name: "queue"

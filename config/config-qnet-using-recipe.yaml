@@ -5,7 +5,7 @@ wants:
   # Primary packet generator
   - metadata:
       name: gen-primary
-      type: sequence
+      type: numbers
       labels:
         role: source
         stream: primary
@@ -18,7 +18,7 @@ wants:
   # Secondary packet generator
   - metadata:
       name: gen-secondary
-      type: sequence
+      type: numbers
       labels:
         role: source
         stream: secondary

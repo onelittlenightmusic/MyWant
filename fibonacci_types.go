@@ -1,20 +1,19 @@
 package main
 
 import (
-	"fmt"
-	"gochain/chain"
+	"MyWant/chain"
 )
 
-// FibonacciGenerator generates fibonacci sequence numbers
-type FibonacciGenerator struct {
+// FibonacciNumbers generates fibonacci sequence numbers
+type FibonacciNumbers struct {
 	Want
 	Count int
 	paths Paths
 }
 
-// NewFibonacciGenerator creates a new fibonacci generator want
-func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *FibonacciGenerator {
-	gen := &FibonacciGenerator{
+// NewFibonacciNumbers creates a new fibonacci numbers want
+func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *FibonacciNumbers {
+	gen := &FibonacciNumbers{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -36,8 +35,8 @@ func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *Fi
 	return gen
 }
 
-// CreateFunction returns the generalized chain function for the generator
-func (g *FibonacciGenerator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+// CreateFunction returns the generalized chain function for the numbers generator
+func (g *FibonacciNumbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	return func(using []chain.Chan, outputs []chain.Chan) bool {
 		if len(outputs) == 0 {
 			return true
@@ -54,21 +53,22 @@ func (g *FibonacciGenerator) CreateFunction() func(using []chain.Chan, outputs [
 }
 
 // GetWant returns the underlying Want
-func (g *FibonacciGenerator) GetWant() *Want {
+func (g *FibonacciNumbers) GetWant() *Want {
 	return &g.Want
 }
 
-// FibonacciFilter filters fibonacci numbers based on criteria
-type FibonacciFilter struct {
+// FibonacciSequence filters fibonacci numbers based on criteria
+type FibonacciSequence struct {
 	Want
-	MinValue int
-	MaxValue int
-	paths    Paths
+	MinValue   int
+	MaxValue   int
+	filtered   []int
+	paths      Paths
 }
 
-// NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *FibonacciFilter {
-	filter := &FibonacciFilter{
+// NewFibonacciSequence creates a new fibonacci sequence want
+func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *FibonacciSequence {
+	filter := &FibonacciSequence{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -78,6 +78,7 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 		},
 		MinValue: 0,
 		MaxValue: 1000000,
+		filtered: make([]int, 0),
 	}
 	
 	if min, ok := params["min_value"]; ok {
@@ -100,19 +101,26 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *FibonacciFilter) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+func (f *FibonacciSequence) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 || len(outputs) == 0 {
+		if len(using) == 0 {
 			return true
 		}
 		in := using[0]
-		out := outputs[0]
+		
+		var out chain.Chan
+		if len(outputs) > 0 {
+			out = outputs[0]
+		}
 		
 		for i := range in {
 			if val, ok := i.(int); ok {
 				// Filter based on min/max values
 				if val >= f.MinValue && val <= f.MaxValue {
-					out <- val
+					f.filtered = append(f.filtered, val)
+					if out != nil {
+						out <- val
+					}
 				}
 				if f.Stats == nil {
 				f.Stats = make(WantStats)
@@ -124,85 +132,65 @@ func (f *FibonacciFilter) CreateFunction() func(using []chain.Chan, outputs []ch
 			}
 			}
 		}
-		close(out)
+		if out != nil {
+			close(out)
+		}
+		
+		// Store filtered fibonacci numbers in state for collection
+		f.StoreState("filtered", f.filtered)
+		f.StoreState("count", len(f.filtered))
+		
 		return true
 	}
 }
 
+// InitializePaths initializes the paths for this sequence
+func (f *FibonacciSequence) InitializePaths(inCount, outCount int) {
+	f.paths.In = make([]PathInfo, inCount)
+	f.paths.Out = make([]PathInfo, outCount)
+}
+
+// GetConnectivityMetadata returns connectivity requirements for fibonacci sequence
+func (f *FibonacciSequence) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0, // Optional output
+		MaxInputs:       1,
+		MaxOutputs:      -1,
+		WantType:        "fibonacci_sequence",
+		Description:     "Fibonacci number sequence",
+	}
+}
+
+// GetStats returns the stats for this sequence
+func (f *FibonacciSequence) GetStats() map[string]interface{} {
+	return f.Stats
+}
+
+// Process processes using enhanced paths
+func (f *FibonacciSequence) Process(paths Paths) bool {
+	f.paths = paths
+	return false
+}
+
+// GetType returns the want type
+func (f *FibonacciSequence) GetType() string {
+	return "fibonacci_sequence"
+}
+
 // GetWant returns the underlying Want
-func (f *FibonacciFilter) GetWant() *Want {
+func (f *FibonacciSequence) GetWant() *Want {
 	return &f.Want
 }
 
-// FibonacciSink collects and displays fibonacci numbers
-type FibonacciSink struct {
-	Want
-	numbers []int
-	paths   Paths
-}
-
-// NewFibonacciSink creates a new fibonacci sink want
-func NewFibonacciSink(metadata Metadata, params map[string]interface{}) *FibonacciSink {
-	sink := &FibonacciSink{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
-		numbers: make([]int, 0),
-	}
-	
-	return sink
-}
-
-// CreateFunction returns the generalized chain function for the sink
-func (s *FibonacciSink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 {
-			return true
-		}
-		in := using[0]
-		
-		fmt.Println("Fibonacci numbers:")
-		for i := range in {
-			if val, ok := i.(int); ok {
-				s.numbers = append(s.numbers, val)
-				fmt.Printf("%d ", val)
-				if s.Stats == nil {
-					s.Stats = make(WantStats)
-				}
-				if val, exists := s.Stats["total_processed"]; exists {
-					s.Stats["total_processed"] = val.(int) + 1
-				} else {
-					s.Stats["total_processed"] = 1
-				}
-			}
-		}
-		fmt.Printf("\n\nTotal fibonacci numbers collected: %d\n", len(s.numbers))
-		s.StoreState("numbers", s.numbers)
-		s.StoreState("count", len(s.numbers))
-		return true
-	}
-}
-
-// GetWant returns the underlying Want
-func (s *FibonacciSink) GetWant() *Want {
-	return &s.Want
-}
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("fibonacci_generator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciGenerator(metadata, spec.Params)
+	builder.RegisterWantType("fibonacci_numbers", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciNumbers(metadata, spec.Params)
 	})
 	
-	builder.RegisterWantType("fibonacci_filter", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciFilter(metadata, spec.Params)
-	})
-	
-	builder.RegisterWantType("fibonacci_sink", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciSink(metadata, spec.Params)
+	builder.RegisterWantType("fibonacci_sequence", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFibonacciSequence(metadata, spec.Params)
 	})
 }

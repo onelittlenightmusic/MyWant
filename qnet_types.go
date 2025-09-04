@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"MyWant/chain"
 	"math"
 	"math/rand"
 )
@@ -36,17 +36,17 @@ func ExpRand64() float64 {
 }
 
 
-// Generator creates packets and sends them downstream
-type Generator struct {
+// Numbers creates packets and sends them downstream
+type Numbers struct {
 	Want
 	Rate  float64
 	Count int
 	paths Paths
 }
 
-// PacketSequence creates a new generator want
-func PacketSequence(metadata Metadata, spec WantSpec) *Generator {
-	gen := &Generator{
+// PacketNumbers creates a new numbers want
+func PacketNumbers(metadata Metadata, spec WantSpec) *Numbers {
+	gen := &Numbers{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
@@ -74,14 +74,14 @@ func PacketSequence(metadata Metadata, spec WantSpec) *Generator {
 	return gen
 }
 
-// InitializePaths initializes the paths for this generator
-func (g *Generator) InitializePaths(inCount, outCount int) {
+// InitializePaths initializes the paths for this numbers generator
+func (g *Numbers) InitializePaths(inCount, outCount int) {
 	g.paths.In = make([]PathInfo, inCount)
 	g.paths.Out = make([]PathInfo, outCount)
 }
 
-// GetConnectivityMetadata returns connectivity requirements for generator
-func (g *Generator) GetConnectivityMetadata() ConnectivityMetadata {
+// GetConnectivityMetadata returns connectivity requirements for numbers generator
+func (g *Numbers) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0, // Generators don't need using
 		RequiredOutputs: 1, // Must have at least one output
@@ -92,30 +92,30 @@ func (g *Generator) GetConnectivityMetadata() ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this generator
-func (g *Generator) GetStats() map[string]interface{} {
+// GetStats returns the stats for this numbers generator
+func (g *Numbers) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
 	return g.Stats
 }
 
 // Process processes using enhanced paths (for enhanced node compatibility)
-func (g *Generator) Process(paths Paths) bool {
+func (g *Numbers) Process(paths Paths) bool {
 	g.paths = paths
 	return false // Not used in current implementation
 }
 
 // GetType returns the want type
-func (g *Generator) GetType() string {
-	return "sequence"
+func (g *Numbers) GetType() string {
+	return "numbers"
 }
 
 // GetWant returns the embedded Want
-func (g *Generator) GetWant() *Want {
+func (g *Numbers) GetWant() *Want {
 	return &g.Want
 }
 
-// CreateFunction returns the generalized chain function for this generator
-func (g *Generator) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+// CreateFunction returns the generalized chain function for this numbers generator
+func (g *Numbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
 	t, j := 0.0, 0
 	
 	// Check for deterministic mode in parameters
@@ -596,9 +596,9 @@ func (s *Sink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) b
 
 // RegisterQNetWantTypes registers the qnet-specific want types with a ChainBuilder
 func RegisterQNetWantTypes(builder *ChainBuilder) {
-	// Register generator type - return the enhanced want itself for validation
-	builder.RegisterWantType("sequence", func(metadata Metadata, spec WantSpec) interface{} {
-		return PacketSequence(metadata, spec)
+	// Register numbers generator type - return the enhanced want itself for validation
+	builder.RegisterWantType("numbers", func(metadata Metadata, spec WantSpec) interface{} {
+		return PacketNumbers(metadata, spec)
 	})
 	
 	// Register queue type - return the enhanced want itself for validation

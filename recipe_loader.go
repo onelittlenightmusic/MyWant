@@ -277,7 +277,7 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 			Labels: finalLabels,
 			OwnerReferences: []OwnerReference{
 				{
-					APIVersion:         "gochain/v1",
+					APIVersion:         "MyWant/v1",
 					Kind:               "Want",
 					Name:               prefix,
 					Controller:         true,
@@ -404,7 +404,7 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 			Labels: wantRecipe.Metadata.Labels,
 			OwnerReferences: []OwnerReference{
 				{
-					APIVersion:         "gochain/v1",
+					APIVersion:         "MyWant/v1",
 					Kind:               "Want",
 					Name:               targetName,
 					Controller:         true,

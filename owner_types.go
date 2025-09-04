@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"MyWant/chain"
 	"strings"
 	"sync"
 )
@@ -149,7 +149,7 @@ func (t *Target) CreateChildWants() []Want {
 			for i := range config.Wants {
 				config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
 					{
-						APIVersion:         "gochain/v1",
+						APIVersion:         "MyWant/v1",
 						Kind:               "Want",
 						Name:               t.Metadata.Name,
 						Controller:         true,
@@ -175,7 +175,7 @@ func (t *Target) CreateChildWants() []Want {
 	generatorWant := Want{
 		Metadata: Metadata{
 			Name: t.Metadata.Name + "-generator",
-			Type: "sequence",
+			Type: "numbers",
 			Labels: map[string]string{
 				"role":     "source",
 				"owner":    "child",
@@ -183,7 +183,7 @@ func (t *Target) CreateChildWants() []Want {
 			},
 			OwnerReferences: []OwnerReference{
 				{
-					APIVersion:         "gochain/v1",
+					APIVersion:         "MyWant/v1",
 					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
@@ -211,7 +211,7 @@ func (t *Target) CreateChildWants() []Want {
 			},
 			OwnerReferences: []OwnerReference{
 				{
-					APIVersion:         "gochain/v1",
+					APIVersion:         "MyWant/v1",
 					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
@@ -240,7 +240,7 @@ func (t *Target) CreateChildWants() []Want {
 			},
 			OwnerReferences: []OwnerReference{
 				{
-					APIVersion:         "gochain/v1",
+					APIVersion:         "MyWant/v1",
 					Kind:               "Want",
 					Name:               t.Metadata.Name,
 					Controller:         true,
@@ -499,8 +499,8 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	})
 	
 	// Override all want types to use OwnerAwareWant wrapper for wants with owner references
-	originalGeneratorFactory := builder.registry["sequence"]
-	builder.RegisterWantType("sequence", func(metadata Metadata, spec WantSpec) interface{} {
+	originalGeneratorFactory := builder.registry["numbers"]
+	builder.RegisterWantType("numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		baseWant := originalGeneratorFactory(metadata, spec)
 		if len(metadata.OwnerReferences) > 0 {
 			return NewOwnerAwareWant(baseWant, metadata)

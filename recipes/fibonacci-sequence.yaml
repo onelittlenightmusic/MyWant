@@ -1,0 +1,46 @@
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "fibonacci"
+    display_name: "Fibonacci Sequence Generator"
+    count: 10
+    min_value: 0
+    max_value: 1000000
+    description: "Generates and filters fibonacci numbers"
+
+  wants:
+    # Fibonacci number generator - generates fibonacci sequence
+    - type: fibonacci_numbers
+      labels:
+        role: generator
+        component: source
+      params:
+        count: count
+
+    # Fibonacci sequence - filters fibonacci numbers by range  
+    - type: fibonacci_sequence
+      labels:
+        role: filter
+        component: processor
+      params:
+        min_value: min_value
+        max_value: max_value
+      using:
+        - role: generator
+
+  # Recipe result definition - specifies how to compute fibonacci results
+  result:
+    # Primary result from the fibonacci sequence (collected fibonacci numbers)
+    primary:
+      want_name: "fibonacci_sequence"
+      stat_name: "total_processed"
+      description: "Total numbers processed by fibonacci filter"
+    
+    # Fibonacci-specific metrics
+    metrics:
+      - want_name: "fibonacci_numbers"
+        stat_name: "total_processed"
+        description: "Total fibonacci numbers generated"
+      - want_name: "fibonacci_sequence"
+        stat_name: "total_processed"
+        description: "Numbers processed through filter"

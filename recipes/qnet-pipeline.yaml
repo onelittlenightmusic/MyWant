@@ -15,7 +15,7 @@ recipe:
   wants:
     # Primary packet generator
     - name: "gen-primary"
-      type: sequence
+      type: numbers
       labels:
         role: source
         stream: primary
@@ -26,7 +26,7 @@ recipe:
 
     # Secondary packet generator
     - name: "gen-secondary" 
-      type: sequence
+      type: numbers
       labels:
         role: source
         stream: secondary

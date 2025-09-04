@@ -1,4 +1,4 @@
-module gochain
+module MyWant
 
 go 1.24.5
 

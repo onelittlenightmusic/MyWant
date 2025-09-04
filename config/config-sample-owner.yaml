@@ -31,7 +31,7 @@ wants:
   # Uses ownerReference pointing to the sink node (similar to Kubernetes Pod ownership)
   - metadata:
       name: number-generator
-      type: sequence
+      type: numbers
       labels:
         role: source
         owner: child

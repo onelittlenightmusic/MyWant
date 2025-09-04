@@ -2,7 +2,7 @@ wants:
   # Fibonacci sequence generator
   - metadata:
       name: generator
-      type: fibonacci_generator
+      type: fibonacci_numbers
       labels:
         role: source
     spec:

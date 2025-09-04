@@ -1,0 +1,12 @@
+# Fibonacci Sequence Recipe Configuration
+# Uses the fibonacci-sequence recipe to generate and filter fibonacci numbers
+
+recipe:
+  path: "recipes/fibonacci-sequence.yaml"
+  parameters:
+    prefix: "fibonacci-seq"
+    display_name: "Fibonacci Sequence (First 15)"
+    count: 15
+    min_value: 0
+    max_value: 1000
+    description: "Generate and filter first 15 fibonacci numbers up to 1000"

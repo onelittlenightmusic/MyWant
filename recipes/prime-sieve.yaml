@@ -1,0 +1,44 @@
+recipe:
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "prime"
+    display_name: "Prime Number Sieve"
+    start_number: 1
+    end_number: 100
+    description: "Generates and filters prime numbers using sieve algorithm"
+
+  wants:
+    # Prime number generator - generates consecutive numbers
+    - type: prime_numbers
+      labels:
+        role: generator
+        component: source
+      params:
+        start: start_number
+        end: end_number
+
+    # Prime sequence - filters out non-prime numbers using sieve algorithm  
+    - type: prime_sequence
+      labels:
+        role: filter
+        component: processor
+      params: {}
+      using:
+        - role: generator
+
+  # Recipe result definition - specifies how to compute prime sieve results
+  result:
+    # Primary result from the prime sequence (collected primes)
+    primary:
+      want_name: "prime_sequence"
+      stat_name: "total_processed"
+      description: "Total numbers processed by prime filter"
+    
+    # Prime-specific metrics
+    metrics:
+      - want_name: "prime_numbers"
+        stat_name: "total_processed"
+        description: "Total numbers generated"
+      - want_name: "prime_sequence"
+        stat_name: "total_processed"
+        description: "Numbers processed through filter"

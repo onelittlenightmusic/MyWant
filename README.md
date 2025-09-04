@@ -1,4 +1,4 @@
-# GoChain
+# MyWant
 
 A Go library implementing functional chain programming patterns with channels, supporting both imperative chain building and declarative configuration-based approaches for flexible stream processing and pipeline architectures.
 
@@ -14,7 +14,7 @@ A Go library implementing functional chain programming patterns with channels, s
 ## Core Concepts
 
 ### Config YAML - Top-Level User Interface
-Config YAML files are the main interface for running GoChain programs. They specify what to execute and how:
+Config YAML files are the main interface for running MyWant programs. They specify what to execute and how:
 
 ```yaml
 # Option 1: Direct want definitions

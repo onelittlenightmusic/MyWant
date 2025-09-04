@@ -4,7 +4,7 @@ wants:
   # Packet generator
   - metadata:
       name: gen-primary
-      type: sequence
+      type: numbers
       labels:
         role: source
         stream: primary
