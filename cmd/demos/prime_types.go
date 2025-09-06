@@ -1,7 +1,7 @@
 package main
 
 import (
-	. "mywant"
+	. "mywant/src"
 )
 
 // PrimeNumbers creates numbers and sends them downstream
@@ -202,6 +202,60 @@ func (f *PrimeSequence) GetWant() *Want {
 }
 
 
+// PrimeSink collects and displays results
+type PrimeSink struct {
+	Want
+	Received int
+	paths    Paths
+}
+
+// NewPrimeSink creates a new prime sink want
+func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
+	return &PrimeSink{
+		Want: Want{
+			Metadata: metadata,
+			Spec:     spec,
+			Stats:    WantStats{},
+			Status:   WantStatusIdle,
+			State:    make(map[string]interface{}),
+		},
+		Received: 0,
+	}
+}
+
+// CreateFunction returns the generalized chain function for the sink
+func (s *PrimeSink) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
+		if len(using) == 0 {
+			return true
+		}
+		
+		primes := make([]int, 0)
+		for val := range using[0] {
+			if prime, ok := val.(int); ok {
+				primes = append(primes, prime)
+				s.Received++
+			}
+		}
+		
+		// Store collected primes in state
+		s.StoreState("primes", primes)
+		s.StoreState("total_received", s.Received)
+		
+		if s.Stats == nil {
+			s.Stats = make(WantStats)
+		}
+		s.Stats["total_processed"] = s.Received
+		
+		return true
+	}
+}
+
+// GetWant returns the underlying Want
+func (s *PrimeSink) GetWant() *Want {
+	return &s.Want
+}
+
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("prime_numbers", func(metadata Metadata, spec WantSpec) interface{} {
@@ -210,5 +264,10 @@ func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	
 	builder.RegisterWantType("prime_sequence", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeSequence(metadata, spec.Params)
+	})
+	
+	// Register sink type for collecting results
+	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewPrimeSink(metadata, spec)
 	})
 }

@@ -2,14 +2,6 @@
 
 A Go library implementing functional programming patterns with channels, supporting declarative configuration-based approaches for flexible processing topologies and data flow architectures. MyWant introduces a declarative programming paradigm that eliminates the need for prior knowledge beyond YAML configuration files, removing prerequisites for understanding individual components or their internal implementations.
 
-## Installation
-
-```bash
-git clone https://github.com/onelittlenightmusic/MyWant.git
-cd MyWant
-go mod tidy
-```
-
 ## Why Choose MyWant's Declarative Framework?
 
 ### **Zero Learning Curve**
@@ -23,18 +15,18 @@ go mod tidy
 - **Focus on What, Not How**: Declare desired outcomes rather than implementation details
 
 ### **Effortless Scalability**
-- **Recipe Reusability**: Define patterns once, reuse across multiple configurations
-- **Parameter Substitution**: Adapt existing recipes with different parameters
+- **Direct Configuration**: Define wants with explicit parameters and connections
+- **Label-based Connections**: Flexible want topology using label selectors
 - **Dynamic Composition**: Add or modify components at runtime through configuration
 
 ### **Maintenance Freedom**
 - **Configuration-Driven Changes**: Modify system behavior without code changes
 - **Version Control Friendly**: Track system evolution through YAML file changes
-- **Environment Adaptation**: Same recipes, different parameters for dev/staging/production
+- **Environment Adaptation**: Different parameters for dev/staging/production
 
 ## Features
 
-- **Recipe-based Configuration**: Define complex processing topologies using YAML recipe files
+- **Direct Want Configuration**: Define processing topologies using explicit YAML configurations
 - **Independent & Dependent Wants**: Support both parallel processing and sequential pipelines
 - **Dynamic Want Addition**: Add wants to running systems at runtime
 - **Memory Reconciliation**: Persistent state management across system executions
@@ -43,21 +35,22 @@ go mod tidy
 
 ## Core Concepts
 
-### Config YAML - Top-Level User Interface
-Config YAML files are the main interface for running MyWant programs. They specify what to execute and how:
+### Config YAML - Direct Want Configuration
+Config YAML files define wants directly without templates or recipes:
 
 ```yaml
-# Option 1: Direct want definitions
+# Direct want definitions only
 wants:
-  - metadata: {...}
-    spec: {...}
-
-# Option 2: Reference reusable recipes  
-recipe:
-  path: "recipes/queue-system.yaml"
-  parameters:
-    count: 500
-    rate: 20.0
+  - metadata:
+      name: processor
+      type: queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 0.1
+      using:
+        - role: source
 ```
 
 ### Wants
@@ -65,8 +58,7 @@ A "want" is a processing unit that performs a specific task. Wants can be:
 - **Independent**: Execute in parallel without dependencies (e.g., travel bookings)
 - **Dependent**: Connected in processing pipelines using `using` selectors (e.g., data processing flows)
 
-### Recipes - Reusable Components
-Recipes are YAML templates stored in the `recipes/` directory that define reusable want configurations with parameters. They are consumed by config files to avoid duplication and enable parameterization.
+All wants are defined directly in configuration files with explicit parameters and connections.
 
 ## Quick Start
 
@@ -74,189 +66,167 @@ Recipes are YAML templates stored in the `recipes/` directory that define reusab
 
 Independent wants execute in parallel without dependencies - perfect for orchestrated tasks.
 
-**Step 1: Create the recipe** (reusable component in `recipes/travel-itinerary.yaml`):
+**Create your config file** (`config/config-travel.yaml`):
 ```yaml
-recipe:
-  # Recipe parameters - these are the configurable values
-  parameters:
-    prefix: "travel"
-    display_name: "One Day Travel Itinerary" 
-    restaurant_type: "fine dining"
-    hotel_type: "luxury"
-    buffet_type: "international"
-    dinner_duration: 2.0
-
-  wants:
-    # Dinner restaurant reservation (independent)
-    - type: restaurant
+wants:
+  # Dinner restaurant reservation (independent)
+  - metadata:
+      name: dinner-reservation
+      type: restaurant
+      labels:
+        role: scheduler
+        category: dining
+    spec:
       params:
-        restaurant_type: restaurant_type
-        duration_hours: dinner_duration
+        restaurant_type: "fine dining"
+        duration_hours: 2.0
 
-    # Hotel accommodation booking (independent)
-    - type: hotel  
+  # Hotel accommodation booking (independent)
+  - metadata:
+      name: hotel-booking
+      type: hotel
+      labels:
+        role: scheduler
+        category: accommodation
+    spec:
       params:
-        hotel_type: hotel_type
+        hotel_type: "luxury"
 
-    # Morning breakfast buffet (independent)
-    - type: buffet
+  # Morning breakfast buffet (independent)
+  - metadata:
+      name: breakfast-buffet
+      type: buffet
+      labels:
+        role: scheduler
+        category: dining
+    spec:
       params:
-        buffet_type: buffet_type
+        buffet_type: "international"
 
-  coordinator:
-    type: travel_coordinator
-    params:
-      display_name: display_name
-    using:
-      - role: scheduler
+  # Travel coordinator (collects all bookings)
+  - metadata:
+      name: get-one-day-travel
+      type: travel_coordinator
+      labels:
+        role: coordinator
+    spec:
+      params:
+        display_name: "One Day Travel Itinerary"
+      using:
+        - role: scheduler
 ```
 
-**Step 2: Create the config file** (top-level user interface in `config/config-travel-recipe.yaml`):
-```yaml
-recipe:
-  path: "recipes/travel-itinerary.yaml"
-  parameters:
-    prefix: "vacation"
-    display_name: "Weekend Vacation Itinerary"
-    restaurant_type: "michelin starred"
-    hotel_type: "boutique"
-    buffet_type: "continental"
-    dinner_duration: 2.5
-```
-
-**Step 3: Run with the config file:**
+**Run the example:**
 ```sh
-make run-travel-recipe  # Uses config/config-travel-recipe.yaml
+make run-travel  # Uses config/config-travel.yaml
 ```
 
 ### Example 2: Dependent Wants (Queue System)
 
 Dependent wants form processing pipelines using `using` selectors to connect outputs to inputs.
 
-**Step 1: Create the recipe** (reusable component in `recipes/queue-system.yaml`):
+**Create your config file** (`config/config-qnet.yaml`):
 ```yaml
-recipe:
-  # Recipe parameters
-  parameters:
-    prefix: "queue-system"
-    count: 1000
-    rate: 10.0
-    service_time: 0.1
-    deterministic: false
-
-  wants:
-    # Generator want (no dependencies)
-    - type: sequence
+wants:
+  # Generator want (no dependencies)
+  - metadata:
+      name: gen-primary
+      type: numbers
       labels:
         role: source
-        category: queue-producer
-        component: generator
+        stream: primary
+    spec:
       params:
-        count: count
-        rate: rate
-        deterministic: deterministic
+        count: 1000
+        rate: 10.0
 
-    # Queue want (depends on generator)
-    - type: queue
+  # Queue want (depends on generator)
+  - metadata:
+      name: queue-main
+      type: queue
       labels:
         role: processor
-        category: queue-processor
-        component: main-queue
+        stream: primary
+    spec:
       params:
-        service_time: service_time
-        deterministic: deterministic
+        service_time: 0.05
       using:
-        - category: queue-producer  # Connect to generator
+        - role: source  # Connect to generator
 
-    # Sink want (depends on queue)
-    - type: sink
+  # Sink want (depends on queue)
+  - metadata:
+      name: sink-main
+      type: sink
       labels:
         role: collector
-        category: result-display
-        component: final-sink
-      params:
-        display_format: "Number: %d"
+    spec:
+      params: {}
       using:
         - role: processor  # Connect to queue
 ```
 
-**Step 2: Create the config file** (top-level user interface in `config/config-queue-system-recipe.yaml`):
-```yaml
-recipe:
-  path: "recipes/queue-system.yaml"
-  parameters:
-    count: 500
-    rate: 20.0
-    service_time: 0.05
-    deterministic: true
-```
-
-**Step 3: Run with the config file:**
+**Run the example:**
 ```sh
-make run-queue-system-recipe  # Uses config/config-queue-system-recipe.yaml
+make run-qnet  # Uses config/config-qnet.yaml
 ```
 
 ## Usage
 
-### Installation & Setup
+### Import MyWant Module
+
+Add MyWant to your Go project:
 
 ```bash
-git clone https://github.com/onelittlenightmusic/MyWant.git
-cd MyWant
-go mod tidy
-make build
+go mod init your-project
+go get github.com/onelittlenightmusic/MyWant
+```
+
+Import in your Go code:
+
+```go
+package main
+
+import (
+    "fmt"
+    "mywant"
+)
+
+func main() {
+    // Load configuration from YAML
+    config, err := mywant.LoadConfigFromYAML("config.yaml")
+    if err != nil {
+        panic(err)
+    }
+
+    // Create and execute chain
+    builder := mywant.NewChainBuilder(config)
+    
+    // Register your want types
+    builder.RegisterWantType("your-type", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+        return NewYourWant(metadata, spec)
+    })
+    
+    builder.Execute()
+}
 ```
 
 ### Running Examples
 
-MyWant provides three main usage patterns through make targets:
+MyWant uses direct want configuration defined in YAML files:
 
-#### 1. Recipe-Based Examples (Recommended)
-Recipe-based examples use reusable YAML templates with parameterization:
-
-```sh
-# Independent wants - parallel execution with coordination
-make run-travel-recipe        # Travel planning from recipe (restaurant, hotel, buffet)
-
-# Dependent wants - sequential pipeline processing  
-make run-queue-system-recipe  # Queue system pipeline (generator → queue → sink)
-
-# Complex multi-stream processing
-make run-qnet-recipe         # Multi-generator QNet with parallel processing
-make run-qnet-using-recipe   # QNet with YAML-defined using connections
-```
-
-**Pattern**: `demo_*_recipe.go` + `config/config-*-recipe.yaml` + `recipes/*.yaml`
-
-#### 2. Direct Configuration Examples
-Direct configuration defines wants inline without recipes:
+#### Direct Want Examples
+All examples use direct want definitions with explicit parameters:
 
 ```sh
-# Simple processing chains
-make run-qnet          # QNet simulation (direct YAML config)
-make run-travel        # Travel planning (direct want definitions)
+# Independent wants - parallel execution
+make run-travel        # Travel planning with coordination
+
+# Dependent wants - pipeline processing  
+make run-qnet          # Queue system (generator → queue → sink)
 
 # Advanced processing patterns
 make run-fibonacci-loop # Fibonacci with feedback loop architecture
 ```
-
-**Pattern**: `demo_*.go` + `config/config-*.yaml`
-
-#### 3. Owner-Based Dynamic Examples
-Owner-based examples demonstrate dynamic want creation at runtime:
-
-```sh
-# Dynamic want generation using recipes
-make run-sample-owner                    # Basic target with recipe loading
-make run-sample-owner-config            # Target with configuration parameters
-make run-sample-owner-high-throughput   # High-performance processing target
-make run-sample-owner-dry               # Fast processing with minimal service time
-make run-sample-owner-input             # Target with custom input processing
-make run-qnet-target                    # QNet processing via target want
-make run-travel-target                  # Travel planning via target want
-```
-
-**Pattern**: `demo_*_owner.go` or `demo_*_target.go` + config + recipe loading
 
 #### 4. Build & Test
 ```sh
@@ -268,8 +238,7 @@ make test-build # Test build with dependency check
 
 | Pattern | Best For | Configuration | Runtime Behavior |
 |---------|----------|---------------|------------------|
-| **Recipe-Based** | Reusable, parameterized systems | YAML recipe templates | Static want topology |
-| **Direct Config** | Simple, one-off configurations | Inline YAML definitions | Static want topology |
+| **Direct Config** | Explicit, clear configurations | Inline YAML definitions | Static want topology |
 | **Owner-Based** | Dynamic, adaptive systems | Config + runtime recipe loading | Dynamic want creation |
 
 ### Complete Example: Queue System with MyWant APIs
@@ -433,55 +402,38 @@ This example demonstrates:
 
 ## Configuration System
 
-### Config Files (Top-Level Interface)
-Config files are what you run - they specify the execution parameters:
+### Config Files - Direct Want Definition
+Config files define wants directly with explicit parameters and connections:
 
 ```yaml
-# Direct want definition approach
+# Direct want definitions
 wants:
   - metadata:
       name: my-generator
-      type: sequence
+      type: numbers
+      labels:
+        role: source
     spec:
       params:
         count: 1000
         rate: 10.0
 
-# Recipe-based approach (recommended)
-recipe:
-  path: "recipes/queue-system.yaml"  # Reference reusable component
-  parameters:                       # Override recipe defaults
-    count: 500
-    rate: 20.0
+  - metadata:
+      name: my-processor
+      type: queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 0.05
+      using:
+        - role: source
 ```
 
-### Config vs Recipe Relationship
-- **Config files**: Top-level user interface, what you execute
-- **Recipe files**: Reusable components, consumed by multiple configs
-- **Benefits**: Share recipes across projects, parameterize common patterns
-
-## Recipe System
-
-### Recipe Structure
-```yaml
-recipe:
-  parameters:        # Configurable values
-    param_name: default_value
-
-  wants:            # Want definitions
-    - type: want_type
-      labels:       # Optional labels for connections
-        key: value
-      params:       # Parameters (can reference recipe parameters)
-        param: param_name
-      using:        # Optional dependencies
-        - label_selector
-
-  coordinator:      # Optional coordinator want
-    type: coordinator_type
-    params: {...}
-    using: [...]
-```
+### Configuration Principles
+- **Explicit**: All want parameters are clearly defined
+- **Direct**: No indirection through templates or recipes
+- **Traceable**: Easy to understand what each want does
 
 ### Using Selectors
 Connect wants using label selectors in the `using` field:
@@ -516,15 +468,13 @@ The system automatically manages persistent state:
 
 ## Typical Workflow
 
-1. **Create/Choose Recipe**: Define reusable want patterns in `recipes/`
-2. **Create Config File**: Reference recipe and set parameters in `config/config-*.yaml`
-3. **Execute**: Run with `make` targets or `go run demo_*.go config/config-*.yaml`
-4. **Parameterize**: Reuse recipes with different configs for different scenarios
+1. **Create Config File**: Define wants directly in `config/config-*.yaml`
+2. **Execute**: Run with `make` targets or `go run demo_*.go`
+3. **Customize**: Modify want parameters and connections as needed
 
 ## Architecture
 
 - **Config Layer**: Top-level user interface for execution
-- **Recipe Layer**: Reusable component templates with parameters
 - **Want Layer**: Individual processing units (independent or dependent)
 - **Independent Wants**: Execute in parallel, coordinated by a coordinator want
 - **Dependent Wants**: Form processing pipelines with `using` connections
@@ -540,6 +490,5 @@ The system automatically manages persistent state:
 
 The codebase follows these patterns:
 - Want types in `*_types.go` files
-- Recipe files in `recipes/` directory
-- Configuration files in `config/` directory follow `config-*-recipe.yaml` naming
-- Demo programs follow `demo_*_recipe.go` naming
+- Configuration files in `config/` directory follow `config-*.yaml` naming
+- Demo programs in `cmd/demos/` directory

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	. "mywant"
-	"mywant/chain"
+	. "mywant/src"
+	"mywant/src/chain"
 )
 
 // TimeSlot represents a time period with start and end times

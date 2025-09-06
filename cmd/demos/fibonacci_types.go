@@ -1,7 +1,7 @@
 package main
 
 import (
-	. "mywant"
+	. "mywant/src"
 )
 
 // FibonacciNumbers generates fibonacci sequence numbers

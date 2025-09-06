@@ -2,7 +2,7 @@ package mywant
 
 import (
 	"fmt"
-	"mywant/chain"
+	"mywant/src/chain"
 	"strings"
 	"sync"
 )

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"mywant"
-	"mywant/chain"
+	mywant "mywant/src"
+	"mywant/src/chain"
 )
 
 // QueuePacket represents data flowing through the chain
@@ -42,17 +42,17 @@ type Numbers struct {
 	mywant.Want
 	Rate  float64
 	Count int
-	paths mywant.mywant.Paths
+	paths mywant.Paths
 }
 
 // PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.mywant.Metadata, spec mywant.mywant.WantSpec) *Numbers {
+func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 	gen := &Numbers{
-		mywant.Want: Want{
-			mywant.Metadata: metadata,
+		Want: mywant.Want{
+			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
+			Stats:    mywant.WantStats{},
+			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Rate:  1.0,
@@ -75,20 +75,20 @@ func PacketNumbers(metadata mywant.mywant.Metadata, spec mywant.mywant.WantSpec)
 	return gen
 }
 
-// Initializemywant.Paths initializes the paths for this numbers generator
-func (g *Numbers) Initializemywant.Paths(inCount, outCount int) {
-	g.paths.In = make([]PathInfo, inCount)
-	g.paths.Out = make([]PathInfo, outCount)
+// InitializePaths initializes the paths for this numbers generator
+func (g *Numbers) InitializePaths(inCount, outCount int) {
+	g.paths.In = make([]mywant.PathInfo, inCount)
+	g.paths.Out = make([]mywant.PathInfo, outCount)
 }
 
-// Getmywant.Connectivitymywant.Metadata returns connectivity requirements for numbers generator
-func (g *Numbers) Getmywant.Connectivitymywant.Metadata() mywant.Connectivitymywant.Metadata {
-	return mywant.Connectivitymywant.Metadata{
+// GetConnectivityMetadata returns connectivity requirements for numbers generator
+func (g *Numbers) GetConnectivityMetadata() mywant.ConnectivityMetadata {
+	return mywant.ConnectivityMetadata{
 		RequiredInputs:  0, // Generators don't need using
 		RequiredOutputs: 1, // Must have at least one output
 		MaxInputs:       0, // No using allowed
 		MaxOutputs:      -1, // Unlimited outputs
-		mywant.WantType:        "sequence",
+		WantType:        "sequence",
 		Description:     "Packet generator want",
 	}
 }
@@ -110,8 +110,8 @@ func (g *Numbers) GetType() string {
 	return "numbers"
 }
 
-// GetWant returns the embedded Want
-func (g *Numbers) GetWant() *Want {
+// Getmywant.Want returns the embedded mywant.Want
+func (g *Numbers) GetWant() *mywant.Want {
 	return &g.Want
 }
 
@@ -139,7 +139,7 @@ func (g *Numbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan
 			// Store generation stats
 			// Initialize stats map if not exists
 			if g.Stats == nil {
-				g.Stats = make(WantStats)
+				g.Stats = make(mywant.WantStats)
 			}
 			g.Stats["total_processed"] = j
 			g.Stats["average_wait_time"] = 0.0 // Generators don't have wait time
@@ -175,11 +175,11 @@ type Queue struct {
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 	queue := &Queue{
-		mywant.Want: Want{
-			mywant.Metadata: metadata,
+		Want: mywant.Want{
+			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
+			Stats:    mywant.WantStats{},
+			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		ServiceTime: 1.0,
@@ -194,20 +194,20 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 	return queue
 }
 
-// Initializemywant.Paths initializes the paths for this queue
-func (q *Queue) Initializemywant.Paths(inCount, outCount int) {
-	q.paths.In = make([]PathInfo, inCount)
-	q.paths.Out = make([]PathInfo, outCount)
+// InitializePaths initializes the paths for this queue
+func (q *Queue) InitializePaths(inCount, outCount int) {
+	q.paths.In = make([]mywant.PathInfo, inCount)
+	q.paths.Out = make([]mywant.PathInfo, outCount)
 }
 
-// Getmywant.Connectivitymywant.Metadata returns connectivity requirements for queue
-func (q *Queue) Getmywant.Connectivitymywant.Metadata() mywant.Connectivitymywant.Metadata {
-	return mywant.Connectivitymywant.Metadata{
+// GetConnectivityMetadata returns connectivity requirements for queue
+func (q *Queue) GetConnectivityMetadata() mywant.ConnectivityMetadata {
+	return mywant.ConnectivityMetadata{
 		RequiredInputs:  1, // Queues need at least one using
 		RequiredOutputs: 1, // Must have at least one output
 		MaxInputs:       1, // Only one using supported
 		MaxOutputs:      -1, // Unlimited outputs
-		mywant.WantType:        "queue",
+		WantType:        "queue",
 		Description:     "Queue processing want",
 	}
 }
@@ -229,8 +229,8 @@ func (q *Queue) GetType() string {
 	return "queue"
 }
 
-// GetWant returns the embedded Want
-func (q *Queue) GetWant() *Want {
+// Getmywant.Want returns the embedded mywant.Want
+func (q *Queue) GetWant() *mywant.Want {
 	return &q.Want
 }
 
@@ -251,17 +251,17 @@ func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) 
 		if packet.isEnded() {
 			if processedCount > 0 {
 				avgWaitTime := waitTimeSum / float64(processedCount)
-				// Store stats in the Want
+				// Store stats in the mywant.Want
 				// Initialize stats map if not exists
 				if q.Stats == nil {
-					q.Stats = make(WantStats)
+					q.Stats = make(mywant.WantStats)
 				}
 				q.Stats["average_wait_time"] = avgWaitTime
 				q.Stats["total_processed"] = processedCount
 				q.Stats["total_wait_time"] = waitTimeSum
 				
 				fmt.Printf("[QUEUE %s] Service: %.2f, Processed: %d, Avg Wait: %.6f\n", 
-					q.mywant.Metadata.Name, q.ServiceTime, processedCount, avgWaitTime)
+					q.Metadata.Name, q.ServiceTime, processedCount, avgWaitTime)
 			}
 			out <- packet
 			return true
@@ -331,11 +331,11 @@ type Combiner struct {
 // NewCombiner creates a new combiner want
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 	combiner := &Combiner{
-		mywant.Want: Want{
-			mywant.Metadata: metadata,
+		Want: mywant.Want{
+			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
+			Stats:    mywant.WantStats{},
+			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Operation: "merge",
@@ -350,20 +350,20 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 	return combiner
 }
 
-// Initializemywant.Paths initializes the paths for this combiner
-func (c *Combiner) Initializemywant.Paths(inCount, outCount int) {
-	c.paths.In = make([]PathInfo, inCount)
-	c.paths.Out = make([]PathInfo, outCount)
+// InitializePaths initializes the paths for this combiner
+func (c *Combiner) InitializePaths(inCount, outCount int) {
+	c.paths.In = make([]mywant.PathInfo, inCount)
+	c.paths.Out = make([]mywant.PathInfo, outCount)
 }
 
-// Getmywant.Connectivitymywant.Metadata returns connectivity requirements for combiner
-func (c *Combiner) Getmywant.Connectivitymywant.Metadata() mywant.Connectivitymywant.Metadata {
-	return mywant.Connectivitymywant.Metadata{
+// GetConnectivityMetadata returns connectivity requirements for combiner
+func (c *Combiner) GetConnectivityMetadata() mywant.ConnectivityMetadata {
+	return mywant.ConnectivityMetadata{
 		RequiredInputs:  2, // Combiners need at least two using
 		RequiredOutputs: 1, // Must have at least one output
 		MaxInputs:       -1, // Unlimited using
 		MaxOutputs:      -1, // Unlimited outputs
-		mywant.WantType:        "combiner",
+		WantType:        "combiner",
 		Description:     "Stream combiner want",
 	}
 }
@@ -385,8 +385,8 @@ func (c *Combiner) GetType() string {
 	return "combiner"
 }
 
-// GetWant returns the embedded Want
-func (c *Combiner) GetWant() *Want {
+// Getmywant.Want returns the embedded mywant.Want
+func (c *Combiner) GetWant() *mywant.Want {
 	return &c.Want
 }
 
@@ -420,7 +420,7 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 			// Store combiner stats
 			// Initialize stats map if not exists
 			if c.Stats == nil {
-				c.Stats = make(WantStats)
+				c.Stats = make(mywant.WantStats)
 			}
 			c.Stats["total_processed"] = processed
 			c.Stats["average_wait_time"] = 0.0 // Combiners don't add wait time
@@ -468,7 +468,7 @@ func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Cha
 				// Send end signal
 				// Initialize stats map if not exists
 				if c.Stats == nil {
-					c.Stats = make(WantStats)
+					c.Stats = make(mywant.WantStats)
 				}
 				c.Stats["total_processed"] = processed
 				out <- QueuePacket{-1, 0}
@@ -513,31 +513,31 @@ type Sink struct {
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
 	return &Sink{
-		mywant.Want: Want{
-			mywant.Metadata: metadata,
+		Want: mywant.Want{
+			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
-			Status:   WantStatusIdle,
+			Stats:    mywant.WantStats{},
+			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
 		Received: 0,
 	}
 }
 
-// Initializemywant.Paths initializes the paths for this sink
-func (s *Sink) Initializemywant.Paths(inCount, outCount int) {
-	s.paths.In = make([]PathInfo, inCount)
-	s.paths.Out = make([]PathInfo, outCount)
+// InitializePaths initializes the paths for this sink
+func (s *Sink) InitializePaths(inCount, outCount int) {
+	s.paths.In = make([]mywant.PathInfo, inCount)
+	s.paths.Out = make([]mywant.PathInfo, outCount)
 }
 
-// Getmywant.Connectivitymywant.Metadata returns connectivity requirements for sink
-func (s *Sink) Getmywant.Connectivitymywant.Metadata() mywant.Connectivitymywant.Metadata {
-	return mywant.Connectivitymywant.Metadata{
+// GetConnectivityMetadata returns connectivity requirements for sink
+func (s *Sink) GetConnectivityMetadata() mywant.ConnectivityMetadata {
+	return mywant.ConnectivityMetadata{
 		RequiredInputs:  1, // Sinks need at least one using
 		RequiredOutputs: 0, // Sinks don't need outputs
 		MaxInputs:       -1, // Unlimited using
 		MaxOutputs:      0, // No outputs allowed
-		mywant.WantType:        "sink",
+		WantType:        "sink",
 		Description:     "Data sink/collector want",
 	}
 }
@@ -559,8 +559,8 @@ func (s *Sink) GetType() string {
 	return "sink"
 }
 
-// GetWant returns the embedded Want
-func (s *Sink) GetWant() *Want {
+// Getmywant.Want returns the embedded mywant.Want
+func (s *Sink) GetWant() *mywant.Want {
 	return &s.Want
 }
 
@@ -580,7 +580,7 @@ func (s *Sink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) b
 			// Store sink stats
 			// Initialize stats map if not exists
 			if s.Stats == nil {
-				s.Stats = make(WantStats)
+				s.Stats = make(mywant.WantStats)
 			}
 			s.Stats["total_processed"] = s.Received
 			s.Stats["average_wait_time"] = 0.0 // Sinks don't add wait time

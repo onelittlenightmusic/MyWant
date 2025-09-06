@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant"
+	mywant "mywant/src"
 )
 
 func main() {
@@ -22,7 +22,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 	
 	// Register qnet node types
-	mywant.RegisterQNetWantTypes(builder)
+	RegisterQNetWantTypes(builder)
 	
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "mywant"
+	. "mywant/src"
 )
 
 // FibonacciSeed represents a fibonacci sequence value with its position

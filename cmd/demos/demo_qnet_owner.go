@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"mywant"
+	mywant "mywant/src"
 )
 
 func main() {

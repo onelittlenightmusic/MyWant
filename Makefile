@@ -1,12 +1,12 @@
-.PHONY: clean build test-build run-example run-qnet run-prime run-prime-recipe run-fibonacci run-fibonacci-recipe run-fibonacci-loop run-sample-owner run-sample-owner-config run-sample-owner-high-throughput run-sample-owner-dry run-sample-owner-input run-qnet-target run-travel-target run-travel run-travel-recipe run-queue-system-recipe run-qnet-recipe run-qnet-using-recipe
+.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-sample-owner-high-throughput run-sample-owner-dry run-sample-owner-input run-qnet-target run-travel-target run-prime-recipe run-fibonacci-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-qnet-using-recipe
 
 # Build the mywant library
 build:
-	go build .
+	go build ./src/...
 
 # Test that module builds correctly  
 test-build:
-	go mod tidy && go build .
+	go mod tidy && go build ./src/...
 
 run-qnet:
 	go run cmd/demos/demo_qnet.go cmd/demos/qnet_types.go config/config-qnet.yaml

@@ -10,10 +10,10 @@ wants:
         start: 1
         end: 100
 
-  # Prime filter that sifts out non-prime numbers
+  # Prime sequence that filters out non-prime numbers
   - metadata:
-      name: prime_filter
-      type: prime_filter
+      name: prime_sequence
+      type: prime_sequence
       labels:
         role: filter
     spec:
@@ -24,7 +24,7 @@ wants:
   # Sink that collects and displays prime numbers
   - metadata:
       name: sink
-      type: prime_sink
+      type: sink
       labels:
         role: collector
     spec:
