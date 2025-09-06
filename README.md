@@ -26,39 +26,21 @@ A Go library implementing functional programming patterns with channels, support
 
 ## Features
 
-- **Direct Want Configuration**: Define processing topologies using explicit YAML configurations
 - **Independent & Dependent Wants**: Support both parallel processing and sequential pipelines
 - **Dynamic Want Addition**: Add wants to running systems at runtime
 - **Memory Reconciliation**: Persistent state management across system executions
 - **Label-based Connectivity**: Flexible want connections using label selectors
 - **Multi-flow Processing**: Support for parallel processing flows with combiners
+- **Custom Target Types**: Recipe-based want types with dynamic child creation
 
 ## Core Concepts
-
-### Config YAML - Direct Want Configuration
-Config YAML files define wants directly without templates or recipes:
-
-```yaml
-# Direct want definitions only
-wants:
-  - metadata:
-      name: processor
-      type: queue
-      labels:
-        role: processor
-    spec:
-      params:
-        service_time: 0.1
-      using:
-        - role: source
-```
 
 ### Wants
 A "want" is a processing unit that performs a specific task. Wants can be:
 - **Independent**: Execute in parallel without dependencies (e.g., travel bookings)
 - **Dependent**: Connected in processing pipelines using `using` selectors (e.g., data processing flows)
 
-All wants are defined directly in configuration files with explicit parameters and connections.
+Wants are defined in configuration files with explicit parameters and connections.
 
 ## Quick Start
 
@@ -212,10 +194,7 @@ func main() {
 
 ### Running Examples
 
-MyWant uses direct want configuration defined in YAML files:
-
-#### Direct Want Examples
-All examples use direct want definitions with explicit parameters:
+MyWant provides various examples demonstrating different processing patterns:
 
 ```sh
 # Independent wants - parallel execution
@@ -272,12 +251,6 @@ make run-sample-owner-input           # Target with input handling
 make run-qnet-target                  # QNet using target architecture
 ```
 
-### Usage Pattern Selection Guide
-
-| Pattern | Best For | Configuration | Runtime Behavior |
-|---------|----------|---------------|------------------|
-| **Direct Config** | Explicit, clear configurations | Inline YAML definitions | Static want topology |
-| **Owner-Based** | Dynamic, adaptive systems | Config + runtime recipe loading | Dynamic want creation |
 
 ### Complete Example: Queue System with MyWant APIs
 
@@ -440,38 +413,10 @@ This example demonstrates:
 
 ## Configuration System
 
-### Config Files - Direct Want Definition
-Config files define wants directly with explicit parameters and connections:
-
-```yaml
-# Direct want definitions
-wants:
-  - metadata:
-      name: my-generator
-      type: numbers
-      labels:
-        role: source
-    spec:
-      params:
-        count: 1000
-        rate: 10.0
-
-  - metadata:
-      name: my-processor
-      type: queue
-      labels:
-        role: processor
-    spec:
-      params:
-        service_time: 0.05
-      using:
-        - role: source
-```
-
 ### Configuration Principles
 - **Explicit**: All want parameters are clearly defined
-- **Direct**: No indirection through templates or recipes
 - **Traceable**: Easy to understand what each want does
+- **Flexible**: Support for both direct wants and custom target types
 
 ### Using Selectors
 Connect wants using label selectors in the `using` field:
@@ -506,7 +451,7 @@ The system automatically manages persistent state:
 
 ## Typical Workflow
 
-1. **Create Config File**: Define wants directly in `config/config-*.yaml`
+1. **Create Config File**: Define wants in `config/config-*.yaml`
 2. **Execute**: Run with `make` targets or `go run demo_*.go`
 3. **Customize**: Modify want parameters and connections as needed
 
