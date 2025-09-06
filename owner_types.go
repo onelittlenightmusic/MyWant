@@ -484,8 +484,7 @@ func (oaw *OwnerAwareWant) GetWant() *Want {
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
-	// Register existing qnet types first
-	RegisterQNetWantTypes(builder)
+	// Note: Demo programs should also call RegisterQNetWantTypes if they use qnet types
 	
 	// Initialize generic recipe loader
 	recipeLoader := NewGenericRecipeLoader("recipes")

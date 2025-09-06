@@ -396,7 +396,7 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, 
 func validateRecipeWithSpec(yamlData []byte) error {
 	// Load the OpenAPI spec for recipes
 	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile("recipe-spec.yaml")
+	spec, err := loader.LoadFromFile("spec/recipe-spec.yaml")
 	if err != nil {
 		return fmt.Errorf("failed to load recipe OpenAPI spec: %w", err)
 	}

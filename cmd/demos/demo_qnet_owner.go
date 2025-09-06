@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	. "mywant"
+	"mywant"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	}
 	
 	// Load YAML configuration with target want
-	config, err := LoadConfigFromYAML(yamlFile)
+	config, err := mywant.LoadConfigFromYAML(yamlFile)
 	if err != nil {
 		fmt.Printf("Error loading %s: %v\n", yamlFile, err)
 		return
@@ -38,10 +38,11 @@ func main() {
 	}
 
 	// Create chain builder
-	builder := NewChainBuilder(config)
+	builder := mywant.NewChainBuilder(config)
 	
-	// Register owner-based want types (includes target and child wants)
-	RegisterOwnerWantTypes(builder)
+	// Register want types
+	RegisterQNetWantTypes(builder)         // For qnet types (numbers, queue, sink, etc.)
+	mywant.RegisterOwnerWantTypes(builder) // For owner types (target)
 	
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")

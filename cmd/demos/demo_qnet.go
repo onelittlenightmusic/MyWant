@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "mywant"
+	"mywant"
 )
 
 func main() {
@@ -10,7 +10,7 @@ func main() {
 	fmt.Println("===================")
 	
 	// Load YAML configuration
-	config, err := LoadConfigFromYAML("config/config-qnet.yaml")
+	config, err := mywant.LoadConfigFromYAML("config/config-qnet.yaml")
 	if err != nil {
 		fmt.Printf("Error loading config/config-qnet.yaml: %v\n", err)
 		return
@@ -19,10 +19,10 @@ func main() {
 	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Wants))
 
 	// Create chain builder
-	builder := NewChainBuilder(config)
+	builder := mywant.NewChainBuilder(config)
 	
 	// Register qnet node types
-	RegisterQNetWantTypes(builder)
+	mywant.RegisterQNetWantTypes(builder)
 	
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()

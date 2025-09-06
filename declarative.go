@@ -1089,7 +1089,7 @@ func loadConfigFromYAML(filename string) (Config, error) {
 func validateConfigWithSpec(yamlData []byte) error {
 	// Load the OpenAPI spec
 	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile("spec.yaml")
+	spec, err := loader.LoadFromFile("spec/want-spec.yaml")
 	if err != nil {
 		return fmt.Errorf("failed to load OpenAPI spec: %w", err)
 	}
