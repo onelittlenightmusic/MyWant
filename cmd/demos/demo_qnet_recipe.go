@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	. "mywant"
 )
 
 func main() {

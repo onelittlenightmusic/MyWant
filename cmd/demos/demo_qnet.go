@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	. "mywant"
 )
 
 func main() {
@@ -9,7 +10,7 @@ func main() {
 	fmt.Println("===================")
 	
 	// Load YAML configuration
-	config, err := loadConfigFromYAML("config/config-qnet.yaml")
+	config, err := LoadConfigFromYAML("config/config-qnet.yaml")
 	if err != nil {
 		fmt.Printf("Error loading config/config-qnet.yaml: %v\n", err)
 		return

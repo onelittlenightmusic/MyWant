@@ -1,4 +1,4 @@
-package main
+package mywant
 
 import (
 	"fmt"
@@ -51,8 +51,8 @@ type DRYRecipeDefaults struct {
 	} `yaml:"spec,omitempty"`
 }
 
-// RecipeResult defines how to fetch a result from child wants
-type RecipeResult struct {
+// LegacyRecipeResult defines how to fetch a result from child wants (legacy format)
+type LegacyRecipeResult struct {
 	Want     string `yaml:"want"`     // Name pattern or label selector for the child want
 	StatName string `yaml:"statName"` // Name of the statistic to fetch (e.g., "AverageWaitTime", "TotalProcessed")
 }
@@ -67,7 +67,7 @@ type ChildRecipe struct {
 	// New minimized parameter format support
 	Params      map[string]interface{} `yaml:"params,omitempty"`
 	
-	Result      *RecipeResult     `yaml:"result,omitempty"` // Optional result fetching configuration
+	Result      *LegacyRecipeResult     `yaml:"result,omitempty"` // Optional result fetching configuration
 	
 	// Legacy format support
 	Children    []WantRecipe      `yaml:"children,omitempty"`
@@ -425,8 +425,8 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 }
 
 
-// GetRecipeResult fetches a result value from child nodes based on recipe configuration
-func (rl *RecipeLoader) GetRecipeResult(recipeName string, targetName string, wants []Want) (interface{}, error) {
+// GetLegacyRecipeResult fetches a result value from child nodes based on recipe configuration
+func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName string, wants []Want) (interface{}, error) {
 	childRecipe, err := rl.GetRecipe(recipeName)
 	if err != nil {
 		return nil, err

@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"MyWant/chain"
 	"math/rand"
 	"time"
+	. "mywant"
+	"mywant/chain"
 )
 
 // TimeSlot represents a time period with start and end times

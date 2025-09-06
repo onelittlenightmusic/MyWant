@@ -1,7 +1,7 @@
 package main
 
 import (
-	"MyWant/chain"
+	. "mywant"
 )
 
 // PrimeNumbers creates numbers and sends them downstream
@@ -45,8 +45,8 @@ func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNum
 }
 
 // CreateFunction returns the generalized chain function for the numbers generator
-func (g *PrimeNumbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+func (g *PrimeNumbers) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -98,14 +98,14 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *PrimeSequence) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+func (f *PrimeSequence) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(using) == 0 {
 			return true
 		}
 		in := using[0]
 		
-		var out chain.Chan
+		var out Chan
 		if len(outputs) > 0 {
 			out = outputs[0]
 		}

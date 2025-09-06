@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	. "mywant"
 )
 
 func main() {
@@ -14,7 +15,7 @@ func main() {
 	fmt.Println()
 	
 	// Load YAML configuration
-	config, err := loadConfigFromYAML("config/config-travel.yaml")
+	config, err := LoadConfigFromYAML("config/config-travel.yaml")
 	if err != nil {
 		fmt.Printf("Error loading config/config-travel.yaml: %v\n", err)
 		return

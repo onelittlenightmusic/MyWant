@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	. "mywant"
 )
 
 func main() {
@@ -16,7 +17,7 @@ func main() {
 	}
 	
 	// Load YAML configuration
-	config, err := loadConfigFromYAML(yamlFile)
+	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
 		fmt.Printf("Error loading %s: %v\n", yamlFile, err)
 		return

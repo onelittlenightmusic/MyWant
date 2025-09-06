@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"MyWant/chain"
+	. "mywant"
 )
 
 // FibonacciSeed represents a fibonacci sequence value with its position
@@ -83,8 +83,8 @@ func (g *SeedNumbers) GetWant() *Want {
 }
 
 // CreateFunction returns the generalized chain function for the seed numbers generator
-func (g *SeedNumbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+func (g *SeedNumbers) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -165,7 +165,7 @@ func (c *FibonacciComputer) GetWant() *Want {
 }
 
 // CreateFunction returns the generalized chain function for the fibonacci computer
-func (c *FibonacciComputer) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+func (c *FibonacciComputer) CreateFunction() func(using []Chan, outputs []Chan) bool {
 	prev := 0
 	current := 1
 	position := 2
@@ -173,7 +173,7 @@ func (c *FibonacciComputer) CreateFunction() func(using []chain.Chan, outputs []
 	processed := 0
 	initialized := false
 	
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(using) == 0 || len(outputs) == 0 {
 			return true
 		}
@@ -279,13 +279,13 @@ func (m *FibonacciMerger) GetWant() *Want {
 }
 
 // CreateFunction returns the generalized chain function for the fibonacci merger
-func (m *FibonacciMerger) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
+func (m *FibonacciMerger) CreateFunction() func(using []Chan, outputs []Chan) bool {
 	seedUsingClosed := false
 	computedUsingClosed := false
 	processed := 0
 	maxCountReceived := false
 	
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(using) < 2 || len(outputs) < 1 {
 			return true
 		}

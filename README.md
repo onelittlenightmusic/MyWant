@@ -196,25 +196,240 @@ recipe:
 make run-queue-system-recipe  # Uses config/config-queue-system-recipe.yaml
 ```
 
-## Available Make Targets
+## Usage
+
+### Installation & Setup
+
+```bash
+git clone https://github.com/onelittlenightmusic/MyWant.git
+cd MyWant
+go mod tidy
+make build
+```
+
+### Running Examples
+
+MyWant provides three main usage patterns through make targets:
+
+#### 1. Recipe-Based Examples (Recommended)
+Recipe-based examples use reusable YAML templates with parameterization:
 
 ```sh
-# Basic demos
-make run-qnet          # QNet simulation
-make run-prime         # Prime number sieve
-make run-fibonacci     # Fibonacci sequence
-make run-fibonacci-loop # Advanced fibonacci with feedback loop
-make run-travel        # Travel planning (direct config)
+# Independent wants - parallel execution with coordination
+make run-travel-recipe        # Travel planning from recipe (restaurant, hotel, buffet)
 
-# Recipe-based demos
-make run-travel-recipe        # Travel planning from recipe
-make run-queue-system-recipe  # Queue system from recipe
-make run-qnet-recipe         # QNet with recipe parameters
-make run-qnet-using-recipe   # QNet with YAML-defined connections
+# Dependent wants - sequential pipeline processing  
+make run-queue-system-recipe  # Queue system pipeline (generator → queue → sink)
 
-# Owner-based dynamic wants
-make run-sample-owner    # Dynamic want creation with recipes
+# Complex multi-stream processing
+make run-qnet-recipe         # Multi-generator QNet with parallel processing
+make run-qnet-using-recipe   # QNet with YAML-defined using connections
 ```
+
+**Pattern**: `demo_*_recipe.go` + `config/config-*-recipe.yaml` + `recipes/*.yaml`
+
+#### 2. Direct Configuration Examples
+Direct configuration defines wants inline without recipes:
+
+```sh
+# Simple processing chains
+make run-qnet          # QNet simulation (direct YAML config)
+make run-travel        # Travel planning (direct want definitions)
+
+# Advanced processing patterns
+make run-fibonacci-loop # Fibonacci with feedback loop architecture
+```
+
+**Pattern**: `demo_*.go` + `config/config-*.yaml`
+
+#### 3. Owner-Based Dynamic Examples
+Owner-based examples demonstrate dynamic want creation at runtime:
+
+```sh
+# Dynamic want generation using recipes
+make run-sample-owner                    # Basic target with recipe loading
+make run-sample-owner-config            # Target with configuration parameters
+make run-sample-owner-high-throughput   # High-performance processing target
+make run-sample-owner-dry               # Fast processing with minimal service time
+make run-sample-owner-input             # Target with custom input processing
+make run-qnet-target                    # QNet processing via target want
+make run-travel-target                  # Travel planning via target want
+```
+
+**Pattern**: `demo_*_owner.go` or `demo_*_target.go` + config + recipe loading
+
+#### 4. Build & Test
+```sh
+make build      # Build the MyWant library
+make test-build # Test build with dependency check
+```
+
+### Usage Pattern Selection Guide
+
+| Pattern | Best For | Configuration | Runtime Behavior |
+|---------|----------|---------------|------------------|
+| **Recipe-Based** | Reusable, parameterized systems | YAML recipe templates | Static want topology |
+| **Direct Config** | Simple, one-off configurations | Inline YAML definitions | Static want topology |
+| **Owner-Based** | Dynamic, adaptive systems | Config + runtime recipe loading | Dynamic want creation |
+
+### Complete Example: Queue System with MyWant APIs
+
+Here's a complete example showing how to use MyWant APIs to build a queue processing system:
+
+#### 1. Create Want Types (`queue_types.go`)
+
+```go
+package main
+
+import (
+    . "mywant"
+    "mywant/chain"
+)
+
+// Numbers generates packets and sends them downstream
+type Numbers struct {
+    Want
+    Rate  float64
+    Count int
+    paths Paths
+}
+
+func (n *Numbers) GetPaths() *Paths { return &n.paths }
+
+func (n *Numbers) ProcessInput(input *chain.Msg) {
+    // Generate packets at specified rate
+    for i := 0; i < n.Count; i++ {
+        packet := &QueuePacket{Num: i, Time: float64(i)/n.Rate}
+        n.paths.Outputs[0] <- &chain.Msg{Data: packet}
+    }
+    close(n.paths.Outputs[0])
+}
+
+// Queue processes packets with service time
+type Queue struct {
+    Want
+    ServiceTime float64
+    paths       Paths
+}
+
+func (q *Queue) GetPaths() *Paths { return &q.paths }
+
+func (q *Queue) ProcessInput(input *chain.Msg) {
+    packet := input.Data.(*QueuePacket)
+    // Simulate processing time
+    time.Sleep(time.Duration(q.ServiceTime * 1000) * time.Millisecond)
+    q.paths.Outputs[0] <- input
+}
+
+// Register want types with the builder
+func RegisterQueueWantTypes(builder *ChainBuilder) {
+    builder.RegisterWantType("numbers", func(metadata Metadata, spec WantSpec) interface{} {
+        return &Numbers{
+            Want:  Want{Metadata: metadata, Spec: spec},
+            Rate:  spec.Params["rate"].(float64),
+            Count: int(spec.Params["count"].(float64)),
+        }
+    })
+    
+    builder.RegisterWantType("queue", func(metadata Metadata, spec WantSpec) interface{} {
+        return &Queue{
+            Want:        Want{Metadata: metadata, Spec: spec},
+            ServiceTime: spec.Params["service_time"].(float64),
+        }
+    })
+    
+    builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
+        return NewSink(metadata, spec)
+    })
+}
+```
+
+#### 2. Create Configuration (`config/config-queue.yaml`)
+
+```yaml
+wants:
+  - metadata:
+      name: generator
+      type: numbers
+      labels:
+        role: source
+    spec:
+      params:
+        rate: 10.0
+        count: 1000
+
+  - metadata:
+      name: processor
+      type: queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 0.05
+      using:
+        - role: source
+
+  - metadata:
+      name: collector
+      type: sink
+      labels:
+        role: collector
+    spec:
+      params: {}
+      using:
+        - role: processor
+```
+
+#### 3. Create Main Program (`main.go`)
+
+```go
+package main
+
+import (
+    "fmt"
+    . "mywant"
+)
+
+func main() {
+    // Load configuration from YAML
+    config, err := LoadConfigFromYAML("config/config-queue.yaml")
+    if err != nil {
+        fmt.Printf("Error loading config: %v\n", err)
+        return
+    }
+
+    // Create chain builder with the configuration
+    builder := NewChainBuilder(config)
+    
+    // Register your custom want types
+    RegisterQueueWantTypes(builder)
+    
+    // Execute the chain
+    fmt.Println("Starting queue processing system...")
+    builder.Execute()
+    
+    // Get final states
+    states := builder.GetAllWantStates()
+    for name, state := range states {
+        fmt.Printf("Want %s: %s (processed: %v)\n", 
+            name, state.Status, state.Stats["total_processed"])
+    }
+}
+```
+
+#### 4. Run the Example
+
+```bash
+go run main.go queue_types.go
+```
+
+This example demonstrates:
+- **Want Creation**: Custom want types implementing the Want interface
+- **Configuration Loading**: Using `LoadConfigFromYAML()` to load YAML configs
+- **Chain Building**: Using `NewChainBuilder()` to create processing chains
+- **Type Registration**: Using `RegisterWantType()` to register custom want types
+- **Execution**: Using `Execute()` to run the processing chain
+- **State Management**: Using `GetAllWantStates()` to retrieve results
 
 ## Configuration System
 

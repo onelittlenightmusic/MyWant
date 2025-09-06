@@ -1,7 +1,7 @@
 package main
 
 import (
-	"MyWant/chain"
+	. "mywant"
 )
 
 // FibonacciNumbers generates fibonacci sequence numbers
@@ -36,8 +36,8 @@ func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *Fibo
 }
 
 // CreateFunction returns the generalized chain function for the numbers generator
-func (g *FibonacciNumbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+func (g *FibonacciNumbers) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(outputs) == 0 {
 			return true
 		}
@@ -101,14 +101,14 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 }
 
 // CreateFunction returns the generalized chain function for the filter
-func (f *FibonacciSequence) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
+func (f *FibonacciSequence) CreateFunction() func(using []Chan, outputs []Chan) bool {
+	return func(using []Chan, outputs []Chan) bool {
 		if len(using) == 0 {
 			return true
 		}
 		in := using[0]
 		
-		var out chain.Chan
+		var out Chan
 		if len(outputs) > 0 {
 			out = outputs[0]
 		}

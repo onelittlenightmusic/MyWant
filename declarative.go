@@ -1,8 +1,8 @@
-package main
+package mywant
 
 import (
 	"fmt"
-	"MyWant/chain"
+	"mywant/chain"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,6 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 	"github.com/getkin/kin-openapi/openapi3"
 )
+
+// Re-export chain types for easier access
+type Chan = chain.Chan
 
 // ChainFunction represents a generalized chain function interface
 type ChainFunction interface {
@@ -1051,6 +1054,11 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want Want) {
 	}
 }
 
+
+// LoadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation (exported version)
+func LoadConfigFromYAML(filename string) (Config, error) {
+	return loadConfigFromYAML(filename)
+}
 
 // loadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation
 func loadConfigFromYAML(filename string) (Config, error) {

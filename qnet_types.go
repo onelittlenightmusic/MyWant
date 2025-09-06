@@ -1,8 +1,8 @@
-package main
+package mywant
 
 import (
 	"fmt"
-	"MyWant/chain"
+	"mywant/chain"
 	"math"
 	"math/rand"
 )
