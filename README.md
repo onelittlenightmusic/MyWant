@@ -1,15 +1,45 @@
 # MyWant
 
-A Go library implementing functional chain programming patterns with channels, supporting both imperative chain building and declarative configuration-based approaches for flexible stream processing and pipeline architectures.
+A Go library implementing functional programming patterns with channels, supporting declarative configuration-based approaches for flexible processing topologies and data flow architectures. MyWant introduces a declarative programming paradigm that eliminates the need for prior knowledge beyond YAML configuration files, removing prerequisites for understanding individual components or their internal implementations.
+
+## Installation
+
+```bash
+git clone https://github.com/onelittlenightmusic/MyWant.git
+cd MyWant
+go mod tidy
+```
+
+## Why Choose MyWant's Declarative Framework?
+
+### **Zero Learning Curve**
+- **YAML-Only Configuration**: No need to learn programming languages, APIs, or complex frameworks
+- **Self-Documenting**: Configuration files serve as both specification and documentation
+- **Instant Productivity**: Start building complex systems immediately without studying component internals
+
+### **Component Agnostic**
+- **Black Box Approach**: Use any processing component without understanding its implementation
+- **Mix and Match**: Combine components from different domains seamlessly
+- **Focus on What, Not How**: Declare desired outcomes rather than implementation details
+
+### **Effortless Scalability**
+- **Recipe Reusability**: Define patterns once, reuse across multiple configurations
+- **Parameter Substitution**: Adapt existing recipes with different parameters
+- **Dynamic Composition**: Add or modify components at runtime through configuration
+
+### **Maintenance Freedom**
+- **Configuration-Driven Changes**: Modify system behavior without code changes
+- **Version Control Friendly**: Track system evolution through YAML file changes
+- **Environment Adaptation**: Same recipes, different parameters for dev/staging/production
 
 ## Features
 
 - **Recipe-based Configuration**: Define complex processing topologies using YAML recipe files
 - **Independent & Dependent Wants**: Support both parallel processing and sequential pipelines
-- **Dynamic Want Addition**: Add wants to running chains at runtime
-- **Memory Reconciliation**: Persistent state management across chain executions
+- **Dynamic Want Addition**: Add wants to running systems at runtime
+- **Memory Reconciliation**: Persistent state management across system executions
 - **Label-based Connectivity**: Flexible want connections using label selectors
-- **Multi-stream Processing**: Support for parallel processing streams with combiners
+- **Multi-flow Processing**: Support for parallel processing flows with combiners
 
 ## Core Concepts
 
@@ -33,7 +63,7 @@ recipe:
 ### Wants
 A "want" is a processing unit that performs a specific task. Wants can be:
 - **Independent**: Execute in parallel without dependencies (e.g., travel bookings)
-- **Dependent**: Connected in processing pipelines using `using` selectors (e.g., data processing chains)
+- **Dependent**: Connected in processing pipelines using `using` selectors (e.g., data processing flows)
 
 ### Recipes - Reusable Components
 Recipes are YAML templates stored in the `recipes/` directory that define reusable want configurations with parameters. They are consumed by config files to avoid duplication and enable parameterization.
@@ -99,7 +129,7 @@ recipe:
 make run-travel-recipe  # Uses config/config-travel-recipe.yaml
 ```
 
-### Example 2: Dependent Wants (Queue System Pipeline)
+### Example 2: Dependent Wants (Queue System)
 
 Dependent wants form processing pipelines using `using` selectors to connect outputs to inputs.
 

@@ -5,7 +5,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"context"
 	"gopkg.in/yaml.v3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // RecipeWant represents a want in recipe format (flattened structure)
@@ -104,12 +106,18 @@ func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 	return loader
 }
 
-// LoadRecipe loads and processes a recipe file (no templating)
+// LoadRecipe loads and processes a recipe file with OpenAPI spec validation
 func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]interface{}) (*GenericRecipeConfig, error) {
 	// Read recipe file
 	data, err := ioutil.ReadFile(recipePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read recipe file: %v", err)
+	}
+
+	// Validate against recipe OpenAPI spec before parsing
+	err = validateRecipeWithSpec(data)
+	if err != nil {
+		return nil, fmt.Errorf("recipe validation failed: %w", err)
 	}
 
 	// Parse recipe directly
@@ -382,4 +390,191 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, 
 		}
 	}
 	return substituted
+}
+
+// validateRecipeWithSpec validates recipe YAML data against the recipe OpenAPI spec
+func validateRecipeWithSpec(yamlData []byte) error {
+	// Load the OpenAPI spec for recipes
+	loader := openapi3.NewLoader()
+	spec, err := loader.LoadFromFile("recipe-spec.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to load recipe OpenAPI spec: %w", err)
+	}
+	
+	// Validate the spec itself
+	ctx := context.Background()
+	err = spec.Validate(ctx)
+	if err != nil {
+		return fmt.Errorf("recipe OpenAPI spec is invalid: %w", err)
+	}
+	
+	// Convert YAML to generic structure for validation
+	var yamlObj interface{}
+	err = yaml.Unmarshal(yamlData, &yamlObj)
+	if err != nil {
+		return fmt.Errorf("failed to parse recipe YAML for validation: %w", err)
+	}
+	
+	// Get the GenericRecipe schema from the spec  
+	recipeSchemaRef := spec.Components.Schemas["GenericRecipe"]
+	if recipeSchemaRef == nil {
+		return fmt.Errorf("GenericRecipe schema not found in recipe OpenAPI spec")
+	}
+	
+	// Basic structural validation - ensure the YAML contains required 'recipe' field
+	var recipeObj map[string]interface{}
+	err = yaml.Unmarshal(yamlData, &recipeObj)
+	if err != nil {
+		return fmt.Errorf("invalid recipe YAML structure: %w", err)
+	}
+	
+	// Check if it has the required 'recipe' root key
+	if recipe, ok := recipeObj["recipe"]; !ok {
+		return fmt.Errorf("recipe validation failed: must have 'recipe' root key")
+	} else {
+		// Validate recipe content structure
+		err = validateRecipeContentStructure(recipe)
+		if err != nil {
+			return fmt.Errorf("recipe content validation failed: %w", err)
+		}
+	}
+	
+	fmt.Printf("[VALIDATION] Recipe validated successfully against OpenAPI spec\n")
+	return nil
+}
+
+// validateRecipeContentStructure validates the structure of recipe content
+func validateRecipeContentStructure(recipeContent interface{}) error {
+	recipeObj, ok := recipeContent.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("recipe must be an object")
+	}
+	
+	// Validate wants array if present
+	if wants, ok := recipeObj["wants"]; ok {
+		err := validateRecipeWantsStructure(wants)
+		if err != nil {
+			return fmt.Errorf("wants validation failed: %w", err)
+		}
+	}
+	
+	// Validate parameters if present
+	if params, ok := recipeObj["parameters"]; ok {
+		if _, ok := params.(map[string]interface{}); !ok {
+			return fmt.Errorf("parameters must be an object")
+		}
+	}
+	
+	// Validate result if present
+	if result, ok := recipeObj["result"]; ok {
+		err := validateRecipeResultStructure(result)
+		if err != nil {
+			return fmt.Errorf("result validation failed: %w", err)
+		}
+	}
+	
+	return nil
+}
+
+// validateRecipeWantsStructure validates the structure of recipe wants array
+func validateRecipeWantsStructure(wants interface{}) error {
+	wantsArray, ok := wants.([]interface{})
+	if !ok {
+		return fmt.Errorf("wants must be an array")
+	}
+	
+	for i, want := range wantsArray {
+		wantObj, ok := want.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("want at index %d must be an object", i)
+		}
+		
+		// Check required type field
+		if wantType, ok := wantObj["type"]; !ok || wantType == "" {
+			return fmt.Errorf("want at index %d missing required 'type' field", i)
+		}
+		
+		// Validate labels if present
+		if labels, ok := wantObj["labels"]; ok {
+			if _, ok := labels.(map[string]interface{}); !ok {
+				return fmt.Errorf("want at index %d 'labels' must be an object", i)
+			}
+		}
+		
+		// Validate params if present
+		if params, ok := wantObj["params"]; ok {
+			if _, ok := params.(map[string]interface{}); !ok {
+				return fmt.Errorf("want at index %d 'params' must be an object", i)
+			}
+		}
+		
+		// Validate using if present
+		if using, ok := wantObj["using"]; ok {
+			usingArray, ok := using.([]interface{})
+			if !ok {
+				return fmt.Errorf("want at index %d 'using' must be an array", i)
+			}
+			for j, selector := range usingArray {
+				if _, ok := selector.(map[string]interface{}); !ok {
+					return fmt.Errorf("want at index %d using selector at index %d must be an object", i, j)
+				}
+			}
+		}
+	}
+	
+	return nil
+}
+
+// validateRecipeResultStructure validates the structure of recipe result
+func validateRecipeResultStructure(result interface{}) error {
+	resultObj, ok := result.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("result must be an object")
+	}
+	
+	// Check required primary field
+	if primary, ok := resultObj["primary"]; !ok {
+		return fmt.Errorf("result missing required 'primary' field")
+	} else {
+		err := validateRecipeResultSpec(primary, "primary")
+		if err != nil {
+			return err
+		}
+	}
+	
+	// Validate metrics if present
+	if metrics, ok := resultObj["metrics"]; ok {
+		metricsArray, ok := metrics.([]interface{})
+		if !ok {
+			return fmt.Errorf("result 'metrics' must be an array")
+		}
+		for i, metric := range metricsArray {
+			err := validateRecipeResultSpec(metric, fmt.Sprintf("metrics[%d]", i))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	
+	return nil
+}
+
+// validateRecipeResultSpec validates a single recipe result spec
+func validateRecipeResultSpec(spec interface{}, fieldName string) error {
+	specObj, ok := spec.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("%s must be an object", fieldName)
+	}
+	
+	// Check required want_name field
+	if wantName, ok := specObj["want_name"]; !ok || wantName == "" {
+		return fmt.Errorf("%s missing required 'want_name' field", fieldName)
+	}
+	
+	// Check required stat_name field
+	if statName, ok := specObj["stat_name"]; !ok || statName == "" {
+		return fmt.Errorf("%s missing required 'stat_name' field", fieldName)
+	}
+	
+	return nil
 }

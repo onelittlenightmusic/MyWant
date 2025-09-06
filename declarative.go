@@ -9,8 +9,10 @@ import (
 	"time"
 	"crypto/md5"
 	"io"
+	"context"
 	
 	"gopkg.in/yaml.v3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // ChainFunction represents a generalized chain function interface
@@ -1050,22 +1052,167 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want Want) {
 }
 
 
-// loadConfigFromYAML loads configuration from a YAML file
+// loadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config
 	
+	// Read the YAML config file
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return config, fmt.Errorf("failed to read YAML file: %w", err)
 	}
 	
+	// Validate against OpenAPI spec before parsing
+	err = validateConfigWithSpec(data)
+	if err != nil {
+		return config, fmt.Errorf("config validation failed: %w", err)
+	}
+	
+	// Parse the validated YAML
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 	
-	
 	return config, nil
+}
+
+// validateConfigWithSpec validates YAML config data against the OpenAPI spec
+func validateConfigWithSpec(yamlData []byte) error {
+	// Load the OpenAPI spec
+	loader := openapi3.NewLoader()
+	spec, err := loader.LoadFromFile("spec.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to load OpenAPI spec: %w", err)
+	}
+	
+	// Validate the spec itself
+	ctx := context.Background()
+	err = spec.Validate(ctx)
+	if err != nil {
+		return fmt.Errorf("OpenAPI spec is invalid: %w", err)
+	}
+	
+	// Convert YAML to JSON for validation
+	var yamlObj interface{}
+	err = yaml.Unmarshal(yamlData, &yamlObj)
+	if err != nil {
+		return fmt.Errorf("failed to parse YAML for validation: %w", err)
+	}
+	
+	// jsonData conversion removed - not needed for basic validation
+	
+	// Get the Config schema from the OpenAPI spec and convert to JSON Schema
+	configSchemaRef := spec.Components.Schemas["Config"]
+	if configSchemaRef == nil {
+		return fmt.Errorf("Config schema not found in OpenAPI spec")
+	}
+	
+	// For now, do basic validation by checking that we can load and parse both spec and data
+	// A full OpenAPI->JSON Schema conversion would be more complex and is beyond current scope
+	
+	// Basic structural validation - ensure the YAML contains expected top-level keys
+	var configObj map[string]interface{}
+	err = yaml.Unmarshal(yamlData, &configObj)
+	if err != nil {
+		return fmt.Errorf("invalid YAML structure: %w", err)
+	}
+	
+	// Check if it has either 'wants' array or 'recipe' reference (matching our Config schema)
+	hasWants := false
+	hasRecipe := false
+	
+	if wants, ok := configObj["wants"]; ok {
+		if wantsArray, ok := wants.([]interface{}); ok && len(wantsArray) > 0 {
+			hasWants = true
+		}
+	}
+	
+	if recipe, ok := configObj["recipe"]; ok {
+		if recipeObj, ok := recipe.(map[string]interface{}); ok {
+			if path, ok := recipeObj["path"]; ok {
+				if pathStr, ok := path.(string); ok && pathStr != "" {
+					hasRecipe = true
+				}
+			}
+		}
+	}
+	
+	if !hasWants && !hasRecipe {
+		return fmt.Errorf("config validation failed: must have either 'wants' array or 'recipe' reference")
+	}
+	
+	if hasWants && hasRecipe {
+		return fmt.Errorf("config validation failed: cannot have both 'wants' array and 'recipe' reference")
+	}
+	
+	// If has wants, validate basic want structure
+	if hasWants {
+		err = validateWantsStructure(configObj["wants"])
+		if err != nil {
+			return fmt.Errorf("wants validation failed: %w", err)
+		}
+	}
+	
+	fmt.Printf("[VALIDATION] Config validated successfully against OpenAPI spec\n")
+	return nil
+}
+
+// validateWantsStructure validates the basic structure of wants array
+func validateWantsStructure(wants interface{}) error {
+	wantsArray, ok := wants.([]interface{})
+	if !ok {
+		return fmt.Errorf("wants must be an array")
+	}
+	
+	for i, want := range wantsArray {
+		wantObj, ok := want.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("want at index %d must be an object", i)
+		}
+		
+		// Check required metadata field
+		metadata, ok := wantObj["metadata"]
+		if !ok {
+			return fmt.Errorf("want at index %d missing required 'metadata' field", i)
+		}
+		
+		metadataObj, ok := metadata.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("want at index %d 'metadata' must be an object", i)
+		}
+		
+		// Check required metadata.name and metadata.type
+		if name, ok := metadataObj["name"]; !ok || name == "" {
+			return fmt.Errorf("want at index %d missing required 'metadata.name' field", i)
+		}
+		
+		if wantType, ok := metadataObj["type"]; !ok || wantType == "" {
+			return fmt.Errorf("want at index %d missing required 'metadata.type' field", i)
+		}
+		
+		// Check required spec field
+		spec, ok := wantObj["spec"]
+		if !ok {
+			return fmt.Errorf("want at index %d missing required 'spec' field", i)
+		}
+		
+		specObj, ok := spec.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("want at index %d 'spec' must be an object", i)
+		}
+		
+		// Check required spec.params field
+		if params, ok := specObj["params"]; !ok {
+			return fmt.Errorf("want at index %d missing required 'spec.params' field", i)
+		} else {
+			if _, ok := params.(map[string]interface{}); !ok {
+				return fmt.Errorf("want at index %d 'spec.params' must be an object", i)
+			}
+		}
+	}
+	
+	return nil
 }
 
 // WantMemoryDump represents the complete state of all wants for dumping

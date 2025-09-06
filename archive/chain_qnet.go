@@ -1,7 +1,7 @@
 package main
 import (
 	"fmt"
-	"./chain"
+	"MyWant/chain"
 	"math/rand"
 //	"runtime"
 )

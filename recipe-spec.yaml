@@ -1,0 +1,157 @@
+openapi: 3.0.3
+info:
+  title: MyWant Recipe Schema  
+  description: OpenAPI specification for MyWant recipe YAML files based on actual Go implementation
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+components:
+  schemas:
+    # Root recipe object
+    GenericRecipe:
+      type: object
+      description: Root recipe object for MyWant recipes
+      required:
+        - recipe
+      properties:
+        recipe:
+          $ref: '#/components/schemas/RecipeContent'
+      additionalProperties: false
+    
+    # Recipe content with metadata, parameters, wants, and results
+    RecipeContent:
+      type: object
+      description: Recipe content containing parameters, wants, and result specifications
+      properties:
+        metadata:
+          $ref: '#/components/schemas/GenericRecipeMetadata'
+        parameters:
+          type: object
+          description: Recipe parameters with default values (map[string]interface{})
+          additionalProperties: true
+          example:
+            prefix: "queue-system"
+            count: 1000
+            rate: 10.0
+            service_time: 0.1
+        wants:
+          type: array
+          description: Array of recipe want definitions
+          items:
+            $ref: '#/components/schemas/RecipeWant'
+        result:
+          $ref: '#/components/schemas/RecipeResult'
+        templates:
+          type: object
+          description: "Legacy support for existing template formats (deprecated)"
+          deprecated: true
+          additionalProperties: true
+      additionalProperties: false
+    
+    # Recipe metadata
+    GenericRecipeMetadata:
+      type: object
+      description: Recipe metadata including name, description, version
+      properties:
+        name:
+          type: string
+          description: Recipe name
+          example: "Travel Itinerary"
+        description:
+          type: string
+          description: Recipe description
+          example: "Complete travel booking coordination"
+        version:
+          type: string
+          description: Recipe version
+          example: "1.0.0"
+        type:
+          type: string
+          description: Recipe type (travel, qnet, fibonacci, etc.)
+          example: "travel"
+      additionalProperties: false
+    
+    # Recipe want definition (flattened structure)
+    RecipeWant:
+      type: object
+      description: Want definition in recipe format with flattened structure
+      required:
+        - type
+      properties:
+        name:
+          type: string
+          description: Want name (optional, auto-generated if not provided)
+          example: "my-processor"
+        type:
+          type: string
+          description: Want type that determines processing behavior
+          example: "queue"
+        labels:
+          type: object
+          description: Key-value pairs for flexible want connections (map[string]string)
+          additionalProperties:
+            type: string
+          example:
+            role: "processor"
+            category: "data-processing"
+            component: "main-queue"
+        params:
+          type: object
+          description: Want-specific parameters (map[string]interface{})
+          additionalProperties: true
+          example:
+            count: 1000
+            service_time: 0.1
+        using:
+          type: array
+          description: Label selectors for connecting to other wants ([]map[string]string)
+          items:
+            type: object
+            description: Label selector map
+            additionalProperties:
+              type: string
+            example:
+              role: "source"
+      additionalProperties: false
+    
+    # Recipe result specification
+    RecipeResult:
+      type: object
+      description: Recipe result definition specifying how to compute results from execution
+      required:
+        - primary
+      properties:
+        primary:
+          $ref: '#/components/schemas/RecipeResultSpec'
+        metrics:
+          type: array
+          description: Additional metrics to collect from recipe execution
+          items:
+            $ref: '#/components/schemas/RecipeResultSpec'
+      additionalProperties: false
+    
+    # Recipe result specification for individual metrics
+    RecipeResultSpec:
+      type: object
+      description: Specification for computing results from a specific want and stat
+      required:
+        - want_name
+        - stat_name
+      properties:
+        want_name:
+          type: string
+          description: Name of the want to collect results from
+          example: "sink"
+        stat_name:
+          type: string
+          description: Name of the stat to use for result computation
+          example: "TotalProcessed"
+        description:
+          type: string
+          description: Human-readable description of this result metric
+          example: "Total items processed through the queue system"
+      additionalProperties: false
+
+paths: {}  # No REST API paths, this is just for schema validation

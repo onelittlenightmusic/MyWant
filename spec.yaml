@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: MyWant Configuration Schema
+  description: OpenAPI specification for MyWant YAML configuration files based on actual Go implementation
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+components:
+  schemas:
+    # Root configuration object - can either have direct wants or recipe reference
+    Config:
+      type: object
+      description: Root configuration object for MyWant
+      anyOf:
+        - $ref: '#/components/schemas/DirectWantsConfig'
+        - $ref: '#/components/schemas/RecipeBasedConfig'
+    
+    # Configuration with directly defined wants array
+    DirectWantsConfig:
+      type: object
+      description: Configuration with directly defined wants
+      required:
+        - wants
+      properties:
+        wants:
+          type: array
+          description: Array of want definitions
+          items:
+            $ref: '#/components/schemas/Want'
+      additionalProperties: false
+    
+    # Configuration that references a recipe file  
+    RecipeBasedConfig:
+      type: object
+      description: Configuration that references a recipe file
+      required:
+        - recipe
+      properties:
+        recipe:
+          $ref: '#/components/schemas/RecipeReference'
+      additionalProperties: false
+    
+    # Recipe reference with path and parameters
+    RecipeReference:
+      type: object
+      description: Reference to a recipe file with parameter overrides
+      required:
+        - path
+      properties:
+        path:
+          type: string
+          description: Path to the recipe YAML file relative to project root
+          example: "recipes/travel-itinerary.yaml"
+        parameters:
+          type: object
+          description: Parameters to override recipe defaults
+          additionalProperties: true
+          example:
+            count: 1000
+            rate: 10.0
+            restaurant_type: "fine dining"
+      additionalProperties: false
+    
+    # Individual want configuration
+    Want:
+      type: object
+      description: Individual processing unit configuration
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        spec:
+          $ref: '#/components/schemas/WantSpec'
+        stats:
+          $ref: '#/components/schemas/WantStats'
+        status:
+          $ref: '#/components/schemas/WantStatus'
+        state:
+          type: object
+          description: Runtime state information (map[string]interface{})
+          additionalProperties: true
+      additionalProperties: false
+    
+    # Want metadata with name, type, labels, owner references
+    Metadata:
+      type: object
+      description: Want metadata including identification and labels
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: Unique identifier for this want
+          example: "my-processor"
+        type:
+          type: string
+          description: Want type that determines processing behavior
+          example: "queue"
+        labels:
+          type: object
+          description: Key-value pairs for flexible want connections (map[string]string)
+          additionalProperties:
+            type: string
+          example:
+            role: "processor"
+            category: "data-processing"
+            stage: "initial"
+        ownerReferences:
+          type: array
+          description: References to owner wants for hierarchical management
+          items:
+            $ref: '#/components/schemas/OwnerReference'
+      additionalProperties: false
+    
+    # Want specification with parameters and dependencies
+    WantSpec:
+      type: object
+      description: Want specification including parameters and dependencies
+      required:
+        - params
+      properties:
+        template:
+          type: string
+          description: "Deprecated: Template reference, use recipe instead"
+          deprecated: true
+        recipe:
+          type: string
+          description: Recipe reference for this want
+        recipe_params:
+          type: object
+          description: Parameters for recipe instantiation (map[string]interface{})
+          additionalProperties: true
+        params:
+          type: object
+          description: Want-specific parameters (map[string]interface{})
+          additionalProperties: true
+          example:
+            count: 1000
+            rate: 10.0
+            service_time: 0.1
+        using:
+          type: array
+          description: Label selectors for connecting to other wants ([]map[string]string)
+          items:
+            type: object
+            description: Label selector map
+            additionalProperties:
+              type: string
+            example:
+              role: "source"
+      additionalProperties: false
+    
+    # Runtime statistics (map[string]interface{})
+    WantStats:
+      type: object
+      description: Runtime statistics for want execution
+      additionalProperties: true
+      example:
+        processed_count: 1000
+        processing_rate: 25.5
+        total_execution_time: 40.2
+    
+    # Want execution status
+    WantStatus:
+      type: string
+      description: Current execution status of the want
+      enum:
+        - "idle"
+        - "running" 
+        - "completed"
+        - "failed"
+      default: "idle"
+    
+    # Owner reference for hierarchical management
+    OwnerReference:
+      type: object
+      description: Reference to an owner want for hierarchical management
+      required:
+        - apiVersion
+        - kind
+        - name
+      properties:
+        apiVersion:
+          type: string
+          description: API version of the owner
+          example: "MyWant/v1"
+        kind:
+          type: string
+          description: Kind of the owner resource
+          example: "Want"
+        name:
+          type: string
+          description: Name of the owner want
+        controller:
+          type: boolean
+          description: Whether this owner is the controller
+          default: false
+        blockOwnerDeletion:
+          type: boolean
+          description: Whether to block owner deletion
+          default: false
+      additionalProperties: false
+
+    # Memory dump structure for state persistence
+    WantMemoryDump:
+      type: object
+      description: Memory dump structure for persistent state management
+      required:
+        - timestamp
+        - execution_id
+        - wants
+      properties:
+        timestamp:
+          type: string
+          description: Timestamp of the memory dump
+        execution_id:
+          type: string
+          description: Unique execution identifier
+        wants:
+          type: array
+          description: Array of want states
+          items:
+            $ref: '#/components/schemas/Want'
+      additionalProperties: false
+
+paths: {}  # No REST API paths, this is just for schema validation
