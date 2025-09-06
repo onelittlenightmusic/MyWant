@@ -27,6 +27,7 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 type Target struct {
 	Want
 	MaxDisplay     int
+	Description    string // Human-readable description of this target
 	RecipePath     string // Path to the recipe file to use for child creation
 	RecipeParams   map[string]interface{} // Parameters to pass to recipe
 	paths          Paths

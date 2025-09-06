@@ -75,7 +75,8 @@ type GenericRecipeMetadata struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	Version     string `yaml:"version"`
-	Type        string `yaml:"type,omitempty"` // travel, qnet, fibonacci, etc.
+	Type        string `yaml:"type,omitempty"`        // travel, qnet, fibonacci, etc.
+	CustomType  string `yaml:"custom_type,omitempty"` // "wait time in queue system", etc.
 }
 
 // GenericRecipeConfig represents the final configuration after recipe processing
@@ -576,5 +577,57 @@ func validateRecipeResultSpec(spec interface{}, fieldName string) error {
 		return fmt.Errorf("%s missing required 'stat_name' field", fieldName)
 	}
 	
+	return nil
+}
+
+// ScanAndRegisterCustomTypes scans all recipes in the recipe directory and registers custom types
+func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegistry) error {
+	grl := NewGenericRecipeLoader(recipeDir)
+	
+	// List all recipes in the directory
+	recipes, err := grl.ListRecipes()
+	if err != nil {
+		return fmt.Errorf("failed to list recipes: %w", err)
+	}
+	
+	fmt.Printf("🔍 Scanning %d recipes for custom types...\n", len(recipes))
+	
+	customTypeCount := 0
+	for _, relativePath := range recipes {
+		// Construct full path for recipe operations
+		fullPath := filepath.Join(recipeDir, relativePath)
+		
+		// Get metadata for each recipe
+		metadata, err := grl.GetRecipeMetadata(fullPath)
+		if err != nil {
+			fmt.Printf("⚠️  Warning: failed to get metadata for %s: %v\n", relativePath, err)
+			continue
+		}
+		
+		// Check if recipe defines a custom type
+		if metadata.CustomType != "" {
+			fmt.Printf("🎯 Found custom type '%s' in recipe %s\n", metadata.CustomType, relativePath)
+			
+			// Get default parameters from recipe
+			defaultParams, err := grl.GetRecipeParameters(fullPath)
+			if err != nil {
+				fmt.Printf("⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
+				defaultParams = make(map[string]interface{})
+			}
+			
+			// Register the custom type with full path
+			RegisterCustomTargetType(
+				registry,
+				metadata.CustomType,
+				metadata.Description,
+				fullPath,
+				defaultParams,
+			)
+			
+			customTypeCount++
+		}
+	}
+	
+	fmt.Printf("✅ Registered %d custom types from recipes\n", customTypeCount)
 	return nil
 }

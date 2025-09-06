@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Queue System"
+    description: "Queue system simulation with wait time analysis"
+    custom_type: "wait time in queue system"
+    version: "1.0.0"
+    
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "queue-system"
@@ -58,3 +65,6 @@ recipe:
       - want_name: "queue"
         stat_name: "TotalProcessed"
         description: "Items processed by queue"
+      - want_name: "queue"
+        stat_name: "average_wait_time"
+        description: "Average wait time in queue"

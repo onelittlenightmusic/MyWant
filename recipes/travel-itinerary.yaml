@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Travel Itinerary"
+    description: "Travel planning system with coordination"
+    custom_type: "travel itinerary planner"
+    version: "1.0.0"
+    
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "travel"

@@ -267,6 +267,7 @@ type ChainBuilder struct {
 	memoryPath     string                    // Path to memory file (watched for changes)
 	wants          map[string]*runtimeWant   // Runtime want registry
 	registry       map[string]WantFactory    // Want type factories
+	customRegistry *CustomTargetTypeRegistry // Custom target type registry
 	waitGroup      *sync.WaitGroup           // Execution synchronization
 	config         Config                    // Current configuration
 	
@@ -306,6 +307,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		memoryPath:     memoryPath,
 		wants:          make(map[string]*runtimeWant),
 		registry:       make(map[string]WantFactory),
+		customRegistry: NewCustomTargetTypeRegistry(),
 		reconcileStop:  make(chan bool),
 		pathMap:        make(map[string]Paths),
 		channels:       make(map[string]chain.Chan),
@@ -315,6 +317,12 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	
 	// Register built-in want types
 	builder.registerBuiltinWantTypes()
+	
+	// Auto-register custom target types from recipes
+	err := ScanAndRegisterCustomTypes("recipes", builder.customRegistry)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
+	}
 	
 	return builder
 }
@@ -429,11 +437,77 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
 
 // createWantFunction creates the appropriate function based on want type using registry
 func (cb *ChainBuilder) createWantFunction(want Want) interface{} {
-	factory, exists := cb.registry[want.Metadata.Type]
+	wantType := want.Metadata.Type
+	
+	// Check if it's a custom target type first
+	if cb.customRegistry.IsCustomType(wantType) {
+		return cb.createCustomTargetWant(want)
+	}
+	
+	// Fall back to standard type registration
+	factory, exists := cb.registry[wantType]
 	if !exists {
-		panic(fmt.Sprintf("Unknown want type: %s", want.Metadata.Type))
+		// List available types for better error message
+		availableTypes := make([]string, 0, len(cb.registry))
+		for typeName := range cb.registry {
+			availableTypes = append(availableTypes, typeName)
+		}
+		customTypes := cb.customRegistry.ListTypes()
+		
+		panic(fmt.Sprintf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v", 
+			wantType, availableTypes, customTypes))
 	}
 	return factory(want.Metadata, want.Spec)
+}
+
+// createCustomTargetWant creates a custom target want using the registry
+func (cb *ChainBuilder) createCustomTargetWant(want Want) interface{} {
+	config, exists := cb.customRegistry.Get(want.Metadata.Type)
+	if !exists {
+		panic(fmt.Sprintf("Custom type '%s' not found in registry", want.Metadata.Type))
+	}
+	
+	fmt.Printf("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
+	
+	// Merge custom type defaults with user-provided spec
+	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
+	
+	// Create the custom target using the registered function
+	target := config.CreateTargetFunc(want.Metadata, mergedSpec)
+	
+	// Set up target with builder and recipe loader (if available)
+	target.SetBuilder(cb)
+	
+	// Set up recipe loader for custom targets
+	recipeLoader := NewGenericRecipeLoader("recipes")
+	target.SetRecipeLoader(recipeLoader)
+	
+	return target
+}
+
+// mergeWithCustomDefaults merges user spec with custom type defaults
+func (cb *ChainBuilder) mergeWithCustomDefaults(spec WantSpec, config CustomTargetTypeConfig) WantSpec {
+	merged := spec
+	
+	// Initialize params if nil
+	if merged.Params == nil {
+		merged.Params = make(map[string]interface{})
+	}
+	
+	// Merge default parameters (user params take precedence)
+	for key, defaultValue := range config.DefaultParams {
+		if _, exists := merged.Params[key]; !exists {
+			merged.Params[key] = defaultValue
+		}
+	}
+	
+	// Set default recipe if not specified
+	if merged.Recipe == "" && config.DefaultRecipe != "" {
+		merged.Recipe = config.DefaultRecipe
+		fmt.Printf("🎯 Using default recipe '%s' for custom type '%s'\n", config.DefaultRecipe, config.Name)
+	}
+	
+	return merged
 }
 
 // copyConfigToMemory copies the current config to memory file for watching

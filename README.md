@@ -223,15 +223,53 @@ make run-travel        # Travel planning with coordination
 
 # Dependent wants - pipeline processing  
 make run-qnet          # Queue system (generator → queue → sink)
+make run-qnet-using-recipe # Advanced QNet with multiple streams
 
-# Advanced processing patterns
+# Computational patterns
+make run-fibonacci     # Fibonacci sequence generation
 make run-fibonacci-loop # Fibonacci with feedback loop architecture
+make run-prime         # Prime number generation
+
+# Dynamic want creation examples
+make run-sample-owner  # Target-based dynamic want creation
+make run-sample-owner-dry # Queue system with wait time analysis
+make run-travel-target # Travel planning using target wants
 ```
 
-#### 4. Build & Test
+#### Build & Test
 ```sh
 make build      # Build the MyWant library
 make test-build # Test build with dependency check
+```
+
+#### Complete List of Available Examples
+
+**Basic Processing Patterns:**
+```sh
+make run-qnet          # Simple queue system (generator → queue → sink)
+make run-prime         # Prime number generation
+make run-fibonacci-loop # Fibonacci with feedback loops
+```
+
+**Advanced Processing:**
+```sh
+make run-qnet-using-recipe  # Multi-stream QNet with combiners
+make run-travel            # Independent travel planning wants
+```
+
+**Dynamic Want Creation (Target-Based):**
+```sh
+make run-sample-owner      # Basic target want demo
+make run-sample-owner-dry  # Queue system with wait time analysis
+make run-travel-target     # Dynamic travel planning
+```
+
+**Configuration Variants:**
+```sh
+make run-sample-owner-config           # Target with custom config
+make run-sample-owner-high-throughput  # High-performance target
+make run-sample-owner-input           # Target with input handling
+make run-qnet-target                  # QNet using target architecture
 ```
 
 ### Usage Pattern Selection Guide

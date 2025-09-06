@@ -2,7 +2,7 @@ wants:
   # Target want that dynamically generates travel wants from travel-itinerary recipe
   - metadata:
       name: travel-planner-target
-      type: target
+      type: "travel itinerary planner"
       labels:
         role: orchestrator
         category: travel-coordinator
@@ -10,10 +10,6 @@ wants:
       # Target-specific parameters
       params:
         max_display: 10
-      # Recipe to use for dynamic want generation
-      recipe: "recipes/travel-itinerary.yaml"
-      # Parameters to pass to the recipe
-      recipe_params:
         prefix: "vacation"
         display_name: "Weekend Vacation Itinerary" 
         restaurant_type: "michelin starred"

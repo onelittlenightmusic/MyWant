@@ -1,70 +1,14 @@
 wants:
   - metadata:
       name: number-target
-      type: target
+      type: "wait time in queue system"
       labels:
         owner: parent
         category: display
     spec:
       params:
         max_display: 100
-  # Sink node (child) - displays number array from 0 to 99
-  - metadata:
-      name: number-sink
-      type: sink
-      labels:
-        role: collector
-        category: display
-      ownerReferences:
-        - apiVersion: "gochain/v1"
-          kind: "Node"
-          name: "number-target"
-          controller: true
-          blockOwnerDeletion: true
-    spec:
-      params:
-        display_format: "Number: %d"
-      using:
-        - role: processor
-
-  # Generator node (child) - generates numbers from 0 to 999
-  # Uses ownerReference pointing to the sink node (similar to Kubernetes Pod ownership)
-  - metadata:
-      name: number-generator
-      type: numbers
-      labels:
-        role: source
-        owner: child
-        category: producer
-      ownerReferences:
-        - apiVersion: "gochain/v1"
-          kind: "Node"
-          name: "number-target"
-          controller: true
-          blockOwnerDeletion: true
-    spec:
-      params:
-        count: 100
+        count: 1000
         rate: 10.0
-      # Generator is a source node - no inputs needed
-
-  # Additional example: Queue node owned by generator
-  - metadata:
-      name: number-queue
-      type: queue
-      labels:
-        role: processor
-        owner: child
-        category: queue
-      ownerReferences:
-        - apiVersion: "gochain/v1"
-          kind: "Node"
-          name: "number-target"
-          controller: true
-          blockOwnerDeletion: true
-    spec:
-      params:
         service_time: 0.1
-      # Using inputs field for input-based channel connection
-      using:
-        - category: producer
+        deterministic: false
