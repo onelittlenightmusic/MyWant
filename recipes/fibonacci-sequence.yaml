@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Fibonacci Sequence"
+    description: "Fibonacci sequence generator and filter"
+    custom_type: "fibonacci sequence"
+    version: "1.0.0"
+    
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "fibonacci"

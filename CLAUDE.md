@@ -12,7 +12,7 @@ MyWant is a Go library implementing functional chain programming patterns with c
 
 - **Config Files**: Top-level user interface in `config/` directory (`config-*-recipe.yaml`)
 - **Recipe Files**: Reusable components in `recipes/` directory
-- **Demo Programs**: Entry points that load config files (`demo_*_recipe.go`)
+- **Demo Programs**: Entry points that load config files (`cmd/demos/demo_*_recipe.go`)
 
 ### Main Components
 
@@ -218,8 +218,8 @@ Memory reconciliation enables:
 ### Configuration Layer (User Interface)
 - `config/config-*-recipe.yaml`: Config files that reference recipes
 - `config/config-*.yaml`: Config files with direct want definitions
-- `demo_*_recipe.go`: Demo programs that load recipe-based configs
-- `demo_*.go`: Demo programs that load direct configs
+- `cmd/demos/demo_*_recipe.go`: Demo programs that load recipe-based configs
+- `cmd/demos/demo_*.go`: Demo programs that load direct configs
 
 ### Recipe Layer (Reusable Components)
 - `recipes/*.yaml`: Recipe template files with parameters

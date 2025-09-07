@@ -608,44 +608,121 @@ func (cb *ChainBuilder) reconcileLoop() {
 }
 
 // reconcileWants performs reconciliation when config changes or during initial load
+// Separated into explicit phases: compile -> connect -> start
 func (cb *ChainBuilder) reconcileWants() {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
 	
+	fmt.Println("[RECONCILE] Starting reconciliation with separated phases")
+	
+	// Phase 1: COMPILE - Load and validate configuration
+	if err := cb.compilePhase(); err != nil {
+		fmt.Printf("[RECONCILE] Compile phase failed: %v\n", err)
+		return
+	}
+	
+	// Phase 2: CONNECT - Establish want topology
+	if err := cb.connectPhase(); err != nil {
+		fmt.Printf("[RECONCILE] Connect phase failed: %v\n", err)
+		return
+	}
+	
+	// Phase 3: START - Launch new/updated wants
+	cb.startPhase()
+	
+	fmt.Println("[RECONCILE] All phases completed successfully")
+}
+
+// compilePhase handles configuration loading and want creation/updates
+func (cb *ChainBuilder) compilePhase() error {
+	fmt.Println("[RECONCILE:COMPILE] Loading and validating configuration")
+	
 	// Load new config
 	newConfig, err := cb.loadMemoryConfig()
 	if err != nil {
-		fmt.Printf("[RECONCILE] Failed to load memory config: %v\n", err)
-		return
+		return fmt.Errorf("failed to load memory config: %w", err)
 	}
 	
 	// Check if this is initial load (no lastConfig set)
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
 	
 	if isInitialLoad {
-		fmt.Printf("[RECONCILE] Initial load: creating %d wants\n", len(newConfig.Wants))
+		fmt.Printf("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
 		// For initial load, treat all wants as new additions
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
 		}
-		// Rebuild connections after all wants are created
-		cb.rebuildConnections()
 	} else {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
 		if len(changes) == 0 {
-			return
+			fmt.Println("[RECONCILE:COMPILE] No configuration changes detected")
+			return nil
 		}
 		
-		fmt.Printf("[RECONCILE] Applying %d changes\n", len(changes))
+		fmt.Printf("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
 		
 		// Apply changes in reverse dependency order (sink to generator)
-		cb.applyChangesInReverseOrder(changes)
+		cb.applyWantChanges(changes)
 	}
 	
 	// Update last config and hash
 	cb.lastConfig = newConfig
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
+	
+	fmt.Println("[RECONCILE:COMPILE] Configuration compilation completed")
+	return nil
+}
+
+// connectPhase handles want topology establishment and validation
+func (cb *ChainBuilder) connectPhase() error {
+	fmt.Println("[RECONCILE:CONNECT] Establishing want topology")
+	
+	// Generate new paths based on current wants
+	cb.pathMap = cb.generatePathsFromConnections()
+	
+	// Validate connectivity requirements
+	if err := cb.validateConnections(cb.pathMap); err != nil {
+		return fmt.Errorf("connectivity validation failed: %w", err)
+	}
+	
+	// Rebuild channels based on new topology
+	cb.channelMutex.Lock()
+	cb.channels = make(map[string]chain.Chan)
+	
+	channelCount := 0
+	for _, paths := range cb.pathMap {
+		for _, outputPath := range paths.Out {
+			if outputPath.Active {
+				channelKey := outputPath.Name
+				cb.channels[channelKey] = make(chain.Chan, 10)
+				channelCount++
+			}
+		}
+	}
+	cb.channelMutex.Unlock()
+	
+	fmt.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
+	return nil
+}
+
+// startPhase handles launching new/updated wants
+func (cb *ChainBuilder) startPhase() {
+	fmt.Println("[RECONCILE:START] Launching new and updated wants")
+	
+	// Start new wants if system is running
+	if cb.running {
+		startedCount := 0
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusIdle {
+				cb.startWant(wantName, want)
+				startedCount++
+			}
+		}
+		fmt.Printf("[RECONCILE:START] Started %d wants\n", startedCount)
+	} else {
+		fmt.Println("[RECONCILE:START] System not running, wants will be started later")
+	}
 }
 
 // detectConfigChanges compares configs and returns change events
@@ -706,24 +783,27 @@ func (cb *ChainBuilder) wantsEqual(a, b Want) bool {
 		fmt.Sprintf("%v", a.Spec.Using) == fmt.Sprintf("%v", b.Spec.Using)
 }
 
-// applyChangesInReverseOrder applies changes in sink-to-generator order
-func (cb *ChainBuilder) applyChangesInReverseOrder(changes []ChangeEvent) {
+// applyWantChanges applies want changes in sink-to-generator order
+// Note: Connections are rebuilt in separate connectPhase()
+func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	// Sort changes by dependency level (sink wants first)
 	sortedChanges := cb.sortChangesByDependency(changes)
 	
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
+			fmt.Printf("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
 			cb.addDynamicWantUnsafe(*change.Want)
 		case ChangeEventUpdate:
+			fmt.Printf("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
 			cb.updateWant(*change.Want)
 		case ChangeEventDelete:
+			fmt.Printf("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
 			cb.deleteWant(change.WantName)
 		}
 	}
 	
-	// Rebuild connections after all changes
-	cb.rebuildConnections()
+	// Note: Connections rebuilt in connectPhase(), not here
 }
 
 // sortChangesByDependency sorts changes by dependency level
@@ -870,45 +950,17 @@ func (cb *ChainBuilder) deleteWant(wantName string) {
 	delete(cb.wants, wantName)
 }
 
-// rebuildConnections rebuilds all connections after changes
+// rebuildConnections is deprecated - functionality moved to connectPhase()
+// Kept for backward compatibility but now delegates to connectPhase()
 func (cb *ChainBuilder) rebuildConnections() {
-	fmt.Println("[RECONCILE] Rebuilding connections")
-	
-	// Generate new paths
-	cb.pathMap = cb.generatePathsFromConnections()
-	
-	// Validate connectivity
-	if err := cb.validateConnections(cb.pathMap); err != nil {
-		fmt.Printf("[RECONCILE] Validation failed: %v\n", err)
-		return
+	fmt.Println("[RECONCILE] rebuildConnections() is deprecated, use connectPhase()")
+	if err := cb.connectPhase(); err != nil {
+		fmt.Printf("[RECONCILE] Connection rebuild failed: %v\n", err)
 	}
 	
-	// Rebuild channels
-	cb.channelMutex.Lock()
-	cb.channels = make(map[string]chain.Chan)
-	
-	for _, paths := range cb.pathMap {
-		for _, outputPath := range paths.Out {
-			if outputPath.Active {
-				channelKey := outputPath.Name
-				cb.channels[channelKey] = make(chain.Chan, 10)
-			}
-		}
-	}
-	cb.channelMutex.Unlock()
-	
-	// Start new wants if system is running
+	// Start wants if running (for backward compatibility)
 	if cb.running {
-		cb.startNewWants()
-	}
-}
-
-// startNewWants starts newly added wants
-func (cb *ChainBuilder) startNewWants() {
-	for wantName, want := range cb.wants {
-		if want.want.GetStatus() == WantStatusIdle {
-			cb.startWant(wantName, want)
-		}
+		cb.startPhase()
 	}
 }
 

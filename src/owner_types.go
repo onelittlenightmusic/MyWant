@@ -498,33 +498,33 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		return target
 	})
 	
-	// Override all want types to use OwnerAwareWant wrapper for wants with owner references
-	originalGeneratorFactory := builder.registry["numbers"]
-	builder.RegisterWantType("numbers", func(metadata Metadata, spec WantSpec) interface{} {
-		baseWant := originalGeneratorFactory(metadata, spec)
-		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareWant(baseWant, metadata)
-		}
-		return baseWant
-	})
+	// Generic OwnerAware wrapping: automatically wrap ALL registered want types
+	// to support owner references without hardcoding specific type names
 	
-	originalQueueFactory := builder.registry["queue"]
-	builder.RegisterWantType("queue", func(metadata Metadata, spec WantSpec) interface{} {
-		baseWant := originalQueueFactory(metadata, spec)
-		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareWant(baseWant, metadata)
-		}
-		return baseWant
-	})
+	// Create a copy of current registry to avoid modification during iteration
+	originalFactories := make(map[string]WantFactory)
+	for typeName, factory := range builder.registry {
+		originalFactories[typeName] = factory
+	}
 	
-	originalSinkFactory := builder.registry["sink"]
-	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
-		baseWant := originalSinkFactory(metadata, spec)
-		if len(metadata.OwnerReferences) > 0 {
-			return NewOwnerAwareWant(baseWant, metadata)
+	// Override all want types to use OwnerAware wrapper when owner references exist
+	for typeName, originalFactory := range originalFactories {
+		// Skip target types as they already handle owner relationships
+		if typeName == "target" {
+			continue
 		}
-		return baseWant
-	})
+		
+		// Create closure to capture variables
+		func(wantType string, factory WantFactory) {
+			builder.RegisterWantType(wantType, func(metadata Metadata, spec WantSpec) interface{} {
+				baseWant := factory(metadata, spec)
+				if len(metadata.OwnerReferences) > 0 {
+					return NewOwnerAwareWant(baseWant, metadata)
+				}
+				return baseWant
+			})
+		}(typeName, originalFactory)
+	}
 }
 
 // getResultFromSpec extracts a specific result value from child wants using recipe specification

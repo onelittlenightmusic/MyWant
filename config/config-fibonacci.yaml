@@ -1,34 +1,12 @@
 wants:
-  # Fibonacci sequence generator
   - metadata:
-      name: generator
-      type: fibonacci_numbers
+      name: fibonacci-sequence-want
+      type: "fibonacci sequence"
       labels:
-        role: source
+        category: fibonacci
     spec:
+      recipe: recipes/fibonacci-sequence.yaml
       params:
         count: 15
-
-  # Fibonacci filter that filters numbers based on min/max values
-  - metadata:
-      name: filter
-      type: fibonacci_filter
-      labels:
-        role: filter
-    spec:
-      params:
         min_value: 1
         max_value: 100
-      using:
-        - role: source
-
-  # Sink that collects and displays fibonacci numbers
-  - metadata:
-      name: sink
-      type: fibonacci_sink
-      labels:
-        role: collector
-    spec:
-      params: {}
-      using:
-        - role: filter

@@ -108,37 +108,45 @@ func (f *FibonacciSequence) CreateFunction() func(using []Chan, outputs []Chan) 
 		}
 		in := using[0]
 		
-		var out Chan
-		if len(outputs) > 0 {
-			out = outputs[0]
-		}
-		
+		// Process all input numbers and filter them
 		for i := range in {
 			if val, ok := i.(int); ok {
 				// Filter based on min/max values
 				if val >= f.MinValue && val <= f.MaxValue {
 					f.filtered = append(f.filtered, val)
-					if out != nil {
-						out <- val
-					}
 				}
 				if f.Stats == nil {
-				f.Stats = make(WantStats)
-			}
-			if val, exists := f.Stats["total_processed"]; exists {
-				f.Stats["total_processed"] = val.(int) + 1
-			} else {
-				f.Stats["total_processed"] = 1
-			}
+					f.Stats = make(WantStats)
+				}
+				if val, exists := f.Stats["total_processed"]; exists {
+					f.Stats["total_processed"] = val.(int) + 1
+				} else {
+					f.Stats["total_processed"] = 1
+				}
 			}
 		}
-		if out != nil {
+		
+		// Close any output channels (though this should be the end point)
+		for _, out := range outputs {
 			close(out)
 		}
 		
 		// Store filtered fibonacci numbers in state for collection
 		f.StoreState("filtered", f.filtered)
 		f.StoreState("count", len(f.filtered))
+		
+		// Display collected results
+		println("🔢 Filtered fibonacci numbers:", len(f.filtered), "numbers between", f.MinValue, "and", f.MaxValue)
+		for i, num := range f.filtered {
+			if i < 10 { // Show first 10 numbers
+				print(num, " ")
+			}
+		}
+		if len(f.filtered) > 10 {
+			println("... (", len(f.filtered)-10, "more)")
+		} else {
+			println()
+		}
 		
 		return true
 	}
@@ -154,11 +162,11 @@ func (f *FibonacciSequence) InitializePaths(inCount, outCount int) {
 func (f *FibonacciSequence) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  1,
-		RequiredOutputs: 0, // Optional output
+		RequiredOutputs: 0, // No outputs - this is a terminal want
 		MaxInputs:       1,
-		MaxOutputs:      -1,
+		MaxOutputs:      0, // Terminal want - no outputs allowed
 		WantType:        "fibonacci_sequence",
-		Description:     "Fibonacci number sequence",
+		Description:     "Fibonacci number sequence filter (terminal)",
 	}
 }
 
