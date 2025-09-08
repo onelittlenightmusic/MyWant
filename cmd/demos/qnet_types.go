@@ -317,6 +317,27 @@ func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) 
 		waitTimeSum += waitTime
 		processedCount = packet.Num
 		
+		// Update live statistics after each packet processed
+		avgWaitTime := waitTimeSum / float64(processedCount)
+		
+		// Initialize stats map if not exists
+		if q.Stats == nil {
+			q.Stats = make(mywant.WantStats)
+		}
+		
+		// Store live statistics
+		q.Stats["average_wait_time"] = avgWaitTime
+		q.Stats["total_processed"] = processedCount
+		q.Stats["total_wait_time"] = waitTimeSum
+		q.Stats["current_server_free_time"] = serverFreeTime
+		
+		// Store live state for external monitoring
+		q.StoreState("average_wait_time", avgWaitTime)
+		q.StoreState("total_processed", processedCount)
+		q.StoreState("total_wait_time", waitTimeSum)
+		q.StoreState("current_server_free_time", serverFreeTime)
+		q.StoreState("last_packet_wait_time", waitTime)
+		
 		return false
 	}
 }

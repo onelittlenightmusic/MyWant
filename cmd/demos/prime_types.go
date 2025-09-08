@@ -138,6 +138,10 @@ func (f *PrimeSequence) CreateFunction() func(using []Chan, outputs []Chan) bool
 					if out != nil {
 						out <- val
 					}
+					// Update live state immediately when prime is found
+					f.StoreState("foundPrimes", f.foundPrimes)
+					f.StoreState("primeCount", len(f.foundPrimes))
+					f.StoreState("lastPrimeFound", val)
 				}
 				
 				if f.Stats == nil {
@@ -148,6 +152,10 @@ func (f *PrimeSequence) CreateFunction() func(using []Chan, outputs []Chan) bool
 				} else {
 					f.Stats["total_processed"] = 1
 				}
+				
+				// Update live state for each processed number
+				f.StoreState("total_processed", f.Stats["total_processed"])
+				f.StoreState("last_number_processed", val)
 			}
 		}
 		if out != nil {

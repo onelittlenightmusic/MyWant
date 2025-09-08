@@ -103,6 +103,27 @@ func (n *Want) StoreState(key string, value interface{}) {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
+	
+	// Notify parent if this want has owner references
+	if len(n.Metadata.OwnerReferences) > 0 {
+		for _, ownerRef := range n.Metadata.OwnerReferences {
+			if ownerRef.Controller && ownerRef.Kind == "Want" {
+				// Import owner_types functions - we'll need to make NotifyTargetStateUpdate available
+				notifyParentStateUpdate(ownerRef.Name, n.Metadata.Name, key, value)
+				break
+			}
+		}
+	}
+}
+
+// notifyParentStateUpdate is a placeholder that will be overridden by owner_types
+var notifyParentStateUpdate = func(targetName, childName, key string, value interface{}) {
+	// Default: do nothing (will be overridden when owner_types is imported)
+}
+
+// setNotifyParentStateUpdate allows owner_types to override the notification function
+func setNotifyParentStateUpdate(fn func(string, string, string, interface{})) {
+	notifyParentStateUpdate = fn
 }
 
 // GetState retrieves a value from the want's state

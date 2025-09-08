@@ -176,6 +176,16 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 			r.Stats = make(WantStats)
 		}
 		r.Stats["total_processed"] = 1
+		
+		// Store live state with reservation details
+		r.StoreState("total_processed", 1)
+		r.StoreState("reservation_type", r.RestaurantType)
+		r.StoreState("reservation_start_time", newEvent.Start.Format("15:04"))
+		r.StoreState("reservation_end_time", newEvent.End.Format("15:04"))
+		r.StoreState("reservation_duration_hours", r.Duration.Hours())
+		r.StoreState("reservation_name", newEvent.Name)
+		r.StoreState("schedule_date", baseDate.Format("2006-01-02"))
+		
 		fmt.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04"), newEvent.End.Format("15:04"))
 
@@ -326,6 +336,15 @@ func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 			h.Stats = make(WantStats)
 		}
 		h.Stats["total_processed"] = 1
+		
+		// Store live state with reservation details
+		h.StoreState("total_processed", 1)
+		h.StoreState("hotel_type", h.HotelType)
+		h.StoreState("check_in_time", newEvent.Start.Format("15:04 Jan 2"))
+		h.StoreState("check_out_time", newEvent.End.Format("15:04 Jan 2"))
+		h.StoreState("stay_duration_hours", newEvent.End.Sub(newEvent.Start).Hours())
+		h.StoreState("reservation_name", newEvent.Name)
+		
 		fmt.Printf("[HOTEL] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
@@ -467,6 +486,15 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 			b.Stats = make(WantStats)
 		}
 		b.Stats["total_processed"] = 1
+		
+		// Store live state with reservation details
+		b.StoreState("total_processed", 1)
+		b.StoreState("buffet_type", b.BuffetType)
+		b.StoreState("buffet_start_time", newEvent.Start.Format("15:04 Jan 2"))
+		b.StoreState("buffet_end_time", newEvent.End.Format("15:04 Jan 2"))
+		b.StoreState("buffet_duration_hours", b.Duration.Hours())
+		b.StoreState("reservation_name", newEvent.Name)
+		
 		fmt.Printf("[BUFFET] Scheduled %s from %s to %s\n",
 			newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 

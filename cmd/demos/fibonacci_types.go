@@ -114,6 +114,9 @@ func (f *FibonacciSequence) CreateFunction() func(using []Chan, outputs []Chan) 
 				// Filter based on min/max values
 				if val >= f.MinValue && val <= f.MaxValue {
 					f.filtered = append(f.filtered, val)
+					// Update state immediately when number is filtered
+					f.StoreState("filtered", f.filtered)
+					f.StoreState("count", len(f.filtered))
 				}
 				if f.Stats == nil {
 					f.Stats = make(WantStats)
@@ -131,7 +134,7 @@ func (f *FibonacciSequence) CreateFunction() func(using []Chan, outputs []Chan) 
 			close(out)
 		}
 		
-		// Store filtered fibonacci numbers in state for collection
+		// Final state update to ensure consistency (in case no numbers were filtered)
 		f.StoreState("filtered", f.filtered)
 		f.StoreState("count", len(f.filtered))
 		

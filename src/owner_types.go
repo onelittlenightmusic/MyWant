@@ -312,6 +312,36 @@ func (t *Target) NotifyChildrenComplete() {
 	}
 }
 
+// NotifyChildStateUpdate handles live state updates from child wants
+func (t *Target) NotifyChildStateUpdate(childName string, key string, value interface{}) {
+	// Store live child state updates in target state for monitoring
+	if t.State == nil {
+		t.State = make(map[string]interface{})
+	}
+	
+	// Create nested structure: child_states -> childName -> key -> value
+	childStates, exists := t.State["child_states"]
+	if !exists {
+		childStates = make(map[string]map[string]interface{})
+		t.State["child_states"] = childStates
+	}
+	
+	childStateMap, exists := childStates.(map[string]map[string]interface{})[childName]
+	if !exists {
+		childStateMap = make(map[string]interface{})
+		childStates.(map[string]map[string]interface{})[childName] = childStateMap
+	}
+	
+	// Update the child's state
+	childStateMap[key] = value
+	
+	// Optional: Log live updates (can be disabled for performance)
+	if key == "average_wait_time" || key == "primeCount" || key == "count" {
+		fmt.Printf("🔄 Target %s: Live update from child %s - %s: %v\n", 
+			t.Metadata.Name, childName, key, value)
+	}
+}
+
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
 	if t.recipeLoader == nil {
@@ -421,6 +451,17 @@ func NotifyTargetCompletion(targetName string, childName string) {
 	}
 }
 
+// NotifyTargetStateUpdate notifies a target that its child has updated state
+func NotifyTargetStateUpdate(targetName string, childName string, key string, value interface{}) {
+	targetRegistryMutex.RLock()
+	target, exists := targetRegistry[targetName]
+	targetRegistryMutex.RUnlock()
+	
+	if exists {
+		target.NotifyChildStateUpdate(childName, key, value)
+	}
+}
+
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
 	BaseWant   interface{} // The original want (Generator, Queue, Sink, etc.)
@@ -475,17 +516,38 @@ func (oaw *OwnerAwareWant) CreateFunction() func(inputs []chain.Chan, outputs []
 	}
 }
 
-// GetWant returns the underlying want from the base want
+// GetWant returns the underlying want from the base want  
 func (oaw *OwnerAwareWant) GetWant() *Want {
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
-		return chainWant.GetWant()
+		want := chainWant.GetWant()
+		if want != nil && oaw.TargetName != "" {
+			// Store reference for notifications and return original want
+			// We'll hook into StoreState calls via a different mechanism
+			oaw.setupStateNotifications(want)
+		}
+		return want
 	}
 	return nil
+}
+
+// setupStateNotifications sets up state change monitoring for this want
+func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
+	// For now, we'll rely on the child wants to call our notification method directly
+	// This is a placeholder for a more sophisticated hooking mechanism
+}
+
+// initializeStateNotifications sets up the state notification system
+func initializeStateNotifications() {
+	// Override the notification function in declarative.go
+	setNotifyParentStateUpdate(NotifyTargetStateUpdate)
 }
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Note: Demo programs should also call RegisterQNetWantTypes if they use qnet types
+	
+	// Initialize state update notification system
+	initializeStateNotifications()
 	
 	// Initialize generic recipe loader
 	recipeLoader := NewGenericRecipeLoader("recipes")
