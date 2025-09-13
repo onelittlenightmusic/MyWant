@@ -5,6 +5,7 @@ import (
 	"mywant/src/chain"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Global registry to track target instances for child notification
@@ -35,6 +36,7 @@ type Target struct {
 	childrenDone   chan bool
 	builder        *ChainBuilder    // Reference to builder for dynamic want creation
 	recipeLoader   *GenericRecipeLoader    // Reference to generic recipe loader
+	stateMutex     sync.RWMutex // Mutex to protect concurrent state updates
 }
 
 // NewTarget creates a new target want
@@ -312,34 +314,79 @@ func (t *Target) NotifyChildrenComplete() {
 	}
 }
 
+// StateMemoryEntry represents a state entry with unique key, timestamp and value
+type StateMemoryEntry struct {
+	UniqueKey string      `yaml:"unique_key"`
+	Timestamp string      `yaml:"timestamp"`
+	Value     interface{} `yaml:"value"`
+}
+
 // NotifyChildStateUpdate handles live state updates from child wants
 func (t *Target) NotifyChildStateUpdate(childName string, key string, value interface{}) {
-	// Store live child state updates in target state for monitoring
+	// Use mutex to prevent concurrent map writes
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
+	
+	// Initialize target state if needed
 	if t.State == nil {
 		t.State = make(map[string]interface{})
 	}
 	
-	// Create nested structure: child_states -> childName -> key -> value
-	childStates, exists := t.State["child_states"]
+	// Create unique key combining child name and field key
+	uniqueKey := fmt.Sprintf("%s.%s", childName, key)
+	timestamp := time.Now().Format(time.RFC3339)
+	
+	// Store in latest state (current values only - simplified structure)
+	latestState, exists := t.State["latestState"]
 	if !exists {
-		childStates = make(map[string]map[string]interface{})
-		t.State["child_states"] = childStates
+		latestState = make(map[string]interface{})
+		t.State["latestState"] = latestState
 	}
 	
-	childStateMap, exists := childStates.(map[string]map[string]interface{})[childName]
-	if !exists {
-		childStateMap = make(map[string]interface{})
-		childStates.(map[string]map[string]interface{})[childName] = childStateMap
-	}
+	// Update latest state with just the value (no timestamp or unique key)
+	latestStateMap := latestState.(map[string]interface{})
+	latestStateMap[uniqueKey] = value
 	
-	// Update the child's state
-	childStateMap[key] = value
+	// Store in history state (all changes)
+	t.addToHistoryState(uniqueKey, timestamp, value)
 	
 	// Optional: Log live updates (can be disabled for performance)
 	if key == "average_wait_time" || key == "primeCount" || key == "count" {
 		fmt.Printf("🔄 Target %s: Live update from child %s - %s: %v\n", 
 			t.Metadata.Name, childName, key, value)
 	}
+}
+
+// addToHistoryState adds a state change entry to the history state
+func (t *Target) addToHistoryState(uniqueKey string, timestamp string, value interface{}) {
+	// Get or create history state (list of all state changes)
+	historyState, exists := t.State["historyState"]
+	if !exists {
+		historyState = make([]StateMemoryEntry, 0)
+		t.State["historyState"] = historyState
+	}
+	
+	// Convert to slice
+	historyList := historyState.([]StateMemoryEntry)
+	
+	// Create new history entry
+	entry := StateMemoryEntry{
+		UniqueKey: uniqueKey,
+		Timestamp: timestamp,
+		Value:     value,
+	}
+	
+	// Add to history
+	historyList = append(historyList, entry)
+	
+	// Limit history size to prevent memory growth (keep last 1000 entries)
+	if len(historyList) > 1000 {
+		historyList = historyList[len(historyList)-1000:]
+	}
+	
+	// Store updated history
+	t.State["historyState"] = historyList
+	t.State["historyStateCount"] = len(historyList)
 }
 
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
