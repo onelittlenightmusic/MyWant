@@ -38,10 +38,6 @@ run-travel:
 run-qnet-using-recipe:
 	go run cmd/demos/demo_qnet_using_recipe.go cmd/demos/qnet_types.go config/config-qnet-using-recipe.yaml
 
-# Run the example project
-run-example:
-	cd ../mywant-example && go run .
-
 clean:
 	rm -f qnet
 	go clean

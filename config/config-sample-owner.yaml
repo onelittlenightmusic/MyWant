@@ -1,6 +1,6 @@
 wants:
   - metadata:
-      name: queue-calculation-target
+      name: queue calculation
       type: "wait time in queue system"
       labels:
         owner: parent
