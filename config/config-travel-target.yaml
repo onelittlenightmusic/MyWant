@@ -1,7 +1,7 @@
 wants:
   # Target want that dynamically generates travel wants from travel-itinerary recipe
   - metadata:
-      name: travel-planner-target
+      name: travel target
       type: "travel itinerary planner"
       labels:
         role: orchestrator

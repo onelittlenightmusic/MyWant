@@ -1436,7 +1436,30 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		file.Close()
 	}
 	
+	// Also create a copy as memory-0000-latest.yaml for easy access
+	var latestFilename string
+	if cb.memoryPath != "" {
+		memoryDir := filepath.Dir(cb.memoryPath)
+		latestFilename = filepath.Join(memoryDir, "memory-0000-latest.yaml")
+	} else {
+		latestFilename = filepath.Join("memory", "memory-0000-latest.yaml")
+	}
+	
+	// Copy the data to the latest file
+	err = os.WriteFile(latestFilename, data, 0644)
+	if err == nil {
+		// Sync the latest file too
+		latestFile, err := os.OpenFile(latestFilename, os.O_WRONLY, 0644)
+		if err == nil {
+			latestFile.Sync()
+			latestFile.Close()
+		}
+	}
+	
 	fmt.Printf("📝 Want memory dumped to: %s\n", filename)
+	if err == nil {
+		fmt.Printf("📝 Latest memory also saved to: %s\n", latestFilename)
+	}
 	return nil
 }
 
