@@ -51,7 +51,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 		Want: mywant.Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    mywant.WantStats{},
+			// Stats field removed - using State instead
 			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -96,7 +96,7 @@ func (g *Numbers) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 // GetStats returns the stats for this numbers generator
 func (g *Numbers) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return g.Stats
+	return g.State
 }
 
 // Process processes using enhanced paths (for enhanced node compatibility)
@@ -115,11 +115,9 @@ func (g *Numbers) GetWant() *mywant.Want {
 	return &g.Want
 }
 
-// CreateFunction returns the generalized chain function for this numbers generator
-func (g *Numbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	t, j := 0.0, 0
-	
-	// Check for deterministic mode in parameters
+// Exec executes the numbers generator directly with dynamic parameter reading
+func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Read parameters fresh each cycle - this enables dynamic param changes!
 	useDeterministic := false
 	if det, ok := g.Spec.Params["deterministic"]; ok {
 		if detBool, ok := det.(bool); ok {
@@ -128,41 +126,48 @@ func (g *Numbers) CreateFunction() func(using []chain.Chan, outputs []chain.Chan
 			useDeterministic = (detStr == "true")
 		}
 	}
-	
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(outputs) == 0 {
-			return true
-		}
-		out := outputs[0]
-		
-		if j >= g.Count {
-			// Store generation stats
-			// Initialize stats map if not exists
-			if g.Stats == nil {
-				g.Stats = make(mywant.WantStats)
-			}
-			g.Stats["total_processed"] = j
-			g.Stats["average_wait_time"] = 0.0 // Generators don't have wait time
-			g.Stats["total_wait_time"] = 0.0
-			
-			out <- QueuePacket{-1, 0}
-			fmt.Printf("[GENERATOR] Generated %d packets\n", j)
-			return true
-		}
-		j++
-		
-		if useDeterministic {
-			// Deterministic inter-arrival time (rate = 1/interval)
-			t += 1.0 / g.Rate
-		} else {
-			// Exponential inter-arrival time (rate = 1/mean_interval)
-			// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
-			t += ExpRand64() / g.Rate
-		}
-		
-		out <- QueuePacket{j, t}
-		return false
+
+	// Initialize state variables if not present
+	if g.State == nil {
+		g.State = make(map[string]interface{})
 	}
+
+	// Get current time and count from state (persistent across calls)
+	t, _ := g.State["current_time"].(float64)
+	j, _ := g.State["current_count"].(int)
+
+	if len(outputs) == 0 {
+		return true
+	}
+	out := outputs[0]
+
+	if j >= g.Count {
+		// Store generation stats
+		g.State["total_processed"] = j
+		g.State["average_wait_time"] = 0.0 // Generators don't have wait time
+		g.State["total_wait_time"] = 0.0
+
+		out <- QueuePacket{-1, 0}
+		fmt.Printf("[GENERATOR] Generated %d packets\n", j)
+		return true
+	}
+	j++
+
+	if useDeterministic {
+		// Deterministic inter-arrival time (rate = 1/interval)
+		t += 1.0 / g.Rate
+	} else {
+		// Exponential inter-arrival time (rate = 1/mean_interval)
+		// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
+		t += ExpRand64() / g.Rate
+	}
+
+	// Store state for next call
+	g.State["current_time"] = t
+	g.State["current_count"] = j
+
+	out <- QueuePacket{j, t}
+	return false
 }
 
 // Queue processes packets with a service time
@@ -178,7 +183,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 		Want: mywant.Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    mywant.WantStats{},
+			// Stats field removed - using State instead
 			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -215,7 +220,7 @@ func (q *Queue) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 // GetStats returns the stats for this queue
 func (q *Queue) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return q.Stats
+	return q.State
 }
 
 // Process processes using enhanced paths
@@ -234,112 +239,76 @@ func (q *Queue) GetWant() *mywant.Want {
 	return &q.Want
 }
 
-// CreateFunction returns the generalized chain function for this queue
-func (q *Queue) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	serverFreeTime, waitTimeSum := 0.0, 0.0
-	processedCount := 0
-	
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 || len(outputs) == 0 {
-			return true
-		}
-		in := using[0]
-		out := outputs[0]
-		
-		packet := (<-in).(QueuePacket)
-		
-		if packet.isEnded() {
-			if processedCount > 0 {
-				avgWaitTime := waitTimeSum / float64(processedCount)
-				// Store stats in the mywant.Want
-				// Initialize stats map if not exists
-				if q.Stats == nil {
-					q.Stats = make(mywant.WantStats)
-				}
-				q.Stats["average_wait_time"] = avgWaitTime
-				q.Stats["total_processed"] = processedCount
-				q.Stats["total_wait_time"] = waitTimeSum
-				
-				fmt.Printf("[QUEUE %s] Service: %.2f, Processed: %d, Avg Wait: %.6f\n", 
-					q.Metadata.Name, q.ServiceTime, processedCount, avgWaitTime)
-			}
-			out <- packet
-			return true
-		}
-		
-		// Correct M/M/1 queue implementation
-		arrivalTime := packet.Time
-		serviceStartTime := arrivalTime
-		if serverFreeTime > arrivalTime {
-			serviceStartTime = serverFreeTime  // Must wait for server
-		}
-		
-		// Calculate actual wait time (time spent waiting, not including service)
-		waitTime := serviceStartTime - arrivalTime
-		
-		// Generate service time (deterministic or exponential)
-		useDeterministic := false
-		if det, ok := q.Spec.Params["deterministic"]; ok {
-			if detBool, ok := det.(bool); ok {
-				useDeterministic = detBool
-			} else if detStr, ok := det.(string); ok {
-				useDeterministic = (detStr == "true")
-			}
-		}
-		
-		var serviceTime float64
-		if useDeterministic {
-			// Deterministic service time (ServiceTime as mean)
-			serviceTime = q.ServiceTime
-		} else {
-			// Exponential service time (ServiceTime as mean service time)
-			// ExpRand64() returns Exp(1), so scale to get mean = ServiceTime
-			serviceTime = q.ServiceTime * ExpRand64()
-		}
-		
-		// Calculate departure time
-		departureTime := serviceStartTime + serviceTime
-		
-		
-		// Update server availability
-		serverFreeTime = departureTime
-		
-		// Send packet with departure time
-		out <- QueuePacket{packet.Num, departureTime}
-		
-		// Debug wait time distribution (commented out to reduce output)
-		// if packet.Num <= 10 || waitTime > 10.0 {
-		//	fmt.Printf("[DEBUG] Packet %d: wait=%.6f, arrival=%.6f, serverFree=%.6f, service=%.6f, q.ServiceTime=%.6f\n", 
-		//		packet.Num, waitTime, arrivalTime, serverFreeTime, serviceTime, q.ServiceTime)
-		// }
-		
-		// Accumulate wait time statistics
-		waitTimeSum += waitTime
-		processedCount = packet.Num
-		
-		// Update live statistics after each packet processed
-		avgWaitTime := waitTimeSum / float64(processedCount)
-		
-		// Initialize stats map if not exists
-		if q.Stats == nil {
-			q.Stats = make(mywant.WantStats)
-		}
-		
-		// Store live statistics
-		q.Stats["average_wait_time"] = avgWaitTime
-		q.Stats["total_processed"] = processedCount
-		q.Stats["total_wait_time"] = waitTimeSum
-		q.Stats["current_server_free_time"] = serverFreeTime
-		
-		// Store live state for external monitoring
-		q.StoreState("average_wait_time", avgWaitTime)
-		q.StoreState("total_processed", processedCount)
-		q.StoreState("total_wait_time", waitTimeSum)
-		q.StoreState("current_server_free_time", serverFreeTime)
-		q.StoreState("last_packet_wait_time", waitTime)
-		
-		return false
+// Exec executes the queue processing directly
+func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Using direct Exec approach for dynamic parameter reading
+	if q.State == nil {
+		q.State = make(map[string]interface{})
 	}
+
+	// Initialize persistent state variables
+	serverFreeTime, _ := q.State["serverFreeTime"].(float64)
+	waitTimeSum, _ := q.State["waitTimeSum"].(float64)
+	processedCount, _ := q.State["processedCount"].(int)
+
+	if len(using) == 0 || len(outputs) == 0 {
+		return true
+	}
+	in := using[0]
+	out := outputs[0]
+
+	packet := (<-in).(QueuePacket)
+
+	if packet.isEnded() {
+		avgWaitTime := 0.0
+		if processedCount > 0 {
+			avgWaitTime = waitTimeSum / float64(processedCount)
+		}
+
+		q.State["average_wait_time"] = avgWaitTime
+		q.State["total_processed"] = processedCount
+		q.State["total_wait_time"] = waitTimeSum
+		q.State["current_server_free_time"] = serverFreeTime
+
+		fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", processedCount, avgWaitTime)
+		out <- packet // Forward end signal
+		return true
+	}
+
+	// Process the packet...
+	arrivalTime := packet.Time
+	startServiceTime := math.Max(arrivalTime, serverFreeTime)
+	waitTime := startServiceTime - arrivalTime
+
+	// Read service time from parameters (can change dynamically!)
+	serviceTime := q.ServiceTime
+	if st, ok := q.Spec.Params["service_time"]; ok {
+		if stFloat, ok := st.(float64); ok {
+			serviceTime = stFloat
+		}
+	}
+
+	finishTime := startServiceTime + serviceTime
+	serverFreeTime = finishTime
+
+	waitTimeSum += waitTime
+	processedCount++
+
+	// Store updated state
+	q.State["serverFreeTime"] = serverFreeTime
+	q.State["waitTimeSum"] = waitTimeSum
+	q.State["processedCount"] = processedCount
+	q.State["last_packet_wait_time"] = waitTime
+
+	// Update live stats
+	avgWaitTime := waitTimeSum / float64(processedCount)
+	q.State["average_wait_time"] = avgWaitTime
+	q.State["total_processed"] = processedCount
+	q.State["total_wait_time"] = waitTimeSum
+	q.State["current_server_free_time"] = serverFreeTime
+
+	out <- QueuePacket{packet.Num, finishTime}
+	return false
 }
 
 // Combiner merges multiple using streams
@@ -349,13 +318,12 @@ type Combiner struct {
 	paths     mywant.Paths
 }
 
-// NewCombiner creates a new combiner want
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 	combiner := &Combiner{
 		Want: mywant.Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    mywant.WantStats{},
+			// Stats field removed - using State instead
 			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -392,7 +360,7 @@ func (c *Combiner) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 // GetStats returns the stats for this combiner
 func (c *Combiner) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return c.Stats
+	return c.State
 }
 
 // Process processes using enhanced paths
@@ -411,118 +379,49 @@ func (c *Combiner) GetWant() *mywant.Want {
 	return &c.Want
 }
 
-// CreateFunction returns the generalized chain function for this combiner
-func (c *Combiner) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	processed := 0
-	usingsClosed := make([]bool, 0) // Track which using are closed
-	packetBuffer := make([]QueuePacket, 0) // Buffer to store packets not yet sent
-	stuckCount := 0 // Track iterations with no progress
-	
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) == 0 || len(outputs) == 0 {
-			return true
-		}
-		out := outputs[0]
-		
-		// Initialize closed tracking if needed
-		if len(usingsClosed) != len(using) {
-			usingsClosed = make([]bool, len(using))
-		}
-		
-		// Check if all using are closed and buffer is empty
-		allClosed := true
-		for _, closed := range usingsClosed {
-			if !closed {
-				allClosed = false
-				break
+// Exec executes the combiner directly
+func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Initialize state if needed
+	if c.State == nil {
+		c.State = make(map[string]interface{})
+	}
+
+	// Get persistent state
+	processed, _ := c.State["processed"].(int)
+
+	if len(using) == 0 || len(outputs) == 0 {
+		return true
+	}
+	out := outputs[0]
+
+	// Simple combiner: just forward all packets from all inputs
+	for _, in := range using {
+		select {
+		case packet, ok := <-in:
+			if !ok {
+				continue
 			}
-		}
-		if allClosed && len(packetBuffer) == 0 {
-			// Store combiner stats
-			// Initialize stats map if not exists
-			if c.Stats == nil {
-				c.Stats = make(mywant.WantStats)
-			}
-			c.Stats["total_processed"] = processed
-			c.Stats["average_wait_time"] = 0.0 // Combiners don't add wait time
-			c.Stats["total_wait_time"] = 0.0
-			
-			fmt.Printf("[COMBINER] Operation: %s, Processed %d packets\n", c.Operation, processed)
-			out <- QueuePacket{-1, 0} // Send end signal
-			return true
-		}
-		
-		// Collect available packets from all open using and add to buffer
-		madeProgress := false
-		for i, input := range using {
-			if usingsClosed[i] {
-				continue // Skip closed using
-			}
-			
-			select {
-			case packet := <-input:
-				qPacket := packet.(QueuePacket)
-				if qPacket.isEnded() {
-					usingsClosed[i] = true // Mark this using as closed
-					madeProgress = true
-				} else {
-					packetBuffer = append(packetBuffer, qPacket)
-					madeProgress = true
-				}
-			default:
-				// No packet available on this using right now
-			}
-		}
-		
-		// If buffer is empty and not all using closed, and no progress was made,
-		// try a blocking read with timeout behavior
-		if len(packetBuffer) == 0 && !allClosed && !madeProgress {
-			stuckCount++
-			
-			// If we've been stuck too many times, force termination
-			if stuckCount > 10000 {
-				fmt.Printf("[COMBINER] Warning: Terminating due to apparent deadlock after %d stuck iterations\n", stuckCount)
-				// Mark all remaining inputs as closed to force termination
-				for i := range usingsClosed {
-					usingsClosed[i] = true
-				}
-				// Send end signal
-				// Initialize stats map if not exists
-				if c.Stats == nil {
-					c.Stats = make(mywant.WantStats)
-				}
-				c.Stats["total_processed"] = processed
-				out <- QueuePacket{-1, 0}
+			qp := packet.(QueuePacket)
+			if qp.isEnded() {
+				// Store combiner stats
+				c.State["total_processed"] = processed
+				c.State["average_wait_time"] = 0.0 // Combiners don't add wait time
+				c.State["total_wait_time"] = 0.0
+
+				out <- qp // Forward end signal
 				return true
 			}
-		} else if madeProgress {
-			stuckCount = 0 // Reset stuck counter when progress is made
-		}
-		
-		// Find and send earliest packet from buffer
-		if len(packetBuffer) > 0 {
-			earliestIdx := 0
-			earliestTime := packetBuffer[0].Time
-			
-			for i, packet := range packetBuffer {
-				if packet.Time < earliestTime {
-					earliestTime = packet.Time
-					earliestIdx = i
-				}
-			}
-			
-			// Send the earliest packet
-			earliestPacket := packetBuffer[earliestIdx]
 			processed++
-			out <- earliestPacket
-			
-			// Remove the sent packet from buffer (preserve order for remaining packets)
-			packetBuffer = append(packetBuffer[:earliestIdx], packetBuffer[earliestIdx+1:]...)
+			out <- qp
+		default:
+			// No data available on this channel right now
 		}
-		
-		return false // Continue processing
 	}
+
+	c.State["processed"] = processed
+	return false
 }
+
 
 // Sink collects and terminates the packet stream
 type Sink struct {
@@ -537,7 +436,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
 		Want: mywant.Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    mywant.WantStats{},
+			// Stats field removed - using State instead
 			Status:   mywant.WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -566,7 +465,7 @@ func (s *Sink) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 // GetStats returns the stats for this sink
 func (s *Sink) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return s.Stats
+	return s.State
 }
 
 // Process processes using enhanced paths
@@ -585,35 +484,32 @@ func (s *Sink) GetWant() *mywant.Want {
 	return &s.Want
 }
 
-// CreateFunction returns the generalized chain function for this sink
-func (s *Sink) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		// If no using configured, this sink shouldn't run
-		if len(using) == 0 {
-			return true
-		}
-		in := using[0]
-		
-		// Block waiting for data from using channel
-		packet := (<-in).(QueuePacket)
-		
-		if packet.isEnded() {
-			// Store sink stats
-			// Initialize stats map if not exists
-			if s.Stats == nil {
-				s.Stats = make(mywant.WantStats)
-			}
-			s.Stats["total_processed"] = s.Received
-			s.Stats["average_wait_time"] = 0.0 // Sinks don't add wait time
-			s.Stats["total_wait_time"] = 0.0
-			
-			fmt.Printf("[SINK] Total received: %d packets\n", s.Received)
-			return true
-		}
-		
-		s.Received++
-		return false
+// Exec executes the sink directly
+func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// If no using configured, this sink shouldn't run
+	if len(using) == 0 {
+		return true
 	}
+	in := using[0]
+
+	// Block waiting for data from using channel
+	packet := (<-in).(QueuePacket)
+
+	if packet.isEnded() {
+		// Store sink stats
+		if s.State == nil {
+			s.State = make(map[string]interface{})
+		}
+		s.State["total_processed"] = s.Received
+		s.State["average_wait_time"] = 0.0 // Sinks don't add wait time
+		s.State["total_wait_time"] = 0.0
+
+		fmt.Printf("[SINK] Received %d packets\n", s.Received)
+		return true
+	}
+
+	s.Received++
+	return false // Continue waiting for more packets
 }
 
 // RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder

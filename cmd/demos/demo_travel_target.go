@@ -32,8 +32,8 @@ func main() {
 	for _, want := range config.Wants {
 		if want.Metadata.Type == "target" {
 			fmt.Printf("🎯 Target Want: %s\n", want.Metadata.Name)
-			fmt.Printf("  Recipe: %s\n", want.Spec.Recipe)
-			fmt.Printf("  Recipe Parameters: %v\n", want.Spec.RecipeParams)
+			fmt.Printf("  Type: %s\n", want.Metadata.Type)
+			fmt.Printf("  Parameters: %v\n", want.Spec.Params)
 		}
 	}
 
@@ -64,8 +64,8 @@ func main() {
 	states := builder.GetAllWantStates()
 	for name, state := range states {
 		processed := 0
-		if state.Stats != nil {
-			if val, ok := state.Stats["total_processed"]; ok {
+		if state.State != nil {
+			if val, ok := state.State["total_processed"]; ok {
 				if intVal, ok := val.(int); ok {
 					processed = intVal
 				}

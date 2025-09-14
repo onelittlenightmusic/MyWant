@@ -50,7 +50,7 @@ func main() {
 		if state != nil {
 			// Show stats from fibonacci filter
 			if state.Metadata.Type == "fibonacci_filter" {
-				if totalProcessed, exists := state.Stats["total_processed"]; exists {
+				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  🔢 Filter %s processed %v numbers\n", name, totalProcessed)
 				}
 				if filtered, exists := state.GetState("filtered"); exists {
@@ -73,7 +73,7 @@ func main() {
 			
 			// Show stats from fibonacci generator
 			if state.Metadata.Type == "fibonacci_numbers" {
-				if totalProcessed, exists := state.Stats["total_processed"]; exists {
+				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  📈 Generator %s produced %v numbers\n", name, totalProcessed)
 				}
 			}

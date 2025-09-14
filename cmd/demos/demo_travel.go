@@ -36,7 +36,7 @@ func main() {
 	states := builder.GetAllWantStates()
 	for name, state := range states {
 		fmt.Printf("  %s: %s (processed: %v)\n", 
-			name, state.Status, state.Stats["total_processed"])
+			name, state.Status, state.State["total_processed"])
 	}
 	
 	fmt.Println("\n✅ Travel planning completed successfully!")

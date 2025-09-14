@@ -30,7 +30,7 @@ type Target struct {
 	MaxDisplay     int
 	Description    string // Human-readable description of this target
 	RecipePath     string // Path to the recipe file to use for child creation
-	RecipeParams   map[string]interface{} // Parameters to pass to recipe
+	RecipeParams   map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
 	paths          Paths
 	childWants     []Want
 	childrenDone   chan bool
@@ -46,7 +46,6 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -61,26 +60,18 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	// Extract target-specific configuration from params
 	target.MaxDisplay = extractIntParam(spec.Params, "max_display", target.MaxDisplay)
 	
-	// Extract recipe path from spec.Recipe field
-	if spec.Recipe != "" {
-		target.RecipePath = spec.Recipe
-	}
+	// Recipe path will be set by custom target type registration
 	
-	// Extract recipe parameters from spec.RecipeParams or spec.Params
-	if spec.RecipeParams != nil {
-		target.RecipeParams = spec.RecipeParams
-	} else {
-		// Fallback: separate recipe parameters from target-specific parameters
-		targetSpecificParams := map[string]bool{
-			"max_display": true,
-		}
-		
-		// Collect recipe parameters (excluding target-specific ones)
-		target.RecipeParams = make(map[string]interface{})
-		for key, value := range spec.Params {
-			if !targetSpecificParams[key] {
-				target.RecipeParams[key] = value
-			}
+	// Separate recipe parameters from target-specific parameters
+	targetSpecificParams := map[string]bool{
+		"max_display": true,
+	}
+
+	// Collect recipe parameters (excluding target-specific ones)
+	target.RecipeParams = make(map[string]interface{})
+	for key, value := range spec.Params {
+		if !targetSpecificParams[key] {
+			target.RecipeParams[key] = value
 		}
 	}
 	
@@ -267,38 +258,36 @@ func (t *Target) CreateChildWants() []Want {
 	return t.childWants
 }
 
-// CreateFunction implements the ChainNode interface for Target
-func (t *Target) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		fmt.Printf("🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
-		
-		// Dynamically create child wants
-		if t.builder != nil {
-			fmt.Printf("🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
-			childWants := t.CreateChildWants()
-			
-			// Add child wants to the builder's configuration
-			for _, childWant := range childWants {
-				fmt.Printf("🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
-			}
-			t.builder.AddDynamicWants(childWants)
-			
-			// Rebuild connections to include new wants
-			fmt.Printf("🔧 Rebuilding connections with dynamic wants...\n")
-			t.builder.rebuildConnections()
+// Exec implements the ChainWant interface for Target with direct execution
+func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
+	fmt.Printf("🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
+
+	// Dynamically create child wants
+	if t.builder != nil {
+		fmt.Printf("🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
+		childWants := t.CreateChildWants()
+
+		// Add child wants to the builder's configuration
+		for _, childWant := range childWants {
+			fmt.Printf("🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
 		}
-		
-		// Target waits for signal that all children have finished
-		fmt.Printf("🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
-		<-t.childrenDone
-		fmt.Printf("🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
-		
-		// Compute and store recipe result
-		t.computeTemplateResult()
-		
-		fmt.Printf("🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
-		return true
+		t.builder.AddDynamicWants(childWants)
+
+		// Rebuild connections to include new wants
+		fmt.Printf("🔧 Rebuilding connections with dynamic wants...\n")
+		t.builder.rebuildConnections()
 	}
+
+	// Target waits for signal that all children have finished
+	fmt.Printf("🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
+	<-t.childrenDone
+	fmt.Printf("🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
+
+	// Compute and store recipe result
+	t.computeTemplateResult()
+
+	fmt.Printf("🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
+	return true
 }
 
 // GetWant returns the underlying want
@@ -473,10 +462,7 @@ func (t *Target) computeTemplateResult() {
 
 	fmt.Printf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
 
-	// Initialize Stats map if not exists
-	if t.Stats == nil {
-		t.Stats = make(WantStats)
-	}
+	// Stats are now stored in State - no separate initialization needed
 
 	// Initialize State map if not exists
 	if t.State == nil {
@@ -497,13 +483,13 @@ func (t *Target) computeTemplateResult() {
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		metrics[metricKey] = resultValue
-		t.Stats[metricKey] = resultValue
+		t.State[metricKey] = resultValue
 
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			t.Stats["recipeResult"] = primaryResult
-			t.Stats["primaryResult"] = primaryResult
+			t.State["recipeResult"] = primaryResult
+			t.State["primaryResult"] = primaryResult
 			t.State["recipeResult"] = primaryResult
 			t.State["primaryResult"] = primaryResult
 			fmt.Printf("✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
@@ -583,32 +569,23 @@ func NewOwnerAwareWant(baseWant interface{}, metadata Metadata) *OwnerAwareWant 
 	}
 }
 
-// CreateFunction wraps the base want's function to add completion notification
-func (oaw *OwnerAwareWant) CreateFunction() func(inputs []chain.Chan, outputs []chain.Chan) bool {
-	// Get the original function from the base want
-	var originalFunc func(inputs []chain.Chan, outputs []chain.Chan) bool
-	
+// Exec wraps the base want's execution to add completion notification
+func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
+	// Call the original Exec method directly
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
-		originalFunc = chainWant.CreateFunction()
-	} else {
-		// Fallback for non-ChainWant types
-		return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-			fmt.Printf("⚠️  Want %s: No CreateFunction available\n", oaw.WantName)
-			return true
-		}
-	}
-	
-	return func(inputs []chain.Chan, outputs []chain.Chan) bool {
-		// Call the original function
-		result := originalFunc(inputs, outputs)
-		
+		result := chainWant.Exec(inputs, outputs)
+
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
 			fmt.Printf("💬 Child %s completed, notifying target %s\n", oaw.WantName, oaw.TargetName)
 			NotifyTargetCompletion(oaw.TargetName, oaw.WantName)
 		}
-		
+
 		return result
+	} else {
+		// Fallback for non-ChainWant types
+		fmt.Printf("⚠️  Want %s: No Exec method available\n", oaw.WantName)
+		return true
 	}
 }
 
@@ -698,25 +675,25 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 
 	// Handle JSON path syntax
 	if strings.HasPrefix(statName, ".") {
-		return t.extractValueByPath(want.Stats, statName)
+		return t.extractValueByPath(want.State, statName)
 	}
 
 	// Try to get the specified stat from the want's dynamic Stats map
-	if want.Stats != nil {
+	if want.State != nil {
 		// Try exact stat name first
-		if value, ok := want.Stats[statName]; ok {
+		if value, ok := want.State[statName]; ok {
 			return value
 		}
 		// Try lowercase version
-		if value, ok := want.Stats[strings.ToLower(statName)]; ok {
+		if value, ok := want.State[strings.ToLower(statName)]; ok {
 			return value
 		}
 		// Try common variations
 		if spec.StatName == "TotalProcessed" {
-			if value, ok := want.Stats["total_processed"]; ok {
+			if value, ok := want.State["total_processed"]; ok {
 				return value
 			}
-			if value, ok := want.Stats["totalprocessed"]; ok {
+			if value, ok := want.State["totalprocessed"]; ok {
 				return value
 			}
 		}
@@ -730,7 +707,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return value
 	}
 	
-	fmt.Printf("⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.Stats)
+	fmt.Printf("⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
 	return 0
 }
 
@@ -832,12 +809,12 @@ func (t *Target) computeFallbackResultUnsafe() {
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
 	for _, child := range childWants {
-		if child.Stats != nil {
-			if processed, ok := child.Stats["total_processed"]; ok {
+		if child.State != nil {
+			if processed, ok := child.State["total_processed"]; ok {
 				if processedInt, ok := processed.(int); ok {
 					totalProcessed += processedInt
 				}
-			} else if processed, ok := child.Stats["TotalProcessed"]; ok {
+			} else if processed, ok := child.State["TotalProcessed"]; ok {
 				if processedInt, ok := processed.(int); ok {
 					totalProcessed += processedInt
 				}

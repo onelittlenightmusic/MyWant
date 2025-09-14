@@ -21,12 +21,12 @@ type Chan = chain.Chan
 
 // ChainFunction represents a generalized chain function interface
 type ChainFunction interface {
-	CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool
+	Exec(using []chain.Chan, outputs []chain.Chan) bool
 }
 
-// ChainWant represents a want that can create chain functions
+// ChainWant represents a want that can execute directly
 type ChainWant interface {
-	CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool
+	Exec(using []chain.Chan, outputs []chain.Chan) bool
 	GetWant() *Want
 }
 
@@ -72,8 +72,6 @@ type Metadata struct {
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Recipe       string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
-	RecipeParams map[string]interface{} `json:"recipe_params,omitempty" yaml:"recipe_params,omitempty"`
 	Params       map[string]interface{} `json:"params" yaml:"params"`
 	Using        []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 }
@@ -82,7 +80,6 @@ type WantSpec struct {
 type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`
 	Spec     WantSpec               `json:"spec" yaml:"spec"`
-	Stats    WantStats              `json:"stats,omitempty" yaml:"stats,omitempty"`
 	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
 	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
 }
@@ -148,7 +145,7 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	n.StoreState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 	
 	// Store final statistics
-	n.StoreState("final_stats", n.Stats)
+	// Stats are now stored directly in State - no separate stats field
 }
 
 // OnProcessFail handles state storage when the want process fails
@@ -165,7 +162,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	n.StoreState("failure_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 	
 	// Store statistics at failure
-	n.StoreState("stats_at_failure", n.Stats)
+	// Stats are now stored directly in State - no separate stats field
 }
 
 // Config holds the complete declarative configuration
@@ -237,9 +234,9 @@ type EnhancedBaseWant interface {
 	GetType() string
 }
 
-// WantStats holds statistical information for a want
-// WantStats represents dynamic statistics as key-value pairs
-type WantStats map[string]interface{}
+// WantStats is deprecated - use State field instead
+// Keeping type alias for backward compatibility during transition
+type WantStats = map[string]interface{}
 
 // WantStatus represents the current state of a want
 type WantStatus string
@@ -539,11 +536,7 @@ func (cb *ChainBuilder) mergeWithCustomDefaults(spec WantSpec, config CustomTarg
 		}
 	}
 	
-	// Set default recipe if not specified
-	if merged.Recipe == "" && config.DefaultRecipe != "" {
-		merged.Recipe = config.DefaultRecipe
-		fmt.Printf("🎯 Using default recipe '%s' for custom type '%s'\n", config.DefaultRecipe, config.Name)
-	}
+	// Recipe is no longer used - custom types are distinguished by metadata.name
 	
 	return merged
 }
@@ -957,7 +950,6 @@ func (cb *ChainBuilder) addWant(wantConfig Want) {
 		wantPtr = &Want{
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
-			Stats:    WantStats{},
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		}
@@ -1037,11 +1029,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		}
 	}
 	
-	// Start want execution
+	// Start want execution with direct Exec() calls
 	if chainWant, ok := want.function.(ChainWant); ok {
-		generalizedFn := chainWant.CreateFunction()
 		want.want.SetStatus(WantStatusRunning)
-		
+
 		cb.waitGroup.Add(1)
 		go func() {
 			defer cb.waitGroup.Done()
@@ -1050,17 +1041,18 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					want.want.SetStatus(WantStatusCompleted)
 				}
 			}()
-			
-			fmt.Printf("[EXEC] Starting want %s with %d using, %d outputs\n", 
+
+			fmt.Printf("[EXEC] Starting want %s with %d using, %d outputs\n",
 				wantName, len(usingChans), len(outputChans))
-			
+
 			for {
-				if generalizedFn(usingChans, outputChans) {
+				// Direct call - parameters can be read fresh each cycle
+				if chainWant.Exec(usingChans, outputChans) {
 					fmt.Printf("[EXEC] Want %s finished\n", wantName)
-					
+
 					// Check if this want completion should notify parent targets
 					cb.notifyParentTargetsOfChildCompletion(wantName)
-					
+
 					break
 				}
 			}
@@ -1086,7 +1078,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		if runtimeWant, exists := cb.wants[want.Metadata.Name]; exists {
 			// Update with runtime data including spec using
 			want.Spec = runtimeWant.spec  // Preserve using from runtime spec
-			want.Stats = runtimeWant.want.Stats
+			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
 			want.State = runtimeWant.want.State
 		}
@@ -1100,7 +1092,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			wantConfig := Want{
 				Metadata: runtimeWant.metadata,
 				Spec:     runtimeWant.spec,
-				Stats:    runtimeWant.want.Stats,
+				// Stats field removed - data now in State
 				Status:   runtimeWant.want.Status,
 				State:    runtimeWant.want.State,
 			}
@@ -1422,7 +1414,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		want := Want{
 			Metadata: runtimeWant.metadata,
 			Spec:     runtimeWant.spec,  // This preserves using
-			Stats:    runtimeWant.want.Stats,
+			// Stats field removed - data now in State
 			Status:   runtimeWant.want.Status,
 			State:    runtimeWant.want.State,
 		}
@@ -1583,17 +1575,17 @@ func (cb *ChainBuilder) extractResultFromSpec(spec RecipeResultSpec) interface{}
 		return fmt.Sprintf("ERROR: Want '%s' not found", spec.WantName)
 	}
 
-	// Extract the stat value
-	if runtimeWant.want.Stats == nil {
-		return fmt.Sprintf("ERROR: No stats available for want '%s'", spec.WantName)
+	// Extract the stat value from State (stats are now stored in State)
+	if runtimeWant.want.State == nil {
+		return fmt.Sprintf("ERROR: No state available for want '%s'", spec.WantName)
 	}
 
 	// Handle JSON path syntax
 	if strings.HasPrefix(spec.StatName, ".") {
-		return cb.extractValueByPath(runtimeWant.want.Stats, spec.StatName)
+		return cb.extractValueByPath(runtimeWant.want.State, spec.StatName)
 	}
 
-	value, exists := runtimeWant.want.Stats[spec.StatName]
+	value, exists := runtimeWant.want.State[spec.StatName]
 	if !exists {
 		return fmt.Sprintf("ERROR: Stat '%s' not found in want '%s'", spec.StatName, spec.WantName)
 	}

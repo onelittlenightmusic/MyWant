@@ -44,7 +44,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) *RestaurantWant {
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
+			// Stats field removed - using State instead
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -85,7 +85,7 @@ func (r *RestaurantWant) InitializePaths(inCount, outCount int) {
 
 func (r *RestaurantWant) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return r.Stats
+	return r.State
 }
 
 func (r *RestaurantWant) Process(paths Paths) bool {
@@ -101,20 +101,37 @@ func (r *RestaurantWant) GetWant() *Want {
 	return &r.Want
 }
 
-// CreateFunction creates a restaurant reservation
-func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	attempted := false
-
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(outputs) == 0 {
-			return true
+// Exec creates a restaurant reservation
+func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Read parameters fresh each cycle - enables dynamic changes!
+	restaurantType := "casual"
+	if rt, ok := r.Spec.Params["restaurant_type"]; ok {
+		if rts, ok := rt.(string); ok {
+			restaurantType = rts
 		}
-		out := outputs[0]
+	}
 
-		if attempted {
-			return true
+	duration := 2 * time.Hour // Default 2 hour dinner
+	if d, ok := r.Spec.Params["duration_hours"]; ok {
+		if df, ok := d.(float64); ok {
+			duration = time.Duration(df * float64(time.Hour))
 		}
-		attempted = true
+	}
+
+	// Check if already attempted using persistent state
+	attempted, _ := r.State["attempted"].(bool)
+
+	if len(outputs) == 0 {
+		return true
+	}
+	out := outputs[0]
+
+	if attempted {
+		return true
+	}
+
+	// Mark as attempted in persistent state
+	r.State["attempted"] = true
 
 		// Check for conflicts from input
 		var existingSchedule *TravelSchedule
@@ -136,9 +153,9 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 
 		newEvent := TimeSlot{
 			Start: dinnerStart,
-			End:   dinnerStart.Add(r.Duration),
+			End:   dinnerStart.Add(duration),
 			Type:  "restaurant",
-			Name:  fmt.Sprintf("%s dinner at %s restaurant", r.Metadata.Name, r.RestaurantType),
+			Name:  fmt.Sprintf("%s dinner at %s restaurant", r.Metadata.Name, restaurantType),
 		}
 
 		// Check for conflicts if we have existing schedule
@@ -151,7 +168,7 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 						// Retry with different time
 						dinnerStart = dinnerStart.Add(time.Hour)
 						newEvent.Start = dinnerStart
-						newEvent.End = dinnerStart.Add(r.Duration)
+						newEvent.End = dinnerStart.Add(duration)
 						fmt.Printf("[RESTAURANT] Conflict detected, retrying at %s\n", dinnerStart.Format("15:04"))
 						break
 					}
@@ -172,17 +189,17 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 		}
 
 		// Initialize stats map if not exists
-		if r.Stats == nil {
-			r.Stats = make(WantStats)
+		if r.State == nil {
+			r.State = make(map[string]interface{})
 		}
-		r.Stats["total_processed"] = 1
+		r.State["total_processed"] = 1
 		
 		// Store live state with reservation details
 		r.StoreState("total_processed", 1)
-		r.StoreState("reservation_type", r.RestaurantType)
+		r.StoreState("reservation_type", restaurantType)
 		r.StoreState("reservation_start_time", newEvent.Start.Format("15:04"))
 		r.StoreState("reservation_end_time", newEvent.End.Format("15:04"))
-		r.StoreState("reservation_duration_hours", r.Duration.Hours())
+		r.StoreState("reservation_duration_hours", duration.Hours())
 		r.StoreState("reservation_name", newEvent.Name)
 		r.StoreState("schedule_date", baseDate.Format("2006-01-02"))
 		
@@ -191,7 +208,6 @@ func (r *RestaurantWant) CreateFunction() func(using []chain.Chan, outputs []cha
 
 		out <- newSchedule
 		return true
-	}
 }
 
 // HotelWant creates hotel stay reservations
@@ -209,7 +225,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) *HotelWant {
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
+			// Stats field removed - using State instead
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -245,7 +261,7 @@ func (h *HotelWant) InitializePaths(inCount, outCount int) {
 
 func (h *HotelWant) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return h.Stats
+	return h.State
 }
 
 func (h *HotelWant) Process(paths Paths) bool {
@@ -261,19 +277,29 @@ func (h *HotelWant) GetWant() *Want {
 	return &h.Want
 }
 
-func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	attempted := false
-
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(outputs) == 0 {
-			return true
+func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Read parameters fresh each cycle - enables dynamic changes!
+	hotelType := "standard"
+	if ht, ok := h.Spec.Params["hotel_type"]; ok {
+		if hts, ok := ht.(string); ok {
+			hotelType = hts
 		}
-		out := outputs[0]
+	}
 
-		if attempted {
-			return true
-		}
-		attempted = true
+	// Check if already attempted using persistent state
+	attempted, _ := h.State["attempted"].(bool)
+
+	if len(outputs) == 0 {
+		return true
+	}
+	out := outputs[0]
+
+	if attempted {
+		return true
+	}
+
+	// Mark as attempted in persistent state
+	h.State["attempted"] = true
 
 		// Check for existing schedule
 		var existingSchedule *TravelSchedule
@@ -300,7 +326,7 @@ func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 			Start: checkInTime,
 			End:   checkOutTime,
 			Type:  "hotel",
-			Name:  fmt.Sprintf("%s stay at %s hotel", h.Metadata.Name, h.HotelType),
+			Name:  fmt.Sprintf("%s stay at %s hotel", h.Metadata.Name, hotelType),
 		}
 
 		// Check conflicts and retry if needed
@@ -332,14 +358,14 @@ func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 		}
 
 		// Initialize stats map if not exists
-		if h.Stats == nil {
-			h.Stats = make(WantStats)
+		if h.State == nil {
+			h.State = make(map[string]interface{})
 		}
-		h.Stats["total_processed"] = 1
+		h.State["total_processed"] = 1
 		
 		// Store live state with reservation details
 		h.StoreState("total_processed", 1)
-		h.StoreState("hotel_type", h.HotelType)
+		h.StoreState("hotel_type", hotelType)
 		h.StoreState("check_in_time", newEvent.Start.Format("15:04 Jan 2"))
 		h.StoreState("check_out_time", newEvent.End.Format("15:04 Jan 2"))
 		h.StoreState("stay_duration_hours", newEvent.End.Sub(newEvent.Start).Hours())
@@ -350,7 +376,6 @@ func (h *HotelWant) CreateFunction() func(using []chain.Chan, outputs []chain.Ch
 
 		out <- newSchedule
 		return true
-	}
 }
 
 // BuffetWant creates breakfast buffet reservations
@@ -366,7 +391,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) *BuffetWant {
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
+			// Stats field removed - using State instead
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -401,7 +426,7 @@ func (b *BuffetWant) InitializePaths(inCount, outCount int) {
 
 func (b *BuffetWant) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return b.Stats
+	return b.State
 }
 
 func (b *BuffetWant) Process(paths Paths) bool {
@@ -417,19 +442,31 @@ func (b *BuffetWant) GetWant() *Want {
 	return &b.Want
 }
 
-func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	attempted := false
-
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(outputs) == 0 {
-			return true
+func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Read parameters fresh each cycle - enables dynamic changes!
+	buffetType := "continental"
+	if bt, ok := b.Spec.Params["buffet_type"]; ok {
+		if bts, ok := bt.(string); ok {
+			buffetType = bts
 		}
-		out := outputs[0]
+	}
 
-		if attempted {
-			return true
-		}
-		attempted = true
+	duration := 1*time.Hour + 30*time.Minute // Default 1.5 hour breakfast
+
+	// Check if already attempted using persistent state
+	attempted, _ := b.State["attempted"].(bool)
+
+	if len(outputs) == 0 {
+		return true
+	}
+	out := outputs[0]
+
+	if attempted {
+		return true
+	}
+
+	// Mark as attempted in persistent state
+	b.State["attempted"] = true
 
 		var existingSchedule *TravelSchedule
 		if len(using) > 0 {
@@ -449,9 +486,9 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 
 		newEvent := TimeSlot{
 			Start: buffetStart,
-			End:   buffetStart.Add(b.Duration),
+			End:   buffetStart.Add(duration),
 			Type:  "buffet",
-			Name:  fmt.Sprintf("%s %s breakfast buffet", b.Metadata.Name, b.BuffetType),
+			Name:  fmt.Sprintf("%s %s breakfast buffet", b.Metadata.Name, buffetType),
 		}
 
 		if existingSchedule != nil {
@@ -462,7 +499,7 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 						conflict = true
 						buffetStart = buffetStart.Add(30 * time.Minute)
 						newEvent.Start = buffetStart
-						newEvent.End = buffetStart.Add(b.Duration)
+						newEvent.End = buffetStart.Add(duration)
 						fmt.Printf("[BUFFET] Conflict detected, retrying at %s\n", buffetStart.Format("15:04"))
 						break
 					}
@@ -482,17 +519,17 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 		}
 
 		// Initialize stats map if not exists
-		if b.Stats == nil {
-			b.Stats = make(WantStats)
+		if b.State == nil {
+			b.State = make(map[string]interface{})
 		}
-		b.Stats["total_processed"] = 1
+		b.State["total_processed"] = 1
 		
 		// Store live state with reservation details
 		b.StoreState("total_processed", 1)
-		b.StoreState("buffet_type", b.BuffetType)
+		b.StoreState("buffet_type", buffetType)
 		b.StoreState("buffet_start_time", newEvent.Start.Format("15:04 Jan 2"))
 		b.StoreState("buffet_end_time", newEvent.End.Format("15:04 Jan 2"))
-		b.StoreState("buffet_duration_hours", b.Duration.Hours())
+		b.StoreState("buffet_duration_hours", duration.Hours())
 		b.StoreState("reservation_name", newEvent.Name)
 		
 		fmt.Printf("[BUFFET] Scheduled %s from %s to %s\n",
@@ -500,7 +537,6 @@ func (b *BuffetWant) CreateFunction() func(using []chain.Chan, outputs []chain.C
 
 		out <- newSchedule
 		return true
-	}
 }
 
 // Helper function to check time conflicts
@@ -528,7 +564,7 @@ func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) *TravelCoordinat
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
-			Stats:    WantStats{},
+			// Stats field removed - using State instead
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
@@ -562,7 +598,7 @@ func (t *TravelCoordinatorWant) InitializePaths(inCount, outCount int) {
 
 func (t *TravelCoordinatorWant) GetStats() map[string]interface{} {
 	// Stats are now dynamic, just return the map directly
-	return t.Stats
+	return t.State
 }
 
 func (t *TravelCoordinatorWant) Process(paths Paths) bool {
@@ -578,29 +614,44 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 	return &t.Want
 }
 
-func (t *TravelCoordinatorWant) CreateFunction() func(using []chain.Chan, outputs []chain.Chan) bool {
-	schedules := make([]*TravelSchedule, 0)
-
-	return func(using []chain.Chan, outputs []chain.Chan) bool {
-		if len(using) < 3 {
-			return true
+func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Read parameters fresh each cycle - enables dynamic changes!
+	template := "travel itinerary"
+	if tmpl, ok := t.Spec.Params["template"]; ok {
+		if tmpls, ok := tmpl.(string); ok {
+			template = tmpls
 		}
+	}
 
-		// Collect all schedules from child wants
-		for _, input := range using {
-			select {
-			case schedData := <-input:
-				if schedule, ok := schedData.(*TravelSchedule); ok {
-					schedules = append(schedules, schedule)
-				}
-			default:
-				// No more data on this channel
+	if len(using) < 3 {
+		return true
+	}
+
+	// Use persistent state to track schedules
+	schedules, _ := t.State["schedules"].([]*TravelSchedule)
+	if schedules == nil {
+		schedules = make([]*TravelSchedule, 0)
+		t.State["schedules"] = schedules
+	}
+
+	// Collect all schedules from child wants
+	for _, input := range using {
+		select {
+		case schedData := <-input:
+			if schedule, ok := schedData.(*TravelSchedule); ok {
+				schedules = append(schedules, schedule)
 			}
+		default:
+			// No more data on this channel
 		}
+	}
 
-		// When we have all schedules, create final itinerary
-		if len(schedules) >= 3 {
-			fmt.Printf("\n🗓️  Final %s:\n", t.Template)
+	// Update persistent state
+	t.State["schedules"] = schedules
+
+	// When we have all schedules, create final itinerary
+	if len(schedules) >= 3 {
+			fmt.Printf("\n🗓️  Final %s:\n", template)
 			fmt.Printf("=================================\n")
 
 			// Combine and sort all events
@@ -625,16 +676,15 @@ func (t *TravelCoordinatorWant) CreateFunction() func(using []chain.Chan, output
 			}
 
 			// Initialize stats map if not exists
-			if t.Stats == nil {
-				t.Stats = make(WantStats)
+			if t.State == nil {
+				t.State = make(map[string]interface{})
 			}
-			t.Stats["total_processed"] = len(allEvents)
+			t.State["total_processed"] = len(allEvents)
 			fmt.Printf("\n✅ Travel itinerary completed with %d events!\n", len(allEvents))
 			return true
 		}
 
 		return false // Continue waiting for more schedules
-	}
 }
 
 // RegisterTravelWantTypes registers all travel-related want types

@@ -53,7 +53,7 @@ func main() {
 		if state != nil {
 			// Show stats from prime filter
 			if state.Metadata.Type == "prime_filter" {
-				if totalProcessed, exists := state.Stats["total_processed"]; exists {
+				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  🔢 Filter %s processed %v numbers\n", name, totalProcessed)
 				}
 				if primes, exists := state.GetState("foundPrimes"); exists {
@@ -76,7 +76,7 @@ func main() {
 			
 			// Show stats from prime generator
 			if state.Metadata.Type == "prime_numbers" {
-				if totalProcessed, exists := state.Stats["total_processed"]; exists {
+				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  📈 Generator %s produced %v numbers\n", name, totalProcessed)
 				}
 			}
