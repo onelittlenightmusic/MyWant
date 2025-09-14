@@ -1,0 +1,15 @@
+wants:
+  - metadata:
+      name: travel planner
+      type: travel itinerary planner
+      labels:
+        role: travel-planner
+    spec:
+      recipe: recipes/travel-itinerary.yaml
+      params:
+        prefix: vacation
+        display_name: "Agent Delegation Travel Test"
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        buffet_type: "international"
+        dinner_duration: 2.0

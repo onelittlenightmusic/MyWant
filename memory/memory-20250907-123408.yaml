@@ -1,0 +1,107 @@
+timestamp: "2025-09-07T12:34:08+09:00"
+execution_id: exec-20250907-123408
+wants:
+    - metadata:
+        name: queue-system-numbers-1
+        type: numbers
+        labels:
+            category: queue-producer
+            component: generator
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 1000
+            deterministic: false
+            rate: 10
+      stats:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: queue-system-queue-2
+        type: queue
+        labels:
+            category: queue-processor
+            component: main-queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            deterministic: false
+            service_time: 0.1
+        using:
+            - category: queue-producer
+      stats:
+        average_wait_time: 3.7988195974792323
+        total_processed: 1000
+        total_wait_time: 3798.8195974792325
+      status: completed
+    - metadata:
+        name: queue-system-sink-3
+        type: sink
+        labels:
+            category: result-display
+            component: final-sink
+            owner: child
+            role: collector
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: number-target
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        using:
+            - role: processor
+      stats:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: number-target
+        type: wait time in queue system
+        labels:
+            category: display
+            owner: parent
+      spec:
+        params:
+            count: 1000
+            deterministic: false
+            max_display: 100
+            prefix: queue-system
+            rate: 10
+            service_time: 0.1
+      stats:
+        numbers_TotalProcessed: 1000
+        primaryResult: 1000
+        queue_TotalProcessed: 1000
+        queue_average_wait_time: 3.7988195974792323
+        recipeResult: 1000
+      status: completed
+      state:
+        childCount: 6
+        metrics:
+            numbers_TotalProcessed: 1000
+            queue_TotalProcessed: 1000
+            queue_average_wait_time: 3.7988195974792323
+        primaryResult: 1000
+        recipePath: recipes/queue-system.yaml
+        recipeResult: 1000
+        result: 'Total items processed through the queue system: 1000'

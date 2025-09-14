@@ -100,23 +100,12 @@ recipe:
 
   # Recipe result definition - specifies which want and stat to use for final result
   result:
-    # Primary result from the final collector
-    primary:
-      want_name: "collector-end"
-      stat_name: "TotalProcessed"
-      description: "Total packets processed through the entire QNet pipeline"
-    
-    # Additional metrics can be defined
-    metrics:
       - want_name: "queue-primary"
-        stat_name: "TotalProcessed" 
-        description: "Primary stream processing count"
+        stat_name: ".average_wait_time"
+        description: "Average wait time in primary stream queue"
       - want_name: "queue-secondary"
-        stat_name: "TotalProcessed"
-        description: "Secondary stream processing count"
-      - want_name: "combiner-main"
-        stat_name: "TotalProcessed"
-        description: "Combined stream processing count"
+        stat_name: ".average_wait_time"
+        description: "Average wait time in secondary stream queue"
       - want_name: "queue-final"
-        stat_name: "TotalProcessed"
-        description: "Final queue processing count"
+        stat_name: "."
+        description: "All metrics in final queue"

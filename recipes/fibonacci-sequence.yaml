@@ -37,23 +37,12 @@ recipe:
 
   # Recipe result definition - specifies how to compute fibonacci results
   result:
-    # Primary result from the fibonacci sequence (collected fibonacci numbers)
-    primary:
-      want_name: "fibonacci_sequence"
-      stat_name: "total_processed"
+    - want_name: "fibonacci_sequence"
+      stat_name: ".total_processed"
       description: "Total numbers processed by fibonacci filter"
-    
-    # Fibonacci-specific metrics
-    metrics:
-      - want_name: "fibonacci_numbers"
-        stat_name: "total_processed"
-        description: "Total fibonacci numbers generated"
-      - want_name: "fibonacci_sequence"
-        stat_name: "total_processed"
-        description: "Numbers processed through filter"
-      - want_name: "fibonacci_sequence"
-        stat_name: "filtered"
-        description: "Actual filtered fibonacci numbers"
-      - want_name: "fibonacci_sequence"
-        stat_name: "count"
-        description: "Count of filtered fibonacci numbers"
+    - want_name: "fibonacci_numbers"
+      stat_name: ".total_processed"
+      description: "Total fibonacci numbers generated"
+    - want_name: "fibonacci_sequence"
+      stat_name: "."
+      description: "All metrics from fibonacci sequence filter"

@@ -1,0 +1,85 @@
+timestamp: "2025-09-13T03:05:22-04:00"
+execution_id: exec-20250913-030522
+wants:
+    - metadata:
+        name: dinner-reservation
+        type: restaurant
+        labels:
+            category: dining
+            priority: high
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            duration_hours: 2
+            restaurant_type: fine dining
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        reservation_duration_hours: 2
+        reservation_end_time: "21:20"
+        reservation_name: dinner-reservation dinner at fine dining restaurant
+        reservation_start_time: "19:20"
+        reservation_type: fine dining
+        schedule_date: "2025-09-14"
+        total_processed: 1
+    - metadata:
+        name: hotel-booking
+        type: hotel
+        labels:
+            category: accommodation
+            priority: high
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            hotel_type: luxury
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        check_in_time: 20:33 Sep 14
+        check_out_time: 07:35 Sep 15
+        hotel_type: luxury
+        reservation_name: hotel-booking stay at luxury hotel
+        stay_duration_hours: 11.033333333333333
+        total_processed: 1
+    - metadata:
+        name: breakfast-buffet
+        type: buffet
+        labels:
+            category: dining
+            priority: medium
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            buffet_type: international
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        buffet_duration_hours: 1.5
+        buffet_end_time: 09:57 Sep 15
+        buffet_start_time: 08:27 Sep 15
+        buffet_type: international
+        reservation_name: breakfast-buffet international breakfast buffet
+        total_processed: 1
+    - metadata:
+        name: get-one-day-travel
+        type: travel_coordinator
+        labels:
+            category: travel
+            priority: critical
+            role: coordinator
+            template: travel_itinerary
+      spec:
+        params:
+            template: One Day Travel Itinerary
+        using:
+            - role: scheduler
+              template: travel_itinerary
+      stats:
+        total_processed: 3
+      status: completed

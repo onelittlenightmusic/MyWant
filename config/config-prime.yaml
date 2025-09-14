@@ -12,7 +12,7 @@ wants:
 
   # Prime sequence that filters out non-prime numbers
   - metadata:
-      name: prime_sequence
+      name: prime sequence
       type: prime_sequence
       labels:
         role: filter

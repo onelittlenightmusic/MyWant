@@ -1,0 +1,283 @@
+timestamp: "2025-09-14T13:47:44+09:00"
+execution_id: exec-20250914-134744
+wants:
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            owner: child
+            role: merger
+            stage: second
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: first
+      stats:
+        average_wait_time: 0
+        total_processed: 14000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            owner: child
+            path: output
+            role: processor
+            stage: final
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: 0.04
+        using:
+            - role: merger
+      stats:
+        average_wait_time: 0.022088645261166127
+        current_server_free_time: 3207.1246673624933
+        total_processed: 8000
+        total_wait_time: 176.70916208932903
+      status: completed
+      state:
+        average_wait_time: 0.022088645261166127
+        current_server_free_time: 3207.1246673624933
+        last_packet_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 176.70916208932903
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            owner: child
+            role: terminal
+            stage: end
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: final
+      stats:
+        average_wait_time: 0
+        total_processed: 14000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: qnet pipeline
+        type: wait time in queue system
+        labels:
+            role: qnet-target
+      spec:
+        recipe: recipes/qnet-pipeline.yaml
+        params:
+            count: 1000
+            deterministic: false
+            final_service_time: 0.04
+            prefix: qnet
+            primary_count: 8000
+            primary_rate: 2.5
+            primary_service_time: 0.08
+            rate: 10
+            secondary_count: 6000
+            secondary_rate: 3.5
+            secondary_service_time: 0.1
+            service_time: 0.05
+      stats:
+        primaryResult: 0.01975988383096187
+        queue-final_all_metrics:
+            average_wait_time: 0.022088645261166127
+            current_server_free_time: 3207.1246673624933
+            total_processed: 8000
+            total_wait_time: 176.70916208932903
+        queue-primary_average_wait_time: 0.01975988383096187
+        queue-secondary_average_wait_time: 0.0549999271707112
+        recipeResult: 0.01975988383096187
+      status: completed
+      state:
+        childCount: 11
+        historyState:
+            - child_name: queue-primary
+              timestamp: "2025-09-14T13:47:44+09:00"
+              state:
+                average_wait_time: 0.019429209024196148
+                current_server_free_time: 3207.093968166024
+                last_packet_wait_time: 0
+                total_processed: 8000
+                total_wait_time: 155.43367219356918
+            - child_name: queue-final
+              timestamp: "2025-09-14T13:47:44+09:00"
+              state:
+                average_wait_time: 0.022088645261166127
+                current_server_free_time: 3207.1246673624933
+                last_packet_wait_time: 0
+                total_processed: 8000
+                total_wait_time: 176.70916208932903
+            - child_name: queue-secondary
+              timestamp: "2025-09-14T13:47:44+09:00"
+              state:
+                average_wait_time: 0.05497633414086895
+                current_server_free_time: 1722.1597465803293
+                last_packet_wait_time: 0.023441602458660782
+                total_processed: 6000
+                total_wait_time: 329.8580048452137
+        historyStateCount: 3
+        latestState:
+            queue-final:
+                average_wait_time: 0.022088645261166127
+                current_server_free_time: 3207.1246673624933
+                last_packet_wait_time: 0
+                total_processed: 8000
+                total_wait_time: 176.70916208932903
+            queue-primary:
+                average_wait_time: 0.019429209024196148
+                current_server_free_time: 3207.093968166024
+                last_packet_wait_time: 0
+                total_processed: 8000
+                total_wait_time: 155.43367219356918
+            queue-secondary:
+                average_wait_time: 0.05497633414086895
+                current_server_free_time: 1722.1597465803293
+                last_packet_wait_time: 0.023441602458660782
+                total_processed: 6000
+                total_wait_time: 329.8580048452137
+        metrics:
+            queue-final_all_metrics:
+                average_wait_time: 0.022088645261166127
+                current_server_free_time: 3207.1246673624933
+                total_processed: 8000
+                total_wait_time: 176.70916208932903
+            queue-primary_average_wait_time: 0.01975988383096187
+            queue-secondary_average_wait_time: 0.0549999271707112
+        primaryResult: 0.01975988383096187
+        recipePath: recipes/qnet-pipeline.yaml
+        recipeResult: 0.01975988383096187
+        result: 'Average wait time in primary stream queue: 0.01975988383096187'
+    - metadata:
+        name: gen-primary
+        type: numbers
+        labels:
+            owner: child
+            priority: high
+            role: source
+            stream: primary
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 8000
+            rate: 2.5
+      stats:
+        average_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: gen-secondary
+        type: numbers
+        labels:
+            owner: child
+            priority: medium
+            role: source
+            stream: secondary
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 6000
+            rate: 3.5
+      stats:
+        average_wait_time: 0
+        total_processed: 6000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            owner: child
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: 0.08
+        using:
+            - role: source
+              stream: primary
+      stats:
+        average_wait_time: 0.019429209024196148
+        current_server_free_time: 3207.093968166024
+        total_processed: 8000
+        total_wait_time: 155.43367219356918
+      status: completed
+      state:
+        average_wait_time: 0.019429209024196148
+        current_server_free_time: 3207.093968166024
+        last_packet_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 155.43367219356918
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            owner: child
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+              stream: secondary
+      stats:
+        average_wait_time: 0.05497633414086895
+        current_server_free_time: 1722.1597465803293
+        total_processed: 6000
+        total_wait_time: 329.8580048452137
+      status: completed
+      state:
+        average_wait_time: 0.05497633414086895
+        current_server_free_time: 1722.1597465803293
+        last_packet_wait_time: 0.023441602458660782
+        total_processed: 6000
+        total_wait_time: 329.8580048452137

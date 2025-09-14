@@ -25,10 +25,8 @@ type GenericRecipe struct {
 }
 
 // RecipeResult defines how to compute results from recipe execution
-type RecipeResult struct {
-	Primary RecipeResultSpec   `yaml:"primary"`
-	Metrics []RecipeResultSpec `yaml:"metrics,omitempty"`
-}
+// Supports both legacy format (primary/metrics) and new flat array format
+type RecipeResult []RecipeResultSpec
 
 // RecipeResultSpec specifies which want and stat to use for result computation
 type RecipeResultSpec struct {
@@ -527,23 +525,40 @@ func validateRecipeWantsStructure(wants interface{}) error {
 }
 
 // validateRecipeResultStructure validates the structure of recipe result
+// Supports both legacy format (object with primary/metrics) and new format (flat array)
 func validateRecipeResultStructure(result interface{}) error {
+	// Try new format first (flat array)
+	if resultArray, ok := result.([]interface{}); ok {
+		// New format: validate as array of result specs
+		if len(resultArray) == 0 {
+			return fmt.Errorf("result array cannot be empty")
+		}
+		for i, spec := range resultArray {
+			err := validateRecipeResultSpec(spec, fmt.Sprintf("result[%d]", i))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Fall back to legacy format (object with primary/metrics)
 	resultObj, ok := result.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("result must be an object")
+		return fmt.Errorf("result must be either an array (new format) or an object (legacy format)")
 	}
-	
-	// Check required primary field
+
+	// Check required primary field for legacy format
 	if primary, ok := resultObj["primary"]; !ok {
-		return fmt.Errorf("result missing required 'primary' field")
+		return fmt.Errorf("result missing required 'primary' field in legacy format")
 	} else {
 		err := validateRecipeResultSpec(primary, "primary")
 		if err != nil {
 			return err
 		}
 	}
-	
-	// Validate metrics if present
+
+	// Validate metrics if present in legacy format
 	if metrics, ok := resultObj["metrics"]; ok {
 		metricsArray, ok := metrics.([]interface{})
 		if !ok {
@@ -556,7 +571,7 @@ func validateRecipeResultStructure(result interface{}) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 

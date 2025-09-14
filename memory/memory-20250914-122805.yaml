@@ -1,0 +1,144 @@
+timestamp: "2025-09-14T12:28:05+09:00"
+execution_id: exec-20250914-122805
+wants:
+    - metadata:
+        name: collector-end
+        type: sink
+        labels:
+            role: terminal
+            stage: end
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: final
+      stats:
+        average_wait_time: 0
+        total_processed: 14000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: gen-primary
+        type: numbers
+        labels:
+            priority: high
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 8000
+            rate: 2.5
+      stats:
+        average_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: gen-secondary
+        type: numbers
+        labels:
+            priority: medium
+            role: source
+            stream: secondary
+      spec:
+        params:
+            count: 6000
+            rate: 3.5
+      stats:
+        average_wait_time: 0
+        total_processed: 6000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: queue-primary
+        type: queue
+        labels:
+            path: main
+            role: processor
+            stage: first
+            stream: primary
+      spec:
+        params:
+            service_time: 0.08
+        using:
+            - role: source
+              stream: primary
+      stats:
+        average_wait_time: 0.021126679030573286
+        current_server_free_time: 3203.3347475047794
+        total_processed: 8000
+        total_wait_time: 169.01343224458628
+      status: completed
+      state:
+        average_wait_time: 0.021126679030573286
+        current_server_free_time: 3203.3347475047794
+        last_packet_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 169.01343224458628
+    - metadata:
+        name: queue-secondary
+        type: queue
+        labels:
+            path: alt
+            role: processor
+            stage: first
+            stream: secondary
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+              stream: secondary
+      stats:
+        average_wait_time: 0.05122286076220146
+        current_server_free_time: 1755.1783853275865
+        total_processed: 6000
+        total_wait_time: 307.3371645732087
+      status: completed
+      state:
+        average_wait_time: 0.05122286076220146
+        current_server_free_time: 1755.1783853275865
+        last_packet_wait_time: 0
+        total_processed: 6000
+        total_wait_time: 307.3371645732087
+    - metadata:
+        name: combiner-main
+        type: combiner
+        labels:
+            operation: combine
+            role: merger
+            stage: second
+      spec:
+        params: {}
+        using:
+            - role: processor
+              stage: first
+      stats:
+        average_wait_time: 0
+        total_processed: 14000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: queue-final
+        type: queue
+        labels:
+            path: output
+            role: processor
+            stage: final
+      spec:
+        params:
+            service_time: 0.04
+        using:
+            - role: merger
+      stats:
+        average_wait_time: 0.1671477275480732
+        current_server_free_time: 3203.3546753281917
+        total_processed: 8000
+        total_wait_time: 1337.1818203845855
+      status: completed
+      state:
+        average_wait_time: 0.1671477275480732
+        current_server_free_time: 3203.3546753281917
+        last_packet_wait_time: 0
+        total_processed: 8000
+        total_wait_time: 1337.1818203845855

@@ -1,0 +1,54 @@
+timestamp: "2025-09-14T11:44:31+09:00"
+execution_id: exec-20250914-114431
+wants:
+    - metadata:
+        name: queue-main
+        type: queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.05
+        using:
+            - role: source
+      stats:
+        average_wait_time: 0.004742832873396946
+        current_server_free_time: 501.2423491457663
+        total_processed: 1000
+        total_wait_time: 4.742832873396946
+      status: completed
+      state:
+        average_wait_time: 0.004742832873396946
+        current_server_free_time: 501.2423491457663
+        last_packet_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 4.742832873396946
+    - metadata:
+        name: sink-main
+        type: sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      stats:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      status: completed
+    - metadata:
+        name: gen-primary
+        type: numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 1000
+            rate: 2
+      stats:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      status: completed

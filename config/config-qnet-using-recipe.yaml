@@ -4,7 +4,7 @@
 wants:
   # Primary packet generator
   - metadata:
-      name: gen-primary
+      name: gen primary
       type: numbers
       labels:
         role: source
@@ -17,7 +17,7 @@ wants:
 
   # Secondary packet generator
   - metadata:
-      name: gen-secondary
+      name: gen secondary
       type: numbers
       labels:
         role: source
@@ -30,7 +30,7 @@ wants:
 
   # Main queue processing primary stream - using field connects to primary source
   - metadata:
-      name: queue-primary
+      name: queue primary
       type: queue
       labels:
         role: processor
@@ -46,7 +46,7 @@ wants:
 
   # Alt queue processing secondary stream - using field connects to secondary source
   - metadata:
-      name: queue-secondary
+      name: queue secondary
       type: queue
       labels:
         role: processor
@@ -62,7 +62,7 @@ wants:
 
   # Stream combiner - using field connects to BOTH first-stage processors
   - metadata:
-      name: combiner-main
+      name: combiner main
       type: combiner
       labels:
         role: merger
@@ -76,7 +76,7 @@ wants:
 
   # Final processing queue - using field connects to combiner
   - metadata:
-      name: queue-final
+      name: queue final
       type: queue
       labels:
         role: processor
@@ -90,7 +90,7 @@ wants:
 
   # Final collector - using field connects to final processor
   - metadata:
-      name: collector-end
+      name: collector end
       type: sink
       labels:
         role: terminal

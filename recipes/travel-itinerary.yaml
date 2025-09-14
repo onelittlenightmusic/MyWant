@@ -47,20 +47,15 @@ recipe:
 
   # Recipe result definition - specifies how to compute travel planning results
   result:
-    # Primary result from the travel coordinator
-    primary:
-      want_name: "travel_coordinator"
-      stat_name: "TotalProcessed"
+    - want_name: "travel_coordinator"
+      stat_name: ".total_processed"
       description: "Total travel bookings coordinated"
-    
-    # Travel-specific metrics
-    metrics:
-      - want_name: "restaurant"
-        stat_name: "TotalProcessed"
-        description: "Restaurant reservations completed"
-      - want_name: "hotel"
-        stat_name: "TotalProcessed"
-        description: "Hotel bookings completed"
-      - want_name: "buffet"
-        stat_name: "TotalProcessed"
-        description: "Buffet reservations completed"
+    - want_name: "restaurant"
+      stat_name: ".total_processed"
+      description: "Restaurant reservations completed"
+    - want_name: "hotel"
+      stat_name: ".total_processed"
+      description: "Hotel bookings completed"
+    - want_name: "buffet"
+      stat_name: ".total_processed"
+      description: "Buffet reservations completed"

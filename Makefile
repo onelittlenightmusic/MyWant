@@ -27,7 +27,7 @@ run-sample-owner-config:
 	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go config/config-sample-owner.yaml
 
 run-qnet-target:
-	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go config/config-qnet.yaml
+	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go config/config-qnet-target.yaml
 
 run-travel-target:
 	go run cmd/demos/demo_travel_target.go cmd/demos/travel_types.go config/config-travel-target.yaml

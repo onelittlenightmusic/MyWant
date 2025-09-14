@@ -1,0 +1,45 @@
+timestamp: "2025-09-13T17:26:58+09:00"
+execution_id: exec-20250913-172658
+wants:
+    - metadata:
+        name: seed-generator
+        type: seed_numbers
+        labels:
+            component: seed
+            role: source
+            stage: initial
+      spec:
+        params:
+            max_count: 20
+      stats:
+        total_processed: 2
+      status: completed
+    - metadata:
+        name: fibonacci-computer
+        type: fibonacci_computer
+        labels:
+            component: calculator
+            role: processor
+            stage: computation
+      spec:
+        params: {}
+        using:
+            - role: merger
+      stats:
+        total_processed: 18
+      status: completed
+    - metadata:
+        name: fibonacci-merger
+        type: fibonacci_merger
+        labels:
+            role: merger
+            stage: combine
+            stream: fibonacci
+      spec:
+        params: {}
+        using:
+            - role: source
+            - role: processor
+      stats:
+        total_processed: 20
+      status: completed

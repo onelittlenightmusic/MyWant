@@ -1,7 +1,7 @@
 wants:
   # Dinner restaurant reservation
   - metadata:
-      name: dinner-reservation
+      name: dinner reservation
       type: restaurant
       labels:
         role: scheduler
@@ -15,7 +15,7 @@ wants:
 
   # Hotel accommodation booking
   - metadata:
-      name: hotel-booking
+      name: hotel booking
       type: hotel
       labels:
         role: scheduler
@@ -28,7 +28,7 @@ wants:
 
   # Morning breakfast buffet
   - metadata:
-      name: breakfast-buffet
+      name: breakfast buffet
       type: buffet
       labels:
         role: scheduler
@@ -41,7 +41,7 @@ wants:
 
   # Travel coordinator (parent want) - "get one day travel"
   - metadata:
-      name: get-one-day-travel
+      name: get one day travel
       type: travel_coordinator
       labels:
         role: coordinator

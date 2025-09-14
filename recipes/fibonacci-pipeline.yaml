@@ -18,3 +18,7 @@ recipe:
         display_format: "Fibonacci: %d"
       using:
         - category: fibonacci-producer
+  result:
+    - want_name: "fibonacci_generator"
+      stat_name: ".total_processed"
+      description: "Total fibonacci numbers generated"

@@ -5,12 +5,13 @@ import (
 	"mywant/src/chain"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 	"crypto/md5"
 	"io"
 	"context"
-	
+
 	"gopkg.in/yaml.v3"
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -303,6 +304,10 @@ type ChainBuilder struct {
 	pathMap        map[string]Paths          // Want path mapping
 	channels       map[string]chain.Chan     // Inter-want channels
 	channelMutex   sync.RWMutex             // Protect channel access
+
+	// Recipe result processing
+	recipeResult   *RecipeResult             // Recipe result definition (if available)
+	recipePath     string                    // Path to recipe file (if loaded from recipe)
 }
 
 // runtimeWant holds the runtime state of a want
@@ -318,6 +323,19 @@ type runtimeWant struct {
 func NewChainBuilder(config Config) *ChainBuilder {
 	builder := NewChainBuilderWithPaths("", "")
 	builder.config = config
+	return builder
+}
+
+// NewChainBuilderFromRecipe creates a ChainBuilder from a GenericRecipeConfig with automatic result processing
+func NewChainBuilderFromRecipe(recipeConfig *GenericRecipeConfig) *ChainBuilder {
+	builder := NewChainBuilderWithPaths("", "")
+	builder.config = recipeConfig.Config
+
+	// Set recipe result for automatic processing
+	if recipeConfig.Result != nil {
+		builder.SetRecipeResult(recipeConfig.Result, "recipe")
+	}
+
 	return builder
 }
 
@@ -1163,8 +1181,10 @@ func (cb *ChainBuilder) Execute() {
 	} else {
 		fmt.Println("[RECONCILE] Memory dump completed successfully")
 	}
-	
-	
+
+	// Process recipe results if available
+	cb.processRecipeResults()
+
 	fmt.Println("[RECONCILE] Execution completed")
 }
 
@@ -1210,25 +1230,25 @@ func LoadConfigFromYAML(filename string) (Config, error) {
 // loadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config
-	
+
 	// Read the YAML config file
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return config, fmt.Errorf("failed to read YAML file: %w", err)
 	}
-	
+
 	// Validate against OpenAPI spec before parsing
 	err = validateConfigWithSpec(data)
 	if err != nil {
 		return config, fmt.Errorf("config validation failed: %w", err)
 	}
-	
+
 	// Parse the validated YAML
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
-	
+
 	return config, nil
 }
 
@@ -1524,4 +1544,128 @@ func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedWantName s
 			}
 		}
 	}
+}
+
+// SetRecipeResult sets the recipe result definition for processing at the end of execution
+func (cb *ChainBuilder) SetRecipeResult(result *RecipeResult, recipePath string) {
+	cb.recipeResult = result
+	cb.recipePath = recipePath
+}
+
+// processRecipeResults processes and displays recipe results if available
+func (cb *ChainBuilder) processRecipeResults() {
+	if cb.recipeResult == nil || len(*cb.recipeResult) == 0 {
+		return
+	}
+
+	fmt.Println("\n🎯 Recipe Results:")
+	fmt.Println("==================")
+
+	// Process all results in the new flat array format
+	for i, resultSpec := range *cb.recipeResult {
+		resultValue := cb.extractResultFromSpec(resultSpec)
+		if i == 0 {
+			fmt.Printf("📊 Primary Result: %s\n", resultSpec.Description)
+			fmt.Printf("   Value: %v (from %s.%s)\n", resultValue, resultSpec.WantName, resultSpec.StatName)
+		} else {
+			fmt.Printf("📈 Additional Metric: %s\n", resultSpec.Description)
+			fmt.Printf("   Value: %v (from %s.%s)\n", resultValue, resultSpec.WantName, resultSpec.StatName)
+		}
+	}
+
+	fmt.Println()
+}
+
+// extractResultFromSpec extracts a result value from want stats using recipe specification
+func (cb *ChainBuilder) extractResultFromSpec(spec RecipeResultSpec) interface{} {
+	// Find the want by name
+	runtimeWant, exists := cb.wants[spec.WantName]
+	if !exists {
+		return fmt.Sprintf("ERROR: Want '%s' not found", spec.WantName)
+	}
+
+	// Extract the stat value
+	if runtimeWant.want.Stats == nil {
+		return fmt.Sprintf("ERROR: No stats available for want '%s'", spec.WantName)
+	}
+
+	// Handle JSON path syntax
+	if strings.HasPrefix(spec.StatName, ".") {
+		return cb.extractValueByPath(runtimeWant.want.Stats, spec.StatName)
+	}
+
+	value, exists := runtimeWant.want.Stats[spec.StatName]
+	if !exists {
+		return fmt.Sprintf("ERROR: Stat '%s' not found in want '%s'", spec.StatName, spec.WantName)
+	}
+
+	return value
+}
+
+// extractValueByPath extracts values using JSON path-like syntax for ChainBuilder
+func (cb *ChainBuilder) extractValueByPath(data map[string]interface{}, path string) interface{} {
+	// Handle root path "." - return entire data
+	if path == "." {
+		return data
+	}
+
+	// Handle field access like ".average_wait_time"
+	if strings.HasPrefix(path, ".") {
+		fieldName := strings.TrimPrefix(path, ".")
+
+		// Simple field access
+		if value, ok := data[fieldName]; ok {
+			return value
+		}
+
+		// Try common field name variations
+		if value, ok := data[strings.ToLower(fieldName)]; ok {
+			return value
+		}
+
+		// Handle underscore/camelCase variations
+		if strings.Contains(fieldName, "_") {
+			// Try camelCase version
+			camelCase := cb.toCamelCase(fieldName)
+			if value, ok := data[camelCase]; ok {
+				return value
+			}
+		} else {
+			// Try snake_case version
+			snakeCase := cb.toSnakeCase(fieldName)
+			if value, ok := data[snakeCase]; ok {
+				return value
+			}
+		}
+	}
+
+	return nil
+}
+
+// toCamelCase converts snake_case to camelCase for ChainBuilder
+func (cb *ChainBuilder) toCamelCase(str string) string {
+	parts := strings.Split(str, "_")
+	if len(parts) <= 1 {
+		return str
+	}
+
+	result := parts[0]
+	for _, part := range parts[1:] {
+		if len(part) > 0 {
+			result += strings.ToUpper(string(part[0])) + strings.ToLower(part[1:])
+		}
+	}
+	return result
+}
+
+// toSnakeCase converts camelCase to snake_case for ChainBuilder
+func (cb *ChainBuilder) toSnakeCase(str string) string {
+	var result []rune
+	for i, r := range str {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result = append(result, '_')
+		}
+		result = append(result, r)
+	}
+	return strings.ToLower(string(result))
 }

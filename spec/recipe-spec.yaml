@@ -116,21 +116,23 @@ components:
               role: "source"
       additionalProperties: false
     
-    # Recipe result specification
+    # Recipe result specification (new array format)
     RecipeResult:
-      type: object
-      description: Recipe result definition specifying how to compute results from execution
-      required:
-        - primary
-      properties:
-        primary:
-          $ref: '#/components/schemas/RecipeResultSpec'
-        metrics:
-          type: array
-          description: Additional metrics to collect from recipe execution
-          items:
-            $ref: '#/components/schemas/RecipeResultSpec'
-      additionalProperties: false
+      type: array
+      description: Array of result specifications with JSON path syntax for extracting metrics
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/RecipeResultSpec'
+      example:
+        - want_name: "queue-primary"
+          stat_name: ".average_wait_time"
+          description: "Average wait time in primary stream queue"
+        - want_name: "queue-secondary"
+          stat_name: ".average_wait_time"
+          description: "Average wait time in secondary stream queue"
+        - want_name: "queue-final"
+          stat_name: "."
+          description: "All metrics from final queue"
     
     # Recipe result specification for individual metrics
     RecipeResultSpec:
@@ -146,8 +148,9 @@ components:
           example: "sink"
         stat_name:
           type: string
-          description: Name of the stat to use for result computation
-          example: "TotalProcessed"
+          description: JSON path expression for extracting stat values. Use '.' for all stats, or '.field_name' for specific fields (e.g., '.' for all stats, '.average_wait_time' for specific field)
+          example: ".average_wait_time"
+          pattern: "^\\.$|^\\.[a-zA-Z_][a-zA-Z0-9_]*$"
         description:
           type: string
           description: Human-readable description of this result metric

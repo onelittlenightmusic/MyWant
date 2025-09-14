@@ -1,0 +1,173 @@
+timestamp: "2025-09-12T06:32:12-04:00"
+execution_id: exec-20250912-063212
+wants:
+    - metadata:
+        name: travel-agent-pool
+        type: agent_pool
+        labels:
+            category: travel
+            role: agent-manager
+      spec:
+        params:
+            agent_workers:
+                - capabilities:
+                    - hotel_reservation
+                  max_tasks: 2
+                  name: hotel-worker
+                  timeout: 20
+                - capabilities:
+                    - restaurant_reservation
+                    - buffet_reservation
+                  max_tasks: 1
+                  name: restaurant-worker
+                  timeout: 15
+            max_concurrent: 3
+            task_timeout_seconds: 30
+      status: completed
+      state:
+        agent_workers_created: 2
+        completion_method: notification
+        completion_status: completed
+        created_workers:
+            - travel-agent-pool-worker-0
+            - travel-agent-pool-worker-1
+        max_concurrent: 3
+        task_timeout_seconds: 30
+    - metadata:
+        name: hotel-requester
+        type: hotel
+        labels:
+            category: accommodation
+            role: task-submitter
+      spec:
+        params:
+            capability: hotel_reservation
+            hotel_type: luxury
+            pool_name: travel-agent-pool
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        check_in_time: 22:22 Sep 13
+        check_out_time: 07:24 Sep 14
+        hotel_type: luxury
+        reservation_name: hotel-requester stay at luxury hotel
+        stay_duration_hours: 9.033333333333333
+        total_processed: 1
+    - metadata:
+        name: restaurant-requester
+        type: restaurant
+        labels:
+            category: dining
+            role: task-submitter
+      spec:
+        params:
+            capability: restaurant_reservation
+            duration_hours: 2
+            pool_name: travel-agent-pool
+            restaurant_type: fine dining
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        reservation_duration_hours: 2
+        reservation_end_time: "21:40"
+        reservation_name: restaurant-requester dinner at fine dining restaurant
+        reservation_start_time: "19:40"
+        reservation_type: fine dining
+        schedule_date: "2025-09-13"
+        total_processed: 1
+    - metadata:
+        name: buffet-requester
+        type: buffet
+        labels:
+            category: dining
+            role: task-submitter
+      spec:
+        params:
+            buffet_type: international
+            capability: buffet_reservation
+            pool_name: travel-agent-pool
+      stats:
+        total_processed: 1
+      status: completed
+      state:
+        buffet_duration_hours: 1.5
+        buffet_end_time: 09:34 Sep 14
+        buffet_start_time: 08:04 Sep 14
+        buffet_type: international
+        reservation_name: buffet-requester international breakfast buffet
+        total_processed: 1
+    - metadata:
+        name: pool-coordinator
+        type: travel_coordinator
+        labels:
+            role: coordinator
+      spec:
+        params:
+            display_name: Agent Pool Delegation Demo
+        using:
+            - role: task-submitter
+      stats:
+        total_processed: 3
+      status: completed
+    - metadata:
+        name: travel-agent-pool-worker-0
+        type: agent_worker
+        labels:
+            pool: travel-agent-pool
+            worker: hotel-worker
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel-agent-pool
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            pool_name: travel-agent-pool
+            worker_spec:
+                name: hotel-worker
+                capabilities:
+                    - hotel_reservation
+                max_tasks: 2
+                timeout: 20
+      status: completed
+      state:
+        max_tasks: 2
+        pool_name: travel-agent-pool
+        timeout_seconds: 20
+        work_completed: true
+        worker_capabilities:
+            - hotel_reservation
+    - metadata:
+        name: travel-agent-pool-worker-1
+        type: agent_worker
+        labels:
+            pool: travel-agent-pool
+            worker: restaurant-worker
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel-agent-pool
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            pool_name: travel-agent-pool
+            worker_spec:
+                name: restaurant-worker
+                capabilities:
+                    - restaurant_reservation
+                    - buffet_reservation
+                max_tasks: 1
+                timeout: 15
+      status: completed
+      state:
+        max_tasks: 1
+        pool_name: travel-agent-pool
+        timeout_seconds: 15
+        work_completed: true
+        worker_capabilities:
+            - restaurant_reservation
+            - buffet_reservation

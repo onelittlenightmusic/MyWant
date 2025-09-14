@@ -37,6 +37,7 @@ type Target struct {
 	builder        *ChainBuilder    // Reference to builder for dynamic want creation
 	recipeLoader   *GenericRecipeLoader    // Reference to generic recipe loader
 	stateMutex     sync.RWMutex // Mutex to protect concurrent state updates
+	lastHistoryTime map[string]time.Time // Track last history time per child
 }
 
 // NewTarget creates a new target want
@@ -49,11 +50,12 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
-		MaxDisplay:     1000,
-		RecipePath:     "recipes/queue-system.yaml", // Default recipe path
-		RecipeParams:   make(map[string]interface{}),
-		childWants:     make([]Want, 0),
-		childrenDone:   make(chan bool, 1),
+		MaxDisplay:      1000,
+		RecipePath:      "recipes/queue-system.yaml", // Default recipe path
+		RecipeParams:    make(map[string]interface{}),
+		childWants:      make([]Want, 0),
+		childrenDone:    make(chan bool, 1),
+		lastHistoryTime: make(map[string]time.Time),
 	}
 	
 	// Extract target-specific configuration from params
@@ -314,11 +316,11 @@ func (t *Target) NotifyChildrenComplete() {
 	}
 }
 
-// StateMemoryEntry represents a state entry with unique key, timestamp and value
+// StateMemoryEntry represents a state entry with child name, timestamp and structured YAML value
 type StateMemoryEntry struct {
-	UniqueKey string      `yaml:"unique_key"`
+	ChildName string      `yaml:"child_name"`
 	Timestamp string      `yaml:"timestamp"`
-	Value     interface{} `yaml:"value"`
+	State     interface{} `yaml:"state"`
 }
 
 // NotifyChildStateUpdate handles live state updates from child wants
@@ -332,23 +334,11 @@ func (t *Target) NotifyChildStateUpdate(childName string, key string, value inte
 		t.State = make(map[string]interface{})
 	}
 	
-	// Create unique key combining child name and field key
-	uniqueKey := fmt.Sprintf("%s.%s", childName, key)
+	// Store child state as structured YAML under child name
 	timestamp := time.Now().Format(time.RFC3339)
 	
-	// Store in latest state (current values only - simplified structure)
-	latestState, exists := t.State["latestState"]
-	if !exists {
-		latestState = make(map[string]interface{})
-		t.State["latestState"] = latestState
-	}
-	
-	// Update latest state with just the value (no timestamp or unique key)
-	latestStateMap := latestState.(map[string]interface{})
-	latestStateMap[uniqueKey] = value
-	
-	// Store in history state (all changes)
-	t.addToHistoryState(uniqueKey, timestamp, value)
+	// Get the complete state from the child want for structured storage
+	t.updateChildStructuredState(childName, timestamp)
 	
 	// Optional: Log live updates (can be disabled for performance)
 	if key == "average_wait_time" || key == "primeCount" || key == "count" {
@@ -357,8 +347,47 @@ func (t *Target) NotifyChildStateUpdate(childName string, key string, value inte
 	}
 }
 
-// addToHistoryState adds a state change entry to the history state
-func (t *Target) addToHistoryState(uniqueKey string, timestamp string, value interface{}) {
+// updateChildStructuredState updates both latestState and historyState with structured child state
+func (t *Target) updateChildStructuredState(childName string, timestamp string) {
+	// Find the child want to get its complete state
+	var childState interface{}
+	if t.builder != nil {
+		allWantStates := t.builder.GetAllWantStates()
+		for _, want := range allWantStates {
+			if want.Metadata.Name == childName {
+				childState = want.State
+				break
+			}
+		}
+	}
+	
+	if childState == nil {
+		return // Child not found
+	}
+	
+	// Store in latest state (current values only - simplified structure with YAML)
+	latestState, exists := t.State["latestState"]
+	if !exists {
+		latestState = make(map[string]interface{})
+		t.State["latestState"] = latestState
+	}
+	
+	// Update latest state with complete structured state under child name
+	latestStateMap := latestState.(map[string]interface{})
+	latestStateMap[childName] = childState
+	
+	// Check if enough time has passed since last history update (300ms interval)
+	now := time.Now()
+	lastTime, exists := t.lastHistoryTime[childName]
+	if !exists || now.Sub(lastTime) >= 300*time.Millisecond {
+		// Store in history state with interval throttling
+		t.addToHistoryState(childName, timestamp, childState)
+		t.lastHistoryTime[childName] = now
+	}
+}
+
+// addToHistoryState adds a structured state entry to the history state
+func (t *Target) addToHistoryState(childName string, timestamp string, childState interface{}) {
 	// Get or create history state (list of all state changes)
 	historyState, exists := t.State["historyState"]
 	if !exists {
@@ -369,19 +398,19 @@ func (t *Target) addToHistoryState(uniqueKey string, timestamp string, value int
 	// Convert to slice
 	historyList := historyState.([]StateMemoryEntry)
 	
-	// Create new history entry
+	// Create new history entry with structured state
 	entry := StateMemoryEntry{
-		UniqueKey: uniqueKey,
+		ChildName: childName,
 		Timestamp: timestamp,
-		Value:     value,
+		State:     childState,
 	}
 	
 	// Add to history
 	historyList = append(historyList, entry)
 	
-	// Limit history size to prevent memory growth (keep last 1000 entries)
-	if len(historyList) > 1000 {
-		historyList = historyList[len(historyList)-1000:]
+	// Limit history size to prevent memory growth (keep last 100 entries)
+	if len(historyList) > 100 {
+		historyList = historyList[len(historyList)-100:]
 	}
 	
 	// Store updated history
@@ -391,9 +420,13 @@ func (t *Target) addToHistoryState(uniqueKey string, timestamp string, value int
 
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
+	// Use mutex to prevent concurrent map access with state updates
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
+
 	if t.recipeLoader == nil {
 		fmt.Printf("⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
-		t.computeFallbackResult()
+		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
@@ -401,13 +434,13 @@ func (t *Target) computeTemplateResult() {
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
 		fmt.Printf("⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
-		t.computeFallbackResult()
+		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
 		fmt.Printf("⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
-		t.computeFallbackResult()
+		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
@@ -440,30 +473,43 @@ func (t *Target) computeTemplateResult() {
 
 	fmt.Printf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
 
-	// Compute primary result using recipe specification
-	primaryResult := t.getResultFromSpec(recipeResult.Primary, childWantsByName)
-	
 	// Initialize Stats map if not exists
 	if t.Stats == nil {
 		t.Stats = make(WantStats)
 	}
-	
-	// Store primary result in dynamic stats
-	t.Stats["recipeResult"] = primaryResult
-	t.Stats["primaryResult"] = primaryResult
-	
-	// Also store in State for backward compatibility
-	t.State["recipeResult"] = primaryResult
-	t.State["primaryResult"] = primaryResult
-	fmt.Printf("✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, recipeResult.Primary.StatName, recipeResult.Primary.WantName, primaryResult)
 
-	// Compute additional metrics
+	// Initialize State map if not exists
+	if t.State == nil {
+		t.State = make(map[string]interface{})
+	}
+
+	// Process all result specs from the new flat array format
+	var primaryResult interface{}
 	metrics := make(map[string]interface{})
-	for _, metricSpec := range recipeResult.Metrics {
-		metricValue := t.getResultFromSpec(metricSpec, childWantsByName)
-		metrics[metricSpec.WantName+"_"+metricSpec.StatName] = metricValue
-		t.Stats[metricSpec.WantName+"_"+metricSpec.StatName] = metricValue
-		fmt.Printf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, metricSpec.Description, metricSpec.StatName, metricSpec.WantName, metricValue)
+
+	for i, resultSpec := range *recipeResult {
+		resultValue := t.getResultFromSpec(resultSpec, childWantsByName)
+
+		// Store in metrics map with cleaned key name
+		statName := strings.TrimPrefix(resultSpec.StatName, ".")
+		if statName == "" {
+			statName = "all_metrics"
+		}
+		metricKey := resultSpec.WantName + "_" + statName
+		metrics[metricKey] = resultValue
+		t.Stats[metricKey] = resultValue
+
+		// Use first result as primary result for backward compatibility
+		if i == 0 {
+			primaryResult = resultValue
+			t.Stats["recipeResult"] = primaryResult
+			t.Stats["primaryResult"] = primaryResult
+			t.State["recipeResult"] = primaryResult
+			t.State["primaryResult"] = primaryResult
+			fmt.Printf("✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
+		} else {
+			fmt.Printf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
+		}
 	}
 	t.State["metrics"] = metrics
 
@@ -472,7 +518,10 @@ func (t *Target) computeTemplateResult() {
 	t.State["childCount"] = len(childWantsByName)
 
 	// Store result in a standardized format for memory dumps
-	t.State["result"] = fmt.Sprintf("%s: %v", recipeResult.Primary.Description, primaryResult)
+	if len(*recipeResult) > 0 {
+		firstResult := (*recipeResult)[0]
+		t.State["result"] = fmt.Sprintf("%s: %v", firstResult.Description, primaryResult)
+	}
 
 	fmt.Printf("✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
@@ -644,14 +693,22 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return 0
 	}
 
+	// Handle JSON path-like stat names
+	statName := spec.StatName
+
+	// Handle JSON path syntax
+	if strings.HasPrefix(statName, ".") {
+		return t.extractValueByPath(want.Stats, statName)
+	}
+
 	// Try to get the specified stat from the want's dynamic Stats map
 	if want.Stats != nil {
 		// Try exact stat name first
-		if value, ok := want.Stats[spec.StatName]; ok {
+		if value, ok := want.Stats[statName]; ok {
 			return value
 		}
 		// Try lowercase version
-		if value, ok := want.Stats[strings.ToLower(spec.StatName)]; ok {
+		if value, ok := want.Stats[strings.ToLower(statName)]; ok {
 			return value
 		}
 		// Try common variations
@@ -677,8 +734,85 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 	return 0
 }
 
+// extractValueByPath extracts values using JSON path-like syntax
+func (t *Target) extractValueByPath(data map[string]interface{}, path string) interface{} {
+	// Handle root path "." - return entire data
+	if path == "." {
+		return data
+	}
+
+	// Handle field access like ".average_wait_time"
+	if strings.HasPrefix(path, ".") {
+		fieldName := strings.TrimPrefix(path, ".")
+
+		// Simple field access
+		if value, ok := data[fieldName]; ok {
+			return value
+		}
+
+		// Try common field name variations
+		if value, ok := data[strings.ToLower(fieldName)]; ok {
+			return value
+		}
+
+		// Handle underscore/camelCase variations
+		if strings.Contains(fieldName, "_") {
+			// Try camelCase version
+			camelCase := t.toCamelCase(fieldName)
+			if value, ok := data[camelCase]; ok {
+				return value
+			}
+		} else {
+			// Try snake_case version
+			snakeCase := t.toSnakeCase(fieldName)
+			if value, ok := data[snakeCase]; ok {
+				return value
+			}
+		}
+	}
+
+	return nil
+}
+
+// toCamelCase converts snake_case to camelCase
+func (t *Target) toCamelCase(str string) string {
+	parts := strings.Split(str, "_")
+	if len(parts) <= 1 {
+		return str
+	}
+
+	result := parts[0]
+	for _, part := range parts[1:] {
+		if len(part) > 0 {
+			result += strings.ToUpper(string(part[0])) + strings.ToLower(part[1:])
+		}
+	}
+	return result
+}
+
+// toSnakeCase converts camelCase to snake_case
+func (t *Target) toSnakeCase(str string) string {
+	var result []rune
+	for i, r := range str {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result = append(result, '_')
+		}
+		result = append(result, r)
+	}
+	return strings.ToLower(string(result))
+}
+
 // computeFallbackResult provides simple aggregation when recipe result definition is not available
 func (t *Target) computeFallbackResult() {
+	// Use mutex to prevent concurrent map access with state updates
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
+
+	t.computeFallbackResultUnsafe()
+}
+
+// computeFallbackResultUnsafe provides simple aggregation without mutex protection (caller must hold mutex)
+func (t *Target) computeFallbackResultUnsafe() {
 	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
 	var childWants []Want
@@ -709,6 +843,11 @@ func (t *Target) computeFallbackResult() {
 				}
 			}
 		}
+	}
+
+	// Initialize State map if not exists
+	if t.State == nil {
+		t.State = make(map[string]interface{})
 	}
 
 	// Store result in target's state

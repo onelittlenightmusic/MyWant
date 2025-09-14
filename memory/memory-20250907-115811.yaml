@@ -1,0 +1,40 @@
+timestamp: "2025-09-07T11:58:11+09:00"
+execution_id: exec-20250907-115811
+wants:
+    - metadata:
+        name: generator
+        type: fibonacci_numbers
+        labels:
+            role: source
+      spec:
+        params:
+            count: 15
+      status: completed
+    - metadata:
+        name: filter
+        type: fibonacci_sequence
+        labels:
+            role: collector
+      spec:
+        params:
+            max_value: 100
+            min_value: 1
+        using:
+            - role: source
+      stats:
+        total_processed: 15
+      status: completed
+      state:
+        count: 11
+        filtered:
+            - 1
+            - 1
+            - 2
+            - 3
+            - 5
+            - 8
+            - 13
+            - 21
+            - 34
+            - 55
+            - 89

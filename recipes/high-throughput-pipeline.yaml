@@ -15,7 +15,8 @@ recipe:
         rate: rate
 
     # Parallel Queue 1
-    - type: queue
+    - name: queue first
+      type: queue
       params:
         service_time: service_time
       using:
@@ -41,3 +42,7 @@ recipe:
         display_format: "Processed: %d"
       using:
         - category: parallel-queue
+  result:
+    - want_name: "queue first"
+      stat_name: ".average_wait_time"
+      description: "Average wait time"

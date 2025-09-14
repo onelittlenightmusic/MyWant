@@ -3,7 +3,7 @@
 wants:
   # Packet generator
   - metadata:
-      name: gen-primary
+      name: gen primary
       type: numbers
       labels:
         role: source
@@ -15,7 +15,7 @@ wants:
 
   # Processing queue
   - metadata:
-      name: queue-main
+      name: queue main
       type: queue
       labels:
         role: processor
@@ -27,7 +27,7 @@ wants:
 
   # Final collector
   - metadata:
-      name: sink-main
+      name: sink main
       type: sink
       labels:
         role: terminal

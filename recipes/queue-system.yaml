@@ -11,7 +11,7 @@ recipe:
     prefix: "queue-system"
     count: 1000
     rate: 10.0
-    service_time: 0.1
+    service_time: 0.05
     deterministic: false
 
   wants:
@@ -51,20 +51,12 @@ recipe:
 
   # Recipe result definition - specifies which want and stat to use for result
   result:
-    # Primary result from the final sink
-    primary:
-      want_name: "sink"
-      stat_name: "TotalProcessed"
-      description: "Total items processed through the queue system"
-    
-    # Queue system metrics
-    metrics:
-      - want_name: "numbers"
-        stat_name: "TotalProcessed"
-        description: "Items generated"
-      - want_name: "queue"
-        stat_name: "TotalProcessed"
-        description: "Items processed by queue"
-      - want_name: "queue"
-        stat_name: "average_wait_time"
-        description: "Average wait time in queue"
+    - want_name: "queue"
+      stat_name: ".average_wait_time"
+      description: "Average wait time in the queue system"
+    - want_name: "numbers"
+      stat_name: ".total_processed"
+      description: "Items generated"
+    - want_name: "queue"
+      stat_name: "."
+      description: "All metrics from queue system"

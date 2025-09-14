@@ -1,6 +1,6 @@
 wants:
   - metadata:
-      name: fibonacci-sequence-want
+      name: fibonacci sequence
       type: "fibonacci sequence"
       labels:
         category: fibonacci
