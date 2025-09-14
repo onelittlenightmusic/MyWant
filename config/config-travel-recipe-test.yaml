@@ -5,7 +5,6 @@ wants:
       labels:
         role: travel-planner
     spec:
-      recipe: recipes/travel-itinerary.yaml
       params:
         prefix: vacation
         display_name: "Agent Delegation Travel Test"
