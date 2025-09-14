@@ -41,9 +41,6 @@ type RecipeContent struct {
 	Wants       []RecipeWant            `yaml:"wants,omitempty"`
 	Parameters  map[string]interface{}  `yaml:"parameters,omitempty"`
 	Result      *RecipeResult           `yaml:"result,omitempty"`
-	
-	// Legacy support for existing template formats (placeholder)
-	Templates   map[string]interface{}  `yaml:"templates,omitempty"`
 }
 
 // ConvertToWant converts a RecipeWant to a Want
@@ -171,10 +168,6 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 	
 
-	// Handle legacy templates if present (deprecated)
-	if len(recipeContent.Templates) > 0 {
-		fmt.Printf("Warning: Legacy template format detected, skipping (deprecated)\n")
-	}
 
 	return &GenericRecipeConfig{
 		Config:     config,
@@ -297,35 +290,6 @@ func (grl *GenericRecipeLoader) ProcessRecipeString(recipeStr string, params map
 	return recipeStr, nil
 }
 
-// Legacy recipe functions (deprecated template names)
-// LoadTravelTemplate is deprecated, use LoadRecipe instead
-func LoadTravelTemplate(recipePath string, params map[string]interface{}) (*GenericRecipeConfig, error) {
-	loader := NewGenericRecipeLoader("")
-	return loader.LoadRecipe(recipePath, params)
-}
-
-// LoadConfigFromTemplate is deprecated, use LoadRecipe instead
-func LoadConfigFromTemplate(recipePath string, params map[string]interface{}) (Config, error) {
-	loader := NewGenericRecipeLoader("")
-	return loader.LoadConfigFromRecipe(recipePath, params)
-}
-
-// ValidateTemplate is deprecated, use ValidateRecipe instead
-func ValidateTemplate(recipePath string) error {
-	loader := NewGenericRecipeLoader("")
-	return loader.ValidateRecipe(recipePath)
-}
-
-// GetTemplateParameters is deprecated, use GetRecipeParameters instead
-func GetTemplateParameters(recipePath string) (map[string]interface{}, error) {
-	loader := NewGenericRecipeLoader("")
-	return loader.GetRecipeParameters(recipePath)
-}
-
-// Legacy types for backward compatibility (deprecated)
-type TemplateConfig = GenericRecipeConfig
-type TemplateMetadata = GenericRecipeMetadata
-type TravelTemplate = GenericRecipe
 
 // New recipe functions with cleaner naming
 func LoadRecipe(recipePath string, params map[string]interface{}) (*GenericRecipeConfig, error) {
