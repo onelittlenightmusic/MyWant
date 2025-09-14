@@ -127,6 +127,23 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 	}
 
+	// Read count and rate parameters fresh each cycle
+	currentCount := g.Count  // Default fallback
+	if c, ok := g.Spec.Params["count"]; ok {
+		if ci, ok := c.(int); ok {
+			currentCount = ci
+		} else if cf, ok := c.(float64); ok {
+			currentCount = int(cf)
+		}
+	}
+
+	currentRate := g.Rate  // Default fallback
+	if r, ok := g.Spec.Params["rate"]; ok {
+		if rf, ok := r.(float64); ok {
+			currentRate = rf
+		}
+	}
+
 	// Initialize state variables if not present
 	if g.State == nil {
 		g.State = make(map[string]interface{})
@@ -141,7 +158,7 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 	out := outputs[0]
 
-	if j >= g.Count {
+	if j >= currentCount {
 		// Store generation stats
 		g.State["total_processed"] = j
 		g.State["average_wait_time"] = 0.0 // Generators don't have wait time
@@ -155,11 +172,11 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	if useDeterministic {
 		// Deterministic inter-arrival time (rate = 1/interval)
-		t += 1.0 / g.Rate
+		t += 1.0 / currentRate
 	} else {
 		// Exponential inter-arrival time (rate = 1/mean_interval)
 		// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
-		t += ExpRand64() / g.Rate
+		t += ExpRand64() / currentRate
 	}
 
 	// Store state for next call

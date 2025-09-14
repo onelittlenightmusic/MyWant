@@ -133,128 +133,41 @@ func (t *Target) resolveRecipeParameters() {
 
 // CreateChildWants dynamically creates child wants based on external recipes
 func (t *Target) CreateChildWants() []Want {
-	// Use recipe loader if available
-	if t.recipeLoader != nil {
-		config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
-		if err != nil {
-			fmt.Printf("⚠️  Failed to load config from recipe %s: %v, falling back to hardcoded creation\n", t.RecipePath, err)
-		} else {
-			fmt.Printf("✅ Successfully loaded config from recipe %s with %d wants\n", t.RecipePath, len(config.Wants))
-			
-			// Add owner references to all child wants
-			for i := range config.Wants {
-				config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
-					{
-						APIVersion:         "MyWant/v1",
-						Kind:               "Want",
-						Name:               t.Metadata.Name,
-						Controller:         true,
-						BlockOwnerDeletion: true,
-					},
-				}
-				// Add owner label for easier identification
-				if config.Wants[i].Metadata.Labels == nil {
-					config.Wants[i].Metadata.Labels = make(map[string]string)
-				}
-				config.Wants[i].Metadata.Labels["owner"] = "child"
-			}
-			
-			t.childWants = config.Wants
-			return t.childWants
+	// Recipe loader is required for target wants
+	if t.recipeLoader == nil {
+		fmt.Printf("❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
+		return []Want{}
+	}
+
+	// Load child wants from recipe
+	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
+	if err != nil {
+		fmt.Printf("❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
+		return []Want{}
+	}
+
+	fmt.Printf("✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
+		t.Metadata.Name, t.RecipePath, len(config.Wants))
+
+	// Add owner references to all child wants
+	for i := range config.Wants {
+		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
+			{
+				APIVersion:         "MyWant/v1",
+				Kind:               "Want",
+				Name:               t.Metadata.Name,
+				Controller:         true,
+				BlockOwnerDeletion: true,
+			},
 		}
+		// Add owner label for easier identification
+		if config.Wants[i].Metadata.Labels == nil {
+			config.Wants[i].Metadata.Labels = make(map[string]string)
+		}
+		config.Wants[i].Metadata.Labels["owner"] = "child"
 	}
 
-	// Fallback to hardcoded recipe creation
-	fmt.Printf("⚠️  Using hardcoded recipe creation for target %s\n", t.Metadata.Name)
-	
-	// Create generator want (hardcoded fallback)
-	generatorWant := Want{
-		Metadata: Metadata{
-			Name: t.Metadata.Name + "-generator",
-			Type: "numbers",
-			Labels: map[string]string{
-				"role":     "source",
-				"owner":    "child",
-				"category": "producer",
-			},
-			OwnerReferences: []OwnerReference{
-				{
-					APIVersion:         "MyWant/v1",
-					Kind:               "Want",
-					Name:               t.Metadata.Name,
-					Controller:         true,
-					BlockOwnerDeletion: true,
-				},
-			},
-		},
-		Spec: WantSpec{
-			Params: map[string]interface{}{
-				"count": t.MaxDisplay,
-				"rate":  10.0,
-			},
-		},
-	}
-
-	// Create queue want (hardcoded fallback)
-	queueWant := Want{
-		Metadata: Metadata{
-			Name: t.Metadata.Name + "-queue",
-			Type: "queue",
-			Labels: map[string]string{
-				"role":     "processor",
-				"owner":    "child",
-				"category": "queue",
-			},
-			OwnerReferences: []OwnerReference{
-				{
-					APIVersion:         "MyWant/v1",
-					Kind:               "Want",
-					Name:               t.Metadata.Name,
-					Controller:         true,
-					BlockOwnerDeletion: true,
-				},
-			},
-		},
-		Spec: WantSpec{
-			Params: map[string]interface{}{
-				"service_time": 0.1,
-			},
-			Using: []map[string]string{
-				{"category": "producer"},
-			},
-		},
-	}
-
-	// Create sink want (hardcoded fallback)
-	sinkWant := Want{
-		Metadata: Metadata{
-			Name: t.Metadata.Name + "-sink",
-			Type: "sink",
-			Labels: map[string]string{
-				"role":     "collector",
-				"category": "display",
-			},
-			OwnerReferences: []OwnerReference{
-				{
-					APIVersion:         "MyWant/v1",
-					Kind:               "Want",
-					Name:               t.Metadata.Name,
-					Controller:         true,
-					BlockOwnerDeletion: true,
-				},
-			},
-		},
-		Spec: WantSpec{
-			Params: map[string]interface{}{
-				"display_format": "Number: %d",
-			},
-			Using: []map[string]string{
-				{"role": "processor"},
-			},
-		},
-	}
-
-	t.childWants = []Want{generatorWant, queueWant, sinkWant}
+	t.childWants = config.Wants
 	return t.childWants
 }
 
@@ -303,6 +216,104 @@ func (t *Target) NotifyChildrenComplete() {
 	default:
 		// Channel already has signal, ignore
 	}
+}
+
+// UpdateParameter updates a parameter and pushes it to child wants
+func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
+	// Update our own parameter first
+	t.Want.UpdateParameter(paramName, paramValue)
+
+	// Also update the RecipeParams if this is a recipe parameter
+	if t.RecipeParams != nil {
+		t.RecipeParams[paramName] = paramValue
+	}
+
+	// Push parameter change to child wants
+	t.PushParameterToChildren(paramName, paramValue)
+
+	fmt.Printf("🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+		t.Metadata.Name, paramName, paramValue)
+}
+
+// ChangeParameter provides a convenient API to change target parameters at runtime
+func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
+	fmt.Printf("🔄 Target %s: Changing parameter %s from %v to %v\n",
+		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
+	t.UpdateParameter(paramName, paramValue)
+}
+
+// GetParameterValue gets the current value of a parameter
+func (t *Target) GetParameterValue(paramName string) interface{} {
+	if value, ok := t.Spec.Params[paramName]; ok {
+		return value
+	}
+	return nil
+}
+
+// PushParameterToChildren propagates parameter changes to all child wants
+func (t *Target) PushParameterToChildren(paramName string, paramValue interface{}) {
+	if t.builder == nil {
+		return
+	}
+
+	// Get all child wants that have owner references pointing to this target
+	for wantName, runtimeWant := range t.builder.wants {
+		if t.isChildWant(runtimeWant.want) {
+			// Map target parameters to child parameters based on naming patterns
+			childParamName := t.mapParameterNameForChild(paramName, runtimeWant.want.Metadata.Type)
+			if childParamName != "" {
+				// Update the child's parameter
+				runtimeWant.want.UpdateParameter(childParamName, paramValue)
+
+				fmt.Printf("🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
+			}
+		}
+	}
+}
+
+// isChildWant checks if a want is a child of this target
+func (t *Target) isChildWant(want *Want) bool {
+	for _, ownerRef := range want.Metadata.OwnerReferences {
+		if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
+			return true
+		}
+	}
+	return false
+}
+
+// mapParameterNameForChild maps target parameters to child-specific parameter names
+func (t *Target) mapParameterNameForChild(targetParamName string, childWantType string) string {
+	// Define parameter mapping rules for different child types
+	parameterMappings := map[string]map[string]string{
+		"queue": {
+			"primary_service_time":   "service_time",
+			"secondary_service_time": "service_time",
+			"final_service_time":     "service_time",
+			"service_time":           "service_time",
+		},
+		"numbers": {
+			"primary_count":    "count",
+			"secondary_count":  "count",
+			"primary_rate":     "rate",
+			"secondary_rate":   "rate",
+			"count":            "count",
+			"rate":             "rate",
+		},
+		"sink": {
+			"display_format": "display_format",
+		},
+	}
+
+	// Look up mapping for this child type
+	if typeMapping, exists := parameterMappings[childWantType]; exists {
+		if childParam, exists := typeMapping[targetParamName]; exists {
+			return childParam
+		}
+	}
+
+	// If no specific mapping, try direct mapping
+	return targetParamName
 }
 
 // StateMemoryEntry represents a state entry with child name, timestamp and structured YAML value

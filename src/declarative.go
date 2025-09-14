@@ -19,6 +19,19 @@ import (
 // Re-export chain types for easier access
 type Chan = chain.Chan
 
+// ParameterUpdate represents a parameter change notification
+type ParameterUpdate struct {
+	WantName   string                 `json:"want_name"`
+	ParamName  string                 `json:"param_name"`
+	ParamValue interface{}            `json:"param_value"`
+	Timestamp  time.Time              `json:"timestamp"`
+}
+
+// ParameterUpdateListener represents a want that can receive parameter updates
+type ParameterUpdateListener interface {
+	OnParameterUpdate(update ParameterUpdate) bool
+}
+
 // ChainFunction represents a generalized chain function interface
 type ChainFunction interface {
 	Exec(using []chain.Chan, outputs []chain.Chan) bool
@@ -100,7 +113,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
-	
+
 	// Notify parent if this want has owner references
 	if len(n.Metadata.OwnerReferences) > 0 {
 		for _, ownerRef := range n.Metadata.OwnerReferences {
@@ -111,6 +124,54 @@ func (n *Want) StoreState(key string, value interface{}) {
 			}
 		}
 	}
+}
+
+// UpdateParameter updates a parameter in the want's spec and notifies listeners
+func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
+	if n.Spec.Params == nil {
+		n.Spec.Params = make(map[string]interface{})
+	}
+
+	// Store old value for logging
+	oldValue := n.Spec.Params[paramName]
+
+	// Update the parameter
+	n.Spec.Params[paramName] = paramValue
+
+	// Store parameter change in state for tracking
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Track parameter changes
+	paramChanges, _ := n.State["parameter_changes"].([]map[string]interface{})
+	if paramChanges == nil {
+		paramChanges = make([]map[string]interface{}, 0)
+	}
+
+	change := map[string]interface{}{
+		"param_name":  paramName,
+		"old_value":   oldValue,
+		"new_value":   paramValue,
+		"timestamp":   time.Now(),
+		"change_id":   fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s-%v-%v", paramName, oldValue, time.Now().UnixNano())))),
+	}
+
+	paramChanges = append(paramChanges, change)
+	n.State["parameter_changes"] = paramChanges
+	n.State["last_parameter_update"] = time.Now()
+
+	fmt.Printf("[PARAM UPDATE] Want %s: %s changed from %v to %v\n",
+		n.Metadata.Name, paramName, oldValue, paramValue)
+}
+
+// GetParameter gets a parameter value from the want's spec
+func (n *Want) GetParameter(paramName string) (interface{}, bool) {
+	if n.Spec.Params == nil {
+		return nil, false
+	}
+	value, exists := n.Spec.Params[paramName]
+	return value, exists
 }
 
 // notifyParentStateUpdate is a placeholder that will be overridden by owner_types
