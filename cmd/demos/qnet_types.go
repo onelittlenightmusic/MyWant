@@ -160,9 +160,9 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	if j >= currentCount {
 		// Store generation stats
-		g.State["total_processed"] = j
-		g.State["average_wait_time"] = 0.0 // Generators don't have wait time
-		g.State["total_wait_time"] = 0.0
+		g.StoreState("total_processed", j)
+		g.StoreState("average_wait_time", 0.0) // Generators don't have wait time
+		g.StoreState("total_wait_time", 0.0)
 
 		out <- QueuePacket{-1, 0}
 		fmt.Printf("[GENERATOR] Generated %d packets\n", j)
@@ -180,8 +180,8 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store state for next call
-	g.State["current_time"] = t
-	g.State["current_count"] = j
+	g.StoreState("current_time", t)
+	g.StoreState("current_count", j)
 
 	out <- QueuePacket{j, t}
 	return false
@@ -282,10 +282,10 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			avgWaitTime = waitTimeSum / float64(processedCount)
 		}
 
-		q.State["average_wait_time"] = avgWaitTime
-		q.State["total_processed"] = processedCount
-		q.State["total_wait_time"] = waitTimeSum
-		q.State["current_server_free_time"] = serverFreeTime
+		q.StoreState("average_wait_time", avgWaitTime)
+		q.StoreState("total_processed", processedCount)
+		q.StoreState("total_wait_time", waitTimeSum)
+		q.StoreState("current_server_free_time", serverFreeTime)
 
 		fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", processedCount, avgWaitTime)
 		out <- packet // Forward end signal
@@ -312,17 +312,17 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	processedCount++
 
 	// Store updated state
-	q.State["serverFreeTime"] = serverFreeTime
-	q.State["waitTimeSum"] = waitTimeSum
-	q.State["processedCount"] = processedCount
-	q.State["last_packet_wait_time"] = waitTime
+	q.StoreState("serverFreeTime", serverFreeTime)
+	q.StoreState("waitTimeSum", waitTimeSum)
+	q.StoreState("processedCount", processedCount)
+	q.StoreState("last_packet_wait_time", waitTime)
 
 	// Update live stats
 	avgWaitTime := waitTimeSum / float64(processedCount)
-	q.State["average_wait_time"] = avgWaitTime
-	q.State["total_processed"] = processedCount
-	q.State["total_wait_time"] = waitTimeSum
-	q.State["current_server_free_time"] = serverFreeTime
+	q.StoreState("average_wait_time", avgWaitTime)
+	q.StoreState("total_processed", processedCount)
+	q.StoreState("total_wait_time", waitTimeSum)
+	q.StoreState("current_server_free_time", serverFreeTime)
 
 	out <- QueuePacket{packet.Num, finishTime}
 	return false
@@ -421,9 +421,9 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			qp := packet.(QueuePacket)
 			if qp.isEnded() {
 				// Store combiner stats
-				c.State["total_processed"] = processed
-				c.State["average_wait_time"] = 0.0 // Combiners don't add wait time
-				c.State["total_wait_time"] = 0.0
+				c.StoreState("total_processed", processed)
+				c.StoreState("average_wait_time", 0.0) // Combiners don't add wait time
+				c.StoreState("total_wait_time", 0.0)
 
 				out <- qp // Forward end signal
 				return true
@@ -435,7 +435,7 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 	}
 
-	c.State["processed"] = processed
+	c.StoreState("processed", processed)
 	return false
 }
 
@@ -517,9 +517,9 @@ func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		if s.State == nil {
 			s.State = make(map[string]interface{})
 		}
-		s.State["total_processed"] = s.Received
-		s.State["average_wait_time"] = 0.0 // Sinks don't add wait time
-		s.State["total_wait_time"] = 0.0
+		s.StoreState("total_processed", s.Received)
+		s.StoreState("average_wait_time", 0.0) // Sinks don't add wait time
+		s.StoreState("total_wait_time", 0.0)
 
 		fmt.Printf("[SINK] Received %d packets\n", s.Received)
 		return true

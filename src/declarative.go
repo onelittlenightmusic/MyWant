@@ -19,6 +19,53 @@ import (
 // Re-export chain types for easier access
 type Chan = chain.Chan
 
+// NotificationType distinguishes different notification scenarios
+type NotificationType string
+
+const (
+	NotificationOwnerChild    NotificationType = "owner-child"    // Current Target system
+	NotificationSubscription NotificationType = "subscription"    // New peer-to-peer
+	NotificationBroadcast     NotificationType = "broadcast"      // Global notifications
+)
+
+// StateNotification contains complete notification information
+type StateNotification struct {
+	SourceWantName   string           `json:"sourceWantName"`
+	TargetWantName   string           `json:"targetWantName"`
+	StateKey         string           `json:"stateKey"`
+	StateValue       interface{}      `json:"stateValue"`
+	PreviousValue    interface{}      `json:"previousValue,omitempty"`
+	Timestamp        time.Time        `json:"timestamp"`
+	NotificationType NotificationType `json:"notificationType"`
+}
+
+// StateUpdateListener allows wants to receive state change notifications
+type StateUpdateListener interface {
+	OnStateUpdate(notification StateNotification) error
+}
+
+// StateSubscription defines what state changes to monitor
+type StateSubscription struct {
+	WantName   string   `json:"wantName" yaml:"wantName"`                         // Which want to monitor
+	StateKeys  []string `json:"stateKeys,omitempty" yaml:"stateKeys,omitempty"`   // Specific keys (empty = all keys)
+	Conditions []string `json:"conditions,omitempty" yaml:"conditions,omitempty"` // Optional conditions like "value > 100"
+	BufferSize int      `json:"bufferSize,omitempty" yaml:"bufferSize,omitempty"` // For rate limiting
+}
+
+// NotificationFilter allows filtering received notifications
+type NotificationFilter struct {
+	SourcePattern string   `json:"sourcePattern" yaml:"sourcePattern"`                 // Regex pattern for source names
+	StateKeys     []string `json:"stateKeys,omitempty" yaml:"stateKeys,omitempty"`     // Only these keys
+	ValuePattern  string   `json:"valuePattern,omitempty" yaml:"valuePattern,omitempty"` // Value conditions
+}
+
+// StateHistoryEntry represents a state change entry in the generic history system
+type StateHistoryEntry struct {
+	WantName   string      `json:"wantName" yaml:"want_name"`
+	StateValue interface{} `json:"stateValue" yaml:"state_value"`
+	Timestamp  time.Time   `json:"timestamp" yaml:"timestamp"`
+}
+
 // ParameterUpdate represents a parameter change notification
 type ParameterUpdate struct {
 	WantName   string                 `json:"want_name"`
@@ -85,8 +132,10 @@ type Metadata struct {
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Params       map[string]interface{} `json:"params" yaml:"params"`
-	Using        []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
+	Params              map[string]interface{} `json:"params" yaml:"params"`
+	Using               []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
+	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
+	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
 }
 
 // Want represents a processing unit in the chain
@@ -95,11 +144,52 @@ type Want struct {
 	Spec     WantSpec               `json:"spec" yaml:"spec"`
 	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
 	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
+
+	// Internal fields for batching state changes during Exec cycles
+	pendingStateChanges map[string]interface{} `json:"-" yaml:"-"`
+	execCycleCount      int                    `json:"-" yaml:"-"`
+	inExecCycle         bool                   `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status
 func (n *Want) SetStatus(status WantStatus) {
 	n.Status = status
+}
+
+// BeginExecCycle starts a new execution cycle for batching state changes
+func (n *Want) BeginExecCycle() {
+	n.inExecCycle = true
+	n.execCycleCount++
+	if n.pendingStateChanges == nil {
+		n.pendingStateChanges = make(map[string]interface{})
+	}
+	// Clear pending changes for new cycle
+	for k := range n.pendingStateChanges {
+		delete(n.pendingStateChanges, k)
+	}
+}
+
+// EndExecCycle completes the execution cycle and commits all batched state changes as a single history entry
+func (n *Want) EndExecCycle() {
+	if !n.inExecCycle || len(n.pendingStateChanges) == 0 {
+		n.inExecCycle = false
+		return
+	}
+
+	// Create a single aggregated state history entry with complete state snapshot
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Apply all pending changes to actual state
+	for key, value := range n.pendingStateChanges {
+		n.State[key] = value
+	}
+
+	// Create one history entry with the complete state snapshot
+	n.addAggregatedStateHistory()
+
+	n.inExecCycle = false
 }
 
 // GetStatus returns the current want status
@@ -109,21 +199,130 @@ func (n *Want) GetStatus() WantStatus {
 
 // StoreState stores a key-value pair in the want's state
 func (n *Want) StoreState(key string, value interface{}) {
+	// If we're in an exec cycle, batch the changes
+	if n.inExecCycle {
+		if n.pendingStateChanges == nil {
+			n.pendingStateChanges = make(map[string]interface{})
+		}
+		n.pendingStateChanges[key] = value
+		return
+	}
+
+	// Otherwise, store immediately (legacy behavior)
+	// Get previous value for notification
+	previousValue, _ := n.GetState(key)
+
+	// Store the state
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
 
-	// Notify parent if this want has owner references
-	if len(n.Metadata.OwnerReferences) > 0 {
-		for _, ownerRef := range n.Metadata.OwnerReferences {
-			if ownerRef.Controller && ownerRef.Kind == "Want" {
-				// Import owner_types functions - we'll need to make NotifyTargetStateUpdate available
-				notifyParentStateUpdate(ownerRef.Name, n.Metadata.Name, key, value)
-				break
-			}
+	// Add to state history
+	n.addToStateHistory(key, value, previousValue)
+
+	// Create notification
+	notification := StateNotification{
+		SourceWantName: n.Metadata.Name,
+		StateKey:       key,
+		StateValue:     value,
+		PreviousValue:  previousValue,
+		Timestamp:      time.Now(),
+	}
+
+	// Send notifications through the generalized system
+	sendStateNotifications(notification)
+}
+
+// addAggregatedStateHistory creates a single history entry with complete state as YAML
+// Respects the execution cycle skipping logic (skip every N cycles)
+func (n *Want) addAggregatedStateHistory() {
+	// Skip history recording based on execution cycle count
+	// Default skip count is 100, so record only every 100th cycle
+	skipCount := 100
+	if skipCount > 0 && n.execCycleCount%skipCount != 0 {
+		return // Skip this cycle
+	}
+
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Initialize state history if needed
+	historyKey := "stateHistory"
+	var history []StateHistoryEntry
+	if existingHistory, exists := n.State[historyKey]; exists {
+		if h, ok := existingHistory.([]StateHistoryEntry); ok {
+			history = h
 		}
 	}
+
+	// Convert the complete state to YAML string
+	stateSnapshot := n.copyCurrentState()
+	yamlData, err := yaml.Marshal(stateSnapshot)
+	var yamlString string
+	if err != nil {
+		yamlString = fmt.Sprintf("# Error marshaling state: %v", err)
+	} else {
+		yamlString = string(yamlData)
+	}
+
+	// Create a single entry with the complete state as YAML
+	entry := StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: yamlString,
+		Timestamp:  time.Now(),
+	}
+
+	// Append the new entry
+	history = append(history, entry)
+	n.State[historyKey] = history
+}
+
+// copyCurrentState creates a copy of the current state excluding the stateHistory itself
+func (n *Want) copyCurrentState() map[string]interface{} {
+	stateCopy := make(map[string]interface{})
+	for key, value := range n.State {
+		if key != "stateHistory" { // Exclude the history itself from the snapshot
+			stateCopy[key] = value
+		}
+	}
+	return stateCopy
+}
+
+// addToStateHistory adds a state change to the want's history
+func (n *Want) addToStateHistory(key string, value interface{}, previousValue interface{}) {
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Initialize state history if needed
+	historyKey := "stateHistory"
+	var history []StateHistoryEntry
+	if existingHistory, exists := n.State[historyKey]; exists {
+		if h, ok := existingHistory.([]StateHistoryEntry); ok {
+			history = h
+		}
+	}
+
+	// Create new history entry (legacy individual field tracking)
+	entry := StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: fmt.Sprintf("%s: %v", key, value), // Simple key:value format for individual changes
+		Timestamp:  time.Now(),
+	}
+
+	// Add to history
+	history = append(history, entry)
+
+	// Limit history size (keep last 100 entries)
+	maxHistorySize := 100
+	if len(history) > maxHistorySize {
+		history = history[len(history)-maxHistorySize:]
+	}
+
+	// Store updated history
+	n.State[historyKey] = history
 }
 
 // UpdateParameter updates a parameter in the want's spec and notifies listeners
@@ -349,14 +548,15 @@ type ChainBuilder struct {
 	customRegistry *CustomTargetTypeRegistry // Custom target type registry
 	waitGroup      *sync.WaitGroup           // Execution synchronization
 	config         Config                    // Current configuration
-	
+
 	// Reconcile loop fields
 	reconcileStop  chan bool                 // Stop signal for reconcile loop
 	reconcileMutex sync.RWMutex             // Protect concurrent access
 	running        bool                      // Execution state
 	lastConfig     Config                    // Last known config state
 	lastConfigHash string                    // Hash of last config for change detection
-	
+
+
 	// Path and channel management
 	pathMap        map[string]Paths          // Want path mapping
 	channels       map[string]chain.Chan     // Inter-want channels
@@ -1023,6 +1223,9 @@ func (cb *ChainBuilder) addWant(wantConfig Want) {
 		want:     wantPtr,
 	}
 	cb.wants[wantConfig.Metadata.Name] = runtimeWant
+
+	// Register want for notification system
+	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
 }
 
 // updateWant updates an existing want
@@ -1052,6 +1255,27 @@ func (cb *ChainBuilder) rebuildConnections() {
 	// Start wants if running (for backward compatibility)
 	if cb.running {
 		cb.startPhase()
+	}
+}
+
+// registerWantForNotifications registers a want with the notification system
+func (cb *ChainBuilder) registerWantForNotifications(wantConfig Want, wantFunction interface{}, wantPtr *Want) {
+	wantName := wantConfig.Metadata.Name
+
+	// 1. Register want in global registry for lookup
+	RegisterWant(wantPtr)
+
+	// 2. Register as listener if it implements StateUpdateListener
+	if listener, ok := wantFunction.(StateUpdateListener); ok {
+		RegisterStateListener(wantName, listener)
+		fmt.Printf("[NOTIFICATION] Registered %s as state listener\n", wantName)
+	}
+
+	// 3. Register its state subscriptions if any
+	if len(wantConfig.Spec.StateSubscriptions) > 0 {
+		RegisterStateSubscriptions(wantName, wantConfig.Spec.StateSubscriptions)
+		fmt.Printf("[NOTIFICATION] Registered %d subscriptions for %s\n",
+			len(wantConfig.Spec.StateSubscriptions), wantName)
 	}
 }
 
@@ -1107,9 +1331,26 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				wantName, len(usingChans), len(outputChans))
 
 			for {
+				// Begin execution cycle for batching state changes
+				if runtimeWant, exists := cb.wants[wantName]; exists {
+					runtimeWant.want.BeginExecCycle()
+				}
+
 				// Direct call - parameters can be read fresh each cycle
-				if chainWant.Exec(usingChans, outputChans) {
+				finished := chainWant.Exec(usingChans, outputChans)
+
+				// End execution cycle and commit batched state changes
+				if runtimeWant, exists := cb.wants[wantName]; exists {
+					runtimeWant.want.EndExecCycle()
+				}
+
+				if finished {
 					fmt.Printf("[EXEC] Want %s finished\n", wantName)
+
+					// Update want status to completed
+					if runtimeWant, exists := cb.wants[wantName]; exists {
+						runtimeWant.want.SetStatus(WantStatusCompleted)
+					}
 
 					// Check if this want completion should notify parent targets
 					cb.notifyParentTargetsOfChildCompletion(wantName)
@@ -1479,6 +1720,8 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 			Status:   runtimeWant.want.Status,
 			State:    runtimeWant.want.State,
 		}
+
+
 		wants = append(wants, want)
 	}
 	
@@ -1565,6 +1808,7 @@ func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedWantName s
 		if notifier, ok := parentRuntimeWant.function.(ParentNotifier); ok {
 			// Find all child wants with this parent
 			allChildrenComplete := true
+			childCount := 0
 			for _, wantConfig := range cb.config.Wants {
 				if wantConfig.Metadata.Name == parentName {
 					continue // Skip the parent itself
@@ -1580,17 +1824,21 @@ func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedWantName s
 				}
 				
 				if hasOwnerRef {
+					childCount++
 					// This is a child - check if it's completed
 					if childRuntimeWant, exists := cb.wants[wantConfig.Metadata.Name]; exists {
 						if childRuntimeWant.want.GetStatus() != WantStatusCompleted {
 							allChildrenComplete = false
 							break
 						}
+					} else {
+						allChildrenComplete = false
+						break
 					}
 				}
 			}
 			
-			if allChildrenComplete {
+			if allChildrenComplete && childCount > 0 {
 				fmt.Printf("🎯 All children of target %s have completed, notifying...\n", parentName)
 				notifier.NotifyChildrenComplete()
 			}
@@ -1603,6 +1851,8 @@ func (cb *ChainBuilder) SetRecipeResult(result *RecipeResult, recipePath string)
 	cb.recipeResult = result
 	cb.recipePath = recipePath
 }
+
+
 
 // processRecipeResults processes and displays recipe results if available
 func (cb *ChainBuilder) processRecipeResults() {
