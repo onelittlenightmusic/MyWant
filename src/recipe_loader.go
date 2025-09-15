@@ -289,7 +289,6 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 			Params: resolvedParams,
 			Using:  dryWant.Using,
 		},
-		Stats:  WantStats{},
 		Status: WantStatusIdle,
 		State:  make(map[string]interface{}),
 	}
@@ -416,7 +415,6 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 			Params: resolvedParams,
 			Using:  wantRecipe.Spec.Using,
 		},
-		Stats:  WantStats{},
 		Status: WantStatusIdle,
 		State:  make(map[string]interface{}),
 	}
@@ -483,11 +481,11 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 func (rl *RecipeLoader) extractWantStat(want *Want, statName string) (interface{}, error) {
 	switch statName {
 	case "AverageWaitTime", "averagewaittime":
-		return want.Stats["average_wait_time"], nil
+		return want.State["average_wait_time"], nil
 	case "TotalProcessed", "totalprocessed":
-		return want.Stats["total_processed"], nil
+		return want.State["total_processed"], nil
 	case "TotalWaitTime", "totalwaittime":
-		return want.Stats["total_wait_time"], nil
+		return want.State["total_wait_time"], nil
 	default:
 		return nil, fmt.Errorf("unknown stat name: %s", statName)
 	}

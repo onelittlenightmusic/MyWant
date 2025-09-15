@@ -79,9 +79,7 @@ func NewQueueSystemTarget(metadata Metadata, spec WantSpec) *Target {
 	baseSpec := spec
 	
 	// Set default recipe if not specified
-	if baseSpec.Recipe == "" {
-		baseSpec.Recipe = "recipes/queue-system.yaml"
-	}
+	// Note: Recipe field removed - using direct params instead
 	
 	// Merge with queue system defaults
 	if baseSpec.Params == nil {
@@ -119,9 +117,7 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 		DefaultRecipe: recipePath,
 		DefaultParams: defaultParams,
 		CreateTargetFunc: func(metadata Metadata, spec WantSpec) *Target {
-			if spec.Recipe == "" {
-				spec.Recipe = recipePath
-			}
+			// Note: Recipe field removed - using direct params instead
 			
 			// Merge default params with provided params
 			if spec.Params == nil {

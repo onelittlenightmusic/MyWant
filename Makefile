@@ -1,4 +1,4 @@
-.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe
+.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-prime-recipe run-fibonacci-recipe
 
 # Build the mywant library
 build:
@@ -36,7 +36,22 @@ run-travel:
 	go run cmd/demos/demo_travel.go cmd/demos/travel_types.go config/config-travel.yaml
 
 run-qnet-using-recipe:
-	go run cmd/demos/demo_qnet_using_recipe.go cmd/demos/qnet_types.go config/config-qnet-using-recipe.yaml
+	go run cmd/demos/demo_qnet_using_recipe.go cmd/demos/qnet_types.go config/config-fibonacci-using-recipe.yaml
+
+run-travel-recipe:
+	go run cmd/demos/demo_travel_recipe.go cmd/demos/travel_types.go
+
+run-queue-system-recipe:
+	go run cmd/demos/demo_queue_system_recipe.go cmd/demos/qnet_types.go
+
+run-qnet-recipe:
+	go run cmd/demos/demo_qnet_recipe.go cmd/demos/qnet_types.go
+
+run-prime-recipe:
+	go run cmd/demos/demo_prime_recipe.go cmd/demos/prime_types.go
+
+run-fibonacci-recipe:
+	go run cmd/demos/demo_fibonacci_recipe.go cmd/demos/fibonacci_types.go
 
 clean:
 	rm -f qnet
