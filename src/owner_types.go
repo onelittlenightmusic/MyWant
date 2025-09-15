@@ -5,7 +5,6 @@ import (
 	"mywant/src/chain"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Global registry to track target instances for child notification
@@ -37,7 +36,6 @@ type Target struct {
 	builder        *ChainBuilder    // Reference to builder for dynamic want creation
 	recipeLoader   *GenericRecipeLoader    // Reference to generic recipe loader
 	stateMutex     sync.RWMutex // Mutex to protect concurrent state updates
-	lastHistoryTime map[string]time.Time // Track last history time per child
 }
 
 // NewTarget creates a new target want
@@ -54,7 +52,6 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		RecipeParams:    make(map[string]interface{}),
 		childWants:      make([]Want, 0),
 		childrenDone:    make(chan bool, 1),
-		lastHistoryTime: make(map[string]time.Time),
 	}
 	
 	// Extract target-specific configuration from params
@@ -79,6 +76,9 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	targetRegistryMutex.Lock()
 	targetRegistry[metadata.Name] = target
 	targetRegistryMutex.Unlock()
+
+	// Register with want system
+	RegisterWant(&target.Want)
 	
 	return target
 }
@@ -316,107 +316,11 @@ func (t *Target) mapParameterNameForChild(targetParamName string, childWantType 
 	return targetParamName
 }
 
-// StateMemoryEntry represents a state entry with child name, timestamp and structured YAML value
-type StateMemoryEntry struct {
-	ChildName string      `yaml:"child_name"`
-	Timestamp string      `yaml:"timestamp"`
-	State     interface{} `yaml:"state"`
-}
 
-// NotifyChildStateUpdate handles live state updates from child wants
-func (t *Target) NotifyChildStateUpdate(childName string, key string, value interface{}) {
-	// Use mutex to prevent concurrent map writes
-	t.stateMutex.Lock()
-	defer t.stateMutex.Unlock()
-	
-	// Initialize target state if needed
-	if t.State == nil {
-		t.State = make(map[string]interface{})
-	}
-	
-	// Store child state as structured YAML under child name
-	timestamp := time.Now().Format(time.RFC3339)
-	
-	// Get the complete state from the child want for structured storage
-	t.updateChildStructuredState(childName, timestamp)
-	
-	// Optional: Log live updates (can be disabled for performance)
-	if key == "average_wait_time" || key == "primeCount" || key == "count" {
-		fmt.Printf("🔄 Target %s: Live update from child %s - %s: %v\n", 
-			t.Metadata.Name, childName, key, value)
-	}
-}
 
-// updateChildStructuredState updates both latestState and historyState with structured child state
-func (t *Target) updateChildStructuredState(childName string, timestamp string) {
-	// Find the child want to get its complete state
-	var childState interface{}
-	if t.builder != nil {
-		allWantStates := t.builder.GetAllWantStates()
-		for _, want := range allWantStates {
-			if want.Metadata.Name == childName {
-				childState = want.State
-				break
-			}
-		}
-	}
-	
-	if childState == nil {
-		return // Child not found
-	}
-	
-	// Store in latest state (current values only - simplified structure with YAML)
-	latestState, exists := t.State["latestState"]
-	if !exists {
-		latestState = make(map[string]interface{})
-		t.State["latestState"] = latestState
-	}
-	
-	// Update latest state with complete structured state under child name
-	latestStateMap := latestState.(map[string]interface{})
-	latestStateMap[childName] = childState
-	
-	// Check if enough time has passed since last history update (300ms interval)
-	now := time.Now()
-	lastTime, exists := t.lastHistoryTime[childName]
-	if !exists || now.Sub(lastTime) >= 300*time.Millisecond {
-		// Store in history state with interval throttling
-		t.addToHistoryState(childName, timestamp, childState)
-		t.lastHistoryTime[childName] = now
-	}
-}
 
-// addToHistoryState adds a structured state entry to the history state
-func (t *Target) addToHistoryState(childName string, timestamp string, childState interface{}) {
-	// Get or create history state (list of all state changes)
-	historyState, exists := t.State["historyState"]
-	if !exists {
-		historyState = make([]StateMemoryEntry, 0)
-		t.State["historyState"] = historyState
-	}
-	
-	// Convert to slice
-	historyList := historyState.([]StateMemoryEntry)
-	
-	// Create new history entry with structured state
-	entry := StateMemoryEntry{
-		ChildName: childName,
-		Timestamp: timestamp,
-		State:     childState,
-	}
-	
-	// Add to history
-	historyList = append(historyList, entry)
-	
-	// Limit history size to prevent memory growth (keep last 100 entries)
-	if len(historyList) > 100 {
-		historyList = historyList[len(historyList)-100:]
-	}
-	
-	// Store updated history
-	t.State["historyState"] = historyList
-	t.State["historyStateCount"] = len(historyList)
-}
+
+
 
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
@@ -544,16 +448,6 @@ func NotifyTargetCompletion(targetName string, childName string) {
 	}
 }
 
-// NotifyTargetStateUpdate notifies a target that its child has updated state
-func NotifyTargetStateUpdate(targetName string, childName string, key string, value interface{}) {
-	targetRegistryMutex.RLock()
-	target, exists := targetRegistry[targetName]
-	targetRegistryMutex.RUnlock()
-	
-	if exists {
-		target.NotifyChildStateUpdate(childName, key, value)
-	}
-}
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
@@ -623,7 +517,7 @@ func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
 // initializeStateNotifications sets up the state notification system
 func initializeStateNotifications() {
 	// Override the notification function in declarative.go
-	setNotifyParentStateUpdate(NotifyTargetStateUpdate)
+	// Remove target state notification system
 }
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
