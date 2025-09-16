@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	. "mywant/src"
 )
 
 func main() {
@@ -20,14 +21,13 @@ func main() {
 	}
 
 	// Load configuration using generic recipe loader
-	config, params, err := LoadRecipeWithConfig(yamlFile)
+	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
 		fmt.Printf("Error loading recipe config %s: %v\n", yamlFile, err)
 		return
 	}
 
-	fmt.Printf("📋 Recipe parameters: %+v\n", params)
-	fmt.Printf("✅ Generated %d wants from recipe\n", len(config.Wants))
+	fmt.Printf("✅ Loaded %d wants from configuration\n", len(config.Wants))
 	for _, want := range config.Wants {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
