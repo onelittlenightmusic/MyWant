@@ -1,0 +1,33 @@
+recipe:
+  # Recipe metadata - defines Level 2 approval system
+  metadata:
+    name: "Level 2 Approval"
+    description: "Level 2 approval workflow coordinator"
+    custom_type: "level 2 approval"
+    version: "1.0.0"
+
+  # Recipe parameters - configurable values for Level 2 approval
+  parameters:
+    approval_id: "approval-001"
+    coordinator_type: "level2"
+    level2_authority: "senior_manager"
+
+  wants:
+    # Level 2 Coordinator - connects to evidence and description via recipeAgent
+    - type: level2_coordinator
+      labels:
+        role: coordinator
+        category: approval-coordinator
+        component: level2-coordinator
+        approval_level: "2"
+      params:
+        approval_id: approval_id
+        coordinator_type: coordinator_type
+        level2_authority: level2_authority
+      recipeAgent: true  # Automatically connects to evidence + description wants
+
+  # Recipe result definition
+  result:
+    - want_name: "level2_coordinator"
+      stat_name: ".final_approval_status"
+      description: "Level 2 final approval status"

@@ -1,4 +1,4 @@
-.PHONY: clean build test-build run-qnet run-prime run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-qnet-using-recipe run-parameter-history-test build-server run-server test-server-api test-server-simple
+.PHONY: clean build test-build run-qnet run-prime run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-qnet-using-recipe run-parameter-history-test run-hierarchical-approval build-server run-server test-server-api test-server-simple
 
 # Build the mywant library
 build:
@@ -34,6 +34,9 @@ run-qnet-using-recipe:
 
 run-parameter-history-test:
 	go run cmd/demos/demo_parameter_history.go cmd/demos/qnet_types.go
+
+run-hierarchical-approval:
+	go run cmd/demos/demo_hierarchical_approval.go cmd/demos/approval_types.go
 
 # Build the mywant server binary
 build-server:

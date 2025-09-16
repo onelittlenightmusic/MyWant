@@ -12,11 +12,12 @@ import (
 
 // RecipeWant represents a want in recipe format (flattened structure)
 type RecipeWant struct {
-	Name   string                 `yaml:"name,omitempty"`
-	Type   string                 `yaml:"type"`
-	Labels map[string]string      `yaml:"labels,omitempty"`
-	Params map[string]interface{} `yaml:"params,omitempty"`
-	Using  []map[string]string    `yaml:"using,omitempty"`
+	Name        string                 `yaml:"name,omitempty"`
+	Type        string                 `yaml:"type"`
+	Labels      map[string]string      `yaml:"labels,omitempty"`
+	Params      map[string]interface{} `yaml:"params,omitempty"`
+	Using       []map[string]string    `yaml:"using,omitempty"`
+	RecipeAgent bool                   `yaml:"recipeAgent,omitempty"`
 }
 
 // GenericRecipe represents the top-level recipe structure
@@ -154,15 +155,21 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 				prefix = prefixStr
 			}
 		}
-		
+
 		for i, recipeWant := range recipeContent.Wants {
 			// Convert recipe want to Want struct
 			want := recipeWant.ConvertToWant()
-			
+
 			// Generate name if missing
 			if want.Metadata.Name == "" {
 				want.Metadata.Name = fmt.Sprintf("%s-%s-%d", prefix, want.Metadata.Type, i+1)
 			}
+
+			// Process auto-connection if RecipeAgent is enabled
+			if recipeWant.RecipeAgent {
+				want = grl.autoConnect(want, recipeContent.Wants, mergedParams)
+			}
+
 			config.Wants = append(config.Wants, want)
 		}
 	}
@@ -353,6 +360,15 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, 
 		}
 	}
 	return substituted
+}
+
+// autoConnect implements auto-connection logic for RecipeAgent wants
+// NOTE: This is legacy recipe-level auto-connection.
+// The real auto-connection happens system-wide during the connection phase in declarative.go
+func (grl *GenericRecipeLoader) autoConnect(want Want, allWants []RecipeWant, params map[string]interface{}) Want {
+	// Recipe-level auto-connection is limited because it can only see wants within the same recipe
+	// System-wide auto-connection in declarative.go handles the full implementation
+	return want
 }
 
 // validateRecipeWithSpec validates recipe YAML data against the recipe OpenAPI spec

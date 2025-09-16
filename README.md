@@ -106,7 +106,122 @@ recipe:
 make run-travel-recipe  # Uses config/config-travel-recipe.yaml → recipes/travel-itinerary.yaml
 ```
 
-### Example 2: Direct Configuration (Queue System)
+### Example 2: Hierarchical Approval System (RecipeAgent Auto-Connection)
+
+This example demonstrates advanced auto-connection capabilities where RecipeAgent wants automatically discover and connect to compatible wants based on shared identifiers.
+
+**Create config file** (`config/config-hierarchical-approval.yaml`):
+```yaml
+wants:
+  # Evidence want - shared by all approval levels
+  - metadata:
+      name: evidence
+      type: evidence
+      labels:
+        role: evidence-provider
+        category: approval-data
+        approval_id: "approval-001"
+    spec:
+      params:
+        evidence_type: "document"
+        approval_id: "approval-001"
+
+  # Description want - shared by all approval levels
+  - metadata:
+      name: description
+      type: description
+      labels:
+        role: description-provider
+        category: approval-data
+        approval_id: "approval-001"
+    spec:
+      params:
+        description_format: "Request for approval: %s"
+        approval_id: "approval-001"
+
+  # Level 1 Approval Target - uses "level 1 approval" custom type
+  - metadata:
+      name: level1_approval
+      type: "level 1 approval"
+      labels:
+        role: approval-target
+        approval_level: "1"
+    spec:
+      params:
+        approval_id: "approval-001"
+        coordinator_type: "level1"
+
+  # Level 2 Approval Target - uses "level 2 approval" custom type
+  - metadata:
+      name: level2_approval
+      type: "level 2 approval"
+      labels:
+        role: approval-target
+        approval_level: "2"
+    spec:
+      params:
+        approval_id: "approval-001"
+        coordinator_type: "level2"
+        level2_authority: "senior_manager"
+```
+
+**Create recipe files** (`recipes/approval-level-1.yaml` and `recipes/approval-level-2.yaml`):
+```yaml
+# recipes/approval-level-1.yaml
+recipe:
+  metadata:
+    name: "Level 1 Approval"
+    description: "Level 1 approval workflow coordinator"
+    custom_type: "level 1 approval"
+    version: "1.0.0"
+
+  parameters:
+    approval_id: "approval-001"
+    coordinator_type: "level1"
+
+  wants:
+    # Level 1 Coordinator with RecipeAgent auto-connection
+    - type: level1_coordinator
+      labels:
+        role: coordinator
+        category: approval-coordinator
+        component: level1-coordinator
+        approval_level: "1"
+      params:
+        approval_id: approval_id
+        coordinator_type: coordinator_type
+      recipeAgent: true  # Enables automatic connection to evidence + description
+```
+
+**Key Features:**
+- **RecipeAgent Auto-Connection**: Coordinators with `recipeAgent: true` automatically connect to wants with matching `approval_id`
+- **Shared Wants**: Evidence and description wants are reused by both approval levels
+- **Custom Target Types**: Approval targets are registered as custom types from recipe scanning
+- **Hierarchical Structure**: Level 1 approval can dynamically create Level 2 approval
+- **Dynamic Want Creation**: Target wants create coordinator children at runtime
+- **Memory Persistence**: All connections and states are preserved in memory dumps
+
+**Run the example:**
+```sh
+make run-hierarchical-approval  # Uses config/config-hierarchical-approval.yaml
+```
+
+**View the connections in memory dump:**
+After execution, check `memory/memory-0000-latest.yaml` to see the auto-generated `using` selectors:
+```yaml
+- metadata:
+    name: want-level1_coordinator-1
+    type: level1_coordinator
+  spec:
+    params:
+      approval_id: approval-001
+      coordinator_type: level1
+    using:
+      - role: evidence-provider
+      - role: description-provider
+```
+
+### Example 3: Direct Configuration (Queue System)
 
 Dependent wants form processing pipelines using `using` selectors to connect outputs to inputs.
 
@@ -293,9 +408,12 @@ MyWant provides various examples demonstrating different processing patterns:
 # Independent wants - parallel execution
 make run-travel        # Travel planning with coordination
 
-# Dependent wants - pipeline processing  
+# Dependent wants - pipeline processing
 make run-qnet          # Queue system (generator → queue → sink)
 make run-qnet-using-recipe # Advanced QNet with multiple streams
+
+# RecipeAgent auto-connection system
+make run-hierarchical-approval # Hierarchical approval with auto-connection
 
 # Computational patterns
 make run-fibonacci     # Fibonacci sequence generation

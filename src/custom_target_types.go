@@ -117,8 +117,6 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 		DefaultRecipe: recipePath,
 		DefaultParams: defaultParams,
 		CreateTargetFunc: func(metadata Metadata, spec WantSpec) *Target {
-			// Note: Recipe field removed - using direct params instead
-			
 			// Merge default params with provided params
 			if spec.Params == nil {
 				spec.Params = make(map[string]interface{})
@@ -126,9 +124,10 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 			for key, value := range defaultParams {
 				setDefaultParam(spec.Params, key, value)
 			}
-			
+
 			target := NewTarget(metadata, spec)
 			target.Description = description
+			target.RecipePath = recipePath // Set the correct recipe path for this custom type
 			return target
 		},
 	})

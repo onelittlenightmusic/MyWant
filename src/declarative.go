@@ -1025,10 +1025,13 @@ func (cb *ChainBuilder) compilePhase() error {
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
 	fmt.Println("[RECONCILE:CONNECT] Establishing want topology")
-	
+
+	// Process auto-connections for RecipeAgent wants before generating paths
+	cb.processAutoConnections()
+
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
-	
+
 	// Validate connectivity requirements
 	if err := cb.validateConnections(cb.pathMap); err != nil {
 		return fmt.Errorf("connectivity validation failed: %w", err)
@@ -1052,6 +1055,165 @@ func (cb *ChainBuilder) connectPhase() error {
 	
 	fmt.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
 	return nil
+}
+
+// processAutoConnections handles system-wide auto-connection for RecipeAgent wants
+func (cb *ChainBuilder) processAutoConnections() {
+	fmt.Println("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
+
+	// Collect all wants with RecipeAgent enabled
+	autoConnectWants := make([]*runtimeWant, 0)
+	allWants := make([]*runtimeWant, 0)
+
+	for _, runtimeWant := range cb.wants {
+		allWants = append(allWants, runtimeWant)
+
+		// Check if want has RecipeAgent enabled in its metadata or state
+		want := runtimeWant.want
+		if cb.hasRecipeAgent(want) {
+			autoConnectWants = append(autoConnectWants, runtimeWant)
+			fmt.Printf("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
+		}
+	}
+
+	// Process auto-connections for each RecipeAgent want
+	for _, runtimeWant := range autoConnectWants {
+		want := runtimeWant.want
+		cb.autoConnectWant(want, allWants)
+		// Update the runtime spec to reflect auto-connection changes
+		runtimeWant.spec.Using = want.Spec.Using
+	}
+
+	fmt.Printf("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
+}
+
+// hasRecipeAgent checks if a want has RecipeAgent functionality enabled
+func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
+	// Check if want has coordinator role (typical for RecipeAgent wants)
+	if want.Metadata.Labels != nil {
+		if role, ok := want.Metadata.Labels["role"]; ok && role == "coordinator" {
+			return true
+		}
+	}
+
+	// Check for specific coordinator types
+	if want.Metadata.Type == "level1_coordinator" || want.Metadata.Type == "level2_coordinator" {
+		return true
+	}
+
+	return false
+}
+
+// autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
+func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
+	fmt.Printf("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
+
+	// Look for approval_id in want's params or labels
+	approvalID := ""
+
+	// Check params first
+	if want.Spec.Params != nil {
+		if approvalVal, ok := want.Spec.Params["approval_id"]; ok {
+			if approvalStr, ok := approvalVal.(string); ok {
+				approvalID = approvalStr
+			}
+		}
+	}
+
+	// Check labels if not found in params
+	if approvalID == "" && want.Metadata.Labels != nil {
+		if approvalVal, ok := want.Metadata.Labels["approval_id"]; ok {
+			approvalID = approvalVal
+		}
+	}
+
+	if approvalID == "" {
+		fmt.Printf("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
+		return
+	}
+
+	fmt.Printf("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
+
+	// Initialize using selectors if nil
+	if want.Spec.Using == nil {
+		want.Spec.Using = make([]map[string]string, 0)
+	}
+
+	connectionsAdded := 0
+
+	// Find all other wants with the same approval_id for auto-connection
+	for _, otherRuntimeWant := range allWants {
+		otherWant := otherRuntimeWant.want
+
+		// Skip self
+		if otherWant.Metadata.Name == want.Metadata.Name {
+			continue
+		}
+
+		// Check if other want has matching approval_id
+		otherApprovalID := ""
+		if otherWant.Spec.Params != nil {
+			if approvalVal, ok := otherWant.Spec.Params["approval_id"]; ok {
+				if approvalStr, ok := approvalVal.(string); ok {
+					otherApprovalID = approvalStr
+				}
+			}
+		}
+
+		if otherApprovalID == "" && otherWant.Metadata.Labels != nil {
+			if approvalVal, ok := otherWant.Metadata.Labels["approval_id"]; ok {
+				otherApprovalID = approvalVal
+			}
+		}
+
+		// Auto-connect to wants with matching approval_id
+		if otherApprovalID == approvalID {
+			// Only auto-connect to data provider wants (evidence, description)
+			// Skip coordinators and target wants
+			if otherWant.Metadata.Labels != nil {
+				role := otherWant.Metadata.Labels["role"]
+				if role == "evidence-provider" || role == "description-provider" {
+					// Create using selector based on other want's role
+					selector := make(map[string]string)
+					selector["role"] = role
+
+					// Check for duplicate connections
+					duplicate := false
+					for _, existingSelector := range want.Spec.Using {
+						if len(existingSelector) == len(selector) {
+							match := true
+							for k, v := range selector {
+								if existingSelector[k] != v {
+									match = false
+									break
+								}
+							}
+							if match {
+								duplicate = true
+								break
+							}
+						}
+					}
+
+					if !duplicate {
+						want.Spec.Using = append(want.Spec.Using, selector)
+						connectionsAdded++
+						fmt.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
+							want.Metadata.Name, selector, otherWant.Metadata.Name)
+					} else {
+						fmt.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
+							want.Metadata.Name, selector)
+					}
+				} else {
+					fmt.Printf("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
+						otherWant.Metadata.Name, role)
+				}
+			}
+		}
+	}
+
+	fmt.Printf("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
+		want.Metadata.Name, connectionsAdded)
 }
 
 // startPhase handles launching new/updated wants
