@@ -1,6 +1,6 @@
 # MyWant
 
-A Go library implementing functional programming patterns with channels, supporting declarative configuration-based approaches for flexible processing topologies and data flow architectures. MyWant introduces a declarative programming paradigm that eliminates the need for prior knowledge beyond YAML configuration files, removing prerequisites for understanding individual components or their internal implementations.
+A Go library implementing functional chain programming patterns with channels. The project uses a **recipe-based configuration system** where config YAML files serve as the top-level user interface and recipes provide reusable component templates. MyWant introduces a declarative programming paradigm that eliminates the need for prior knowledge beyond YAML configuration files, removing prerequisites for understanding individual components or their internal implementations.
 
 ## Why Choose MyWant's Declarative Framework?
 
@@ -15,6 +15,7 @@ A Go library implementing functional programming patterns with channels, support
 - **Focus on What, Not How**: Declare desired outcomes rather than implementation details
 
 ### **Effortless Scalability**
+- **Recipe-Based Configuration**: Use reusable component templates with parameter substitution
 - **Direct Configuration**: Define wants with explicit parameters and connections
 - **Label-based Connections**: Flexible want topology using label selectors
 - **Dynamic Composition**: Add or modify components at runtime through configuration
@@ -26,12 +27,14 @@ A Go library implementing functional programming patterns with channels, support
 
 ## Features
 
+- **Recipe-Based Configuration**: Reusable component templates with parameter substitution
 - **Independent & Dependent Wants**: Support both parallel processing and sequential pipelines
 - **Dynamic Want Addition**: Add wants to running systems at runtime
 - **Memory Reconciliation**: Persistent state management across system executions
 - **Label-based Connectivity**: Flexible want connections using label selectors
 - **Multi-flow Processing**: Support for parallel processing flows with combiners
-- **Custom Target Types**: Recipe-based want types with dynamic child creation
+- **Notification System**: Built-in monitoring and alerting capabilities
+- **Parameter History**: Track parameter changes and execution cycles
 
 ## Core Concepts
 
@@ -44,66 +47,66 @@ Wants are defined in configuration files with explicit parameters and connection
 
 ## Quick Start
 
-### Example 1: Independent Wants (Travel Planning)
+### Configuration Approaches
+
+MyWant supports two configuration approaches:
+1. **Recipe-Based**: Use reusable component templates (recommended)
+2. **Direct Configuration**: Define wants directly in config files
+
+### Example 1: Recipe-Based Configuration (Travel Planning)
 
 Independent wants execute in parallel without dependencies - perfect for orchestrated tasks.
 
-**Create your config file** (`config/config-travel.yaml`):
+**Create config file** (`config/config-travel-recipe.yaml`):
 ```yaml
-wants:
-  # Dinner restaurant reservation (independent)
-  - metadata:
-      name: dinner-reservation
-      type: restaurant
+recipe_path: "recipes/travel-itinerary.yaml"
+parameters:
+  prefix: "travel"
+  restaurant_type: "fine dining"
+  hotel_type: "luxury"
+  display_name: "One Day Travel Itinerary"
+```
+
+**Create recipe file** (`recipes/travel-itinerary.yaml`):
+```yaml
+recipe:
+  parameters:
+    prefix: "travel"
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    display_name: "Travel Itinerary"
+
+  wants:
+    # Restaurant booking (independent)
+    - type: restaurant
       labels:
         role: scheduler
         category: dining
-    spec:
       params:
-        restaurant_type: "fine dining"
+        restaurant_type: restaurant_type
         duration_hours: 2.0
 
-  # Hotel accommodation booking (independent)
-  - metadata:
-      name: hotel-booking
-      type: hotel
+    # Hotel booking (independent)
+    - type: hotel
       labels:
         role: scheduler
         category: accommodation
-    spec:
       params:
-        hotel_type: "luxury"
+        hotel_type: hotel_type
 
-  # Morning breakfast buffet (independent)
-  - metadata:
-      name: breakfast-buffet
-      type: buffet
-      labels:
-        role: scheduler
-        category: dining
-    spec:
-      params:
-        buffet_type: "international"
-
-  # Travel coordinator (collects all bookings)
-  - metadata:
-      name: get-one-day-travel
-      type: travel_coordinator
-      labels:
-        role: coordinator
-    spec:
-      params:
-        display_name: "One Day Travel Itinerary"
-      using:
-        - role: scheduler
+    # Coordinator (collects all bookings)
+  coordinator:
+    type: travel_coordinator
+    params:
+      display_name: display_name
 ```
 
 **Run the example:**
 ```sh
-make run-travel  # Uses config/config-travel.yaml
+make run-travel-recipe  # Uses config/config-travel-recipe.yaml → recipes/travel-itinerary.yaml
 ```
 
-### Example 2: Dependent Wants (Queue System)
+### Example 2: Direct Configuration (Queue System)
 
 Dependent wants form processing pipelines using `using` selectors to connect outputs to inputs.
 
@@ -151,6 +154,56 @@ wants:
 ```sh
 make run-qnet  # Uses config/config-qnet.yaml
 ```
+
+## Execution Modes
+
+MyWant supports multiple execution modes to fit different deployment scenarios:
+
+### Server Mode
+Run MyWant as a persistent server with HTTP API endpoints:
+
+```bash
+# Start server mode
+make server
+
+# Server provides HTTP endpoints for:
+# - Configuration management
+# - Dynamic want addition
+# - Real-time monitoring
+# - State inspection
+```
+
+The server mode enables:
+- **Remote Management**: Control MyWant instances via HTTP API
+- **Live Configuration**: Update configurations without restart
+- **State Inspection**: Query want states and statistics via HTTP endpoints
+- **Multi-Client Support**: Handle multiple concurrent requests
+
+### Offline Mode
+Execute configurations in standalone batch mode:
+
+```bash
+# Run in offline mode (default for demos)
+make run-travel-recipe    # Executes and exits
+make run-qnet            # Processes data and terminates
+```
+
+Offline mode is ideal for:
+- **Batch Processing**: One-time data processing tasks
+- **Testing**: Development and validation scenarios
+- **CI/CD Integration**: Automated pipeline execution
+- **Resource Management**: Controlled execution lifecycle
+
+### Choosing the Right Mode
+
+| Use Case | Server Mode | Offline Mode |
+|----------|-------------|--------------|
+| Web Applications | ✓ | |
+| Interactive Systems | ✓ | |
+| Batch Processing | | ✓ |
+| Development/Testing | | ✓ |
+| Production Services | ✓ | |
+| CI/CD Pipelines | | ✓ |
 
 ## Usage
 

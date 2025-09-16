@@ -1,4 +1,4 @@
-.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-prime-recipe run-fibonacci-recipe
+.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-prime-recipe run-fibonacci-recipe run-notification-demo build-server run-server
 
 # Build the mywant library
 build:
@@ -53,8 +53,28 @@ run-prime-recipe:
 run-fibonacci-recipe:
 	go run cmd/demos/demo_fibonacci_recipe.go cmd/demos/fibonacci_types.go
 
+run-notification-demo:
+	go run cmd/demos/demo_notification_system.go cmd/demos/qnet_types.go config/config-notification-demo.yaml
+
+run-target-notifications:
+	go run cmd/demos/demo_target_notifications.go cmd/demos/qnet_types.go config/config-target-notification-test.yaml
+
+run-parameter-history-test:
+	go run cmd/demos/demo_parameter_history.go cmd/demos/qnet_types.go
+
+run-qnet-with-params:
+	go run cmd/demos/demo_qnet_with_params.go cmd/demos/qnet_types.go config/config-qnet.yaml
+
+# Build the mywant server binary
+build-server:
+	go build -o bin/mywant cmd/server/*.go
+
+# Run the mywant server
+run-server: build-server
+	./bin/mywant 8080 localhost
+
 clean:
-	rm -f qnet
+	rm -f qnet bin/mywant
 	go clean
 
 all: build
