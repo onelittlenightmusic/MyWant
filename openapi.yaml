@@ -1,0 +1,721 @@
+openapi: 3.0.3
+info:
+  title: MyWant API
+  description: |
+    MyWant is a Go library implementing functional chain programming patterns with channels.
+    This API allows you to create, manage, and execute functional processing chains (called "Wants")
+    through a RESTful interface.
+
+    ## Core Concepts
+
+    - **Want**: A processing unit in the chain with metadata, spec, status, and state
+    - **Config**: Complete execution configuration containing an array of Wants
+    - **Chain Execution**: Asynchronous execution of interconnected processing units
+    - **Recipe System**: Reusable component templates with parameter substitution
+    - **State History**: All `stateValue` fields in history entries are structured objects, not strings
+
+  version: 1.0.0
+  contact:
+    name: MyWant API Support
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.mywant.dev
+    description: Production server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the current health status of the MyWant server
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /api/v1/wants:
+    post:
+      summary: Create and execute a new want configuration
+      description: |
+        Creates a new want configuration from YAML config and immediately starts
+        asynchronous execution. Supports both direct JSON payload with embedded
+        YAML and raw YAML content.
+      operationId: createWant
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWantRequest'
+            example:
+              yaml: |
+                wants:
+                  - metadata:
+                      name: "sample-processor"
+                      type: "queue"
+                    spec:
+                      params:
+                        service_time: 0.1
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Config'
+          text/yaml:
+            schema:
+              $ref: '#/components/schemas/Config'
+      responses:
+        '201':
+          description: Want created and execution started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantExecution'
+        '400':
+          description: Invalid request body or YAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List all wants
+      description: Returns a list of all want executions currently stored on the server
+      operationId: listWants
+      tags:
+        - Wants
+      responses:
+        '200':
+          description: List of wants retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WantExecution'
+
+  /api/v1/wants/{id}:
+    get:
+      summary: Get current runtime state of wants
+      description: |
+        Retrieves the current runtime state of all wants in an execution,
+        including live metrics, processing counts, and current status.
+        Returns the same format as memory dumps.
+      operationId: getWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+            example: "want-1a2b3c-1234"
+      responses:
+        '200':
+          description: Want runtime state retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantRuntimeState'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update a want configuration
+      description: |
+        Updates an existing want configuration. Only allowed if the want is not currently running.
+        Resets the want status to "updated" and clears previous results.
+      operationId: updateWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+            example: "want-1a2b3c-1234"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWantRequest'
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Config'
+          text/yaml:
+            schema:
+              $ref: '#/components/schemas/Config'
+      responses:
+        '200':
+          description: Want updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantExecution'
+        '400':
+          description: Invalid request body or YAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot update running want
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete a want
+      description: |
+        Deletes a want execution from the server. Only allowed if the want is not currently running.
+      operationId: deleteWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+            example: "want-1a2b3c-1234"
+      responses:
+        '204':
+          description: Want deleted successfully
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete running want
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /api/v1/wants/{id}/status:
+    get:
+      summary: Get want execution status
+      description: Returns the current execution status of a specific want
+      operationId: getWantStatus
+      tags:
+        - Monitoring
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+            example: "want-1a2b3c-1234"
+      responses:
+        '200':
+          description: Want status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantStatus'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/wants/{id}/results:
+    get:
+      summary: Get want execution results
+      description: |
+        Returns the execution results of a want, including final states,
+        statistics, and summary information. Available after execution completes.
+      operationId: getWantResults
+      tags:
+        - Monitoring
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+            example: "want-1a2b3c-1234"
+      responses:
+        '200':
+          description: Want results retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantResults'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        wants:
+          type: integer
+          description: Number of active want executions
+          example: 3
+        version:
+          type: string
+          example: "1.0.0"
+        server:
+          type: string
+          example: "mywant"
+      required:
+        - status
+        - wants
+        - version
+        - server
+
+    CreateWantRequest:
+      type: object
+      properties:
+        yaml:
+          type: string
+          description: YAML configuration for the want(s)
+          example: |
+            wants:
+              - metadata:
+                  name: "sample-processor"
+                  type: "queue"
+                spec:
+                  params:
+                    service_time: 0.1
+        name:
+          type: string
+          description: Optional name for the want execution
+          example: "my-custom-execution"
+      required:
+        - yaml
+
+    UpdateWantRequest:
+      type: object
+      properties:
+        yaml:
+          type: string
+          description: Updated YAML configuration for the want(s)
+          example: |
+            wants:
+              - metadata:
+                  name: "updated-processor"
+                  type: "queue"
+                spec:
+                  params:
+                    service_time: 0.2
+      required:
+        - yaml
+
+    Config:
+      type: object
+      description: Complete declarative configuration containing an array of wants
+      properties:
+        wants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Want'
+      required:
+        - wants
+
+    Want:
+      type: object
+      description: A processing unit in the chain with metadata, spec, status, and state
+      properties:
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        spec:
+          $ref: '#/components/schemas/WantSpec'
+        status:
+          $ref: '#/components/schemas/WantStatusEnum'
+        state:
+          type: object
+          additionalProperties: true
+          description: Current state of the want
+        history:
+          $ref: '#/components/schemas/WantHistory'
+      required:
+        - metadata
+        - spec
+
+    Metadata:
+      type: object
+      description: Want identification and classification information
+      properties:
+        name:
+          type: string
+          description: Unique name for this want
+          example: "sample-processor"
+        type:
+          type: string
+          description: Type of want (e.g., queue, sequence, sink)
+          example: "queue"
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value pairs for categorization and selection
+          example:
+            role: "processor"
+            category: "queue-system"
+        ownerReferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/OwnerReference'
+          description: References to owner objects for hierarchical relationships
+      required:
+        - name
+        - type
+
+    OwnerReference:
+      type: object
+      description: Reference to an owner object for hierarchical relationships
+      properties:
+        apiVersion:
+          type: string
+          example: "v1"
+        kind:
+          type: string
+          example: "Recipe"
+        name:
+          type: string
+          example: "queue-system-recipe"
+        controller:
+          type: boolean
+          example: true
+        blockOwnerDeletion:
+          type: boolean
+          example: false
+      required:
+        - apiVersion
+        - kind
+        - name
+
+    WantSpec:
+      type: object
+      description: Desired state configuration for a want
+      properties:
+        params:
+          type: object
+          additionalProperties: true
+          description: Configuration parameters specific to the want type
+          example:
+            service_time: 0.1
+            count: 1000
+        using:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+          description: Label selectors for connecting to other wants
+          example:
+            - role: "producer"
+            - category: "data-source"
+        stateSubscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/StateSubscription'
+          description: State change subscriptions for monitoring other wants
+        notificationFilters:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationFilter'
+          description: Filters for received notifications
+      required:
+        - params
+
+    StateSubscription:
+      type: object
+      description: Defines what state changes to monitor from other wants
+      properties:
+        wantName:
+          type: string
+          description: Name of the want to monitor
+          example: "data-producer"
+        stateKeys:
+          type: array
+          items:
+            type: string
+          description: Specific state keys to monitor (empty = all keys)
+          example: ["count", "rate"]
+        conditions:
+          type: array
+          items:
+            type: string
+          description: Optional conditions for state changes
+          example: ["value > 100"]
+        bufferSize:
+          type: integer
+          description: Buffer size for rate limiting
+          example: 10
+      required:
+        - wantName
+
+    NotificationFilter:
+      type: object
+      description: Filter for received notifications
+      properties:
+        sourcePattern:
+          type: string
+          description: Regex pattern for source want names
+          example: "producer.*"
+        stateKeys:
+          type: array
+          items:
+            type: string
+          description: Only include notifications for these state keys
+          example: ["count", "status"]
+        valuePattern:
+          type: string
+          description: Pattern for value conditions
+          example: "value > 50"
+      required:
+        - sourcePattern
+
+    WantStatusEnum:
+      type: string
+      enum:
+        - idle
+        - running
+        - completed
+        - failed
+        - terminated
+      description: Current status of the want execution
+
+    WantHistory:
+      type: object
+      description: Historical data for parameter and state changes
+      properties:
+        parameterHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/StateHistoryEntry'
+          description: History of parameter changes
+        stateHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/StateHistoryEntry'
+          description: History of state changes
+      required:
+        - parameterHistory
+        - stateHistory
+
+    StateHistoryEntry:
+      type: object
+      description: Single entry in state or parameter history
+      properties:
+        wantName:
+          type: string
+          example: "sample-processor"
+        stateValue:
+          type: object
+          additionalProperties: true
+          description: The state or parameter values as a structured object
+          example:
+            current_count: 100
+            current_time: 10.267
+        timestamp:
+          type: string
+          format: date-time
+          example: "2023-10-15T14:30:00Z"
+      required:
+        - wantName
+        - stateValue
+        - timestamp
+
+    WantExecution:
+      type: object
+      description: Represents a running or completed want execution
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this execution
+          example: "want-1a2b3c-1234"
+        config:
+          $ref: '#/components/schemas/Config'
+        status:
+          type: string
+          enum:
+            - created
+            - running
+            - completed
+            - failed
+            - updated
+          description: Current execution status
+          example: "running"
+        results:
+          type: object
+          additionalProperties: true
+          description: Execution results (available after completion)
+      required:
+        - id
+        - config
+        - status
+
+    WantRuntimeState:
+      type: object
+      description: Current runtime state of wants with live metrics and processing data
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this execution
+          example: "want-1a2b3c-1234"
+        execution_status:
+          type: string
+          enum:
+            - created
+            - running
+            - completed
+            - failed
+            - updated
+          description: Overall execution status
+          example: "running"
+        wants:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Want'
+          description: Map of want names to their current runtime state
+          example:
+            "qnet-pipeline":
+              metadata:
+                name: "qnet-pipeline"
+                type: "queue"
+              spec:
+                params:
+                  service_time: 0.05
+              status: "completed"
+              state:
+                numbers_total_processed: 1000
+                queue_average_wait_time: 0.027
+              history:
+                parameterHistory:
+                  - wantName: "qnet-pipeline"
+                    stateValue:
+                      service_time: 0.05
+                      deterministic: false
+                    timestamp: "2023-10-15T14:30:00Z"
+                stateHistory:
+                  - wantName: "qnet-pipeline"
+                    stateValue:
+                      current_count: 1000
+                      current_time: 100.5
+                    timestamp: "2023-10-15T14:30:15Z"
+        results:
+          type: object
+          additionalProperties: true
+          description: Execution results and summary
+      required:
+        - id
+        - execution_status
+        - wants
+
+    WantStatus:
+      type: object
+      description: Status information for a want execution
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this execution
+          example: "want-1a2b3c-1234"
+        status:
+          type: string
+          enum:
+            - created
+            - running
+            - completed
+            - failed
+            - updated
+          description: Current execution status
+          example: "running"
+      required:
+        - id
+        - status
+
+    WantResults:
+      type: object
+      description: Execution results and statistics
+      properties:
+        final_states:
+          type: object
+          additionalProperties: true
+          description: Final states of all wants in the execution
+        want_count:
+          type: integer
+          description: Total number of wants in the execution
+          example: 3
+        summary:
+          type: object
+          properties:
+            total_wants:
+              type: integer
+              example: 3
+            completed_wants:
+              type: integer
+              example: 3
+            status:
+              type: string
+              example: "completed"
+          description: Execution summary statistics
+        error:
+          type: string
+          description: Error message if execution failed
+      additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      description: Standard error response
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Want not found"
+        code:
+          type: integer
+          description: HTTP status code
+          example: 404
+      required:
+        - error
+
+tags:
+  - name: Health
+    description: Server health monitoring endpoints
+  - name: Wants
+    description: Want configuration management (creation automatically triggers execution)
+  - name: Monitoring
+    description: Want execution status and results monitoring

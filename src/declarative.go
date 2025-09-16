@@ -23,9 +23,10 @@ type Chan = chain.Chan
 type NotificationType string
 
 const (
-	NotificationOwnerChild    NotificationType = "owner-child"    // Current Target system
-	NotificationSubscription NotificationType = "subscription"    // New peer-to-peer
-	NotificationBroadcast     NotificationType = "broadcast"      // Global notifications
+	NotificationOwnerChild    NotificationType = "owner-child"    // Current Target system (child → parent)
+	NotificationSubscription NotificationType = "subscription"    // New peer-to-peer (any → any)
+	NotificationBroadcast     NotificationType = "broadcast"      // Global notifications (any → all)
+	NotificationParameter     NotificationType = "parameter"      // Parameter changes (parent → child)
 )
 
 // StateNotification contains complete notification information
@@ -42,6 +43,11 @@ type StateNotification struct {
 // StateUpdateListener allows wants to receive state change notifications
 type StateUpdateListener interface {
 	OnStateUpdate(notification StateNotification) error
+}
+
+// ParameterChangeListener allows wants to receive parameter change notifications
+type ParameterChangeListener interface {
+	OnParameterChange(notification StateNotification) error
 }
 
 // StateSubscription defines what state changes to monitor
@@ -138,22 +144,68 @@ type WantSpec struct {
 	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
 }
 
+// WantHistory contains both parameter and state history
+type WantHistory struct {
+	ParameterHistory []StateHistoryEntry `json:"parameterHistory" yaml:"parameterHistory"`
+	StateHistory     []StateHistoryEntry `json:"stateHistory" yaml:"stateHistory"`
+}
+
 // Want represents a processing unit in the chain
 type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`
 	Spec     WantSpec               `json:"spec" yaml:"spec"`
 	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
 	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
+	History  WantHistory            `json:"history" yaml:"history"`
 
 	// Internal fields for batching state changes during Exec cycles
-	pendingStateChanges map[string]interface{} `json:"-" yaml:"-"`
-	execCycleCount      int                    `json:"-" yaml:"-"`
-	inExecCycle         bool                   `json:"-" yaml:"-"`
+	pendingStateChanges     map[string]interface{} `json:"-" yaml:"-"`
+	pendingParameterChanges map[string]interface{} `json:"-" yaml:"-"`
+	execCycleCount          int                    `json:"-" yaml:"-"`
+	inExecCycle             bool                   `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status
 func (n *Want) SetStatus(status WantStatus) {
 	n.Status = status
+}
+
+// UpdateParameter updates a parameter and propagates the change to children
+func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
+	// Get previous value for history tracking
+	var previousValue interface{}
+	if n.Spec.Params != nil {
+		previousValue = n.Spec.Params[paramName]
+	}
+
+	// Update the parameter in spec
+	if n.Spec.Params == nil {
+		n.Spec.Params = make(map[string]interface{})
+	}
+	n.Spec.Params[paramName] = paramValue
+
+	// Batch parameter changes during Exec cycles (like state changes)
+	if n.inExecCycle {
+		if n.pendingParameterChanges == nil {
+			n.pendingParameterChanges = make(map[string]interface{})
+		}
+		n.pendingParameterChanges[paramName] = paramValue
+	} else {
+		// Add to parameter history immediately if not in exec cycle
+		n.addToParameterHistory(paramName, paramValue, previousValue)
+	}
+
+	// Create parameter change notification to propagate to children
+	notification := StateNotification{
+		SourceWantName:   n.Metadata.Name,
+		StateKey:         paramName,
+		StateValue:       paramValue,
+		Timestamp:        time.Now(),
+		NotificationType: NotificationParameter,
+	}
+
+	// Send parameter change notification to children
+	sendParameterNotifications(notification)
 }
 
 // BeginExecCycle starts a new execution cycle for batching state changes
@@ -163,31 +215,45 @@ func (n *Want) BeginExecCycle() {
 	if n.pendingStateChanges == nil {
 		n.pendingStateChanges = make(map[string]interface{})
 	}
+	if n.pendingParameterChanges == nil {
+		n.pendingParameterChanges = make(map[string]interface{})
+	}
 	// Clear pending changes for new cycle
 	for k := range n.pendingStateChanges {
 		delete(n.pendingStateChanges, k)
 	}
+	for k := range n.pendingParameterChanges {
+		delete(n.pendingParameterChanges, k)
+	}
 }
 
-// EndExecCycle completes the execution cycle and commits all batched state changes as a single history entry
+// EndExecCycle completes the execution cycle and commits all batched state and parameter changes
 func (n *Want) EndExecCycle() {
-	if !n.inExecCycle || len(n.pendingStateChanges) == 0 {
-		n.inExecCycle = false
+	if !n.inExecCycle {
 		return
 	}
 
-	// Create a single aggregated state history entry with complete state snapshot
-	if n.State == nil {
-		n.State = make(map[string]interface{})
+	// Handle state changes
+	if len(n.pendingStateChanges) > 0 {
+		// Create a single aggregated state history entry with complete state snapshot
+		if n.State == nil {
+			n.State = make(map[string]interface{})
+		}
+
+		// Apply all pending changes to actual state
+		for key, value := range n.pendingStateChanges {
+			n.State[key] = value
+		}
+
+		// Create one history entry with the complete state snapshot
+		n.addAggregatedStateHistory()
 	}
 
-	// Apply all pending changes to actual state
-	for key, value := range n.pendingStateChanges {
-		n.State[key] = value
+	// Handle parameter changes
+	if len(n.pendingParameterChanges) > 0 {
+		// Create one aggregated parameter history entry
+		n.addAggregatedParameterHistory()
 	}
-
-	// Create one history entry with the complete state snapshot
-	n.addAggregatedStateHistory()
 
 	n.inExecCycle = false
 }
@@ -212,7 +278,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 	// Get previous value for notification
 	previousValue, _ := n.GetState(key)
 
-	// Store the state
+	// Store the state - preserve existing State to maintain parameterHistory
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
@@ -248,44 +314,46 @@ func (n *Want) addAggregatedStateHistory() {
 		n.State = make(map[string]interface{})
 	}
 
-	// Initialize state history if needed
-	historyKey := "stateHistory"
-	var history []StateHistoryEntry
-	if existingHistory, exists := n.State[historyKey]; exists {
-		if h, ok := existingHistory.([]StateHistoryEntry); ok {
-			history = h
-		}
-	}
-
-	// Convert the complete state to YAML string
+	// Create a single entry with the complete state as object
 	stateSnapshot := n.copyCurrentState()
-	yamlData, err := yaml.Marshal(stateSnapshot)
-	var yamlString string
-	if err != nil {
-		yamlString = fmt.Sprintf("# Error marshaling state: %v", err)
-	} else {
-		yamlString = string(yamlData)
-	}
-
-	// Create a single entry with the complete state as YAML
 	entry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
-		StateValue: yamlString,
+		StateValue: stateSnapshot,
 		Timestamp:  time.Now(),
 	}
 
-	// Append the new entry
-	history = append(history, entry)
-	n.State[historyKey] = history
+	// Append the new entry to History field
+	n.History.StateHistory = append(n.History.StateHistory, entry)
 }
 
-// copyCurrentState creates a copy of the current state excluding the stateHistory itself
+// addAggregatedParameterHistory creates a single history entry with all parameter changes as object
+func (n *Want) addAggregatedParameterHistory() {
+	if len(n.pendingParameterChanges) == 0 {
+		return
+	}
+
+	// Create a single entry with all parameter changes as object
+	entry := StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: n.pendingParameterChanges,
+		Timestamp:  time.Now(),
+	}
+
+	// Append the new entry to parameter history
+	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
+
+	// Limit history size (keep last 50 entries for parameters)
+	maxHistorySize := 50
+	if len(n.History.ParameterHistory) > maxHistorySize {
+		n.History.ParameterHistory = n.History.ParameterHistory[len(n.History.ParameterHistory)-maxHistorySize:]
+	}
+}
+
+// copyCurrentState creates a copy of the current state
 func (n *Want) copyCurrentState() map[string]interface{} {
 	stateCopy := make(map[string]interface{})
 	for key, value := range n.State {
-		if key != "stateHistory" { // Exclude the history itself from the snapshot
-			stateCopy[key] = value
-		}
+		stateCopy[key] = value
 	}
 	return stateCopy
 }
@@ -296,73 +364,61 @@ func (n *Want) addToStateHistory(key string, value interface{}, previousValue in
 		n.State = make(map[string]interface{})
 	}
 
-	// Initialize state history if needed
-	historyKey := "stateHistory"
-	var history []StateHistoryEntry
-	if existingHistory, exists := n.State[historyKey]; exists {
-		if h, ok := existingHistory.([]StateHistoryEntry); ok {
-			history = h
-		}
+	// Create new history entry (individual field tracking)
+	stateMap := map[string]interface{}{
+		key: value,
 	}
-
-	// Create new history entry (legacy individual field tracking)
 	entry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
-		StateValue: fmt.Sprintf("%s: %v", key, value), // Simple key:value format for individual changes
+		StateValue: stateMap,
 		Timestamp:  time.Now(),
 	}
 
-	// Add to history
-	history = append(history, entry)
+	// Add to state history in History field
+	n.History.StateHistory = append(n.History.StateHistory, entry)
 
 	// Limit history size (keep last 100 entries)
 	maxHistorySize := 100
-	if len(history) > maxHistorySize {
-		history = history[len(history)-maxHistorySize:]
+	if len(n.History.StateHistory) > maxHistorySize {
+		n.History.StateHistory = n.History.StateHistory[len(n.History.StateHistory)-maxHistorySize:]
 	}
-
-	// Store updated history
-	n.State[historyKey] = history
 }
 
-// UpdateParameter updates a parameter in the want's spec and notifies listeners
-func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
-	if n.Spec.Params == nil {
-		n.Spec.Params = make(map[string]interface{})
+// addToParameterHistory adds a parameter change to the want's parameter history (for non-exec-cycle changes)
+func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, previousValue interface{}) {
+	// Create a single-parameter entry in aggregated format (like stateHistory)
+	paramMap := map[string]interface{}{
+		paramName: paramValue,
 	}
 
-	// Store old value for logging
-	oldValue := n.Spec.Params[paramName]
-
-	// Update the parameter
-	n.Spec.Params[paramName] = paramValue
-
-	// Store parameter change in state for tracking
-	if n.State == nil {
-		n.State = make(map[string]interface{})
+	entry := StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: paramMap,
+		Timestamp:  time.Now(),
 	}
 
-	// Track parameter changes
-	paramChanges, _ := n.State["parameter_changes"].([]map[string]interface{})
-	if paramChanges == nil {
-		paramChanges = make([]map[string]interface{}, 0)
+	// Add to parameter history in History field
+	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
+
+	// Limit history size (keep last 50 entries for parameters)
+	maxHistorySize := 50
+	if len(n.History.ParameterHistory) > maxHistorySize {
+		n.History.ParameterHistory = n.History.ParameterHistory[len(n.History.ParameterHistory)-maxHistorySize:]
 	}
 
-	change := map[string]interface{}{
-		"param_name":  paramName,
-		"old_value":   oldValue,
-		"new_value":   paramValue,
-		"timestamp":   time.Now(),
-		"change_id":   fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s-%v-%v", paramName, oldValue, time.Now().UnixNano())))),
-	}
-
-	paramChanges = append(paramChanges, change)
-	n.State["parameter_changes"] = paramChanges
-	n.State["last_parameter_update"] = time.Now()
-
-	fmt.Printf("[PARAM UPDATE] Want %s: %s changed from %v to %v\n",
-		n.Metadata.Name, paramName, oldValue, paramValue)
+	fmt.Printf("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
+		n.Metadata.Name, paramName, previousValue, paramValue)
 }
+
+// Helper function to get state keys for debugging
+func getStateKeys(state map[string]interface{}) []string {
+	keys := make([]string, 0, len(state))
+	for k := range state {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 
 // GetParameter gets a parameter value from the want's spec
 func (n *Want) GetParameter(paramName string) (interface{}, bool) {
@@ -1207,12 +1263,61 @@ func (cb *ChainBuilder) addWant(wantConfig Want) {
 	var wantPtr *Want
 	if wantWithGetWant, ok := wantFunction.(interface{ GetWant() *Want }); ok {
 		wantPtr = wantWithGetWant.GetWant()
+
+		// Copy State from config (simple copy since History is separate)
+		if wantConfig.State != nil {
+			if wantPtr.State == nil {
+				wantPtr.State = make(map[string]interface{})
+			}
+			// Copy all state data
+			for k, v := range wantConfig.State {
+				wantPtr.State[k] = v
+			}
+		}
+
+		// Copy History field from config
+		wantPtr.History = wantConfig.History
+
+		// Initialize parameterHistory with initial parameter values if empty
+		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+			// Create one entry with all initial parameters as object
+			entry := StateHistoryEntry{
+				WantName:   wantConfig.Metadata.Name,
+				StateValue: wantConfig.Spec.Params,
+				Timestamp:  time.Now(),
+			}
+			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
+		}
 	} else {
+		// Initialize State map (simple copy since History is separate)
+		stateMap := make(map[string]interface{})
+		if wantConfig.State != nil {
+			// Copy all state data
+			for k, v := range wantConfig.State {
+				stateMap[k] = v
+			}
+		}
+
+		// Copy History field from config
+		historyField := wantConfig.History
+
+		// Initialize parameterHistory with initial parameters if empty
+		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+			// Create one entry with all initial parameters as object
+			entry := StateHistoryEntry{
+				WantName:   wantConfig.Metadata.Name,
+				StateValue: wantConfig.Spec.Params,
+				Timestamp:  time.Now(),
+			}
+			historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
+		}
+
 		wantPtr = &Want{
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
 			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			State:    stateMap,
+			History:  historyField,
 		}
 	}
 	
@@ -1520,6 +1625,11 @@ func LoadConfigFromYAML(filename string) (Config, error) {
 	return loadConfigFromYAML(filename)
 }
 
+// LoadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation (exported version)
+func LoadConfigFromYAMLBytes(data []byte) (Config, error) {
+	return loadConfigFromYAMLBytes(data)
+}
+
 // loadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config
@@ -1532,6 +1642,25 @@ func loadConfigFromYAML(filename string) (Config, error) {
 
 	// Validate against OpenAPI spec before parsing
 	err = validateConfigWithSpec(data)
+	if err != nil {
+		return config, fmt.Errorf("config validation failed: %w", err)
+	}
+
+	// Parse the validated YAML
+	err = yaml.Unmarshal(data, &config)
+	if err != nil {
+		return config, fmt.Errorf("failed to parse YAML config: %w", err)
+	}
+
+	return config, nil
+}
+
+// loadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation
+func loadConfigFromYAMLBytes(data []byte) (Config, error) {
+	var config Config
+
+	// Validate against OpenAPI spec before parsing
+	err := validateConfigWithSpec(data)
 	if err != nil {
 		return config, fmt.Errorf("config validation failed: %w", err)
 	}
@@ -1719,6 +1848,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 			// Stats field removed - data now in State
 			Status:   runtimeWant.want.Status,
 			State:    runtimeWant.want.State,
+			History:  runtimeWant.want.History, // Include history in memory dump
 		}
 
 

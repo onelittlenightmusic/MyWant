@@ -166,11 +166,9 @@ Run MyWant as a persistent server with HTTP API endpoints:
 # Start server mode
 make server
 
-# Server provides HTTP endpoints for:
-# - Configuration management
-# - Dynamic want addition
-# - Real-time monitoring
-# - State inspection
+# Test server API
+make test-server-api    # Comprehensive API testing with JSON output
+make test-server-simple # Basic API testing without jq
 ```
 
 The server mode enables:
@@ -178,6 +176,48 @@ The server mode enables:
 - **Live Configuration**: Update configurations without restart
 - **State Inspection**: Query want states and statistics via HTTP endpoints
 - **Multi-Client Support**: Handle multiple concurrent requests
+
+#### Server API Documentation
+
+The server provides a complete REST API documented in OpenAPI 3.0.3 format. View the full specification:
+- **OpenAPI Spec**: [`openapi.yaml`](openapi.yaml) - Complete API specification
+- **Local Server**: http://localhost:8080/health (when server is running)
+
+#### Key Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Server health check |
+| POST | `/api/v1/wants` | Create and execute wants (auto-starts execution) |
+| GET | `/api/v1/wants` | List all want executions |
+| GET | `/api/v1/wants/{id}` | Get current runtime state (consistent with memory dumps) |
+| PUT | `/api/v1/wants/{id}` | Update want configuration (if not running) |
+| DELETE | `/api/v1/wants/{id}` | Delete want execution (if not running) |
+| GET | `/api/v1/wants/{id}/status` | Get execution status |
+| GET | `/api/v1/wants/{id}/results` | Get execution results (after completion) |
+
+#### API Usage Examples
+
+**Create and execute wants:**
+```bash
+# Upload YAML configuration (auto-starts execution)
+curl -X POST http://localhost:8080/api/v1/wants \
+  -H "Content-Type: application/yaml" \
+  --data-binary @config/config-qnet-target.yaml
+```
+
+**Monitor runtime state:**
+```bash
+# Get live want states (same format as memory dumps)
+curl -s http://localhost:8080/api/v1/wants/{id} | jq .
+```
+
+**Check execution status:**
+```bash
+curl -s http://localhost:8080/api/v1/wants/{id}/status
+```
+
+The API returns structured JSON responses with proper error handling and supports both YAML and JSON content types for configuration uploads.
 
 ### Offline Mode
 Execute configurations in standalone batch mode:

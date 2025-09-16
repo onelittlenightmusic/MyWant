@@ -58,7 +58,6 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
-	wants.HandleFunc("/{id}/execute", s.executeWant).Methods("POST")
 	wants.HandleFunc("/{id}/status", s.getWantStatus).Methods("GET")
 	wants.HandleFunc("/{id}/results", s.getWantResults).Methods("GET")
 
@@ -132,20 +131,33 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(wants)
 }
 
-// getWant handles GET /api/v1/wants/{id} - gets a specific want
+// getWant handles GET /api/v1/wants/{id} - gets current runtime state of wants
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	want, exists := s.wants[wantID]
+	execution, exists := s.wants[wantID]
 	if !exists {
 		http.Error(w, "Want not found", http.StatusNotFound)
 		return
 	}
 
-	json.NewEncoder(w).Encode(want)
+	// Return current runtime state if builder is available (execution started)
+	if execution.Builder != nil {
+		currentStates := execution.Builder.GetAllWantStates()
+		response := map[string]interface{}{
+			"id":              execution.ID,
+			"execution_status": execution.Status,
+			"wants":           currentStates,
+			"results":         execution.Results,
+		}
+		json.NewEncoder(w).Encode(response)
+	} else {
+		// If no builder yet (not executed), return the original execution info
+		json.NewEncoder(w).Encode(execution)
+	}
 }
 
 // updateWant handles PUT /api/v1/wants/{id} - updates a want configuration
@@ -218,30 +230,6 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// executeWant handles POST /api/v1/wants/{id}/execute - executes a want
-func (s *Server) executeWant(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
-	want, exists := s.wants[wantID]
-	if !exists {
-		http.Error(w, "Want not found", http.StatusNotFound)
-		return
-	}
-
-	if want.Status == "running" {
-		http.Error(w, "Want is already running", http.StatusConflict)
-		return
-	}
-
-	// Execute asynchronously
-	go s.executeWantAsync(wantID)
-
-	want.Status = "running"
-	json.NewEncoder(w).Encode(want)
-}
 
 // getWantStatus handles GET /api/v1/wants/{id}/status - gets want execution status
 func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
@@ -387,7 +375,6 @@ func (s *Server) Start() error {
 	fmt.Printf("  GET  /api/v1/wants/{id}         - Get want\n")
 	fmt.Printf("  PUT  /api/v1/wants/{id}         - Update want\n")
 	fmt.Printf("  DELETE /api/v1/wants/{id}       - Delete want\n")
-	fmt.Printf("  POST /api/v1/wants/{id}/execute - Execute want\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/status  - Get execution status\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/results - Get execution results\n")
 	fmt.Printf("\n")

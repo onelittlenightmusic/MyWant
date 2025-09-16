@@ -1,4 +1,4 @@
-.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-prime-recipe run-fibonacci-recipe run-notification-demo build-server run-server
+.PHONY: clean build test-build run-example run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-sample-owner-config run-qnet-target run-travel-target run-qnet-using-recipe run-travel-recipe run-queue-system-recipe run-qnet-recipe run-prime-recipe run-fibonacci-recipe run-notification-demo build-server run-server test-server-api test-server-simple
 
 # Build the mywant library
 build:
@@ -72,6 +72,89 @@ build-server:
 # Run the mywant server
 run-server: build-server
 	./bin/mywant 8080 localhost
+
+# Test server API endpoints
+test-server-api: build-server
+	@echo "🧪 Testing MyWant Server API..."
+	@echo "📋 Starting server in background..."
+	@./bin/mywant 8080 localhost & \
+	SERVER_PID=$$! && \
+	sleep 3 && \
+	echo "✅ Server started (PID: $$SERVER_PID)" && \
+	echo "" && \
+	echo "🩺 Testing health endpoint..." && \
+	curl -s http://localhost:8080/health | jq '.' && \
+	echo "" && \
+	echo "📝 Creating want with qnet-target config..." && \
+	WANT_ID=$$(curl -s -X POST http://localhost:8080/api/v1/wants \
+		-H "Content-Type: application/json" \
+		-d '{"yaml": "$(shell cat config/config-qnet-target.yaml | sed 's/"/\\"/g' | tr -d '\n')"}' \
+		| jq -r '.id') && \
+	echo "✅ Created want: $$WANT_ID" && \
+	echo "" && \
+	echo "📋 Listing all wants..." && \
+	curl -s http://localhost:8080/api/v1/wants | jq '.' && \
+	echo "" && \
+	echo "⏳ Waiting for execution to complete..." && \
+	sleep 5 && \
+	echo "" && \
+	echo "📊 Getting want status..." && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/status | jq '.' && \
+	echo "" && \
+	echo "🎯 Getting want runtime state..." && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID | jq '.' && \
+	echo "" && \
+	echo "📈 Getting want results..." && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/results | jq '.' && \
+	echo "" && \
+	echo "🛑 Stopping server..." && \
+	kill $$SERVER_PID && \
+	echo "✅ Server API tests completed successfully!"
+
+# Simple server API test (no jq required)
+test-server-simple: build-server
+	@echo "🧪 Simple MyWant Server API Test..."
+	@echo "📋 Starting server in background..."
+	@./bin/mywant 8080 localhost & \
+	SERVER_PID=$$! && \
+	sleep 3 && \
+	echo "✅ Server started (PID: $$SERVER_PID)" && \
+	echo "" && \
+	echo "🩺 Testing health endpoint:" && \
+	curl -s http://localhost:8080/health && \
+	echo "" && \
+	echo "" && \
+	echo "📝 Creating want with YAML config:" && \
+	curl -s -X POST http://localhost:8080/api/v1/wants \
+		-H "Content-Type: application/yaml" \
+		--data-binary @config/config-qnet-target.yaml && \
+	echo "" && \
+	echo "" && \
+	echo "📋 Listing all wants:" && \
+	WANT_ID=$$(curl -s http://localhost:8080/api/v1/wants | grep -o 'want-[^"]*' | head -1) && \
+	curl -s http://localhost:8080/api/v1/wants && \
+	echo "" && \
+	echo "" && \
+	echo "⏳ Waiting for execution to complete..." && \
+	sleep 5 && \
+	echo "" && \
+	echo "🎯 Getting want runtime state ($$WANT_ID):" && \
+	mkdir -p test && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID | tee test/want.json && \
+	echo "" && \
+	echo "" && \
+	echo "📊 Getting want status ($$WANT_ID):" && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/status && \
+	echo "" && \
+	echo "" && \
+	echo "📈 Getting want results ($$WANT_ID):" && \
+	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/results && \
+	echo "" && \
+	echo "" && \
+	echo "🛑 Stopping server..." && \
+	kill $$SERVER_PID && \
+	echo "💾 Want runtime state saved to test/want.json" && \
+	echo "✅ Simple server API test completed!"
 
 clean:
 	rm -f qnet bin/mywant
