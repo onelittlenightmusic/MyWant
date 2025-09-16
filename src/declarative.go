@@ -1173,9 +1173,19 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 			if otherWant.Metadata.Labels != nil {
 				role := otherWant.Metadata.Labels["role"]
 				if role == "evidence-provider" || role == "description-provider" {
-					// Create using selector based on other want's role
+					// Add unique connection label to source want first
+					connectionKey := cb.generateConnectionKey(want)
+					cb.addConnectionLabel(otherWant, want)
+
+					// Create using selector based on the unique label we just added
 					selector := make(map[string]string)
-					selector["role"] = role
+					if connectionKey != "" {
+						labelKey := fmt.Sprintf("used_by_%s", connectionKey)
+						selector[labelKey] = want.Metadata.Name
+					} else {
+						// Fallback to role-based selector if no unique key generated
+						selector["role"] = role
+					}
 
 					// Check for duplicate connections
 					duplicate := false
@@ -1214,6 +1224,56 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 
 	fmt.Printf("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
 		want.Metadata.Name, connectionsAdded)
+}
+
+// addConnectionLabel adds a unique label to source want indicating which coordinator is using it
+func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want) {
+	if sourceWant.Metadata.Labels == nil {
+		sourceWant.Metadata.Labels = make(map[string]string)
+	}
+
+	// Generate unique connection label based on consumer want
+	// Extract meaningful identifier from consumer (e.g., level1, level2, etc.)
+	connectionKey := cb.generateConnectionKey(consumerWant)
+
+	if connectionKey != "" {
+		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
+		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
+		fmt.Printf("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
+			sourceWant.Metadata.Name, labelKey, consumerWant.Metadata.Name)
+	}
+}
+
+// generateConnectionKey creates a unique key based on consumer want characteristics
+func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
+	// Try to extract meaningful identifier from labels first
+	if consumerWant.Metadata.Labels != nil {
+		// Check for approval_level, component, or other identifying labels
+		if level, ok := consumerWant.Metadata.Labels["approval_level"]; ok {
+			return fmt.Sprintf("level%s", level)
+		}
+		if component, ok := consumerWant.Metadata.Labels["component"]; ok {
+			return component
+		}
+		if category, ok := consumerWant.Metadata.Labels["category"]; ok {
+			return category
+		}
+	}
+
+	// Extract from want type as fallback
+	wantType := consumerWant.Metadata.Type
+	if strings.Contains(wantType, "level1") {
+		return "level1"
+	}
+	if strings.Contains(wantType, "level2") {
+		return "level2"
+	}
+	if strings.Contains(wantType, "coordinator") {
+		return "coordinator"
+	}
+
+	// Use sanitized want name as last resort
+	return strings.ReplaceAll(consumerWant.Metadata.Name, "-", "_")
 }
 
 // startPhase handles launching new/updated wants
