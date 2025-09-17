@@ -1,0 +1,13 @@
+agents:
+  - name: agent_premium
+    type: do
+    capabilities:
+      - hotel_agency
+    uses:
+      - xxx
+  - name: hotel_monitor
+    type: monitor
+    capabilities:
+      - hotel_agency
+    uses:
+      - xxx

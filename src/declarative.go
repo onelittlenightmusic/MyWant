@@ -142,6 +142,7 @@ type WantSpec struct {
 	Using               []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
 	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
+	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`
 }
 
 // WantHistory contains both parameter and state history
@@ -163,6 +164,12 @@ type Want struct {
 	pendingParameterChanges map[string]interface{} `json:"-" yaml:"-"`
 	execCycleCount          int                    `json:"-" yaml:"-"`
 	inExecCycle             bool                   `json:"-" yaml:"-"`
+
+	// Agent system
+	agentRegistry           *AgentRegistry         `json:"-" yaml:"-"`
+	runningAgents           map[string]context.CancelFunc `json:"-" yaml:"-"`
+	agentStateChanges       map[string]interface{} `json:"-" yaml:"-"`
+	agentStateMutex         sync.RWMutex           `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status
@@ -448,6 +455,19 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 	return value, exists
 }
 
+// GetAllState returns the entire state map
+func (n *Want) GetAllState() map[string]interface{} {
+	if n.State == nil {
+		return make(map[string]interface{})
+	}
+	// Return a copy to prevent external modifications
+	stateCopy := make(map[string]interface{})
+	for k, v := range n.State {
+		stateCopy[k] = v
+	}
+	return stateCopy
+}
+
 // OnProcessEnd handles state storage when the want process ends
 func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	n.SetStatus(WantStatusCompleted)
@@ -459,9 +479,12 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	
 	// Store completion timestamp
 	n.StoreState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
-	
+
 	// Store final statistics
 	// Stats are now stored directly in State - no separate stats field
+
+	// Stop all running agents
+	n.StopAllAgents()
 }
 
 // OnProcessFail handles state storage when the want process fails
@@ -479,6 +502,9 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	
 	// Store statistics at failure
 	// Stats are now stored directly in State - no separate stats field
+
+	// Stop all running agents
+	n.StopAllAgents()
 }
 
 // Config holds the complete declarative configuration
@@ -2322,4 +2348,177 @@ func (cb *ChainBuilder) toSnakeCase(str string) string {
 		result = append(result, r)
 	}
 	return strings.ToLower(string(result))
+}
+
+// Agent execution methods for Want
+
+// SetAgentRegistry sets the agent registry for this want
+func (n *Want) SetAgentRegistry(registry *AgentRegistry) {
+	n.agentRegistry = registry
+	if n.runningAgents == nil {
+		n.runningAgents = make(map[string]context.CancelFunc)
+	}
+}
+
+// ExecuteAgents finds and executes agents based on want requirements
+func (n *Want) ExecuteAgents() error {
+	if n.agentRegistry == nil {
+		return nil // No agent registry configured, skip agent execution
+	}
+
+	if len(n.Spec.Requires) == 0 {
+		return nil // No requirements specified, skip agent execution
+	}
+
+	for _, requirement := range n.Spec.Requires {
+		agents := n.agentRegistry.FindAgentsByGives(requirement)
+		for _, agent := range agents {
+			if err := n.executeAgent(agent); err != nil {
+				return fmt.Errorf("failed to execute agent %s: %w", agent.GetName(), err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// executeAgent executes a single agent in a goroutine
+func (n *Want) executeAgent(agent Agent) error {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Store cancel function for later cleanup
+	n.runningAgents[agent.GetName()] = cancel
+
+	// Execute agent in goroutine
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
+			}
+			// Remove from running agents when done
+			delete(n.runningAgents, agent.GetName())
+		}()
+
+		if err := agent.Exec(ctx, n); err != nil {
+			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
+		}
+	}()
+
+	return nil
+}
+
+// StopAllAgents stops all running agents for this want
+func (n *Want) StopAllAgents() {
+	if n.runningAgents == nil {
+		return
+	}
+
+	for agentName, cancel := range n.runningAgents {
+		fmt.Printf("Stopping agent: %s\n", agentName)
+		cancel()
+	}
+
+	// Clear the map
+	n.runningAgents = make(map[string]context.CancelFunc)
+}
+
+// StopAgent stops a specific running agent
+func (n *Want) StopAgent(agentName string) {
+	if n.runningAgents == nil {
+		return
+	}
+
+	if cancel, exists := n.runningAgents[agentName]; exists {
+		fmt.Printf("Stopping agent: %s\n", agentName)
+		cancel()
+		delete(n.runningAgents, agentName)
+	}
+}
+
+// StageStateChange stages state changes for later commit (used by agents)
+// Can be called with either:
+// 1. Single key-value: StageStateChange("key", "value")
+// 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
+func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) {
+	n.agentStateMutex.Lock()
+	defer n.agentStateMutex.Unlock()
+
+	if n.agentStateChanges == nil {
+		n.agentStateChanges = make(map[string]interface{})
+	}
+
+	// Handle object case: StageStateChange(map[string]interface{}{...})
+	if len(value) == 0 {
+		if stateObject, ok := keyOrObject.(map[string]interface{}); ok {
+			for k, v := range stateObject {
+				n.agentStateChanges[k] = v
+			}
+			return
+		}
+		// Invalid usage - no value provided and not a map
+		panic("StageStateChange: when called with single argument, it must be map[string]interface{}")
+	}
+
+	// Handle single key-value case: StageStateChange("key", "value")
+	if len(value) == 1 {
+		if key, ok := keyOrObject.(string); ok {
+			n.agentStateChanges[key] = value[0]
+			return
+		}
+		// Invalid usage - first arg is not a string
+		panic("StageStateChange: when called with two arguments, first must be string")
+	}
+
+	// Invalid usage - too many arguments
+	panic("StageStateChange: accepts either 1 argument (map) or 2 arguments (key, value)")
+}
+
+// CommitStateChanges commits all staged state changes in a single atomic operation
+func (n *Want) CommitStateChanges() {
+	n.agentStateMutex.Lock()
+	defer n.agentStateMutex.Unlock()
+
+	if len(n.agentStateChanges) == 0 {
+		return
+	}
+
+	// Create a single aggregated state history entry
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Apply all changes to current state
+	for key, value := range n.agentStateChanges {
+		n.State[key] = value
+	}
+
+	// Add single history entry with all changes (one entry instead of multiple)
+	historyEntry := StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: n.agentStateChanges,
+		Timestamp:  time.Now(),
+	}
+	n.History.StateHistory = append(n.History.StateHistory, historyEntry)
+
+	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
+		len(n.agentStateChanges), n.Metadata.Name)
+
+	// Clear staged changes
+	n.agentStateChanges = make(map[string]interface{})
+}
+
+// GetStagedChanges returns a copy of currently staged changes (for debugging)
+func (n *Want) GetStagedChanges() map[string]interface{} {
+	n.agentStateMutex.RLock()
+	defer n.agentStateMutex.RUnlock()
+
+	if n.agentStateChanges == nil {
+		return make(map[string]interface{})
+	}
+
+	staged := make(map[string]interface{})
+	for k, v := range n.agentStateChanges {
+		staged[k] = v
+	}
+	return staged
 }

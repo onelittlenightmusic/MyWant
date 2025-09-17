@@ -1,0 +1,236 @@
+openapi: 3.0.3
+info:
+  title: MyWant Agent & Capability Schema
+  description: OpenAPI specification for MyWant agent and capability YAML configuration files
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+components:
+  schemas:
+    # Root capability configuration object
+    CapabilityConfig:
+      type: object
+      description: Root configuration object for capabilities
+      required:
+        - capabilities
+      properties:
+        capabilities:
+          type: array
+          description: Array of capability definitions
+          items:
+            $ref: '#/components/schemas/Capability'
+      additionalProperties: false
+
+    # Individual capability definition
+    Capability:
+      type: object
+      description: A capability that agents can provide
+      required:
+        - name
+        - gives
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the capability
+          minLength: 1
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "hotel_agency"
+        gives:
+          type: array
+          description: List of services this capability provides
+          items:
+            type: string
+            minLength: 1
+            pattern: '^[a-zA-Z0-9_-]+$'
+          minItems: 1
+          example: ["hotel_reservation", "hotel_cancellation"]
+        description:
+          type: string
+          description: Human-readable description of the capability
+          example: "Provides hotel booking and management services"
+        version:
+          type: string
+          description: Version of the capability
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+          example: "1.0.0"
+        metadata:
+          type: object
+          description: Additional metadata for the capability
+          additionalProperties: true
+      additionalProperties: false
+
+    # Root agent configuration object
+    AgentConfig:
+      type: object
+      description: Root configuration object for agents
+      required:
+        - agents
+      properties:
+        agents:
+          type: array
+          description: Array of agent definitions
+          items:
+            $ref: '#/components/schemas/Agent'
+      additionalProperties: false
+
+    # Individual agent definition
+    Agent:
+      type: object
+      description: An agent that can execute actions or monitor state
+      required:
+        - name
+        - type
+        - capabilities
+      properties:
+        name:
+          type: string
+          description: Unique identifier for the agent
+          minLength: 1
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "agent_premium"
+        type:
+          type: string
+          description: Type of agent determining its behavior
+          enum:
+            - "do"
+            - "monitor"
+          example: "do"
+        capabilities:
+          type: array
+          description: List of capabilities this agent has
+          items:
+            type: string
+            minLength: 1
+            pattern: '^[a-zA-Z0-9_-]+$'
+          minItems: 1
+          example: ["hotel_agency", "payment_processing"]
+        uses:
+          type: array
+          description: List of resources or dependencies this agent uses
+          items:
+            type: string
+            minLength: 1
+          example: ["booking_api", "payment_gateway"]
+        description:
+          type: string
+          description: Human-readable description of the agent
+          example: "Premium hotel booking agent with VIP services"
+        config:
+          type: object
+          description: Agent-specific configuration parameters
+          additionalProperties: true
+          example:
+            timeout: 30
+            retry_count: 3
+            api_endpoint: "https://api.hotel.com"
+        priority:
+          type: integer
+          description: Execution priority (higher number = higher priority)
+          minimum: 0
+          maximum: 100
+          default: 50
+          example: 75
+        enabled:
+          type: boolean
+          description: Whether this agent is enabled
+          default: true
+          example: true
+        tags:
+          type: array
+          description: Tags for categorizing and filtering agents
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          example: ["production", "premium", "hotel"]
+        version:
+          type: string
+          description: Version of the agent
+          pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+          example: "2.1.0"
+        metadata:
+          type: object
+          description: Additional metadata for the agent
+          additionalProperties: true
+      additionalProperties: false
+
+    # Agent execution context
+    AgentExecutionContext:
+      type: object
+      description: Context passed to agents during execution
+      properties:
+        want_name:
+          type: string
+          description: Name of the want requesting agent execution
+        requirements:
+          type: array
+          description: List of requirements the want needs fulfilled
+          items:
+            type: string
+        timeout:
+          type: integer
+          description: Maximum execution time in seconds
+          minimum: 1
+          default: 300
+        environment:
+          type: object
+          description: Environment variables and settings
+          additionalProperties: true
+      additionalProperties: false
+
+    # Agent execution result
+    AgentExecutionResult:
+      type: object
+      description: Result returned by agent execution
+      properties:
+        success:
+          type: boolean
+          description: Whether the agent execution was successful
+        state_changes:
+          type: object
+          description: State changes made by the agent
+          additionalProperties: true
+        error:
+          type: string
+          description: Error message if execution failed
+        duration:
+          type: number
+          description: Execution duration in seconds
+          minimum: 0
+        metadata:
+          type: object
+          description: Additional execution metadata
+          additionalProperties: true
+      additionalProperties: false
+
+# Example usage paths (for documentation)
+paths:
+  /capabilities:
+    get:
+      summary: Load capability definitions
+      description: Load and validate capability definitions from YAML files
+      responses:
+        '200':
+          description: Successfully loaded capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityConfig'
+        '400':
+          description: Invalid capability configuration
+
+  /agents:
+    get:
+      summary: Load agent definitions
+      description: Load and validate agent definitions from YAML files
+      responses:
+        '200':
+          description: Successfully loaded agents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConfig'
+        '400':
+          description: Invalid agent configuration
+

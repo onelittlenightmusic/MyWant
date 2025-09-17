@@ -4,6 +4,7 @@ go 1.24.5
 
 require (
 	github.com/getkin/kin-openapi v0.133.0
+	github.com/gorilla/mux v1.8.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
