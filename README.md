@@ -1,5 +1,11 @@
 # MyWant
 
+## Key Differentiation: Declarative Desire Expression
+
+MyWant transforms system design from describing **operations** to expressing **human desires and business outcomes**. Instead of telling the system "how to do something," you declare "what you want to achieve" - like `customer-satisfaction: "delighted"` or `order-fulfillment: "next-day"`. The system automatically determines the operational steps needed to achieve your desired states.
+
+---
+
 A Go library implementing functional chain programming patterns with channels. The project uses a **recipe-based configuration system** where config YAML files serve as the top-level user interface and recipes provide reusable component templates. MyWant introduces a declarative programming paradigm that eliminates the need for prior knowledge beyond YAML configuration files, removing prerequisites for understanding individual components or their internal implementations.
 
 ## Why Choose MyWant's Declarative Framework?
