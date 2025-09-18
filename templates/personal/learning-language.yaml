@@ -1,0 +1,156 @@
+# Language Learning Plan Template
+# Agent-based comprehensive language learning support system
+
+recipe:
+  parameters:
+    target_language: "English"
+    current_level: "beginner"
+    target_level: "intermediate"
+    study_hours_per_day: 2
+    goal_months: 6
+    preferred_study_time: "morning"
+    study_budget: 50000
+
+  # Collaborative agent definitions
+  agents:
+    - name: learning_coordinator
+      type: do
+      capabilities: ["learning_planning", "schedule_coordination"]
+      description: "Learning plan coordination and management"
+
+    - name: progress_tracker
+      type: monitor
+      capabilities: ["progress_monitoring", "data_analysis"]
+      description: "Learning progress tracking and analysis"
+
+    - name: motivation_coach
+      type: do
+      capabilities: ["motivation_support", "goal_reminder"]
+      description: "Motivation maintenance and coaching"
+
+    - name: content_curator
+      type: do
+      capabilities: ["content_recommendation", "resource_management"]
+      description: "Learning content selection and management"
+
+  wants:
+    # Learning plan creation agent
+    - type: agent_want
+      labels:
+        role: planner
+        category: learning
+        phase: planning
+      params:
+        agent_name: learning_coordinator
+        task_type: create_learning_plan
+        inputs:
+          target_language: target_language
+          current_level: current_level
+          target_level: target_level
+          study_hours: study_hours_per_day
+          timeline: goal_months
+        capabilities_required: ["learning_planning"]
+
+    # Daily learning execution agent
+    - type: agent_want
+      labels:
+        role: executor
+        category: learning
+        phase: execution
+      params:
+        agent_name: content_curator
+        task_type: daily_learning_session
+        schedule: preferred_study_time
+        duration_hours: study_hours_per_day
+        capabilities_required: ["content_recommendation"]
+      using:
+        - role: planner
+
+    # Weekly progress evaluation agent
+    - type: agent_want
+      labels:
+        role: evaluator
+        category: learning
+        phase: evaluation
+      params:
+        agent_name: progress_tracker
+        task_type: weekly_progress_review
+        schedule: "weekly"
+        metrics: ["vocabulary_count", "listening_hours", "speaking_practice", "comprehension_score"]
+        capabilities_required: ["progress_monitoring", "data_analysis"]
+      using:
+        - role: executor
+
+    # Motivation management agent
+    - type: agent_want
+      labels:
+        role: supporter
+        category: learning
+        phase: support
+      params:
+        agent_name: motivation_coach
+        task_type: motivation_management
+        triggers: ["low_progress", "missed_sessions", "milestone_reached"]
+        support_methods: ["encouragement", "goal_adjustment", "reward_system"]
+        capabilities_required: ["motivation_support"]
+      using:
+        - role: evaluator
+
+    # Learning resource management agent
+    - type: agent_want
+      labels:
+        role: resource_manager
+        category: learning
+        phase: resource
+      params:
+        agent_name: content_curator
+        task_type: resource_optimization
+        budget: study_budget
+        resource_types: ["textbooks", "apps", "online_courses", "conversation_practice"]
+        quality_criteria: ["effectiveness", "cost_efficiency", "user_rating"]
+        capabilities_required: ["resource_management"]
+      using:
+        - role: planner
+
+    # Monthly level assessment agent
+    - type: agent_want
+      labels:
+        role: assessor
+        category: learning
+        phase: assessment
+      params:
+        agent_name: progress_tracker
+        task_type: level_assessment
+        schedule: "monthly"
+        assessment_areas: ["grammar", "vocabulary", "listening", "speaking", "reading", "writing"]
+        benchmark_tests: ["mock_exams", "conversation_tests", "writing_samples"]
+        capabilities_required: ["data_analysis"]
+      using:
+        - role: evaluator
+
+  # Learning outcome result definitions
+  result:
+    - want_name: "*assessor*"
+      stat_name: "current_language_level"
+      description: "Current language proficiency level"
+    - want_name: "*evaluator*"
+      stat_name: "weekly_study_hours"
+      description: "Weekly study time commitment"
+    - want_name: "*supporter*"
+      stat_name: "motivation_score"
+      description: "Motivation sustainability score"
+
+  # Learning phases and milestones
+  milestones:
+    - month: 1
+      target: "Master 500 basic vocabulary words"
+      evaluation_agent: progress_tracker
+    - month: 2
+      target: "Understand basic grammar patterns"
+      evaluation_agent: progress_tracker
+    - month: 3
+      target: "Engage in simple conversations"
+      evaluation_agent: progress_tracker
+    - month: 6
+      target: "Achieve target proficiency level"
+      evaluation_agent: progress_tracker

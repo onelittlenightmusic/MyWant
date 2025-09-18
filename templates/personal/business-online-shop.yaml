@@ -1,0 +1,202 @@
+# Online Shop Business Template
+# Agent-based e-commerce business development system
+
+recipe:
+  parameters:
+    business_type: "product_retail"  # product_retail, digital_products, dropshipping, handmade
+    startup_budget: 100000  # currency units
+    target_launch: 3  # months
+    niche_market: "eco_friendly_products"
+    experience_level: "beginner"
+    time_commitment: 20  # hours per week
+
+  # E-commerce business specialized agents
+  agents:
+    - name: business_strategist
+      type: do
+      capabilities: ["business_planning", "market_analysis"]
+      description: "Business strategy development and market analysis"
+
+    - name: product_manager
+      type: do
+      capabilities: ["product_sourcing", "inventory_management"]
+      description: "Product management and inventory optimization"
+
+    - name: marketing_specialist
+      type: do
+      capabilities: ["digital_marketing", "brand_development"]
+      description: "Marketing strategy and brand development"
+
+    - name: operations_coordinator
+      type: monitor
+      capabilities: ["operations_monitoring", "performance_analytics"]
+      description: "Operations coordination and performance tracking"
+
+  wants:
+    # Business foundation and planning agent
+    - type: agent_want
+      labels:
+        role: business_founder
+        category: business
+        phase: foundation
+      params:
+        agent_name: business_strategist
+        task_type: establish_business_foundation
+        foundation_elements:
+          - market_research: "target_audience_and_competitor_analysis"
+          - business_model: "revenue_streams_and_pricing_strategy"
+          - legal_setup: "business_registration_and_compliance"
+          - financial_planning: "budget_allocation_and_cash_flow_projection"
+        inputs:
+          budget: startup_budget
+          timeline: target_launch
+          niche: niche_market
+          business_type: business_type
+        deliverables:
+          - business_plan: "comprehensive_strategy_document"
+          - market_analysis: "competitive_landscape_assessment"
+          - financial_projections: "revenue_and_expense_forecasts"
+        capabilities_required: ["business_planning", "market_analysis"]
+
+    # Product sourcing and catalog development agent
+    - type: agent_want
+      labels:
+        role: product_curator
+        category: business
+        phase: product_development
+      params:
+        agent_name: product_manager
+        task_type: develop_product_catalog
+        product_strategy:
+          - sourcing_approach: "supplier_identification_and_evaluation"
+          - product_selection: "market_fit_and_profitability_analysis"
+          - quality_assurance: "product_testing_and_standards_compliance"
+          - pricing_optimization: "competitive_pricing_and_margin_analysis"
+        catalog_management:
+          - product_photography: "high_quality_visual_content_creation"
+          - product_descriptions: "compelling_and_seo_optimized_copy"
+          - categorization: "user_friendly_navigation_structure"
+          - inventory_planning: "stock_level_optimization"
+        capabilities_required: ["product_sourcing", "inventory_management"]
+      using:
+        - role: business_founder
+
+    # E-commerce platform setup agent
+    - type: agent_want
+      labels:
+        role: platform_developer
+        category: business
+        phase: development
+      params:
+        agent_name: operations_coordinator
+        task_type: setup_ecommerce_platform
+        platform_requirements:
+          - technology_selection: "ecommerce_platform_evaluation_and_choice"
+          - website_development: "user_experience_optimized_design"
+          - payment_processing: "secure_payment_gateway_integration"
+          - shipping_integration: "logistics_and_fulfillment_setup"
+        technical_setup:
+          - domain_and_hosting: "professional_web_presence_establishment"
+          - ssl_security: "customer_data_protection_implementation"
+          - mobile_optimization: "responsive_design_for_all_devices"
+          - analytics_integration: "performance_tracking_tools_setup"
+        capabilities_required: ["operations_monitoring"]
+      using:
+        - role: product_curator
+
+    # Marketing and brand development agent
+    - type: agent_want
+      labels:
+        role: brand_marketer
+        category: business
+        phase: marketing
+      params:
+        agent_name: marketing_specialist
+        task_type: develop_marketing_strategy
+        brand_development:
+          - brand_identity: "logo_colors_and_visual_identity_creation"
+          - brand_messaging: "unique_value_proposition_and_voice"
+          - content_strategy: "engaging_content_calendar_development"
+          - social_media_presence: "platform_specific_strategy_implementation"
+        marketing_channels:
+          - seo_optimization: "search_engine_visibility_improvement"
+          - social_media_marketing: "audience_engagement_and_growth"
+          - email_marketing: "customer_retention_and_nurturing"
+          - paid_advertising: "targeted_ad_campaigns_for_customer_acquisition"
+        budget_allocation: "cost_effective_marketing_mix"
+        capabilities_required: ["digital_marketing", "brand_development"]
+      using:
+        - role: platform_developer
+
+    # Launch preparation and execution agent
+    - type: agent_want
+      labels:
+        role: launch_coordinator
+        category: business
+        phase: launch
+      params:
+        agent_name: operations_coordinator
+        task_type: coordinate_business_launch
+        pre_launch_checklist:
+          - testing_phase: "comprehensive_functionality_and_user_testing"
+          - inventory_preparation: "stock_ready_for_initial_orders"
+          - customer_service_setup: "support_systems_and_processes"
+          - legal_compliance: "terms_conditions_and_privacy_policies"
+        launch_execution:
+          - soft_launch: "limited_audience_testing_and_feedback"
+          - marketing_campaign: "coordinated_promotional_activities"
+          - performance_monitoring: "real_time_metrics_tracking"
+          - rapid_iteration: "quick_response_to_launch_feedback"
+        capabilities_required: ["operations_monitoring"]
+      using:
+        - role: brand_marketer
+
+    # Post-launch optimization agent
+    - type: agent_want
+      labels:
+        role: growth_optimizer
+        category: business
+        phase: optimization
+      params:
+        agent_name: operations_coordinator
+        task_type: optimize_business_performance
+        optimization_areas:
+          - conversion_rate: "checkout_process_and_user_experience_improvement"
+          - customer_satisfaction: "service_quality_and_feedback_integration"
+          - operational_efficiency: "process_automation_and_cost_reduction"
+          - revenue_growth: "upselling_cross_selling_and_retention_strategies"
+        analytics_focus:
+          - key_metrics: "sales_traffic_conversion_and_customer_lifetime_value"
+          - trend_analysis: "seasonal_patterns_and_growth_opportunities"
+          - competitive_monitoring: "market_position_and_differentiation"
+        continuous_improvement: true
+        capabilities_required: ["performance_analytics"]
+      using:
+        - role: launch_coordinator
+
+  # Business development results
+  result:
+    - want_name: "*business_founder*"
+      stat_name: "business_readiness_score"
+      description: "Overall business foundation readiness"
+    - want_name: "*launch_coordinator*"
+      stat_name: "launch_success_metrics"
+      description: "Launch phase success indicators"
+    - want_name: "*growth_optimizer*"
+      stat_name: "business_performance_score"
+      description: "Post-launch business performance metrics"
+
+  # Business development milestones
+  milestones:
+    - month: 1
+      target: "Business plan and legal setup completed"
+      evaluation_agent: business_strategist
+    - month: 2
+      target: "Product catalog and platform ready"
+      evaluation_agent: product_manager
+    - month: 3
+      target: "Successful business launch"
+      evaluation_agent: operations_coordinator
+    - month: 6
+      target: "Sustainable business operations established"
+      evaluation_agent: operations_coordinator

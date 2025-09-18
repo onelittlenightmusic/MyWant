@@ -1,0 +1,187 @@
+# Morning Routine Building Template
+# Agent-based habit formation support system
+
+recipe:
+  parameters:
+    wake_up_time: "06:00"
+    routine_duration: 90  # minutes
+    target_habits: ["meditation", "exercise", "reading", "planning"]
+    habit_formation_weeks: 8
+    difficulty_level: "beginner"
+    tracking_method: "digital"
+
+  # Habit formation specialized agents
+  agents:
+    - name: habit_architect
+      type: do
+      capabilities: ["habit_design", "routine_optimization"]
+      description: "Habit design and optimization"
+
+    - name: behavior_tracker
+      type: monitor
+      capabilities: ["behavior_monitoring", "pattern_analysis"]
+      description: "Behavior pattern tracking and analysis"
+
+    - name: habit_coach
+      type: do
+      capabilities: ["behavior_coaching", "motivation_enhancement"]
+      description: "Habit coaching and support"
+
+    - name: environment_optimizer
+      type: do
+      capabilities: ["environment_design", "trigger_management"]
+      description: "Environment design and trigger management"
+
+  wants:
+    # 習慣設計エージェント
+    - type: agent_want
+      labels:
+        role: designer
+        category: habit_formation
+        phase: design
+      params:
+        agent_name: habit_architect
+        task_type: design_morning_routine
+        inputs:
+          wake_time: wake_up_time
+          duration: routine_duration
+          target_habits: target_habits
+          difficulty: difficulty_level
+        output: "optimized_routine_schedule"
+        capabilities_required: ["habit_design", "routine_optimization"]
+
+    # 環境準備エージェント
+    - type: agent_want
+      labels:
+        role: environment_setter
+        category: habit_formation
+        phase: preparation
+      params:
+        agent_name: environment_optimizer
+        task_type: setup_environment
+        environment_elements:
+          - meditation_space: "quiet_corner_with_cushion"
+          - exercise_area: "workout_mat_and_equipment"
+          - reading_nook: "comfortable_chair_with_good_light"
+          - planning_desk: "clean_desk_with_journal"
+        trigger_cues: ["alarm_sound", "pre_positioned_items", "visual_reminders"]
+        capabilities_required: ["environment_design", "trigger_management"]
+      using:
+        - role: designer
+
+    # 日次習慣実行エージェント
+    - type: agent_want
+      labels:
+        role: executor
+        category: habit_formation
+        phase: execution
+      params:
+        agent_name: behavior_tracker
+        task_type: daily_routine_execution
+        schedule: wake_up_time
+        habit_sequence:
+          - step: 1
+            activity: "wake_up_routine"
+            duration: 10
+          - step: 2
+            activity: "meditation"
+            duration: 15
+          - step: 3
+            activity: "light_exercise"
+            duration: 20
+          - step: 4
+            activity: "reading"
+            duration: 30
+          - step: 5
+            activity: "day_planning"
+            duration: 15
+        tracking_metrics: ["completion_rate", "start_time", "duration", "quality_score"]
+        capabilities_required: ["behavior_monitoring"]
+      using:
+        - role: environment_setter
+
+    # 週次パターン分析エージェント
+    - type: agent_want
+      labels:
+        role: analyzer
+        category: habit_formation
+        phase: analysis
+      params:
+        agent_name: behavior_tracker
+        task_type: weekly_pattern_analysis
+        schedule: "weekly"
+        analysis_dimensions:
+          - consistency: "daily_completion_rate"
+          - timing: "start_time_variance"
+          - quality: "self_reported_satisfaction"
+          - obstacles: "identified_barriers"
+        improvement_suggestions: true
+        capabilities_required: ["pattern_analysis"]
+      using:
+        - role: executor
+
+    # 習慣コーチングエージェント
+    - type: agent_want
+      labels:
+        role: coach
+        category: habit_formation
+        phase: coaching
+      params:
+        agent_name: habit_coach
+        task_type: personalized_coaching
+        coaching_triggers:
+          - missed_routine: "gentle_reminder_and_adjustment"
+          - low_motivation: "motivation_boost_session"
+          - streak_milestone: "celebration_and_reinforcement"
+          - difficulty_spike: "routine_simplification"
+        coaching_methods: ["positive_reinforcement", "obstacle_removal", "habit_stacking"]
+        capabilities_required: ["behavior_coaching", "motivation_enhancement"]
+      using:
+        - role: analyzer
+
+    # 月次習慣最適化エージェント
+    - type: agent_want
+      labels:
+        role: optimizer
+        category: habit_formation
+        phase: optimization
+      params:
+        agent_name: habit_architect
+        task_type: routine_optimization
+        schedule: "monthly"
+        optimization_criteria:
+          - efficiency: "time_per_benefit_ratio"
+          - sustainability: "long_term_adherence_potential"
+          - satisfaction: "personal_fulfillment_score"
+          - integration: "life_harmony_index"
+        adaptation_strategies: ["habit_evolution", "routine_refinement", "goal_adjustment"]
+        capabilities_required: ["routine_optimization"]
+      using:
+        - role: coach
+
+  # 習慣形成の成果測定
+  result:
+    - want_name: "*executor*"
+      stat_name: "daily_completion_rate"
+      description: "日次習慣完了率"
+    - want_name: "*analyzer*"
+      stat_name: "habit_strength_score"
+      description: "習慣定着度スコア"
+    - want_name: "*coach*"
+      stat_name: "motivation_sustainability"
+      description: "モチベーション持続性"
+
+  # 習慣形成マイルストーン
+  milestones:
+    - week: 1
+      target: "環境セットアップ完了"
+      evaluation_agent: environment_optimizer
+    - week: 2
+      target: "基本ルーティン確立"
+      evaluation_agent: behavior_tracker
+    - week: 4
+      target: "習慣の安定化"
+      evaluation_agent: behavior_tracker
+    - week: 8
+      target: "自動化された朝習慣"
+      evaluation_agent: habit_architect

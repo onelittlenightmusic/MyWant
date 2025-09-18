@@ -1,0 +1,185 @@
+# International Travel Planning Template
+# Agent-based comprehensive travel management system
+
+recipe:
+  parameters:
+    destination_country: "Japan"
+    travel_duration: 10  # days
+    travel_budget: 300000  # currency units
+    travel_type: "leisure"  # leisure, business, adventure
+    group_size: 2
+    accommodation_preference: "hotel"
+    transportation_preference: "flight"
+
+  # Travel planning specialized agents
+  agents:
+    - name: travel_planner
+      type: do
+      capabilities: ["itinerary_planning", "destination_research"]
+      description: "Travel itinerary planning and destination research"
+
+    - name: booking_coordinator
+      type: do
+      capabilities: ["reservation_management", "price_optimization"]
+      description: "Booking coordination and price optimization"
+
+    - name: document_manager
+      type: monitor
+      capabilities: ["document_tracking", "compliance_monitoring"]
+      description: "Travel document and compliance management"
+
+    - name: experience_optimizer
+      type: do
+      capabilities: ["activity_recommendation", "local_insights"]
+      description: "Experience optimization and local recommendations"
+
+  wants:
+    # Pre-travel planning agent
+    - type: agent_want
+      labels:
+        role: planner
+        category: travel
+        phase: planning
+      params:
+        agent_name: travel_planner
+        task_type: create_travel_itinerary
+        inputs:
+          destination: destination_country
+          duration: travel_duration
+          budget: travel_budget
+          travel_type: travel_type
+          group_size: group_size
+        planning_elements:
+          - weather_research: "seasonal_conditions_analysis"
+          - cultural_research: "local_customs_and_etiquette"
+          - attraction_research: "must_visit_locations"
+          - transportation_research: "local_transport_options"
+        capabilities_required: ["itinerary_planning", "destination_research"]
+
+    # Document preparation agent
+    - type: agent_want
+      labels:
+        role: document_manager
+        category: travel
+        phase: preparation
+      params:
+        agent_name: document_manager
+        task_type: prepare_travel_documents
+        document_checklist:
+          - passport: "validity_check_6_months"
+          - visa: "requirement_check_and_application"
+          - insurance: "travel_coverage_verification"
+          - vaccinations: "health_requirement_compliance"
+          - reservations: "booking_confirmation_collection"
+        deadline_tracking: true
+        reminder_system: true
+        capabilities_required: ["document_tracking", "compliance_monitoring"]
+      using:
+        - role: planner
+
+    # Booking coordination agent
+    - type: agent_want
+      labels:
+        role: booking_coordinator
+        category: travel
+        phase: booking
+      params:
+        agent_name: booking_coordinator
+        task_type: coordinate_bookings
+        booking_priorities:
+          - flights: "optimal_price_timing_balance"
+          - accommodation: accommodation_preference
+          - activities: "advance_booking_discounts"
+          - transportation: transportation_preference
+        price_monitoring: true
+        cancellation_policy_tracking: true
+        capabilities_required: ["reservation_management", "price_optimization"]
+      using:
+        - role: document_manager
+
+    # Experience optimization agent
+    - type: agent_want
+      labels:
+        role: experience_optimizer
+        category: travel
+        phase: optimization
+      params:
+        agent_name: experience_optimizer
+        task_type: optimize_travel_experience
+        optimization_areas:
+          - local_cuisine: "authentic_restaurant_recommendations"
+          - cultural_activities: "immersive_experience_selection"
+          - hidden_gems: "off_beaten_path_discoveries"
+          - local_events: "timing_based_event_recommendations"
+        personalization_factors: [travel_type, group_size, budget]
+        local_contact_network: true
+        capabilities_required: ["activity_recommendation", "local_insights"]
+      using:
+        - role: booking_coordinator
+
+    # During-travel support agent
+    - type: agent_want
+      labels:
+        role: travel_assistant
+        category: travel
+        phase: execution
+      params:
+        agent_name: experience_optimizer
+        task_type: real_time_travel_support
+        support_services:
+          - weather_updates: "daily_condition_alerts"
+          - traffic_monitoring: "route_optimization"
+          - emergency_contacts: "24_7_assistance_network"
+          - cultural_guidance: "situation_specific_advice"
+        communication_channels: ["mobile_app", "sms", "email"]
+        emergency_protocols: true
+        capabilities_required: ["local_insights"]
+      using:
+        - role: experience_optimizer
+
+    # Post-travel evaluation agent
+    - type: agent_want
+      labels:
+        role: evaluator
+        category: travel
+        phase: evaluation
+      params:
+        agent_name: travel_planner
+        task_type: post_travel_analysis
+        evaluation_metrics:
+          - satisfaction_score: "overall_experience_rating"
+          - budget_efficiency: "planned_vs_actual_spending"
+          - itinerary_effectiveness: "time_utilization_analysis"
+          - memorable_moments: "highlight_identification"
+        improvement_insights: true
+        future_planning_recommendations: true
+        capabilities_required: ["itinerary_planning"]
+      using:
+        - role: travel_assistant
+
+  # Travel planning results
+  result:
+    - want_name: "*planner*"
+      stat_name: "itinerary_completeness"
+      description: "Travel itinerary completion status"
+    - want_name: "*booking_coordinator*"
+      stat_name: "booking_efficiency"
+      description: "Booking cost optimization effectiveness"
+    - want_name: "*evaluator*"
+      stat_name: "overall_satisfaction"
+      description: "Overall travel satisfaction score"
+
+  # Travel planning milestones
+  milestones:
+    - weeks_before: 12
+      target: "Destination research completed"
+      evaluation_agent: travel_planner
+    - weeks_before: 8
+      target: "Documents and visa prepared"
+      evaluation_agent: document_manager
+    - weeks_before: 4
+      target: "All bookings confirmed"
+      evaluation_agent: booking_coordinator
+    - weeks_before: 1
+      target: "Final preparations completed"
+      evaluation_agent: experience_optimizer

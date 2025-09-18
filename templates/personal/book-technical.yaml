@@ -1,0 +1,220 @@
+# Technical Book Writing Template
+# Agent-based comprehensive technical writing and publishing system
+
+recipe:
+  parameters:
+    book_topic: "machine_learning_fundamentals"
+    target_audience: "intermediate_developers"  # beginners, intermediate_developers, experts
+    book_length: "300_pages"  # 150_pages, 300_pages, 500_pages
+    writing_timeline: 12  # months
+    writing_schedule: "part_time"  # full_time, part_time, weekend
+    publication_goal: "traditional_publisher"  # self_publish, traditional_publisher, both
+
+  # Technical writing specialized agents
+  agents:
+    - name: content_architect
+      type: do
+      capabilities: ["content_planning", "technical_structuring"]
+      description: "Content architecture and technical structure planning"
+
+    - name: writing_coach
+      type: do
+      capabilities: ["writing_guidance", "technical_communication"]
+      description: "Writing coaching and technical communication expertise"
+
+    - name: research_coordinator
+      type: do
+      capabilities: ["research_management", "technical_accuracy"]
+      description: "Research coordination and technical accuracy validation"
+
+    - name: publication_strategist
+      type: monitor
+      capabilities: ["publishing_guidance", "market_analysis"]
+      description: "Publishing strategy and market positioning"
+
+  wants:
+    # Book concept and structure development agent
+    - type: agent_want
+      labels:
+        role: concept_developer
+        category: writing
+        phase: conceptualization
+      params:
+        agent_name: content_architect
+        task_type: develop_book_concept_and_structure
+        concept_development:
+          - topic_analysis: "comprehensive_subject_matter_exploration"
+          - audience_research: "reader_needs_and_knowledge_level_assessment"
+          - unique_angle: "differentiation_from_existing_technical_books"
+          - value_proposition: "clear_learning_outcomes_and_benefits"
+        structural_planning:
+          - chapter_outline: "logical_progression_and_knowledge_building"
+          - content_hierarchy: "concepts_examples_and_exercises_organization"
+          - code_examples: "practical_implementation_demonstrations"
+          - appendices_resources: "supplementary_materials_and_references"
+        inputs:
+          topic: book_topic
+          audience: target_audience
+          length: book_length
+          timeline: writing_timeline
+        capabilities_required: ["content_planning", "technical_structuring"]
+
+    # Research and technical validation agent
+    - type: agent_want
+      labels:
+        role: research_manager
+        category: writing
+        phase: research
+      params:
+        agent_name: research_coordinator
+        task_type: conduct_comprehensive_research
+        research_activities:
+          - literature_review: "existing_books_papers_and_resources_analysis"
+          - technical_verification: "code_examples_and_concepts_validation"
+          - expert_interviews: "subject_matter_expert_consultations"
+          - current_trends: "latest_developments_and_best_practices"
+        quality_assurance:
+          - fact_checking: "technical_accuracy_verification"
+          - code_testing: "example_functionality_and_reliability"
+          - peer_review: "expert_feedback_and_validation"
+          - citation_management: "proper_attribution_and_references"
+        research_tools: ["academic_databases", "code_repositories", "industry_reports"]
+        capabilities_required: ["research_management", "technical_accuracy"]
+      using:
+        - role: concept_developer
+
+    # Writing process management agent
+    - type: agent_want
+      labels:
+        role: writing_manager
+        category: writing
+        phase: writing
+      params:
+        agent_name: writing_coach
+        task_type: manage_writing_process
+        writing_approach:
+          - daily_writing_goals: "consistent_progress_targets"
+          - chapter_milestones: "structured_completion_checkpoints"
+          - writing_techniques: "clear_technical_explanation_methods"
+          - style_consistency: "unified_voice_and_formatting"
+        writing_support:
+          - outline_refinement: "iterative_structure_improvement"
+          - clarity_optimization: "complex_concept_simplification"
+          - example_integration: "practical_code_demonstration"
+          - exercise_development: "reader_practice_opportunities"
+        schedule_management:
+          - time_blocking: "dedicated_writing_sessions"
+          - progress_tracking: "daily_and_weekly_output_monitoring"
+          - deadline_management: "milestone_and_final_deadline_adherence"
+        writing_schedule: writing_schedule
+        capabilities_required: ["writing_guidance", "technical_communication"]
+      using:
+        - role: research_manager
+
+    # Content review and editing agent
+    - type: agent_want
+      labels:
+        role: editor
+        category: writing
+        phase: editing
+      params:
+        agent_name: writing_coach
+        task_type: comprehensive_content_editing
+        editing_phases:
+          - developmental_editing: "structure_flow_and_content_optimization"
+          - technical_editing: "accuracy_completeness_and_clarity_review"
+          - copy_editing: "grammar_style_and_consistency_improvement"
+          - proofreading: "final_error_detection_and_correction"
+        editing_focus:
+          - technical_accuracy: "concept_explanation_and_code_verification"
+          - reader_experience: "learning_progression_and_comprehension"
+          - practical_utility: "real_world_application_and_usefulness"
+          - professional_quality: "publication_ready_standards"
+        collaboration_tools: ["version_control", "review_platforms", "feedback_systems"]
+        capabilities_required: ["technical_communication"]
+      using:
+        - role: writing_manager
+
+    # Publication strategy and execution agent
+    - type: agent_want
+      labels:
+        role: publication_manager
+        category: writing
+        phase: publication
+      params:
+        agent_name: publication_strategist
+        task_type: execute_publication_strategy
+        publication_paths:
+          - traditional_publishing: "agent_and_publisher_acquisition"
+          - self_publishing: "platform_selection_and_setup"
+          - hybrid_approach: "combined_strategy_optimization"
+        pre_publication:
+          - proposal_development: "compelling_book_proposal_creation"
+          - sample_chapters: "high_quality_excerpt_preparation"
+          - market_positioning: "competitive_analysis_and_differentiation"
+          - platform_building: "author_credibility_and_audience_development"
+        publication_execution:
+          - manuscript_preparation: "final_formatting_and_submission"
+          - marketing_strategy: "launch_and_promotion_planning"
+          - distribution_optimization: "reach_and_availability_maximization"
+        publication_goal: publication_goal
+        capabilities_required: ["publishing_guidance", "market_analysis"]
+      using:
+        - role: editor
+
+    # Post-publication marketing and community building agent
+    - type: agent_want
+      labels:
+        role: marketing_coordinator
+        category: writing
+        phase: marketing
+      params:
+        agent_name: publication_strategist
+        task_type: coordinate_book_marketing
+        marketing_activities:
+          - content_marketing: "blog_posts_articles_and_technical_content"
+          - speaking_engagements: "conferences_webinars_and_presentations"
+          - community_engagement: "developer_forums_and_social_media"
+          - media_outreach: "podcast_interviews_and_press_coverage"
+        audience_building:
+          - email_list: "subscriber_growth_and_engagement"
+          - social_media: "platform_specific_audience_development"
+          - professional_network: "industry_connections_and_endorsements"
+          - teaching_opportunities: "workshops_courses_and_tutorials"
+        performance_tracking:
+          - sales_metrics: "revenue_and_unit_sales_monitoring"
+          - reader_feedback: "reviews_ratings_and_testimonials"
+          - market_impact: "industry_recognition_and_influence"
+        capabilities_required: ["market_analysis"]
+      using:
+        - role: publication_manager
+
+  # Technical book writing results
+  result:
+    - want_name: "*concept_developer*"
+      stat_name: "content_structure_quality"
+      description: "Content organization and structure effectiveness"
+    - want_name: "*writing_manager*"
+      stat_name: "writing_progress_consistency"
+      description: "Writing schedule adherence and output quality"
+    - want_name: "*publication_manager*"
+      stat_name: "publication_success_score"
+      description: "Publication achievement and market performance"
+
+  # Technical book writing milestones
+  milestones:
+    - month: 2
+      target: "Complete book outline and research plan"
+      evaluation_agent: content_architect
+    - month: 4
+      target: "First three chapters drafted"
+      evaluation_agent: writing_coach
+    - month: 8
+      target: "Complete first draft finished"
+      evaluation_agent: writing_coach
+    - month: 10
+      target: "Professional editing completed"
+      evaluation_agent: writing_coach
+    - month: 12
+      target: "Book published and marketing launched"
+      evaluation_agent: publication_strategist
