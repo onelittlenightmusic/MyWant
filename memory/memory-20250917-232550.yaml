@@ -1,0 +1,73 @@
+timestamp: "2025-09-17T23:25:50+09:00"
+execution_id: exec-20250917-232550
+wants:
+    - metadata:
+        name: luxury-hotel-booking
+        type: hotel
+        labels:
+            category: accommodation
+            priority: high
+      spec:
+        params:
+            check_in: "2025-09-20"
+            check_out: "2025-09-22"
+            hotel_type: luxury
+            location: Tokyo
+        requires:
+            - hotel_reservation
+      status: completed
+      state:
+        check_in: "2025-09-20"
+        check_out: "2025-09-22"
+        hotel_name: Premium Hotel
+        hotel_type: luxury
+        last_checked: "2025-09-17T10:00:00Z"
+        reservation_id: HTL-12345
+        room_ready: true
+        status: confirmed
+      history:
+        parameterHistory:
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_in: "2025-09-20"
+                check_out: "2025-09-22"
+                hotel_type: luxury
+                location: Tokyo
+              timestamp: 2025-09-17T23:25:50.194576+09:00
+        stateHistory:
+            - want_name: luxury-hotel-booking
+              state_value:
+                reservation_id: HTL-12345
+              timestamp: 2025-09-17T23:25:50.206766+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                status: confirmed
+              timestamp: 2025-09-17T23:25:50.206768+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                hotel_name: Premium Hotel
+              timestamp: 2025-09-17T23:25:50.206772+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_in: "2025-09-20"
+              timestamp: 2025-09-17T23:25:50.206774+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_out: "2025-09-22"
+              timestamp: 2025-09-17T23:25:50.206774+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                reservation_id: HTL-12345
+              timestamp: 2025-09-17T23:25:50.206804+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                status: confirmed
+              timestamp: 2025-09-17T23:25:50.206806+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                last_checked: "2025-09-17T10:00:00Z"
+              timestamp: 2025-09-17T23:25:50.206806+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                room_ready: true
+              timestamp: 2025-09-17T23:25:50.206807+09:00

@@ -8,7 +8,7 @@ import (
 func main() {
 	fmt.Println("🚀 Chain Waits for Sink Completion Demo")
 	fmt.Println("=======================================")
-	
+
 	// Create simple chain: Generator → Queue → Sink
 	config := Config{
 		Nodes: []Node{
@@ -29,7 +29,7 @@ func main() {
 			},
 			{
 				Metadata: Metadata{
-					Name: "processing-queue", 
+					Name: "processing-queue",
 					Type: "queue",
 					Labels: map[string]string{
 						"role": "processor",
@@ -47,7 +47,7 @@ func main() {
 			{
 				Metadata: Metadata{
 					Name: "final-sink",
-					Type: "sink", 
+					Type: "sink",
 					Labels: map[string]string{
 						"role": "sink",
 					},
@@ -61,52 +61,52 @@ func main() {
 			},
 		},
 	}
-	
+
 	builder := NewChainBuilder(config)
 	RegisterQNetNodeTypes(builder)
-	
+
 	fmt.Println("🏗️  Building chain: Generator → Queue → Sink")
 	err := builder.Build()
 	if err != nil {
 		fmt.Printf("❌ Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("▶️  Starting execution (chain will wait for sink to complete)...")
 	startTime := time.Now()
-	
+
 	// Execute and wait for sink completion
 	builder.Execute()
-	
+
 	duration := time.Since(startTime)
-	
+
 	fmt.Println("\n📊 Final Results (after sink completion):")
 	states := builder.GetAllNodeStates()
 	totalGenerated := 0
 	totalProcessed := 0
 	totalReceived := 0
-	
+
 	for name, state := range states {
 		processed := int(state.Stats.TotalProcessed)
 		fmt.Printf("  • %s: %s (processed: %d)\n",
 			name, state.GetStatus(), processed)
-		
+
 		switch name {
 		case "fast-generator":
 			totalGenerated = processed
 		case "processing-queue":
-			totalProcessed = processed  
+			totalProcessed = processed
 		case "final-sink":
 			totalReceived = processed
 		}
 	}
-	
+
 	fmt.Printf("\n📈 Processing Summary:\n")
 	fmt.Printf("  📦 Generated: %d packets\n", totalGenerated)
 	fmt.Printf("  ⚙️  Processed: %d packets\n", totalProcessed)
 	fmt.Printf("  📥 Received: %d packets\n", totalReceived)
 	fmt.Printf("  ⏱️  Duration: %v\n", duration)
-	
+
 	fmt.Println("\n✅ Key Behavior Demonstrated:")
 	fmt.Println("   🔸 Generator completed immediately (no wait time)")
 	fmt.Println("   🔸 Chain waited for sink to finish processing all data")

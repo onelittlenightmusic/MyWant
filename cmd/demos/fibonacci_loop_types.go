@@ -26,12 +26,12 @@ func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbe
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		MaxCount: 15,
 	}
-	
+
 	if c, ok := params["max_count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.MaxCount = ci
@@ -39,7 +39,7 @@ func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbe
 			gen.MaxCount = int(cf)
 		}
 	}
-	
+
 	return gen
 }
 
@@ -137,8 +137,8 @@ func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *Fib
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 	}
 }
@@ -269,8 +269,8 @@ func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *Fibon
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 	}
 }
@@ -326,8 +326,8 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 	processed, _ := m.State["processed"].(int)
 	maxCountReceived, _ := m.State["maxCountReceived"].(bool)
 
-	seedIn := using[0]       // From seed generator
-	computedIn := using[1]   // From fibonacci computer (feedback loop)
+	seedIn := using[0]        // From seed generator
+	computedIn := using[1]    // From fibonacci computer (feedback loop)
 	computerOut := outputs[0] // To fibonacci computer
 
 	// Handle both using with blocking select
@@ -344,7 +344,7 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 				m.State["maxCountReceived"] = maxCountReceived
 			}
 		} else {
-			computerOut <- fibSeed  // Send to computer for processing
+			computerOut <- fibSeed                                      // Send to computer for processing
 			fmt.Printf("F(%d) = %d\n", fibSeed.Position, fibSeed.Value) // Display directly
 			processed++
 			m.State["processed"] = processed
@@ -376,19 +376,18 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 	return false
 }
 
-
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
 	// Register seed numbers type
 	builder.RegisterWantType("seed_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewSeedNumbers(metadata, spec.Params)
 	})
-	
+
 	// Register fibonacci computer type
 	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciComputer(metadata, spec.Params)
 	})
-	
+
 	// Register fibonacci merger type
 	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciMerger(metadata, spec.Params)

@@ -8,7 +8,7 @@ import (
 func main() {
 	fmt.Println("QNet Validation Demo")
 	fmt.Println("===================")
-	
+
 	// Load YAML configuration
 	config, err := mywant.LoadConfigFromYAML("config/config-qnet.yaml")
 	if err != nil {
@@ -20,19 +20,19 @@ func main() {
 
 	// Create chain builder
 	builder := mywant.NewChainBuilder(config)
-	
+
 	// Register qnet node types
 	RegisterQNetWantTypes(builder)
-	
+
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()
-	
+
 	fmt.Println("\n📊 Final Node States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
-		fmt.Printf("  %s: %s (processed: %v)\n", 
+		fmt.Printf("  %s: %s (processed: %v)\n",
 			name, state.Status, state.State["total_processed"])
 	}
-	
+
 	fmt.Println("\n✅ QNet execution completed successfully!")
 }

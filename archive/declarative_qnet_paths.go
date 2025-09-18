@@ -16,7 +16,7 @@ var (
 		NodeType:        "sequence",
 		Description:     "Generates packets at specified rate",
 	}
-	
+
 	QueueConnectivity = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 1,
@@ -25,7 +25,7 @@ var (
 		NodeType:        "queue",
 		Description:     "Processes packets with service time delay",
 	}
-	
+
 	CombinerConnectivity = ConnectivityMetadata{
 		RequiredInputs:  2,
 		RequiredOutputs: 1,
@@ -34,7 +34,7 @@ var (
 		NodeType:        "combiner",
 		Description:     "Merges multiple input streams in chronological order",
 	}
-	
+
 	SinkConnectivity = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 0,
@@ -48,31 +48,31 @@ var (
 // ValidateConnectivity checks if a node's paths match its connectivity requirements
 func ValidateConnectivity(node EnhancedBaseNode, inCount, outCount int) error {
 	meta := node.GetConnectivityMetadata()
-	
+
 	// Check required inputs
 	if inCount < meta.RequiredInputs {
-		return fmt.Errorf("node %s requires %d inputs, got %d", 
+		return fmt.Errorf("node %s requires %d inputs, got %d",
 			meta.NodeType, meta.RequiredInputs, inCount)
 	}
-	
+
 	// Check required outputs
 	if outCount < meta.RequiredOutputs {
-		return fmt.Errorf("node %s requires %d outputs, got %d", 
+		return fmt.Errorf("node %s requires %d outputs, got %d",
 			meta.NodeType, meta.RequiredOutputs, outCount)
 	}
-	
+
 	// Check maximum inputs
 	if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-		return fmt.Errorf("node %s allows max %d inputs, got %d", 
+		return fmt.Errorf("node %s allows max %d inputs, got %d",
 			meta.NodeType, meta.MaxInputs, inCount)
 	}
-	
+
 	// Check maximum outputs
 	if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-		return fmt.Errorf("node %s allows max %d outputs, got %d", 
+		return fmt.Errorf("node %s allows max %d outputs, got %d",
 			meta.NodeType, meta.MaxOutputs, outCount)
 	}
-	
+
 	return nil
 }
 
@@ -134,13 +134,13 @@ func (g *EnhancedGeneratorNode) InitializePaths(inCount, outCount int) {
 
 func (g *EnhancedGeneratorNode) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"rate":              g.Rate,
-		"count":             g.Count,
-		"generated":         g.current,
-		"input_paths":       g.paths.GetInCount(),
-		"output_paths":      g.paths.GetOutCount(),
-		"active_in_paths":   g.paths.GetActiveInCount(),
-		"active_out_paths":  g.paths.GetActiveOutCount(),
+		"rate":             g.Rate,
+		"count":            g.Count,
+		"generated":        g.current,
+		"input_paths":      g.paths.GetInCount(),
+		"output_paths":     g.paths.GetOutCount(),
+		"active_in_paths":  g.paths.GetActiveInCount(),
+		"active_out_paths": g.paths.GetActiveOutCount(),
 	}
 }
 
@@ -152,32 +152,32 @@ func (g *EnhancedGeneratorNode) Process(paths *Paths) bool {
 				outPath.Channel <- Packet{-1, 0}
 			}
 		}
-		fmt.Printf("[GENERATOR] Generated %d packets on %d output paths\n", 
+		fmt.Printf("[GENERATOR] Generated %d packets on %d output paths\n",
 			g.current, paths.GetActiveOutCount())
 		return true
 	}
-	
+
 	g.current++
 	g.time += g.Rate * rand.ExpFloat64()
 	packet := Packet{g.current, g.time}
-	
+
 	// Send to all active output paths
 	for _, outPath := range paths.Out {
 		if outPath.Active {
 			outPath.Channel <- packet
 		}
 	}
-	
+
 	return false
 }
 
 // Enhanced Queue Node
 type EnhancedQueueNode struct {
-	ServiceTime  float64
-	queueTime    float64
-	processed    int
-	totalDelay   float64
-	paths        Paths
+	ServiceTime float64
+	queueTime   float64
+	processed   int
+	totalDelay  float64
+	paths       Paths
 }
 
 func (q *EnhancedQueueNode) GetType() string {
@@ -216,13 +216,13 @@ func (q *EnhancedQueueNode) GetStats() map[string]interface{} {
 		avgDelay = q.totalDelay / float64(q.processed)
 	}
 	return map[string]interface{}{
-		"service_time":      q.ServiceTime,
-		"processed":         q.processed,
-		"average_delay":     avgDelay,
-		"input_paths":       q.paths.GetInCount(),
-		"output_paths":      q.paths.GetOutCount(),
-		"active_in_paths":   q.paths.GetActiveInCount(),
-		"active_out_paths":  q.paths.GetActiveOutCount(),
+		"service_time":     q.ServiceTime,
+		"processed":        q.processed,
+		"average_delay":    avgDelay,
+		"input_paths":      q.paths.GetInCount(),
+		"output_paths":     q.paths.GetOutCount(),
+		"active_in_paths":  q.paths.GetActiveInCount(),
+		"active_out_paths": q.paths.GetActiveOutCount(),
 	}
 }
 
@@ -235,16 +235,16 @@ func (q *EnhancedQueueNode) Process(paths *Paths) bool {
 			break
 		}
 	}
-	
+
 	if packet.IsEnd() {
 		avgDelay := 0.0
 		if q.processed > 0 {
 			avgDelay = q.totalDelay / float64(q.processed)
 		}
 		fmt.Printf("[QUEUE] Service: %.2fs, Processed: %d packets, Average Wait Time: %.3fs, Paths: %dIn/%dOut\n",
-			q.ServiceTime, q.processed, avgDelay, 
+			q.ServiceTime, q.processed, avgDelay,
 			paths.GetActiveInCount(), paths.GetActiveOutCount())
-		
+
 		// Forward end marker to all active output paths
 		for _, outPath := range paths.Out {
 			if outPath.Active {
@@ -253,25 +253,25 @@ func (q *EnhancedQueueNode) Process(paths *Paths) bool {
 		}
 		return true
 	}
-	
+
 	// Process packet through queue
 	if packet.Time > q.queueTime {
 		q.queueTime = packet.Time
 	}
 	q.queueTime += q.ServiceTime * rand.ExpFloat64()
-	
+
 	q.totalDelay += q.queueTime - packet.Time
 	q.processed++
-	
+
 	processedPacket := Packet{packet.ID, q.queueTime}
-	
+
 	// Send to all active output paths
 	for _, outPath := range paths.Out {
 		if outPath.Active {
 			outPath.Channel <- processedPacket
 		}
 	}
-	
+
 	return false
 }
 
@@ -298,7 +298,7 @@ func (c *EnhancedCombinerNode) InitializePaths(inCount, outCount int) {
 	}
 	c.bufferedPackets = make([]Packet, inCount)
 	c.streamsEnded = make([]bool, inCount)
-	
+
 	// Initialize input paths
 	for i := 0; i < inCount; i++ {
 		c.paths.In[i] = PathInfo{
@@ -307,7 +307,7 @@ func (c *EnhancedCombinerNode) InitializePaths(inCount, outCount int) {
 			Active:  true,
 		}
 	}
-	
+
 	// Initialize output path
 	if outCount > 0 {
 		c.paths.Out[0] = PathInfo{
@@ -320,12 +320,12 @@ func (c *EnhancedCombinerNode) InitializePaths(inCount, outCount int) {
 
 func (c *EnhancedCombinerNode) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"merged_packets":    c.merged,
-		"input_paths":       c.paths.GetInCount(),
-		"output_paths":      c.paths.GetOutCount(),
-		"active_in_paths":   c.paths.GetActiveInCount(),
-		"active_out_paths":  c.paths.GetActiveOutCount(),
-		"streams_ended":     c.countEndedStreams(),
+		"merged_packets":   c.merged,
+		"input_paths":      c.paths.GetInCount(),
+		"output_paths":     c.paths.GetOutCount(),
+		"active_in_paths":  c.paths.GetActiveInCount(),
+		"active_out_paths": c.paths.GetActiveOutCount(),
+		"streams_ended":    c.countEndedStreams(),
 	}
 }
 
@@ -351,7 +351,7 @@ func (c *EnhancedCombinerNode) Process(paths *Paths) bool {
 			}
 		}
 	}
-	
+
 	// Check if all streams have ended
 	allEnded := true
 	for _, ended := range c.streamsEnded {
@@ -360,11 +360,11 @@ func (c *EnhancedCombinerNode) Process(paths *Paths) bool {
 			break
 		}
 	}
-	
+
 	if allEnded {
-		fmt.Printf("[COMBINER] Merged %d packets from %d input paths\n", 
+		fmt.Printf("[COMBINER] Merged %d packets from %d input paths\n",
 			c.merged, paths.GetActiveInCount())
-		
+
 		// Send end marker to all active output paths
 		for _, outPath := range paths.Out {
 			if outPath.Active {
@@ -373,11 +373,11 @@ func (c *EnhancedCombinerNode) Process(paths *Paths) bool {
 		}
 		return true
 	}
-	
+
 	// Find earliest packet among buffered packets
 	earliestIdx := -1
 	var earliestTime float64 = -1
-	
+
 	for i, packet := range c.bufferedPackets {
 		if !c.streamsEnded[i] && packet.ID > 0 {
 			if earliestIdx == -1 || packet.Time < earliestTime {
@@ -386,22 +386,22 @@ func (c *EnhancedCombinerNode) Process(paths *Paths) bool {
 			}
 		}
 	}
-	
+
 	if earliestIdx == -1 {
 		return false // No packets to process
 	}
-	
+
 	// Send earliest packet to all active output paths
 	selectedPacket := c.bufferedPackets[earliestIdx]
 	c.bufferedPackets[earliestIdx] = Packet{} // Clear buffer
 	c.merged++
-	
+
 	for _, outPath := range paths.Out {
 		if outPath.Active {
 			outPath.Channel <- selectedPacket
 		}
 	}
-	
+
 	return false
 }
 
@@ -425,7 +425,7 @@ func (s *EnhancedSinkNode) InitializePaths(inCount, outCount int) {
 		In:  make([]PathInfo, inCount),
 		Out: make([]PathInfo, outCount),
 	}
-	
+
 	// Initialize input paths
 	for i := 0; i < inCount; i++ {
 		s.paths.In[i] = PathInfo{
@@ -438,12 +438,12 @@ func (s *EnhancedSinkNode) InitializePaths(inCount, outCount int) {
 
 func (s *EnhancedSinkNode) GetStats() map[string]interface{} {
 	return map[string]interface{}{
-		"received":          s.received,
-		"last_time":         s.lastTime,
-		"input_paths":       s.paths.GetInCount(),
-		"output_paths":      s.paths.GetOutCount(),
-		"active_in_paths":   s.paths.GetActiveInCount(),
-		"active_out_paths":  s.paths.GetActiveOutCount(),
+		"received":         s.received,
+		"last_time":        s.lastTime,
+		"input_paths":      s.paths.GetInCount(),
+		"output_paths":     s.paths.GetOutCount(),
+		"active_in_paths":  s.paths.GetActiveInCount(),
+		"active_out_paths": s.paths.GetActiveOutCount(),
 	}
 }
 
@@ -456,16 +456,16 @@ func (s *EnhancedSinkNode) Process(paths *Paths) bool {
 			break
 		}
 	}
-	
+
 	if !packet.IsEnd() {
 		s.received++
 		s.lastTime = packet.Time
 		// Removed real-time packet monitoring for performance
 	} else {
-		fmt.Printf("[SINK] Total received: %d packets via %d input paths\n", 
+		fmt.Printf("[SINK] Total received: %d packets via %d input paths\n",
 			s.received, paths.GetInCount())
 	}
-	
+
 	return packet.IsEnd()
 }
 

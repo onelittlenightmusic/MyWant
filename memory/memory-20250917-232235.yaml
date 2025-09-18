@@ -1,0 +1,33 @@
+timestamp: "2025-09-17T23:22:35+09:00"
+execution_id: exec-20250917-232235
+wants:
+    - metadata:
+        name: luxury-hotel-booking
+        type: hotel
+        labels:
+            category: accommodation
+            priority: high
+      spec:
+        params:
+            check_in: "2025-09-20"
+            check_out: "2025-09-22"
+            hotel_type: luxury
+            location: Tokyo
+        requires:
+            - hotel_reservation
+      status: completed
+      state:
+        check_in: "2025-09-20"
+        check_out: "2025-09-22"
+        hotel_type: luxury
+        status: processing
+      history:
+        parameterHistory:
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_in: "2025-09-20"
+                check_out: "2025-09-22"
+                hotel_type: luxury
+                location: Tokyo
+              timestamp: 2025-09-17T23:22:35.552193+09:00
+        stateHistory: []

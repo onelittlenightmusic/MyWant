@@ -13,11 +13,11 @@ type CustomTargetTypeRegistry struct {
 
 // CustomTargetTypeConfig defines a custom target want type
 type CustomTargetTypeConfig struct {
-	Name              string                 // "wait time in queue system"
-	Description       string                 // Human description
-	DefaultRecipe     string                 // Default recipe path
-	DefaultParams     map[string]interface{} // Default parameters
-	CreateTargetFunc  func(metadata Metadata, spec WantSpec) *Target
+	Name             string                 // "wait time in queue system"
+	Description      string                 // Human description
+	DefaultRecipe    string                 // Default recipe path
+	DefaultParams    map[string]interface{} // Default parameters
+	CreateTargetFunc func(metadata Metadata, spec WantSpec) *Target
 }
 
 // NewCustomTargetTypeRegistry creates a new custom target type registry
@@ -31,7 +31,7 @@ func NewCustomTargetTypeRegistry() *CustomTargetTypeRegistry {
 func (r *CustomTargetTypeRegistry) Register(config CustomTargetTypeConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	
+
 	r.customTypes[config.Name] = config
 	fmt.Printf("🎯 Registered custom target type: '%s'\n", config.Name)
 }
@@ -40,7 +40,7 @@ func (r *CustomTargetTypeRegistry) Register(config CustomTargetTypeConfig) {
 func (r *CustomTargetTypeRegistry) Get(typeName string) (CustomTargetTypeConfig, bool) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	
+
 	config, exists := r.customTypes[typeName]
 	return config, exists
 }
@@ -49,7 +49,7 @@ func (r *CustomTargetTypeRegistry) Get(typeName string) (CustomTargetTypeConfig,
 func (r *CustomTargetTypeRegistry) IsCustomType(typeName string) bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	
+
 	_, exists := r.customTypes[typeName]
 	return exists
 }
@@ -58,7 +58,7 @@ func (r *CustomTargetTypeRegistry) IsCustomType(typeName string) bool {
 func (r *CustomTargetTypeRegistry) ListTypes() []string {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	
+
 	types := make([]string, 0, len(r.customTypes))
 	for typeName := range r.customTypes {
 		types = append(types, typeName)
@@ -77,28 +77,28 @@ type QueueSystemTarget struct {
 func NewQueueSystemTarget(metadata Metadata, spec WantSpec) *Target {
 	// Create base target with queue system specific defaults
 	baseSpec := spec
-	
+
 	// Set default recipe if not specified
 	// Note: Recipe field removed - using direct params instead
-	
+
 	// Merge with queue system defaults
 	if baseSpec.Params == nil {
 		baseSpec.Params = make(map[string]interface{})
 	}
-	
+
 	// Set queue system specific defaults
 	setDefaultParam(baseSpec.Params, "max_display", 200)
 	setDefaultParam(baseSpec.Params, "service_time", 0.1)
 	setDefaultParam(baseSpec.Params, "deterministic", false)
 	setDefaultParam(baseSpec.Params, "count", 1000)
 	setDefaultParam(baseSpec.Params, "rate", 10.0)
-	
+
 	// Create the base target with enhanced spec
 	target := NewTarget(metadata, baseSpec)
-	
+
 	// Add queue system specific configuration
 	target.Description = "Queue system with wait time analysis"
-	
+
 	return target
 }
 

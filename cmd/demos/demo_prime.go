@@ -2,20 +2,20 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
 	fmt.Println("Prime Sieve Demo (YAML Config)")
 	fmt.Println("==============================")
-	
+
 	// Get YAML file from command line argument
 	yamlFile := "config/config-prime.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-	
+
 	// Load YAML configuration
 	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
@@ -27,7 +27,7 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register prime node types
 	RegisterPrimeWantTypes(builder)
 

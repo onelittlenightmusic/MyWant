@@ -376,10 +376,10 @@ func (r *AgentRegistry) hotelReservationAction(ctx context.Context, want *Want) 
 	// Stage all state changes as a single object
 	want.StageStateChange(map[string]interface{}{
 		"reservation_id": "HTL-12345",
-		"status":        "confirmed",
-		"hotel_name":    "Premium Hotel",
-		"check_in":      "2025-09-20",
-		"check_out":     "2025-09-22",
+		"status":         "confirmed",
+		"hotel_name":     "Premium Hotel",
+		"check_in":       "2025-09-20",
+		"check_out":      "2025-09-22",
 	})
 
 	// Commit all changes at once
@@ -396,9 +396,9 @@ func (r *AgentRegistry) hotelReservationMonitor(ctx context.Context, want *Want)
 		// Stage all monitoring updates as a single object
 		want.StageStateChange(map[string]interface{}{
 			"reservation_id": reservationID, // Keep existing reservation ID
-			"status":        "confirmed",    // Confirm status
-			"last_checked":  "2025-09-17T10:00:00Z",
-			"room_ready":    true,
+			"status":         "confirmed",   // Confirm status
+			"last_checked":   "2025-09-17T10:00:00Z",
+			"room_ready":     true,
 		})
 
 		// Commit all monitoring updates at once

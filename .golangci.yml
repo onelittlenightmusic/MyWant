@@ -1,0 +1,239 @@
+# golangci-lint configuration for MyWant project
+# This configuration enforces high code quality standards while being practical
+
+run:
+  # Timeout for analysis
+  timeout: 3m
+  # Number of operating system threads (`GOMAXPROCS`) that can execute golangci-lint simultaneously.
+  concurrency: 4
+  # Exit code when at least one issue was found.
+  issues-exit-code: 1
+  # Include test files
+  tests: true
+  # Allow multiple parallel golangci-lint instances running.
+  allow-parallel-runners: false
+  # Define the Go version to target. The default is taken from the go.mod file.
+  go: '1.24'
+
+  # Exclude directories
+  exclude-dirs:
+    - archive
+    - vendor
+
+# Output configuration options
+output:
+  # Colored output; set to false for CI/CD environments
+  color: true
+  # Print lines of code with issue
+  print-issued-lines: true
+  # Print linter name in the end of issue text
+  print-linter-name: true
+  # Sort results by: filepath, line and column
+  sort-results: true
+
+# Linters configuration
+linters:
+  # Disable all linters
+  disable-all: true
+  # Enable specific linters
+  enable:
+    # Core linters (always enabled)
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Go vet tool
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis
+    - typecheck     # Type checking
+    - unused        # Check for unused code
+
+    # Code quality linters
+    - gofmt         # Check whether code was gofmt-ed
+    - goimports     # Check import sorting
+    - misspell      # Finds commonly misspelled English words
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Reports unused function parameters
+    - gocritic      # Comprehensive Go source code linter
+    - gocyclo       # Computes and checks the cyclomatic complexity
+    - dupl          # Tool for code clone detection
+    - goconst       # Finds repeated strings that could be replaced by a constant
+    - gocognit      # Computes and checks the cognitive complexity
+
+    # Security linters
+    - gosec         # Inspects source code for security problems
+
+    # Performance linters
+    - prealloc      # Finds slice declarations that could potentially be pre-allocated
+
+    # Style linters
+    - godot         # Check if comments end in a period
+    - gofumpt       # Stricter gofmt
+    - whitespace    # Detection of leading and trailing whitespace
+
+    # Bug detection linters
+    - bodyclose     # Checks whether HTTP response body is closed successfully
+    - rowserrcheck  # Checks whether Err of rows is checked successfully
+    - sqlclosecheck # Checks that sql.Rows and sql.Stmt are closed
+
+    # Note: deadcode, varcheck, structcheck are deprecated and replaced by 'unused'
+
+# Linters settings
+linters-settings:
+  # Settings for gocyclo
+  gocyclo:
+    # Minimal cyclomatic complexity to report
+    min-complexity: 15
+
+  # Settings for gocognit
+  gocognit:
+    # Minimal cognitive complexity to report
+    min-complexity: 20
+
+  # Settings for goconst
+  goconst:
+    # Minimum length of string constant
+    min-len: 3
+    # Minimum occurrences count to trigger
+    min-occurrences: 3
+    # Ignore test files
+    ignore-tests: true
+
+  # Settings for dupl
+  dupl:
+    # Tokens count to trigger issue
+    threshold: 100
+
+  # Settings for gocritic
+  gocritic:
+    # Enable multiple checks by tags
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+    disabled-checks:
+      - unnamedResult   # Allow unnamed results for short functions
+      - hugeParam       # Allow large parameters (common in config structs)
+      - rangeValCopy    # Allow range value copying for clarity
+      - paramTypeCombine # Allow separate parameter types for clarity
+
+  # Settings for gosec
+  gosec:
+    # Exclude rules that are too strict for this project
+    excludes:
+      - G204  # Subprocess launched with variable - needed for dynamic execution
+      - G304  # File path join - controlled usage in recipe loading
+
+  # Settings for unused
+  unused:
+    # Check arguments and receivers
+    check-exported: false
+
+  # Settings for unparam
+  unparam:
+    # Check exported functions
+    check-exported: false
+
+  # Settings for gofumpt
+  gofumpt:
+    # Use gofumpt simplifications
+    extra-rules: true
+
+  # Settings for misspell
+  misspell:
+    # Locale for spell checking
+    locale: US
+    # Ignore words
+    ignore-words:
+      - mywant
+      - qnet
+      - DRY
+
+# Issues configuration
+issues:
+  # Make issues output unique by line
+  uniq-by-line: true
+
+  # List of regexps of issue texts to exclude
+  exclude:
+    # Exclude common false positives
+    - "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*printf?|os\\.(Un)?Setenv). is not checked"
+    - "should have( a package)? comment"
+    - "comment on exported (.+) should be of the form"
+
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - goconst
+
+    # Exclude some linters from running on archive files (legacy code)
+    - path: archive/
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - goconst
+        - gocritic
+        - gocognit
+        - unused
+
+    # Exclude duplicate main function checks from demo directory
+    - path: cmd/demos/
+      text: "main redeclared"
+      linters:
+        - typecheck
+
+    # Exclude godot from certain comment patterns
+    - text: "should end in a period"
+      linters:
+        - godot
+      path: "(cmd/|archive/)"
+
+    # Allow complex functions in main demo files
+    - path: cmd/demos/
+      linters:
+        - gocyclo
+        - gocognit
+
+    # Allow unused parameters in interface implementations
+    - text: "parameter .* seems to be unused, consider removing or renaming it as _"
+      linters:
+        - unparam
+
+  # Fix issues automatically when possible
+  fix: false
+
+  # Maximum issues count per one linter
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text
+  max-same-issues: 0
+
+  # Show only new issues created after git revision
+  new: false
+
+  # Show only new issues created in git patch with set file path
+  new-from-patch: ""
+
+# Severity configuration
+severity:
+  # Default severity for issues
+  default-severity: error
+
+  # Custom severity for specific linters
+  rules:
+    - linters:
+        - misspell
+        - godot
+      severity: warning
+    - linters:
+        - gocritic
+        - gocognit
+      severity: info

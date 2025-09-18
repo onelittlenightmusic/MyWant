@@ -1,0 +1,34 @@
+recipe:
+  parameters:
+    count: 1000
+    rate: 10.0
+    service_time: 0.1
+
+  wants:
+    - type: sequence
+      labels:
+        role: generator
+        category: source
+      params:
+        count: count
+        rate: rate
+
+    - type: queue
+      labels:
+        role: processor
+        category: queue-system
+      params:
+        service_time: service_time
+      using:
+        - role: generator
+
+    - type: sink
+      labels:
+        role: collector
+      using:
+        - role: processor
+
+  result:
+    - want_name: "*queue*"
+      stat_name: "average_wait_time"
+      description: "Average wait time in queue"

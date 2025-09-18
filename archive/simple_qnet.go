@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 	"math/rand"
 	"time"
 )
@@ -36,7 +36,7 @@ type SimpleNode struct {
 func createGenerator(params map[string]interface{}) func(chain.Chan, chain.Chan) bool {
 	rate := 1.0
 	count := 100
-	
+
 	if r, ok := params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
 			rate = rf
@@ -49,7 +49,7 @@ func createGenerator(params map[string]interface{}) func(chain.Chan, chain.Chan)
 			count = int(cf)
 		}
 	}
-	
+
 	t, j := 0.0, 0
 	return func(_, out chain.Chan) bool {
 		if j++; j >= count {
@@ -67,7 +67,7 @@ func createGenerator(params map[string]interface{}) func(chain.Chan, chain.Chan)
 func createQueue(params map[string]interface{}) func(chain.Chan, chain.Chan) bool {
 	serviceTime := 1.0
 	queueName := "QUEUE"
-	
+
 	if st, ok := params["service_time"]; ok {
 		if stf, ok := st.(float64); ok {
 			serviceTime = stf
@@ -78,29 +78,29 @@ func createQueue(params map[string]interface{}) func(chain.Chan, chain.Chan) boo
 			queueName = nameStr
 		}
 	}
-	
+
 	tBuf, tSum := 0.0, 0.0
 	nBuf := 0
-	
+
 	return func(in, out chain.Chan) bool {
 		packet := (<-in).(QueuePacket)
-		
+
 		if packet.isEnded() {
 			if nBuf > 0 {
-				fmt.Printf("[%s] Service: %.2f, Processed: %d, Avg Wait Time: %.3f\n", 
+				fmt.Printf("[%s] Service: %.2f, Processed: %d, Avg Wait Time: %.3f\n",
 					queueName, serviceTime, nBuf, tSum/float64(nBuf))
 			}
 			out <- packet
 			return true
 		}
-		
+
 		if packet.Time > tBuf {
 			tBuf = packet.Time
 		}
 		tBuf += serviceTime * rand.ExpFloat64()
-		
+
 		out <- QueuePacket{packet.Num, tBuf}
-		
+
 		tSum += tBuf - packet.Time
 		nBuf = packet.Num
 		return false
@@ -110,15 +110,15 @@ func createQueue(params map[string]interface{}) func(chain.Chan, chain.Chan) boo
 // Create simple sink function
 func createSink(params map[string]interface{}) func(chain.Chan) bool {
 	received := 0
-	
+
 	return func(in chain.Chan) bool {
 		packet := (<-in).(QueuePacket)
-		
+
 		if packet.isEnded() {
 			fmt.Printf("[SINK] Total received: %d packets\n", received)
 			return true
 		}
-		
+
 		received++
 		return false
 	}
@@ -141,10 +141,10 @@ func CreateNode(nodeType NodeType, params map[string]interface{}) interface{} {
 func main() {
 	fmt.Println("Simple QNet Node Creation")
 	fmt.Println("========================")
-	
+
 	// Create simple linear chain: Generator -> Queue -> Sink
 	ch := chain.C_chain{}
-	
+
 	// Add generator
 	genParams := map[string]interface{}{
 		"rate":  2.0,
@@ -152,28 +152,28 @@ func main() {
 	}
 	genFunc := CreateNode(GeneratorNode, genParams).(func(chain.Chan, chain.Chan) bool)
 	ch.Add(genFunc)
-	
+
 	// Add queue
 	queueParams := map[string]interface{}{
 		"service_time": 0.5,
 	}
 	queueFunc := CreateNode(QueueNode, queueParams).(func(chain.Chan, chain.Chan) bool)
 	ch.Add(queueFunc)
-	
+
 	// Add sink
 	sinkParams := map[string]interface{}{}
 	sinkFunc := CreateNode(SinkNode, sinkParams).(func(chain.Chan) bool)
 	ch.End(sinkFunc)
-	
+
 	fmt.Println("Running simple chain...")
-	
+
 	// Measure runtime
 	startTime := time.Now()
 	chain.Run()
 	endTime := time.Now()
-	
+
 	duration := endTime.Sub(startTime)
-	
+
 	fmt.Println("Simple QNet completed successfully!")
 	fmt.Printf("Runtime: %v\n", duration)
 	fmt.Printf("Runtime (milliseconds): %.2f ms\n", float64(duration.Nanoseconds())/1000000.0)

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {

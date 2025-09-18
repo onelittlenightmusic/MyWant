@@ -9,7 +9,7 @@ import (
 func main() {
 	fmt.Println("Node Type Structure in GoChain")
 	fmt.Println("==============================")
-	
+
 	// 1. Base Interface
 	fmt.Println("\n1. BASE INTERFACE:")
 	fmt.Println("==================")
@@ -23,7 +23,7 @@ type BaseNode interface {
 	// 2. Concrete Node Types
 	fmt.Println("\n2. CONCRETE NODE TYPES:")
 	fmt.Println("=======================")
-	
+
 	// Generator Node
 	fmt.Println("\nGeneratorNode:")
 	fmt.Println("--------------")
@@ -37,7 +37,7 @@ type BaseNode interface {
 	}
 	fmt.Printf("Methods: Process(), GetType(), GetStats()\n")
 	fmt.Printf("Stats: %+v\n", gen.GetStats())
-	
+
 	// Queue Node
 	fmt.Println("\nQueueNode:")
 	fmt.Println("----------")
@@ -51,7 +51,7 @@ type BaseNode interface {
 	}
 	fmt.Printf("Methods: Process(), GetType(), GetStats()\n")
 	fmt.Printf("Stats: %+v\n", queue.GetStats())
-	
+
 	// Combiner Node
 	fmt.Println("\nCombinerNode:")
 	fmt.Println("-------------")
@@ -65,7 +65,7 @@ type BaseNode interface {
 	}
 	fmt.Printf("Methods: Process(), ProcessTwoStreams(), GetType(), GetStats()\n")
 	fmt.Printf("Stats: %+v\n", combiner.GetStats())
-	
+
 	// Sink Node
 	fmt.Println("\nSinkNode:")
 	fmt.Println("---------")
@@ -79,11 +79,11 @@ type BaseNode interface {
 	}
 	fmt.Printf("Methods: Process(), GetType(), GetStats()\n")
 	fmt.Printf("Stats: %+v\n", sink.GetStats())
-	
+
 	// 3. Supporting Types
 	fmt.Println("\n3. SUPPORTING TYPES:")
 	fmt.Println("====================")
-	
+
 	fmt.Println("\nPacket:")
 	fmt.Println("-------")
 	packet := Packet{ID: 1, Time: 5.5}
@@ -96,7 +96,7 @@ type BaseNode interface {
 	}
 	fmt.Printf("Methods: IsEnd() bool\n")
 	fmt.Printf("Example: %+v, IsEnd: %t\n", packet, packet.IsEnd())
-	
+
 	// 4. Factory Functions
 	fmt.Println("\n4. FACTORY FUNCTIONS:")
 	fmt.Println("=====================")
@@ -105,7 +105,7 @@ CreateGeneratorNode(rate float64, count int) *GeneratorNode
 CreateQueueNode(serviceTime float64) *QueueNode  
 CreateCombinerNode() *CombinerNode
 CreateSinkNode() *SinkNode`)
-	
+
 	// 5. Adapter Functions
 	fmt.Println("\n5. ADAPTER FUNCTIONS:")
 	fmt.Println("=====================")
@@ -113,7 +113,7 @@ CreateSinkNode() *SinkNode`)
 NodeToChainFunc(node BaseNode) func(chain.Chan, chain.Chan) bool
 NodeToEndFunc(node BaseNode) func(chain.Chan) bool
 CombinerToChainFunc(combiner *CombinerNode) func(chain.Chan, chain.Chan, chain.Chan) bool`)
-	
+
 	// 6. Type Hierarchy
 	fmt.Println("\n6. TYPE HIERARCHY:")
 	fmt.Println("==================")
@@ -146,7 +146,7 @@ func getFieldDescription(fieldName string) string {
 		"processed":   "Number of packets processed",
 		"totalDelay":  "Cumulative queueing delay",
 		"packet1":     "Buffered packet from first input stream",
-		"packet2":     "Buffered packet from second input stream", 
+		"packet2":     "Buffered packet from second input stream",
 		"stream1Done": "Flag indicating first stream has ended",
 		"stream2Done": "Flag indicating second stream has ended",
 		"merged":      "Number of packets merged so far",
@@ -164,11 +164,11 @@ func getFieldDescription(fieldName string) string {
 func showMemoryLayout() {
 	gen := CreateGeneratorNode(2.0, 100)
 	queue := CreateQueueNode(1.5)
-	
+
 	fmt.Printf("GeneratorNode size: %d bytes\n", reflect.TypeOf(*gen).Size())
 	fmt.Printf("QueueNode size: %d bytes\n", reflect.TypeOf(*queue).Size())
 	fmt.Printf("Packet size: %d bytes\n", reflect.TypeOf(Packet{}).Size())
-	
+
 	fmt.Println("\nMemory alignment:")
 	fmt.Printf("GeneratorNode alignment: %d bytes\n", reflect.TypeOf(*gen).Align())
 	fmt.Printf("QueueNode alignment: %d bytes\n", reflect.TypeOf(*queue).Align())

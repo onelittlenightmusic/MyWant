@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
@@ -11,7 +11,7 @@ func main() {
 	fmt.Println("===================================================")
 	fmt.Println("Loading qnet system from recipe with:")
 	fmt.Println("- Dual generators (primary/secondary streams)")
-	fmt.Println("- Parallel processing queues") 
+	fmt.Println("- Parallel processing queues")
 	fmt.Println("- Stream combiner with recipe-defined using fields")
 	fmt.Println("- Final processing and collection")
 	fmt.Println("- All using connections defined in recipe YAML")

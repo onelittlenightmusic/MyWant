@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"gopkg.in/yaml.v3"
+	"os"
 )
 
 // Simple YAML loader
@@ -19,23 +19,23 @@ func loadYAML(filename string) (Config, error) {
 func main() {
 	fmt.Println("Simple Queueing Network Example")
 	fmt.Println("===============================")
-	
+
 	// Load config
 	config, err := loadYAML("simple_config.yaml")
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-	
+
 	// Build and run
 	builder := NewChainBuilder(config)
 	RegisterSimpleQNetNodeTypes(builder)
-	
+
 	if err := builder.Build(); err != nil {
 		fmt.Printf("Build error: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Running simulation...")
 	builder.Execute()
 	fmt.Println("Done!")

@@ -2,20 +2,20 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
 	fmt.Println("Fibonacci Sequence Demo (YAML Config)")
 	fmt.Println("=====================================")
-	
+
 	// Get YAML file from command line argument
 	yamlFile := "config/config-fibonacci.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-	
+
 	// Load YAML configuration
 	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
@@ -27,10 +27,10 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register fibonacci node types
 	RegisterFibonacciWantTypes(builder)
-	
+
 	// Register owner/target types for Target system support
 	RegisterOwnerWantTypes(builder)
 

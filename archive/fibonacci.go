@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 )
 
 // FibonacciGenerator generates fibonacci sequence numbers
@@ -24,7 +24,7 @@ func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *Fi
 		},
 		Count: 20,
 	}
-	
+
 	if c, ok := params["count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.Count = ci
@@ -32,7 +32,7 @@ func NewFibonacciGenerator(metadata Metadata, params map[string]interface{}) *Fi
 			gen.Count = int(cf)
 		}
 	}
-	
+
 	return gen
 }
 
@@ -79,7 +79,7 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 		MinValue: 0,
 		MaxValue: 1000000,
 	}
-	
+
 	if min, ok := params["min_value"]; ok {
 		if mini, ok := min.(int); ok {
 			filter.MinValue = mini
@@ -87,7 +87,7 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 			filter.MinValue = int(minf)
 		}
 	}
-	
+
 	if max, ok := params["max_value"]; ok {
 		if maxi, ok := max.(int); ok {
 			filter.MaxValue = maxi
@@ -95,7 +95,7 @@ func NewFibonacciFilter(metadata Metadata, params map[string]interface{}) *Fibon
 			filter.MaxValue = int(maxf)
 		}
 	}
-	
+
 	return filter
 }
 
@@ -107,7 +107,7 @@ func (f *FibonacciFilter) CreateFunction() func(inputs []chain.Chan, outputs []c
 		}
 		in := inputs[0]
 		out := outputs[0]
-		
+
 		for i := range in {
 			if val, ok := i.(int); ok {
 				// Filter based on min/max values
@@ -146,7 +146,7 @@ func NewFibonacciSink(metadata Metadata, params map[string]interface{}) *Fibonac
 		},
 		numbers: make([]int, 0),
 	}
-	
+
 	return sink
 }
 
@@ -157,7 +157,7 @@ func (s *FibonacciSink) CreateFunction() func(inputs []chain.Chan, outputs []cha
 			return true
 		}
 		in := inputs[0]
-		
+
 		fmt.Println("Fibonacci numbers:")
 		for i := range in {
 			if val, ok := i.(int); ok {
@@ -183,11 +183,11 @@ func RegisterFibonacciNodeTypes(builder *ChainBuilder) {
 	builder.RegisterNodeType("fibonacci_generator", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciGenerator(metadata, params)
 	})
-	
+
 	builder.RegisterNodeType("fibonacci_filter", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciFilter(metadata, params)
 	})
-	
+
 	builder.RegisterNodeType("fibonacci_sink", func(metadata Metadata, params map[string]interface{}) interface{} {
 		return NewFibonacciSink(metadata, params)
 	})
@@ -196,7 +196,7 @@ func RegisterFibonacciNodeTypes(builder *ChainBuilder) {
 func main() {
 	fmt.Println("Fibonacci Sequence Demo")
 	fmt.Println("=======================")
-	
+
 	// Create a configuration for fibonacci sequence
 	config := Config{
 		Nodes: []Node{
@@ -249,33 +249,33 @@ func main() {
 			},
 		},
 	}
-	
+
 	fmt.Printf("Created configuration with %d nodes\n", len(config.Nodes))
-	
+
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register fibonacci node types
 	RegisterFibonacciNodeTypes(builder)
-	
+
 	fmt.Println("\nBuilding fibonacci chain...")
 	err := builder.Build()
 	if err != nil {
 		fmt.Printf("❌ Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("✅ Build successful!")
-	
+
 	fmt.Println("\nExecuting fibonacci sequence...")
 	builder.Execute()
-	
+
 	fmt.Println("\n📊 Final Node States:")
 	states := builder.GetAllNodeStates()
 	for name, state := range states {
 		fmt.Printf("  %s: %s (processed: %d)\n",
 			name, state.Status, state.Stats.TotalProcessed)
 	}
-	
+
 	fmt.Println("\n✅ Fibonacci sequence execution completed!")
 }

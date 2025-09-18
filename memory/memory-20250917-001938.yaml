@@ -1,0 +1,334 @@
+timestamp: "2025-09-17T00:19:38+09:00"
+execution_id: exec-20250917-001938
+wants:
+    - metadata:
+        name: qnet pipeline
+        type: wait time in queue system
+        labels:
+            role: qnet-target
+      spec:
+        params:
+            count: 1000
+            deterministic: false
+            final_service_time: 0.04
+            prefix: qnet
+            primary_count: 8000
+            primary_rate: 2.5
+            primary_service_time: 0.08
+            rate: 10
+            secondary_count: 6000
+            secondary_rate: 3.5
+            secondary_service_time: 0.1
+            service_time: 0.05
+      status: completed
+      state:
+        childCount: 6
+        metrics:
+            numbers_total_processed: 1000
+            queue_all_metrics:
+                average_wait_time: 0.022738142615664075
+                current_server_free_time: 97.30920773605418
+                last_packet_wait_time: 0
+                processedCount: 1000
+                serverFreeTime: 97.30920773605418
+                total_processed: 1000
+                total_wait_time: 22.738142615664074
+                waitTimeSum: 22.738142615664074
+            queue_average_wait_time: 0.022738142615664075
+        numbers_total_processed: 1000
+        primaryResult: 0.022738142615664075
+        queue_all_metrics:
+            average_wait_time: 0.022738142615664075
+            current_server_free_time: 97.30920773605418
+            last_packet_wait_time: 0
+            processedCount: 1000
+            serverFreeTime: 97.30920773605418
+            total_processed: 1000
+            total_wait_time: 22.738142615664074
+            waitTimeSum: 22.738142615664074
+        queue_average_wait_time: 0.022738142615664075
+        recipePath: recipes/queue-system.yaml
+        recipeResult: 0.022738142615664075
+        result: 'Average wait time in the queue system: 0.022738142615664075'
+      history:
+        parameterHistory:
+            - want_name: qnet pipeline
+              state_value:
+                count: 1000
+                deterministic: false
+                final_service_time: 0.04
+                prefix: qnet
+                primary_count: 8000
+                primary_rate: 2.5
+                primary_service_time: 0.08
+                rate: 10
+                secondary_count: 6000
+                secondary_rate: 3.5
+                secondary_service_time: 0.1
+                service_time: 0.05
+              timestamp: 2025-09-17T00:19:38.343403+09:00
+        stateHistory: []
+    - metadata:
+        name: qnet-numbers-1
+        type: numbers
+        labels:
+            category: queue-producer
+            component: generator
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 1000
+            deterministic: false
+            rate: 10
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 1000
+        current_time: 97.25920773605418
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: qnet-numbers-1
+              state_value:
+                count: 1000
+                deterministic: false
+                rate: 10
+              timestamp: 2025-09-17T00:19:38.344772+09:00
+        stateHistory:
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 100
+                current_time: 9.20876284021273
+              timestamp: 2025-09-17T00:19:38.344949+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 200
+                current_time: 17.11114034262816
+              timestamp: 2025-09-17T00:19:38.345053+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 300
+                current_time: 28.5877267754437
+              timestamp: 2025-09-17T00:19:38.345152+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 400
+                current_time: 37.06309894016962
+              timestamp: 2025-09-17T00:19:38.34524+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 500
+                current_time: 47.71437847025296
+              timestamp: 2025-09-17T00:19:38.345351+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 600
+                current_time: 58.55822459149112
+              timestamp: 2025-09-17T00:19:38.345416+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 700
+                current_time: 69.16206900726262
+              timestamp: 2025-09-17T00:19:38.345486+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 800
+                current_time: 78.68453920204354
+              timestamp: 2025-09-17T00:19:38.345558+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 900
+                current_time: 86.77039635279402
+              timestamp: 2025-09-17T00:19:38.345638+09:00
+            - want_name: qnet-numbers-1
+              state_value:
+                current_count: 1000
+                current_time: 97.25920773605418
+              timestamp: 2025-09-17T00:19:38.345708+09:00
+    - metadata:
+        name: qnet-queue-2
+        type: queue
+        labels:
+            category: queue-processor
+            component: main-queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            deterministic: false
+            service_time: 0.05
+        using:
+            - category: queue-producer
+      status: completed
+      state:
+        average_wait_time: 0.022738142615664075
+        current_server_free_time: 97.30920773605418
+        last_packet_wait_time: 0
+        processedCount: 1000
+        serverFreeTime: 97.30920773605418
+        total_processed: 1000
+        total_wait_time: 22.738142615664074
+        waitTimeSum: 22.738142615664074
+      history:
+        parameterHistory:
+            - want_name: qnet-queue-2
+              state_value:
+                deterministic: false
+                service_time: 0.05
+              timestamp: 2025-09-17T00:19:38.344774+09:00
+        stateHistory:
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.020348783749800727
+                current_server_free_time: 9.25876284021273
+                last_packet_wait_time: 0
+                processedCount: 100
+                serverFreeTime: 9.25876284021273
+                total_processed: 100
+                total_wait_time: 2.0348783749800727
+                waitTimeSum: 2.0348783749800727
+              timestamp: 2025-09-17T00:19:38.344962+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.026189384626428457
+                current_server_free_time: 17.202343600945046
+                last_packet_wait_time: 0.04120325831688376
+                processedCount: 200
+                serverFreeTime: 17.202343600945046
+                total_processed: 200
+                total_wait_time: 5.237876925285692
+                waitTimeSum: 5.237876925285692
+              timestamp: 2025-09-17T00:19:38.345059+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.025233230686337798
+                current_server_free_time: 28.6377267754437
+                last_packet_wait_time: 0
+                processedCount: 300
+                serverFreeTime: 28.6377267754437
+                total_processed: 300
+                total_wait_time: 7.569969205901339
+                waitTimeSum: 7.569969205901339
+              timestamp: 2025-09-17T00:19:38.345152+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.024958116045228126
+                current_server_free_time: 37.113098940169614
+                last_packet_wait_time: 0
+                processedCount: 400
+                serverFreeTime: 37.113098940169614
+                total_processed: 400
+                total_wait_time: 9.98324641809125
+                waitTimeSum: 9.98324641809125
+              timestamp: 2025-09-17T00:19:38.345242+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.023970188763056857
+                current_server_free_time: 47.78810764123026
+                last_packet_wait_time: 0.023729170977304648
+                processedCount: 500
+                serverFreeTime: 47.78810764123026
+                total_processed: 500
+                total_wait_time: 11.985094381528429
+                waitTimeSum: 11.985094381528429
+              timestamp: 2025-09-17T00:19:38.345357+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.022666821245267508
+                current_server_free_time: 58.63888374473897
+                last_packet_wait_time: 0.03065915324785351
+                processedCount: 600
+                serverFreeTime: 58.63888374473897
+                total_processed: 600
+                total_wait_time: 13.600092747160504
+                waitTimeSum: 13.600092747160504
+              timestamp: 2025-09-17T00:19:38.345422+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.022016410523972234
+                current_server_free_time: 69.21206900726261
+                last_packet_wait_time: 0
+                processedCount: 700
+                serverFreeTime: 69.21206900726261
+                total_processed: 700
+                total_wait_time: 15.411487366780564
+                waitTimeSum: 15.411487366780564
+              timestamp: 2025-09-17T00:19:38.345491+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.022288644106772944
+                current_server_free_time: 78.73453920204354
+                last_packet_wait_time: 0
+                processedCount: 800
+                serverFreeTime: 78.73453920204354
+                total_processed: 800
+                total_wait_time: 17.830915285418357
+                waitTimeSum: 17.830915285418357
+              timestamp: 2025-09-17T00:19:38.345563+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.02312196366316177
+                current_server_free_time: 86.86407683581756
+                last_packet_wait_time: 0.043680483023536
+                processedCount: 900
+                serverFreeTime: 86.86407683581756
+                total_processed: 900
+                total_wait_time: 20.809767296845592
+                waitTimeSum: 20.809767296845592
+              timestamp: 2025-09-17T00:19:38.345643+09:00
+            - want_name: qnet-queue-2
+              state_value:
+                average_wait_time: 0.022738142615664075
+                current_server_free_time: 97.30920773605418
+                last_packet_wait_time: 0
+                processedCount: 1000
+                serverFreeTime: 97.30920773605418
+                total_processed: 1000
+                total_wait_time: 22.738142615664074
+                waitTimeSum: 22.738142615664074
+              timestamp: 2025-09-17T00:19:38.345714+09:00
+    - metadata:
+        name: qnet-sink-3
+        type: sink
+        labels:
+            category: result-display
+            component: final-sink
+            owner: child
+            role: collector
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: qnet pipeline
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: qnet-sink-3
+              state_value:
+                display_format: 'Number: %d'
+              timestamp: 2025-09-17T00:19:38.344776+09:00
+        stateHistory: []

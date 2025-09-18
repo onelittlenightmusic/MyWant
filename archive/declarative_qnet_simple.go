@@ -3,7 +3,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 	"math/rand"
 )
 
@@ -22,13 +22,13 @@ func (p Packet) IsEnd() bool {
 func Generator(rate float64, count int) func(chain.Chan, chain.Chan) bool {
 	current := 0
 	time := 0.0
-	
+
 	return func(_, out chain.Chan) bool {
 		if current >= count {
 			out <- Packet{-1, 0} // End marker
 			return true
 		}
-		
+
 		current++
 		time += rate * rand.ExpFloat64()
 		out <- Packet{current, time}
@@ -41,28 +41,28 @@ func Queue(serviceTime float64) func(chain.Chan, chain.Chan) bool {
 	queueTime := 0.0
 	processed := 0
 	totalDelay := 0.0
-	
+
 	return func(in, out chain.Chan) bool {
 		packet := (<-in).(Packet)
-		
+
 		if packet.IsEnd() {
 			if processed > 0 {
-				fmt.Printf("[QUEUE] Service: %.2f, Average Delay: %.2f\n", 
+				fmt.Printf("[QUEUE] Service: %.2f, Average Delay: %.2f\n",
 					serviceTime, totalDelay/float64(processed))
 			}
 			out <- packet
 			return true
 		}
-		
+
 		// Process packet
 		if packet.Time > queueTime {
 			queueTime = packet.Time
 		}
 		queueTime += serviceTime * rand.ExpFloat64()
-		
+
 		totalDelay += queueTime - packet.Time
 		processed++
-		
+
 		out <- Packet{packet.ID, queueTime}
 		return false
 	}
@@ -72,7 +72,7 @@ func Queue(serviceTime float64) func(chain.Chan, chain.Chan) bool {
 func Combiner() func(chain.Chan, chain.Chan, chain.Chan) bool {
 	var packet1, packet2 *Packet
 	stream1Done, stream2Done := false, false
-	
+
 	return func(in1, in2, out chain.Chan) bool {
 		// Read from streams if needed
 		if packet1 == nil && !stream1Done {
@@ -83,7 +83,7 @@ func Combiner() func(chain.Chan, chain.Chan, chain.Chan) bool {
 				packet1 = &p
 			}
 		}
-		
+
 		if packet2 == nil && !stream2Done {
 			p := (<-in2).(Packet)
 			if p.IsEnd() {
@@ -92,13 +92,13 @@ func Combiner() func(chain.Chan, chain.Chan, chain.Chan) bool {
 				packet2 = &p
 			}
 		}
-		
+
 		// Both streams ended
 		if stream1Done && stream2Done {
 			out <- Packet{-1, 0}
 			return true
 		}
-		
+
 		// Select earliest packet
 		var selected *Packet
 		if packet1 != nil && packet2 != nil {
@@ -118,7 +118,7 @@ func Combiner() func(chain.Chan, chain.Chan, chain.Chan) bool {
 		} else {
 			return false // Need more data
 		}
-		
+
 		out <- *selected
 		return false
 	}
@@ -146,16 +146,16 @@ func RegisterSimpleQNetNodeTypes(builder *ChainBuilder) {
 		}
 		return Generator(rate, count)
 	})
-	
+
 	builder.RegisterNodeType("queue", func(params map[string]interface{}) interface{} {
 		serviceTime := params["service_time"].(float64)
 		return Queue(serviceTime)
 	})
-	
+
 	builder.RegisterNodeType("combiner", func(params map[string]interface{}) interface{} {
 		return Combiner()
 	})
-	
+
 	builder.RegisterNodeType("sink", func(params map[string]interface{}) interface{} {
 		return Sink()
 	})

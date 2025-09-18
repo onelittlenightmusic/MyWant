@@ -15,4 +15,3 @@ func main() {
 	// Function calls are evaluated left-to-right.
 	println(f(), f(), f(), f(), f())
 }
-

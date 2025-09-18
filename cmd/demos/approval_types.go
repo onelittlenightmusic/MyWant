@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	. "mywant/src"
 	"mywant/src/chain"
+	"time"
 )
 
 // ApprovalData represents shared evidence and description data
@@ -17,12 +17,12 @@ type ApprovalData struct {
 
 // ApprovalResult represents the outcome of an approval process
 type ApprovalResult struct {
-	ApprovalID     string
-	Level          int
-	Status         string // "pending", "approved", "rejected"
-	ApprovalTime   time.Time
-	ApproverID     string
-	Comments       string
+	ApprovalID   string
+	Level        int
+	Status       string // "pending", "approved", "rejected"
+	ApprovalTime time.Time
+	ApproverID   string
+	Comments     string
 }
 
 // EvidenceWant provides evidence data for approval processes

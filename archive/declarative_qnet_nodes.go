@@ -3,7 +3,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 	"math/rand"
 )
 
@@ -48,7 +48,7 @@ func (g *GeneratorNode) Process(in chain.Chan, out chain.Chan) bool {
 		fmt.Printf("[GENERATOR] Generated %d packets\n", g.current)
 		return true
 	}
-	
+
 	g.current++
 	g.time += g.Rate * rand.ExpFloat64()
 	out <- Packet{g.current, g.time}
@@ -57,10 +57,10 @@ func (g *GeneratorNode) Process(in chain.Chan, out chain.Chan) bool {
 
 // QueueNode processes packets with service delays
 type QueueNode struct {
-	ServiceTime  float64
-	queueTime    float64
-	processed    int
-	totalDelay   float64
+	ServiceTime float64
+	queueTime   float64
+	processed   int
+	totalDelay  float64
 }
 
 func (q *QueueNode) GetType() string {
@@ -81,7 +81,7 @@ func (q *QueueNode) GetStats() map[string]interface{} {
 
 func (q *QueueNode) Process(in chain.Chan, out chain.Chan) bool {
 	packet := (<-in).(Packet)
-	
+
 	if packet.IsEnd() {
 		stats := q.GetStats()
 		fmt.Printf("[QUEUE] Service: %.2f, Processed: %d, Avg Delay: %.2f\n",
@@ -89,16 +89,16 @@ func (q *QueueNode) Process(in chain.Chan, out chain.Chan) bool {
 		out <- packet
 		return true
 	}
-	
+
 	// Process packet through queue
 	if packet.Time > q.queueTime {
 		q.queueTime = packet.Time
 	}
 	q.queueTime += q.ServiceTime * rand.ExpFloat64()
-	
+
 	q.totalDelay += q.queueTime - packet.Time
 	q.processed++
-	
+
 	out <- Packet{packet.ID, q.queueTime}
 	return false
 }
@@ -132,7 +132,7 @@ func (c *CombinerNode) ProcessTwoStreams(in1, in2, out chain.Chan) bool {
 			c.packet1 = &p
 		}
 	}
-	
+
 	if c.packet2 == nil && !c.stream2Done {
 		p := (<-in2).(Packet)
 		if p.IsEnd() {
@@ -141,14 +141,14 @@ func (c *CombinerNode) ProcessTwoStreams(in1, in2, out chain.Chan) bool {
 			c.packet2 = &p
 		}
 	}
-	
+
 	// Both streams ended
 	if c.stream1Done && c.stream2Done {
 		fmt.Printf("[COMBINER] Merged %d packets\n", c.merged)
 		out <- Packet{-1, 0}
 		return true
 	}
-	
+
 	// Select earliest packet
 	var selected *Packet
 	if c.packet1 != nil && c.packet2 != nil {
@@ -168,7 +168,7 @@ func (c *CombinerNode) ProcessTwoStreams(in1, in2, out chain.Chan) bool {
 	} else {
 		return false // Need more data
 	}
-	
+
 	c.merged++
 	out <- *selected
 	return false
@@ -201,7 +201,7 @@ func (s *SinkNode) GetStats() map[string]interface{} {
 
 func (s *SinkNode) Process(in chain.Chan, out chain.Chan) bool {
 	packet := (<-in).(Packet)
-	
+
 	if !packet.IsEnd() {
 		s.received++
 		s.lastTime = packet.Time
@@ -209,7 +209,7 @@ func (s *SinkNode) Process(in chain.Chan, out chain.Chan) bool {
 	} else {
 		fmt.Printf("[SINK] Total received: %d packets\n", s.received)
 	}
-	
+
 	return packet.IsEnd()
 }
 
@@ -268,18 +268,18 @@ func RegisterNodeBasedQNetTypes(builder *ChainBuilder) {
 		node := CreateGeneratorNode(rate, count)
 		return NodeToChainFunc(node)
 	})
-	
+
 	builder.RegisterNodeType("queue", func(params map[string]interface{}) interface{} {
 		serviceTime := params["service_time"].(float64)
 		node := CreateQueueNode(serviceTime)
 		return NodeToChainFunc(node)
 	})
-	
+
 	builder.RegisterNodeType("combiner", func(params map[string]interface{}) interface{} {
 		node := CreateCombinerNode()
 		return CombinerToChainFunc(node)
 	})
-	
+
 	builder.RegisterNodeType("sink", func(params map[string]interface{}) interface{} {
 		node := CreateSinkNode()
 		return NodeToEndFunc(node)

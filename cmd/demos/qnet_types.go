@@ -23,19 +23,18 @@ func (p *QueuePacket) isEnded() bool {
 func ExpRand64() float64 {
 	// Generate uniform random number in (0,1) avoiding exactly 0 and 1
 	u := rand.Float64()
-	
+
 	// Handle edge cases for better numerical stability
 	if u == 0.0 {
 		u = math.SmallestNonzeroFloat64
 	} else if u == 1.0 {
 		u = 1.0 - math.SmallestNonzeroFloat64
 	}
-	
+
 	// Use inverse transform: -ln(u) for exponential distribution
 	// This provides better distribution than the standard library's algorithm
 	return -math.Log(u)
 }
-
 
 // Numbers creates packets and sends them downstream
 type Numbers struct {
@@ -52,13 +51,13 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 			Metadata: metadata,
 			Spec:     spec,
 			// Stats field removed - using State instead
-			Status:   mywant.WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: mywant.WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Rate:  1.0,
 		Count: 100,
 	}
-	
+
 	if r, ok := spec.Params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
 			gen.Rate = rf
@@ -71,7 +70,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 			gen.Count = int(cf)
 		}
 	}
-	
+
 	return gen
 }
 
@@ -84,9 +83,9 @@ func (g *Numbers) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for numbers generator
 func (g *Numbers) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	return mywant.ConnectivityMetadata{
-		RequiredInputs:  0, // Generators don't need using
-		RequiredOutputs: 1, // Must have at least one output
-		MaxInputs:       0, // No using allowed
+		RequiredInputs:  0,  // Generators don't need using
+		RequiredOutputs: 1,  // Must have at least one output
+		MaxInputs:       0,  // No using allowed
 		MaxOutputs:      -1, // Unlimited outputs
 		WantType:        "sequence",
 		Description:     "Packet generator want",
@@ -128,7 +127,7 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Read count and rate parameters fresh each cycle
-	currentCount := g.Count  // Default fallback
+	currentCount := g.Count // Default fallback
 	if c, ok := g.Spec.Params["count"]; ok {
 		if ci, ok := c.(int); ok {
 			currentCount = ci
@@ -137,7 +136,7 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 	}
 
-	currentRate := g.Rate  // Default fallback
+	currentRate := g.Rate // Default fallback
 	if r, ok := g.Spec.Params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
 			currentRate = rf
@@ -201,18 +200,18 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 			Metadata: metadata,
 			Spec:     spec,
 			// Stats field removed - using State instead
-			Status:   mywant.WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: mywant.WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		ServiceTime: 1.0,
 	}
-	
+
 	if st, ok := spec.Params["service_time"]; ok {
 		if stf, ok := st.(float64); ok {
 			queue.ServiceTime = stf
 		}
 	}
-	
+
 	return queue
 }
 
@@ -225,9 +224,9 @@ func (q *Queue) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for queue
 func (q *Queue) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	return mywant.ConnectivityMetadata{
-		RequiredInputs:  1, // Queues need at least one using
-		RequiredOutputs: 1, // Must have at least one output
-		MaxInputs:       1, // Only one using supported
+		RequiredInputs:  1,  // Queues need at least one using
+		RequiredOutputs: 1,  // Must have at least one output
+		MaxInputs:       1,  // Only one using supported
 		MaxOutputs:      -1, // Unlimited outputs
 		WantType:        "queue",
 		Description:     "Queue processing want",
@@ -341,18 +340,18 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 			Metadata: metadata,
 			Spec:     spec,
 			// Stats field removed - using State instead
-			Status:   mywant.WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: mywant.WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Operation: "merge",
 	}
-	
+
 	if op, ok := spec.Params["operation"]; ok {
 		if ops, ok := op.(string); ok {
 			combiner.Operation = ops
 		}
 	}
-	
+
 	return combiner
 }
 
@@ -365,8 +364,8 @@ func (c *Combiner) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for combiner
 func (c *Combiner) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	return mywant.ConnectivityMetadata{
-		RequiredInputs:  2, // Combiners need at least two using
-		RequiredOutputs: 1, // Must have at least one output
+		RequiredInputs:  2,  // Combiners need at least two using
+		RequiredOutputs: 1,  // Must have at least one output
 		MaxInputs:       -1, // Unlimited using
 		MaxOutputs:      -1, // Unlimited outputs
 		WantType:        "combiner",
@@ -439,7 +438,6 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	return false
 }
 
-
 // Sink collects and terminates the packet stream
 type Sink struct {
 	mywant.Want
@@ -454,8 +452,8 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
 			Metadata: metadata,
 			Spec:     spec,
 			// Stats field removed - using State instead
-			Status:   mywant.WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: mywant.WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Received: 0,
 	}
@@ -470,10 +468,10 @@ func (s *Sink) InitializePaths(inCount, outCount int) {
 // GetConnectivityMetadata returns connectivity requirements for sink
 func (s *Sink) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	return mywant.ConnectivityMetadata{
-		RequiredInputs:  1, // Sinks need at least one using
-		RequiredOutputs: 0, // Sinks don't need outputs
+		RequiredInputs:  1,  // Sinks need at least one using
+		RequiredOutputs: 0,  // Sinks don't need outputs
 		MaxInputs:       -1, // Unlimited using
-		MaxOutputs:      0, // No outputs allowed
+		MaxOutputs:      0,  // No outputs allowed
 		WantType:        "sink",
 		Description:     "Data sink/collector want",
 	}
@@ -535,25 +533,24 @@ func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
 	builder.RegisterWantType("numbers", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return PacketNumbers(metadata, spec)
 	})
-	
+
 	// Register queue type - return the enhanced want itself for validation
 	builder.RegisterWantType("queue", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return NewQueue(metadata, spec)
 	})
-	
+
 	// Register combiner type - return the enhanced want itself for validation
 	builder.RegisterWantType("combiner", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return NewCombiner(metadata, spec)
 	})
-	
+
 	// Register sink type - return the enhanced want itself for validation
 	builder.RegisterWantType("sink", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
-	
+
 	// Register collector type (alias for sink) - return the enhanced want itself for validation
 	builder.RegisterWantType("collector", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
 }
-

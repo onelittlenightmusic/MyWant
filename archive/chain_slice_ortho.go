@@ -1,30 +1,36 @@
 package main
+
 import (
+	"mywant/src/chain"
 	"fmt"
-	"chain"
 )
 
 type tupple struct {
 	Num int
 	Row []int
 }
+
 //type tupple chain.Tupple
 
-func init_func (in chain.Chan)(fin bool) {
-	t0, t1, te := tupple{ 0, []int{0} },
-		tupple{ 1, []int{1} },
-		tupple{ -1, []int{0} }
+func init_func(in chain.Chan) (fin bool) {
+	t0, t1, te := tupple{0, []int{0}},
+		tupple{1, []int{1}},
+		tupple{-1, []int{0}}
 	in <- t0
 	in <- t1
 	in <- te
 	fin = true
 	return
 }
-func double	(in, out chain.Chan)(fin bool) {
-	x := (<- in).(tupple)
-	if x.Num<0 { out <- x; fin = true; return }
-//	x1 := x //FAILED! ONLY POINTER COPIED
-	x1 := tupple{ x.Num, make([]int,len(x.Row)) }
+func double(in, out chain.Chan) (fin bool) {
+	x := (<-in).(tupple)
+	if x.Num < 0 {
+		out <- x
+		fin = true
+		return
+	}
+	//	x1 := x //FAILED! ONLY POINTER COPIED
+	x1 := tupple{x.Num, make([]int, len(x.Row))}
 	copy(x1.Row, x.Row)
 	x.Row = append(x.Row, 0)
 	out <- x
@@ -34,48 +40,52 @@ func double	(in, out chain.Chan)(fin bool) {
 	return
 }
 
-func plus (in, out chain.Chan)(fin bool) {
-	x := (<- in).(tupple)
-	if x.Num<0 { out <- x; fin = true; return }
+func plus(in, out chain.Chan) (fin bool) {
+	x := (<-in).(tupple)
+	if x.Num < 0 {
+		out <- x
+		fin = true
+		return
+	}
 	_row_max := len(x.Row) - 1
 	for i := 0; i < _row_max; i++ {
-		x.Row = append(x.Row, (x.Row[_row_max] + x.Row[i])%2)
+		x.Row = append(x.Row, (x.Row[_row_max]+x.Row[i])%2)
 	}
 	out <- x
 	fin = false
 	return
 }
 
-func end_func (cend chain.Chan)(fin bool) {
-	p := (<- cend).(tupple)
-	if p.Num < 0 { fin = true; return }
-	for _, x := range p.Row {
-		fmt.Printf("%d\t", x);
+func end_func(cend chain.Chan) (fin bool) {
+	p := (<-cend).(tupple)
+	if p.Num < 0 {
+		fin = true
+		return
 	}
-	fmt.Printf("\n");
+	for _, x := range p.Row {
+		fmt.Printf("%d\t", x)
+	}
+	fmt.Printf("\n")
 	fin = false
 	return
 }
-	
 
 func main() {
-/*	start_chain, add_chain, end_chain := chain.Chain()
-	start_chain	(init_func)
-	add_chain	(double)
-	add_chain	(plus)
-//	end_chain	(end_func)
-	add_chain	(double)
-	add_chain	(plus)
-	end_chain	(end_func)
-*/
+	/*	start_chain, add_chain, end_chain := chain.Chain()
+		start_chain	(init_func)
+		add_chain	(double)
+		add_chain	(plus)
+	//	end_chain	(end_func)
+		add_chain	(double)
+		add_chain	(plus)
+		end_chain	(end_func)
+	*/
 	var c1 chain.C_chain
-	c1.Start	(init_func)
-	c1.Add		(double)
-	c1.Add		(plus)
-	c1.Add		(double)
-	c1.Add		(plus)
-	c1.End		(end_func)
+	c1.Start(init_func)
+	c1.Add(double)
+	c1.Add(plus)
+	c1.Add(double)
+	c1.Add(plus)
+	c1.End(end_func)
 	chain.Run()
 }
-
-

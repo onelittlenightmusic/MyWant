@@ -1,0 +1,31 @@
+wants:
+  - metadata:
+      name: test-sequence
+      type: sequence
+      labels:
+        role: generator
+        category: source
+    spec:
+      params:
+        count: 100
+        rate: 10.0
+  - metadata:
+      name: test-queue
+      type: queue
+      labels:
+        role: processor
+        category: queue-system
+    spec:
+      params:
+        service_time: 0.1
+      using:
+        - role: generator
+  - metadata:
+      name: test-sink
+      type: sink
+      labels:
+        role: collector
+    spec:
+      params: {}
+      using:
+        - role: processor

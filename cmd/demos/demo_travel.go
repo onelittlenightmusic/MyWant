@@ -10,10 +10,10 @@ func main() {
 	fmt.Println("=======================")
 	fmt.Println("Creating one day travel itinerary with:")
 	fmt.Println("- Dinner restaurant visit")
-	fmt.Println("- Hotel stay overnight")  
+	fmt.Println("- Hotel stay overnight")
 	fmt.Println("- Breakfast buffet next morning")
 	fmt.Println()
-	
+
 	// Load YAML configuration
 	config, err := LoadConfigFromYAML("config/config-travel.yaml")
 	if err != nil {
@@ -25,19 +25,19 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register travel want types
 	RegisterTravelWantTypes(builder)
-	
+
 	fmt.Println("\n🏁 Executing travel planning workflow...")
 	builder.Execute()
-	
+
 	fmt.Println("\n📊 Final Want States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
-		fmt.Printf("  %s: %s (processed: %v)\n", 
+		fmt.Printf("  %s: %s (processed: %v)\n",
 			name, state.Status, state.State["total_processed"])
 	}
-	
+
 	fmt.Println("\n✅ Travel planning completed successfully!")
 }

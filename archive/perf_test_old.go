@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 	"math/rand"
 	"time"
 )
@@ -35,7 +35,7 @@ func createOldQueue(serviceTime float64) func(chain.Chan, chain.Chan) bool {
 	return func(in, out chain.Chan) bool {
 		t := (<-in).(QueuePacketTuple)
 		if t.isEnded() {
-			fmt.Printf("[OLD QUEUE] Service: %.2f, Processed: %d, Avg Delay: %.2f\n", 
+			fmt.Printf("[OLD QUEUE] Service: %.2f, Processed: %d, Avg Delay: %.2f\n",
 				serviceTime, nBuf, tSum/float64(nBuf))
 			out <- t
 			return true
@@ -67,19 +67,19 @@ func createOldSink() func(chain.Chan) bool {
 func main() {
 	fmt.Println("Performance Test: Old Implementation")
 	fmt.Println("===================================")
-	
+
 	start := time.Now()
-	
+
 	// Create old-style chain
 	ch := chain.C_chain{}
 	ch.Add(createOldGenerator(3.0, 1000))
 	ch.Add(createOldQueue(0.5))
 	ch.Add(createOldQueue(0.7))
 	ch.End(createOldSink())
-	
+
 	fmt.Println("Starting old implementation...")
 	chain.Run()
-	
+
 	elapsed := time.Since(start)
 	fmt.Printf("Old implementation completed in: %v\n", elapsed)
 }

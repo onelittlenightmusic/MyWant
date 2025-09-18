@@ -7,7 +7,7 @@ import (
 func main() {
 	fmt.Println("Prime Sieve Demo (YAML Config)")
 	fmt.Println("==============================")
-	
+
 	// Load YAML configuration
 	config, err := loadConfigFromYAML("config-prime.yaml")
 	if err != nil {
@@ -19,7 +19,7 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register prime node types
 	RegisterPrimeNodeTypes(builder)
 
@@ -29,7 +29,7 @@ func main() {
 		fmt.Printf("❌ Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("✅ Build successful!")
 
 	fmt.Println("\nExecuting prime sieve...")

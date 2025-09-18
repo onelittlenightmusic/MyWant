@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
-	"context"
 )
 
 // Packet represents a data packet with metadata for dynamic chains
@@ -37,14 +37,14 @@ func NewEOSPacket(id uint64) *Packet {
 
 // PersistentChannel manages buffered channels with packet history
 type PersistentChannel struct {
-	buffer     []*Packet
-	capacity   int
-	mutex      sync.RWMutex
-	notEmpty   *sync.Cond
-	notFull    *sync.Cond
-	closed     bool
+	buffer      []*Packet
+	capacity    int
+	mutex       sync.RWMutex
+	notEmpty    *sync.Cond
+	notFull     *sync.Cond
+	closed      bool
 	subscribers []chan *Packet
-	subMutex   sync.RWMutex
+	subMutex    sync.RWMutex
 }
 
 // NewPersistentChannel creates a new persistent channel with given capacity
@@ -80,7 +80,7 @@ func (pc *PersistentChannel) Send(packet *Packet, ctx context.Context) error {
 
 	// Add packet to buffer
 	pc.buffer = append(pc.buffer, packet)
-	
+
 	// Notify subscribers
 	pc.subMutex.RLock()
 	for _, sub := range pc.subscribers {
@@ -179,21 +179,21 @@ func (s DynamicNodeState) String() string {
 
 // DynamicNode represents a node in the dynamic chain system
 type DynamicNode struct {
-	Name           string
-	Type           string
-	State          DynamicNodeState
-	stateMutex     sync.RWMutex
-	
+	Name       string
+	Type       string
+	State      DynamicNodeState
+	stateMutex sync.RWMutex
+
 	// Channels
 	outputChannels map[string]*PersistentChannel
 	inputSubs      map[string]chan *Packet
 	channelMutex   sync.RWMutex
-	
+
 	// Processing
-	processFunc    func(inputs map[string]chan *Packet, outputs map[string]*PersistentChannel) error
-	ctx            context.Context
-	cancel         context.CancelFunc
-	
+	processFunc func(inputs map[string]chan *Packet, outputs map[string]*PersistentChannel) error
+	ctx         context.Context
+	cancel      context.CancelFunc
+
 	// Statistics
 	packetsProcessed uint64
 	lastActivity     time.Time
@@ -203,7 +203,7 @@ type DynamicNode struct {
 // NewDynamicNode creates a new dynamic node
 func NewDynamicNode(name, nodeType string, processFunc func(inputs map[string]chan *Packet, outputs map[string]*PersistentChannel) error) *DynamicNode {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	return &DynamicNode{
 		Name:           name,
 		Type:           nodeType,
@@ -221,7 +221,7 @@ func NewDynamicNode(name, nodeType string, processFunc func(inputs map[string]ch
 func (dn *DynamicNode) AddOutputChannel(name string, capacity int) {
 	dn.channelMutex.Lock()
 	defer dn.channelMutex.Unlock()
-	
+
 	dn.outputChannels[name] = NewPersistentChannel(capacity)
 }
 
@@ -229,7 +229,7 @@ func (dn *DynamicNode) AddOutputChannel(name string, capacity int) {
 func (dn *DynamicNode) ConnectInput(inputName string, outputChannel *PersistentChannel, bufferSize int) {
 	dn.channelMutex.Lock()
 	defer dn.channelMutex.Unlock()
-	
+
 	// Subscribe to the output channel
 	subscriber := outputChannel.Subscribe(bufferSize)
 	dn.inputSubs[inputName] = subscriber
@@ -252,14 +252,14 @@ func (dn *DynamicNode) GetState() DynamicNodeState {
 // Start begins processing for this node
 func (dn *DynamicNode) Start() error {
 	dn.SetState(StateRunning)
-	
+
 	go func() {
 		defer func() {
 			if dn.GetState() == StateRunning {
 				dn.SetState(StateFinalized)
 			}
 		}()
-		
+
 		// Execute the processing function
 		err := dn.processFunc(dn.inputSubs, dn.outputChannels)
 		if err != nil {
@@ -267,7 +267,7 @@ func (dn *DynamicNode) Start() error {
 			fmt.Printf("[ERROR] Node %s failed: %v\n", dn.Name, err)
 		}
 	}()
-	
+
 	return nil
 }
 
@@ -275,7 +275,7 @@ func (dn *DynamicNode) Start() error {
 func (dn *DynamicNode) Stop() {
 	dn.cancel()
 	dn.SetState(StateFinalized)
-	
+
 	// Close all output channels
 	dn.channelMutex.Lock()
 	for _, channel := range dn.outputChannels {
@@ -288,7 +288,7 @@ func (dn *DynamicNode) Stop() {
 func (dn *DynamicNode) UpdateStats() {
 	dn.statsMutex.Lock()
 	defer dn.statsMutex.Unlock()
-	
+
 	dn.packetsProcessed++
 	dn.lastActivity = time.Now()
 }
@@ -297,20 +297,20 @@ func (dn *DynamicNode) UpdateStats() {
 func (dn *DynamicNode) GetStats() (uint64, time.Time) {
 	dn.statsMutex.RLock()
 	defer dn.statsMutex.RUnlock()
-	
+
 	return dn.packetsProcessed, dn.lastActivity
 }
 
 // DynamicChainManager manages the dynamic chain execution
 type DynamicChainManager struct {
-	nodes        map[string]*DynamicNode
-	sinkNodes    map[string]*DynamicNode
-	nodesMutex   sync.RWMutex
-	
+	nodes      map[string]*DynamicNode
+	sinkNodes  map[string]*DynamicNode
+	nodesMutex sync.RWMutex
+
 	// Execution control
-	running      bool
-	runMutex     sync.RWMutex
-	
+	running  bool
+	runMutex sync.RWMutex
+
 	// Completion tracking
 	completedSinks map[string]bool
 	sinkMutex      sync.RWMutex
@@ -331,17 +331,17 @@ func NewDynamicChainManager() *DynamicChainManager {
 func (dcm *DynamicChainManager) AddNode(node *DynamicNode, isSink bool) error {
 	dcm.nodesMutex.Lock()
 	defer dcm.nodesMutex.Unlock()
-	
+
 	if _, exists := dcm.nodes[node.Name]; exists {
 		return fmt.Errorf("node %s already exists", node.Name)
 	}
-	
+
 	dcm.nodes[node.Name] = node
-	
+
 	if isSink {
 		dcm.sinkNodes[node.Name] = node
 	}
-	
+
 	// If system is already running, start the node immediately
 	dcm.runMutex.RLock()
 	if dcm.running {
@@ -349,7 +349,7 @@ func (dcm *DynamicChainManager) AddNode(node *DynamicNode, isSink bool) error {
 		fmt.Printf("[DYNAMIC] Hot-added node %s (type: %s)\n", node.Name, node.Type)
 	}
 	dcm.runMutex.RUnlock()
-	
+
 	return nil
 }
 
@@ -357,32 +357,32 @@ func (dcm *DynamicChainManager) AddNode(node *DynamicNode, isSink bool) error {
 func (dcm *DynamicChainManager) ConnectNodes(outputNodeName, outputChannelName, inputNodeName, inputChannelName string, bufferSize int) error {
 	dcm.nodesMutex.RLock()
 	defer dcm.nodesMutex.RUnlock()
-	
+
 	outputNode, exists := dcm.nodes[outputNodeName]
 	if !exists {
 		return fmt.Errorf("output node %s not found", outputNodeName)
 	}
-	
+
 	inputNode, exists := dcm.nodes[inputNodeName]
 	if !exists {
 		return fmt.Errorf("input node %s not found", inputNodeName)
 	}
-	
+
 	// Get the output channel
 	outputNode.channelMutex.RLock()
 	outputChannel, exists := outputNode.outputChannels[outputChannelName]
 	outputNode.channelMutex.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("output channel %s not found in node %s", outputChannelName, outputNodeName)
 	}
-	
+
 	// Connect input
 	inputNode.ConnectInput(inputChannelName, outputChannel, bufferSize)
-	
-	fmt.Printf("[DYNAMIC] Connected %s:%s -> %s:%s\n", 
+
+	fmt.Printf("[DYNAMIC] Connected %s:%s -> %s:%s\n",
 		outputNodeName, outputChannelName, inputNodeName, inputChannelName)
-	
+
 	return nil
 }
 
@@ -391,9 +391,9 @@ func (dcm *DynamicChainManager) Start() {
 	dcm.runMutex.Lock()
 	dcm.running = true
 	dcm.runMutex.Unlock()
-	
+
 	fmt.Println("[DYNAMIC] Starting dynamic chain execution")
-	
+
 	// Start all existing nodes
 	dcm.nodesMutex.RLock()
 	for _, node := range dcm.nodes {
@@ -401,7 +401,7 @@ func (dcm *DynamicChainManager) Start() {
 		fmt.Printf("[DYNAMIC] Started node %s (type: %s)\n", node.Name, node.Type)
 	}
 	dcm.nodesMutex.RUnlock()
-	
+
 	// Start monitoring sink completion
 	go dcm.monitorSinkCompletion()
 }
@@ -410,7 +410,7 @@ func (dcm *DynamicChainManager) Start() {
 func (dcm *DynamicChainManager) monitorSinkCompletion() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	for {
 		dcm.runMutex.RLock()
 		if !dcm.running {
@@ -418,7 +418,7 @@ func (dcm *DynamicChainManager) monitorSinkCompletion() {
 			return
 		}
 		dcm.runMutex.RUnlock()
-		
+
 		select {
 		case <-ticker.C:
 			dcm.checkSinkCompletion()
@@ -430,12 +430,12 @@ func (dcm *DynamicChainManager) monitorSinkCompletion() {
 func (dcm *DynamicChainManager) checkSinkCompletion() {
 	dcm.sinkMutex.Lock()
 	defer dcm.sinkMutex.Unlock()
-	
+
 	for sinkName, sink := range dcm.sinkNodes {
 		if !dcm.completedSinks[sinkName] && sink.GetState() == StateFinalized {
 			dcm.completedSinks[sinkName] = true
 			fmt.Printf("[DYNAMIC] Sink %s completed\n", sinkName)
-			
+
 			select {
 			case dcm.completion <- sinkName:
 			default:
@@ -454,9 +454,9 @@ func (dcm *DynamicChainManager) Stop() {
 	dcm.runMutex.Lock()
 	dcm.running = false
 	dcm.runMutex.Unlock()
-	
+
 	fmt.Println("[DYNAMIC] Stopping dynamic chain execution")
-	
+
 	// Stop all nodes
 	dcm.nodesMutex.RLock()
 	for _, node := range dcm.nodes {
@@ -469,7 +469,7 @@ func (dcm *DynamicChainManager) Stop() {
 func (dcm *DynamicChainManager) GetNodeStates() map[string]DynamicNodeState {
 	dcm.nodesMutex.RLock()
 	defer dcm.nodesMutex.RUnlock()
-	
+
 	states := make(map[string]DynamicNodeState)
 	for name, node := range dcm.nodes {
 		states[name] = node.GetState()

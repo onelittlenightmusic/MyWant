@@ -19,13 +19,13 @@ func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNum
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Start: 2,
 		End:   100,
 	}
-	
+
 	if s, ok := params["start"]; ok {
 		if si, ok := s.(int); ok {
 			gen.Start = si
@@ -40,7 +40,7 @@ func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNum
 			gen.End = int(ef)
 		}
 	}
-	
+
 	return gen
 }
 
@@ -95,9 +95,9 @@ func (g *PrimeNumbers) GetWant() *Want {
 // PrimeSequence filters out multiples of a prime number
 type PrimeSequence struct {
 	Want
-	Prime int
+	Prime       int
 	foundPrimes []int
-	paths Paths
+	paths       Paths
 }
 
 // NewPrimeSequence creates a new prime sequence want
@@ -107,13 +107,13 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
-		Prime: 2,
+		Prime:       2,
 		foundPrimes: make([]int, 0),
 	}
-	
+
 	if p, ok := params["prime"]; ok {
 		if pi, ok := p.(int); ok {
 			filter.Prime = pi
@@ -121,7 +121,7 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 			filter.Prime = int(pf)
 		}
 	}
-	
+
 	return filter
 }
 
@@ -245,7 +245,6 @@ func (f *PrimeSequence) GetWant() *Want {
 	return &f.Want
 }
 
-
 // PrimeSink collects and displays results
 type PrimeSink struct {
 	Want
@@ -260,8 +259,8 @@ func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
 			Metadata: metadata,
 			Spec:     spec,
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Received: 0,
 	}
@@ -309,11 +308,11 @@ func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("prime_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeNumbers(metadata, spec.Params)
 	})
-	
+
 	builder.RegisterWantType("prime_sequence", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeSequence(metadata, spec.Params)
 	})
-	
+
 	// Register sink type for collecting results
 	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeSink(metadata, spec)

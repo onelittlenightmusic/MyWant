@@ -3,7 +3,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 )
 
 // Data packet
@@ -56,14 +56,14 @@ func End() func(chain.Chan) bool {
 
 func main() {
 	fmt.Println("Ultra-Simple Network")
-	
+
 	// Manual chain building (no config needed)
 	var c chain.C_chain
-	c.Add(Source(5))          // Generate 5 packets
-	c.Add(Process(1.0))       // Add 1.0 delay
-	c.Add(Process(2.0))       // Add 2.0 delay  
-	c.End(End())              // Print results
-	
+	c.Add(Source(5))    // Generate 5 packets
+	c.Add(Process(1.0)) // Add 1.0 delay
+	c.Add(Process(2.0)) // Add 2.0 delay
+	c.End(End())        // Print results
+
 	chain.Run()
 	fmt.Println("Done!")
 }

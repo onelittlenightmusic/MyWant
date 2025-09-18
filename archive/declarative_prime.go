@@ -4,7 +4,7 @@ package main
 
 import (
 	"fmt"
-	"gochain/chain"
+	"mywant/src/chain"
 )
 
 // PrimeTuple represents a number flowing through the prime sieve pipeline.
@@ -38,7 +38,7 @@ func createPrimeGeneratorFunc(start, end int) func(chain.Chan, chain.Chan) bool 
 			fmt.Printf("[END] Number generation complete\n")
 			return true // Signal completion
 		}
-		
+
 		// Generate next number
 		out <- PrimeTuple{current, false}
 		current++
@@ -56,20 +56,20 @@ func createPrimeGeneratorFunc(start, end int) func(chain.Chan, chain.Chan) bool 
 func createPrimeFilterFunc(prime int) func(chain.Chan, chain.Chan) bool {
 	return func(in, out chain.Chan) bool {
 		t := (<-in).(PrimeTuple)
-		
+
 		// Handle end-of-stream marker
 		if t.isEnded() {
 			fmt.Printf("[FILTER] Prime %d filter complete\n", prime)
-			out <- t // Forward end marker
+			out <- t    // Forward end marker
 			return true // Signal completion
 		}
-		
+
 		// Filter logic: pass through numbers that are not multiples of this prime
 		if t.Num%prime != 0 {
 			out <- t // Pass through non-multiples
 		}
 		// Drop multiples (don't forward them)
-		
+
 		return false // Continue filtering
 	}
 }
@@ -81,19 +81,19 @@ func createPrimeFilterFunc(prime int) func(chain.Chan, chain.Chan) bool {
 func createPrimeDetectorFunc() func(chain.Chan, chain.Chan) bool {
 	return func(in, out chain.Chan) bool {
 		t := (<-in).(PrimeTuple)
-		
+
 		// Handle end-of-stream marker
 		if t.isEnded() {
 			fmt.Printf("[DETECTOR] Prime detection complete\n")
-			out <- t // Forward end marker
+			out <- t    // Forward end marker
 			return true // Signal completion
 		}
-		
+
 		// If a number reaches here, it's prime (survived all filters)
 		fmt.Printf("Prime found: %d\n", t.Num)
 		t.Prime = true
 		out <- t
-		
+
 		return false // Continue detecting
 	}
 }
@@ -106,18 +106,18 @@ func createPrimeCollectorFunc() func(chain.Chan) bool {
 	primes := []int{}
 	return func(in chain.Chan) bool {
 		t := (<-in).(PrimeTuple)
-		
+
 		// Handle end-of-stream marker
 		if t.isEnded() {
 			fmt.Printf("[COLLECTOR] Found %d primes: %v\n", len(primes), primes)
 			return true // Signal completion
 		}
-		
+
 		// Collect the prime
 		if t.Prime {
 			primes = append(primes, t.Num)
 		}
-		
+
 		return false // Continue collecting
 	}
 }
@@ -147,7 +147,7 @@ func RegisterPrimeNodeTypes(builder *ChainBuilder) {
 		default:
 			panic(fmt.Sprintf("Invalid type for start parameter: %T", v))
 		}
-		
+
 		// Handle both int and float64 for end parameter
 		var end int
 		switch v := params["end"].(type) {
@@ -158,10 +158,10 @@ func RegisterPrimeNodeTypes(builder *ChainBuilder) {
 		default:
 			panic(fmt.Sprintf("Invalid type for end parameter: %T", v))
 		}
-		
+
 		return createPrimeGeneratorFunc(start, end)
 	})
-	
+
 	// Register prime filter node type
 	// Expected params: prime (int)
 	builder.RegisterNodeType("prime_filter", func(params map[string]interface{}) interface{} {
@@ -177,13 +177,13 @@ func RegisterPrimeNodeTypes(builder *ChainBuilder) {
 		}
 		return createPrimeFilterFunc(prime)
 	})
-	
+
 	// Register prime detector node type
 	// Expected params: none
 	builder.RegisterNodeType("prime_detector", func(params map[string]interface{}) interface{} {
 		return createPrimeDetectorFunc()
 	})
-	
+
 	// Register prime collector node type
 	// Expected params: none
 	builder.RegisterNodeType("prime_collector", func(params map[string]interface{}) interface{} {

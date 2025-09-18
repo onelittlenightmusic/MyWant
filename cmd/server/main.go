@@ -21,21 +21,20 @@ type ServerConfig struct {
 	Host string `json:"host"`
 }
 
-
 // Server represents the MyWant server
 type Server struct {
-	config   ServerConfig
-	wants    map[string]*WantExecution // Store active want executions
-	router   *mux.Router
+	config ServerConfig
+	wants  map[string]*WantExecution // Store active want executions
+	router *mux.Router
 }
 
 // WantExecution represents a running want execution
 type WantExecution struct {
-	ID       string                     `json:"id"`
-	Config   mywant.Config             `json:"config"`  // Changed from pointer
-	Status   string                    `json:"status"` // "running", "completed", "failed"
-	Results  map[string]interface{}    `json:"results,omitempty"`
-	Builder  *mywant.ChainBuilder      `json:"-"` // Don't serialize builder
+	ID      string                 `json:"id"`
+	Config  mywant.Config          `json:"config"` // Changed from pointer
+	Status  string                 `json:"status"` // "running", "completed", "failed"
+	Results map[string]interface{} `json:"results,omitempty"`
+	Builder *mywant.ChainBuilder   `json:"-"` // Don't serialize builder
 }
 
 // NewServer creates a new MyWant server
@@ -148,10 +147,10 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	if execution.Builder != nil {
 		currentStates := execution.Builder.GetAllWantStates()
 		response := map[string]interface{}{
-			"id":              execution.ID,
+			"id":               execution.ID,
 			"execution_status": execution.Status,
-			"wants":           currentStates,
-			"results":         execution.Results,
+			"wants":            currentStates,
+			"results":          execution.Results,
 		}
 		json.NewEncoder(w).Encode(response)
 	} else {
@@ -229,7 +228,6 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	delete(s.wants, wantID)
 	w.WriteHeader(http.StatusNoContent)
 }
-
 
 // getWantStatus handles GET /api/v1/wants/{id}/status - gets want execution status
 func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
@@ -354,10 +352,10 @@ func (s *Server) executeWantAsync(wantID string) {
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	health := map[string]interface{}{
-		"status":     "healthy",
-		"wants":      len(s.wants),
-		"version":    "1.0.0",
-		"server":     "mywant",
+		"status":  "healthy",
+		"wants":   len(s.wants),
+		"version": "1.0.0",
+		"server":  "mywant",
 	}
 	json.NewEncoder(w).Encode(health)
 }
@@ -382,14 +380,12 @@ func (s *Server) Start() error {
 	return http.ListenAndServe(addr, s.router)
 }
 
-
 // generateWantID generates a unique ID for want execution
 func generateWantID() string {
 	bytes := make([]byte, 6)
 	rand.Read(bytes)
 	return fmt.Sprintf("want-%s-%d", hex.EncodeToString(bytes), time.Now().Unix()%10000)
 }
-
 
 func main() {
 	// Parse command line arguments

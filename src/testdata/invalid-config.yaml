@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      # Missing name field
+      type: sequence
+    spec:
+      params:
+        count: 100
+  - metadata:
+      name: test-queue
+      # Missing type field
+    spec:
+      # Missing params field

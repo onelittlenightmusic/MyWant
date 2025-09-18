@@ -2,9 +2,9 @@ package mywant
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
-	"gopkg.in/yaml.v3"
 )
 
 // RecipeParameter defines a configurable parameter for recipes
@@ -23,8 +23,8 @@ type WantRecipe struct {
 		Labels map[string]string `yaml:"labels"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Params map[string]interface{}   `yaml:"params"`
-		Using []map[string]string      `yaml:"using,omitempty"`
+		Params map[string]interface{} `yaml:"params"`
+		Using  []map[string]string    `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
@@ -32,11 +32,11 @@ type WantRecipe struct {
 
 // DRYWantSpec defines minimal want specification in DRY format
 type DRYWantSpec struct {
-	Name   string                    `yaml:"name"`
-	Type   string                    `yaml:"type"`
-	Labels map[string]string         `yaml:"labels,omitempty"`
-	Params map[string]interface{}    `yaml:"params,omitempty"`
-	Using []map[string]string       `yaml:"using,omitempty"`
+	Name   string                 `yaml:"name"`
+	Type   string                 `yaml:"type"`
+	Labels map[string]string      `yaml:"labels,omitempty"`
+	Params map[string]interface{} `yaml:"params,omitempty"`
+	Using  []map[string]string    `yaml:"using,omitempty"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
@@ -59,22 +59,22 @@ type LegacyRecipeResult struct {
 
 // ChildRecipe defines a complete recipe for creating child wants
 type ChildRecipe struct {
-	Description string              `yaml:"description"`
-	
+	Description string `yaml:"description"`
+
 	// Legacy parameter format support
-	Parameters  []RecipeParameter `yaml:"parameters,omitempty"`
-	
+	Parameters []RecipeParameter `yaml:"parameters,omitempty"`
+
 	// New minimized parameter format support
-	Params      map[string]interface{} `yaml:"params,omitempty"`
-	
-	Result      *LegacyRecipeResult     `yaml:"result,omitempty"` // Optional result fetching configuration
-	
+	Params map[string]interface{} `yaml:"params,omitempty"`
+
+	Result *LegacyRecipeResult `yaml:"result,omitempty"` // Optional result fetching configuration
+
 	// Legacy format support
-	Children    []WantRecipe      `yaml:"children,omitempty"`
-	
-	// New DRY format support  
-	Defaults    *DRYRecipeDefaults `yaml:"defaults,omitempty"`
-	Wants       []DRYWantSpec        `yaml:"wants,omitempty"`
+	Children []WantRecipe `yaml:"children,omitempty"`
+
+	// New DRY format support
+	Defaults *DRYRecipeDefaults `yaml:"defaults,omitempty"`
+	Wants    []DRYWantSpec      `yaml:"wants,omitempty"`
 }
 
 // RecipeConfig holds all available recipes
@@ -84,8 +84,8 @@ type RecipeConfigLegacy struct {
 
 // RecipeLoader manages loading and instantiating want recipes (legacy compatibility)
 type RecipeLoader struct {
-	recipes     map[string]ChildRecipe
-	recipeDir   string
+	recipes   map[string]ChildRecipe
+	recipeDir string
 }
 
 // NewRecipeLoader creates a new recipe loader
@@ -108,20 +108,20 @@ func (rl *RecipeLoader) LoadRecipes() error {
 		if err != nil {
 			return err
 		}
-		
+
 		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
 			fmt.Printf("[RECIPE] Loading recipe file: %s\n", path)
 			return rl.loadRecipeFile(path)
 		}
 		return nil
 	})
-	
+
 	// Show final recipe count
 	fmt.Printf("[RECIPE] Total recipes loaded: %d\n", len(rl.recipes))
 	for name := range rl.recipes {
 		fmt.Printf("[RECIPE] Available recipe: %s\n", name)
 	}
-	
+
 	return err
 }
 
@@ -150,7 +150,7 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 	recipeName := baseName[:len(baseName)-len(filepath.Ext(baseName))]
 	rl.recipes[recipeName] = config
 	fmt.Printf("[RECIPE] Loaded recipe: %s\n", recipeName)
-		
+
 	// Debug: Show recipe params and wants count
 	fmt.Printf("[RECIPE-PARAMS] Recipe params: %+v\n", config.Params)
 	fmt.Printf("[RECIPE-WANTS] Recipe wants count: %d\n", len(config.Wants))
@@ -161,15 +161,12 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 // RecipeFile represents the new simplified recipe file format
 type RecipeFile struct {
 	Parameters map[string]interface{} `yaml:"parameters"`
-	Wants      []DRYWantSpec         `yaml:"wants"`
+	Wants      []DRYWantSpec          `yaml:"wants"`
 }
-
-
-
 
 // loadDefaultRecipes provides fallback hardcoded recipes (simplified)
 func (rl *RecipeLoader) loadDefaultRecipes() error {
-	// Since we have recipe files in the recipes directory, 
+	// Since we have recipe files in the recipes directory,
 	// we don't need complex default recipes anymore
 	fmt.Printf("[RECIPE] No recipe directory found, but using simplified defaults\n")
 	return nil
@@ -195,7 +192,7 @@ func (rl *RecipeLoader) ListRecipes() []string {
 }
 
 // InstantiateRecipe creates actual Want instances from a recipe
-func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, params map[string]interface{}) ([]Want, error) {
+func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, params map[string]interface{}) ([]*Want, error) {
 	childRecipe, err := rl.GetRecipe(recipeName)
 	if err != nil {
 		return nil, err
@@ -218,8 +215,8 @@ func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, para
 		recipeParams[key] = value
 	}
 
-	var wants []Want
-	
+	var wants []*Want
+
 	// Process wants with automatic naming and labeling
 	if len(childRecipe.Wants) > 0 {
 		// New recipe format - no templating needed
@@ -245,32 +242,32 @@ func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, para
 }
 
 // instantiateDRYWant creates a single Want from a DRY want spec with automatic naming and labeling
-func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRecipeDefaults, params map[string]interface{}, prefix string, wantIndex int) (Want, error) {
+func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRecipeDefaults, params map[string]interface{}, prefix string, wantIndex int) (*Want, error) {
 	// Generate automatic name: prefix-type-index
 	generatedName := fmt.Sprintf("%s-%s-%d", prefix, dryWant.Type, wantIndex)
-	
+
 	// Use only recipe-defined labels (no hardcoded generation)
 	finalLabels := make(map[string]string)
-	
+
 	// Start with defaults if available
 	if defaults != nil && defaults.Metadata.Labels != nil {
 		for key, value := range defaults.Metadata.Labels {
 			finalLabels[key] = value
 		}
 	}
-	
+
 	// Apply recipe-defined labels (no automatic generation)
 	if dryWant.Labels != nil {
 		for key, value := range dryWant.Labels {
 			finalLabels[key] = value
 		}
 	}
-	
+
 	// Resolve parameter values by looking up from recipe parameters
 	resolvedParams := rl.resolveParams(dryWant.Params, params)
-	
+
 	// Create the Want directly without templating
-	want := Want{
+	want := &Want{
 		Metadata: Metadata{
 			Name:   generatedName,
 			Type:   dryWant.Type,
@@ -308,7 +305,7 @@ func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]st
 // resolveParams resolves parameter values by looking them up in the recipe parameters
 func (rl *RecipeLoader) resolveParams(wantParams map[string]interface{}, recipeParams map[string]interface{}) map[string]interface{} {
 	resolvedParams := make(map[string]interface{})
-	
+
 	for paramName, paramValue := range wantParams {
 		if paramKey, ok := paramValue.(string); ok {
 			// Look up the parameter key in recipe parameters
@@ -323,7 +320,7 @@ func (rl *RecipeLoader) resolveParams(wantParams map[string]interface{}, recipeP
 			resolvedParams[paramName] = paramValue
 		}
 	}
-	
+
 	return resolvedParams
 }
 
@@ -336,67 +333,67 @@ func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecip
 			Type   string            `yaml:"type"`
 			Labels map[string]string `yaml:"labels"`
 		}{
-			Name: dryWant.Name,
-			Type: dryWant.Type,
+			Name:   dryWant.Name,
+			Type:   dryWant.Type,
 			Labels: make(map[string]string),
 		},
 		Spec: struct {
-			Params map[string]interface{}   `yaml:"params"`
-			Using []map[string]string      `yaml:"using,omitempty"`
+			Params map[string]interface{} `yaml:"params"`
+			Using  []map[string]string    `yaml:"using,omitempty"`
 		}{
 			Params: make(map[string]interface{}),
-			Using: dryWant.Using, // Copy using directly
+			Using:  dryWant.Using, // Copy using directly
 		},
 		TypeHints: make(map[string]string),
 	}
-	
+
 	// Merge default labels first, then override with node-specific labels
 	if defaults != nil && defaults.Metadata.Labels != nil {
 		for key, value := range defaults.Metadata.Labels {
 			wantRecipe.Metadata.Labels[key] = value
 		}
 	}
-	
+
 	// Override with node-specific labels
 	if dryWant.Labels != nil {
 		for key, value := range dryWant.Labels {
 			wantRecipe.Metadata.Labels[key] = value
 		}
 	}
-	
+
 	// Merge default params first, then override with node-specific params
 	if defaults != nil && defaults.Spec.Params != nil {
 		for key, value := range defaults.Spec.Params {
 			wantRecipe.Spec.Params[key] = value
 		}
 	}
-	
+
 	// Override with node-specific params
 	if dryWant.Params != nil {
 		for key, value := range dryWant.Params {
 			wantRecipe.Spec.Params[key] = value
 		}
 	}
-	
+
 	// Copy type hints from DRY node
 	if dryWant.TypeHints != nil {
 		for key, value := range dryWant.TypeHints {
 			wantRecipe.TypeHints[key] = value
 		}
 	}
-	
+
 	fmt.Printf("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantRecipe.Spec.Params)
-	
+
 	return wantRecipe
 }
 
 // instantiateWantFromTemplate creates a single Want from a WantRecipe (simplified, no templating)
-func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, params map[string]interface{}, targetName string) (Want, error) {
+func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, params map[string]interface{}, targetName string) (*Want, error) {
 	// Resolve parameter values directly
 	resolvedParams := rl.resolveParams(wantRecipe.Spec.Params, params)
 
 	// Create the actual Want with owner references
-	want := Want{
+	want := &Want{
 		Metadata: Metadata{
 			Name:   wantRecipe.Metadata.Name,
 			Type:   wantRecipe.Metadata.Type,
@@ -422,9 +419,8 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 	return want, nil
 }
 
-
 // GetLegacyRecipeResult fetches a result value from child nodes based on recipe configuration
-func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName string, wants []Want) (interface{}, error) {
+func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName string, wants []*Want) (interface{}, error) {
 	childRecipe, err := rl.GetRecipe(recipeName)
 	if err != nil {
 		return nil, err
@@ -436,9 +432,7 @@ func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName stri
 
 	// Find the target want based on the result configuration
 	var targetWant *Want
-	for i := range wants {
-		want := &wants[i]
-		
+	for _, want := range wants {
 		// Check if this want matches the result configuration
 		if rl.matchesResultWant(want, childRecipe.Result.Want, targetName) {
 			targetWant = want
@@ -461,19 +455,19 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 	if wantSelector == "{{.targetName}}-queue" {
 		resolvedSelector = targetName + "-queue"
 	}
-	
+
 	// Check if it matches the want name exactly
 	if want.Metadata.Name == resolvedSelector {
 		return true
 	}
-	
+
 	// Check if it matches based on labels (category, role, etc.)
 	for key, value := range want.Metadata.Labels {
 		if key == resolvedSelector || value == resolvedSelector {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

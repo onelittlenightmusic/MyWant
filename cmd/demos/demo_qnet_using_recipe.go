@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
@@ -11,7 +11,7 @@ func main() {
 	fmt.Println("=========================================================")
 	fmt.Println("This demo shows using field connections defined in YAML:")
 	fmt.Println("- queue-primary using: [role: source, stream: primary]")
-	fmt.Println("- queue-secondary using: [role: source, stream: secondary]") 
+	fmt.Println("- queue-secondary using: [role: source, stream: secondary]")
 	fmt.Println("- combiner-main using: [role: processor, stage: first]")
 	fmt.Println("- queue-final using: [role: merger]")
 	fmt.Println("- collector-end using: [role: processor, stage: final]")
@@ -31,7 +31,7 @@ func main() {
 	}
 
 	fmt.Printf("Loaded %d wants from YAML configuration\n", len(config.Wants))
-	
+
 	// Show the using field connections defined in YAML
 	fmt.Println("\n🔗 Using Field Connections (from YAML, not Go code):")
 	for _, want := range config.Wants {

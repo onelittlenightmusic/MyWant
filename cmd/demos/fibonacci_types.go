@@ -18,12 +18,12 @@ func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *Fibo
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		Count: 20,
 	}
-	
+
 	if c, ok := params["count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.Count = ci
@@ -31,7 +31,7 @@ func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *Fibo
 			gen.Count = int(cf)
 		}
 	}
-	
+
 	return gen
 }
 
@@ -79,10 +79,10 @@ func (g *FibonacciNumbers) GetWant() *Want {
 // FibonacciSequence filters fibonacci numbers based on criteria
 type FibonacciSequence struct {
 	Want
-	MinValue   int
-	MaxValue   int
-	filtered   []int
-	paths      Paths
+	MinValue int
+	MaxValue int
+	filtered []int
+	paths    Paths
 }
 
 // NewFibonacciSequence creates a new fibonacci sequence want
@@ -92,14 +92,14 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
 			// Stats field removed - using State instead
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			Status: WantStatusIdle,
+			State:  make(map[string]interface{}),
 		},
 		MinValue: 0,
 		MaxValue: 1000000,
 		filtered: make([]int, 0),
 	}
-	
+
 	if min, ok := params["min_value"]; ok {
 		if mini, ok := min.(int); ok {
 			filter.MinValue = mini
@@ -107,7 +107,7 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 			filter.MinValue = int(minf)
 		}
 	}
-	
+
 	if max, ok := params["max_value"]; ok {
 		if maxi, ok := max.(int); ok {
 			filter.MaxValue = maxi
@@ -115,7 +115,7 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 			filter.MaxValue = int(maxf)
 		}
 	}
-	
+
 	return filter
 }
 
@@ -238,13 +238,12 @@ func (f *FibonacciSequence) GetWant() *Want {
 	return &f.Want
 }
 
-
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("fibonacci_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciNumbers(metadata, spec.Params)
 	})
-	
+
 	builder.RegisterWantType("fibonacci_sequence", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciSequence(metadata, spec.Params)
 	})

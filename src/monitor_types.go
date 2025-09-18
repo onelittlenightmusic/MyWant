@@ -17,13 +17,13 @@ type MonitorWant struct {
 
 // AlertRecord stores information about triggered alerts
 type AlertRecord struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	SourceWant  string      `json:"sourceWant"`
-	StateKey    string      `json:"stateKey"`
-	Value       interface{} `json:"value"`
-	Threshold   interface{} `json:"threshold"`
-	AlertType   string      `json:"alertType"`
-	Message     string      `json:"message"`
+	Timestamp  time.Time   `json:"timestamp"`
+	SourceWant string      `json:"sourceWant"`
+	StateKey   string      `json:"stateKey"`
+	Value      interface{} `json:"value"`
+	Threshold  interface{} `json:"threshold"`
+	AlertType  string      `json:"alertType"`
+	Message    string      `json:"message"`
 }
 
 // NewMonitorWant creates a new monitor want

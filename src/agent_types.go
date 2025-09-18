@@ -6,6 +6,7 @@ import (
 	"sync"
 )
 
+// AgentType defines the type of agent for execution strategies.
 type AgentType string
 
 const (
@@ -13,11 +14,13 @@ const (
 	MonitorAgentType AgentType = "monitor"
 )
 
+// Capability represents an agent's functional capability with its dependencies.
 type Capability struct {
 	Name  string   `yaml:"name"`
 	Gives []string `yaml:"gives"`
 }
 
+// Agent defines the interface for all agent implementations.
 type Agent interface {
 	Exec(ctx context.Context, want *Want) error
 	GetCapabilities() []string
@@ -26,6 +29,7 @@ type Agent interface {
 	GetUses() []string
 }
 
+// BaseAgent provides common functionality for all agent types.
 type BaseAgent struct {
 	Name         string    `yaml:"name"`
 	Capabilities []string  `yaml:"capabilities"`
@@ -49,6 +53,7 @@ func (a *BaseAgent) GetUses() []string {
 	return a.Uses
 }
 
+// DoAgent implements an agent that performs specific actions on wants.
 type DoAgent struct {
 	BaseAgent
 	Action func(ctx context.Context, want *Want) error
@@ -61,6 +66,7 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
 	return fmt.Errorf("no action defined for DoAgent %s", a.Name)
 }
 
+// MonitorAgent implements an agent that monitors want execution and state.
 type MonitorAgent struct {
 	BaseAgent
 	Monitor func(ctx context.Context, want *Want) error
@@ -73,17 +79,19 @@ func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
 	return fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
 }
 
+// AgentRegistry manages agent registration and capability mapping.
 type AgentRegistry struct {
 	capabilities       map[string]Capability
-	agents            map[string]Agent
+	agents             map[string]Agent
 	capabilityToAgents map[string][]string
-	mutex             sync.RWMutex
+	mutex              sync.RWMutex
 }
 
+// NewAgentRegistry creates a new agent registry for managing agents and capabilities.
 func NewAgentRegistry() *AgentRegistry {
 	return &AgentRegistry{
 		capabilities:       make(map[string]Capability),
-		agents:            make(map[string]Agent),
+		agents:             make(map[string]Agent),
 		capabilityToAgents: make(map[string][]string),
 	}
 }

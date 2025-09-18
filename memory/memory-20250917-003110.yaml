@@ -1,0 +1,39 @@
+timestamp: "2025-09-17T00:31:10+09:00"
+execution_id: exec-20250917-003110
+wants:
+    - metadata:
+        name: test-want
+        type: numbers
+        labels:
+            role: test
+      spec:
+        params:
+            count: 500
+            description: test parameter
+            rate: 0.5
+      status: completed
+      state:
+        initial_state: initialized
+      history:
+        parameterHistory:
+            - want_name: test-want
+              state_value:
+                count: 200
+              timestamp: 2025-09-17T00:31:10.256172+09:00
+            - want_name: test-want
+              state_value:
+                rate: 2.5
+              timestamp: 2025-09-17T00:31:10.30831+09:00
+            - want_name: test-want
+              state_value:
+                count: 500
+              timestamp: 2025-09-17T00:31:10.360531+09:00
+            - want_name: test-want
+              state_value:
+                rate: 0.5
+              timestamp: 2025-09-17T00:31:10.412597+09:00
+            - want_name: test-want
+              state_value:
+                description: test parameter
+              timestamp: 2025-09-17T00:31:10.464743+09:00
+        stateHistory: []

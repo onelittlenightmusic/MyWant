@@ -7,7 +7,7 @@ import (
 func main() {
 	fmt.Println("Fibonacci Sequence Demo (YAML Config)")
 	fmt.Println("=====================================")
-	
+
 	// Load YAML configuration
 	config, err := loadConfigFromYAML("config-fibonacci.yaml")
 	if err != nil {
@@ -19,7 +19,7 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register fibonacci node types
 	RegisterFibonacciNodeTypes(builder)
 
@@ -29,7 +29,7 @@ func main() {
 		fmt.Printf("❌ Build failed: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("✅ Build successful!")
 
 	fmt.Println("\nExecuting fibonacci sequence...")

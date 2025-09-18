@@ -19,12 +19,12 @@ var (
 	subscriptionMutex  sync.RWMutex
 
 	// Want registry for notification lookup
-	wantRegistry = make(map[string]*Want)
+	wantRegistry      = make(map[string]*Want)
 	wantRegistryMutex sync.RWMutex
 
 	// Notification history for debugging
 	notificationHistory = make([]StateNotification, 0, 1000)
-	historyMutex       sync.RWMutex
+	historyMutex        sync.RWMutex
 
 	// Configuration
 	maxNotificationHistory = 1000
@@ -151,7 +151,7 @@ func sendOwnerChildNotifications(notification StateNotification) {
 				// LEGACY: Also call old Target system for backward compatibility
 				// This ensures existing Target behavior continues to work
 				notifyParentStateUpdate(ownerRef.Name, want.Metadata.Name,
-				                      notification.StateKey, notification.StateValue)
+					notification.StateKey, notification.StateValue)
 				break
 			}
 		}

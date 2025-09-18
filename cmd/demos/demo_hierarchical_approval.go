@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	mywant "mywant/src"
 	"os"
 	"time"
-	mywant "mywant/src"
 )
 
 func main() {

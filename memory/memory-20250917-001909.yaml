@@ -1,0 +1,162 @@
+timestamp: "2025-09-17T00:19:09+09:00"
+execution_id: exec-20250917-001909
+wants:
+    - metadata:
+        name: fibonacci sequence
+        type: fibonacci sequence
+        labels:
+            category: fibonacci
+      spec:
+        params:
+            count: 15
+            description: Generates and filters fibonacci numbers
+            display_name: Fibonacci Sequence Generator
+            max_value: 100
+            min_value: 1
+            prefix: fibonacci
+      status: completed
+      state:
+        childCount: 6
+        metrics:
+            numbers_total_processed: 15
+            queue_all_metrics:
+                average_wait_time: 0.0035864452596592916
+                current_server_free_time: 1.7166166406935197
+                last_packet_wait_time: 0
+                processedCount: 15
+                serverFreeTime: 1.7166166406935197
+                total_processed: 15
+                total_wait_time: 0.05379667889488937
+                waitTimeSum: 0.05379667889488937
+            queue_average_wait_time: 0.0035864452596592916
+        numbers_total_processed: 15
+        primaryResult: 0.0035864452596592916
+        queue_all_metrics:
+            average_wait_time: 0.0035864452596592916
+            current_server_free_time: 1.7166166406935197
+            last_packet_wait_time: 0
+            processedCount: 15
+            serverFreeTime: 1.7166166406935197
+            total_processed: 15
+            total_wait_time: 0.05379667889488937
+            waitTimeSum: 0.05379667889488937
+        queue_average_wait_time: 0.0035864452596592916
+        recipePath: recipes/queue-system.yaml
+        recipeResult: 0.0035864452596592916
+        result: 'Average wait time in the queue system: 0.0035864452596592916'
+      history:
+        parameterHistory:
+            - want_name: fibonacci sequence
+              state_value:
+                count: 15
+                description: Generates and filters fibonacci numbers
+                display_name: Fibonacci Sequence Generator
+                max_value: 100
+                min_value: 1
+                prefix: fibonacci
+              timestamp: 2025-09-17T00:19:09.885425+09:00
+        stateHistory: []
+    - metadata:
+        name: fibonacci-numbers-1
+        type: numbers
+        labels:
+            category: queue-producer
+            component: generator
+            owner: child
+            role: source
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: fibonacci sequence
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            count: 15
+            deterministic: false
+            rate: 10
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 15
+        current_time: 1.6666166406935197
+        total_processed: 15
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: fibonacci-numbers-1
+              state_value:
+                count: 15
+                deterministic: false
+                rate: 10
+              timestamp: 2025-09-17T00:19:09.887928+09:00
+        stateHistory: []
+    - metadata:
+        name: fibonacci-queue-2
+        type: queue
+        labels:
+            category: queue-processor
+            component: main-queue
+            owner: child
+            role: processor
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: fibonacci sequence
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            deterministic: false
+            service_time: 0.05
+        using:
+            - category: queue-producer
+      status: completed
+      state:
+        average_wait_time: 0.0035864452596592916
+        current_server_free_time: 1.7166166406935197
+        last_packet_wait_time: 0
+        processedCount: 15
+        serverFreeTime: 1.7166166406935197
+        total_processed: 15
+        total_wait_time: 0.05379667889488937
+        waitTimeSum: 0.05379667889488937
+      history:
+        parameterHistory:
+            - want_name: fibonacci-queue-2
+              state_value:
+                deterministic: false
+                service_time: 0.05
+              timestamp: 2025-09-17T00:19:09.887933+09:00
+        stateHistory: []
+    - metadata:
+        name: fibonacci-sink-3
+        type: sink
+        labels:
+            category: result-display
+            component: final-sink
+            owner: child
+            role: collector
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: fibonacci sequence
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_format: 'Number: %d'
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 15
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: fibonacci-sink-3
+              state_value:
+                display_format: 'Number: %d'
+              timestamp: 2025-09-17T00:19:09.887947+09:00
+        stateHistory: []

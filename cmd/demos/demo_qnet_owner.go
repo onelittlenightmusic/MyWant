@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	mywant "mywant/src"
+	"os"
 )
 
 func main() {
@@ -12,13 +12,13 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("other wants from the qnet-pipeline recipe at runtime.")
 	fmt.Println()
-	
+
 	// Get YAML file from command line argument or use default
 	yamlFile := "config/config-qnet.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-	
+
 	// Load YAML configuration with target want
 	config, err := mywant.LoadConfigFromYAML(yamlFile)
 	if err != nil {
@@ -27,7 +27,7 @@ func main() {
 	}
 
 	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config.Wants))
-	
+
 	// Show target want details
 	for _, want := range config.Wants {
 		if want.Metadata.Type == "target" {
@@ -39,11 +39,11 @@ func main() {
 
 	// Create chain builder
 	builder := mywant.NewChainBuilder(config)
-	
+
 	// Register want types
 	RegisterQNetWantTypes(builder)         // For qnet types (numbers, queue, sink, etc.)
 	mywant.RegisterOwnerWantTypes(builder) // For owner types (target)
-	
+
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")
 	fmt.Println("1. Load the qnet-pipeline recipe")
@@ -52,12 +52,12 @@ func main() {
 	fmt.Println("4. Wait for all children to complete")
 	fmt.Println("5. Compute aggregate results")
 	fmt.Println()
-	
+
 	// Memory dump will be automatically created as memory-*.yaml by the system
-	
+
 	// Execute using existing reconcile loop system
 	builder.Execute()
-	
+
 	fmt.Println("\n📊 Final Want States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
@@ -69,10 +69,10 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("  %s: %s (processed: %d)\n", 
+		fmt.Printf("  %s: %s (processed: %d)\n",
 			name, state.Status, processed)
 	}
-	
+
 	// Show target results
 	fmt.Println("\n🎯 Target Want Results:")
 	for name, state := range states {
@@ -89,7 +89,7 @@ func main() {
 			}
 		}
 	}
-	
+
 	// Memory snapshot is automatically saved to memory/memory-TIMESTAMP.yaml
 	fmt.Println("✅ Target-based dynamic recipe execution completed successfully!")
 }

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 
 	// Get final state from all wants
 	states := builder.GetAllWantStates()
-	
+
 	fmt.Println("\n📊 Final Fibonacci Sequence Results:")
 	for name, state := range states {
 		if state != nil {
@@ -70,7 +70,7 @@ func main() {
 					}
 				}
 			}
-			
+
 			// Show stats from fibonacci generator
 			if state.Metadata.Type == "fibonacci_numbers" {
 				if totalProcessed, exists := state.State["total_processed"]; exists {

@@ -1,0 +1,52 @@
+timestamp: "2025-09-17T23:30:52+09:00"
+execution_id: exec-20250917-233052
+wants:
+    - metadata:
+        name: luxury-hotel-booking
+        type: hotel
+        labels:
+            category: accommodation
+            priority: high
+      spec:
+        params:
+            check_in: "2025-09-20"
+            check_out: "2025-09-22"
+            hotel_type: luxury
+            location: Tokyo
+        requires:
+            - hotel_reservation
+      status: completed
+      state:
+        check_in: "2025-09-20"
+        check_out: "2025-09-22"
+        hotel_name: Premium Hotel
+        hotel_type: luxury
+        last_checked: "2025-09-17T10:00:00Z"
+        reservation_id: HTL-12345
+        room_ready: true
+        status: confirmed
+      history:
+        parameterHistory:
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_in: "2025-09-20"
+                check_out: "2025-09-22"
+                hotel_type: luxury
+                location: Tokyo
+              timestamp: 2025-09-17T23:30:52.622573+09:00
+        stateHistory:
+            - want_name: luxury-hotel-booking
+              state_value:
+                check_in: "2025-09-20"
+                check_out: "2025-09-22"
+                hotel_name: Premium Hotel
+                reservation_id: HTL-12345
+                status: confirmed
+              timestamp: 2025-09-17T23:30:52.63483+09:00
+            - want_name: luxury-hotel-booking
+              state_value:
+                last_checked: "2025-09-17T10:00:00Z"
+                reservation_id: HTL-12345
+                room_ready: true
+                status: confirmed
+              timestamp: 2025-09-17T23:30:52.634846+09:00

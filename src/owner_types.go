@@ -26,16 +26,16 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 // Target represents a parent want that creates and manages child wants
 type Target struct {
 	Want
-	MaxDisplay     int
-	Description    string // Human-readable description of this target
-	RecipePath     string // Path to the recipe file to use for child creation
-	RecipeParams   map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
-	paths          Paths
-	childWants     []Want
-	childrenDone   chan bool
-	builder        *ChainBuilder    // Reference to builder for dynamic want creation
-	recipeLoader   *GenericRecipeLoader    // Reference to generic recipe loader
-	stateMutex     sync.RWMutex // Mutex to protect concurrent state updates
+	MaxDisplay   int
+	Description  string                 // Human-readable description of this target
+	RecipePath   string                 // Path to the recipe file to use for child creation
+	RecipeParams map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
+	paths        Paths
+	childWants   []*Want
+	childrenDone chan bool
+	builder      *ChainBuilder        // Reference to builder for dynamic want creation
+	recipeLoader *GenericRecipeLoader // Reference to generic recipe loader
+	stateMutex   sync.RWMutex         // Mutex to protect concurrent state updates
 }
 
 // NewTarget creates a new target want
@@ -47,18 +47,18 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
-		MaxDisplay:      1000,
-		RecipePath:      "recipes/queue-system.yaml", // Default recipe path
-		RecipeParams:    make(map[string]interface{}),
-		childWants:      make([]Want, 0),
-		childrenDone:    make(chan bool, 1),
+		MaxDisplay:   1000,
+		RecipePath:   "recipes/queue-system.yaml", // Default recipe path
+		RecipeParams: make(map[string]interface{}),
+		childWants:   make([]*Want, 0),
+		childrenDone: make(chan bool, 1),
 	}
-	
+
 	// Extract target-specific configuration from params
 	target.MaxDisplay = extractIntParam(spec.Params, "max_display", target.MaxDisplay)
-	
+
 	// Recipe path will be set by custom target type registration
-	
+
 	// Separate recipe parameters from target-specific parameters
 	targetSpecificParams := map[string]bool{
 		"max_display": true,
@@ -71,7 +71,7 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			target.RecipeParams[key] = value
 		}
 	}
-	
+
 	// Register the target instance for child notification
 	targetRegistryMutex.Lock()
 	targetRegistry[metadata.Name] = target
@@ -79,7 +79,7 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 
 	// Register with want system
 	RegisterWant(&target.Want)
-	
+
 	return target
 }
 
@@ -100,50 +100,50 @@ func (t *Target) resolveRecipeParameters() {
 	if t.recipeLoader == nil {
 		return
 	}
-	
+
 	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
 		fmt.Printf("⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
-	
+
 	// Create resolved parameters map starting with recipe defaults
 	resolvedParams := make(map[string]interface{})
-	
+
 	// Set default values from recipe parameter definitions
 	for key, value := range recipeParams {
 		resolvedParams[key] = value
 	}
-	
+
 	// Override with provided recipe parameters
 	for key, value := range t.RecipeParams {
 		resolvedParams[key] = value
 	}
-	
+
 	// Add target-specific parameters that may be referenced by recipes
 	resolvedParams["targetName"] = t.Metadata.Name
 	if _, hasCount := resolvedParams["count"]; !hasCount {
 		resolvedParams["count"] = t.MaxDisplay
 	}
-	
+
 	// Update recipe parameters with resolved values
 	t.RecipeParams = resolvedParams
 }
 
 // CreateChildWants dynamically creates child wants based on external recipes
-func (t *Target) CreateChildWants() []Want {
+func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
 		fmt.Printf("❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
-		return []Want{}
+		return []*Want{}
 	}
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
 		fmt.Printf("❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
-		return []Want{}
+		return []*Want{}
 	}
 
 	fmt.Printf("✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
@@ -293,12 +293,12 @@ func (t *Target) mapParameterNameForChild(targetParamName string, childWantType 
 			"service_time":           "service_time",
 		},
 		"numbers": {
-			"primary_count":    "count",
-			"secondary_count":  "count",
-			"primary_rate":     "rate",
-			"secondary_rate":   "rate",
-			"count":            "count",
-			"rate":             "rate",
+			"primary_count":   "count",
+			"secondary_count": "count",
+			"primary_rate":    "rate",
+			"secondary_rate":  "rate",
+			"count":           "count",
+			"rate":            "rate",
 		},
 		"sink": {
 			"display_format": "display_format",
@@ -315,12 +315,6 @@ func (t *Target) mapParameterNameForChild(targetParamName string, childWantType 
 	// If no specific mapping, try direct mapping
 	return targetParamName
 }
-
-
-
-
-
-
 
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
@@ -351,7 +345,7 @@ func (t *Target) computeTemplateResult() {
 	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
 	childWantsByName := make(map[string]*Want)
-	
+
 	// Build map of child wants by name
 	for _, want := range allWantStates {
 		for _, ownerRef := range want.Metadata.OwnerReferences {
@@ -441,13 +435,12 @@ func NotifyTargetCompletion(targetName string, childName string) {
 	targetRegistryMutex.RLock()
 	target, exists := targetRegistry[targetName]
 	targetRegistryMutex.RUnlock()
-	
+
 	if exists {
 		fmt.Printf("📢 Child %s notifying target %s of completion\n", childName, targetName)
 		target.NotifyChildrenComplete()
 	}
 }
-
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
@@ -466,7 +459,7 @@ func NewOwnerAwareWant(baseWant interface{}, metadata Metadata) *OwnerAwareWant 
 			break
 		}
 	}
-	
+
 	return &OwnerAwareWant{
 		BaseWant:   baseWant,
 		TargetName: targetName,
@@ -494,7 +487,7 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 	}
 }
 
-// GetWant returns the underlying want from the base want  
+// GetWant returns the underlying want from the base want
 func (oaw *OwnerAwareWant) GetWant() *Want {
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
 		want := chainWant.GetWant()
@@ -523,13 +516,13 @@ func initializeStateNotifications() {
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Note: Demo programs should also call RegisterQNetWantTypes if they use qnet types
-	
+
 	// Initialize state update notification system
 	initializeStateNotifications()
-	
+
 	// Initialize generic recipe loader
 	recipeLoader := NewGenericRecipeLoader("recipes")
-	
+
 	// Register target type with recipe support
 	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
 		target := NewTarget(metadata, spec)
@@ -537,23 +530,23 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes
 		return target
 	})
-	
+
 	// Generic OwnerAware wrapping: automatically wrap ALL registered want types
 	// to support owner references without hardcoding specific type names
-	
+
 	// Create a copy of current registry to avoid modification during iteration
 	originalFactories := make(map[string]WantFactory)
 	for typeName, factory := range builder.registry {
 		originalFactories[typeName] = factory
 	}
-	
+
 	// Override all want types to use OwnerAware wrapper when owner references exist
 	for typeName, originalFactory := range originalFactories {
 		// Skip target types as they already handle owner relationships
 		if typeName == "target" {
 			continue
 		}
-		
+
 		// Create closure to capture variables
 		func(wantType string, factory WantFactory) {
 			builder.RegisterWantType(wantType, func(metadata Metadata, spec WantSpec) interface{} {
@@ -603,7 +596,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 			}
 		}
 	}
-	
+
 	// Fallback: try to get from State map
 	if value, ok := want.State[spec.StatName]; ok {
 		return value
@@ -611,7 +604,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 	if value, ok := want.State[strings.ToLower(spec.StatName)]; ok {
 		return value
 	}
-	
+
 	fmt.Printf("⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
 	return 0
 }
@@ -697,13 +690,13 @@ func (t *Target) computeFallbackResult() {
 func (t *Target) computeFallbackResultUnsafe() {
 	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
-	var childWants []Want
-	
+	var childWants []*Want
+
 	// Filter to only wants owned by this target
 	for _, want := range allWantStates {
 		for _, ownerRef := range want.Metadata.OwnerReferences {
 			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
-				childWants = append(childWants, *want)
+				childWants = append(childWants, want)
 				break
 			}
 		}

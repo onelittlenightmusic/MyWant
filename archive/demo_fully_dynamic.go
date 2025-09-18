@@ -8,19 +8,19 @@ import (
 func main() {
 	fmt.Println("🚀 Fully Dynamic Chain Configuration Demo")
 	fmt.Println("=========================================")
-	
+
 	// Create an empty dynamic chain builder
 	builder := NewDynamicChainBuilder()
 	RegisterQNetNodeTypes(builder)
-	
+
 	fmt.Println("📊 Starting with completely empty chain")
-	
+
 	// Start execution mode without any predefined nodes
 	builder.ExecuteDynamic()
-	
+
 	// Wait a moment to ensure execution mode is active
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Step 1: Add a patient generator node (no dependencies)
 	fmt.Println("\n🔧 Step 1: Adding patient generator node...")
 	generatorNode := Node{
@@ -40,17 +40,17 @@ func main() {
 			},
 		},
 	}
-	
+
 	err := builder.AddNode(generatorNode)
 	if err != nil {
 		fmt.Printf("❌ Failed to add generator: %v\n", err)
 		return
 	}
 	fmt.Println("✅ Generator added successfully!")
-	
+
 	// Wait for generator to start producing
 	time.Sleep(500 * time.Millisecond)
-	
+
 	// Step 2: Add a processing queue
 	fmt.Println("\n🔧 Step 2: Adding processing queue...")
 	queueNode := Node{
@@ -58,7 +58,7 @@ func main() {
 			Name: "processor-queue",
 			Type: "queue",
 			Labels: map[string]string{
-				"role": "processor",
+				"role":  "processor",
 				"stage": "primary",
 			},
 		},
@@ -71,17 +71,17 @@ func main() {
 			},
 		},
 	}
-	
+
 	err = builder.AddNode(queueNode)
 	if err != nil {
 		fmt.Printf("❌ Failed to add queue: %v\n", err)
 		return
 	}
 	fmt.Println("✅ Processing queue added successfully!")
-	
+
 	// Wait for processing to occur
 	time.Sleep(1 * time.Second)
-	
+
 	// Step 3: Add another patient generator for secondary stream
 	fmt.Println("\n🔧 Step 3: Adding secondary patient generator...")
 	secondGenerator := Node{
@@ -101,14 +101,14 @@ func main() {
 			},
 		},
 	}
-	
+
 	err = builder.AddNode(secondGenerator)
 	if err != nil {
 		fmt.Printf("❌ Failed to add secondary generator: %v\n", err)
 		return
 	}
 	fmt.Println("✅ Secondary generator added successfully!")
-	
+
 	// Step 4: Add a combiner to merge both streams
 	fmt.Println("\n🔧 Step 4: Adding stream combiner...")
 	combinerNode := Node{
@@ -116,7 +116,7 @@ func main() {
 			Name: "stream-combiner",
 			Type: "combiner",
 			Labels: map[string]string{
-				"role": "aggregator",
+				"role":      "aggregator",
 				"operation": "merge",
 			},
 		},
@@ -130,14 +130,14 @@ func main() {
 			},
 		},
 	}
-	
+
 	err = builder.AddNode(combinerNode)
 	if err != nil {
 		fmt.Printf("❌ Failed to add combiner: %v\n", err)
 		return
 	}
 	fmt.Println("✅ Stream combiner added successfully!")
-	
+
 	// Step 5: Add final sink
 	fmt.Println("\n🔧 Step 5: Adding final sink...")
 	sinkNode := Node{
@@ -156,18 +156,18 @@ func main() {
 			},
 		},
 	}
-	
+
 	err = builder.AddNode(sinkNode)
 	if err != nil {
 		fmt.Printf("❌ Failed to add sink: %v\n", err)
 		return
 	}
 	fmt.Println("✅ Final sink added successfully!")
-	
+
 	// Step 6: Let the dynamically built chain run
 	fmt.Println("\n⏱️  Letting the dynamically built chain complete...")
 	time.Sleep(3 * time.Second)
-	
+
 	// Step 7: Show intermediate state
 	fmt.Println("\n📊 Intermediate Node States:")
 	states := builder.GetAllNodeStates()
@@ -175,11 +175,11 @@ func main() {
 		fmt.Printf("  • %s: %s (processed: %d)\n",
 			name, state.GetStatus(), state.Stats.TotalProcessed)
 	}
-	
+
 	// Step 8: Wait for full completion
 	fmt.Println("\n🏁 Waiting for chain completion...")
 	builder.WaitForCompletion()
-	
+
 	// Step 9: Show final state
 	fmt.Println("\n📈 Final Node States:")
 	finalStates := builder.GetAllNodeStates()
@@ -187,7 +187,7 @@ func main() {
 		fmt.Printf("  • %s: %s (processed: %d)\n",
 			name, state.GetStatus(), state.Stats.TotalProcessed)
 	}
-	
+
 	fmt.Printf("\n🎉 Fully dynamic chain configuration completed!\n")
 	fmt.Printf("📊 Total nodes dynamically added: %d\n", len(finalStates))
 	fmt.Println("✨ Chain built entirely through dynamic node additions!")

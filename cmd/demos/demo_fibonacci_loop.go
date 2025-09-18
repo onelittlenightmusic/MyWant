@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
@@ -15,13 +15,13 @@ func main() {
 	fmt.Println("• Merger: Creates feedback loop combining seeds + computed values")
 	fmt.Println("• Sink: Collects and displays the complete sequence")
 	fmt.Println("")
-	
+
 	// Get YAML file from command line argument
 	yamlFile := "config/config-fibonacci-loop.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-	
+
 	// Load YAML configuration
 	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
@@ -34,17 +34,17 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register fibonacci loop node types
 	RegisterFibonacciLoopWantTypes(builder)
-	
+
 	fmt.Println("🚀 Executing fibonacci loop with reconcile system...")
 	fmt.Println("")
 	builder.Execute()
-	
+
 	fmt.Println("📊 Final Execution State:")
 	fmt.Printf("  Fibonacci loop processing completed")
-	
+
 	fmt.Println("")
 	fmt.Println("✅ Fibonacci loop execution completed successfully!")
 	fmt.Println("🔄 The feedback loop architecture successfully generated the sequence!")

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 	. "mywant/src"
+	"os"
 )
 
 func main() {
@@ -12,13 +12,13 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("travel wants from the travel-itinerary recipe at runtime.")
 	fmt.Println()
-	
+
 	// Get YAML file from command line argument or use default
 	yamlFile := "config/config-travel-target.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-	
+
 	// Load YAML configuration with target want
 	config, err := LoadConfigFromYAML(yamlFile)
 	if err != nil {
@@ -27,7 +27,7 @@ func main() {
 	}
 
 	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config.Wants))
-	
+
 	// Show target want details
 	for _, want := range config.Wants {
 		if want.Metadata.Type == "target" {
@@ -39,13 +39,13 @@ func main() {
 
 	// Create chain builder
 	builder := NewChainBuilder(config)
-	
+
 	// Register travel want types first
 	RegisterTravelWantTypes(builder)
-	
+
 	// Register owner-based want types (includes target and child wants)
 	RegisterOwnerWantTypes(builder)
-	
+
 	fmt.Println("\n🚀 Executing travel target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")
 	fmt.Println("1. Load the travel-itinerary recipe")
@@ -54,12 +54,12 @@ func main() {
 	fmt.Println("4. Wait for all children to complete")
 	fmt.Println("5. Compute aggregate results")
 	fmt.Println()
-	
+
 	// Memory dump will be automatically created as memory-*.yaml by the system
-	
+
 	// Execute using existing reconcile loop system
 	builder.Execute()
-	
+
 	fmt.Println("\n📊 Final Want States:")
 	states := builder.GetAllWantStates()
 	for name, state := range states {
@@ -71,10 +71,10 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("  %s: %s (processed: %d)\n", 
+		fmt.Printf("  %s: %s (processed: %d)\n",
 			name, state.Status, processed)
 	}
-	
+
 	// Show target results
 	fmt.Println("\n🎯 Target Want Results:")
 	for name, state := range states {
@@ -91,7 +91,7 @@ func main() {
 			}
 		}
 	}
-	
+
 	// Memory snapshot is automatically saved to memory/memory-TIMESTAMP.yaml
 	fmt.Println("✅ Travel target-based dynamic recipe execution completed successfully!")
 }

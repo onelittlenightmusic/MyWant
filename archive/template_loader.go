@@ -1,15 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
-	"text/template"
-	"bytes"
 	"strconv"
-	"gopkg.in/yaml.v3"
+	"text/template"
 )
-
 
 // TemplateParameter defines a configurable parameter for templates
 type TemplateParameter struct {
@@ -27,8 +26,8 @@ type WantTemplate struct {
 		Labels map[string]string `yaml:"labels"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Params map[string]interface{}   `yaml:"params"`
-		Using []map[string]string      `yaml:"using,omitempty"`
+		Params map[string]interface{} `yaml:"params"`
+		Using  []map[string]string    `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
@@ -36,11 +35,11 @@ type WantTemplate struct {
 
 // DRYWantSpec defines minimal want specification in DRY format
 type DRYWantSpec struct {
-	Name   string                    `yaml:"name"`
-	Type   string                    `yaml:"type"`
-	Labels map[string]string         `yaml:"labels,omitempty"`
-	Params map[string]interface{}    `yaml:"params,omitempty"`
-	Using []map[string]string       `yaml:"using,omitempty"`
+	Name   string                 `yaml:"name"`
+	Type   string                 `yaml:"type"`
+	Labels map[string]string      `yaml:"labels,omitempty"`
+	Params map[string]interface{} `yaml:"params,omitempty"`
+	Using  []map[string]string    `yaml:"using,omitempty"`
 	// Store type tag information separately
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
@@ -63,22 +62,22 @@ type TemplateResult struct {
 
 // ChildTemplate defines a complete template for creating child wants
 type ChildTemplate struct {
-	Description string              `yaml:"description"`
-	
+	Description string `yaml:"description"`
+
 	// Legacy parameter format support
-	Parameters  []TemplateParameter `yaml:"parameters,omitempty"`
-	
+	Parameters []TemplateParameter `yaml:"parameters,omitempty"`
+
 	// New minimized parameter format support
-	Params      map[string]interface{} `yaml:"params,omitempty"`
-	
-	Result      *TemplateResult     `yaml:"result,omitempty"` // Optional result fetching configuration
-	
+	Params map[string]interface{} `yaml:"params,omitempty"`
+
+	Result *TemplateResult `yaml:"result,omitempty"` // Optional result fetching configuration
+
 	// Legacy format support
-	Children    []WantTemplate      `yaml:"children,omitempty"`
-	
-	// New DRY format support  
-	Defaults    *DRYTemplateDefaults `yaml:"defaults,omitempty"`
-	Wants       []DRYWantSpec        `yaml:"wants,omitempty"`
+	Children []WantTemplate `yaml:"children,omitempty"`
+
+	// New DRY format support
+	Defaults *DRYTemplateDefaults `yaml:"defaults,omitempty"`
+	Wants    []DRYWantSpec        `yaml:"wants,omitempty"`
 }
 
 // TemplateConfig holds all available templates
@@ -115,20 +114,20 @@ func (tl *TemplateLoader) LoadTemplates() error {
 		if err != nil {
 			return err
 		}
-		
+
 		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
 			fmt.Printf("[TEMPLATE] Loading template file: %s\n", path)
 			return tl.loadTemplateFile(path)
 		}
 		return nil
 	})
-	
+
 	// Show final template count
 	fmt.Printf("[TEMPLATE] Total templates loaded: %d\n", len(tl.templates))
 	for name := range tl.templates {
 		fmt.Printf("[TEMPLATE] Available template: %s\n", name)
 	}
-	
+
 	return err
 }
 
@@ -154,7 +153,7 @@ func (tl *TemplateLoader) loadTemplateFile(filename string) error {
 	for name, template := range config.Templates {
 		tl.templates[name] = template
 		fmt.Printf("[TEMPLATE] Loaded template: %s\n", name)
-		
+
 		// Debug: Show first child template params
 		if len(template.Children) > 0 {
 			fmt.Printf("[TEMPLATE-PARAMS] First child params: %+v\n", template.Children[0].Spec.Params)
@@ -169,13 +168,13 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 	// First extract type hints from the YAML structure
 	typeHints := make(map[string]map[string]string) // template_name -> param_name -> type_tag
 	tl.extractTypeHints(rootNode, typeHints)
-	
+
 	// Decode to TemplateConfig struct (this loses type tags but gets the structure)
 	var config TemplateConfig
 	if err := rootNode.Decode(&config); err != nil {
 		return TemplateConfig{}, err
 	}
-	
+
 	// Apply the extracted type hints to both legacy and DRY templates
 	for templateName, template := range config.Templates {
 		// Handle legacy Children templates
@@ -183,7 +182,7 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 			if config.Templates[templateName].Children[i].TypeHints == nil {
 				config.Templates[templateName].Children[i].TypeHints = make(map[string]string)
 			}
-			
+
 			// Copy global type hints (we use global for simplicity)
 			if globalHints, exists := typeHints["global"]; exists {
 				for paramName, typeTag := range globalHints {
@@ -191,13 +190,13 @@ func (tl *TemplateLoader) parseTemplateConfigWithTypeTags(rootNode *yaml.Node) (
 				}
 			}
 		}
-		
+
 		// Handle DRY Wants templates
 		for i := range template.Wants {
 			if config.Templates[templateName].Wants[i].TypeHints == nil {
 				config.Templates[templateName].Wants[i].TypeHints = make(map[string]string)
 			}
-			
+
 			// Copy global type hints (we use global for simplicity)
 			if globalHints, exists := typeHints["global"]; exists {
 				for paramName, typeTag := range globalHints {
@@ -222,7 +221,7 @@ func (tl *TemplateLoader) extractTypeHints(node *yaml.Node, typeHints map[string
 		for i := 0; i < len(node.Content); i += 2 {
 			key := node.Content[i]
 			value := node.Content[i+1]
-			
+
 			// Look for parameter wants with type tags
 			if key.Value == "params" && value.Kind == yaml.MappingNode {
 				tl.extractParamTypeHints(value, typeHints)
@@ -242,7 +241,7 @@ func (tl *TemplateLoader) extractParamTypeHints(paramsNode *yaml.Node, typeHints
 	for i := 0; i < len(paramsNode.Content); i += 2 {
 		paramName := paramsNode.Content[i].Value
 		paramValue := paramsNode.Content[i+1]
-		
+
 		// Check if this parameter has a type tag
 		if paramValue.Tag != "" && (paramValue.Tag == "!int" || paramValue.Tag == "!float" || paramValue.Tag == "!bool") {
 			fmt.Printf("[TYPE-HINT] Found %s with type %s\n", paramName, paramValue.Tag)
@@ -293,7 +292,7 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Using []map[string]string    `yaml:"using,omitempty"`
+					Using  []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"count": "{{.count}}",
@@ -317,7 +316,7 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Using []map[string]string    `yaml:"using,omitempty"`
+					Using  []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"service_time": "{{.service_time}}",
@@ -342,7 +341,7 @@ func (tl *TemplateLoader) loadDefaultTemplates() error {
 				},
 				Spec: struct {
 					Params map[string]interface{} `yaml:"params"`
-					Using []map[string]string    `yaml:"using,omitempty"`
+					Using  []map[string]string    `yaml:"using,omitempty"`
 				}{
 					Params: map[string]interface{}{
 						"display_format": "Number: %d",
@@ -409,7 +408,7 @@ func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName st
 	}
 
 	var wants []Want
-	
+
 	// Check if this is a DRY template (has Wants field) or legacy template (has Children field)
 	if len(childTemplate.Wants) > 0 {
 		// New DRY template format
@@ -438,7 +437,7 @@ func (tl *TemplateLoader) InstantiateTemplate(templateName string, targetName st
 func (tl *TemplateLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYTemplateDefaults, params map[string]interface{}, targetName string) (Want, error) {
 	// Merge defaults with want-specific values to create a complete WantTemplate
 	mergedTemplate := tl.mergeDRYDefaults(dryWant, defaults, targetName)
-	
+
 	// Now use the existing instantiation logic
 	return tl.instantiateWantFromTemplate(mergedTemplate, params, targetName)
 }
@@ -452,57 +451,57 @@ func (tl *TemplateLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYTem
 			Type   string            `yaml:"type"`
 			Labels map[string]string `yaml:"labels"`
 		}{
-			Name: dryWant.Name,
-			Type: dryWant.Type,
+			Name:   dryWant.Name,
+			Type:   dryWant.Type,
 			Labels: make(map[string]string),
 		},
 		Spec: struct {
-			Params map[string]interface{}   `yaml:"params"`
-			Using []map[string]string      `yaml:"using,omitempty"`
+			Params map[string]interface{} `yaml:"params"`
+			Using  []map[string]string    `yaml:"using,omitempty"`
 		}{
 			Params: make(map[string]interface{}),
-			Using: dryWant.Using, // Copy using directly
+			Using:  dryWant.Using, // Copy using directly
 		},
 		TypeHints: make(map[string]string),
 	}
-	
+
 	// Merge default labels first, then override with node-specific labels
 	if defaults != nil && defaults.Metadata.Labels != nil {
 		for key, value := range defaults.Metadata.Labels {
 			wantTemplate.Metadata.Labels[key] = value
 		}
 	}
-	
+
 	// Override with node-specific labels
 	if dryWant.Labels != nil {
 		for key, value := range dryWant.Labels {
 			wantTemplate.Metadata.Labels[key] = value
 		}
 	}
-	
+
 	// Merge default params first, then override with node-specific params
 	if defaults != nil && defaults.Spec.Params != nil {
 		for key, value := range defaults.Spec.Params {
 			wantTemplate.Spec.Params[key] = value
 		}
 	}
-	
+
 	// Override with node-specific params
 	if dryWant.Params != nil {
 		for key, value := range dryWant.Params {
 			wantTemplate.Spec.Params[key] = value
 		}
 	}
-	
+
 	// Copy type hints from DRY node
 	if dryWant.TypeHints != nil {
 		for key, value := range dryWant.TypeHints {
 			wantTemplate.TypeHints[key] = value
 		}
 	}
-	
+
 	fmt.Printf("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantTemplate.Spec.Params)
-	
+
 	return wantTemplate
 }
 
@@ -513,7 +512,7 @@ func (tl *TemplateLoader) instantiateWantFromTemplate(wantTemplate WantTemplate,
 	if err != nil {
 		return Want{}, fmt.Errorf("failed to marshal want template: %w", err)
 	}
-	
+
 	fmt.Printf("[TEMPLATE-DEBUG] Raw template YAML:\n%s\n", string(templateBytes))
 
 	// Apply template parameters using Go text/template
@@ -551,7 +550,7 @@ func (tl *TemplateLoader) instantiateWantFromTemplate(wantTemplate WantTemplate,
 		},
 		Spec: WantSpec{
 			Params: instantiatedTemplate.Spec.Params, // Now contains properly typed values!
-			Using: instantiatedTemplate.Spec.Using,
+			Using:  instantiatedTemplate.Spec.Using,
 		},
 		Stats:  WantStats{},
 		Status: WantStatusIdle,
@@ -622,7 +621,7 @@ func (tl *TemplateLoader) processYAMLNodeForTypes(node *yaml.Node) error {
 		// Process key-value pairs
 		for i := 0; i < len(node.Content); i += 2 {
 			value := node.Content[i+1]
-			
+
 			// Process the value node (which may have type tags)
 			if err := tl.processYAMLNodeForTypes(value); err != nil {
 				return err
@@ -690,7 +689,7 @@ func (tl *TemplateLoader) GetTemplateResult(templateName string, targetName stri
 	var targetWant *Want
 	for i := range wants {
 		want := &wants[i]
-		
+
 		// Check if this want matches the result configuration
 		if tl.matchesResultWant(want, childTemplate.Result.Want, targetName) {
 			targetWant = want
@@ -713,30 +712,30 @@ func (tl *TemplateLoader) matchesResultWant(want *Want, wantSelector string, tar
 	if err != nil {
 		return false
 	}
-	
+
 	params := map[string]interface{}{
 		"targetName": targetName,
 	}
-	
+
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, params); err != nil {
 		return false
 	}
-	
+
 	resolvedSelector := buf.String()
-	
+
 	// Check if it matches the want name exactly
 	if want.Metadata.Name == resolvedSelector {
 		return true
 	}
-	
+
 	// Check if it matches based on labels (category, role, etc.)
 	for key, value := range want.Metadata.Labels {
 		if key == resolvedSelector || value == resolvedSelector {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
