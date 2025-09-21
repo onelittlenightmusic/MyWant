@@ -11,6 +11,8 @@ interface WantGridProps {
   onViewWant: (want: Want) => void;
   onEditWant: (want: Want) => void;
   onDeleteWant: (want: Want) => void;
+  onSuspendWant?: (want: Want) => void;
+  onResumeWant?: (want: Want) => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -20,7 +22,9 @@ export const WantGrid: React.FC<WantGridProps> = ({
   statusFilters,
   onViewWant,
   onEditWant,
-  onDeleteWant
+  onDeleteWant,
+  onSuspendWant,
+  onResumeWant
 }) => {
   const filteredWants = useMemo(() => {
     return wants.filter(want => {
@@ -126,6 +130,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
           onView={onViewWant}
           onEdit={onEditWant}
           onDelete={onDeleteWant}
+          onSuspend={onSuspendWant}
+          onResume={onResumeWant}
         />
       ))}
     </div>

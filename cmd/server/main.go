@@ -73,6 +73,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/status", s.getWantStatus).Methods("GET")
 	wants.HandleFunc("/{id}/results", s.getWantResults).Methods("GET")
+	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
+	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 
 	// Agents CRUD endpoints
 	agents := api.PathPrefix("/agents").Subrouter()
@@ -320,6 +322,13 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
 		"id":     want.ID,
 		"status": want.Status,
+	}
+
+	// Add suspension state if builder exists
+	if want.Builder != nil {
+		status["suspended"] = want.Builder.IsSuspended()
+	} else {
+		status["suspended"] = false
 	}
 
 	json.NewEncoder(w).Encode(status)
@@ -658,6 +667,98 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(response)
 }
 
+// suspendWant handles POST /api/v1/wants/{id}/suspend - suspends want execution
+func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract want ID from URL path
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Find the want execution
+	execution, exists := s.wants[wantID]
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
+		})
+		return
+	}
+
+	// Check if builder exists
+	if execution.Builder == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Want execution has no active builder to suspend",
+		})
+		return
+	}
+
+	// Suspend the execution
+	if err := execution.Builder.Suspend(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
+		})
+		return
+	}
+
+	// Return success response
+	response := map[string]interface{}{
+		"message":   "Want execution suspended successfully",
+		"wantId":    wantID,
+		"suspended": true,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// resumeWant handles POST /api/v1/wants/{id}/resume - resumes want execution
+func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract want ID from URL path
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Find the want execution
+	execution, exists := s.wants[wantID]
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
+		})
+		return
+	}
+
+	// Check if builder exists
+	if execution.Builder == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Want execution has no active builder to resume",
+		})
+		return
+	}
+
+	// Resume the execution
+	if err := execution.Builder.Resume(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Failed to resume want execution: %v", err),
+		})
+		return
+	}
+
+	// Return success response
+	response := map[string]interface{}{
+		"message":   "Want execution resumed successfully",
+		"wantId":    wantID,
+		"suspended": false,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.setupRoutes()
@@ -673,6 +774,8 @@ func (s *Server) Start() error {
 	fmt.Printf("  DELETE /api/v1/wants/{id}          - Delete want\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/status     - Get execution status\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
+	fmt.Printf("  POST /api/v1/wants/{id}/suspend    - Suspend want execution\n")
+	fmt.Printf("  POST /api/v1/wants/{id}/resume     - Resume want execution\n")
 	fmt.Printf("  POST /api/v1/agents                - Create agent\n")
 	fmt.Printf("  GET  /api/v1/agents                - List agents\n")
 	fmt.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")

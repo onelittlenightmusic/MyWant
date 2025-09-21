@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Play, Square, MoreHorizontal } from 'lucide-react';
+import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -9,6 +9,8 @@ interface WantCardProps {
   onView: (want: Want) => void;
   onEdit: (want: Want) => void;
   onDelete: (want: Want) => void;
+  onSuspend?: (want: Want) => void;
+  onResume?: (want: Want) => void;
   className?: string;
 }
 
@@ -17,6 +19,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   onView,
   onEdit,
   onDelete,
+  onSuspend,
+  onResume,
   className
 }) => {
   const wantName = want.metadata?.name || want.metadata?.id || 'Unnamed Want';
@@ -27,7 +31,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   const completedAt = want.stats?.completed_at;
 
   const isRunning = want.status === 'running';
+  const isSuspended = want.suspended === true;
   const canControl = want.status === 'running' || want.status === 'stopped';
+  const canSuspendResume = isRunning && (onSuspend || onResume);
 
   return (
     <div className={classNames(
@@ -77,6 +83,28 @@ export const WantCard: React.FC<WantCardProps> = ({
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
+                  </button>
+                )}
+
+                {canSuspendResume && !isSuspended && onSuspend && (
+                  <button
+                    onClick={() => onSuspend(want)}
+                    className="flex items-center w-full px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
+                    title="Suspend execution"
+                  >
+                    <Pause className="h-4 w-4 mr-2" />
+                    Suspend
+                  </button>
+                )}
+
+                {canSuspendResume && isSuspended && onResume && (
+                  <button
+                    onClick={() => onResume(want)}
+                    className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                    title="Resume execution"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Resume
                   </button>
                 )}
 
@@ -170,12 +198,27 @@ export const WantCard: React.FC<WantCardProps> = ({
       {isRunning && (
         <div className="mt-4">
           <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-            <span>Running...</span>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span>{isSuspended ? 'Suspended' : 'Running...'}</span>
+            <div className={classNames(
+              'w-2 h-2 rounded-full',
+              isSuspended ? 'bg-orange-500' : 'bg-blue-500 animate-pulse'
+            )} />
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1">
-            <div className="bg-blue-500 h-1 rounded-full animate-pulse-slow" style={{ width: '70%' }} />
+            <div
+              className={classNames(
+                'h-1 rounded-full',
+                isSuspended ? 'bg-orange-500' : 'bg-blue-500 animate-pulse-slow'
+              )}
+              style={{ width: isSuspended ? '50%' : '70%' }}
+            />
           </div>
+          {isSuspended && (
+            <div className="flex items-center mt-2 text-xs text-orange-600">
+              <Pause className="h-3 w-3 mr-1" />
+              Execution paused
+            </div>
+          )}
         </div>
       )}
 

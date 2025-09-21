@@ -643,6 +643,13 @@ type ChainBuilder struct {
 	// Recipe result processing
 	recipeResult *RecipeResult // Recipe result definition (if available)
 	recipePath   string        // Path to recipe file (if loaded from recipe)
+
+	// Suspend/Resume control
+	suspended    bool         // Current suspension state
+	suspendChan  chan bool    // Channel to signal suspension
+	resumeChan   chan bool    // Channel to signal resume
+	controlMutex sync.RWMutex // Protect suspension state access
+	controlStop  chan bool    // Stop signal for control loop
 }
 
 // runtimeWant holds the runtime state of a want
@@ -687,6 +694,11 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		channels:       make(map[string]chain.Chan),
 		running:        false,
 		waitGroup:      &sync.WaitGroup{},
+		// Initialize suspend/resume control
+		suspended:   false,
+		suspendChan: make(chan bool),
+		resumeChan:  make(chan bool),
+		controlStop: make(chan bool),
 	}
 
 	// Register built-in want types
@@ -1782,6 +1794,9 @@ func (cb *ChainBuilder) Execute() {
 	cb.running = true
 	cb.reconcileMutex.Unlock()
 
+	// Start suspension control loop
+	cb.startControlLoop()
+
 	// Start reconcile loop in background - it will handle initial want creation
 	go cb.reconcileLoop()
 
@@ -1807,6 +1822,9 @@ func (cb *ChainBuilder) Execute() {
 
 	// Stop reconcile loop
 	cb.reconcileStop <- true
+
+	// Stop suspension control loop
+	cb.controlStop <- true
 
 	// Mark as not running
 	cb.reconcileMutex.Lock()
@@ -2523,4 +2541,101 @@ func (n *Want) GetStagedChanges() map[string]interface{} {
 		staged[k] = v
 	}
 	return staged
+}
+
+// ==============================
+// Suspend/Resume Control Methods
+// ==============================
+
+// Suspend pauses the execution of all wants
+func (cb *ChainBuilder) Suspend() error {
+	cb.controlMutex.Lock()
+	defer cb.controlMutex.Unlock()
+
+	if cb.suspended {
+		return nil // Already suspended
+	}
+
+	cb.suspended = true
+
+	// Signal suspension to control loop
+	select {
+	case cb.suspendChan <- true:
+		fmt.Println("[SUSPEND] Chain execution suspended")
+		return nil
+	default:
+		// Control loop not running, just mark as suspended
+		fmt.Println("[SUSPEND] Chain marked as suspended (control loop not active)")
+		return nil
+	}
+}
+
+// Resume resumes the execution of all wants
+func (cb *ChainBuilder) Resume() error {
+	cb.controlMutex.Lock()
+	defer cb.controlMutex.Unlock()
+
+	if !cb.suspended {
+		return nil // Not suspended
+	}
+
+	cb.suspended = false
+
+	// Signal resume to control loop
+	select {
+	case cb.resumeChan <- true:
+		fmt.Println("[RESUME] Chain execution resumed")
+		return nil
+	default:
+		// Control loop not running, just mark as resumed
+		fmt.Println("[RESUME] Chain marked as resumed (control loop not active)")
+		return nil
+	}
+}
+
+// IsSuspended returns the current suspension state
+func (cb *ChainBuilder) IsSuspended() bool {
+	cb.controlMutex.RLock()
+	defer cb.controlMutex.RUnlock()
+	return cb.suspended
+}
+
+// checkSuspension blocks execution if suspended until resumed
+func (cb *ChainBuilder) checkSuspension() {
+	cb.controlMutex.RLock()
+	suspended := cb.suspended
+	cb.controlMutex.RUnlock()
+
+	if suspended {
+		fmt.Println("[SUSPEND] Want execution paused, waiting for resume...")
+		// Block until resumed
+		<-cb.resumeChan
+		fmt.Println("[RESUME] Want execution continuing...")
+	}
+}
+
+// controlLoop handles suspend/resume signals in a separate goroutine
+func (cb *ChainBuilder) controlLoop() {
+	fmt.Println("[CONTROL] Starting suspension control loop")
+
+	for {
+		select {
+		case <-cb.suspendChan:
+			fmt.Println("[CONTROL] Processing suspend signal")
+			// Suspend signal processed by Suspend() method
+
+		case <-cb.resumeChan:
+			fmt.Println("[CONTROL] Processing resume signal")
+			// Resume signal processed by Resume() method
+
+		case <-cb.controlStop:
+			fmt.Println("[CONTROL] Stopping suspension control loop")
+			return
+		}
+	}
+}
+
+// startControlLoop starts the suspension control loop if not already running
+func (cb *ChainBuilder) startControlLoop() {
+	go cb.controlLoop()
 }

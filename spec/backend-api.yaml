@@ -1,0 +1,818 @@
+openapi: 3.0.3
+info:
+  title: MyWant Backend API
+  description: |
+    REST API for MyWant backend server providing CRUD operations for wants, agents, and capabilities.
+
+    This API allows you to:
+    - Create, read, update, and delete want configurations
+    - Execute want chains and monitor their status
+    - Manage agents and their capabilities
+    - Create and query capability definitions
+
+    The API integrates with the existing MyWant agent system and supports both
+    direct want definitions and recipe-based configurations.
+  version: 1.0.0
+  contact:
+    name: MyWant Project
+    url: https://github.com/onelittlenightmusic/MyWant
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://localhost:8080/api/v1
+    description: API v1 base path
+
+paths:
+  # Health Check
+  /health:
+    get:
+      summary: Health check
+      description: Check if the server is running and healthy
+      operationId: healthCheck
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  # Want Management
+  /api/v1/wants:
+    post:
+      summary: Create want configuration
+      description: Create a new want configuration from YAML or JSON
+      operationId: createWant
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWantRequest'
+          application/yaml:
+            schema:
+              type: string
+              description: Raw YAML configuration
+      responses:
+        '201':
+          description: Want created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantExecution'
+        '400':
+          description: Invalid request or YAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List all wants
+      description: Get all wants in memory dump format (same as memory reconciliation files)
+      operationId: listWants
+      tags:
+        - Wants
+      responses:
+        '200':
+          description: All wants in memory dump format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantMemoryDump'
+
+  /api/v1/wants/{id}:
+    get:
+      summary: Get want details
+      description: Get current runtime state and details of a specific want execution
+      operationId: getWant
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      responses:
+        '200':
+          description: Want details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantExecutionDetail'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update want configuration
+      description: Update a want configuration (only if not currently running)
+      operationId: updateWant
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWantRequest'
+          application/yaml:
+            schema:
+              type: string
+              description: Raw YAML configuration
+      responses:
+        '200':
+          description: Want updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantExecution'
+        '400':
+          description: Invalid request or YAML configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot update running want
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete want
+      description: Delete a want execution (only if not currently running)
+      operationId: deleteWant
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      responses:
+        '204':
+          description: Want deleted successfully
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete running want
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/wants/{id}/status:
+    get:
+      summary: Get want execution status
+      description: Get the current execution status of a want
+      operationId: getWantStatus
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      responses:
+        '200':
+          description: Want status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantStatusResponse'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/wants/{id}/results:
+    get:
+      summary: Get want execution results
+      description: Get the execution results and outputs of a want
+      operationId: getWantResults
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      responses:
+        '200':
+          description: Want execution results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WantResultsResponse'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Agent Management
+  /api/v1/agents:
+    post:
+      summary: Create agent
+      description: Create a new agent with specified capabilities
+      operationId: createAgent
+      tags:
+        - Agents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentRequest'
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+        '400':
+          description: Invalid agent configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List all agents
+      description: Get a list of all registered agents
+      operationId: listAgents
+      tags:
+        - Agents
+      responses:
+        '200':
+          description: List of agents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentListResponse'
+
+  /api/v1/agents/{name}:
+    get:
+      summary: Get agent details
+      description: Get details of a specific agent by name
+      operationId: getAgent
+      tags:
+        - Agents
+      parameters:
+        - $ref: '#/components/parameters/AgentName'
+      responses:
+        '200':
+          description: Agent details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResponse'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete agent
+      description: Remove an agent from the registry
+      operationId: deleteAgent
+      tags:
+        - Agents
+      parameters:
+        - $ref: '#/components/parameters/AgentName'
+      responses:
+        '200':
+          description: Agent deletion status (may require registry enhancement)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Capability Management
+  /api/v1/capabilities:
+    post:
+      summary: Create capability
+      description: Create a new capability definition
+      operationId: createCapability
+      tags:
+        - Capabilities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCapabilityRequest'
+      responses:
+        '201':
+          description: Capability created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityResponse'
+        '400':
+          description: Invalid capability configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List all capabilities
+      description: Get a list of all registered capabilities
+      operationId: listCapabilities
+      tags:
+        - Capabilities
+      responses:
+        '200':
+          description: List of capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityListResponse'
+
+  /api/v1/capabilities/{name}:
+    get:
+      summary: Get capability details
+      description: Get details of a specific capability by name
+      operationId: getCapability
+      tags:
+        - Capabilities
+      parameters:
+        - $ref: '#/components/parameters/CapabilityName'
+      responses:
+        '200':
+          description: Capability details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityResponse'
+        '404':
+          description: Capability not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete capability
+      description: Remove a capability from the registry
+      operationId: deleteCapability
+      tags:
+        - Capabilities
+      parameters:
+        - $ref: '#/components/parameters/CapabilityName'
+      responses:
+        '200':
+          description: Capability deletion status (may require registry enhancement)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '404':
+          description: Capability not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/capabilities/{name}/agents:
+    get:
+      summary: Find agents by capability
+      description: Get all agents that provide a specific capability
+      operationId: findAgentsByCapability
+      tags:
+        - Capabilities
+      parameters:
+        - $ref: '#/components/parameters/CapabilityName'
+      responses:
+        '200':
+          description: Agents providing the capability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityAgentsResponse'
+
+components:
+  parameters:
+    WantId:
+      name: id
+      in: path
+      required: true
+      description: Unique identifier for the want execution
+      schema:
+        type: string
+        example: "want-abc123-1234"
+
+    AgentName:
+      name: name
+      in: path
+      required: true
+      description: Unique name of the agent
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+        example: "test_agent"
+
+    CapabilityName:
+      name: name
+      in: path
+      required: true
+      description: Unique name of the capability
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+        example: "hotel_agency"
+
+  schemas:
+    # Reference existing schemas from want-spec.yaml
+    Want:
+      description: "Want object from want-spec.yaml"
+      allOf:
+        - type: object
+          description: "Referenced from want-spec.yaml - Individual processing unit configuration"
+          properties:
+            metadata:
+              $ref: '#/components/schemas/Metadata'
+            spec:
+              $ref: '#/components/schemas/WantSpec'
+            stats:
+              $ref: '#/components/schemas/WantStats'
+            status:
+              $ref: '#/components/schemas/WantStatus'
+            state:
+              type: object
+              additionalProperties: true
+
+    Metadata:
+      type: object
+      description: "Want metadata from want-spec.yaml"
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: Unique identifier for this want
+          example: "my-processor"
+        type:
+          type: string
+          description: Want type that determines processing behavior
+          example: "queue"
+        labels:
+          type: object
+          description: Key-value pairs for flexible want connections
+          additionalProperties:
+            type: string
+          example:
+            role: "processor"
+            category: "data-processing"
+
+    WantSpec:
+      type: object
+      description: "Want specification from want-spec.yaml"
+      required:
+        - params
+      properties:
+        params:
+          type: object
+          description: Want-specific parameters
+          additionalProperties: true
+          example:
+            count: 1000
+            rate: 10.0
+        using:
+          type: array
+          description: Label selectors for connecting to other wants
+          items:
+            type: object
+            additionalProperties:
+              type: string
+
+    WantStats:
+      type: object
+      description: "Runtime statistics from want-spec.yaml"
+      additionalProperties: true
+      example:
+        processed_count: 1000
+        processing_rate: 25.5
+
+    WantStatus:
+      type: string
+      description: "Want execution status from want-spec.yaml"
+      enum:
+        - "idle"
+        - "running"
+        - "completed"
+        - "failed"
+      default: "idle"
+
+    # Reference existing schemas from agent-spec.yaml
+    Agent:
+      description: "Agent object from agent-spec.yaml"
+      type: object
+      required:
+        - name
+        - type
+        - capabilities
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "agent_premium"
+        type:
+          type: string
+          enum:
+            - "do"
+            - "monitor"
+          example: "do"
+        capabilities:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          minItems: 1
+          example: ["hotel_agency"]
+        uses:
+          type: array
+          items:
+            type: string
+          example: ["booking_api"]
+
+    Capability:
+      description: "Capability object from agent-spec.yaml"
+      type: object
+      required:
+        - name
+        - gives
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "hotel_agency"
+        gives:
+          type: array
+          items:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          minItems: 1
+          example: ["hotel_reservation"]
+
+    # API Request/Response Schemas
+    CreateWantRequest:
+      type: object
+      properties:
+        yaml:
+          type: string
+          description: YAML configuration for the want
+        name:
+          type: string
+          description: Optional name for the want execution
+      required:
+        - yaml
+
+    WantExecution:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique execution identifier
+          example: "want-abc123-1234"
+        config:
+          $ref: '#/components/schemas/Config'
+        status:
+          type: string
+          enum: ["created", "running", "completed", "failed", "updated"]
+          description: Execution status
+        results:
+          type: object
+          additionalProperties: true
+          description: Execution results
+
+    Config:
+      type: object
+      description: "Configuration object from want-spec.yaml"
+      properties:
+        wants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Want'
+
+    WantMemoryDump:
+      type: object
+      description: "Memory dump format from want-spec.yaml - same format as memory reconciliation files"
+      required:
+        - timestamp
+        - execution_id
+        - wants
+      properties:
+        timestamp:
+          type: string
+          description: "Timestamp of the dump in RFC3339 format"
+          format: date-time
+          example: "2025-09-21T18:35:26+09:00"
+        execution_id:
+          type: string
+          description: "Unique execution identifier"
+          example: "api-dump-1234567890"
+        wants:
+          type: array
+          description: "Array of want states with current runtime information"
+          items:
+            $ref: '#/components/schemas/Want'
+
+    WantExecutionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique execution identifier
+        execution_status:
+          type: string
+          description: Overall execution status
+        wants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Want'
+          description: Current runtime states of all wants
+        results:
+          type: object
+          additionalProperties: true
+
+    WantStatusResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+
+    WantResultsResponse:
+      type: object
+      additionalProperties: true
+      description: Execution results and metrics
+
+    CreateAgentRequest:
+      type: object
+      required:
+        - name
+        - type
+        - capabilities
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9_-]+$'
+          example: "test_agent"
+        type:
+          type: string
+          enum: ["do", "monitor"]
+          example: "do"
+        capabilities:
+          type: array
+          items:
+            type: string
+          example: ["test_capability"]
+        uses:
+          type: array
+          items:
+            type: string
+          example: ["input"]
+
+    AgentResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        uses:
+          type: array
+          items:
+            type: string
+
+    AgentListResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Information about agent listing functionality
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResponse'
+
+    CreateCapabilityRequest:
+      allOf:
+        - $ref: '#/components/schemas/Capability'
+
+    CapabilityResponse:
+      allOf:
+        - $ref: '#/components/schemas/Capability'
+
+    CapabilityListResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Information about capability listing functionality
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityResponse'
+
+    CapabilityAgentsResponse:
+      type: object
+      properties:
+        capability:
+          type: string
+          description: Name of the capability
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResponse'
+          description: Agents that provide this capability
+
+    DeleteResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Deletion status message
+        agent:
+          type: string
+          description: Name of the affected resource (for agent deletion)
+        capability:
+          type: string
+          description: Name of the affected resource (for capability deletion)
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        wants:
+          type: integer
+          description: Number of active want executions
+        version:
+          type: string
+          example: "1.0.0"
+        server:
+          type: string
+          example: "mywant"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+
+tags:
+  - name: Health
+    description: Server health and status
+  - name: Wants
+    description: Want configuration and execution management
+  - name: Agents
+    description: Agent management and registration
+  - name: Capabilities
+    description: Capability definition and querying
+
+externalDocs:
+  description: MyWant Project Documentation
+  url: https://github.com/onelittlenightmusic/MyWant

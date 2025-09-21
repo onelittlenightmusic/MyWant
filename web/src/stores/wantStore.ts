@@ -23,10 +23,12 @@ interface WantStore {
   fetchWantResults: (id: string) => Promise<void>;
   clearError: () => void;
   refreshWant: (id: string) => Promise<void>;
+  suspendWant: (id: string) => Promise<void>;
+  resumeWant: (id: string) => Promise<void>;
 }
 
 export const useWantStore = create<WantStore>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set) => ({
     // Initial state
     wants: [],
     selectedWant: null,
@@ -165,15 +167,15 @@ export const useWantStore = create<WantStore>()(
 
     refreshWant: async (id: string) => {
       try {
-        const [want, details] = await Promise.all([
+        const [want, status] = await Promise.all([
           apiClient.getWant(id),
           apiClient.getWantStatus(id)
         ]);
 
         set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: details.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: details.status } : state.selectedWant,
-          selectedWantDetails: details as WantDetails
+          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: { ...want, suspended: status.suspended }
         }));
       } catch (error) {
         console.error('Failed to refresh want:', error);
@@ -182,6 +184,56 @@ export const useWantStore = create<WantStore>()(
 
     clearError: () => {
       set({ error: null });
+    },
+
+    suspendWant: async (id: string) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.suspendWant(id);
+
+        // Refresh the want status to get updated suspended state
+        const status = await apiClient.getWantStatus(id);
+
+        set(state => ({
+          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: state.selectedWantDetails?.id === id ?
+            { ...state.selectedWantDetails, suspended: status.suspended } :
+            state.selectedWantDetails,
+          loading: false
+        }));
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to suspend want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    resumeWant: async (id: string) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.resumeWant(id);
+
+        // Refresh the want status to get updated suspended state
+        const status = await apiClient.getWantStatus(id);
+
+        set(state => ({
+          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: state.selectedWantDetails?.id === id ?
+            { ...state.selectedWantDetails, suspended: status.suspended } :
+            state.selectedWantDetails,
+          loading: false
+        }));
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to resume want',
+          loading: false
+        });
+        throw error;
+      }
     },
   }))
 );

@@ -21,6 +21,8 @@ export const Dashboard: React.FC = () => {
     error,
     fetchWants,
     deleteWant,
+    suspendWant,
+    resumeWant,
     clearError
   } = useWantStore();
 
@@ -87,6 +89,24 @@ export const Dashboard: React.FC = () => {
       } catch (error) {
         console.error('Failed to delete want:', error);
       }
+    }
+  };
+
+  const handleSuspendWant = async (want: Want) => {
+    if (!want.id) return;
+    try {
+      await suspendWant(want.id);
+    } catch (error) {
+      console.error('Failed to suspend want:', error);
+    }
+  };
+
+  const handleResumeWant = async (want: Want) => {
+    if (!want.id) return;
+    try {
+      await resumeWant(want.id);
+    } catch (error) {
+      console.error('Failed to resume want:', error);
     }
   };
 
@@ -183,6 +203,8 @@ export const Dashboard: React.FC = () => {
               onViewWant={handleViewWant}
               onEditWant={handleEditWant}
               onDeleteWant={setDeleteWantState}
+              onSuspendWant={handleSuspendWant}
+              onResumeWant={handleResumeWant}
             />
           </div>
         </main>

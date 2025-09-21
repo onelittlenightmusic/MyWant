@@ -5,7 +5,8 @@ import {
   WantResults,
   CreateWantRequest,
   UpdateWantRequest,
-  WantExecutionStatus
+  SuspendResumeResponse,
+  WantStatusResponse
 } from '@/types/want';
 import { HealthCheck, ApiError } from '@/types/api';
 
@@ -107,13 +108,24 @@ class MyWantApiClient {
     await this.client.delete(`/api/v1/wants/${id}`);
   }
 
-  async getWantStatus(id: string): Promise<{ status: WantExecutionStatus }> {
-    const response = await this.client.get<{ status: WantExecutionStatus }>(`/api/v1/wants/${id}/status`);
+  async getWantStatus(id: string): Promise<WantStatusResponse> {
+    const response = await this.client.get<WantStatusResponse>(`/api/v1/wants/${id}/status`);
     return response.data;
   }
 
   async getWantResults(id: string): Promise<WantResults> {
     const response = await this.client.get<WantResults>(`/api/v1/wants/${id}/results`);
+    return response.data;
+  }
+
+  // Suspend/Resume operations
+  async suspendWant(id: string): Promise<SuspendResumeResponse> {
+    const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/suspend`);
+    return response.data;
+  }
+
+  async resumeWant(id: string): Promise<SuspendResumeResponse> {
+    const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/resume`);
     return response.data;
   }
 }

@@ -1,4 +1,5 @@
 export interface Want {
+  id?: string; // Want execution ID
   metadata: WantMetadata;
   spec: WantSpec;
   status: WantExecutionStatus;
@@ -6,6 +7,7 @@ export interface Want {
   history?: WantHistory;
   results?: Record<string, unknown>;
   builder?: unknown; // ChainBuilder reference (not serialized)
+  suspended?: boolean; // Suspension state
 }
 
 export interface WantConfig {
@@ -62,6 +64,7 @@ export interface WantDetails {
   execution_status: WantExecutionStatus;
   wants: WantDefinition[];
   results?: Record<string, unknown>;
+  suspended?: boolean;
 }
 
 export interface WantResults {
@@ -91,4 +94,17 @@ export interface CreateWantRequest {
 
 export interface UpdateWantRequest {
   yaml: string;
+}
+
+export interface SuspendResumeResponse {
+  message: string;
+  wantId: string;
+  suspended: boolean;
+  timestamp: string;
+}
+
+export interface WantStatusResponse {
+  id: string;
+  status: WantExecutionStatus;
+  suspended?: boolean;
 }

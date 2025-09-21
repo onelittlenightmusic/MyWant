@@ -1,0 +1,32 @@
+wants:
+  - metadata:
+      name: "slow number generator"
+      type: numbers
+      labels:
+        role: source
+        stream: primary
+    spec:
+      params:
+        count: 10000
+        rate: 1
+
+  - metadata:
+      name: "slow processing queue"
+      type: queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 2.0
+      using:
+        - role: source
+
+  - metadata:
+      name: "slow result collector"
+      type: sink
+      labels:
+        role: terminal
+    spec:
+      params: {}
+      using:
+        - role: processor
