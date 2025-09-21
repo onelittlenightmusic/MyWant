@@ -8,6 +8,7 @@ import { usePolling } from '@/hooks/usePolling';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
+import { WantFilters } from '@/components/dashboard/WantFilters';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsModal } from '@/components/modals/WantDetailsModal';
@@ -112,10 +113,6 @@ export const Dashboard: React.FC = () => {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        selectedStatuses={statusFilters}
-        onStatusFilter={setStatusFilters}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
       />
 
       {/* Main content */}
@@ -167,6 +164,14 @@ export const Dashboard: React.FC = () => {
           <div className="mb-8">
             <StatsOverview wants={wants} loading={loading} />
           </div>
+
+          {/* Filters */}
+          <WantFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedStatuses={statusFilters}
+            onStatusFilter={setStatusFilters}
+          />
 
           {/* Want Grid */}
           <div>

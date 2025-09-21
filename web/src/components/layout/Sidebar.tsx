@@ -1,45 +1,45 @@
 import React from 'react';
-import { Filter, X } from 'lucide-react';
-import { WantExecutionStatus } from '@/types/want';
-import { getStatusColor, classNames } from '@/utils/helpers';
+import { X, Heart, Bot, Settings, BookOpen, ChevronRight } from 'lucide-react';
+import { classNames } from '@/utils/helpers';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedStatuses: WantExecutionStatus[];
-  onStatusFilter: (statuses: WantExecutionStatus[]) => void;
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
 }
 
-const STATUS_OPTIONS: WantExecutionStatus[] = [
-  'created',
-  'running',
-  'completed',
-  'failed',
-  'stopped'
+const MENU_ITEMS = [
+  {
+    id: 'wants',
+    label: 'Wants',
+    icon: Heart,
+    href: '/dashboard',
+    active: true
+  },
+  {
+    id: 'agents',
+    label: 'Agents',
+    icon: Bot,
+    href: '/agents',
+    active: false,
+    disabled: true
+  }
+];
+
+const ADVANCED_ITEMS = [
+  {
+    id: 'recipes',
+    label: 'Recipes',
+    icon: BookOpen,
+    href: '/recipes',
+    active: false,
+    disabled: true
+  }
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  onClose,
-  selectedStatuses,
-  onStatusFilter,
-  searchQuery,
-  onSearchChange
+  onClose
 }) => {
-  const handleStatusToggle = (status: WantExecutionStatus) => {
-    if (selectedStatuses.includes(status)) {
-      onStatusFilter(selectedStatuses.filter(s => s !== status));
-    } else {
-      onStatusFilter([...selectedStatuses, status]);
-    }
-  };
-
-  const clearAllFilters = () => {
-    onStatusFilter([]);
-    onSearchChange('');
-  };
 
   return (
     <>
@@ -57,9 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex flex-col h-full">
-          {/* Header */}
+          {/* Mobile Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 lg:hidden">
-            <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Menu</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600"
@@ -68,76 +68,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
+          {/* Logo/Brand */}
           <div className="hidden lg:block px-4 py-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Filter className="h-5 w-5 mr-2" />
-              Filters
-            </h2>
+            <h1 className="text-xl font-bold text-gray-900">MyWant</h1>
+            <p className="text-sm text-gray-500 mt-1">Chain Programming</p>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 px-4 py-4 space-y-6">
-            {/* Search */}
-            <div>
-              <label className="label">Search</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search wants..."
-                className="input"
-              />
-            </div>
+          {/* Navigation */}
+          <div className="flex-1 px-4 py-6 space-y-8">
+            {/* Main Menu */}
+            <nav className="space-y-2">
+              {MENU_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <a
+                    key={item.id}
+                    href={item.href}
+                    className={classNames(
+                      'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                      {
+                        'bg-primary-100 text-primary-900': item.active,
+                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
+                        'text-gray-400 cursor-not-allowed': item.disabled
+                      }
+                    )}
+                    onClick={(e) => item.disabled && e.preventDefault()}
+                  >
+                    <Icon className="h-5 w-5 mr-3" />
+                    {item.label}
+                    {item.disabled && (
+                      <span className="ml-auto text-xs text-gray-400">Soon</span>
+                    )}
+                  </a>
+                );
+              })}
+            </nav>
 
-            {/* Status Filter */}
+            {/* Advanced Section */}
             <div>
-              <label className="label">Status</label>
-              <div className="space-y-2">
-                {STATUS_OPTIONS.map((status) => {
-                  const color = getStatusColor(status);
-                  const isSelected = selectedStatuses.includes(status);
-
+              <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Advanced
+              </h3>
+              <nav className="space-y-2">
+                {ADVANCED_ITEMS.map((item) => {
+                  const Icon = item.icon;
                   return (
-                    <label
-                      key={status}
-                      className="flex items-center cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleStatusToggle(status)}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700 capitalize">
-                        {status}
-                      </span>
-                      <div className={classNames(
-                        'ml-auto w-3 h-3 rounded-full',
+                    <a
+                      key={item.id}
+                      href={item.href}
+                      className={classNames(
+                        'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         {
-                          'bg-gray-400': color === 'gray',
-                          'bg-blue-400': color === 'blue',
-                          'bg-green-400': color === 'green',
-                          'bg-red-400': color === 'red',
-                          'bg-yellow-400': color === 'yellow'
+                          'bg-primary-100 text-primary-900': item.active,
+                          'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
+                          'text-gray-400 cursor-not-allowed': item.disabled
                         }
-                      )} />
-                    </label>
+                      )}
+                      onClick={(e) => item.disabled && e.preventDefault()}
+                    >
+                      <Icon className="h-5 w-5 mr-3" />
+                      {item.label}
+                      {item.disabled && (
+                        <span className="ml-auto text-xs text-gray-400">Soon</span>
+                      )}
+                    </a>
                   );
                 })}
-              </div>
+              </nav>
             </div>
-
-            {/* Clear Filters */}
-            {(selectedStatuses.length > 0 || searchQuery) && (
-              <div>
-                <button
-                  onClick={clearAllFilters}
-                  className="text-sm text-primary-600 hover:text-primary-800"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
