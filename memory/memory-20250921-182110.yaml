@@ -1,0 +1,91 @@
+timestamp: "2025-09-21T18:21:10+09:00"
+execution_id: exec-20250921-182110
+wants:
+    - metadata:
+        name: number generator
+        type: numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 100
+            rate: 2
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 100
+        current_time: 53.246121593133985
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: number generator
+              state_value:
+                count: 100
+                rate: 2
+              timestamp: 2025-09-21T18:21:10.944957+09:00
+        stateHistory:
+            - want_name: number generator
+              state_value:
+                current_count: 100
+                current_time: 53.246121593133985
+              timestamp: 2025-09-21T18:21:10.945284+09:00
+    - metadata:
+        name: processing queue
+        type: queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0.012421796292782998
+        current_server_free_time: 53.34612159313399
+        last_packet_wait_time: 0
+        processedCount: 100
+        serverFreeTime: 53.34612159313399
+        total_processed: 100
+        total_wait_time: 1.2421796292782998
+        waitTimeSum: 1.2421796292782998
+      history:
+        parameterHistory:
+            - want_name: processing queue
+              state_value:
+                service_time: 0.1
+              timestamp: 2025-09-21T18:21:10.94501+09:00
+        stateHistory:
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.012421796292782998
+                current_server_free_time: 53.34612159313399
+                last_packet_wait_time: 0
+                processedCount: 100
+                serverFreeTime: 53.34612159313399
+                total_processed: 100
+                total_wait_time: 1.2421796292782998
+                waitTimeSum: 1.2421796292782998
+              timestamp: 2025-09-21T18:21:10.945292+09:00
+    - metadata:
+        name: result collector
+        type: sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: result collector
+              state_value: {}
+              timestamp: 2025-09-21T18:21:10.945017+09:00
+        stateHistory: []
