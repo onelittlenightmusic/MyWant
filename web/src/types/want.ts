@@ -1,7 +1,9 @@
 export interface Want {
-  id: string;
-  config: WantConfig;
+  metadata: WantMetadata;
+  spec: WantSpec;
   status: WantExecutionStatus;
+  stats?: WantStats;
+  history?: WantHistory;
   results?: Record<string, unknown>;
   builder?: unknown; // ChainBuilder reference (not serialized)
 }
@@ -19,6 +21,7 @@ export interface WantDefinition {
 }
 
 export interface WantMetadata {
+  id?: string;
   name: string;
   type: string;
   labels?: Record<string, string>;
@@ -70,6 +73,15 @@ export interface WantResults {
     error_count?: number;
   };
   logs?: string[];
+}
+
+export interface WantHistory {
+  parameterHistory?: Array<{
+    wantName: string;
+    stateValue: Record<string, unknown>;
+    timestamp: string;
+  }>;
+  stateHistory?: Array<unknown>;
 }
 
 export interface CreateWantRequest {

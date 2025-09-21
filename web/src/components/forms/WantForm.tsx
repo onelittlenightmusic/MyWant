@@ -144,8 +144,23 @@ export const WantForm: React.FC<WantFormProps> = ({
   useEffect(() => {
     if (editingWant) {
       setIsEditing(true);
-      setYaml(stringifyYaml(editingWant.config));
-      setName(editingWant.config.wants?.[0]?.metadata?.name || editingWant.id);
+      // Convert want structure to YAML config format for editing
+      const configForEdit = {
+        wants: [{
+          metadata: {
+            name: editingWant.metadata?.name,
+            type: editingWant.metadata?.type,
+            labels: editingWant.metadata?.labels || {}
+          },
+          spec: {
+            params: editingWant.spec?.params || {},
+            ...(editingWant.spec?.using && { using: editingWant.spec.using }),
+            ...(editingWant.spec?.recipe && { recipe: editingWant.spec.recipe })
+          }
+        }]
+      };
+      setYaml(stringifyYaml(configForEdit));
+      setName(editingWant.metadata?.name || editingWant.metadata?.id || 'Unnamed Want');
     } else {
       setIsEditing(false);
       setYaml(SAMPLE_YAML);

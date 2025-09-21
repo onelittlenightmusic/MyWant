@@ -128,6 +128,7 @@ type OwnerReference struct {
 
 // Metadata contains want identification and classification info
 type Metadata struct {
+	ID              string            `json:"id,omitempty" yaml:"id,omitempty"`
 	Name            string            `json:"name" yaml:"name"`
 	Type            string            `json:"type" yaml:"type"`
 	Labels          map[string]string `json:"labels" yaml:"labels"`
@@ -1888,7 +1889,20 @@ func loadConfigFromYAML(filename string) (Config, error) {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
+	// Assign individual IDs to each want if not already set
+	assignWantIDs(&config)
+
 	return config, nil
+}
+
+// assignWantIDs assigns unique IDs to wants that don't have them
+func assignWantIDs(config *Config) {
+	baseID := time.Now().UnixNano()
+	for i := range config.Wants {
+		if config.Wants[i].Metadata.ID == "" {
+			config.Wants[i].Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
+		}
+	}
 }
 
 // loadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation
@@ -1906,6 +1920,9 @@ func loadConfigFromYAMLBytes(data []byte) (Config, error) {
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
+
+	// Assign individual IDs to each want if not already set
+	assignWantIDs(&config)
 
 	return config, nil
 }

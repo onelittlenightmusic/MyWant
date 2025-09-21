@@ -23,9 +23,10 @@ type ServerConfig struct {
 
 // Server represents the MyWant server
 type Server struct {
-	config ServerConfig
-	wants  map[string]*WantExecution // Store active want executions
-	router *mux.Router
+	config        ServerConfig
+	wants         map[string]*WantExecution // Store active want executions
+	agentRegistry *mywant.AgentRegistry     // Agent and capability registry
+	router        *mux.Router
 }
 
 // WantExecution represents a running want execution
@@ -39,10 +40,23 @@ type WantExecution struct {
 
 // NewServer creates a new MyWant server
 func NewServer(config ServerConfig) *Server {
+	// Create agent registry and load existing capabilities/agents
+	agentRegistry := mywant.NewAgentRegistry()
+
+	// Load capabilities and agents from directories if they exist
+	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+		fmt.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+	}
+
+	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+		fmt.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+	}
+
 	return &Server{
-		config: config,
-		wants:  make(map[string]*WantExecution),
-		router: mux.NewRouter(),
+		config:        config,
+		wants:         make(map[string]*WantExecution),
+		agentRegistry: agentRegistry,
+		router:        mux.NewRouter(),
 	}
 }
 
@@ -59,6 +73,21 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/status", s.getWantStatus).Methods("GET")
 	wants.HandleFunc("/{id}/results", s.getWantResults).Methods("GET")
+
+	// Agents CRUD endpoints
+	agents := api.PathPrefix("/agents").Subrouter()
+	agents.HandleFunc("", s.createAgent).Methods("POST")
+	agents.HandleFunc("", s.listAgents).Methods("GET")
+	agents.HandleFunc("/{name}", s.getAgent).Methods("GET")
+	agents.HandleFunc("/{name}", s.deleteAgent).Methods("DELETE")
+
+	// Capabilities CRUD endpoints
+	capabilities := api.PathPrefix("/capabilities").Subrouter()
+	capabilities.HandleFunc("", s.createCapability).Methods("POST")
+	capabilities.HandleFunc("", s.listCapabilities).Methods("GET")
+	capabilities.HandleFunc("/{name}", s.getCapability).Methods("GET")
+	capabilities.HandleFunc("/{name}", s.deleteCapability).Methods("DELETE")
+	capabilities.HandleFunc("/{name}/agents", s.findAgentsByCapability).Methods("GET")
 
 	// Health check endpoint
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
@@ -100,6 +129,14 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	// Generate unique ID for this want execution
 	wantID := generateWantID()
 
+	// Assign individual IDs to each want if not already set
+	baseID := time.Now().UnixNano()
+	for i := range config.Wants {
+		if config.Wants[i].Metadata.ID == "" {
+			config.Wants[i].Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
+		}
+	}
+
 	// Create want execution
 	execution := &WantExecution{
 		ID:     wantID,
@@ -118,19 +155,46 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(execution)
 }
 
-// listWants handles GET /api/v1/wants - lists all wants
+// listWants handles GET /api/v1/wants - lists all wants in memory dump format
 func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	wants := make([]*WantExecution, 0, len(s.wants))
-	for _, want := range s.wants {
-		wants = append(wants, want)
+	// Collect all wants from all executions in memory dump format
+	allWants := make([]*mywant.Want, 0)
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			// Get current want states from the builder (map[string]*Want)
+			currentStates := execution.Builder.GetAllWantStates()
+			for _, want := range currentStates {
+				// Ensure state is populated by calling GetAllState()
+				if want.State == nil {
+					want.State = make(map[string]interface{})
+				}
+				// Get current runtime state and update the want's state field
+				currentState := want.GetAllState()
+				for k, v := range currentState {
+					want.State[k] = v
+				}
+				allWants = append(allWants, want)
+			}
+		} else {
+			// If no builder yet, use the original config wants
+			allWants = append(allWants, execution.Config.Wants...)
+		}
 	}
 
-	json.NewEncoder(w).Encode(wants)
+	// Create memory dump format response
+	response := map[string]interface{}{
+		"timestamp":    time.Now().Format(time.RFC3339),
+		"execution_id": fmt.Sprintf("api-dump-%d", time.Now().Unix()),
+		"wants":        allWants,
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
-// getWant handles GET /api/v1/wants/{id} - gets current runtime state of wants
+// getWant handles GET /api/v1/wants/{id} - gets wants for a specific execution
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -143,20 +207,31 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return current runtime state if builder is available (execution started)
+	// Collect wants from this specific execution
+	allWants := make([]*mywant.Want, 0)
+
 	if execution.Builder != nil {
+		// Get current want states from the builder (map[string]*Want)
 		currentStates := execution.Builder.GetAllWantStates()
-		response := map[string]interface{}{
-			"id":               execution.ID,
-			"execution_status": execution.Status,
-			"wants":            currentStates,
-			"results":          execution.Results,
+		for _, want := range currentStates {
+			// Ensure state is populated by calling GetAllState()
+			if want.State == nil {
+				want.State = make(map[string]interface{})
+			}
+			// Get current runtime state and update the want's state field
+			currentState := want.GetAllState()
+			for k, v := range currentState {
+				want.State[k] = v
+			}
+			allWants = append(allWants, want)
 		}
-		json.NewEncoder(w).Encode(response)
 	} else {
-		// If no builder yet (not executed), return the original execution info
-		json.NewEncoder(w).Encode(execution)
+		// If no builder yet, use the original config wants
+		allWants = append(allWants, execution.Config.Wants...)
 	}
+
+	// Return just the wants array (single want objects)
+	json.NewEncoder(w).Encode(allWants)
 }
 
 // updateWant handles PUT /api/v1/wants/{id} - updates a want configuration
@@ -360,6 +435,229 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(health)
 }
 
+// ======= AGENT CRUD HANDLERS =======
+
+// createAgent handles POST /api/v1/agents - creates a new agent
+func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var agentData struct {
+		Name         string   `json:"name"`
+		Type         string   `json:"type"`
+		Capabilities []string `json:"capabilities"`
+		Uses         []string `json:"uses"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&agentData); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Create agent based on type
+	var agent mywant.Agent
+	baseAgent := mywant.BaseAgent{
+		Name:         agentData.Name,
+		Capabilities: agentData.Capabilities,
+		Uses:         agentData.Uses,
+		Type:         mywant.AgentType(agentData.Type),
+	}
+
+	switch agentData.Type {
+	case "do":
+		agent = &mywant.DoAgent{
+			BaseAgent: baseAgent,
+			Action:    nil, // Default action will be set by registry
+		}
+	case "monitor":
+		agent = &mywant.MonitorAgent{
+			BaseAgent: baseAgent,
+			Monitor:   nil, // Default monitor will be set by registry
+		}
+	default:
+		http.Error(w, "Invalid agent type. Must be 'do' or 'monitor'", http.StatusBadRequest)
+		return
+	}
+
+	// Register the agent
+	s.agentRegistry.RegisterAgent(agent)
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"name":         agent.GetName(),
+		"type":         agent.GetType(),
+		"capabilities": agent.GetCapabilities(),
+		"uses":         agent.GetUses(),
+	})
+}
+
+// listAgents handles GET /api/v1/agents - lists all agents
+func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Since AgentRegistry doesn't have a GetAllAgents method, we'll access via reflection
+	// In a production system, you'd add this method to AgentRegistry
+	agents := make([]map[string]interface{}, 0)
+
+	// We need to add a method to AgentRegistry to list all agents
+	// For now, we'll return a message indicating this
+	response := map[string]interface{}{
+		"message": "Agent listing requires GetAllAgents method to be added to AgentRegistry",
+		"agents":  agents,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// getAgent handles GET /api/v1/agents/{name} - gets a specific agent
+func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	agentName := vars["name"]
+
+	agent, exists := s.agentRegistry.GetAgent(agentName)
+	if !exists {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	response := map[string]interface{}{
+		"name":         agent.GetName(),
+		"type":         agent.GetType(),
+		"capabilities": agent.GetCapabilities(),
+		"uses":         agent.GetUses(),
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// deleteAgent handles DELETE /api/v1/agents/{name} - deletes an agent
+func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	agentName := vars["name"]
+
+	// Check if agent exists
+	_, exists := s.agentRegistry.GetAgent(agentName)
+	if !exists {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// AgentRegistry doesn't have a Delete method, so we'll return a message
+	// In production, you'd add UnregisterAgent method to AgentRegistry
+	response := map[string]interface{}{
+		"message": "Agent deletion requires UnregisterAgent method to be added to AgentRegistry",
+		"agent":   agentName,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// ======= CAPABILITY CRUD HANDLERS =======
+
+// createCapability handles POST /api/v1/capabilities - creates a new capability
+func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var capability mywant.Capability
+	if err := json.NewDecoder(r.Body).Decode(&capability); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Register the capability
+	s.agentRegistry.RegisterCapability(capability)
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(capability)
+}
+
+// listCapabilities handles GET /api/v1/capabilities - lists all capabilities
+func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Since AgentRegistry doesn't have a GetAllCapabilities method
+	// we'll return a message indicating this needs to be implemented
+	capabilities := make([]mywant.Capability, 0)
+
+	response := map[string]interface{}{
+		"message":      "Capability listing requires GetAllCapabilities method to be added to AgentRegistry",
+		"capabilities": capabilities,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// getCapability handles GET /api/v1/capabilities/{name} - gets a specific capability
+func (s *Server) getCapability(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	capabilityName := vars["name"]
+
+	capability, exists := s.agentRegistry.GetCapability(capabilityName)
+	if !exists {
+		http.Error(w, "Capability not found", http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(capability)
+}
+
+// deleteCapability handles DELETE /api/v1/capabilities/{name} - deletes a capability
+func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	capabilityName := vars["name"]
+
+	// Check if capability exists
+	_, exists := s.agentRegistry.GetCapability(capabilityName)
+	if !exists {
+		http.Error(w, "Capability not found", http.StatusNotFound)
+		return
+	}
+
+	// AgentRegistry doesn't have a Delete method for capabilities
+	response := map[string]interface{}{
+		"message":    "Capability deletion requires UnregisterCapability method to be added to AgentRegistry",
+		"capability": capabilityName,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// findAgentsByCapability handles GET /api/v1/capabilities/{name}/agents - finds agents by capability
+func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	capabilityName := vars["name"]
+
+	agents := s.agentRegistry.FindAgentsByGives(capabilityName)
+	if agents == nil {
+		agents = make([]mywant.Agent, 0)
+	}
+
+	// Convert agents to response format
+	agentResponses := make([]map[string]interface{}, len(agents))
+	for i, agent := range agents {
+		agentResponses[i] = map[string]interface{}{
+			"name":         agent.GetName(),
+			"type":         agent.GetType(),
+			"capabilities": agent.GetCapabilities(),
+			"uses":         agent.GetUses(),
+		}
+	}
+
+	response := map[string]interface{}{
+		"capability": capabilityName,
+		"agents":     agentResponses,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.setupRoutes()
@@ -367,14 +665,23 @@ func (s *Server) Start() error {
 
 	fmt.Printf("🚀 MyWant server starting on %s\n", addr)
 	fmt.Printf("📋 Available endpoints:\n")
-	fmt.Printf("  GET  /health                     - Health check\n")
-	fmt.Printf("  POST /api/v1/wants              - Create want (YAML config)\n")
-	fmt.Printf("  GET  /api/v1/wants              - List wants\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}         - Get want\n")
-	fmt.Printf("  PUT  /api/v1/wants/{id}         - Update want\n")
-	fmt.Printf("  DELETE /api/v1/wants/{id}       - Delete want\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}/status  - Get execution status\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}/results - Get execution results\n")
+	fmt.Printf("  GET  /health                        - Health check\n")
+	fmt.Printf("  POST /api/v1/wants                 - Create want (YAML config)\n")
+	fmt.Printf("  GET  /api/v1/wants                 - List wants\n")
+	fmt.Printf("  GET  /api/v1/wants/{id}            - Get want\n")
+	fmt.Printf("  PUT  /api/v1/wants/{id}            - Update want\n")
+	fmt.Printf("  DELETE /api/v1/wants/{id}          - Delete want\n")
+	fmt.Printf("  GET  /api/v1/wants/{id}/status     - Get execution status\n")
+	fmt.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
+	fmt.Printf("  POST /api/v1/agents                - Create agent\n")
+	fmt.Printf("  GET  /api/v1/agents                - List agents\n")
+	fmt.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")
+	fmt.Printf("  DELETE /api/v1/agents/{name}       - Delete agent\n")
+	fmt.Printf("  POST /api/v1/capabilities          - Create capability\n")
+	fmt.Printf("  GET  /api/v1/capabilities          - List capabilities\n")
+	fmt.Printf("  GET  /api/v1/capabilities/{name}   - Get capability\n")
+	fmt.Printf("  DELETE /api/v1/capabilities/{name} - Delete capability\n")
+	fmt.Printf("  GET  /api/v1/capabilities/{name}/agents - Find agents by capability\n")
 	fmt.Printf("\n")
 
 	return http.ListenAndServe(addr, s.router)

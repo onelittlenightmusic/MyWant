@@ -27,14 +27,14 @@ export const WantGrid: React.FC<WantGridProps> = ({
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const wantName = want.config.wants?.[0]?.metadata?.name || want.id;
-        const wantType = want.config.wants?.[0]?.metadata?.type || '';
-        const labels = want.config.wants?.[0]?.metadata?.labels || {};
+        const wantName = want.metadata?.name || want.metadata?.id || '';
+        const wantType = want.metadata?.type || '';
+        const labels = want.metadata?.labels || {};
 
         const matchesSearch =
           wantName.toLowerCase().includes(query) ||
           wantType.toLowerCase().includes(query) ||
-          want.id.toLowerCase().includes(query) ||
+          (want.metadata?.id || '').toLowerCase().includes(query) ||
           Object.values(labels).some(value =>
             value.toLowerCase().includes(query)
           );
@@ -48,6 +48,11 @@ export const WantGrid: React.FC<WantGridProps> = ({
       }
 
       return true;
+    }).sort((a, b) => {
+      // Sort by ID to ensure consistent ordering
+      const idA = a.metadata?.id || '';
+      const idB = b.metadata?.id || '';
+      return idA.localeCompare(idB);
     });
   }, [wants, searchQuery, statusFilters]);
 
@@ -114,9 +119,9 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {filteredWants.map((want) => (
+      {filteredWants.map((want, index) => (
         <WantCard
-          key={want.id}
+          key={want.metadata?.id || `want-${index}`}
           want={want}
           onView={onViewWant}
           onEdit={onEditWant}

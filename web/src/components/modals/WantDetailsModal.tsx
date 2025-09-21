@@ -70,7 +70,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     { id: 'results', label: 'Results', icon: BarChart3 },
   ];
 
-  const wantDetails = selectedWantDetails?.wants?.[0];
+  const wantDetails = selectedWantDetails;
   const createdAt = wantDetails?.stats?.created_at;
   const startedAt = wantDetails?.stats?.started_at;
   const completedAt = wantDetails?.stats?.completed_at;
@@ -235,36 +235,6 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   </div>
                 )}
 
-                {/* Individual Want Statuses */}
-                {selectedWantDetails?.wants && selectedWantDetails.wants.length > 1 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Individual Want Status</h4>
-                    <div className="space-y-2">
-                      {selectedWantDetails.wants.map((want, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-sm font-medium text-gray-900">
-                              {want.metadata?.name || `Want ${index + 1}`}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              ({want.metadata?.type})
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {want.status?.phase && (
-                              <StatusBadge status={want.status.phase} size="sm" />
-                            )}
-                            {want.status?.message && (
-                              <span className="text-xs text-gray-500 max-w-32 truncate">
-                                {want.status.message}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Parameters */}
                 {wantDetails?.spec?.params && Object.keys(wantDetails.spec.params).length > 0 && (
@@ -283,7 +253,22 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
             {activeTab === 'config' && (
               <div>
                 <YamlEditor
-                  value={stringifyYaml(want.config)}
+                  value={stringifyYaml({
+                    wants: [{
+                      metadata: {
+                        name: want.metadata?.name,
+                        type: want.metadata?.type,
+                        labels: want.metadata?.labels || {}
+                      },
+                      spec: {
+                        params: want.spec?.params || {},
+                        ...(want.spec?.using && { using: want.spec.using }),
+                        ...(want.spec?.recipe && { recipe: want.spec.recipe })
+                      },
+                      status: want.status,
+                      ...(want.state && { state: want.state })
+                    }]
+                  })}
                   onChange={() => {}} // Read-only
                   readOnly={true}
                   height="350px"
@@ -292,61 +277,95 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
             )}
 
             {activeTab === 'logs' && (
-              <div className="bg-gray-900 text-gray-100 p-4 rounded-md font-mono text-sm">
-                <div className="space-y-1">
-                  <div>[2024-01-20 10:30:15] Want execution started</div>
-                  <div>[2024-01-20 10:30:16] Initializing chain builder...</div>
-                  <div>[2024-01-20 10:30:17] Registering want types...</div>
-                  <div>[2024-01-20 10:30:18] Starting execution...</div>
-                  {want.status === 'running' && (
-                    <div className="text-blue-400">[2024-01-20 10:30:19] Processing... <span className="animate-pulse">●</span></div>
-                  )}
-                  {want.status === 'completed' && (
-                    <div className="text-green-400">[2024-01-20 10:35:22] Execution completed successfully</div>
-                  )}
-                  {want.status === 'failed' && (
-                    <div className="text-red-400">[2024-01-20 10:33:45] Execution failed: Connection timeout</div>
-                  )}
-                </div>
+              <div>
+                {want.history?.parameterHistory && want.history.parameterHistory.length > 0 ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Parameter History</h4>
+                      <div className="space-y-3">
+                        {want.history.parameterHistory.map((entry, index) => (
+                          <div key={index} className="bg-gray-50 rounded-md p-3 border">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">
+                                {entry.wantName}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(entry.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="bg-white rounded p-2">
+                              <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                                {JSON.stringify(entry.stateValue, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 text-gray-100 p-4 rounded-md font-mono text-sm">
+                    <div className="space-y-1">
+                      <div>[{new Date().toLocaleString()}] Want execution started</div>
+                      <div>[{new Date().toLocaleString()}] Initializing chain builder...</div>
+                      <div>[{new Date().toLocaleString()}] Registering want types...</div>
+                      <div>[{new Date().toLocaleString()}] Starting execution...</div>
+                      {want.status === 'running' && (
+                        <div className="text-blue-400">[{new Date().toLocaleString()}] Processing... <span className="animate-pulse">●</span></div>
+                      )}
+                      {want.status === 'completed' && (
+                        <div className="text-green-400">[{new Date().toLocaleString()}] Execution completed successfully</div>
+                      )}
+                      {want.status === 'failed' && (
+                        <div className="text-red-400">[{new Date().toLocaleString()}] Execution failed: Connection timeout</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === 'results' && (
               <div>
-                {selectedWantResults ? (
+                {want.history?.stateHistory && want.history.stateHistory.length > 0 ? (
                   <div className="space-y-4">
-                    {selectedWantResults.metrics && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Metrics</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {Object.entries(selectedWantResults.metrics).map(([key, value]) => (
-                            <div key={key} className="bg-gray-50 rounded-md p-3">
-                              <div className="text-sm text-gray-500 capitalize">
-                                {key.replace(/_/g, ' ')}
-                              </div>
-                              <div className="text-lg font-semibold text-gray-900">
-                                {typeof value === 'number' ? value.toLocaleString() : String(value)}
-                              </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">State History</h4>
+                      <div className="space-y-3">
+                        {want.history.stateHistory.map((entry: any, index: number) => (
+                          <div key={index} className="bg-gray-50 rounded-md p-3 border">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">
+                                {entry.want_name || 'State Entry'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp'}
+                              </span>
                             </div>
-                          ))}
-                        </div>
+                            <div className="bg-white rounded p-2">
+                              <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                                {JSON.stringify(entry.state_value || entry, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-
-                    {selectedWantResults.data && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Data</h4>
-                        <div className="bg-gray-50 rounded-md p-3">
-                          <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                            {JSON.stringify(selectedWantResults.data, null, 2)}
-                          </pre>
-                        </div>
+                    </div>
+                  </div>
+                ) : want.state ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Current State</h4>
+                      <div className="bg-gray-50 rounded-md p-3">
+                        <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {JSON.stringify(want.state, null, 2)}
+                        </pre>
                       </div>
-                    )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    No results available yet
+                    No state data available yet
                   </div>
                 )}
               </div>

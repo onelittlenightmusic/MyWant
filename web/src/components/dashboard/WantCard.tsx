@@ -19,12 +19,12 @@ export const WantCard: React.FC<WantCardProps> = ({
   onDelete,
   className
 }) => {
-  const wantName = want.config.wants?.[0]?.metadata?.name || want.id;
-  const wantType = want.config.wants?.[0]?.metadata?.type || 'unknown';
-  const labels = want.config.wants?.[0]?.metadata?.labels || {};
-  const createdAt = want.config.wants?.[0]?.stats?.created_at;
-  const startedAt = want.config.wants?.[0]?.stats?.started_at;
-  const completedAt = want.config.wants?.[0]?.stats?.completed_at;
+  const wantName = want.metadata?.name || want.metadata?.id || 'Unnamed Want';
+  const wantType = want.metadata?.type || 'unknown';
+  const labels = want.metadata?.labels || {};
+  const createdAt = want.stats?.created_at;
+  const startedAt = want.stats?.started_at;
+  const completedAt = want.stats?.completed_at;
 
   const isRunning = want.status === 'running';
   const canControl = want.status === 'running' || want.status === 'stopped';

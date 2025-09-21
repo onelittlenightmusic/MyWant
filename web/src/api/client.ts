@@ -80,8 +80,8 @@ class MyWantApiClient {
   }
 
   async listWants(): Promise<Want[]> {
-    const response = await this.client.get<Want[]>('/api/v1/wants');
-    return response.data;
+    const response = await this.client.get<{wants: Want[], execution_id: string, timestamp: string}>('/api/v1/wants');
+    return response.data.wants;
   }
 
   async getWant(id: string): Promise<WantDetails> {
