@@ -367,8 +367,13 @@ func (s *Server) executeWantAsync(wantID string) {
 	builder := mywant.NewChainBuilder(want.Config)
 	want.Builder = builder
 
-	// Register QNet types from demos package
-	RegisterQNetWantTypes(builder)
+	// Register want types
+	RegisterQNetWantTypes(builder)      // QNet types (numbers, queue, sink, etc.)
+	RegisterFibonacciWantTypes(builder) // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
+	RegisterPrimeWantTypes(builder)     // Prime types (prime_numbers, prime_sieve)
+	mywant.RegisterOwnerWantTypes(builder)   // Owner types (target)
+	mywant.RegisterMonitorWantTypes(builder) // Monitor types (monitor, alert)
+	mywant.RegisterHotelWantTypes(builder, nil) // Hotel types (hotel, restaurant, travel_coordinator)
 
 	// Execute the chain
 	fmt.Printf("[SERVER] Executing want %s with %d wants\n", wantID, len(want.Config.Wants))
