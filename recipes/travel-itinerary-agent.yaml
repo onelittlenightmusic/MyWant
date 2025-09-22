@@ -1,0 +1,72 @@
+recipe:
+  # Recipe metadata - defines this as a custom target type with agent integration
+  metadata:
+    name: "Travel Itinerary with Agents"
+    description: "Travel planning system with agent integration and coordination"
+    custom_type: "agent travel itinerary planner"
+    version: "1.1.0"
+
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "travel"
+    display_name: "Agent-Enabled Travel Itinerary"
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    buffet_type: "international"
+    dinner_duration: 2.0
+
+  wants:
+    # Dinner restaurant reservation
+    - metadata:
+        type: restaurant
+        labels:
+          role: scheduler
+      spec:
+        params:
+          restaurant_type: restaurant_type
+          duration_hours: dinner_duration
+
+    # Hotel accommodation booking with agent support
+    - metadata:
+        type: hotel
+        labels:
+          role: scheduler
+      spec:
+        params:
+          hotel_type: hotel_type
+          agent_name: "agent_premium"
+        requires:
+          - hotel_reservation
+
+    # Morning breakfast buffet
+    - metadata:
+        type: buffet
+        labels:
+          role: scheduler
+      spec:
+        params:
+          buffet_type: buffet_type
+
+    # Travel coordinator that combines all schedules
+    - metadata:
+        type: travel_coordinator
+      spec:
+        params:
+          display_name: display_name
+        using:
+          - role: scheduler
+
+  # Recipe result definition - specifies how to compute travel planning results
+  result:
+    - want_name: "travel_coordinator"
+      stat_name: ".total_processed"
+      description: "Total travel bookings coordinated"
+    - want_name: "restaurant"
+      stat_name: ".total_processed"
+      description: "Restaurant reservations completed"
+    - want_name: "hotel"
+      stat_name: ".total_processed"
+      description: "Hotel bookings completed"
+    - want_name: "buffet"
+      stat_name: ".total_processed"
+      description: "Buffet reservations completed"

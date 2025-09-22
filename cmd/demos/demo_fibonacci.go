@@ -33,9 +33,6 @@ func main() {
 	// Register fibonacci loop node types
 	types.RegisterFibonacciLoopWantTypes(builder)
 
-	// Register owner/target types for Target system support
-	RegisterOwnerWantTypes(builder)
-
 	fmt.Println("\nExecuting fibonacci sequence with reconcile loop...")
 	builder.Execute()
 

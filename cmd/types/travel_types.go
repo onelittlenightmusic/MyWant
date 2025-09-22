@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	. "mywant/src"
@@ -301,6 +302,12 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Mark as attempted in persistent state
 	h.State["attempted"] = true
 
+	// Try to use agent system if available
+	if h.tryAgentExecution() {
+		// Agent execution initiated, continue with regular flow
+		fmt.Printf("[HOTEL] Agent execution initiated for %s\n", h.Metadata.Name)
+	}
+
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
 	if len(using) > 0 {
@@ -376,6 +383,38 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	out <- newSchedule
 	return true
+}
+
+// tryAgentExecution attempts to execute hotel reservation using the agent system
+func (h *HotelWant) tryAgentExecution() bool {
+	// Check if this want has agent requirements
+	if len(h.Spec.Requires) > 0 {
+		for _, capability := range h.Spec.Requires {
+			if capability == "hotel_reservation" {
+				// Check if a specific agent is configured
+				if agentName, ok := h.Spec.Params["agent_name"].(string); ok && h.Want.GetAgentRegistry() != nil {
+					if agent, exists := h.Want.GetAgentRegistry().GetAgent(agentName); exists {
+						// Execute specified agent with Hotel Want
+						ctx := context.Background()
+						if err := agent.Exec(ctx, &h.Want); err != nil {
+							fmt.Printf("[HOTEL] Agent %s execution failed: %v, falling back to default execution\n", agentName, err)
+							return false
+						}
+						fmt.Printf("[HOTEL] Agent %s execution completed successfully\n", agentName)
+						return true
+					}
+				}
+
+				// Fallback to regular agent execution
+				if err := h.ExecuteAgents(); err != nil {
+					fmt.Printf("[HOTEL] Agent execution failed: %v, falling back to direct execution\n", err)
+					return false
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // BuffetWant creates breakfast buffet reservations
@@ -695,6 +734,27 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 
 	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewHotelWant(metadata, spec)
+	})
+
+	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewBuffetWant(metadata, spec)
+	})
+
+	builder.RegisterWantType("travel_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewTravelCoordinatorWant(metadata, spec)
+	})
+}
+
+// RegisterTravelWantTypesWithAgents registers travel want types with agent system support
+func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
+	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewRestaurantWant(metadata, spec)
+	})
+
+	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
+		hotel := NewHotelWant(metadata, spec)
+		hotel.SetAgentRegistry(agentRegistry)
+		return hotel
 	})
 
 	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {

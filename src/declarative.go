@@ -625,6 +625,7 @@ type ChainBuilder struct {
 	wants          map[string]*runtimeWant   // Runtime want registry
 	registry       map[string]WantFactory    // Want type factories
 	customRegistry *CustomTargetTypeRegistry // Custom target type registry
+	agentRegistry  *AgentRegistry            // Agent registry for agent-enabled wants
 	waitGroup      *sync.WaitGroup           // Execution synchronization
 	config         Config                    // Current configuration
 
@@ -710,6 +711,9 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
 	}
 
+	// Auto-register owner want types for target system support
+	RegisterOwnerWantTypes(builder)
+
 	return builder
 }
 
@@ -721,6 +725,11 @@ func (cb *ChainBuilder) registerBuiltinWantTypes() {
 // RegisterWantType allows registering custom want types
 func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
 	cb.registry[wantType] = factory
+}
+
+// SetAgentRegistry sets the agent registry for the chain builder
+func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
+	cb.agentRegistry = registry
 }
 
 // matchesSelector checks if want labels match the selector criteria
@@ -842,7 +851,16 @@ func (cb *ChainBuilder) createWantFunction(want *Want) interface{} {
 		panic(fmt.Sprintf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v",
 			wantType, availableTypes, customTypes))
 	}
-	return factory(want.Metadata, want.Spec)
+	wantInstance := factory(want.Metadata, want.Spec)
+
+	// Set agent registry if available and the want instance supports it
+	if cb.agentRegistry != nil {
+		if w, ok := wantInstance.(*Want); ok {
+			w.SetAgentRegistry(cb.agentRegistry)
+		}
+	}
+
+	return wantInstance
 }
 
 // createCustomTargetWant creates a custom target want using the registry
@@ -2378,6 +2396,11 @@ func (n *Want) SetAgentRegistry(registry *AgentRegistry) {
 	if n.runningAgents == nil {
 		n.runningAgents = make(map[string]context.CancelFunc)
 	}
+}
+
+// GetAgentRegistry returns the agent registry for this want
+func (n *Want) GetAgentRegistry() *AgentRegistry {
+	return n.agentRegistry
 }
 
 // ExecuteAgents finds and executes agents based on want requirements

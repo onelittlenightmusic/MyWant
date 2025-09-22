@@ -43,7 +43,6 @@ func main() {
 
 	// Register want types
 	types.RegisterQNetWantTypes(builder)         // For qnet types (numbers, queue, sink, etc.)
-	mywant.RegisterOwnerWantTypes(builder) // For owner types (target)
 
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")

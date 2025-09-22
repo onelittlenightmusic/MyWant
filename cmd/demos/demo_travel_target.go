@@ -44,9 +44,6 @@ func main() {
 	// Register travel want types first
 	types.RegisterTravelWantTypes(builder)
 
-	// Register owner-based want types (includes target and child wants)
-	RegisterOwnerWantTypes(builder)
-
 	fmt.Println("\n🚀 Executing travel target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")
 	fmt.Println("1. Load the travel-itinerary recipe")

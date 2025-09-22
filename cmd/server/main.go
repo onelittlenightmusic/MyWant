@@ -364,18 +364,19 @@ func (s *Server) executeWantAsync(wantID string) {
 
 	want.Status = "running"
 
-	// Create chain builder
+	// Create chain builder (automatically registers owner want types)
 	builder := mywant.NewChainBuilder(want.Config)
 	want.Builder = builder
+
+	// Set agent registry for agent-enabled wants
+	builder.SetAgentRegistry(s.agentRegistry)
 
 	// Register want types
 	types.RegisterQNetWantTypes(builder)              // QNet types (qnet numbers, qnet queue, qnet sink, etc.)
 	types.RegisterFibonacciWantTypes(builder)         // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
 	types.RegisterPrimeWantTypes(builder)             // Prime types (prime_numbers, prime_sieve)
-	types.RegisterTravelWantTypes(builder)
-	mywant.RegisterOwnerWantTypes(builder)      // Owner types (target)
-	mywant.RegisterMonitorWantTypes(builder)    // Monitor types (monitor, alert)
-	//mywant.RegisterHotelWantTypes(builder, nil) // Hotel types (hotel, restaurant, travel_coordinator)
+	types.RegisterTravelWantTypes(builder)            // Travel types (restaurant, hotel, buffet, travel_coordinator)
+	mywant.RegisterMonitorWantTypes(builder)          // Monitor types (monitor, alert)
 
 	// Execute the chain
 	fmt.Printf("[SERVER] Executing want %s with %d wants\n", wantID, len(want.Config.Wants))

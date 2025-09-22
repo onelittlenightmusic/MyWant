@@ -1,0 +1,80 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	. "mywant/src"
+	"mywant/cmd/types"
+	"os"
+)
+
+func main() {
+	fmt.Println("🏨 Travel Agent Demo (Recipe-based with Agent Integration)")
+	fmt.Println("=========================================================")
+
+	// Get config file path from command line argument
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run demo_travel_agent.go <config-file-path>")
+		os.Exit(1)
+	}
+	configPath := os.Args[1]
+
+	// Load configuration using automatic recipe loading
+	config, err := LoadConfigFromYAML(configPath)
+	if err != nil {
+		fmt.Printf("Error loading %s: %v\n", configPath, err)
+		return
+	}
+
+	fmt.Printf("📋 Loaded configuration with %d wants\n", len(config.Wants))
+	for _, want := range config.Wants {
+		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+		if len(want.Spec.Requires) > 0 {
+			fmt.Printf("    Requires: %v\n", want.Spec.Requires)
+		}
+	}
+
+	// Create chain builder
+	builder := NewChainBuilder(config)
+
+	// Create and configure agent registry
+	agentRegistry := NewAgentRegistry()
+
+	// Load capabilities and agents
+	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+		fmt.Printf("Warning: Failed to load capabilities: %v\n", err)
+	}
+
+	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+		fmt.Printf("Warning: Failed to load agents: %v\n", err)
+	}
+
+	// Dynamically register AgentPremium
+	agentPremium := types.NewAgentPremium(
+		"agent_premium",
+		[]string{"hotel_agency"},
+		[]string{"xxx"},
+		"platinum",
+	)
+
+	// Set premium action for hotel booking
+	agentPremium.Action = func(ctx context.Context, want *Want) error {
+		fmt.Printf("[AGENT_PREMIUM] Processing hotel reservation for %s with premium service\n", want.Metadata.Name)
+		// Premium hotel booking logic would go here
+		return nil
+	}
+
+	agentRegistry.RegisterAgent(agentPremium)
+	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
+
+	// Set agent registry on the builder
+	builder.SetAgentRegistry(agentRegistry)
+
+	// Register travel want types
+	types.RegisterTravelWantTypes(builder)
+
+	fmt.Println("🚀 Executing agent-enabled travel planning...")
+	builder.Execute()
+
+	fmt.Println("✅ Travel planning with agents completed!")
+}

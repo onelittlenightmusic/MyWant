@@ -1,0 +1,14 @@
+wants:
+  - metadata:
+      name: travel planner with agents
+      type: agent travel itinerary planner
+      labels:
+        role: travel-planner
+    spec:
+      params:
+        prefix: vacation
+        display_name: "Agent-Enabled Travel Itinerary"
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        buffet_type: "international"
+        dinner_duration: 2.0
