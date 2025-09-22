@@ -855,7 +855,9 @@ func (cb *ChainBuilder) createWantFunction(want *Want) interface{} {
 
 	// Set agent registry if available and the want instance supports it
 	if cb.agentRegistry != nil {
-		if w, ok := wantInstance.(*Want); ok {
+		if wantWithGetWant, ok := wantInstance.(interface{ GetWant() *Want }); ok {
+			wantWithGetWant.GetWant().SetAgentRegistry(cb.agentRegistry)
+		} else if w, ok := wantInstance.(*Want); ok {
 			w.SetAgentRegistry(cb.agentRegistry)
 		}
 	}

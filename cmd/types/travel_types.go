@@ -302,11 +302,21 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Mark as attempted in persistent state
 	h.State["attempted"] = true
 
-	// Try to use agent system if available
+	// Try to use agent system if available - agent completely overrides normal execution
 	if h.tryAgentExecution() {
-		// Agent execution initiated, continue with regular flow
-		fmt.Printf("[HOTEL] Agent execution initiated for %s\n", h.Metadata.Name)
+		fmt.Printf("[HOTEL] Agent execution completed, skipping normal hotel logic\n")
+		// Agent handled everything, just send empty schedule to maintain flow
+		if len(outputs) > 0 {
+			out <- &TravelSchedule{
+				Date:   time.Now().AddDate(0, 0, 1),
+				Events: []TimeSlot{}, // Agent doesn't need to provide schedule data
+			}
+		}
+		return true
 	}
+
+	// Normal hotel execution (only runs if no agent match)
+	fmt.Printf("[HOTEL] No agent match, using standard hotel logic\n")
 
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
@@ -393,7 +403,9 @@ func (h *HotelWant) tryAgentExecution() bool {
 			if capability == "hotel_reservation" {
 				// Check if a specific agent is configured
 				if agentName, ok := h.Spec.Params["agent_name"].(string); ok && h.Want.GetAgentRegistry() != nil {
+					fmt.Printf("[HOTEL] Looking for agent: %s\n", agentName)
 					if agent, exists := h.Want.GetAgentRegistry().GetAgent(agentName); exists {
+						fmt.Printf("[HOTEL] Found agent: %s, about to call agent.Exec()\n", agent.GetName())
 						// Execute specified agent with Hotel Want
 						ctx := context.Background()
 						if err := agent.Exec(ctx, &h.Want); err != nil {
@@ -402,7 +414,11 @@ func (h *HotelWant) tryAgentExecution() bool {
 						}
 						fmt.Printf("[HOTEL] Agent %s execution completed successfully\n", agentName)
 						return true
+					} else {
+						fmt.Printf("[HOTEL] Agent %s not found in registry\n", agentName)
 					}
+				} else {
+					fmt.Printf("[HOTEL] No agent_name parameter or no agent registry\n")
 				}
 
 				// Fallback to regular agent execution

@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent
 
 # Code quality targets
 fmt:
@@ -57,6 +57,9 @@ run-travel:
 # Recipe-based execution targets
 run-travel-recipe:
 	go run cmd/demos/demo_travel_recipe.go config/config-travel-recipe.yaml
+
+run-travel-agent:
+	go run cmd/demos/demo_travel_agent.go config/config-travel-agent.yaml
 
 run-hierarchical-approval:
 	go run cmd/demos/demo_hierarchical_approval.go config/config-hierarchical-approval.yaml
@@ -187,6 +190,7 @@ help:
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
+	@echo "  run-travel-agent      - Travel with agent system integration"
 	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"

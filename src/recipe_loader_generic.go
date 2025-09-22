@@ -8,15 +8,21 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 )
 
-// RecipeWant represents a want in recipe format (flattened structure)
+// RecipeWant represents a want in recipe format (aligned with Want structure)
 type RecipeWant struct {
+	Metadata Metadata `yaml:"metadata,omitempty"`
+	Spec     WantSpec `yaml:"spec,omitempty"`
+
+	// Legacy flattened fields for backward compatibility
 	Name        string                 `yaml:"name,omitempty"`
-	Type        string                 `yaml:"type"`
+	Type        string                 `yaml:"type,omitempty"`
 	Labels      map[string]string      `yaml:"labels,omitempty"`
 	Params      map[string]interface{} `yaml:"params,omitempty"`
 	Using       []map[string]string    `yaml:"using,omitempty"`
+	Requires    []string               `yaml:"requires,omitempty"`
 	RecipeAgent bool                   `yaml:"recipeAgent,omitempty"`
 }
 
@@ -46,16 +52,29 @@ type RecipeContent struct {
 
 // ConvertToWant converts a RecipeWant to a Want
 func (rw RecipeWant) ConvertToWant() *Want {
-	want := &Want{
-		Metadata: Metadata{
+	want := &Want{}
+
+	// Use structured format if metadata type is provided
+	if rw.Metadata.Type != "" {
+		want.Metadata = rw.Metadata
+		want.Spec = rw.Spec
+
+		// Also support legacy fields as fallback for name if not set in metadata
+		if want.Metadata.Name == "" && rw.Name != "" {
+			want.Metadata.Name = rw.Name
+		}
+	} else {
+		// Fall back to legacy flattened format
+		want.Metadata = Metadata{
 			Name:   rw.Name,
 			Type:   rw.Type,
 			Labels: rw.Labels,
-		},
-		Spec: WantSpec{
-			Params: rw.Params,
-			Using:  rw.Using,
-		},
+		}
+		want.Spec = WantSpec{
+			Params:   rw.Params,
+			Using:    rw.Using,
+			Requires: rw.Requires,
+		}
 	}
 
 	// Ensure labels map is initialized
@@ -137,7 +156,9 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 
 	// Perform parameter substitution on wants
 	for i := range recipeContent.Wants {
+		// Substitute both legacy flattened params and structured spec.params
 		recipeContent.Wants[i].Params = grl.substituteParams(recipeContent.Wants[i].Params, mergedParams)
+		recipeContent.Wants[i].Spec.Params = grl.substituteParams(recipeContent.Wants[i].Spec.Params, mergedParams)
 	}
 
 	// Build final configuration
@@ -145,7 +166,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		Wants: make([]*Want, 0),
 	}
 
-	// Add all wants from recipe, generating names if missing
+	// Add all wants from recipe, generating names and IDs if missing
 	if len(recipeContent.Wants) > 0 {
 		prefix := "want"
 		if prefixVal, ok := mergedParams["prefix"]; ok {
@@ -154,6 +175,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 			}
 		}
 
+		baseID := time.Now().UnixNano()
 		for i, recipeWant := range recipeContent.Wants {
 			// Convert recipe want to Want struct
 			want := recipeWant.ConvertToWant()
@@ -161,6 +183,11 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 			// Generate name if missing
 			if want.Metadata.Name == "" {
 				want.Metadata.Name = fmt.Sprintf("%s-%s-%d", prefix, want.Metadata.Type, i+1)
+			}
+
+			// Generate ID if missing
+			if want.Metadata.ID == "" {
+				want.Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
 			}
 
 			// Process auto-connection if RecipeAgent is enabled
@@ -463,9 +490,27 @@ func validateRecipeWantsStructure(wants interface{}) error {
 			return fmt.Errorf("want at index %d must be an object", i)
 		}
 
-		// Check required type field
-		if wantType, ok := wantObj["type"]; !ok || wantType == "" {
-			return fmt.Errorf("want at index %d missing required 'type' field", i)
+		// Check required type field - support both structured (metadata.type) and legacy (top-level type) format
+		hasLegacyType := false
+		hasStructuredType := false
+
+		// Check for legacy top-level type field
+		if wantType, ok := wantObj["type"]; ok && wantType != "" {
+			hasLegacyType = true
+		}
+
+		// Check for structured metadata.type field
+		if metadata, ok := wantObj["metadata"]; ok {
+			if metadataObj, ok := metadata.(map[string]interface{}); ok {
+				if wantType, ok := metadataObj["type"]; ok && wantType != "" {
+					hasStructuredType = true
+				}
+			}
+		}
+
+		// Require at least one type field
+		if !hasLegacyType && !hasStructuredType {
+			return fmt.Errorf("want at index %d missing required 'type' field (either top-level 'type' or 'metadata.type')", i)
 		}
 
 		// Validate labels if present

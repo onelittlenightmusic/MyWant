@@ -52,16 +52,15 @@ func main() {
 	// Dynamically register AgentPremium
 	agentPremium := types.NewAgentPremium(
 		"agent_premium",
-		[]string{"hotel_agency"},
+		[]string{"hotel_reservation"},  // Match the required capability in recipe
 		[]string{"xxx"},
 		"platinum",
 	)
 
-	// Set premium action for hotel booking
+	// Set a simple action that delegates to the AgentPremium.Exec() method
 	agentPremium.Action = func(ctx context.Context, want *Want) error {
-		fmt.Printf("[AGENT_PREMIUM] Processing hotel reservation for %s with premium service\n", want.Metadata.Name)
-		// Premium hotel booking logic would go here
-		return nil
+		fmt.Printf("[AGENT_PREMIUM_ACTION] Simple action called, delegating to AgentPremium.Exec()\n")
+		return agentPremium.Exec(ctx, want)
 	}
 
 	agentRegistry.RegisterAgent(agentPremium)
