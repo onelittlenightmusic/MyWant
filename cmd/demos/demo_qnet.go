@@ -2,17 +2,26 @@ package main
 
 import (
 	"fmt"
+	"os"
 	mywant "mywant/src"
+	types "mywant/cmd/types"
 )
 
 func main() {
 	fmt.Println("QNet Validation Demo")
 	fmt.Println("===================")
 
+	// Get config file path from command line argument
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run demo_qnet.go <config-file-path>")
+		os.Exit(1)
+	}
+	configPath := os.Args[1]
+
 	// Load YAML configuration
-	config, err := mywant.LoadConfigFromYAML("config/config-qnet.yaml")
+	config, err := mywant.LoadConfigFromYAML(configPath)
 	if err != nil {
-		fmt.Printf("Error loading config/config-qnet.yaml: %v\n", err)
+		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		return
 	}
 
@@ -22,7 +31,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register qnet node types
-	RegisterQNetWantTypes(builder)
+	types.RegisterQNetWantTypes(builder)
 
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()

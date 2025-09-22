@@ -24,7 +24,7 @@ wants:
   # Sink that collects and displays prime numbers
   - metadata:
       name: sink
-      type: sink
+      type: prime_sink
       labels:
         role: collector
     spec:

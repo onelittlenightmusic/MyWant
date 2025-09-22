@@ -1,0 +1,238 @@
+timestamp: "2025-09-22T23:30:02+09:00"
+execution_id: exec-20250922-233002
+wants:
+    - metadata:
+        id: want-1758551402854266001
+        name: queue main
+        type: qnet queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.05
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0.0032400410060536215
+        current_server_free_time: 499.40874616310055
+        last_packet_wait_time: 0
+        processedCount: 1000
+        serverFreeTime: 499.40874616310055
+        total_processed: 1000
+        total_wait_time: 3.2400410060536213
+        waitTimeSum: 3.2400410060536213
+      history:
+        parameterHistory:
+            - want_name: queue main
+              state_value:
+                service_time: 0.05
+              timestamp: 2025-09-22T23:30:02.855201+09:00
+        stateHistory:
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0010111858606352642
+                current_server_free_time: 48.39755117112764
+                last_packet_wait_time: 0
+                processedCount: 100
+                serverFreeTime: 48.39755117112764
+                total_processed: 100
+                total_wait_time: 0.10111858606352642
+                waitTimeSum: 0.10111858606352642
+              timestamp: 2025-09-22T23:30:02.855376+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.004399074143462755
+                current_server_free_time: 100.7929087122532
+                last_packet_wait_time: 0
+                processedCount: 200
+                serverFreeTime: 100.7929087122532
+                total_processed: 200
+                total_wait_time: 0.8798148286925509
+                waitTimeSum: 0.8798148286925509
+              timestamp: 2025-09-22T23:30:02.855432+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.004253918394840942
+                current_server_free_time: 147.71745231306565
+                last_packet_wait_time: 0
+                processedCount: 300
+                serverFreeTime: 147.71745231306565
+                total_processed: 300
+                total_wait_time: 1.2761755184522825
+                waitTimeSum: 1.2761755184522825
+              timestamp: 2025-09-22T23:30:02.855504+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.004072816201843508
+                current_server_free_time: 196.76411191146738
+                last_packet_wait_time: 0.06343516798190763
+                processedCount: 400
+                serverFreeTime: 196.76411191146738
+                total_processed: 400
+                total_wait_time: 1.6291264807374033
+                waitTimeSum: 1.6291264807374033
+              timestamp: 2025-09-22T23:30:02.855567+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0038978833070820087
+                current_server_free_time: 239.761041422336
+                last_packet_wait_time: 0
+                processedCount: 500
+                serverFreeTime: 239.761041422336
+                total_processed: 500
+                total_wait_time: 1.9489416535410042
+                waitTimeSum: 1.9489416535410042
+              timestamp: 2025-09-22T23:30:02.855622+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.003999062932554513
+                current_server_free_time: 286.1974445448308
+                last_packet_wait_time: 0.001705936462712998
+                processedCount: 600
+                serverFreeTime: 286.1974445448308
+                total_processed: 600
+                total_wait_time: 2.3994377595327077
+                waitTimeSum: 2.3994377595327077
+              timestamp: 2025-09-22T23:30:02.855686+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0038096586485859797
+                current_server_free_time: 337.45555383765804
+                last_packet_wait_time: 0
+                processedCount: 700
+                serverFreeTime: 337.45555383765804
+                total_processed: 700
+                total_wait_time: 2.666761054010186
+                waitTimeSum: 2.666761054010186
+              timestamp: 2025-09-22T23:30:02.855754+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0035393108514114925
+                current_server_free_time: 392.5255054457259
+                last_packet_wait_time: 0
+                processedCount: 800
+                serverFreeTime: 392.5255054457259
+                total_processed: 800
+                total_wait_time: 2.831448681129194
+                waitTimeSum: 2.831448681129194
+              timestamp: 2025-09-22T23:30:02.855811+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0033583033465693192
+                current_server_free_time: 448.9014680995208
+                last_packet_wait_time: 0
+                processedCount: 900
+                serverFreeTime: 448.9014680995208
+                total_processed: 900
+                total_wait_time: 3.0224730119123873
+                waitTimeSum: 3.0224730119123873
+              timestamp: 2025-09-22T23:30:02.855878+09:00
+            - want_name: queue main
+              state_value:
+                average_wait_time: 0.0032400410060536215
+                current_server_free_time: 499.40874616310055
+                last_packet_wait_time: 0
+                processedCount: 1000
+                serverFreeTime: 499.40874616310055
+                total_processed: 1000
+                total_wait_time: 3.2400410060536213
+                waitTimeSum: 3.2400410060536213
+              timestamp: 2025-09-22T23:30:02.855949+09:00
+    - metadata:
+        id: want-1758551402854266002
+        name: sink main
+        type: qnet sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: sink main
+              state_value: {}
+              timestamp: 2025-09-22T23:30:02.855206+09:00
+        stateHistory: []
+    - metadata:
+        id: want-1758551402854266000
+        name: gen primary
+        type: qnet numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 1000
+            rate: 2
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 1000
+        current_time: 499.35874616310053
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: gen primary
+              state_value:
+                count: 1000
+                rate: 2
+              timestamp: 2025-09-22T23:30:02.855187+09:00
+        stateHistory:
+            - want_name: gen primary
+              state_value:
+                current_count: 100
+                current_time: 48.34755117112764
+              timestamp: 2025-09-22T23:30:02.855373+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 200
+                current_time: 100.7429087122532
+              timestamp: 2025-09-22T23:30:02.855427+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 300
+                current_time: 147.66745231306564
+              timestamp: 2025-09-22T23:30:02.855499+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 400
+                current_time: 196.65067674348546
+              timestamp: 2025-09-22T23:30:02.855565+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 500
+                current_time: 239.711041422336
+              timestamp: 2025-09-22T23:30:02.855615+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 600
+                current_time: 286.14573860836805
+              timestamp: 2025-09-22T23:30:02.855681+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 700
+                current_time: 337.40555383765803
+              timestamp: 2025-09-22T23:30:02.855749+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 800
+                current_time: 392.4755054457259
+              timestamp: 2025-09-22T23:30:02.855804+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 900
+                current_time: 448.8514680995208
+              timestamp: 2025-09-22T23:30:02.855873+09:00
+            - want_name: gen primary
+              state_value:
+                current_count: 1000
+                current_time: 499.35874616310053
+              timestamp: 2025-09-22T23:30:02.855938+09:00

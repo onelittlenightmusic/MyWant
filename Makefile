@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci-loop run-travel run-hotel-agent run-sample-owner run-sample-owner-config run-qnet-target run-qnet-using-recipe run-parameter-history-test run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-queue-system-recipe run-qnet-recipe run-fibonacci-recipe run-prime-recipe
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe
 
 # Code quality targets
 fmt:
@@ -36,57 +36,33 @@ build: check
 test-build:
 	go mod tidy && go build ./src/...
 
-run-qnet:
-	go run cmd/demos/demo_qnet.go cmd/demos/qnet_types.go config/config-qnet.yaml
+run-fibonacci-loop:
+	go run cmd/demos/demo_fibonacci_loop.go config/config-fibonacci-loop.yaml
+
+run-fibonacci-recipe:
+	go run cmd/demos/demo_fibonacci_recipe.go config/config-fibonacci-recipe.yaml
 
 run-prime:
-	go run cmd/demos/demo_prime.go cmd/demos/prime_types.go
+	go run cmd/demos/demo_prime.go config/config-prime.yaml
 
-run-fibonacci-loop:
-	go run cmd/demos/demo_fibonacci_loop.go cmd/demos/fibonacci_loop_types.go config/config-fibonacci-loop.yaml
+run-qnet:
+	go run cmd/demos/demo_qnet.go config/config-qnet.yaml
 
-run-sample-owner:
-	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go
-
-run-sample-owner-config:
-	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go config/config-sample-owner.yaml
-
-run-qnet-target:
-	go run cmd/demos/demo_qnet_owner.go cmd/demos/qnet_types.go config/config-qnet-target.yaml
+run-qnet-recipe:
+	go run cmd/demos/demo_qnet_owner.go config/config-qnet-recipe.yaml
 
 run-travel:
-	go run cmd/demos/demo_travel.go cmd/demos/travel_types.go config/config-travel.yaml
-
-run-hotel-agent:
-	go run cmd/demos/demo_hotel_agent.go
-
-run-qnet-using-recipe:
-	go run cmd/demos/demo_qnet_using_recipe.go cmd/demos/qnet_types.go config/config-fibonacci-using-recipe.yaml
-
-run-parameter-history-test:
-	go run cmd/demos/demo_parameter_history.go cmd/demos/qnet_types.go
-
-run-hierarchical-approval:
-	go run cmd/demos/demo_hierarchical_approval.go cmd/demos/approval_types.go
+	go run cmd/demos/demo_travel.go config/config-travel.yaml
 
 # Recipe-based execution targets
 run-travel-recipe:
-	go run cmd/demos/demo_travel_recipe.go cmd/demos/travel_types.go config/config-travel-recipe.yaml
+	go run cmd/demos/demo_travel_recipe.go config/config-travel-recipe.yaml
 
-run-queue-system-recipe:
-	go run cmd/demos/demo_queue_system_recipe.go cmd/demos/qnet_types.go config/config-queue-system-recipe.yaml
-
-run-qnet-recipe:
-	go run cmd/demos/demo_qnet_recipe.go cmd/demos/qnet_types.go config/config-qnet-recipe.yaml
-
-run-fibonacci-recipe:
-	go run cmd/demos/demo_fibonacci_recipe.go cmd/demos/fibonacci_types.go config/config-fibonacci-recipe.yaml
-
-run-prime-recipe:
-	go run cmd/demos/demo_prime_recipe.go cmd/demos/prime_types.go config/config-prime-recipe.yaml
+run-hierarchical-approval:
+	go run cmd/demos/demo_hierarchical_approval.go config/config-hierarchical-approval.yaml
 
 # Build the mywant server binary
-build-server: check
+build-server:
 	@echo "🏗️  Building mywant server..."
 	mkdir -p bin
 	go build -o bin/mywant cmd/server/*.go
@@ -202,15 +178,16 @@ help:
 	@echo "🏃 Run Examples:"
 	@echo "  run-qnet              - Queue network example"
 	@echo "  run-prime             - Prime number example"
+	@echo "  run-fibonacci         - Fibonacci sequence example"
 	@echo "  run-fibonacci-loop    - Fibonacci loop example"
 	@echo "  run-travel            - Travel planning example"
+	@echo "  run-sample-owner      - QNet with dynamic recipe loading"
+	@echo "  run-qnet-target       - QNet with target want"
+	@echo "  run-hierarchical-approval - Hierarchical approval workflow"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
-	@echo "  run-queue-system-recipe - Queue system with recipes"
-	@echo "  run-qnet-recipe       - QNet with recipes"
-	@echo "  run-fibonacci-recipe  - Fibonacci with recipes"
-	@echo "  run-prime-recipe      - Prime with recipes"
+	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"
 	@echo "  run-server       - Start mywant server"

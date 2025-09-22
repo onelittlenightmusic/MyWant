@@ -1,0 +1,47 @@
+timestamp: "2025-09-21T19:12:23+09:00"
+execution_id: exec-20250921-191223
+wants:
+    - metadata:
+        name: generator
+        type: numbers
+        labels:
+            role: source
+      spec:
+        params:
+            count: 10
+            rate: 10
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 10
+        current_time: 10.185451938124201
+        total_processed: 10
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: generator
+              state_value:
+                count: 10
+                rate: 10
+              timestamp: 2025-09-21T19:12:23.977954+09:00
+        stateHistory: []
+    - metadata:
+        name: collector
+        type: sink
+        labels:
+            role: sink
+      spec:
+        params: {}
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 10
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: collector
+              state_value: {}
+              timestamp: 2025-09-21T19:12:23.977956+09:00
+        stateHistory: []

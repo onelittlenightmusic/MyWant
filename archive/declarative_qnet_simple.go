@@ -3,8 +3,8 @@ package main
 
 import (
 	"fmt"
-	"mywant/src/chain"
 	"math/rand"
+	"mywant/src/chain"
 )
 
 // Packet represents data flowing through the network

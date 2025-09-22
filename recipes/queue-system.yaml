@@ -16,7 +16,7 @@ recipe:
 
   wants:
     # Generator want - explicitly define all labels in recipe
-    - type: numbers
+    - type: qnet numbers
       labels:
         role: source               # Explicitly defined, not auto-generated
         category: queue-producer   # Recipe-specific connection label
@@ -27,7 +27,7 @@ recipe:
         deterministic: deterministic
 
     # Queue want - explicitly define all labels in recipe
-    - type: queue
+    - type: qnet queue
       labels:
         role: processor           # Explicitly defined, not auto-generated
         category: queue-processor # Recipe-specific semantic label
@@ -39,7 +39,7 @@ recipe:
         - category: queue-producer  # Connect to generator via recipe-defined label
 
     # Sink want - explicitly define all labels in recipe
-    - type: sink
+    - type: qnet sink
       labels:
         role: collector           # Explicitly defined, not auto-generated  
         category: result-display  # Recipe-specific semantic label

@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"mywant/src/chain"
 	"math/rand"
+	"mywant/src/chain"
 	"time"
 )
 

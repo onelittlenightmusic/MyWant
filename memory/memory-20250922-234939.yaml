@@ -1,0 +1,186 @@
+timestamp: "2025-09-22T23:49:39+09:00"
+execution_id: exec-20250922-234939
+wants:
+    - metadata:
+        id: want-1758552579151442000
+        name: travel planner
+        type: travel itinerary planner
+        labels:
+            role: travel-planner
+      spec:
+        params:
+            buffet_type: international
+            dinner_duration: 2
+            display_name: Agent Delegation Travel Test
+            hotel_type: luxury
+            prefix: vacation
+            restaurant_type: fine dining
+      status: completed
+      state:
+        buffet_total_processed: 1
+        childCount: 8
+        hotel_total_processed: 1
+        metrics:
+            buffet_total_processed: 1
+            hotel_total_processed: 1
+            restaurant_total_processed: 1
+            travel_coordinator_total_processed: 3
+        primaryResult: 3
+        recipePath: recipes/travel-itinerary.yaml
+        recipeResult: 3
+        restaurant_total_processed: 1
+        result: 'Total travel bookings coordinated: 3'
+        travel_coordinator_total_processed: 3
+      history:
+        parameterHistory:
+            - want_name: travel planner
+              state_value:
+                buffet_type: international
+                dinner_duration: 2
+                display_name: Agent Delegation Travel Test
+                hotel_type: luxury
+                prefix: vacation
+                restaurant_type: fine dining
+              timestamp: 2025-09-22T23:49:39.157422+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-restaurant-1
+        type: restaurant
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            duration_hours: 2
+            restaurant_type: fine dining
+      status: completed
+      state:
+        attempted: true
+        reservation_duration_hours: 2
+        reservation_end_time: "22:47"
+        reservation_name: vacation-restaurant-1 dinner at fine dining restaurant
+        reservation_start_time: "20:47"
+        reservation_type: fine dining
+        schedule_date: "2025-09-23"
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-restaurant-1
+              state_value:
+                duration_hours: 2
+                restaurant_type: fine dining
+              timestamp: 2025-09-22T23:49:39.160098+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-hotel-2
+        type: hotel
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            hotel_type: luxury
+      status: completed
+      state:
+        attempted: true
+        check_in_time: 22:06 Sep 23
+        check_out_time: 08:20 Sep 24
+        hotel_type: luxury
+        reservation_name: vacation-hotel-2 stay at luxury hotel
+        stay_duration_hours: 10.233333333333333
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-hotel-2
+              state_value:
+                hotel_type: luxury
+              timestamp: 2025-09-22T23:49:39.160104+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-buffet-3
+        type: buffet
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            buffet_type: international
+      status: completed
+      state:
+        attempted: true
+        buffet_duration_hours: 1.5
+        buffet_end_time: 10:38 Sep 24
+        buffet_start_time: 09:08 Sep 24
+        buffet_type: international
+        reservation_name: vacation-buffet-3 international breakfast buffet
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-buffet-3
+              state_value:
+                buffet_type: international
+              timestamp: 2025-09-22T23:49:39.160109+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-travel_coordinator-4
+        type: travel_coordinator
+        labels:
+            owner: child
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_name: Agent Delegation Travel Test
+        using:
+            - role: scheduler
+      status: completed
+      state:
+        schedules:
+            - events:
+                - start: 2025-09-23T22:06:00+09:00
+                  end: 2025-09-24T08:20:00+09:00
+                  type: hotel
+                  name: vacation-hotel-2 stay at luxury hotel
+              date: 2025-09-23T23:49:39.160161+09:00
+            - events:
+                - start: 2025-09-24T09:08:00+09:00
+                  end: 2025-09-24T10:38:00+09:00
+                  type: buffet
+                  name: vacation-buffet-3 international breakfast buffet
+              date: 2025-09-24T23:49:39.160191+09:00
+            - events:
+                - start: 2025-09-23T20:47:00+09:00
+                  end: 2025-09-23T22:47:00+09:00
+                  type: restaurant
+                  name: vacation-restaurant-1 dinner at fine dining restaurant
+              date: 2025-09-23T23:49:39.160181+09:00
+        total_processed: 3
+      history:
+        parameterHistory:
+            - want_name: vacation-travel_coordinator-4
+              state_value:
+                display_name: Agent Delegation Travel Test
+              timestamp: 2025-09-22T23:49:39.160114+09:00
+        stateHistory: []

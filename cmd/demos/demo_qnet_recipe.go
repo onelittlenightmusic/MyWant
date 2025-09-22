@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -44,7 +45,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, combiner, sink)
-	RegisterQNetWantTypes(builder)
+	types.RegisterQNetWantTypes(builder)
 
 	fmt.Println("🏁 Executing recipe-based qnet with parameterized using fields...")
 	builder.Execute()

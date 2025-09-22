@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	mywant "mywant/src"
+	types "mywant/cmd/types"
 )
 
 // ServerConfig holds server configuration
@@ -368,12 +369,13 @@ func (s *Server) executeWantAsync(wantID string) {
 	want.Builder = builder
 
 	// Register want types
-	RegisterQNetWantTypes(builder)      // QNet types (numbers, queue, sink, etc.)
-	RegisterFibonacciWantTypes(builder) // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
-	RegisterPrimeWantTypes(builder)     // Prime types (prime_numbers, prime_sieve)
-	mywant.RegisterOwnerWantTypes(builder)   // Owner types (target)
-	mywant.RegisterMonitorWantTypes(builder) // Monitor types (monitor, alert)
-	mywant.RegisterHotelWantTypes(builder, nil) // Hotel types (hotel, restaurant, travel_coordinator)
+	types.RegisterQNetWantTypes(builder)              // QNet types (qnet numbers, qnet queue, qnet sink, etc.)
+	types.RegisterFibonacciWantTypes(builder)         // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
+	types.RegisterPrimeWantTypes(builder)             // Prime types (prime_numbers, prime_sieve)
+	types.RegisterTravelWantTypes(builder)
+	mywant.RegisterOwnerWantTypes(builder)      // Owner types (target)
+	mywant.RegisterMonitorWantTypes(builder)    // Monitor types (monitor, alert)
+	//mywant.RegisterHotelWantTypes(builder, nil) // Hotel types (hotel, restaurant, travel_coordinator)
 
 	// Execute the chain
 	fmt.Printf("[SERVER] Executing want %s with %d wants\n", wantID, len(want.Config.Wants))

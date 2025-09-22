@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -45,7 +46,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types
-	RegisterQNetWantTypes(builder)
+	types.RegisterQNetWantTypes(builder)
 
 	fmt.Println("🚀 Executing qnet with using fields from YAML...")
 	builder.Execute()

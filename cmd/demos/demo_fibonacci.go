@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -10,16 +11,17 @@ func main() {
 	fmt.Println("Fibonacci Sequence Demo (YAML Config)")
 	fmt.Println("=====================================")
 
-	// Get YAML file from command line argument
-	yamlFile := "config/config-fibonacci.yaml"
-	if len(os.Args) > 1 {
-		yamlFile = os.Args[1]
+	// Get config file path from command line argument
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run demo_fibonacci.go <config-file-path>")
+		os.Exit(1)
 	}
+	configPath := os.Args[1]
 
 	// Load YAML configuration
-	config, err := LoadConfigFromYAML(yamlFile)
+	config, err := LoadConfigFromYAML(configPath)
 	if err != nil {
-		fmt.Printf("Error loading %s: %v\n", yamlFile, err)
+		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		return
 	}
 
@@ -28,8 +30,8 @@ func main() {
 	// Create chain builder
 	builder := NewChainBuilder(config)
 
-	// Register fibonacci node types
-	RegisterFibonacciWantTypes(builder)
+	// Register fibonacci loop node types
+	types.RegisterFibonacciLoopWantTypes(builder)
 
 	// Register owner/target types for Target system support
 	RegisterOwnerWantTypes(builder)

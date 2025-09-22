@@ -1,4 +1,4 @@
-package main
+package types
 
 import (
 	. "mywant/src"
@@ -314,7 +314,7 @@ func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	})
 
 	// Register sink type for collecting results
-	builder.RegisterWantType("sink", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("prime_sink", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeSink(metadata, spec)
 	})
 }

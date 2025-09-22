@@ -1,9 +1,9 @@
 package main
 
 import (
-	"mywant/src/chain"
 	"fmt"
 	"math/rand"
+	"mywant/src/chain"
 	// "runtime"
 )
 

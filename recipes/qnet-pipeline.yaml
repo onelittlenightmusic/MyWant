@@ -15,7 +15,7 @@ recipe:
   wants:
     # Primary packet generator
     - name: "gen-primary"
-      type: numbers
+      type: qnet numbers
       labels:
         role: source
         stream: primary
@@ -26,7 +26,7 @@ recipe:
 
     # Secondary packet generator
     - name: "gen-secondary" 
-      type: numbers
+      type: qnet numbers
       labels:
         role: source
         stream: secondary
@@ -37,7 +37,7 @@ recipe:
 
     # Main queue processing primary stream
     - name: "queue-primary"
-      type: queue
+      type: qnet queue
       labels:
         role: processor
         stage: first
@@ -51,7 +51,7 @@ recipe:
 
     # Alt queue processing secondary stream
     - name: "queue-secondary"
-      type: queue
+      type: qnet queue
       labels:
         role: processor
         stage: first
@@ -65,7 +65,7 @@ recipe:
 
     # Stream combiner - connects to both first-stage processors
     - name: "combiner-main"
-      type: combiner
+      type: qnet combiner
       labels:
         role: merger
         operation: combine
@@ -77,7 +77,7 @@ recipe:
 
     # Final processing queue - connects to combiner
     - name: "queue-final"
-      type: queue
+      type: qnet queue
       labels:
         role: processor
         stage: final
@@ -89,7 +89,7 @@ recipe:
 
     # Final collector - connects to final processor
     - name: "collector-end"
-      type: sink
+      type: qnet sink
       labels:
         role: terminal
         stage: end

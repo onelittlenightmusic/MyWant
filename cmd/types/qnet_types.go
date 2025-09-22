@@ -1,4 +1,4 @@
-package main
+package types
 
 import (
 	"fmt"
@@ -527,27 +527,27 @@ func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 // RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder
 func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
 	// Register numbers generator type - return the enhanced want itself for validation
-	builder.RegisterWantType("numbers", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+	builder.RegisterWantType("qnet numbers", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return PacketNumbers(metadata, spec)
 	})
 
 	// Register queue type - return the enhanced want itself for validation
-	builder.RegisterWantType("queue", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+	builder.RegisterWantType("qnet queue", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return NewQueue(metadata, spec)
 	})
 
 	// Register combiner type - return the enhanced want itself for validation
-	builder.RegisterWantType("combiner", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+	builder.RegisterWantType("qnet combiner", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return NewCombiner(metadata, spec)
 	})
 
 	// Register sink type - return the enhanced want itself for validation
-	builder.RegisterWantType("sink", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+	builder.RegisterWantType("qnet sink", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
 
 	// Register collector type (alias for sink) - return the enhanced want itself for validation
-	builder.RegisterWantType("collector", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+	builder.RegisterWantType("qnet collector", func(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		return Goal(metadata, spec)
 	})
 }

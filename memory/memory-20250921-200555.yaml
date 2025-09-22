@@ -1,0 +1,94 @@
+timestamp: "2025-09-21T20:05:55+09:00"
+execution_id: exec-20250921-200555
+wants:
+    - metadata:
+        id: want-1758452755803136001
+        name: processing queue
+        type: queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0.017649948852968896
+        current_server_free_time: 53.07613233900712
+        last_packet_wait_time: 0.09605350710599936
+        processedCount: 100
+        serverFreeTime: 53.07613233900712
+        total_processed: 100
+        total_wait_time: 1.7649948852968895
+        waitTimeSum: 1.7649948852968895
+      history:
+        parameterHistory:
+            - want_name: processing queue
+              state_value:
+                service_time: 0.1
+              timestamp: 2025-09-21T20:05:55.807063+09:00
+        stateHistory:
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.017649948852968896
+                current_server_free_time: 53.07613233900712
+                last_packet_wait_time: 0.09605350710599936
+                processedCount: 100
+                serverFreeTime: 53.07613233900712
+                total_processed: 100
+                total_wait_time: 1.7649948852968895
+                waitTimeSum: 1.7649948852968895
+              timestamp: 2025-09-21T20:05:55.807311+09:00
+    - metadata:
+        id: want-1758452755803136002
+        name: result collector
+        type: sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: result collector
+              state_value: {}
+              timestamp: 2025-09-21T20:05:55.807068+09:00
+        stateHistory: []
+    - metadata:
+        id: want-1758452755803136000
+        name: number generator
+        type: numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 100
+            rate: 2
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 100
+        current_time: 52.880078831901116
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: number generator
+              state_value:
+                count: 100
+                rate: 2
+              timestamp: 2025-09-21T20:05:55.807052+09:00
+        stateHistory:
+            - want_name: number generator
+              state_value:
+                current_count: 100
+                current_time: 52.880078831901116
+              timestamp: 2025-09-21T20:05:55.807311+09:00

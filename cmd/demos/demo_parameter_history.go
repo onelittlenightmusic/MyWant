@@ -5,6 +5,7 @@ import (
 	"time"
 
 	mywant "mywant/src"
+	"mywant/cmd/types"
 )
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 
 	// Create chain builder and register types
 	builder := mywant.NewChainBuilder(*config)
-	RegisterQNetWantTypes(builder)
+	types.RegisterQNetWantTypes(builder)
 
 	fmt.Println("🔧 Creating test want...")
 

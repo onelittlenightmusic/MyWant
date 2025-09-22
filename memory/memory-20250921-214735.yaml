@@ -1,0 +1,238 @@
+timestamp: "2025-09-21T21:47:35+09:00"
+execution_id: exec-20250921-214735
+wants:
+    - metadata:
+        id: want-1758458855821250000
+        name: number generator
+        type: numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 1000
+            rate: 2
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 1000
+        current_time: 532.132999766069
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: number generator
+              state_value:
+                count: 1000
+                rate: 2
+              timestamp: 2025-09-21T21:47:35.825055+09:00
+        stateHistory:
+            - want_name: number generator
+              state_value:
+                current_count: 100
+                current_time: 58.867409981311674
+              timestamp: 2025-09-21T21:47:35.825333+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 200
+                current_time: 103.98584648648982
+              timestamp: 2025-09-21T21:47:35.825469+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 300
+                current_time: 154.989077867131
+              timestamp: 2025-09-21T21:47:35.825613+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 400
+                current_time: 203.5626229328093
+              timestamp: 2025-09-21T21:47:35.825768+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 500
+                current_time: 250.46213750208386
+              timestamp: 2025-09-21T21:47:35.825912+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 600
+                current_time: 302.4681725552597
+              timestamp: 2025-09-21T21:47:35.826046+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 700
+                current_time: 365.92974912370204
+              timestamp: 2025-09-21T21:47:35.826179+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 800
+                current_time: 416.1452425347647
+              timestamp: 2025-09-21T21:47:35.82632+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 900
+                current_time: 478.6654628996046
+              timestamp: 2025-09-21T21:47:35.826468+09:00
+            - want_name: number generator
+              state_value:
+                current_count: 1000
+                current_time: 532.132999766069
+              timestamp: 2025-09-21T21:47:35.826582+09:00
+    - metadata:
+        id: want-1758458855821250001
+        name: processing queue
+        type: queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0.013013121364011084
+        current_server_free_time: 532.2499679194602
+        last_packet_wait_time: 0.016968153391189844
+        processedCount: 1000
+        serverFreeTime: 532.2499679194602
+        total_processed: 1000
+        total_wait_time: 13.013121364011084
+        waitTimeSum: 13.013121364011084
+      history:
+        parameterHistory:
+            - want_name: processing queue
+              state_value:
+                service_time: 0.1
+              timestamp: 2025-09-21T21:47:35.82507+09:00
+        stateHistory:
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.015450749102236481
+                current_server_free_time: 58.967409981311675
+                last_packet_wait_time: 0
+                processedCount: 100
+                serverFreeTime: 58.967409981311675
+                total_processed: 100
+                total_wait_time: 1.545074910223648
+                waitTimeSum: 1.545074910223648
+              timestamp: 2025-09-21T21:47:35.825346+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.01609485234318669
+                current_server_free_time: 104.08584648648981
+                last_packet_wait_time: 0
+                processedCount: 200
+                serverFreeTime: 104.08584648648981
+                total_processed: 200
+                total_wait_time: 3.2189704686373384
+                waitTimeSum: 3.2189704686373384
+              timestamp: 2025-09-21T21:47:35.825484+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.015072035791326455
+                current_server_free_time: 155.08907786713098
+                last_packet_wait_time: 0
+                processedCount: 300
+                serverFreeTime: 155.08907786713098
+                total_processed: 300
+                total_wait_time: 4.521610737397936
+                waitTimeSum: 4.521610737397936
+              timestamp: 2025-09-21T21:47:35.825625+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.014618108808366375
+                current_server_free_time: 203.66262293280928
+                last_packet_wait_time: 0
+                processedCount: 400
+                serverFreeTime: 203.66262293280928
+                total_processed: 400
+                total_wait_time: 5.84724352334655
+                waitTimeSum: 5.84724352334655
+              timestamp: 2025-09-21T21:47:35.825781+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.014189611853665327
+                current_server_free_time: 250.56213750208386
+                last_packet_wait_time: 0
+                processedCount: 500
+                serverFreeTime: 250.56213750208386
+                total_processed: 500
+                total_wait_time: 7.094805926832664
+                waitTimeSum: 7.094805926832664
+              timestamp: 2025-09-21T21:47:35.825923+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.013802757129246335
+                current_server_free_time: 302.5681725552597
+                last_packet_wait_time: 0
+                processedCount: 600
+                serverFreeTime: 302.5681725552597
+                total_processed: 600
+                total_wait_time: 8.281654277547801
+                waitTimeSum: 8.281654277547801
+              timestamp: 2025-09-21T21:47:35.826056+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.013242196207581816
+                current_server_free_time: 366.02974912370206
+                last_packet_wait_time: 0
+                processedCount: 700
+                serverFreeTime: 366.02974912370206
+                total_processed: 700
+                total_wait_time: 9.26953734530727
+                waitTimeSum: 9.26953734530727
+              timestamp: 2025-09-21T21:47:35.826188+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.0129043684027857
+                current_server_free_time: 416.2452425347647
+                last_packet_wait_time: 0
+                processedCount: 800
+                serverFreeTime: 416.2452425347647
+                total_processed: 800
+                total_wait_time: 10.32349472222856
+                waitTimeSum: 10.32349472222856
+              timestamp: 2025-09-21T21:47:35.826334+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.012490937390912948
+                current_server_free_time: 478.76546289960464
+                last_packet_wait_time: 0
+                processedCount: 900
+                serverFreeTime: 478.76546289960464
+                total_processed: 900
+                total_wait_time: 11.241843651821654
+                waitTimeSum: 11.241843651821654
+              timestamp: 2025-09-21T21:47:35.826472+09:00
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.013013121364011084
+                current_server_free_time: 532.2499679194602
+                last_packet_wait_time: 0.016968153391189844
+                processedCount: 1000
+                serverFreeTime: 532.2499679194602
+                total_processed: 1000
+                total_wait_time: 13.013121364011084
+                waitTimeSum: 13.013121364011084
+              timestamp: 2025-09-21T21:47:35.826592+09:00
+    - metadata:
+        id: want-1758458855821250002
+        name: result collector
+        type: sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 1000
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: result collector
+              state_value: {}
+              timestamp: 2025-09-21T21:47:35.825076+09:00
+        stateHistory: []

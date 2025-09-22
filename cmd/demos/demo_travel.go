@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	. "mywant/src"
+	"mywant/cmd/types"
 )
 
 func main() {
@@ -14,10 +16,17 @@ func main() {
 	fmt.Println("- Breakfast buffet next morning")
 	fmt.Println()
 
+	// Get config file path from command line argument
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run demo_travel.go <config-file-path>")
+		os.Exit(1)
+	}
+	configPath := os.Args[1]
+
 	// Load YAML configuration
-	config, err := LoadConfigFromYAML("config/config-travel.yaml")
+	config, err := LoadConfigFromYAML(configPath)
 	if err != nil {
-		fmt.Printf("Error loading config/config-travel.yaml: %v\n", err)
+		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		return
 	}
 
@@ -27,7 +36,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types
-	RegisterTravelWantTypes(builder)
+	types.RegisterTravelWantTypes(builder)
 
 	fmt.Println("\n🏁 Executing travel planning workflow...")
 	builder.Execute()

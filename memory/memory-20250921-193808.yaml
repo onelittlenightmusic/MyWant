@@ -1,0 +1,22 @@
+timestamp: "2025-09-21T19:38:08+09:00"
+execution_id: exec-20250921-193808
+wants:
+    - metadata:
+        id: want-1758451088457198000
+        name: test-want
+        type: numbers
+        labels:
+            role: source
+      spec:
+        params:
+            count: 5
+            rate: 10
+      status: completed
+      history:
+        parameterHistory:
+            - want_name: test-want
+              state_value:
+                count: 5
+                rate: 10
+              timestamp: 2025-09-21T19:38:08.458619+09:00
+        stateHistory: []

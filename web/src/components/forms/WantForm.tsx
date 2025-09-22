@@ -16,7 +16,7 @@ const SAMPLE_YAML = `wants:
   # Packet generator
   - metadata:
       name: "number generator"
-      type: "numbers"
+      type: "qnet numbers"
       labels:
         role: "source"
         stream: "primary"
@@ -28,7 +28,7 @@ const SAMPLE_YAML = `wants:
   # Processing queue
   - metadata:
       name: "processing queue"
-      type: "queue"
+      type: "qnet queue"
       labels:
         role: "processor"
     spec:
@@ -40,7 +40,7 @@ const SAMPLE_YAML = `wants:
   # Final collector
   - metadata:
       name: "result collector"
-      type: "sink"
+      type: "qnet sink"
       labels:
         role: "terminal"
     spec:
@@ -53,7 +53,7 @@ const FIBONACCI_EXAMPLE = `wants:
   # Number generator for fibonacci sequence
   - metadata:
       name: "fibonacci generator"
-      type: "numbers"
+      type: "fibonaaci numbers"
       labels:
         role: "source"
         target: "fibonacci sequence"
@@ -78,7 +78,7 @@ const FIBONACCI_EXAMPLE = `wants:
   # Result collector
   - metadata:
       name: "fibonacci collector"
-      type: "collector"
+      type: "fibonacci collector"
       labels:
         role: "terminal"
     spec:
@@ -88,45 +88,20 @@ const FIBONACCI_EXAMPLE = `wants:
 `;
 
 const TRAVEL_EXAMPLE = `wants:
-  # Travel request generator
+  # Dinner restaurant reservation
   - metadata:
-      name: "travel request generator"
-      type: "numbers"
+      name: travel planner
+      type: travel itinerary planner
       labels:
-        role: "source"
-        category: "travel"
-        target: "travel itinerary planner"
+        role: travel-planner
     spec:
       params:
-        count: 5
-        rate: 1.0
-
-  # Travel itinerary planner
-  - metadata:
-      name: "travel planner"
-      type: "travel itinerary planner"
-      labels:
-        role: "processor"
-        category: "planning"
-    spec:
-      params:
-        destination: "Tokyo"
-        duration_days: 3
-        budget: 2000
-      using:
-        - role: "source"
-
-  # Travel result collector
-  - metadata:
-      name: "travel collector"
-      type: "collector"
-      labels:
-        role: "terminal"
-        category: "results"
-    spec:
-      params: {}
-      using:
-        - role: "processor"
+        prefix: vacation
+        display_name: "Agent Delegation Travel Test"
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        buffet_type: "international"
+        dinner_duration: 2.0
 `;
 
 export const WantForm: React.FC<WantFormProps> = ({

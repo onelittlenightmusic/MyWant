@@ -3,8 +3,8 @@ package main
 
 import (
 	"fmt"
-	"mywant/src/chain"
 	"math/rand"
+	"mywant/src/chain"
 )
 
 // BaseNode defines the common interface for all network nodes

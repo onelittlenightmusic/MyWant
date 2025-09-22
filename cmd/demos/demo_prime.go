@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -10,16 +11,17 @@ func main() {
 	fmt.Println("Prime Sieve Demo (YAML Config)")
 	fmt.Println("==============================")
 
-	// Get YAML file from command line argument
-	yamlFile := "config/config-prime.yaml"
-	if len(os.Args) > 1 {
-		yamlFile = os.Args[1]
+	// Get config file path from command line argument
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run demo_prime.go <config-file-path>")
+		os.Exit(1)
 	}
+	configPath := os.Args[1]
 
 	// Load YAML configuration
-	config, err := LoadConfigFromYAML(yamlFile)
+	config, err := LoadConfigFromYAML(configPath)
 	if err != nil {
-		fmt.Printf("Error loading %s: %v\n", yamlFile, err)
+		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		return
 	}
 
@@ -29,7 +31,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register prime node types
-	RegisterPrimeWantTypes(builder)
+	types.RegisterPrimeWantTypes(builder)
 
 	fmt.Println("\nExecuting prime sieve with reconcile loop...")
 	builder.Execute()

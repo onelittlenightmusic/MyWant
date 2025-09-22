@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -41,7 +42,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types first
-	RegisterTravelWantTypes(builder)
+	types.RegisterTravelWantTypes(builder)
 
 	// Register owner-based want types (includes target and child wants)
 	RegisterOwnerWantTypes(builder)

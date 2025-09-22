@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	. "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -37,7 +38,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register fibonacci want types
-	RegisterFibonacciWantTypes(builder)
+	types.RegisterFibonacciWantTypes(builder)
 
 	fmt.Println("🏁 Executing recipe-based fibonacci sequence...")
 	builder.Execute()

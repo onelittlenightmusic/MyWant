@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	mywant "mywant/src"
+	"mywant/cmd/types"
 	"os"
 )
 
@@ -41,7 +42,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types
-	RegisterQNetWantTypes(builder)         // For qnet types (numbers, queue, sink, etc.)
+	types.RegisterQNetWantTypes(builder)         // For qnet types (numbers, queue, sink, etc.)
 	mywant.RegisterOwnerWantTypes(builder) // For owner types (target)
 
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")

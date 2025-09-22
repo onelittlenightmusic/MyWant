@@ -1,8 +1,8 @@
 package main
 
 import (
-	"mywant/src/chain"
 	"fmt"
+	"mywant/src/chain"
 )
 
 type tupple struct {
@@ -73,13 +73,13 @@ func end_func(cend chain.Chan) (fin bool) {
 
 func main() {
 	/*	start_chain, add_chain, end_chain := chain.Chain()
-		start_chain	(init_func)
-		add_chain	(double)
-		add_chain	(plus)
-	//	end_chain	(end_func)
-		add_chain	(double)
-		add_chain	(plus)
-		end_chain	(end_func)
+			start_chain	(init_func)
+			add_chain	(double)
+			add_chain	(plus)
+		//	end_chain	(end_func)
+			add_chain	(double)
+			add_chain	(plus)
+			end_chain	(end_func)
 	*/
 	var c1 chain.C_chain
 	c1.Start(init_func)
