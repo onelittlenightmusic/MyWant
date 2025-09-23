@@ -80,6 +80,16 @@ type ParameterUpdate struct {
 	Timestamp  time.Time   `json:"timestamp"`
 }
 
+// AgentExecution represents information about an agent execution
+type AgentExecution struct {
+	AgentName   string    `json:"agent_name" yaml:"agent_name"`
+	AgentType   string    `json:"agent_type" yaml:"agent_type"`
+	StartTime   time.Time `json:"start_time" yaml:"start_time"`
+	EndTime     *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
+	Status      string    `json:"status" yaml:"status"` // "running", "completed", "failed"
+	Error       string    `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
 // ParameterUpdateListener represents a want that can receive parameter updates
 type ParameterUpdateListener interface {
 	OnParameterUpdate(update ParameterUpdate) bool
@@ -157,6 +167,11 @@ type Want struct {
 	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
 	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
 	History  WantHistory            `json:"history" yaml:"history"`
+
+	// Agent execution information
+	CurrentAgent     string            `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
+	RunningAgents    []string          `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
+	AgentHistory     []AgentExecution  `json:"agent_history,omitempty" yaml:"agent_history,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
 	pendingStateChanges     map[string]interface{} `json:"-" yaml:"-"`
@@ -2462,11 +2477,76 @@ func (n *Want) executeAgent(agent Agent) error {
 	// Store cancel function for later cleanup
 	n.runningAgents[agent.GetName()] = cancel
 
-	// Execute agent in goroutine
-	go func() {
+	// Initialize agent tracking fields if needed
+	if n.RunningAgents == nil {
+		n.RunningAgents = make([]string, 0)
+	}
+	if n.AgentHistory == nil {
+		n.AgentHistory = make([]AgentExecution, 0)
+	}
+
+	// Add to running agents list
+	n.RunningAgents = append(n.RunningAgents, agent.GetName())
+	n.CurrentAgent = agent.GetName()
+
+	// Store agent information in state for history tracking
+	n.StoreState("current_agent", agent.GetName())
+	n.StoreState("running_agents", n.RunningAgents)
+
+	// Create agent execution record
+	agentExec := AgentExecution{
+		AgentName: agent.GetName(),
+		AgentType: string(agent.GetType()),
+		StartTime: time.Now(),
+		Status:    "running",
+	}
+	n.AgentHistory = append(n.AgentHistory, agentExec)
+	n.StoreState("agent_history", n.AgentHistory)
+
+	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
+	executeFunc := func() {
 		defer func() {
+			// Update agent execution record
+			for i := range n.AgentHistory {
+				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].EndTime == nil {
+					endTime := time.Now()
+					n.AgentHistory[i].EndTime = &endTime
+					break
+				}
+			}
+
+			// Remove from running agents list
+			for i, runningAgent := range n.RunningAgents {
+				if runningAgent == agent.GetName() {
+					n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
+					break
+				}
+			}
+
+			// Update current agent (set to empty if no more agents running)
+			if len(n.RunningAgents) == 0 {
+				n.CurrentAgent = ""
+			} else {
+				// Set to the last running agent
+				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
+			}
+
+			// Update state with current agent and running agents info
+			n.StoreState("current_agent", n.CurrentAgent)
+			n.StoreState("running_agents", n.RunningAgents)
+
 			if r := recover(); r != nil {
 				fmt.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
+				// Update agent execution record with panic info
+				for i := range n.AgentHistory {
+					if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
+						n.AgentHistory[i].Status = "failed"
+						n.AgentHistory[i].Error = fmt.Sprintf("Panic: %v", r)
+						break
+					}
+				}
+				// Update state with latest agent history
+				n.StoreState("agent_history", n.AgentHistory)
 			}
 			// Remove from running agents when done
 			delete(n.runningAgents, agent.GetName())
@@ -2474,8 +2554,37 @@ func (n *Want) executeAgent(agent Agent) error {
 
 		if err := agent.Exec(ctx, n); err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
+			// Update agent execution record with error
+			for i := range n.AgentHistory {
+				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
+					n.AgentHistory[i].Status = "failed"
+					n.AgentHistory[i].Error = err.Error()
+					break
+				}
+			}
+			// Update state with latest agent history
+			n.StoreState("agent_history", n.AgentHistory)
+		} else {
+			// Mark as completed
+			for i := range n.AgentHistory {
+				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
+					n.AgentHistory[i].Status = "completed"
+					break
+				}
+			}
+			// Update state with latest agent history
+			n.StoreState("agent_history", n.AgentHistory)
 		}
-	}()
+	}
+
+	// Execute synchronously for DO agents, asynchronously for MONITOR agents
+	if agent.GetType() == DoAgentType {
+		// DO agents execute synchronously to return results immediately
+		executeFunc()
+	} else {
+		// MONITOR agents execute asynchronously to run in background
+		go executeFunc()
+	}
 
 	return nil
 }
@@ -2489,10 +2598,22 @@ func (n *Want) StopAllAgents() {
 	for agentName, cancel := range n.runningAgents {
 		fmt.Printf("Stopping agent: %s\n", agentName)
 		cancel()
+
+		// Update agent execution records
+		for i := range n.AgentHistory {
+			if n.AgentHistory[i].AgentName == agentName && n.AgentHistory[i].Status == "running" {
+				endTime := time.Now()
+				n.AgentHistory[i].EndTime = &endTime
+				n.AgentHistory[i].Status = "terminated"
+				break
+			}
+		}
 	}
 
-	// Clear the map
+	// Clear the maps and lists
 	n.runningAgents = make(map[string]context.CancelFunc)
+	n.RunningAgents = make([]string, 0)
+	n.CurrentAgent = ""
 }
 
 // StopAgent stops a specific running agent
@@ -2505,6 +2626,33 @@ func (n *Want) StopAgent(agentName string) {
 		fmt.Printf("Stopping agent: %s\n", agentName)
 		cancel()
 		delete(n.runningAgents, agentName)
+
+		// Update agent execution record
+		for i := range n.AgentHistory {
+			if n.AgentHistory[i].AgentName == agentName && n.AgentHistory[i].Status == "running" {
+				endTime := time.Now()
+				n.AgentHistory[i].EndTime = &endTime
+				n.AgentHistory[i].Status = "terminated"
+				break
+			}
+		}
+
+		// Remove from running agents list
+		for i, runningAgent := range n.RunningAgents {
+			if runningAgent == agentName {
+				n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
+				break
+			}
+		}
+
+		// Update current agent
+		if n.CurrentAgent == agentName {
+			if len(n.RunningAgents) == 0 {
+				n.CurrentAgent = ""
+			} else {
+				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
+			}
+		}
 	}
 }
 

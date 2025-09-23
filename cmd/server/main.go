@@ -554,15 +554,22 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Since AgentRegistry doesn't have a GetAllAgents method, we'll access via reflection
-	// In a production system, you'd add this method to AgentRegistry
-	agents := make([]map[string]interface{}, 0)
+	// Get all agents from registry
+	agents := s.agentRegistry.GetAllAgents()
 
-	// We need to add a method to AgentRegistry to list all agents
-	// For now, we'll return a message indicating this
+	// Convert agents to response format
+	agentResponses := make([]map[string]interface{}, len(agents))
+	for i, agent := range agents {
+		agentResponses[i] = map[string]interface{}{
+			"name":         agent.GetName(),
+			"type":         agent.GetType(),
+			"capabilities": agent.GetCapabilities(),
+			"uses":         agent.GetUses(),
+		}
+	}
+
 	response := map[string]interface{}{
-		"message": "Agent listing requires GetAllAgents method to be added to AgentRegistry",
-		"agents":  agents,
+		"agents": agentResponses,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -596,22 +603,13 @@ func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	agentName := vars["name"]
 
-	// Check if agent exists
-	_, exists := s.agentRegistry.GetAgent(agentName)
-	if !exists {
+	// Check if agent exists and delete it
+	if !s.agentRegistry.UnregisterAgent(agentName) {
 		http.Error(w, "Agent not found", http.StatusNotFound)
 		return
 	}
 
-	// AgentRegistry doesn't have a Delete method, so we'll return a message
-	// In production, you'd add UnregisterAgent method to AgentRegistry
-	response := map[string]interface{}{
-		"message": "Agent deletion requires UnregisterAgent method to be added to AgentRegistry",
-		"agent":   agentName,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ======= CAPABILITY CRUD HANDLERS =======
@@ -637,12 +635,10 @@ func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Since AgentRegistry doesn't have a GetAllCapabilities method
-	// we'll return a message indicating this needs to be implemented
-	capabilities := make([]mywant.Capability, 0)
+	// Get all capabilities from registry
+	capabilities := s.agentRegistry.GetAllCapabilities()
 
 	response := map[string]interface{}{
-		"message":      "Capability listing requires GetAllCapabilities method to be added to AgentRegistry",
 		"capabilities": capabilities,
 	}
 
@@ -670,21 +666,13 @@ func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	capabilityName := vars["name"]
 
-	// Check if capability exists
-	_, exists := s.agentRegistry.GetCapability(capabilityName)
-	if !exists {
+	// Check if capability exists and delete it
+	if !s.agentRegistry.UnregisterCapability(capabilityName) {
 		http.Error(w, "Capability not found", http.StatusNotFound)
 		return
 	}
 
-	// AgentRegistry doesn't have a Delete method for capabilities
-	response := map[string]interface{}{
-		"message":    "Capability deletion requires UnregisterCapability method to be added to AgentRegistry",
-		"capability": capabilityName,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // findAgentsByCapability handles GET /api/v1/capabilities/{name}/agents - finds agents by capability

@@ -159,3 +159,79 @@ func (r *AgentRegistry) GetCapability(name string) (Capability, bool) {
 	cap, exists := r.capabilities[name]
 	return cap, exists
 }
+
+// GetAllAgents returns all registered agents
+func (r *AgentRegistry) GetAllAgents() []Agent {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	agents := make([]Agent, 0, len(r.agents))
+	for _, agent := range r.agents {
+		agents = append(agents, agent)
+	}
+	return agents
+}
+
+// GetAllCapabilities returns all registered capabilities
+func (r *AgentRegistry) GetAllCapabilities() []Capability {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	capabilities := make([]Capability, 0, len(r.capabilities))
+	for _, cap := range r.capabilities {
+		capabilities = append(capabilities, cap)
+	}
+	return capabilities
+}
+
+// UnregisterAgent removes an agent from the registry
+func (r *AgentRegistry) UnregisterAgent(name string) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	agent, exists := r.agents[name]
+	if !exists {
+		return false
+	}
+
+	// Remove agent from agents map
+	delete(r.agents, name)
+
+	// Remove agent from capability mappings
+	for _, capName := range agent.GetCapabilities() {
+		if cap, exists := r.capabilities[capName]; exists {
+			for _, gives := range cap.Gives {
+				agentNames := r.capabilityToAgents[gives]
+				for i, agentName := range agentNames {
+					if agentName == name {
+						r.capabilityToAgents[gives] = append(agentNames[:i], agentNames[i+1:]...)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return true
+}
+
+// UnregisterCapability removes a capability from the registry
+func (r *AgentRegistry) UnregisterCapability(name string) bool {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	cap, exists := r.capabilities[name]
+	if !exists {
+		return false
+	}
+
+	// Remove capability from capabilities map
+	delete(r.capabilities, name)
+
+	// Remove capability mappings
+	for _, gives := range cap.Gives {
+		delete(r.capabilityToAgents, gives)
+	}
+
+	return true
+}

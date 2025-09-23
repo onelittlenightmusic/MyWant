@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	. "mywant/src"
@@ -303,15 +302,31 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	h.State["attempted"] = true
 
 	// Try to use agent system if available - agent completely overrides normal execution
-	if h.tryAgentExecution() {
-		fmt.Printf("[HOTEL] Agent execution completed, skipping normal hotel logic\n")
-		// Agent handled everything, just send empty schedule to maintain flow
-		if len(outputs) > 0 {
-			out <- &TravelSchedule{
-				Date:   time.Now().AddDate(0, 0, 1),
-				Events: []TimeSlot{}, // Agent doesn't need to provide schedule data
-			}
+	if agentSchedule := h.tryAgentExecution(); agentSchedule != nil {
+		fmt.Printf("[HOTEL] Agent execution completed, processing agent result\n")
+
+		// Use the agent's schedule result
+		h.SetSchedule(*agentSchedule)
+
+		// Send the schedule to output channel
+		hotelEvent := TimeSlot{
+			Start: agentSchedule.CheckInTime,
+			End:   agentSchedule.CheckOutTime,
+			Type:  "hotel",
+			Name:  agentSchedule.ReservationName,
 		}
+
+		travelSchedule := &TravelSchedule{
+			Date:   agentSchedule.CheckInTime.Truncate(24 * time.Hour),
+			Events: []TimeSlot{hotelEvent},
+		}
+
+		out <- travelSchedule
+		fmt.Printf("[HOTEL] Sent agent-generated schedule: %s from %s to %s\n",
+			agentSchedule.ReservationName,
+			agentSchedule.CheckInTime.Format("15:04 Jan 2"),
+			agentSchedule.CheckOutTime.Format("15:04 Jan 2"))
+
 		return true
 	}
 
@@ -396,41 +411,54 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 }
 
 // tryAgentExecution attempts to execute hotel reservation using the agent system
-func (h *HotelWant) tryAgentExecution() bool {
+// Returns the HotelSchedule if successful, nil if no agent execution
+func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 	// Check if this want has agent requirements
 	if len(h.Spec.Requires) > 0 {
-		for _, capability := range h.Spec.Requires {
-			if capability == "hotel_reservation" {
-				// Check if a specific agent is configured
-				if agentName, ok := h.Spec.Params["agent_name"].(string); ok && h.Want.GetAgentRegistry() != nil {
-					fmt.Printf("[HOTEL] Looking for agent: %s\n", agentName)
-					if agent, exists := h.Want.GetAgentRegistry().GetAgent(agentName); exists {
-						fmt.Printf("[HOTEL] Found agent: %s, about to call agent.Exec()\n", agent.GetName())
-						// Execute specified agent with Hotel Want
-						ctx := context.Background()
-						if err := agent.Exec(ctx, &h.Want); err != nil {
-							fmt.Printf("[HOTEL] Agent %s execution failed: %v, falling back to default execution\n", agentName, err)
-							return false
-						}
-						fmt.Printf("[HOTEL] Agent %s execution completed successfully\n", agentName)
-						return true
-					} else {
-						fmt.Printf("[HOTEL] Agent %s not found in registry\n", agentName)
-					}
-				} else {
-					fmt.Printf("[HOTEL] No agent_name parameter or no agent registry\n")
-				}
+		fmt.Printf("[HOTEL] Want has agent requirements: %v\n", h.Spec.Requires)
 
-				// Fallback to regular agent execution
-				if err := h.ExecuteAgents(); err != nil {
-					fmt.Printf("[HOTEL] Agent execution failed: %v, falling back to direct execution\n", err)
-					return false
-				}
-				return true
+		// Store the requirements in want state for tracking
+		h.StoreState("agent_requirements", h.Spec.Requires)
+
+		// Use dynamic agent execution based on requirements
+		if err := h.ExecuteAgents(); err != nil {
+			fmt.Printf("[HOTEL] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			h.StoreState("agent_execution_status", "failed")
+			h.StoreState("agent_execution_error", err.Error())
+			return nil
+		}
+
+		fmt.Printf("[HOTEL] Dynamic agent execution completed successfully\n")
+		h.StoreState("agent_execution_status", "completed")
+
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+		fmt.Printf("[HOTEL] Checking state for agent_result, state keys: %v\n", getStateKeys(h.State))
+		if result, exists := h.State["agent_result"]; exists {
+			fmt.Printf("[HOTEL] Found agent_result in state: %+v\n", result)
+			if schedule, ok := result.(HotelSchedule); ok {
+				fmt.Printf("[HOTEL] Successfully retrieved agent result: %+v\n", schedule)
+				return &schedule
+			} else {
+				fmt.Printf("[HOTEL] agent_result is not HotelSchedule type: %T\n", result)
 			}
 		}
+
+		fmt.Printf("[HOTEL] Warning: Agent completed but no result found in state\n")
+		return nil
 	}
-	return false
+
+	fmt.Printf("[HOTEL] No agent requirements specified\n")
+	return nil
+}
+
+// Helper function to get state keys for debugging
+func getStateKeys(state map[string]interface{}) []string {
+	keys := make([]string, 0, len(state))
+	for k := range state {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // BuffetWant creates breakfast buffet reservations
@@ -602,6 +630,45 @@ func (r *RestaurantWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 func (h *HotelWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
 }
+
+// HotelSchedule represents a complete hotel booking schedule
+type HotelSchedule struct {
+	CheckInTime       time.Time `json:"check_in_time"`
+	CheckOutTime      time.Time `json:"check_out_time"`
+	HotelType         string    `json:"hotel_type"`
+	StayDurationHours float64   `json:"stay_duration_hours"`
+	ReservationName   string    `json:"reservation_name"`
+	PremiumLevel      string    `json:"premium_level,omitempty"`
+	ServiceTier       string    `json:"service_tier,omitempty"`
+	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
+}
+
+// SetSchedule sets the hotel booking schedule and updates all related state
+func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
+	// Store basic hotel booking information
+	h.Want.StoreState("attempted", true)
+	h.Want.StoreState("check_in_time", schedule.CheckInTime.Format("15:04 Jan 2"))
+	h.Want.StoreState("check_out_time", schedule.CheckOutTime.Format("15:04 Jan 2"))
+	h.Want.StoreState("hotel_type", schedule.HotelType)
+	h.Want.StoreState("stay_duration_hours", schedule.StayDurationHours)
+	h.Want.StoreState("reservation_name", schedule.ReservationName)
+	h.Want.StoreState("total_processed", 1)
+
+	// Store premium information if provided
+	if schedule.PremiumLevel != "" {
+		h.Want.StoreState("premium_processed", true)
+		h.Want.StoreState("premium_level", schedule.PremiumLevel)
+	}
+	if schedule.ServiceTier != "" {
+		h.Want.StoreState("service_tier", schedule.ServiceTier)
+	}
+	if len(schedule.PremiumAmenities) > 0 {
+		h.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+	}
+
+	// No need to send output here anymore - handled directly in Exec method
+}
+
 
 func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)

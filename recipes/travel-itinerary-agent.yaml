@@ -34,7 +34,6 @@ recipe:
       spec:
         params:
           hotel_type: hotel_type
-          agent_name: "agent_premium"
         requires:
           - hotel_reservation
 

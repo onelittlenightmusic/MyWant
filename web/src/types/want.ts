@@ -9,6 +9,9 @@ export interface Want {
   results?: Record<string, unknown>;
   builder?: unknown; // ChainBuilder reference (not serialized)
   suspended?: boolean; // Suspension state
+  current_agent?: string; // Name of the agent currently executing for this want
+  running_agents?: string[]; // Array of all currently running agent names
+  agent_history?: AgentExecution[]; // Complete history of agent executions for this want
 }
 
 export interface WantConfig {
@@ -104,4 +107,13 @@ export interface WantStatusResponse {
   id: string;
   status: WantExecutionStatus;
   suspended?: boolean;
+}
+
+export interface AgentExecution {
+  agent_name: string;
+  agent_type: 'do' | 'monitor';
+  start_time: string;
+  end_time?: string;
+  status: 'running' | 'completed' | 'failed' | 'terminated';
+  error?: string;
 }

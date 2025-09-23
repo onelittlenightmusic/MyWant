@@ -369,6 +369,21 @@ components:
           description: Current state of the want
         history:
           $ref: '#/components/schemas/WantHistory'
+        current_agent:
+          type: string
+          description: Name of the agent currently executing for this want
+          example: "hotel_agent"
+        running_agents:
+          type: array
+          items:
+            type: string
+          description: Array of all currently running agent names
+          example: ["hotel_agent", "booking_agent"]
+        agent_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentExecution'
+          description: Complete history of agent executions for this want
       required:
         - metadata
         - spec
@@ -696,6 +711,50 @@ components:
           type: string
           description: Error message if execution failed
       additionalProperties: true
+
+    AgentExecution:
+      type: object
+      description: Information about an agent execution
+      properties:
+        agent_name:
+          type: string
+          description: Name of the agent
+          example: "hotel_agent"
+        agent_type:
+          type: string
+          description: Type of the agent
+          enum:
+            - do
+            - monitor
+          example: "do"
+        start_time:
+          type: string
+          format: date-time
+          description: When the agent execution started
+          example: "2023-10-15T14:30:00Z"
+        end_time:
+          type: string
+          format: date-time
+          description: When the agent execution ended (null if still running)
+          example: "2023-10-15T14:30:15Z"
+        status:
+          type: string
+          enum:
+            - running
+            - completed
+            - failed
+            - terminated
+          description: Current status of the agent execution
+          example: "completed"
+        error:
+          type: string
+          description: Error message if the agent execution failed
+          example: "Connection timeout"
+      required:
+        - agent_name
+        - agent_type
+        - start_time
+        - status
 
     ErrorResponse:
       type: object

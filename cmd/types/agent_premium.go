@@ -33,14 +33,26 @@ func NewAgentPremium(name string, capabilities []string, uses []string, premiumL
 
 // Exec executes premium agent actions with enhanced capabilities
 func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
-	// Don't call parent DoAgent.Exec to avoid infinite recursion
-	// The Action function already delegates to this method
+	// Generate premium hotel booking schedule
+	schedule := a.generateHotelSchedule(want)
 
-	// Generate ALL hotel booking state in the agent
+	// Agent should not store state directly - store in temporary field for retrieval
+	if want.State == nil {
+		want.State = make(map[string]interface{})
+	}
+	want.State["agent_result"] = schedule
+
+	fmt.Printf("[AGENT_PREMIUM] Premium hotel booking completed: %s from %s to %s\n",
+		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2"))
+
+	return nil
+}
+
+// generateHotelSchedule creates a premium hotel schedule
+func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
 	fmt.Printf("[AGENT_PREMIUM] Processing hotel reservation for %s with premium service\n", want.Metadata.Name)
 
 	// Generate premium hotel booking with better times and luxury amenities
-
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	// Premium service: earlier check-in, later check-out
 	checkInTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
@@ -58,23 +70,16 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 		}
 	}
 
-	// Store ALL hotel booking state using proper state storage
-	want.StoreState("attempted", true)
-	want.StoreState("check_in_time", checkInTime.Format("15:04 Jan 2"))
-	want.StoreState("check_out_time", checkOutTime.Format("15:04 Jan 2"))
-	want.StoreState("hotel_type", hotelType)
-	want.StoreState("stay_duration_hours", checkOutTime.Sub(checkInTime).Hours())
-	want.StoreState("reservation_name", fmt.Sprintf("%s stay at %s hotel", want.Metadata.Name, hotelType))
-	want.StoreState("total_processed", 1)
-
-	// Add premium-specific processing using proper state storage
-	want.StoreState("premium_processed", true)
-	want.StoreState("premium_level", a.PremiumLevel)
-	want.StoreState("service_tier", a.ServiceTier)
-	want.StoreState("premium_amenities", []string{"spa_access", "concierge_service", "room_upgrade"})
-
-	fmt.Printf("[AGENT_PREMIUM] Premium hotel booking completed: %s from %s to %s\n",
-		hotelType, checkInTime.Format("15:04 Jan 2"), checkOutTime.Format("15:04 Jan 2"))
-
-	return nil
+	// Create and return structured hotel schedule
+	return HotelSchedule{
+		CheckInTime:       checkInTime,
+		CheckOutTime:      checkOutTime,
+		HotelType:         hotelType,
+		StayDurationHours: checkOutTime.Sub(checkInTime).Hours(),
+		ReservationName:   fmt.Sprintf("%s stay at %s hotel", want.Metadata.Name, hotelType),
+		PremiumLevel:      a.PremiumLevel,
+		ServiceTier:       a.ServiceTier,
+		PremiumAmenities:  []string{"spa_access", "concierge_service", "room_upgrade"},
+	}
 }
+

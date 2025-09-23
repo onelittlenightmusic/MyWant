@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCw, Eye, BarChart3, AlertTriangle } from 'lucide-react';
+import { X, RefreshCw, Eye, BarChart3, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -268,6 +268,137 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   </div>
                 )}
 
+                {/* Agent Information */}
+                {(wantDetails?.current_agent ||
+                  (wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
+                  (wantDetails?.agent_history && wantDetails.agent_history.length > 0)) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      Agent Execution
+                    </h4>
+
+                    <div className="bg-blue-50 rounded-lg p-4 space-y-4">
+                      {/* Current Agent */}
+                      {wantDetails.current_agent && (
+                        <div className="flex items-center justify-between p-3 bg-blue-100 rounded-md">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse" />
+                            <div>
+                              <div className="text-sm font-medium text-blue-900">Current Agent</div>
+                              <div className="text-sm text-blue-700">{wantDetails.current_agent}</div>
+                            </div>
+                          </div>
+                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            Active
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Running Agents Summary */}
+                      {wantDetails.running_agents && wantDetails.running_agents.length > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center text-blue-700">
+                            <Users className="h-4 w-4 mr-2" />
+                            Running Agents
+                          </span>
+                          <span className="font-medium text-blue-900">
+                            {wantDetails.running_agents.length} agent{wantDetails.running_agents.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Agent History */}
+                      {wantDetails.agent_history && wantDetails.agent_history.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="flex items-center text-sm font-medium text-blue-900">
+                              <Clock className="h-4 w-4 mr-2" />
+                              Execution History
+                            </span>
+                            <span className="text-xs text-blue-700">
+                              {wantDetails.agent_history.length} execution{wantDetails.agent_history.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {wantDetails.agent_history.map((execution, index) => {
+                              const getStatusIcon = (status: string) => {
+                                switch (status) {
+                                  case 'completed':
+                                    return <CheckCircle className="h-4 w-4 text-green-600" />;
+                                  case 'failed':
+                                    return <XCircle className="h-4 w-4 text-red-600" />;
+                                  case 'running':
+                                    return <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" />;
+                                  case 'terminated':
+                                    return <Minus className="h-4 w-4 text-gray-600" />;
+                                  default:
+                                    return <div className="w-4 h-4 bg-gray-400 rounded-full" />;
+                                }
+                              };
+
+                              const getStatusColor = (status: string) => {
+                                switch (status) {
+                                  case 'completed':
+                                    return 'bg-green-100 text-green-800';
+                                  case 'failed':
+                                    return 'bg-red-100 text-red-800';
+                                  case 'running':
+                                    return 'bg-blue-100 text-blue-800';
+                                  case 'terminated':
+                                    return 'bg-gray-100 text-gray-800';
+                                  default:
+                                    return 'bg-gray-100 text-gray-800';
+                                }
+                              };
+
+                              return (
+                                <div key={index} className="bg-white rounded border border-blue-200 p-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start space-x-3">
+                                      {getStatusIcon(execution.status)}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-sm font-medium text-gray-900">
+                                            {execution.agent_name}
+                                          </span>
+                                          <span className="text-xs text-gray-500">
+                                            ({execution.agent_type})
+                                          </span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          Started: {formatDate(execution.start_time)}
+                                        </div>
+                                        {execution.end_time && (
+                                          <div className="text-xs text-gray-500">
+                                            Ended: {formatDate(execution.end_time)}
+                                          </div>
+                                        )}
+                                        {execution.error && (
+                                          <div className="text-xs text-red-600 mt-1">
+                                            Error: {execution.error}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className={classNames(
+                                      'text-xs font-medium px-2 py-1 rounded-full',
+                                      getStatusColor(execution.status)
+                                    )}>
+                                      {execution.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
 
                 {/* Parameters */}
                 {wantDetails?.spec?.params && Object.keys(wantDetails.spec.params).length > 0 && (
@@ -379,23 +510,55 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-2">State History</h4>
                       <div className="space-y-3">
-                        {want.history.stateHistory.map((entry: any, index: number) => (
-                          <div key={index} className="bg-gray-50 rounded-md p-3 border">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-gray-700">
-                                {entry.want_name || 'State Entry'}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp'}
-                              </span>
+                        {want.history.stateHistory.map((entry: any, index: number) => {
+                          const stateValue = entry.state_value || entry;
+                          const hasAgentInfo = stateValue && (
+                            stateValue.current_agent ||
+                            stateValue.running_agents ||
+                            stateValue.agent_history
+                          );
+
+                          return (
+                            <div key={index} className={`rounded-md p-3 border ${hasAgentInfo ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {entry.want_name || 'State Entry'}
+                                  </span>
+                                  {hasAgentInfo && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      <User className="h-3 w-3 mr-1" />
+                                      Agent State
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {entry.timestamp ? new Date(entry.timestamp).toLocaleString() : 'No timestamp'}
+                                </span>
+                              </div>
+
+                              {hasAgentInfo && stateValue.current_agent && (
+                                <div className="mb-2 p-2 bg-white rounded border">
+                                  <div className="text-xs font-medium text-blue-700 mb-1">Current Agent</div>
+                                  <div className="text-sm text-blue-900">{stateValue.current_agent}</div>
+                                </div>
+                              )}
+
+                              {hasAgentInfo && stateValue.running_agents && Array.isArray(stateValue.running_agents) && stateValue.running_agents.length > 0 && (
+                                <div className="mb-2 p-2 bg-white rounded border">
+                                  <div className="text-xs font-medium text-blue-700 mb-1">Running Agents</div>
+                                  <div className="text-sm text-blue-900">{stateValue.running_agents.join(', ')}</div>
+                                </div>
+                              )}
+
+                              <div className="bg-white rounded p-2">
+                                <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                                  {JSON.stringify(stateValue, null, 2)}
+                                </pre>
+                              </div>
                             </div>
-                            <div className="bg-white rounded p-2">
-                              <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                                {JSON.stringify(entry.state_value || entry, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
