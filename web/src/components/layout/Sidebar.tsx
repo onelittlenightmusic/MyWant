@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Heart, Bot, Settings, BookOpen, ChevronRight } from 'lucide-react';
+import { X, Heart, Bot, BookOpen, AlertTriangle } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface SidebarProps {
@@ -7,23 +7,41 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const MENU_ITEMS = [
-  {
-    id: 'wants',
-    label: 'Wants',
-    icon: Heart,
-    href: '/dashboard',
-    active: true
-  },
-  {
-    id: 'agents',
-    label: 'Agents',
-    icon: Bot,
-    href: '/agents',
-    active: false,
-    disabled: true
+// Get current path for active state
+const getCurrentPath = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.pathname;
   }
-];
+  return '/dashboard';
+};
+
+const getMenuItems = () => {
+  const currentPath = getCurrentPath();
+  return [
+    {
+      id: 'wants',
+      label: 'Wants',
+      icon: Heart,
+      href: '/dashboard',
+      active: currentPath === '/dashboard'
+    },
+    {
+      id: 'errors',
+      label: 'Error History',
+      icon: AlertTriangle,
+      href: '/errors',
+      active: currentPath === '/errors'
+    },
+    {
+      id: 'agents',
+      label: 'Agents',
+      icon: Bot,
+      href: '/agents',
+      active: false,
+      disabled: true
+    }
+  ];
+};
 
 const ADVANCED_ITEMS = [
   {
@@ -40,6 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose
 }) => {
+  const menuItems = getMenuItems();
 
   return (
     <>
@@ -78,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex-1 px-4 py-6 space-y-8">
             {/* Main Menu */}
             <nav className="space-y-2">
-              {MENU_ITEMS.map((item) => {
+              {menuItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <a

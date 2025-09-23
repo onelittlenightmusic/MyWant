@@ -8,7 +8,7 @@ import {
   SuspendResumeResponse,
   WantStatusResponse
 } from '@/types/want';
-import { HealthCheck, ApiError } from '@/types/api';
+import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse } from '@/types/api';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -140,6 +140,26 @@ class MyWantApiClient {
   async resumeWant(id: string): Promise<SuspendResumeResponse> {
     const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/resume`);
     return response.data;
+  }
+
+  // Error history operations
+  async listErrorHistory(): Promise<ErrorHistoryResponse> {
+    const response = await this.client.get<ErrorHistoryResponse>('/api/v1/errors');
+    return response.data;
+  }
+
+  async getErrorHistoryEntry(id: string): Promise<ErrorHistoryEntry> {
+    const response = await this.client.get<ErrorHistoryEntry>(`/api/v1/errors/${id}`);
+    return response.data;
+  }
+
+  async updateErrorHistoryEntry(id: string, updates: { resolved?: boolean; notes?: string }): Promise<ErrorHistoryEntry> {
+    const response = await this.client.put<ErrorHistoryEntry>(`/api/v1/errors/${id}`, updates);
+    return response.data;
+  }
+
+  async deleteErrorHistoryEntry(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/errors/${id}`);
   }
 }
 

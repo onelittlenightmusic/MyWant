@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
@@ -22,11 +23,29 @@ type ServerConfig struct {
 	Host string `json:"host"`
 }
 
+// ErrorHistoryEntry represents an API error with detailed context
+type ErrorHistoryEntry struct {
+	ID          string                 `json:"id"`
+	Timestamp   string                 `json:"timestamp"`
+	Message     string                 `json:"message"`
+	Status      int                    `json:"status"`
+	Code        string                 `json:"code,omitempty"`
+	Type        string                 `json:"type,omitempty"`
+	Details     string                 `json:"details,omitempty"`
+	Endpoint    string                 `json:"endpoint"`
+	Method      string                 `json:"method"`
+	RequestData interface{}            `json:"request_data,omitempty"`
+	UserAgent   string                 `json:"user_agent,omitempty"`
+	Resolved    bool                   `json:"resolved"`
+	Notes       string                 `json:"notes,omitempty"`
+}
+
 // Server represents the MyWant server
 type Server struct {
 	config        ServerConfig
 	wants         map[string]*WantExecution // Store active want executions
 	agentRegistry *mywant.AgentRegistry     // Agent and capability registry
+	errorHistory  []ErrorHistoryEntry       // Store error history
 	router        *mux.Router
 }
 
@@ -57,6 +76,7 @@ func NewServer(config ServerConfig) *Server {
 		config:        config,
 		wants:         make(map[string]*WantExecution),
 		agentRegistry: agentRegistry,
+		errorHistory:  make([]ErrorHistoryEntry, 0),
 		router:        mux.NewRouter(),
 	}
 }
@@ -91,6 +111,13 @@ func (s *Server) setupRoutes() {
 	capabilities.HandleFunc("/{name}", s.getCapability).Methods("GET")
 	capabilities.HandleFunc("/{name}", s.deleteCapability).Methods("DELETE")
 	capabilities.HandleFunc("/{name}/agents", s.findAgentsByCapability).Methods("GET")
+
+	// Error history endpoints
+	errors := api.PathPrefix("/errors").Subrouter()
+	errors.HandleFunc("", s.listErrorHistory).Methods("GET")
+	errors.HandleFunc("/{id}", s.getErrorHistoryEntry).Methods("GET")
+	errors.HandleFunc("/{id}", s.updateErrorHistoryEntry).Methods("PUT")
+	errors.HandleFunc("/{id}", s.deleteErrorHistoryEntry).Methods("DELETE")
 
 	// Health check endpoint
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
@@ -131,7 +158,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 
 	// Validate want types before proceeding
 	if err := s.validateWantTypes(config); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid want types: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid want types: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), string(configYAML))
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -286,7 +315,9 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 	// Validate want types before proceeding
 	if err := s.validateWantTypes(config); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid want types: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid want types: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), string(configYAML))
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -805,6 +836,10 @@ func (s *Server) Start() error {
 	fmt.Printf("  GET  /api/v1/capabilities/{name}   - Get capability\n")
 	fmt.Printf("  DELETE /api/v1/capabilities/{name} - Delete capability\n")
 	fmt.Printf("  GET  /api/v1/capabilities/{name}/agents - Find agents by capability\n")
+	fmt.Printf("  GET  /api/v1/errors              - List error history\n")
+	fmt.Printf("  GET  /api/v1/errors/{id}         - Get error details\n")
+	fmt.Printf("  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)\n")
+	fmt.Printf("  DELETE /api/v1/errors/{id}       - Delete error entry\n")
 	fmt.Printf("\n")
 
 	return http.ListenAndServe(addr, s.router)
@@ -847,6 +882,136 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 	}
 
 	return nil
+}
+
+// ======= ERROR HISTORY HANDLERS =======
+
+// logError adds an error to the error history
+func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData interface{}) {
+	errorID := generateErrorID()
+
+	entry := ErrorHistoryEntry{
+		ID:          errorID,
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Message:     message,
+		Status:      status,
+		Type:        errorType,
+		Details:     details,
+		Endpoint:    r.URL.Path,
+		Method:      r.Method,
+		RequestData: requestData,
+		UserAgent:   r.Header.Get("User-Agent"),
+		Resolved:    false,
+	}
+
+	s.errorHistory = append(s.errorHistory, entry)
+
+	// Keep only the last 1000 errors to prevent memory issues
+	if len(s.errorHistory) > 1000 {
+		s.errorHistory = s.errorHistory[len(s.errorHistory)-1000:]
+	}
+}
+
+// httpErrorWithLogging handles HTTP errors and logs them to error history
+func (s *Server) httpErrorWithLogging(w http.ResponseWriter, r *http.Request, status int, message, errorType string, requestData interface{}) {
+	// Log the error to history
+	s.logError(r, status, message, errorType, "", requestData)
+
+	// Send HTTP error response
+	http.Error(w, message, status)
+}
+
+// listErrorHistory handles GET /api/v1/errors - lists all error history entries
+func (s *Server) listErrorHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Sort errors by timestamp (newest first)
+	sortedErrors := make([]ErrorHistoryEntry, len(s.errorHistory))
+	copy(sortedErrors, s.errorHistory)
+	sort.Slice(sortedErrors, func(i, j int) bool {
+		return sortedErrors[i].Timestamp > sortedErrors[j].Timestamp
+	})
+
+	response := map[string]interface{}{
+		"errors": sortedErrors,
+		"total":  len(sortedErrors),
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// getErrorHistoryEntry handles GET /api/v1/errors/{id} - gets a specific error entry
+func (s *Server) getErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	errorID := vars["id"]
+
+	for _, entry := range s.errorHistory {
+		if entry.ID == errorID {
+			json.NewEncoder(w).Encode(entry)
+			return
+		}
+	}
+
+	http.Error(w, "Error entry not found", http.StatusNotFound)
+}
+
+// updateErrorHistoryEntry handles PUT /api/v1/errors/{id} - updates an error entry (mark as resolved, add notes)
+func (s *Server) updateErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	errorID := vars["id"]
+
+	var updateRequest struct {
+		Resolved bool   `json:"resolved,omitempty"`
+		Notes    string `json:"notes,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	for i, entry := range s.errorHistory {
+		if entry.ID == errorID {
+			if updateRequest.Resolved {
+				s.errorHistory[i].Resolved = true
+			}
+			if updateRequest.Notes != "" {
+				s.errorHistory[i].Notes = updateRequest.Notes
+			}
+			json.NewEncoder(w).Encode(s.errorHistory[i])
+			return
+		}
+	}
+
+	http.Error(w, "Error entry not found", http.StatusNotFound)
+}
+
+// deleteErrorHistoryEntry handles DELETE /api/v1/errors/{id} - deletes an error entry
+func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	errorID := vars["id"]
+
+	for i, entry := range s.errorHistory {
+		if entry.ID == errorID {
+			// Remove the entry from the slice
+			s.errorHistory = append(s.errorHistory[:i], s.errorHistory[i+1:]...)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+
+	http.Error(w, "Error entry not found", http.StatusNotFound)
+}
+
+// generateErrorID generates a unique ID for error entries
+func generateErrorID() string {
+	bytes := make([]byte, 6)
+	rand.Read(bytes)
+	return fmt.Sprintf("error-%s-%d", hex.EncodeToString(bytes), time.Now().Unix()%10000)
 }
 
 // generateWantID generates a unique ID for want execution
