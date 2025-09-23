@@ -37,8 +37,7 @@ const getMenuItems = () => {
       label: 'Agents',
       icon: Bot,
       href: '/agents',
-      active: false,
-      disabled: true
+      active: currentPath === '/agents'
     }
   ];
 };

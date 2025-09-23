@@ -9,6 +9,17 @@ import {
   WantStatusResponse
 } from '@/types/want';
 import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse } from '@/types/api';
+import {
+  Agent,
+  AgentResponse,
+  CreateAgentRequest,
+  Capability,
+  CapabilityResponse,
+  CreateCapabilityRequest,
+  AgentsListResponse,
+  CapabilitiesListResponse,
+  FindAgentsByCapabilityResponse
+} from '@/types/agent';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -160,6 +171,51 @@ class MyWantApiClient {
 
   async deleteErrorHistoryEntry(id: string): Promise<void> {
     await this.client.delete(`/api/v1/errors/${id}`);
+  }
+
+  // Agent management
+  async createAgent(request: CreateAgentRequest): Promise<AgentResponse> {
+    const response = await this.client.post<AgentResponse>('/api/v1/agents', request);
+    return response.data;
+  }
+
+  async listAgents(): Promise<AgentResponse[]> {
+    const response = await this.client.get<AgentsListResponse>('/api/v1/agents');
+    return response.data.agents;
+  }
+
+  async getAgent(name: string): Promise<AgentResponse> {
+    const response = await this.client.get<AgentResponse>(`/api/v1/agents/${name}`);
+    return response.data;
+  }
+
+  async deleteAgent(name: string): Promise<void> {
+    await this.client.delete(`/api/v1/agents/${name}`);
+  }
+
+  // Capability management
+  async createCapability(request: CreateCapabilityRequest): Promise<CapabilityResponse> {
+    const response = await this.client.post<CapabilityResponse>('/api/v1/capabilities', request);
+    return response.data;
+  }
+
+  async listCapabilities(): Promise<CapabilityResponse[]> {
+    const response = await this.client.get<CapabilitiesListResponse>('/api/v1/capabilities');
+    return response.data.capabilities;
+  }
+
+  async getCapability(name: string): Promise<CapabilityResponse> {
+    const response = await this.client.get<CapabilityResponse>(`/api/v1/capabilities/${name}`);
+    return response.data;
+  }
+
+  async deleteCapability(name: string): Promise<void> {
+    await this.client.delete(`/api/v1/capabilities/${name}`);
+  }
+
+  async findAgentsByCapability(capabilityName: string): Promise<FindAgentsByCapabilityResponse> {
+    const response = await this.client.get<FindAgentsByCapabilityResponse>(`/api/v1/capabilities/${capabilityName}/agents`);
+    return response.data;
   }
 }
 
