@@ -36,8 +36,11 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
   // Fetch details when modal opens
   useEffect(() => {
     if (isOpen && want) {
-      fetchWantDetails(want.id);
-      fetchWantResults(want.id);
+      const wantId = want.metadata?.id || want.id;
+      if (wantId) {
+        fetchWantDetails(wantId);
+        fetchWantResults(wantId);
+      }
     }
   }, [isOpen, want, fetchWantDetails, fetchWantResults]);
 
@@ -47,8 +50,11 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
     const interval = setInterval(() => {
       if (want.status === 'running') {
-        fetchWantDetails(want.id);
-        fetchWantResults(want.id);
+        const wantId = want.metadata?.id || want.id;
+        if (wantId) {
+          fetchWantDetails(wantId);
+          fetchWantResults(wantId);
+        }
       }
     }, 3000);
 
@@ -57,8 +63,11 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
   const handleRefresh = () => {
     if (want) {
-      fetchWantDetails(want.id);
-      fetchWantResults(want.id);
+      const wantId = want.metadata?.id || want.id;
+      if (wantId) {
+        fetchWantDetails(wantId);
+        fetchWantResults(wantId);
+      }
     }
   };
 
@@ -83,7 +92,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
         <div className="flex items-center justify-between pb-4 border-b border-gray-200">
           <div className="flex items-center space-x-4">
             <h3 className="text-xl font-semibold text-gray-900">
-              {wantDetails?.metadata?.name || want.id}
+              {wantDetails?.metadata?.name || want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want'}
             </h3>
             <StatusBadge status={want.status} />
             {want.status === 'running' && (
@@ -204,7 +213,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                     <dl className="space-y-2 text-sm">
                       <div>
                         <dt className="text-gray-500">ID:</dt>
-                        <dd className="text-gray-900 font-mono">{want.id}</dd>
+                        <dd className="text-gray-900 font-mono">{want.metadata?.id || want.id || 'N/A'}</dd>
                       </div>
                       <div>
                         <dt className="text-gray-500">Type:</dt>
@@ -212,7 +221,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       </div>
                       <div>
                         <dt className="text-gray-500">Name:</dt>
-                        <dd className="text-gray-900">{wantDetails?.metadata?.name || want.id}</dd>
+                        <dd className="text-gray-900">{wantDetails?.metadata?.name || want.metadata?.name || want.metadata?.id || want.id || 'Unnamed'}</dd>
                       </div>
                     </dl>
                   </div>

@@ -20,7 +20,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
 }) => {
   if (!isOpen || !want) return null;
 
-  const wantName = want.config.wants?.[0]?.metadata?.name || want.id;
+  const wantName = want.config?.wants?.[0]?.metadata?.name || want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want';
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -55,7 +55,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
               <span className="font-medium">Want:</span> {wantName}
             </p>
             <p className="text-sm text-gray-700">
-              <span className="font-medium">ID:</span> {want.id}
+              <span className="font-medium">ID:</span> {want.metadata?.id || want.id || 'N/A'}
             </p>
             <p className="text-sm text-gray-700">
               <span className="font-medium">Status:</span> {want.status}

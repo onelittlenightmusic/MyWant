@@ -56,7 +56,7 @@ export const WantCard: React.FC<WantCardProps> = ({
             Type: <span className="font-medium">{wantType}</span>
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            ID: {want.id}
+            ID: {want.metadata?.id || want.id || 'N/A'}
           </p>
         </div>
 

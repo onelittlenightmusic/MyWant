@@ -93,18 +93,20 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleSuspendWant = async (want: Want) => {
-    if (!want.id) return;
+    const wantId = want.metadata?.id || want.id;
+    if (!wantId) return;
     try {
-      await suspendWant(want.id);
+      await suspendWant(wantId);
     } catch (error) {
       console.error('Failed to suspend want:', error);
     }
   };
 
   const handleResumeWant = async (want: Want) => {
-    if (!want.id) return;
+    const wantId = want.metadata?.id || want.id;
+    if (!wantId) return;
     try {
-      await resumeWant(want.id);
+      await resumeWant(wantId);
     } catch (error) {
       console.error('Failed to resume want:', error);
     }
