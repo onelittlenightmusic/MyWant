@@ -1,0 +1,134 @@
+timestamp: "2025-09-23T01:01:31+09:00"
+execution_id: exec-20250923-010131
+wants:
+    - metadata:
+        id: want-1758556891640429000
+        name: dinner reservation
+        type: restaurant
+        labels:
+            category: dining
+            priority: high
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            duration_hours: 2
+            restaurant_type: fine dining
+      status: completed
+      state:
+        attempted: true
+        reservation_duration_hours: 2
+        reservation_end_time: "22:27"
+        reservation_name: dinner reservation dinner at fine dining restaurant
+        reservation_start_time: "20:27"
+        reservation_type: fine dining
+        schedule_date: "2025-09-24"
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: dinner reservation
+              state_value:
+                duration_hours: 2
+                restaurant_type: fine dining
+              timestamp: 2025-09-23T01:01:31.643596+09:00
+        stateHistory: []
+    - metadata:
+        id: want-1758556891640429001
+        name: hotel booking
+        type: hotel
+        labels:
+            category: accommodation
+            priority: high
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            hotel_type: luxury
+      status: completed
+      state:
+        attempted: true
+        check_in_time: 20:55 Sep 24
+        check_out_time: 07:52 Sep 25
+        hotel_type: luxury
+        reservation_name: hotel booking stay at luxury hotel
+        stay_duration_hours: 10.95
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: hotel booking
+              state_value:
+                hotel_type: luxury
+              timestamp: 2025-09-23T01:01:31.643625+09:00
+        stateHistory: []
+    - metadata:
+        id: want-1758556891640429002
+        name: breakfast buffet
+        type: buffet
+        labels:
+            category: dining
+            priority: medium
+            role: scheduler
+            template: travel_itinerary
+      spec:
+        params:
+            buffet_type: international
+      status: completed
+      state:
+        attempted: true
+        buffet_duration_hours: 1.5
+        buffet_end_time: 09:57 Sep 25
+        buffet_start_time: 08:27 Sep 25
+        buffet_type: international
+        reservation_name: breakfast buffet international breakfast buffet
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: breakfast buffet
+              state_value:
+                buffet_type: international
+              timestamp: 2025-09-23T01:01:31.643631+09:00
+        stateHistory: []
+    - metadata:
+        id: want-1758556891640429003
+        name: get one day travel
+        type: travel_coordinator
+        labels:
+            category: travel
+            priority: critical
+            role: coordinator
+            template: travel_itinerary
+      spec:
+        params:
+            template: One Day Travel Itinerary
+        using:
+            - role: scheduler
+              template: travel_itinerary
+      status: completed
+      state:
+        schedules:
+            - events:
+                - start: 2025-09-24T20:55:00+09:00
+                  end: 2025-09-25T07:52:00+09:00
+                  type: hotel
+                  name: hotel booking stay at luxury hotel
+              date: 2025-09-24T01:01:31.643731+09:00
+            - events:
+                - start: 2025-09-24T20:27:00+09:00
+                  end: 2025-09-24T22:27:00+09:00
+                  type: restaurant
+                  name: dinner reservation dinner at fine dining restaurant
+              date: 2025-09-24T01:01:31.643943+09:00
+            - events:
+                - start: 2025-09-25T08:27:00+09:00
+                  end: 2025-09-25T09:57:00+09:00
+                  type: buffet
+                  name: breakfast buffet international breakfast buffet
+              date: 2025-09-25T01:01:31.643955+09:00
+        total_processed: 3
+      history:
+        parameterHistory:
+            - want_name: get one day travel
+              state_value:
+                template: One Day Travel Itinerary
+              timestamp: 2025-09-23T01:01:31.643635+09:00
+        stateHistory: []

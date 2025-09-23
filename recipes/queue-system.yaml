@@ -16,38 +16,44 @@ recipe:
 
   wants:
     # Generator want - explicitly define all labels in recipe
-    - type: qnet numbers
-      labels:
-        role: source               # Explicitly defined, not auto-generated
-        category: queue-producer   # Recipe-specific connection label
-        component: generator       # Additional semantic label
-      params:
-        count: count
-        rate: rate
-        deterministic: deterministic
+    - metadata:
+        type: qnet numbers
+        labels:
+          role: source               # Explicitly defined, not auto-generated
+          category: queue-producer   # Recipe-specific connection label
+          component: generator       # Additional semantic label
+      spec:
+        params:
+          count: count
+          rate: rate
+          deterministic: deterministic
 
     # Queue want - explicitly define all labels in recipe
-    - type: qnet queue
-      labels:
-        role: processor           # Explicitly defined, not auto-generated
-        category: queue-processor # Recipe-specific semantic label
-        component: main-queue     # Additional semantic label
-      params:
-        service_time: service_time
-        deterministic: deterministic
-      using:
-        - category: queue-producer  # Connect to generator via recipe-defined label
+    - metadata:
+        type: qnet queue
+        labels:
+          role: processor           # Explicitly defined, not auto-generated
+          category: queue-processor # Recipe-specific semantic label
+          component: main-queue     # Additional semantic label
+      spec:
+        params:
+          service_time: service_time
+          deterministic: deterministic
+        using:
+          - category: queue-producer  # Connect to generator via recipe-defined label
 
     # Sink want - explicitly define all labels in recipe
-    - type: qnet sink
-      labels:
-        role: collector           # Explicitly defined, not auto-generated  
-        category: result-display  # Recipe-specific semantic label
-        component: final-sink     # Additional semantic label
-      params:
-        display_format: "Number: %d"
-      using:
-        - role: processor         # Connect to queue via recipe-defined label
+    - metadata:
+        type: qnet sink
+        labels:
+          role: collector           # Explicitly defined, not auto-generated
+          category: result-display  # Recipe-specific semantic label
+          component: final-sink     # Additional semantic label
+      spec:
+        params:
+          display_format: "Number: %d"
+        using:
+          - role: processor         # Connect to queue via recipe-defined label
 
   # Recipe result definition - specifies which want and stat to use for result
   result:

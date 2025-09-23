@@ -7,7 +7,7 @@ wants:
     spec:
       params:
         prefix: vacation
-        display_name: "Agent Delegation Travel Test"
+        display_name: "One Day Travel Itinerary"
         restaurant_type: "fine dining"
         hotel_type: "luxury"
         buffet_type: "international"

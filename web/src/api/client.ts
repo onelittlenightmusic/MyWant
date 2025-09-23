@@ -44,8 +44,21 @@ class MyWantApiClient {
           code: error.code,
         };
 
+        // Handle string error responses (from our Go server)
         if (error.response?.data && typeof error.response.data === 'string') {
           apiError.message = error.response.data;
+        }
+        // Handle object error responses
+        else if (error.response?.data && typeof error.response.data === 'object') {
+          const data = error.response.data as any;
+          apiError.message = data.message || data.error || error.message;
+        }
+
+        // Specifically handle validation errors from want type validation
+        if (error.response?.status === 400 && apiError.message.includes('Invalid want types:')) {
+          // Extract the detailed error message for better formatting
+          apiError.type = 'validation';
+          apiError.details = apiError.message.replace('Invalid want types: ', '');
         }
 
         console.error('API Error:', apiError);

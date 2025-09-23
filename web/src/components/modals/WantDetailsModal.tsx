@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCw, Eye, BarChart3 } from 'lucide-react';
+import { X, RefreshCw, Eye, BarChart3, AlertTriangle } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
@@ -151,6 +152,29 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
           <div className="mt-6 h-96 overflow-y-auto custom-scrollbar">
             {activeTab === 'overview' && (
               <div className="space-y-6">
+                {/* Runtime Error Display */}
+                {want.status === 'failed' && want.state?.error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-red-800 mb-2">Runtime Error</h4>
+                        <p className="text-sm text-red-700">{String(want.state?.error || 'Unknown error')}</p>
+                        {String(want.state?.error || '').includes('Unknown want type:') && (
+                          <div className="mt-3 bg-red-100 bg-opacity-50 p-3 rounded border">
+                            <p className="text-xs text-red-600 font-medium mb-1">This want failed during creation because:</p>
+                            <ul className="list-disc list-inside space-y-1 text-xs text-red-600">
+                              <li>The want type doesn't exist or is misspelled</li>
+                              <li>A custom type may not be properly registered</li>
+                              <li>Check the available types listed in the error</li>
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status Overview */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-gray-900 mb-3">Execution Status</h4>
@@ -327,6 +351,20 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
             {activeTab === 'results' && (
               <div>
+                {/* Show error details prominently if the want failed */}
+                {want.status === 'failed' && want.state?.error && (
+                  <div className="mb-6">
+                    <ErrorDisplay
+                      error={{
+                        message: 'Want execution failed',
+                        status: 500,
+                        type: 'runtime',
+                        details: String(want.state?.error || 'Unknown error')
+                      }}
+                    />
+                  </div>
+                )}
+
                 {want.history?.stateHistory && want.history.stateHistory.length > 0 ? (
                   <div className="space-y-4">
                     <div>

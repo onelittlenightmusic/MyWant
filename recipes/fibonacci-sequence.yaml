@@ -17,23 +17,27 @@ recipe:
 
   wants:
     # Fibonacci number generator - generates fibonacci sequence
-    - type: fibonacci_numbers
-      labels:
-        role: generator
-        component: source
-      params:
-        count: count
+    - metadata:
+        type: fibonacci_numbers
+        labels:
+          role: generator
+          component: source
+      spec:
+        params:
+          count: count
 
-    # Fibonacci sequence - filters fibonacci numbers by range  
-    - type: fibonacci_sequence
-      labels:
-        role: filter
-        component: processor
-      params:
-        min_value: min_value
-        max_value: max_value
-      using:
-        - role: generator
+    # Fibonacci sequence - filters fibonacci numbers by range
+    - metadata:
+        type: fibonacci_sequence
+        labels:
+          role: filter
+          component: processor
+      spec:
+        params:
+          min_value: min_value
+          max_value: max_value
+        using:
+          - role: generator
 
   # Recipe result definition - specifies how to compute fibonacci results
   result:

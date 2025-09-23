@@ -3,6 +3,7 @@ export interface Want {
   metadata: WantMetadata;
   spec: WantSpec;
   status: WantExecutionStatus;
+  state?: Record<string, unknown>; // Runtime state including error details
   stats?: WantStats;
   history?: WantHistory;
   results?: Record<string, unknown>;
@@ -59,12 +60,8 @@ export type WantExecutionStatus = 'created' | 'running' | 'completed' | 'failed'
 
 export type WantPhase = 'pending' | 'initializing' | 'running' | 'completed' | 'failed' | 'stopped';
 
-export interface WantDetails {
-  id: string;
-  execution_status: WantExecutionStatus;
-  wants: WantDefinition[];
-  results?: Record<string, unknown>;
-  suspended?: boolean;
+export interface WantDetails extends Want {
+  execution_status?: WantExecutionStatus;
 }
 
 export interface WantResults {

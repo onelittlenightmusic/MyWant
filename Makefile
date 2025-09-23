@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all
 
 # Code quality targets
 fmt:
@@ -196,12 +196,33 @@ help:
 	@echo "🔧 Server:"
 	@echo "  run-server       - Start mywant server"
 	@echo "  test-server-api  - Test server API endpoints"
+	@echo "  restart-all      - Kill and restart frontend and backend processes"
 	@echo ""
 	@echo "🧹 Utility:"
 	@echo "  clean - Clean build artifacts"
 	@echo "  help  - Show this help"
 
 all: build
+
+# Kill and restart frontend and backend processes
+restart-all:
+	@echo "🔄 Restarting frontend and backend..."
+	@echo "🛑 Killing existing processes..."
+	@pkill -f "npm run dev" || echo "No frontend process found"
+	@pkill -f "./bin/mywant" || echo "No backend process found"
+	@pkill -f "vite" || echo "No vite process found"
+	@sleep 2
+	@echo "🏗️  Building backend..."
+	@$(MAKE) build-server
+	@echo "🚀 Starting backend in background..."
+	@./bin/mywant 8080 localhost &
+	@echo "📦 Installing frontend dependencies..."
+	@cd web && npm install
+	@echo "🌐 Starting frontend in background..."
+	@cd web && npm run dev &
+	@echo "✅ Both processes started!"
+	@echo "🌐 Frontend: http://localhost:5173"
+	@echo "🔧 Backend: http://localhost:8080"
 
 # Default target
 .DEFAULT_GOAL := help

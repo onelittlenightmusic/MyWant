@@ -14,89 +14,103 @@ recipe:
 
   wants:
     # Primary packet generator
-    - name: "gen-primary"
-      type: qnet numbers
-      labels:
-        role: source
-        stream: primary
-        priority: high
-      params:
-        rate: primary_rate
-        count: primary_count
+    - metadata:
+        name: "gen-primary"
+        type: qnet numbers
+        labels:
+          role: source
+          stream: primary
+          priority: high
+      spec:
+        params:
+          rate: primary_rate
+          count: primary_count
 
     # Secondary packet generator
-    - name: "gen-secondary" 
-      type: qnet numbers
-      labels:
-        role: source
-        stream: secondary
-        priority: medium
-      params:
-        rate: secondary_rate
-        count: secondary_count
+    - metadata:
+        name: "gen-secondary"
+        type: qnet numbers
+        labels:
+          role: source
+          stream: secondary
+          priority: medium
+      spec:
+        params:
+          rate: secondary_rate
+          count: secondary_count
 
     # Main queue processing primary stream
-    - name: "queue-primary"
-      type: qnet queue
-      labels:
-        role: processor
-        stage: first
-        stream: primary
-        path: main
-      params:
-        service_time: primary_service_time
-      using:
-        - role: source
+    - metadata:
+        name: "queue-primary"
+        type: qnet queue
+        labels:
+          role: processor
+          stage: first
           stream: primary
+          path: main
+      spec:
+        params:
+          service_time: primary_service_time
+        using:
+          - role: source
+            stream: primary
 
     # Alt queue processing secondary stream
-    - name: "queue-secondary"
-      type: qnet queue
-      labels:
-        role: processor
-        stage: first
-        stream: secondary
-        path: alt
-      params:
-        service_time: secondary_service_time
-      using:
-        - role: source
+    - metadata:
+        name: "queue-secondary"
+        type: qnet queue
+        labels:
+          role: processor
+          stage: first
           stream: secondary
+          path: alt
+      spec:
+        params:
+          service_time: secondary_service_time
+        using:
+          - role: source
+            stream: secondary
 
     # Stream combiner - connects to both first-stage processors
-    - name: "combiner-main"
-      type: qnet combiner
-      labels:
-        role: merger
-        operation: combine
-        stage: second
-      params: {}
-      using:
-        - role: processor
-          stage: first
+    - metadata:
+        name: "combiner-main"
+        type: qnet combiner
+        labels:
+          role: merger
+          operation: combine
+          stage: second
+      spec:
+        params: {}
+        using:
+          - role: processor
+            stage: first
 
     # Final processing queue - connects to combiner
-    - name: "queue-final"
-      type: qnet queue
-      labels:
-        role: processor
-        stage: final
-        path: output
-      params:
-        service_time: final_service_time
-      using:
-        - role: merger
+    - metadata:
+        name: "queue-final"
+        type: qnet queue
+        labels:
+          role: processor
+          stage: final
+          path: output
+      spec:
+        params:
+          service_time: final_service_time
+        using:
+          - role: merger
 
     # Final collector - connects to final processor
-    - name: "collector-end"
-      type: qnet sink
-      labels:
-        role: terminal
-        stage: end
-      params: {}
-      using:
-        - role: processor
-          stage: final
+    - metadata:
+        name: "collector-end"
+        type: qnet sink
+        labels:
+          role: terminal
+          stage: end
+      spec:
+        params: {}
+        using:
+          - role: processor
+            stage: final
 
   # Recipe result definition - specifies which want and stat to use for final result
   result:

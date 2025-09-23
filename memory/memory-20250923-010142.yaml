@@ -1,0 +1,186 @@
+timestamp: "2025-09-23T01:01:42+09:00"
+execution_id: exec-20250923-010142
+wants:
+    - metadata:
+        id: want-1758556902691992000
+        name: travel planner
+        type: travel itinerary planner
+        labels:
+            role: travel-planner
+      spec:
+        params:
+            buffet_type: international
+            dinner_duration: 2
+            display_name: One Day Travel Itinerary
+            hotel_type: luxury
+            prefix: vacation
+            restaurant_type: fine dining
+      status: completed
+      state:
+        buffet_total_processed: 1
+        childCount: 8
+        hotel_total_processed: 1
+        metrics:
+            buffet_total_processed: 1
+            hotel_total_processed: 1
+            restaurant_total_processed: 1
+            travel_coordinator_total_processed: 3
+        primaryResult: 3
+        recipePath: recipes/travel-itinerary.yaml
+        recipeResult: 3
+        restaurant_total_processed: 1
+        result: 'Total travel bookings coordinated: 3'
+        travel_coordinator_total_processed: 3
+      history:
+        parameterHistory:
+            - want_name: travel planner
+              state_value:
+                buffet_type: international
+                dinner_duration: 2
+                display_name: One Day Travel Itinerary
+                hotel_type: luxury
+                prefix: vacation
+                restaurant_type: fine dining
+              timestamp: 2025-09-23T01:01:42.693193+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-restaurant-1
+        type: restaurant
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            duration_hours: dinner_duration
+            restaurant_type: restaurant_type
+      status: completed
+      state:
+        attempted: true
+        reservation_duration_hours: 2
+        reservation_end_time: "22:14"
+        reservation_name: vacation-restaurant-1 dinner at restaurant_type restaurant
+        reservation_start_time: "20:14"
+        reservation_type: restaurant_type
+        schedule_date: "2025-09-24"
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-restaurant-1
+              state_value:
+                duration_hours: dinner_duration
+                restaurant_type: restaurant_type
+              timestamp: 2025-09-23T01:01:42.694006+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-hotel-2
+        type: hotel
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            hotel_type: hotel_type
+      status: completed
+      state:
+        attempted: true
+        check_in_time: 23:26 Sep 24
+        check_out_time: 08:35 Sep 25
+        hotel_type: hotel_type
+        reservation_name: vacation-hotel-2 stay at hotel_type hotel
+        stay_duration_hours: 9.15
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-hotel-2
+              state_value:
+                hotel_type: hotel_type
+              timestamp: 2025-09-23T01:01:42.694008+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-buffet-3
+        type: buffet
+        labels:
+            owner: child
+            role: scheduler
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            buffet_type: buffet_type
+      status: completed
+      state:
+        attempted: true
+        buffet_duration_hours: 1.5
+        buffet_end_time: 10:46 Sep 25
+        buffet_start_time: 09:16 Sep 25
+        buffet_type: buffet_type
+        reservation_name: vacation-buffet-3 buffet_type breakfast buffet
+        total_processed: 1
+      history:
+        parameterHistory:
+            - want_name: vacation-buffet-3
+              state_value:
+                buffet_type: buffet_type
+              timestamp: 2025-09-23T01:01:42.69401+09:00
+        stateHistory: []
+    - metadata:
+        name: vacation-travel_coordinator-4
+        type: travel_coordinator
+        labels:
+            owner: child
+        ownerReferences:
+            - apiVersion: MyWant/v1
+              kind: Want
+              name: travel planner
+              controller: true
+              blockOwnerDeletion: true
+      spec:
+        params:
+            display_name: display_name
+        using:
+            - role: scheduler
+      status: completed
+      state:
+        schedules:
+            - events:
+                - start: 2025-09-25T09:16:00+09:00
+                  end: 2025-09-25T10:46:00+09:00
+                  type: buffet
+                  name: vacation-buffet-3 buffet_type breakfast buffet
+              date: 2025-09-25T01:01:42.69403+09:00
+            - events:
+                - start: 2025-09-24T20:14:00+09:00
+                  end: 2025-09-24T22:14:00+09:00
+                  type: restaurant
+                  name: vacation-restaurant-1 dinner at restaurant_type restaurant
+              date: 2025-09-24T01:01:42.694037+09:00
+            - events:
+                - start: 2025-09-24T23:26:00+09:00
+                  end: 2025-09-25T08:35:00+09:00
+                  type: hotel
+                  name: vacation-hotel-2 stay at hotel_type hotel
+              date: 2025-09-24T01:01:42.694065+09:00
+        total_processed: 3
+      history:
+        parameterHistory:
+            - want_name: vacation-travel_coordinator-4
+              state_value:
+                display_name: display_name
+              timestamp: 2025-09-23T01:01:42.694011+09:00
+        stateHistory: []

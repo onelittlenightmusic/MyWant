@@ -830,12 +830,12 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
 }
 
 // createWantFunction creates the appropriate function based on want type using registry
-func (cb *ChainBuilder) createWantFunction(want *Want) interface{} {
+func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	wantType := want.Metadata.Type
 
 	// Check if it's a custom target type first
 	if cb.customRegistry.IsCustomType(wantType) {
-		return cb.createCustomTargetWant(want)
+		return cb.createCustomTargetWant(want), nil
 	}
 
 	// Fall back to standard type registration
@@ -848,8 +848,8 @@ func (cb *ChainBuilder) createWantFunction(want *Want) interface{} {
 		}
 		customTypes := cb.customRegistry.ListTypes()
 
-		panic(fmt.Sprintf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v",
-			wantType, availableTypes, customTypes))
+		return nil, fmt.Errorf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v",
+			wantType, availableTypes, customTypes)
 	}
 	wantInstance := factory(want.Metadata, want.Spec)
 
@@ -862,7 +862,12 @@ func (cb *ChainBuilder) createWantFunction(want *Want) interface{} {
 		}
 	}
 
-	return wantInstance
+	return wantInstance, nil
+}
+
+// TestCreateWantFunction tests want type creation without side effects (exported for validation)
+func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (interface{}, error) {
+	return cb.createWantFunction(want)
 }
 
 // createCustomTargetWant creates a custom target want using the registry
@@ -1532,7 +1537,30 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	fmt.Printf("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
 
 	// Create the function/want
-	wantFunction := cb.createWantFunction(wantConfig)
+	wantFunction, err := cb.createWantFunction(wantConfig)
+	if err != nil {
+		fmt.Printf("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
+
+		// Create a failed want instead of returning error
+		wantPtr := &Want{
+			Metadata: wantConfig.Metadata,
+			Spec:     wantConfig.Spec,
+			Status:   WantStatusFailed,
+			State: map[string]interface{}{
+				"error": err.Error(),
+			},
+			History: wantConfig.History,
+		}
+
+		runtimeWant := &runtimeWant{
+			metadata: wantConfig.Metadata,
+			spec:     wantConfig.Spec,
+			function: nil, // No function since creation failed
+			want:     wantPtr,
+		}
+		cb.wants[wantConfig.Metadata.Name] = runtimeWant
+		return
+	}
 
 	var wantPtr *Want
 	if wantWithGetWant, ok := wantFunction.(interface{ GetWant() *Want }); ok {

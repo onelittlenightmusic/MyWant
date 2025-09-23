@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal } from 'lucide-react';
+import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -31,6 +31,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   const completedAt = want.stats?.completed_at;
 
   const isRunning = want.status === 'running';
+  const isFailed = want.status === 'failed';
+  const hasError = isFailed && want.state?.error;
   const isSuspended = want.suspended === true;
   const canControl = want.status === 'running' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
@@ -38,6 +40,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div className={classNames(
       'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
+      hasError && 'border-red-200 bg-red-50',
       className
     )}>
       {/* Header */}
@@ -219,6 +222,27 @@ export const WantCard: React.FC<WantCardProps> = ({
               Execution paused
             </div>
           )}
+        </div>
+      )}
+
+      {/* Error indicator */}
+      {hasError && (
+        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-md">
+          <div className="flex items-start">
+            <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-red-800">Execution Failed</p>
+              <p className="text-xs text-red-600 mt-1 truncate">
+                {truncateText(String(want.state?.error || 'Unknown error'), 100)}
+              </p>
+              <button
+                onClick={() => onView(want)}
+                className="text-xs text-red-700 hover:text-red-800 underline mt-1"
+              >
+                View details →
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

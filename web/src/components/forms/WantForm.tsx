@@ -3,8 +3,10 @@ import { X, Save, FileText, Code } from 'lucide-react';
 import { Want } from '@/types/want';
 import { YamlEditor } from './YamlEditor';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { validateYaml, formatYaml, stringifyYaml } from '@/utils/yaml';
 import { useWantStore } from '@/stores/wantStore';
+import { ApiError } from '@/types/api';
 
 interface WantFormProps {
   isOpen: boolean;
@@ -53,7 +55,7 @@ const FIBONACCI_EXAMPLE = `wants:
   # Number generator for fibonacci sequence
   - metadata:
       name: "fibonacci generator"
-      type: "fibonaaci numbers"
+      type: "fibonacci_numbers"
       labels:
         role: "source"
         target: "fibonacci sequence"
@@ -104,6 +106,30 @@ const TRAVEL_EXAMPLE = `wants:
         dinner_duration: 2.0
 `;
 
+const INVALID_EXAMPLE = `wants:
+  # This example has intentionally invalid want types for testing
+  - metadata:
+      name: "invalid generator"
+      type: "fibonaaci numbers"  # Typo in fibonacci_numbers
+      labels:
+        role: "source"
+    spec:
+      params:
+        count: 10
+        rate: 1.0
+
+  - metadata:
+      name: "unknown processor"
+      type: "non_existent_type"  # This type doesn't exist
+      labels:
+        role: "processor"
+    spec:
+      params:
+        max_iterations: 10
+      using:
+        - role: "source"
+`;
+
 export const WantForm: React.FC<WantFormProps> = ({
   isOpen,
   onClose,
@@ -113,6 +139,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [yaml, setYaml] = useState(SAMPLE_YAML);
   const [name, setName] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<ApiError | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
   // Initialize form when editing
@@ -142,6 +169,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       setName('');
     }
     setValidationError(null);
+    setApiError(null);
   }, [editingWant, isOpen]);
 
   // Validate YAML on change
@@ -169,6 +197,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
 
     try {
+      setApiError(null);
       if (isEditing && editingWant) {
         await updateWant(editingWant.id, yaml);
       } else {
@@ -177,6 +206,14 @@ export const WantForm: React.FC<WantFormProps> = ({
       onClose();
     } catch (error) {
       console.error('Failed to save want:', error);
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        setApiError(error as ApiError);
+      } else {
+        setApiError({
+          message: 'An unexpected error occurred',
+          status: 500
+        });
+      }
     }
   };
 
@@ -189,11 +226,12 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   };
 
-  const loadSample = (sampleType: 'qnet' | 'fibonacci' | 'travel' = 'qnet') => {
+  const loadSample = (sampleType: 'qnet' | 'fibonacci' | 'travel' | 'invalid' = 'qnet') => {
     const samples = {
       qnet: SAMPLE_YAML,
       fibonacci: FIBONACCI_EXAMPLE,
-      travel: TRAVEL_EXAMPLE
+      travel: TRAVEL_EXAMPLE,
+      invalid: INVALID_EXAMPLE
     };
     setYaml(samples[sampleType]);
     setName('');
@@ -279,6 +317,13 @@ export const WantForm: React.FC<WantFormProps> = ({
                         >
                           Travel Planning
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => loadSample('invalid')}
+                          className="flex items-center w-full px-4 py-2 text-sm text-orange-700 hover:bg-orange-50"
+                        >
+                          Invalid Types (Test)
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -308,8 +353,13 @@ export const WantForm: React.FC<WantFormProps> = ({
             )}
           </div>
 
-          {/* Error message */}
-          {error && (
+          {/* Error messages */}
+          {apiError && (
+            <div className="mb-6">
+              <ErrorDisplay error={apiError} />
+            </div>
+          )}
+          {error && !apiError && (
             <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-md">
               <p className="text-sm text-red-600">{error}</p>
             </div>

@@ -8,6 +8,8 @@ export interface ApiError {
   message: string;
   status: number;
   code?: string;
+  type?: 'validation' | 'runtime' | 'network';
+  details?: string;
 }
 
 export interface HealthCheck {

@@ -129,6 +129,12 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate want types before proceeding
+	if err := s.validateWantTypes(config); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid want types: %v", err), http.StatusBadRequest)
+		return
+	}
+
 	// Generate unique ID for this want execution
 	wantID := generateWantID()
 
@@ -275,6 +281,12 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	config, err := mywant.LoadConfigFromYAMLBytes(configYAML)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Invalid YAML config: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate want types before proceeding
+	if err := s.validateWantTypes(config); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid want types: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -796,6 +808,45 @@ func (s *Server) Start() error {
 	fmt.Printf("\n")
 
 	return http.ListenAndServe(addr, s.router)
+}
+
+
+// validateWantTypes validates that all want types are known before execution
+func (s *Server) validateWantTypes(config mywant.Config) error {
+	// Create a temporary builder to check available types
+	builder := mywant.NewChainBuilder(mywant.Config{})
+	builder.SetAgentRegistry(s.agentRegistry)
+
+	// Register all want types (same as in executeWantAsync)
+	types.RegisterQNetWantTypes(builder)
+	types.RegisterFibonacciWantTypes(builder)
+	types.RegisterPrimeWantTypes(builder)
+	types.RegisterTravelWantTypes(builder)
+	mywant.RegisterMonitorWantTypes(builder)
+
+	// Check each want type by trying to create a minimal want
+	for _, want := range config.Wants {
+		wantType := want.Metadata.Type
+
+		// Create a minimal test want to validate the type
+		testWant := &mywant.Want{
+			Metadata: mywant.Metadata{
+				Name: want.Metadata.Name,
+				Type: wantType,
+			},
+			Spec: mywant.WantSpec{
+				Params: make(map[string]interface{}),
+			},
+		}
+
+		// Try to create the want function to check if type is valid
+		_, err := builder.TestCreateWantFunction(testWant)
+		if err != nil {
+			return fmt.Errorf("invalid want type '%s' in want '%s': %v", wantType, want.Metadata.Name, err)
+		}
+	}
+
+	return nil
 }
 
 // generateWantID generates a unique ID for want execution
