@@ -4,6 +4,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
 import { ErrorHistoryPage } from '@/pages/ErrorHistoryPage';
 import { AgentsPage } from '@/pages/AgentsPage';
+import RecipePage from '@/pages/RecipePage';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/agents" element={<AgentsPage />} />
+            <Route path="/recipes" element={<RecipePage />} />
             <Route path="/errors" element={<ErrorHistoryPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

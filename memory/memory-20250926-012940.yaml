@@ -1,8 +1,8 @@
-timestamp: "2025-09-26T01:44:09+09:00"
-execution_id: exec-20250926-014409
+timestamp: "2025-09-26T01:29:40+09:00"
+execution_id: exec-20250926-012940
 wants:
     - metadata:
-        id: want-1758818649389841001
+        id: want-1758817780832621001
         name: processing queue
         type: qnet queue
         labels:
@@ -14,34 +14,34 @@ wants:
             - role: source
       status: completed
       state:
-        average_wait_time: 0.012914251725506844
-        current_server_free_time: 53.846262002744574
+        average_wait_time: 0.006943254789589593
+        current_server_free_time: 55.250697868092075
         last_packet_wait_time: 0
         processedCount: 100
-        serverFreeTime: 53.846262002744574
+        serverFreeTime: 55.250697868092075
         total_processed: 100
-        total_wait_time: 1.2914251725506845
-        waitTimeSum: 1.2914251725506845
+        total_wait_time: 0.6943254789589592
+        waitTimeSum: 0.6943254789589592
       history:
         parameterHistory:
             - want_name: processing queue
               state_value:
                 service_time: 0.1
-              timestamp: 2025-09-26T01:44:09.399049+09:00
+              timestamp: 2025-09-26T01:29:40.842127+09:00
         stateHistory:
             - want_name: processing queue
               state_value:
-                average_wait_time: 0.012914251725506844
-                current_server_free_time: 53.846262002744574
+                average_wait_time: 0.006943254789589593
+                current_server_free_time: 55.250697868092075
                 last_packet_wait_time: 0
                 processedCount: 100
-                serverFreeTime: 53.846262002744574
+                serverFreeTime: 55.250697868092075
                 total_processed: 100
-                total_wait_time: 1.2914251725506845
-                waitTimeSum: 1.2914251725506845
-              timestamp: 2025-09-26T01:44:09.399432+09:00
+                total_wait_time: 0.6943254789589592
+                waitTimeSum: 0.6943254789589592
+              timestamp: 2025-09-26T01:29:40.842506+09:00
     - metadata:
-        id: want-1758818649389841002
+        id: want-1758817780832621002
         name: result collector
         type: qnet sink
         labels:
@@ -59,10 +59,10 @@ wants:
         parameterHistory:
             - want_name: result collector
               state_value: {}
-              timestamp: 2025-09-26T01:44:09.399053+09:00
+              timestamp: 2025-09-26T01:29:40.842141+09:00
         stateHistory: []
     - metadata:
-        id: want-1758818649389841000
+        id: want-1758817780832621000
         name: number generator
         type: qnet numbers
         labels:
@@ -76,7 +76,7 @@ wants:
       state:
         average_wait_time: 0
         current_count: 100
-        current_time: 53.74626200274457
+        current_time: 55.150697868092074
         total_processed: 100
         total_wait_time: 0
       history:
@@ -85,10 +85,10 @@ wants:
               state_value:
                 count: 100
                 rate: 2
-              timestamp: 2025-09-26T01:44:09.399033+09:00
+              timestamp: 2025-09-26T01:29:40.842111+09:00
         stateHistory:
             - want_name: number generator
               state_value:
                 current_count: 100
-                current_time: 53.74626200274457
-              timestamp: 2025-09-26T01:44:09.399394+09:00
+                current_time: 55.150697868092074
+              timestamp: 2025-09-26T01:29:40.842501+09:00

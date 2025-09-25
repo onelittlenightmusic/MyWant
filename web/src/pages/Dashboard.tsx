@@ -84,7 +84,12 @@ export const Dashboard: React.FC = () => {
   const handleDeleteWantConfirm = async () => {
     if (deleteWantState) {
       try {
-        await deleteWant(deleteWantState.id);
+        const wantId = deleteWantState.metadata?.id || deleteWantState.id;
+        if (!wantId) {
+          console.error('No want ID found for deletion');
+          return;
+        }
+        await deleteWant(wantId);
         setDeleteWantState(null);
       } catch (error) {
         console.error('Failed to delete want:', error);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, RefreshCw, Eye, BarChart3, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus } from 'lucide-react';
+import { X, RefreshCw, Eye, BarChart3, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -15,7 +15,7 @@ interface WantDetailsModalProps {
   want: Want | null;
 }
 
-type TabType = 'overview' | 'config' | 'logs' | 'results';
+type TabType = 'overview' | 'config' | 'logs' | 'agents' | 'results';
 
 export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
   isOpen,
@@ -27,11 +27,16 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     selectedWantResults,
     fetchWantDetails,
     fetchWantResults,
+    updateWant,
     loading
   } = useWantStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedConfig, setEditedConfig] = useState<string>('');
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Fetch details when modal opens
   useEffect(() => {
@@ -71,16 +76,89 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     }
   };
 
+  const handleEditStart = () => {
+    // Initialize the editor with current want configuration
+    const currentConfig = stringifyYaml({
+      wants: [{
+        metadata: {
+          name: want.metadata?.name,
+          type: want.metadata?.type,
+          labels: want.metadata?.labels || {}
+        },
+        spec: {
+          params: want.spec?.params || {},
+          ...(want.spec?.using && { using: want.spec.using }),
+          ...(want.spec?.recipe && { recipe: want.spec.recipe })
+        }
+      }]
+    });
+    setEditedConfig(currentConfig);
+    setIsEditing(true);
+    setUpdateError(null);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditedConfig('');
+    setUpdateError(null);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!want || !editedConfig.trim()) return;
+
+    const wantId = want.metadata?.id;
+    if (!wantId) return;
+
+    setUpdateLoading(true);
+    setUpdateError(null);
+
+    try {
+      await updateWant(wantId, editedConfig);
+      setIsEditing(false);
+      setEditedConfig('');
+
+      // Refresh the want details to show updated data
+      await fetchWantDetails(wantId);
+      await fetchWantResults(wantId);
+    } catch (error) {
+      console.error('Failed to update want:', error);
+      setUpdateError(error instanceof Error ? error.message : 'Failed to update want configuration');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
   if (!isOpen || !want) return null;
+
+  const wantDetails = selectedWantDetails;
+
+  // Debug logging
+  console.log('WantDetailsModal Debug:', {
+    wantDetails,
+    current_agent: wantDetails?.current_agent,
+    running_agents: wantDetails?.running_agents,
+    agent_history: wantDetails?.agent_history,
+    state_agent_history: wantDetails?.state?.agent_history,
+    state_current_agent: wantDetails?.state?.current_agent,
+    state_running_agents: wantDetails?.state?.running_agents
+  });
+
+  const hasAgentData = (wantDetails?.current_agent ||
+    (wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
+    (wantDetails?.agent_history && wantDetails.agent_history.length > 0) ||
+    (wantDetails?.state?.current_agent) ||
+    (wantDetails?.state?.running_agents && Array.isArray(wantDetails.state.running_agents) && wantDetails.state.running_agents.length > 0) ||
+    (wantDetails?.state?.agent_history && Array.isArray(wantDetails.state.agent_history) && wantDetails.state.agent_history.length > 0));
+
+  console.log('hasAgentData:', hasAgentData);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Eye },
     { id: 'config', label: 'Configuration', icon: Eye },
     { id: 'logs', label: 'Logs', icon: Eye },
+    ...(hasAgentData ? [{ id: 'agents', label: 'Agents', icon: Bot }] : []),
     { id: 'results', label: 'Results', icon: BarChart3 },
   ];
-
-  const wantDetails = selectedWantDetails;
   const createdAt = wantDetails?.stats?.created_at;
   const startedAt = wantDetails?.stats?.started_at;
   const completedAt = wantDetails?.stats?.completed_at;
@@ -268,136 +346,6 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   </div>
                 )}
 
-                {/* Agent Information */}
-                {(wantDetails?.current_agent ||
-                  (wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
-                  (wantDetails?.agent_history && wantDetails.agent_history.length > 0)) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      Agent Execution
-                    </h4>
-
-                    <div className="bg-blue-50 rounded-lg p-4 space-y-4">
-                      {/* Current Agent */}
-                      {wantDetails.current_agent && (
-                        <div className="flex items-center justify-between p-3 bg-blue-100 rounded-md">
-                          <div className="flex items-center">
-                            <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse" />
-                            <div>
-                              <div className="text-sm font-medium text-blue-900">Current Agent</div>
-                              <div className="text-sm text-blue-700">{wantDetails.current_agent}</div>
-                            </div>
-                          </div>
-                          <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                            Active
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Running Agents Summary */}
-                      {wantDetails.running_agents && wantDetails.running_agents.length > 0 && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center text-blue-700">
-                            <Users className="h-4 w-4 mr-2" />
-                            Running Agents
-                          </span>
-                          <span className="font-medium text-blue-900">
-                            {wantDetails.running_agents.length} agent{wantDetails.running_agents.length !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Agent History */}
-                      {wantDetails.agent_history && wantDetails.agent_history.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="flex items-center text-sm font-medium text-blue-900">
-                              <Clock className="h-4 w-4 mr-2" />
-                              Execution History
-                            </span>
-                            <span className="text-xs text-blue-700">
-                              {wantDetails.agent_history.length} execution{wantDetails.agent_history.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {wantDetails.agent_history.map((execution, index) => {
-                              const getStatusIcon = (status: string) => {
-                                switch (status) {
-                                  case 'completed':
-                                    return <CheckCircle className="h-4 w-4 text-green-600" />;
-                                  case 'failed':
-                                    return <XCircle className="h-4 w-4 text-red-600" />;
-                                  case 'running':
-                                    return <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" />;
-                                  case 'terminated':
-                                    return <Minus className="h-4 w-4 text-gray-600" />;
-                                  default:
-                                    return <div className="w-4 h-4 bg-gray-400 rounded-full" />;
-                                }
-                              };
-
-                              const getStatusColor = (status: string) => {
-                                switch (status) {
-                                  case 'completed':
-                                    return 'bg-green-100 text-green-800';
-                                  case 'failed':
-                                    return 'bg-red-100 text-red-800';
-                                  case 'running':
-                                    return 'bg-blue-100 text-blue-800';
-                                  case 'terminated':
-                                    return 'bg-gray-100 text-gray-800';
-                                  default:
-                                    return 'bg-gray-100 text-gray-800';
-                                }
-                              };
-
-                              return (
-                                <div key={index} className="bg-white rounded border border-blue-200 p-3">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex items-start space-x-3">
-                                      {getStatusIcon(execution.status)}
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center space-x-2">
-                                          <span className="text-sm font-medium text-gray-900">
-                                            {execution.agent_name}
-                                          </span>
-                                          <span className="text-xs text-gray-500">
-                                            ({execution.agent_type})
-                                          </span>
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-1">
-                                          Started: {formatDate(execution.start_time)}
-                                        </div>
-                                        {execution.end_time && (
-                                          <div className="text-xs text-gray-500">
-                                            Ended: {formatDate(execution.end_time)}
-                                          </div>
-                                        )}
-                                        {execution.error && (
-                                          <div className="text-xs text-red-600 mt-1">
-                                            Error: {execution.error}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <span className={classNames(
-                                      'text-xs font-medium px-2 py-1 rounded-full',
-                                      getStatusColor(execution.status)
-                                    )}>
-                                      {execution.status}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
 
                 {/* Parameters */}
@@ -415,9 +363,75 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
             )}
 
             {activeTab === 'config' && (
-              <div>
+              <div className="space-y-4">
+                {/* Configuration Header with Edit/Save controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-sm font-medium text-gray-900">Want Configuration</h4>
+                    {isEditing && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        <Edit className="h-3 w-3 mr-1" />
+                        Editing
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {!isEditing ? (
+                      <button
+                        onClick={handleEditStart}
+                        className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleEditCancel}
+                          disabled={updateLoading}
+                          className="inline-flex items-center px-3 py-1 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveConfig}
+                          disabled={updateLoading || !editedConfig.trim()}
+                          className="inline-flex items-center px-3 py-1 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          {updateLoading ? (
+                            <>
+                              <LoadingSpinner size="sm" className="mr-1" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-1" />
+                              Save Changes
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Error Display */}
+                {updateError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
+                      <div>
+                        <h4 className="text-sm font-medium text-red-800">Failed to Update Configuration</h4>
+                        <p className="text-sm text-red-700 mt-1">{updateError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* YAML Editor */}
                 <YamlEditor
-                  value={stringifyYaml({
+                  value={isEditing ? editedConfig : stringifyYaml({
                     wants: [{
                       metadata: {
                         name: want.metadata?.name,
@@ -433,10 +447,33 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       ...(want.state && { state: want.state })
                     }]
                   })}
-                  onChange={() => {}} // Read-only
-                  readOnly={true}
+                  onChange={isEditing ? setEditedConfig : () => {}}
+                  readOnly={!isEditing}
                   height="350px"
                 />
+
+                {/* Help Text */}
+                {isEditing && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <div className="w-4 h-4 rounded-full bg-blue-400 flex items-center justify-center">
+                          <span className="text-xs text-white font-bold">i</span>
+                        </div>
+                      </div>
+                      <div className="ml-3">
+                        <h4 className="text-sm font-medium text-blue-800">Editing Tips</h4>
+                        <div className="text-sm text-blue-700 mt-1">
+                          <ul className="list-disc list-inside space-y-1">
+                            <li>You can modify parameters, labels, and other want specifications</li>
+                            <li>Changes will take effect immediately after saving</li>
+                            <li>Invalid YAML syntax will be rejected</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -578,6 +615,170 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                     No state data available yet
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'agents' && (
+              <div>
+                <div className="space-y-6">
+                  {/* Current Agent */}
+                  {(wantDetails?.current_agent || wantDetails?.state?.current_agent) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
+                        <User className="h-4 w-4 mr-2" />
+                        Current Agent
+                      </h4>
+                      <div className="flex items-center justify-between p-3 bg-blue-100 rounded-md">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse" />
+                          <div>
+                            <div className="text-sm font-medium text-blue-900">{wantDetails.current_agent || wantDetails.state?.current_agent}</div>
+                            <div className="text-xs text-blue-700">Currently executing</div>
+                          </div>
+                        </div>
+                        <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Running Agents Summary */}
+                  {((wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
+                    (wantDetails?.state?.running_agents && Array.isArray(wantDetails.state.running_agents) && wantDetails.state.running_agents.length > 0)) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        Running Agents
+                      </h4>
+                      {(() => {
+                        const runningAgents = wantDetails.running_agents || wantDetails.state?.running_agents || [];
+                        return (
+                          <>
+                            <div className="text-sm text-gray-700">
+                              <span className="font-medium">{runningAgents.length}</span> agent{runningAgents.length !== 1 ? 's' : ''} currently running:
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              {runningAgents.map((agentName, index) => (
+                                <div key={index} className="flex items-center text-sm text-blue-700">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse" />
+                                  {agentName}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Agent Execution History */}
+                  {((wantDetails?.agent_history && wantDetails.agent_history.length > 0) ||
+                    (wantDetails?.state?.agent_history && Array.isArray(wantDetails.state.agent_history) && wantDetails.state.agent_history.length > 0)) && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+                        <Clock className="h-4 w-4 mr-2" />
+                        Execution History
+                        {(() => {
+                          const agentHistory = wantDetails.agent_history || wantDetails.state?.agent_history || [];
+                          return (
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({agentHistory.length} execution{agentHistory.length !== 1 ? 's' : ''})
+                            </span>
+                          );
+                        })()}
+                      </h4>
+
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {(() => {
+                          const agentHistory = wantDetails.agent_history || wantDetails.state?.agent_history || [];
+                          return agentHistory.map((execution, index) => {
+                          const getStatusIcon = (status: string) => {
+                            switch (status) {
+                              case 'completed':
+                                return <CheckCircle className="h-4 w-4 text-green-600" />;
+                              case 'failed':
+                                return <XCircle className="h-4 w-4 text-red-600" />;
+                              case 'running':
+                                return <Clock className="h-4 w-4 text-blue-600 animate-pulse" />;
+                              default:
+                                return <Minus className="h-4 w-4 text-gray-600" />;
+                            }
+                          };
+
+                          const getStatusColor = (status: string) => {
+                            switch (status) {
+                              case 'completed':
+                                return 'bg-green-50 border-green-200';
+                              case 'failed':
+                                return 'bg-red-50 border-red-200';
+                              case 'running':
+                                return 'bg-blue-50 border-blue-200';
+                              default:
+                                return 'bg-gray-50 border-gray-200';
+                            }
+                          };
+
+                          const duration = execution.end_time
+                            ? new Date(execution.end_time).getTime() - new Date(execution.start_time).getTime()
+                            : null;
+
+                          return (
+                            <div key={index} className={`rounded-md p-3 border ${getStatusColor(execution.status)}`}>
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center space-x-2 flex-1">
+                                  {getStatusIcon(execution.status)}
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-sm font-medium text-gray-900">
+                                        {execution.agent_name}
+                                      </span>
+                                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                        {execution.agent_type}
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      Started: {formatDate(execution.start_time)}
+                                      {execution.end_time && (
+                                        <> • Ended: {formatDate(execution.end_time)}</>
+                                      )}
+                                      {duration && (
+                                        <> • Duration: {formatDuration(execution.start_time, execution.end_time)}</>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className={classNames(
+                                  'px-2 py-1 rounded-full text-xs font-medium',
+                                  execution.status === 'running' && 'bg-blue-100 text-blue-800',
+                                  execution.status === 'completed' && 'bg-green-100 text-green-800',
+                                  execution.status === 'failed' && 'bg-red-100 text-red-800',
+                                  execution.status === 'terminated' && 'bg-gray-100 text-gray-800'
+                                )}>
+                                  {execution.status}
+                                </span>
+                              </div>
+                              {execution.error && (
+                                <div className="mt-2 p-2 bg-white border border-red-200 rounded text-xs text-red-700">
+                                  <div className="font-medium">Error:</div>
+                                  <div className="mt-1">{execution.error}</div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No agent data */}
+                  {!hasAgentData && (
+                    <div className="text-center py-8 text-gray-500">
+                      No agent execution data available
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

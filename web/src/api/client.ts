@@ -20,6 +20,12 @@ import {
   CapabilitiesListResponse,
   FindAgentsByCapabilityResponse
 } from '@/types/agent';
+import {
+  GenericRecipe,
+  RecipeListResponse,
+  RecipeCreateResponse,
+  RecipeUpdateResponse,
+} from '@/types/recipe';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -217,9 +223,34 @@ class MyWantApiClient {
     const response = await this.client.get<FindAgentsByCapabilityResponse>(`/api/v1/capabilities/${capabilityName}/agents`);
     return response.data;
   }
+
+  // Recipe management
+  async createRecipe(recipe: GenericRecipe): Promise<RecipeCreateResponse> {
+    const response = await this.client.post<RecipeCreateResponse>('/api/v1/recipes', recipe);
+    return response.data;
+  }
+
+  async listRecipes(): Promise<RecipeListResponse> {
+    const response = await this.client.get<RecipeListResponse>('/api/v1/recipes');
+    return response.data;
+  }
+
+  async getRecipe(id: string): Promise<GenericRecipe> {
+    const response = await this.client.get<GenericRecipe>(`/api/v1/recipes/${id}`);
+    return response.data;
+  }
+
+  async updateRecipe(id: string, recipe: GenericRecipe): Promise<RecipeUpdateResponse> {
+    const response = await this.client.put<RecipeUpdateResponse>(`/api/v1/recipes/${id}`, recipe);
+    return response.data;
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/recipes/${id}`);
+  }
 }
 
 // Export singleton instance
-export const apiClient = new MyWantApiClient();
+export const apiClient = new MyWantApiClient('http://localhost:8080');
 
 export default MyWantApiClient;

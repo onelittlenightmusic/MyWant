@@ -1,0 +1,59 @@
+[VALIDATION] Capability validated successfully against OpenAPI spec
+[VALIDATION] Agent validated successfully against OpenAPI spec
+🔍 Scanning 9 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 6 custom types from recipes
+[SERVER] Loading 9 recipe files into registry...
+📝 Created recipe: 'Level 1 Approval'
+[SERVER] ✅ Loaded recipe: Level 1 Approval
+📝 Created recipe: 'Level 2 Approval'
+[SERVER] ✅ Loaded recipe: Level 2 Approval
+[SERVER] Warning: Failed to register recipe fibonacci-pipeline: recipe validation failed: recipe name is required
+📝 Created recipe: 'Fibonacci Sequence'
+[SERVER] ✅ Loaded recipe: Fibonacci Sequence
+[SERVER] Warning: Failed to register recipe prime-sieve: recipe validation failed: recipe name is required
+[SERVER] Warning: Failed to register recipe qnet-pipeline: recipe validation failed: recipe name is required
+📝 Created recipe: 'Queue System'
+[SERVER] ✅ Loaded recipe: Queue System
+📝 Created recipe: 'Travel Itinerary with Agents'
+[SERVER] ✅ Loaded recipe: Travel Itinerary with Agents
+📝 Created recipe: 'Travel Itinerary'
+[SERVER] ✅ Loaded recipe: Travel Itinerary
+[SERVER] Successfully loaded 6/9 recipe files
+🚀 MyWant server starting on localhost:8080
+📋 Available endpoints:
+  GET  /health                        - Health check
+  POST /api/v1/wants                 - Create want (YAML config)
+  GET  /api/v1/wants                 - List wants
+  GET  /api/v1/wants/{id}            - Get want
+  PUT  /api/v1/wants/{id}            - Update want
+  DELETE /api/v1/wants/{id}          - Delete want
+  GET  /api/v1/wants/{id}/status     - Get execution status
+  GET  /api/v1/wants/{id}/results    - Get execution results
+  POST /api/v1/wants/{id}/suspend    - Suspend want execution
+  POST /api/v1/wants/{id}/resume     - Resume want execution
+  POST /api/v1/agents                - Create agent
+  GET  /api/v1/agents                - List agents
+  GET  /api/v1/agents/{name}         - Get agent
+  DELETE /api/v1/agents/{name}       - Delete agent
+  POST /api/v1/capabilities          - Create capability
+  GET  /api/v1/capabilities          - List capabilities
+  GET  /api/v1/capabilities/{name}   - Get capability
+  DELETE /api/v1/capabilities/{name} - Delete capability
+  GET  /api/v1/capabilities/{name}/agents - Find agents by capability
+  GET  /api/v1/errors              - List error history
+  GET  /api/v1/errors/{id}         - Get error details
+  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)
+  DELETE /api/v1/errors/{id}       - Delete error entry
+

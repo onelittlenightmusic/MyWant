@@ -1,0 +1,30 @@
+timestamp: "2025-09-23T10:15:24+09:00"
+execution_id: exec-20250923-101524
+wants:
+    - metadata:
+        id: want-1758590124535715000
+        name: travel planner
+        type: travel_coordinator
+        labels:
+            role: travel-planner
+      spec:
+        params:
+            buffet_type: international
+            dinner_duration: 2
+            display_name: One Day Travel Itinerary
+            hotel_type: luxury
+            prefix: vacation
+            restaurant_type: fine dining
+      status: completed
+      history:
+        parameterHistory:
+            - want_name: travel planner
+              state_value:
+                buffet_type: international
+                dinner_duration: 2
+                display_name: One Day Travel Itinerary
+                hotel_type: luxury
+                prefix: vacation
+                restaurant_type: fine dining
+              timestamp: 2025-09-23T10:15:24.538579+09:00
+        stateHistory: []

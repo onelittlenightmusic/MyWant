@@ -42,16 +42,19 @@ const getMenuItems = () => {
   ];
 };
 
-const ADVANCED_ITEMS = [
-  {
-    id: 'recipes',
-    label: 'Recipes',
-    icon: BookOpen,
-    href: '/recipes',
-    active: false,
-    disabled: true
-  }
-];
+const getAdvancedItems = () => {
+  const currentPath = getCurrentPath();
+  return [
+    {
+      id: 'recipes',
+      label: 'Recipes',
+      icon: BookOpen,
+      href: '/recipes',
+      active: currentPath === '/recipes',
+      disabled: false
+    }
+  ];
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
@@ -128,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Advanced
               </h3>
               <nav className="space-y-2">
-                {ADVANCED_ITEMS.map((item) => {
+                {getAdvancedItems().map((item) => {
                   const Icon = item.icon;
                   return (
                     <a

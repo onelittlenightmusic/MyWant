@@ -11,8 +11,15 @@ info:
     - **Want**: A processing unit in the chain with metadata, spec, status, and state
     - **Config**: Complete execution configuration containing an array of Wants
     - **Chain Execution**: Asynchronous execution of interconnected processing units
-    - **Recipe System**: Reusable component templates with parameter substitution
+    - **Recipe System**: Reusable component templates with parameter substitution and CRUD management
     - **State History**: All `stateValue` fields in history entries are structured objects, not strings
+
+    ## Recipe Management
+
+    The API now supports full CRUD operations for recipe templates:
+    - Create, read, update, and delete recipe configurations
+    - Recipes serve as reusable templates for generating want configurations
+    - Support parameter substitution and validation
 
   version: 1.0.0
   contact:
@@ -275,6 +282,157 @@ paths:
                 $ref: '#/components/schemas/WantResults'
         '404':
           description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/recipes:
+    post:
+      summary: Create a new recipe
+      description: |
+        Creates a new recipe template that can be used to generate want configurations.
+        Recipes contain reusable component definitions with parameters.
+      operationId: createRecipe
+      tags:
+        - Recipes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericRecipe'
+      responses:
+        '201':
+          description: Recipe created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Invalid recipe format or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Recipe already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List all recipes
+      description: Returns a map of all registered recipes with their full content
+      operationId: listRecipes
+      tags:
+        - Recipes
+      responses:
+        '200':
+          description: Recipes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/GenericRecipe'
+
+  /api/v1/recipes/{id}:
+    get:
+      summary: Get a specific recipe
+      description: Returns the full content of a specific recipe by ID
+      operationId: getRecipe
+      tags:
+        - Recipes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe ID
+      responses:
+        '200':
+          description: Recipe retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRecipe'
+        '404':
+          description: Recipe not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update an existing recipe
+      description: Updates the content of an existing recipe
+      operationId: updateRecipe
+      tags:
+        - Recipes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericRecipe'
+      responses:
+        '200':
+          description: Recipe updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Invalid recipe format or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Recipe not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete a recipe
+      description: Removes a recipe from the registry
+      operationId: deleteRecipe
+      tags:
+        - Recipes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Recipe ID
+      responses:
+        '204':
+          description: Recipe deleted successfully
+        '404':
+          description: Recipe not found
           content:
             application/json:
               schema:
@@ -756,6 +914,84 @@ components:
         - start_time
         - status
 
+    GenericRecipe:
+      type: object
+      description: A recipe template for generating want configurations
+      properties:
+        recipe:
+          type: object
+          properties:
+            metadata:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Recipe name (used as ID)
+                  example: "queue-system"
+                description:
+                  type: string
+                  description: Human-readable description
+                  example: "Queue system analysis recipe"
+                version:
+                  type: string
+                  description: Recipe version
+                  example: "1.0.0"
+                custom_type:
+                  type: string
+                  description: Custom target type name
+                  example: "queue system analyzer"
+              required:
+                - name
+            parameters:
+              type: object
+              description: Configurable parameters for the recipe
+              additionalProperties: true
+              example:
+                count: 1000
+                rate: 10.0
+                service_time: 0.1
+            wants:
+              type: array
+              description: Array of want configurations
+              items:
+                type: object
+                properties:
+                  metadata:
+                    $ref: '#/components/schemas/WantMetadata'
+                  spec:
+                    $ref: '#/components/schemas/WantSpec'
+                  type:
+                    type: string
+                    description: Want type (legacy flattened field)
+                  params:
+                    type: object
+                    description: Want parameters (legacy flattened field)
+                    additionalProperties: true
+                  using:
+                    type: array
+                    description: Using selectors (legacy flattened field)
+                    items:
+                      type: object
+                      additionalProperties:
+                        type: string
+            result:
+              type: array
+              description: Result computation specifications
+              items:
+                type: object
+                properties:
+                  want_name:
+                    type: string
+                  stat_name:
+                    type: string
+                  description:
+                    type: string
+          required:
+            - metadata
+            - wants
+      required:
+        - recipe
+
     ErrorResponse:
       type: object
       description: Standard error response
@@ -776,5 +1012,7 @@ tags:
     description: Server health monitoring endpoints
   - name: Wants
     description: Want configuration management (creation automatically triggers execution)
+  - name: Recipes
+    description: Recipe template management for reusable want configurations
   - name: Monitoring
     description: Want execution status and results monitoring

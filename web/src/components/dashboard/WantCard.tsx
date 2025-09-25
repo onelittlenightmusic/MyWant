@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal, AlertTriangle, User, Users, Clock } from 'lucide-react';
+import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal, AlertTriangle, Bot } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -32,7 +32,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const isRunning = want.status === 'running';
   const isFailed = want.status === 'failed';
-  const hasError = isFailed && want.state?.error;
+  const hasError = Boolean(isFailed && want.state?.error);
   const isSuspended = want.suspended === true;
   const canControl = want.status === 'running' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
@@ -41,7 +41,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     <div className={classNames(
       'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
       hasError && 'border-red-200 bg-red-50',
-      className
+      className || ''
     )}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
@@ -62,6 +62,24 @@ export const WantCard: React.FC<WantCardProps> = ({
 
         <div className="flex items-center space-x-2">
           <StatusBadge status={want.status} size="sm" />
+
+          {/* Agent indicator - simple icon and status */}
+          {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.agent_history && want.agent_history.length > 0)) && (
+            <div className="flex items-center space-x-1" title="Agent-enabled want">
+              <Bot className="h-4 w-4 text-blue-600" />
+              {want.current_agent && (
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Agent running" />
+              )}
+              {want.agent_history && want.agent_history.length > 0 && (
+                <span className={classNames(
+                  'w-2 h-2 rounded-full',
+                  want.agent_history[want.agent_history.length - 1]?.status === 'completed' && 'bg-green-500',
+                  want.agent_history[want.agent_history.length - 1]?.status === 'failed' && 'bg-red-500',
+                  want.agent_history[want.agent_history.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
+                )} title={`Latest agent: ${want.agent_history[want.agent_history.length - 1]?.status || 'unknown'}`} />
+              )}
+            </div>
+          )}
 
           {/* Actions dropdown */}
           <div className="relative group/menu">
@@ -166,78 +184,6 @@ export const WantCard: React.FC<WantCardProps> = ({
         </div>
       )}
 
-      {/* Agent Information */}
-      {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.agent_history && want.agent_history.length > 0)) && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <h4 className="text-sm font-medium text-blue-900 mb-2 flex items-center">
-            <User className="h-4 w-4 mr-1" />
-            Agent Execution
-          </h4>
-
-          {/* Current Agent */}
-          {want.current_agent && (
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-blue-700">Current Agent:</span>
-              <span className="font-medium text-blue-900 flex items-center">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
-                {want.current_agent}
-              </span>
-            </div>
-          )}
-
-          {/* Running Agents */}
-          {want.running_agents && want.running_agents.length > 0 && (
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-blue-700">Running:</span>
-              <span className="font-medium text-blue-900 flex items-center">
-                <Users className="h-3 w-3 mr-1" />
-                {want.running_agents.length} agent{want.running_agents.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
-
-          {/* Agent History Summary */}
-          {want.agent_history && want.agent_history.length > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-blue-700">History:</span>
-              <span className="font-medium text-blue-900 flex items-center">
-                <Clock className="h-3 w-3 mr-1" />
-                {want.agent_history.length} execution{want.agent_history.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
-
-          {/* Latest Agent Execution */}
-          {want.agent_history && want.agent_history.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-blue-200">
-              {(() => {
-                const latest = want.agent_history[want.agent_history.length - 1];
-                return (
-                  <div className="text-xs text-blue-600">
-                    <div className="flex justify-between items-center">
-                      <span>Latest: {latest.agent_name}</span>
-                      <span className={classNames(
-                        'px-1.5 py-0.5 rounded-full text-xs font-medium',
-                        latest.status === 'running' && 'bg-blue-100 text-blue-800',
-                        latest.status === 'completed' && 'bg-green-100 text-green-800',
-                        latest.status === 'failed' && 'bg-red-100 text-red-800',
-                        latest.status === 'terminated' && 'bg-gray-100 text-gray-800'
-                      )}>
-                        {latest.status}
-                      </span>
-                    </div>
-                    {latest.error && (
-                      <div className="mt-1 text-red-600">
-                        Error: {truncateText(latest.error, 50)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Timeline */}
       <div className="space-y-2 text-sm text-gray-600">
@@ -306,7 +252,7 @@ export const WantCard: React.FC<WantCardProps> = ({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-red-800">Execution Failed</p>
               <p className="text-xs text-red-600 mt-1 truncate">
-                {truncateText(String(want.state?.error || 'Unknown error'), 100)}
+                {truncateText(typeof want.state?.error === 'string' ? want.state.error : 'Unknown error', 100)}
               </p>
               <button
                 onClick={() => onView(want)}

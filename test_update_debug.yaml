@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: generator
+      type: prime_numbers
+      labels:
+        role: source
+    spec:
+      params:
+        start: 1
+        end: 150  # Changed to test

@@ -1,0 +1,94 @@
+timestamp: "2025-09-26T01:26:35+09:00"
+execution_id: exec-20250926-012635
+wants:
+    - metadata:
+        id: want-1758817595626401000
+        name: number generator
+        type: qnet numbers
+        labels:
+            role: source
+            stream: primary
+      spec:
+        params:
+            count: 100
+            rate: 2
+      status: completed
+      state:
+        average_wait_time: 0
+        current_count: 100
+        current_time: 52.23097397799565
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: number generator
+              state_value:
+                count: 100
+                rate: 2
+              timestamp: 2025-09-26T01:26:35.635662+09:00
+        stateHistory:
+            - want_name: number generator
+              state_value:
+                current_count: 100
+                current_time: 52.23097397799565
+              timestamp: 2025-09-26T01:26:35.636068+09:00
+    - metadata:
+        id: want-1758817595626401001
+        name: processing queue
+        type: qnet queue
+        labels:
+            role: processor
+      spec:
+        params:
+            service_time: 0.1
+        using:
+            - role: source
+      status: completed
+      state:
+        average_wait_time: 0.012226021332664025
+        current_server_free_time: 52.330973977995654
+        last_packet_wait_time: 0
+        processedCount: 100
+        serverFreeTime: 52.330973977995654
+        total_processed: 100
+        total_wait_time: 1.2226021332664025
+        waitTimeSum: 1.2226021332664025
+      history:
+        parameterHistory:
+            - want_name: processing queue
+              state_value:
+                service_time: 0.1
+              timestamp: 2025-09-26T01:26:35.635678+09:00
+        stateHistory:
+            - want_name: processing queue
+              state_value:
+                average_wait_time: 0.012226021332664025
+                current_server_free_time: 52.330973977995654
+                last_packet_wait_time: 0
+                processedCount: 100
+                serverFreeTime: 52.330973977995654
+                total_processed: 100
+                total_wait_time: 1.2226021332664025
+                waitTimeSum: 1.2226021332664025
+              timestamp: 2025-09-26T01:26:35.636076+09:00
+    - metadata:
+        id: want-1758817595626401002
+        name: result collector
+        type: qnet sink
+        labels:
+            role: terminal
+      spec:
+        params: {}
+        using:
+            - role: processor
+      status: completed
+      state:
+        average_wait_time: 0
+        total_processed: 100
+        total_wait_time: 0
+      history:
+        parameterHistory:
+            - want_name: result collector
+              state_value: {}
+              timestamp: 2025-09-26T01:26:35.635687+09:00
+        stateHistory: []

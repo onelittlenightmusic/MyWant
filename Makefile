@@ -8,12 +8,12 @@ fmt:
 
 vet:
 	@echo "🔍 Running go vet..."
-	go vet ./src/... ./cmd/server/...
+	go vet -C engine ./src/... ./cmd/server/...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./src/... ./cmd/server/...; \
+		golangci-lint run -C engine ./src/... ./cmd/server/...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 		echo "📋 Running basic checks instead..."; \
@@ -22,7 +22,7 @@ lint:
 
 test:
 	@echo "🧪 Running tests..."
-	go test -v ./src/... ./cmd/server/... || echo "⚠️  Some tests failed or no tests found"
+	go test -v -C engine ./src/... ./cmd/server/... || echo "⚠️  Some tests failed or no tests found"
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
@@ -30,45 +30,45 @@ check: fmt vet test
 # Build the mywant library
 build: check
 	@echo "🔨 Building mywant library..."
-	go build ./src/...
+	go build -C engine ./src/...
 
 # Test that module builds correctly
 test-build:
-	go mod tidy && go build ./src/...
+	cd engine && go mod tidy && go build ./src/...
 
 run-fibonacci-loop:
-	go run cmd/demos/demo_fibonacci_loop.go config/config-fibonacci-loop.yaml
+	go run -C engine cmd/demos/demo_fibonacci_loop.go ../config/config-fibonacci-loop.yaml
 
 run-fibonacci-recipe:
-	go run cmd/demos/demo_fibonacci_recipe.go config/config-fibonacci-recipe.yaml
+	go run -C engine cmd/demos/demo_fibonacci_recipe.go ../config/config-fibonacci-recipe.yaml
 
 run-prime:
-	go run cmd/demos/demo_prime.go config/config-prime.yaml
+	go run -C engine cmd/demos/demo_prime.go ../config/config-prime.yaml
 
 run-qnet:
-	go run cmd/demos/demo_qnet.go config/config-qnet.yaml
+	go run -C engine cmd/demos/demo_qnet.go ../config/config-qnet.yaml
 
 run-qnet-recipe:
-	go run cmd/demos/demo_qnet_owner.go config/config-qnet-recipe.yaml
+	go run -C engine cmd/demos/demo_qnet_owner.go ../config/config-qnet-recipe.yaml
 
 run-travel:
-	go run cmd/demos/demo_travel.go config/config-travel.yaml
+	go run -C engine cmd/demos/demo_travel.go ../config/config-travel.yaml
 
 # Recipe-based execution targets
 run-travel-recipe:
-	go run cmd/demos/demo_travel_recipe.go config/config-travel-recipe.yaml
+	go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-travel-recipe.yaml
 
 run-travel-agent:
-	go run cmd/demos/demo_travel_agent.go config/config-travel-agent.yaml
+	go run -C engine cmd/demos/demo_travel_agent.go ../config/config-travel-agent.yaml
 
 run-hierarchical-approval:
-	go run cmd/demos/demo_hierarchical_approval.go config/config-hierarchical-approval.yaml
+	go run -C engine cmd/demos/demo_hierarchical_approval.go ../config/config-hierarchical-approval.yaml
 
 # Build the mywant server binary
 build-server:
 	@echo "🏗️  Building mywant server..."
 	mkdir -p bin
-	go build -o bin/mywant cmd/server/*.go
+	go build -C engine -o ../bin/mywant ./cmd/server
 
 # Run the mywant server
 run-server: build-server
