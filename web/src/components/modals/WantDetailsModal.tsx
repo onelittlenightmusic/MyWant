@@ -27,6 +27,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     selectedWantResults,
     fetchWantDetails,
     fetchWantResults,
+    fetchWants,
     updateWant,
     loading
   } = useWantStore();
@@ -45,9 +46,10 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
       if (wantId) {
         fetchWantDetails(wantId);
         fetchWantResults(wantId);
+        fetchWants(); // Also refresh main wants list
       }
     }
-  }, [isOpen, want, fetchWantDetails, fetchWantResults]);
+  }, [isOpen, want, fetchWantDetails, fetchWantResults, fetchWants]);
 
   // Auto-refresh for running wants
   useEffect(() => {
@@ -59,36 +61,39 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
         if (wantId) {
           fetchWantDetails(wantId);
           fetchWantResults(wantId);
+          fetchWants(); // Also refresh main wants list
         }
       }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isOpen, want, autoRefresh, fetchWantDetails, fetchWantResults]);
+  }, [isOpen, want, autoRefresh, fetchWantDetails, fetchWantResults, fetchWants]);
 
   const handleRefresh = () => {
     if (want) {
       const wantId = want.metadata?.id || want.id;
       if (wantId) {
+        // Refresh both the modal details and the main wants list
         fetchWantDetails(wantId);
         fetchWantResults(wantId);
+        fetchWants(); // This ensures the parent component gets updated data
       }
     }
   };
 
   const handleEditStart = () => {
-    // Initialize the editor with current want configuration
+    // Initialize the editor with current want configuration (prefer wantDetails over want prop)
     const currentConfig = stringifyYaml({
       wants: [{
         metadata: {
-          name: want.metadata?.name,
-          type: want.metadata?.type,
-          labels: want.metadata?.labels || {}
+          name: wantDetails?.metadata?.name || want.metadata?.name,
+          type: wantDetails?.metadata?.type || want.metadata?.type,
+          labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
         },
         spec: {
-          params: want.spec?.params || {},
-          ...(want.spec?.using && { using: want.spec.using }),
-          ...(want.spec?.recipe && { recipe: want.spec.recipe })
+          params: wantDetails?.spec?.params || want.spec?.params || {},
+          ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
+          ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
         }
       }]
     });
@@ -117,9 +122,10 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
       setIsEditing(false);
       setEditedConfig('');
 
-      // Refresh the want details to show updated data
+      // Refresh the want details and main wants list to show updated data
       await fetchWantDetails(wantId);
       await fetchWantResults(wantId);
+      await fetchWants(); // This ensures the parent component gets updated data
     } catch (error) {
       console.error('Failed to update want:', error);
       setUpdateError(error instanceof Error ? error.message : 'Failed to update want configuration');
@@ -434,17 +440,17 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   value={isEditing ? editedConfig : stringifyYaml({
                     wants: [{
                       metadata: {
-                        name: want.metadata?.name,
-                        type: want.metadata?.type,
-                        labels: want.metadata?.labels || {}
+                        name: wantDetails?.metadata?.name || want.metadata?.name,
+                        type: wantDetails?.metadata?.type || want.metadata?.type,
+                        labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
                       },
                       spec: {
-                        params: want.spec?.params || {},
-                        ...(want.spec?.using && { using: want.spec.using }),
-                        ...(want.spec?.recipe && { recipe: want.spec.recipe })
+                        params: wantDetails?.spec?.params || want.spec?.params || {},
+                        ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
+                        ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
                       },
-                      status: want.status,
-                      ...(want.state && { state: want.state })
+                      status: wantDetails?.status || want.status,
+                      ...(wantDetails?.state || want.state) && { state: wantDetails?.state || want.state }
                     }]
                   })}
                   onChange={isEditing ? setEditedConfig : () => {}}
@@ -479,12 +485,12 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
             {activeTab === 'logs' && (
               <div>
-                {want.history?.parameterHistory && want.history.parameterHistory.length > 0 ? (
+                {(wantDetails?.history?.parameterHistory || want.history?.parameterHistory) && (wantDetails?.history?.parameterHistory || want.history?.parameterHistory).length > 0 ? (
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-2">Parameter History</h4>
                       <div className="space-y-3">
-                        {want.history.parameterHistory.map((entry, index) => (
+                        {(wantDetails?.history?.parameterHistory || want.history?.parameterHistory || []).map((entry, index) => (
                           <div key={index} className="bg-gray-50 rounded-md p-3 border">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-gray-700">
@@ -542,12 +548,12 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   </div>
                 )}
 
-                {want.history?.stateHistory && want.history.stateHistory.length > 0 ? (
+                {(wantDetails?.history?.stateHistory || want.history?.stateHistory) && (wantDetails?.history?.stateHistory || want.history?.stateHistory).length > 0 ? (
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-2">State History</h4>
                       <div className="space-y-3">
-                        {want.history.stateHistory.map((entry: any, index: number) => {
+                        {(wantDetails?.history?.stateHistory || want.history?.stateHistory || []).map((entry: any, index: number) => {
                           const stateValue = entry.state_value || entry;
                           const hasAgentInfo = stateValue && (
                             stateValue.current_agent ||
@@ -599,13 +605,13 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       </div>
                     </div>
                   </div>
-                ) : want.state ? (
+                ) : (wantDetails?.state || want.state) ? (
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-medium text-gray-900 mb-2">Current State</h4>
                       <div className="bg-gray-50 rounded-md p-3">
                         <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                          {JSON.stringify(want.state, null, 2)}
+                          {JSON.stringify(wantDetails?.state || want.state, null, 2)}
                         </pre>
                       </div>
                     </div>

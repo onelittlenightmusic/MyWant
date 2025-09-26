@@ -94,6 +94,7 @@ export const useWantStore = create<WantStore>()(
         set(state => ({
           wants: state.wants.map(w => w.id === id ? updatedWant : w),
           selectedWant: state.selectedWant?.id === id ? updatedWant : state.selectedWant,
+          selectedWantDetails: state.selectedWantDetails?.metadata?.id === id ? updatedWant : state.selectedWantDetails,
           loading: false
         }));
       } catch (error) {

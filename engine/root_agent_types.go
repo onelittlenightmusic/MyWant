@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	mywant "mywant/engine/src"
 )
 
 type AgentType string
@@ -19,7 +20,7 @@ type Capability struct {
 }
 
 type Agent interface {
-	Exec(ctx context.Context, want *Want) error
+	Exec(ctx context.Context, want *mywant.Want) error
 	GetCapabilities() []string
 	GetName() string
 	GetType() AgentType
@@ -51,10 +52,10 @@ func (a *BaseAgent) GetUses() []string {
 
 type DoAgent struct {
 	BaseAgent
-	Action func(ctx context.Context, want *Want) error
+	Action func(ctx context.Context, want *mywant.Want) error
 }
 
-func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
+func (a *DoAgent) Exec(ctx context.Context, want *mywant.Want) error {
 	if a.Action != nil {
 		return a.Action(ctx, want)
 	}
@@ -63,10 +64,10 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
 
 type MonitorAgent struct {
 	BaseAgent
-	Monitor func(ctx context.Context, want *Want) error
+	Monitor func(ctx context.Context, want *mywant.Want) error
 }
 
-func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
+func (a *MonitorAgent) Exec(ctx context.Context, want *mywant.Want) error {
 	if a.Monitor != nil {
 		return a.Monitor(ctx, want)
 	}

@@ -100,6 +100,28 @@ type ChainFunction interface {
 	Exec(using []chain.Chan, outputs []chain.Chan) bool
 }
 
+// Packet interface for all packet types in the system
+type Packet interface {
+	IsEnded() bool
+	GetData() interface{}
+	SetEnded(bool)
+}
+
+// PacketHandler defines callbacks for packet processing events
+type PacketHandler interface {
+	OnEnded(packet Packet) error
+}
+
+// BasePacket provides common packet functionality
+type BasePacket struct {
+	ended bool
+	data  interface{}
+}
+
+func (p *BasePacket) IsEnded() bool { return p.ended }
+func (p *BasePacket) SetEnded(ended bool) { p.ended = ended }
+func (p *BasePacket) GetData() interface{} { return p.data }
+
 // ChainWant represents a want that can execute directly
 type ChainWant interface {
 	Exec(using []chain.Chan, outputs []chain.Chan) bool
@@ -367,6 +389,11 @@ func (n *Want) addAggregatedParameterHistory() {
 	maxHistorySize := 50
 	if len(n.History.ParameterHistory) > maxHistorySize {
 		n.History.ParameterHistory = n.History.ParameterHistory[len(n.History.ParameterHistory)-maxHistorySize:]
+	}
+
+	// Clear pending parameter changes after adding to history
+	for k := range n.pendingParameterChanges {
+		delete(n.pendingParameterChanges, k)
 	}
 }
 
@@ -1595,13 +1622,22 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		// Copy History field from config
 		wantPtr.History = wantConfig.History
 
-		// Initialize parameterHistory with initial parameter values if empty
-		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+		// Initialize parameterHistory with initial parameter values if empty or nil
+		if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
+			fmt.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
+			// Create a deep copy of the parameters to avoid reference issues
+			paramsCopy := make(map[string]interface{})
+			for k, v := range wantConfig.Spec.Params {
+				paramsCopy[k] = v
+			}
 			// Create one entry with all initial parameters as object
 			entry := StateHistoryEntry{
 				WantName:   wantConfig.Metadata.Name,
-				StateValue: wantConfig.Spec.Params,
+				StateValue: paramsCopy,
 				Timestamp:  time.Now(),
+			}
+			if wantPtr.History.ParameterHistory == nil {
+				wantPtr.History.ParameterHistory = make([]StateHistoryEntry, 0)
 			}
 			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
 		}
@@ -1672,8 +1708,59 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 		return
 	}
 
-	// Update the want's configuration in place
-	existingWant.Spec = wantConfig.Spec
+	// Detect parameter changes and create a single consolidated history entry
+	var changedParams map[string]interface{}
+	if wantConfig.Spec.Params != nil {
+		for paramName, newValue := range wantConfig.Spec.Params {
+			// Check if parameter changed
+			var oldValue interface{}
+			var hasOldValue bool
+			if existingWant.Spec.Params != nil {
+				oldValue, hasOldValue = existingWant.Spec.Params[paramName]
+			}
+
+			// Update if value changed or is new
+			if !hasOldValue || oldValue != newValue {
+				// Initialize params map if needed
+				if existingWant.Spec.Params == nil {
+					existingWant.Spec.Params = make(map[string]interface{})
+				}
+
+				// Update the parameter directly (bypass UpdateParameter to avoid individual history entries)
+				existingWant.Spec.Params[paramName] = newValue
+
+				// Track changed parameters for consolidated history entry
+				if changedParams == nil {
+					changedParams = make(map[string]interface{})
+				}
+				changedParams[paramName] = newValue
+
+				fmt.Printf("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
+			}
+		}
+	}
+
+	// Create a single consolidated parameter history entry for all changes
+	if changedParams != nil {
+		entry := StateHistoryEntry{
+			WantName:   existingWant.Metadata.Name,
+			StateValue: changedParams,
+			Timestamp:  time.Now(),
+		}
+		existingWant.History.ParameterHistory = append(existingWant.History.ParameterHistory, entry)
+
+		// Limit history size (keep last 50 entries for parameters)
+		maxHistorySize := 50
+		if len(existingWant.History.ParameterHistory) > maxHistorySize {
+			existingWant.History.ParameterHistory = existingWant.History.ParameterHistory[len(existingWant.History.ParameterHistory)-maxHistorySize:]
+		}
+	}
+
+	// Update other spec fields (using, requires, etc.)
+	existingWant.Spec.Using = wantConfig.Spec.Using
+	existingWant.Spec.Requires = wantConfig.Spec.Requires
+
+	// Update metadata
 	existingWant.Metadata = wantConfig.Metadata
 
 	// Reset status from completed to idle to allow re-execution
@@ -2888,3 +2975,4 @@ func (cb *ChainBuilder) controlLoop() {
 func (cb *ChainBuilder) startControlLoop() {
 	go cb.controlLoop()
 }
+

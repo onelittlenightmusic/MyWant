@@ -10,12 +10,22 @@ import (
 
 // QueuePacket represents data flowing through the chain
 type QueuePacket struct {
+	mywant.BasePacket
 	Num  int
 	Time float64
 }
 
-func (p *QueuePacket) isEnded() bool {
-	return p.Num < 0
+// IsEnded implements Packet interface with QueuePacket-specific logic
+func (p *QueuePacket) IsEnded() bool {
+	return p.Num < 0 || p.BasePacket.IsEnded()
+}
+
+// GetData returns the packet's queue-specific data
+func (p *QueuePacket) GetData() interface{} {
+	return struct {
+		Num  int
+		Time float64
+	}{p.Num, p.Time}
 }
 
 // ExpRand64 generates exponentially distributed random numbers with improved precision
@@ -163,7 +173,7 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		g.StoreState("average_wait_time", 0.0) // Generators don't have wait time
 		g.StoreState("total_wait_time", 0.0)
 
-		out <- QueuePacket{-1, 0}
+		out <- QueuePacket{Num: -1, Time: 0}
 		fmt.Printf("[GENERATOR] Generated %d packets\n", j)
 		return true
 	}
@@ -182,7 +192,7 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	g.StoreState("current_time", t)
 	g.StoreState("current_count", j)
 
-	out <- QueuePacket{j, t}
+	out <- QueuePacket{Num: j, Time: t}
 	return false
 }
 
@@ -275,19 +285,14 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	packet := (<-in).(QueuePacket)
 
-	if packet.isEnded() {
-		avgWaitTime := 0.0
-		if processedCount > 0 {
-			avgWaitTime = waitTimeSum / float64(processedCount)
+	// Check for termination packet and forward it
+	if packet.IsEnded() {
+		// Trigger OnEnded callback
+		if err := q.OnEnded(&packet); err != nil {
+			fmt.Printf("[QUEUE] OnEnded callback error: %v\n", err)
 		}
-
-		q.StoreState("average_wait_time", avgWaitTime)
-		q.StoreState("total_processed", processedCount)
-		q.StoreState("total_wait_time", waitTimeSum)
-		q.StoreState("current_server_free_time", serverFreeTime)
-
-		fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", processedCount, avgWaitTime)
-		out <- packet // Forward end signal
+		// Forward end signal to next want
+		out <- packet
 		return true
 	}
 
@@ -323,8 +328,31 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	q.StoreState("total_wait_time", waitTimeSum)
 	q.StoreState("current_server_free_time", serverFreeTime)
 
-	out <- QueuePacket{packet.Num, finishTime}
+	out <- QueuePacket{Num: packet.Num, Time: finishTime}
 	return false
+}
+
+// OnEnded implements PacketHandler interface for packet termination callbacks
+func (q *Queue) OnEnded(packet mywant.Packet) error {
+	// Extract queue-specific statistics from state
+	waitTimeSum, _ := q.State["waitTimeSum"].(float64)
+	processedCount, _ := q.State["processedCount"].(int)
+	serverFreeTime, _ := q.State["serverFreeTime"].(float64)
+
+	// Calculate final statistics
+	avgWaitTime := 0.0
+	if processedCount > 0 {
+		avgWaitTime = waitTimeSum / float64(processedCount)
+	}
+
+	// Store final state
+	q.StoreState("average_wait_time", avgWaitTime)
+	q.StoreState("total_processed", processedCount)
+	q.StoreState("total_wait_time", waitTimeSum)
+	q.StoreState("current_server_free_time", serverFreeTime)
+
+	fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", processedCount, avgWaitTime)
+	return nil
 }
 
 // Combiner merges multiple using streams
@@ -418,15 +446,18 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				continue
 			}
 			qp := packet.(QueuePacket)
-			if qp.isEnded() {
-				// Store combiner stats
-				c.StoreState("total_processed", processed)
-				c.StoreState("average_wait_time", 0.0) // Combiners don't add wait time
-				c.StoreState("total_wait_time", 0.0)
 
-				out <- qp // Forward end signal
+			// Check for termination packet and forward it
+			if qp.IsEnded() {
+				// Trigger OnEnded callback
+				if err := c.OnEnded(&qp); err != nil {
+					fmt.Printf("[COMBINER] OnEnded callback error: %v\n", err)
+				}
+				// Forward end signal to next want
+				out <- qp
 				return true
 			}
+
 			processed++
 			out <- qp
 		default:
@@ -436,6 +467,20 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	c.StoreState("processed", processed)
 	return false
+}
+
+// OnEnded implements PacketHandler interface for Combiner termination callbacks
+func (c *Combiner) OnEnded(packet mywant.Packet) error {
+	// Extract combiner-specific statistics from state
+	processed, _ := c.State["processed"].(int)
+
+	// Store final state
+	c.StoreState("total_processed", processed)
+	c.StoreState("average_wait_time", 0.0) // Combiners don't add wait time
+	c.StoreState("total_wait_time", 0.0)
+
+	fmt.Printf("[COMBINER] Processed %d packets\n", processed)
+	return nil
 }
 
 // Sink collects and terminates the packet stream
@@ -510,18 +555,28 @@ func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Block waiting for data from using channel
 	packet := (<-in).(QueuePacket)
 
-	if packet.isEnded() {
-		// Store sink stats (StoreState will handle State initialization properly)
-		s.StoreState("total_processed", s.Received)
-		s.StoreState("average_wait_time", 0.0) // Sinks don't add wait time
-		s.StoreState("total_wait_time", 0.0)
-
-		fmt.Printf("[SINK] Received %d packets\n", s.Received)
+	// Check for termination packet
+	if packet.IsEnded() {
+		// Trigger OnEnded callback
+		if err := s.OnEnded(&packet); err != nil {
+			fmt.Printf("[SINK] OnEnded callback error: %v\n", err)
+		}
 		return true
 	}
 
 	s.Received++
 	return false // Continue waiting for more packets
+}
+
+// OnEnded implements PacketHandler interface for Sink termination callbacks
+func (s *Sink) OnEnded(packet mywant.Packet) error {
+	// Store final state
+	s.StoreState("total_processed", s.Received)
+	s.StoreState("average_wait_time", 0.0) // Sinks don't add wait time
+	s.StoreState("total_wait_time", 0.0)
+
+	fmt.Printf("[SINK] Received %d packets\n", s.Received)
+	return nil
 }
 
 // RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder
