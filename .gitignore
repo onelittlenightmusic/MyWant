@@ -21,3 +21,8 @@ test/
 # OS
 .DS_Store
 Thumbs.db
+
+# Memory dumps (runtime data)
+memory/
+engine/memory/
+**/memory-*.yaml

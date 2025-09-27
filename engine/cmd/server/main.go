@@ -237,8 +237,11 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		Status: "created",
 	}
 
-	// Create chain builder immediately (no timing window)
-	builder := mywant.NewChainBuilder(config)
+	// Create chain builder with memory path for dumping (use engine/memory directory)
+	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", wantID)
+	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
+	// Set the config directly since there's no SetConfig method
+	builder.SetConfigInternal(config)
 	execution.Builder = builder
 
 	// Set agent registry for agent-enabled wants

@@ -774,6 +774,11 @@ func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
 
+// SetConfigInternal sets the config for the builder (for server mode)
+func (cb *ChainBuilder) SetConfigInternal(config Config) {
+	cb.config = config
+}
+
 // matchesSelector checks if want labels match the selector criteria
 func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
 	for key, value := range selector {
@@ -1099,6 +1104,14 @@ func (cb *ChainBuilder) compilePhase() error {
 		// For initial load, treat all wants as new additions
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
+		}
+
+		// Dump memory after initial load
+		if len(newConfig.Wants) > 0 {
+			fmt.Println("[RECONCILE:MEMORY] Dumping memory after initial load...")
+			if err := cb.dumpWantMemoryToYAML(); err != nil {
+				fmt.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
+			}
 		}
 	} else {
 		// Detect changes for ongoing updates
@@ -1459,17 +1472,29 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	// Sort changes by dependency level (sink wants first)
 	sortedChanges := cb.sortChangesByDependency(changes)
 
+	hasWantChanges := false
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
 			fmt.Printf("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
 			cb.addDynamicWantUnsafe(change.Want)
+			hasWantChanges = true
 		case ChangeEventUpdate:
 			fmt.Printf("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
 			cb.UpdateWant(change.Want)
+			hasWantChanges = true
 		case ChangeEventDelete:
 			fmt.Printf("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
 			cb.deleteWant(change.WantName)
+			hasWantChanges = true
+		}
+	}
+
+	// Dump memory after want additions/deletions/updates
+	if hasWantChanges {
+		fmt.Println("[RECONCILE:MEMORY] Dumping memory after want changes...")
+		if err := cb.dumpWantMemoryToYAML(); err != nil {
+			fmt.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
 		}
 	}
 
