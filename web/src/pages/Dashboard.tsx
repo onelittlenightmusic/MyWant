@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Menu } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
 
 // Components
+import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { StatsOverview } from '@/components/dashboard/StatsOverview';
 import { WantFilters } from '@/components/dashboard/WantFilters';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
-import { WantDetailsModal } from '@/components/modals/WantDetailsModal';
+import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 
 export const Dashboard: React.FC = () => {
@@ -27,7 +27,6 @@ export const Dashboard: React.FC = () => {
   } = useWantStore();
 
   // UI State
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [selectedWant, setSelectedWant] = useState<Want | null>(null);
@@ -120,35 +119,16 @@ export const Dashboard: React.FC = () => {
   const handleCloseModals = () => {
     setShowCreateForm(false);
     setEditingWant(null);
-    setSelectedWant(null);
     setDeleteWantState(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-md bg-white shadow-md border border-gray-200 text-gray-600 hover:text-gray-900"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </div>
+    <Layout>
+      {/* Header */}
+      <Header onCreateWant={handleCreateWant} />
 
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      {/* Main content */}
-      <div className="flex-1 lg:ml-0 flex flex-col">
-        {/* Header */}
-        <Header onCreateWant={handleCreateWant} />
-
-        {/* Main content area */}
-        <main className="flex-1 p-6">
+      {/* Main content area */}
+      <main className="flex-1 p-6">
           {/* Error message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -207,6 +187,7 @@ export const Dashboard: React.FC = () => {
               loading={loading}
               searchQuery={searchQuery}
               statusFilters={statusFilters}
+              selectedWant={selectedWant}
               onViewWant={handleViewWant}
               onEditWant={handleEditWant}
               onDeleteWant={setDeleteWantState}
@@ -214,20 +195,22 @@ export const Dashboard: React.FC = () => {
               onResumeWant={handleResumeWant}
             />
           </div>
-        </main>
-      </div>
+      </main>
+
+      {/* Right Sidebar for Want Details */}
+      <RightSidebar
+        isOpen={!!selectedWant}
+        onClose={() => setSelectedWant(null)}
+        title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
+      >
+        <WantDetailsSidebar want={selectedWant} />
+      </RightSidebar>
 
       {/* Modals */}
       <WantForm
         isOpen={showCreateForm}
         onClose={handleCloseModals}
         editingWant={editingWant}
-      />
-
-      <WantDetailsModal
-        isOpen={!!selectedWant}
-        onClose={handleCloseModals}
-        want={selectedWant}
       />
 
       <ConfirmDeleteModal
@@ -237,6 +220,6 @@ export const Dashboard: React.FC = () => {
         want={deleteWantState}
         loading={loading}
       />
-    </div>
+    </Layout>
   );
 };

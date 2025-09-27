@@ -1,10 +1,12 @@
 import React from 'react';
-import { X, Heart, Bot, BookOpen, AlertTriangle } from 'lucide-react';
+import { X, Heart, Bot, BookOpen, AlertTriangle, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface SidebarProps {
   isOpen: boolean;
+  isMinimized: boolean;
   onClose: () => void;
+  onMinimizeToggle: () => void;
 }
 
 // Get current path for active state
@@ -26,13 +28,6 @@ const getMenuItems = () => {
       active: currentPath === '/dashboard'
     },
     {
-      id: 'errors',
-      label: 'Error History',
-      icon: AlertTriangle,
-      href: '/errors',
-      active: currentPath === '/errors'
-    },
-    {
       id: 'agents',
       label: 'Agents',
       icon: Bot,
@@ -52,20 +47,29 @@ const getAdvancedItems = () => {
       href: '/recipes',
       active: currentPath === '/recipes',
       disabled: false
+    },
+    {
+      id: 'errors',
+      label: 'Error History',
+      icon: AlertTriangle,
+      href: '/errors',
+      active: currentPath === '/errors'
     }
   ];
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  onClose
+  isMinimized,
+  onClose,
+  onMinimizeToggle
 }) => {
   const menuItems = getMenuItems();
 
   return (
     <>
       {/* Overlay */}
-      {isOpen && (
+      {isOpen && !isMinimized && (
         <div
           className="fixed inset-0 bg-gray-600 bg-opacity-50 z-40 lg:hidden"
           onClick={onClose}
@@ -74,8 +78,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar */}
       <div className={classNames(
-        'fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:flex lg:flex-col lg:h-screen',
-        isOpen ? 'translate-x-0' : '-translate-x-full'
+        'fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transform transition-all duration-300 ease-in-out lg:flex lg:flex-col lg:h-screen',
+        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        isMinimized ? 'w-20' : 'w-64'
       )}>
         <div className="flex flex-col h-full">
           {/* Mobile Header */}
@@ -90,13 +95,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Logo/Brand */}
-          <div className="hidden lg:block px-4 py-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">MyWant</h1>
-            <p className="text-sm text-gray-500 mt-1">Chain Programming</p>
+          <div className={classNames(
+            "hidden lg:block px-4 py-6 border-b border-gray-200",
+            isMinimized && "px-2 text-center"
+          )}>
+            <h1 className={classNames(
+              "text-xl font-bold text-gray-900",
+              isMinimized && "text-lg"
+            )}>
+              {isMinimized ? "MW" : "MyWant"}
+            </h1>
+            {!isMinimized && <p className="text-sm text-gray-500 mt-1">Chain Programming</p>}
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 px-4 py-6 space-y-8">
+          <div className="flex-1 px-4 py-6 space-y-8 overflow-y-auto">
             {/* Main Menu */}
             <nav className="space-y-2">
               {menuItems.map((item) => {
@@ -111,13 +124,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         'bg-primary-100 text-primary-900': item.active,
                         'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
                         'text-gray-400 cursor-not-allowed': item.disabled
-                      }
+                      },
+                      isMinimized && "justify-center"
                     )}
                     onClick={(e) => item.disabled && e.preventDefault()}
+                    title={isMinimized ? item.label : undefined}
                   >
-                    <Icon className="h-5 w-5 mr-3" />
-                    {item.label}
-                    {item.disabled && (
+                    <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
+                    {!isMinimized && item.label}
+                    {!isMinimized && item.disabled && (
                       <span className="ml-auto text-xs text-gray-400">Soon</span>
                     )}
                   </a>
@@ -127,8 +142,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Advanced Section */}
             <div>
-              <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                Advanced
+              <h3 className={classNames(
+                "px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3",
+                isMinimized && "text-center"
+              )}>
+                {isMinimized ? "Adv" : "Advanced"}
               </h3>
               <nav className="space-y-2">
                 {getAdvancedItems().map((item) => {
@@ -143,13 +161,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           'bg-primary-100 text-primary-900': item.active,
                           'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
                           'text-gray-400 cursor-not-allowed': item.disabled
-                        }
+                        },
+                        isMinimized && "justify-center"
                       )}
                       onClick={(e) => item.disabled && e.preventDefault()}
+                      title={isMinimized ? item.label : undefined}
                     >
-                      <Icon className="h-5 w-5 mr-3" />
-                      {item.label}
-                      {item.disabled && (
+                      <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
+                      {!isMinimized && item.label}
+                      {!isMinimized && item.disabled && (
                         <span className="ml-auto text-xs text-gray-400">Soon</span>
                       )}
                     </a>
@@ -159,6 +179,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Minimize Toggle */}
+      <div className="hidden lg:block fixed z-50 bottom-4 left-4">
+        <button
+          onClick={onMinimizeToggle}
+          className="flex items-center justify-center w-12 h-12 p-2 rounded-full bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors shadow-md"
+          title={isMinimized ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isMinimized ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+        </button>
       </div>
     </>
   );

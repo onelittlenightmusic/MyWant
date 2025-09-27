@@ -3,12 +3,15 @@ import { Menu, Plus } from 'lucide-react';
 import { AgentResponse } from '@/types/agent';
 import { useAgentStore } from '@/stores/agentStore';
 
+import { classNames } from '@/utils/helpers';
+
 // Components
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { AgentFilters } from '@/components/dashboard/AgentFilters';
 import { AgentGrid } from '@/components/dashboard/AgentGrid';
-import { AgentDetailsModal } from '@/components/modals/AgentDetailsModal';
+import { AgentDetailsSidebar } from '@/components/sidebar/AgentDetailsSidebar';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -23,7 +26,8 @@ export const AgentsPage: React.FC = () => {
   } = useAgentStore();
 
   // UI State
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentResponse | null>(null);
@@ -77,7 +81,6 @@ export const AgentsPage: React.FC = () => {
   const handleCloseModals = () => {
     setShowCreateForm(false);
     setEditingAgent(null);
-    setSelectedAgent(null);
     setDeleteAgentState(null);
   };
 
@@ -104,11 +107,16 @@ export const AgentsPage: React.FC = () => {
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
+        isMinimized={sidebarMinimized}
         onClose={() => setSidebarOpen(false)}
+        onMinimizeToggle={() => setSidebarMinimized(!sidebarMinimized)}
       />
 
       {/* Main content */}
-      <div className="flex-1 lg:ml-0 flex flex-col">
+      <div className={classNames(
+        "flex-1 flex flex-col relative transition-all duration-300 ease-in-out",
+        sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
+      )}>
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -283,15 +291,18 @@ export const AgentsPage: React.FC = () => {
             />
           </div>
         </main>
+
+        {/* Right Sidebar for Agent Details */}
+        <RightSidebar
+          isOpen={!!selectedAgent}
+          onClose={() => setSelectedAgent(null)}
+          title={selectedAgent ? selectedAgent.name : undefined}
+        >
+          <AgentDetailsSidebar agent={selectedAgent} />
+        </RightSidebar>
       </div>
 
       {/* Modals */}
-      <AgentDetailsModal
-        isOpen={!!selectedAgent}
-        onClose={handleCloseModals}
-        agent={selectedAgent}
-      />
-
       <ConfirmDeleteModal
         isOpen={!!deleteAgentState}
         onClose={handleCloseModals}

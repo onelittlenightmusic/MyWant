@@ -26,11 +26,20 @@ export interface WantDefinition {
   status?: WantStatus;
 }
 
+export interface OwnerReference {
+  apiVersion: string;
+  kind: string;
+  name: string;
+  controller: boolean;
+  blockOwnerDeletion?: boolean;
+}
+
 export interface WantMetadata {
   id?: string;
   name: string;
   type: string;
   labels?: Record<string, string>;
+  ownerReferences?: OwnerReference[];
 }
 
 export interface WantSpec {

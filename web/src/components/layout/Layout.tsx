@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Menu } from 'lucide-react';
-import { Header } from '@/components/layout/Header';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { ErrorHistory } from '@/components/error/ErrorHistory';
 import { classNames } from '@/utils/helpers';
+import { Sidebar } from './Sidebar';
 
-export const ErrorHistoryPage: React.FC = () => {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
@@ -34,13 +36,7 @@ export const ErrorHistoryPage: React.FC = () => {
         "flex-1 flex flex-col relative transition-all duration-300 ease-in-out",
         sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
       )}>
-        {/* Header */}
-        <Header onCreateWant={() => {}} />
-
-        {/* Main content area */}
-        <main className="flex-1 p-6">
-          <ErrorHistory />
-        </main>
+        {children}
       </div>
     </div>
   );

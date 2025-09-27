@@ -3,8 +3,10 @@ import { Plus, BookOpen, Edit2, Trash2, Eye, Menu } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { GenericRecipe } from '@/types/recipe';
 import RecipeModal from '@/components/modals/RecipeModal';
-import RecipeDetailsModal from '@/components/modals/RecipeDetailsModal';
+import { RecipeDetailsSidebar } from '@/components/sidebar/RecipeDetailsSidebar';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { classNames } from '@/utils/helpers';
 
 export default function RecipePage() {
   const {
@@ -17,7 +19,8 @@ export default function RecipePage() {
   } = useRecipeStore();
 
   // UI State
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -76,11 +79,16 @@ export default function RecipePage() {
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
+        isMinimized={sidebarMinimized}
         onClose={() => setSidebarOpen(false)}
+        onMinimizeToggle={() => setSidebarMinimized(!sidebarMinimized)}
       />
 
       {/* Main content */}
-      <div className="flex-1 lg:ml-0 flex flex-col">
+      <div className={classNames(
+        "flex-1 flex flex-col relative transition-all duration-300 ease-in-out",
+        sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
+      )}>
         {/* Custom Header for Recipes */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -268,12 +276,6 @@ export default function RecipePage() {
             mode="edit"
           />
 
-          <RecipeDetailsModal
-            isOpen={showDetailsModal}
-            onClose={() => setShowDetailsModal(false)}
-            recipe={selectedRecipe}
-          />
-
           {/* Delete Confirmation Modal */}
           {showDeleteModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -301,6 +303,15 @@ export default function RecipePage() {
           )}
 
         </main>
+
+        {/* Right Sidebar for Recipe Details */}
+        <RightSidebar
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          title={selectedRecipe ? selectedRecipe.recipe.metadata.name : undefined}
+        >
+          <RecipeDetailsSidebar recipe={selectedRecipe} />
+        </RightSidebar>
       </div>
     </div>
   );
