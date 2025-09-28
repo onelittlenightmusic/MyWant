@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { Want, WantDetails, WantResults, CreateWantRequest } from '@/types/want';
+import { Want, WantDetails, WantResults, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { apiClient } from '@/api/client';
 
 interface WantStore {
@@ -15,8 +15,7 @@ interface WantStore {
   // Actions
   fetchWants: () => Promise<void>;
   createWant: (request: CreateWantRequest) => Promise<Want>;
-  createWantFromYaml: (yaml: string, name?: string) => Promise<Want>;
-  updateWant: (id: string, yaml: string) => Promise<void>;
+  updateWant: (id: string, request: UpdateWantRequest) => Promise<void>;
   deleteWant: (id: string) => Promise<void>;
   selectWant: (want: Want | null) => void;
   fetchWantDetails: (id: string) => Promise<void>;
@@ -69,28 +68,10 @@ export const useWantStore = create<WantStore>()(
       }
     },
 
-    createWantFromYaml: async (yaml: string, name?: string) => {
+    updateWant: async (id: string, request: UpdateWantRequest) => {
       set({ loading: true, error: null });
       try {
-        const want = await apiClient.createWantFromYaml(yaml, name);
-        set(state => ({
-          wants: [...state.wants, want],
-          loading: false
-        }));
-        return want;
-      } catch (error) {
-        set({
-          error: error instanceof Error ? error.message : 'Failed to create want',
-          loading: false
-        });
-        throw error;
-      }
-    },
-
-    updateWant: async (id: string, yaml: string) => {
-      set({ loading: true, error: null });
-      try {
-        const updatedWant = await apiClient.updateWantFromYaml(id, yaml);
+        const updatedWant = await apiClient.updateWant(id, request);
         set(state => ({
           wants: state.wants.map(w => w.id === id ? updatedWant : w),
           selectedWant: state.selectedWant?.id === id ? updatedWant : state.selectedWant,

@@ -5,6 +5,7 @@ import { truncateText, classNames } from '@/utils/helpers';
 
 interface AgentCardProps {
   agent: Agent;
+  selected?: boolean;
   onView: (agent: Agent) => void;
   onEdit: (agent: Agent) => void;
   onDelete: (agent: Agent) => void;
@@ -13,6 +14,7 @@ interface AgentCardProps {
 
 export const AgentCard: React.FC<AgentCardProps> = ({
   agent,
+  selected = false,
   onView,
   onEdit,
   onDelete,
@@ -48,6 +50,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({
   return (
     <div className={classNames(
       'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
+      selected ? 'border-blue-500 border-2' : 'border-gray-200',
       className
     )}>
       {/* Header */}

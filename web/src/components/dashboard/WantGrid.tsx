@@ -182,13 +182,14 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
       {filteredWants.map((want, index) => (
         <WantCard
           key={want.metadata?.id || `want-${index}`}
           want={want}
           children={want.children}
           selected={selectedWant?.metadata?.id === want.metadata?.id}
+          selectedWant={selectedWant}
           onView={onViewWant}
           onEdit={onEditWant}
           onDelete={onDeleteWant}

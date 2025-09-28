@@ -97,13 +97,21 @@ export interface WantHistory {
 }
 
 export interface CreateWantRequest {
-  yaml?: string;
-  name?: string;
+  metadata: WantMetadata;
+  spec: WantSpec;
+  status?: WantExecutionStatus;
+  state?: Record<string, unknown>;
+  history?: WantHistory;
 }
 
 export interface UpdateWantRequest {
-  yaml: string;
+  metadata: WantMetadata;
+  spec: WantSpec;
+  status?: WantExecutionStatus;
+  state?: Record<string, unknown>;
+  history?: WantHistory;
 }
+
 
 export interface SuspendResumeResponse {
   message: string;

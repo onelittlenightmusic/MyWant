@@ -8,6 +8,7 @@ interface AgentGridProps {
   loading: boolean;
   searchQuery: string;
   typeFilters: ('do' | 'monitor')[];
+  selectedAgent?: AgentResponse | null;
   onViewAgent: (agent: AgentResponse) => void;
   onEditAgent: (agent: AgentResponse) => void;
   onDeleteAgent: (agent: AgentResponse) => void;
@@ -18,6 +19,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   loading,
   searchQuery,
   typeFilters,
+  selectedAgent,
   onViewAgent,
   onEditAgent,
   onDeleteAgent
@@ -117,11 +119,12 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
       {filteredAgents.map((agent, index) => (
         <AgentCard
           key={agent.name || `agent-${index}`}
           agent={agent}
+          selected={selectedAgent?.name === agent.name}
           onView={onViewAgent}
           onEdit={onEditAgent}
           onDelete={onDeleteAgent}

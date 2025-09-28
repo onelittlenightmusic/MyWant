@@ -7,7 +7,7 @@ import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
-import { stringifyYaml } from '@/utils/yaml';
+import { stringifyYaml, validateYaml } from '@/utils/yaml';
 
 interface WantDetailsModalProps {
   isOpen: boolean;
@@ -82,20 +82,18 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
   };
 
   const handleEditStart = () => {
-    // Initialize the editor with current want configuration (prefer wantDetails over want prop)
+    // Initialize the editor with current want configuration as single want object
     const currentConfig = stringifyYaml({
-      wants: [{
-        metadata: {
-          name: wantDetails?.metadata?.name || want.metadata?.name,
-          type: wantDetails?.metadata?.type || want.metadata?.type,
-          labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
-        },
-        spec: {
-          params: wantDetails?.spec?.params || want.spec?.params || {},
-          ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
-          ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
-        }
-      }]
+      metadata: {
+        name: wantDetails?.metadata?.name || want.metadata?.name,
+        type: wantDetails?.metadata?.type || want.metadata?.type,
+        labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
+      },
+      spec: {
+        params: wantDetails?.spec?.params || want.spec?.params || {},
+        ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
+        ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
+      }
     });
     setEditedConfig(currentConfig);
     setIsEditing(true);
@@ -118,7 +116,17 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     setUpdateError(null);
 
     try {
-      await updateWant(wantId, editedConfig);
+      // Parse YAML to want object
+      const yamlValidation = validateYaml(editedConfig);
+      if (!yamlValidation.isValid) {
+        setUpdateError(`Invalid YAML: ${yamlValidation.error}`);
+        setUpdateLoading(false);
+        return;
+      }
+
+      // Use parsed YAML as update request
+      const updateRequest = yamlValidation.data;
+      await updateWant(wantId, updateRequest);
       setIsEditing(false);
       setEditedConfig('');
 
@@ -438,20 +446,18 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                 {/* YAML Editor */}
                 <YamlEditor
                   value={isEditing ? editedConfig : stringifyYaml({
-                    wants: [{
-                      metadata: {
-                        name: wantDetails?.metadata?.name || want.metadata?.name,
-                        type: wantDetails?.metadata?.type || want.metadata?.type,
-                        labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
-                      },
-                      spec: {
-                        params: wantDetails?.spec?.params || want.spec?.params || {},
-                        ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
-                        ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
-                      },
-                      status: wantDetails?.status || want.status,
-                      ...(wantDetails?.state || want.state) && { state: wantDetails?.state || want.state }
-                    }]
+                    metadata: {
+                      name: wantDetails?.metadata?.name || want.metadata?.name,
+                      type: wantDetails?.metadata?.type || want.metadata?.type,
+                      labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
+                    },
+                    spec: {
+                      params: wantDetails?.spec?.params || want.spec?.params || {},
+                      ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
+                      ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
+                    },
+                    status: wantDetails?.status || want.status,
+                    ...(wantDetails?.state || want.state) && { state: wantDetails?.state || want.state }
                   })}
                   onChange={isEditing ? setEditedConfig : () => {}}
                   readOnly={!isEditing}

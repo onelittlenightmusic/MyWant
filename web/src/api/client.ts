@@ -96,20 +96,6 @@ class MyWantApiClient {
     return response.data;
   }
 
-  async createWantFromYaml(yaml: string, name?: string): Promise<Want> {
-    const response = await this.client.post<Want>('/api/v1/wants', { yaml, name });
-    return response.data;
-  }
-
-  async createWantFromYamlRaw(yaml: string): Promise<Want> {
-    const response = await this.client.post<Want>('/api/v1/wants', yaml, {
-      headers: {
-        'Content-Type': 'application/yaml',
-      },
-    });
-    return response.data;
-  }
-
   async listWants(): Promise<Want[]> {
     const response = await this.client.get<{wants: Want[], execution_id: string, timestamp: string}>('/api/v1/wants');
     return response.data.wants;
@@ -122,15 +108,6 @@ class MyWantApiClient {
 
   async updateWant(id: string, request: UpdateWantRequest): Promise<Want> {
     const response = await this.client.put<Want>(`/api/v1/wants/${id}`, request);
-    return response.data;
-  }
-
-  async updateWantFromYaml(id: string, yaml: string): Promise<Want> {
-    const response = await this.client.put<Want>(`/api/v1/wants/${id}`, yaml, {
-      headers: {
-        'Content-Type': 'application/yaml',
-      },
-    });
     return response.data;
   }
 

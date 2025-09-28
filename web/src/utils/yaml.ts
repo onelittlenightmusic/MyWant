@@ -9,9 +9,9 @@ export const parseYaml = (yamlString: string): WantConfig => {
   }
 };
 
-export const stringifyYaml = (config: WantConfig): string => {
+export const stringifyYaml = (data: any): string => {
   try {
-    return yaml.dump(config, {
+    return yaml.dump(data, {
       indent: 2,
       lineWidth: 120,
       noRefs: true,
@@ -21,13 +21,13 @@ export const stringifyYaml = (config: WantConfig): string => {
   }
 };
 
-export const validateYaml = (yamlString: string): { valid: boolean; error?: string } => {
+export const validateYaml = (yamlString: string): { isValid: boolean; error?: string; data?: any } => {
   try {
-    yaml.load(yamlString);
-    return { valid: true };
+    const data = yaml.load(yamlString);
+    return { isValid: true, data };
   } catch (error) {
     return {
-      valid: false,
+      isValid: false,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }

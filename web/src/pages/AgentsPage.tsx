@@ -285,6 +285,7 @@ export const AgentsPage: React.FC = () => {
               loading={loading}
               searchQuery={searchQuery}
               typeFilters={typeFilters}
+              selectedAgent={selectedAgent}
               onViewAgent={handleViewAgent}
               onEditAgent={handleEditAgent}
               onDeleteAgent={setDeleteAgentState}

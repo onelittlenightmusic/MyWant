@@ -7,7 +7,7 @@ import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
-import { stringifyYaml } from '@/utils/yaml';
+import { stringifyYaml, validateYaml } from '@/utils/yaml';
 import {
   DetailsSidebar,
   TabContent,
@@ -112,7 +112,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     setUpdateError(null);
 
     try {
-      await updateWant(wantId, editedConfig);
+      // Parse YAML to want object
+      const yamlValidation = validateYaml(editedConfig);
+      if (!yamlValidation.isValid) {
+        setUpdateError(`Invalid YAML: ${yamlValidation.error}`);
+        setUpdateLoading(false);
+        return;
+      }
+
+      // Use parsed YAML as update request
+      const updateRequest = yamlValidation.data;
+      await updateWant(wantId, updateRequest);
       setIsEditing(false);
       // Refresh details after update
       await fetchWantDetails(wantId);

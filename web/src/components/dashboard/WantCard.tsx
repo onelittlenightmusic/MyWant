@@ -8,6 +8,7 @@ interface WantCardProps {
   want: Want;
   children?: Want[];
   selected: boolean;
+  selectedWant?: Want | null;
   onView: (want: Want) => void;
   onEdit: (want: Want) => void;
   onDelete: (want: Want) => void;
@@ -20,6 +21,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   want,
   children,
   selected,
+  selectedWant,
   onView,
   onEdit,
   onDelete,
@@ -83,23 +85,36 @@ export const WantCard: React.FC<WantCardProps> = ({
             </button>
           </div>
           <div className="space-y-2">
-            {children!.map((child, index) => (
-              <div
-                key={child.metadata?.id || `child-${index}`}
-                className="p-3 bg-white rounded-md border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all duration-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onView(child);
-                }}
-              >
+            {children!.sort((a, b) => {
+              const idA = a.metadata?.id || a.id || '';
+              const idB = b.metadata?.id || b.id || '';
+              return idA.localeCompare(idB);
+            }).map((child, index) => {
+              const isChildSelected = selectedWant && (
+                (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
+                (selectedWant.id && selectedWant.id === child.id)
+              );
+              return (
+                <div
+                  key={child.metadata?.id || `child-${index}`}
+                  className={classNames(
+                    "p-3 bg-white rounded-md border hover:shadow-sm transition-all duration-200",
+                    isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onView(child);
+                  }}
+                >
                 {/* Child want content using reusable component */}
                 <WantCardContent
                   want={child}
                   isChild={true}
                   onView={onView}
                 />
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

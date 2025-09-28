@@ -181,40 +181,42 @@ func (s *Server) setupRoutes() {
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
 }
 
-// createWant handles POST /api/v1/wants - creates a new want configuration
+// createWant handles POST /api/v1/wants - creates a new want object
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Parse YAML config from request body
-	var configYAML []byte
+	// Parse want object directly
+	var newWant *mywant.Want
+
 	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		// Read raw YAML
-		configYAML = make([]byte, r.ContentLength)
-		r.Body.Read(configYAML)
-	} else {
-		// Expect JSON with yaml field
-		var request struct {
-			YAML string `json:"yaml"`
-			Name string `json:"name,omitempty"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		// Handle YAML want object directly
+		wantYAML := make([]byte, r.ContentLength)
+		r.Body.Read(wantYAML)
+
+		if err := yaml.Unmarshal(wantYAML, &newWant); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid YAML want: %v", err), http.StatusBadRequest)
 			return
 		}
-		configYAML = []byte(request.YAML)
+	} else {
+		// Handle JSON want object directly
+		if err := json.NewDecoder(r.Body).Decode(&newWant); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid JSON want: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
-	// Parse YAML config
-	config, err := mywant.LoadConfigFromYAMLBytes(configYAML)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid YAML config: %v", err), http.StatusBadRequest)
+	if newWant == nil {
+		http.Error(w, "Want object is required", http.StatusBadRequest)
 		return
 	}
 
-	// Validate want types before proceeding
+	// Create config with single want
+	config := mywant.Config{Wants: []*mywant.Want{newWant}}
+
+	// Validate want type before proceeding
 	if err := s.validateWantTypes(config); err != nil {
-		errorMsg := fmt.Sprintf("Invalid want types: %v", err)
-		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), string(configYAML))
+		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
@@ -222,12 +224,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	// Generate unique ID for this want execution
 	wantID := generateWantID()
 
-	// Assign individual IDs to each want if not already set
-	baseID := time.Now().UnixNano()
-	for i := range config.Wants {
-		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
-		}
+	// Assign ID to the want if not already set
+	if newWant.Metadata.ID == "" {
+		newWant.Metadata.ID = fmt.Sprintf("want-%d", time.Now().UnixNano())
 	}
 
 	// Create want execution with builder
@@ -252,6 +251,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	types.RegisterFibonacciWantTypes(builder)         // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
 	types.RegisterPrimeWantTypes(builder)             // Prime types (prime_numbers, prime_sieve)
 	types.RegisterTravelWantTypes(builder)            // Travel types (restaurant, hotel, buffet, travel_coordinator)
+	types.RegisterApprovalWantTypes(builder)          // Approval types (evidence, description, level1_coordinator, level2_coordinator)
 	mywant.RegisterMonitorWantTypes(builder)          // Monitor types (monitor, alert)
 
 	// Store the execution
@@ -329,7 +329,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Want not found", http.StatusNotFound)
 }
 
-// updateWant handles PUT /api/v1/wants/{id} - updates a want configuration
+// updateWant handles PUT /api/v1/wants/{id} - updates a want object
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -371,67 +371,66 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse updated config
-	var configYAML []byte
+	// Parse updated want object directly
+	var updatedWant *mywant.Want
+
 	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		configYAML = make([]byte, r.ContentLength)
-		r.Body.Read(configYAML)
-	} else {
-		var request struct {
-			YAML string `json:"yaml"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		// Handle YAML want object directly
+		wantYAML := make([]byte, r.ContentLength)
+		r.Body.Read(wantYAML)
+
+		if err := yaml.Unmarshal(wantYAML, &updatedWant); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid YAML want: %v", err), http.StatusBadRequest)
 			return
 		}
-		configYAML = []byte(request.YAML)
+	} else {
+		// Handle JSON want object directly
+		if err := json.NewDecoder(r.Body).Decode(&updatedWant); err != nil {
+			http.Error(w, fmt.Sprintf("Invalid JSON want: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 
-	config, err := mywant.LoadConfigFromYAMLBytes(configYAML)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Invalid YAML config: %v", err), http.StatusBadRequest)
+	if updatedWant == nil {
+		http.Error(w, "Want object is required", http.StatusBadRequest)
 		return
 	}
 
-	// Validate want types before proceeding
-	if err := s.validateWantTypes(config); err != nil {
-		errorMsg := fmt.Sprintf("Invalid want types: %v", err)
-		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), string(configYAML))
+	// Validate want type before proceeding
+	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
+	if err := s.validateWantTypes(tempConfig); err != nil {
+		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
-	// Update the specific want within the execution config
-	if len(config.Wants) > 0 {
-		// Preserve the original want ID
-		config.Wants[0].Metadata.ID = foundWant.Metadata.ID
+	// Preserve the original want ID
+	updatedWant.Metadata.ID = foundWant.Metadata.ID
 
-		// Update config
-		if targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
-			targetExecution.Config.Wants[targetWantIndex] = config.Wants[0]
-		} else {
-			targetExecution.Config.Wants = append(targetExecution.Config.Wants, config.Wants[0])
-		}
-
-		// Use ChainBuilder's UpdateWant API - let reconcile loop handle the rest
-		if targetExecution.Builder != nil {
-			targetExecution.Builder.UpdateWant(config.Wants[0])
-		}
-
-		targetExecution.Status = "updated"
-
-		// Return the updated want, not the entire execution
-		updatedWant := &WantExecution{
-			ID:      executionID,
-			Config:  mywant.Config{Wants: []*mywant.Want{config.Wants[0]}},
-			Status:  "updated",
-			Results: nil,
-		}
-
-		json.NewEncoder(w).Encode(updatedWant)
+	// Update config
+	if targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
+		targetExecution.Config.Wants[targetWantIndex] = updatedWant
 	} else {
-		http.Error(w, "No wants provided in update config", http.StatusBadRequest)
+		targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
 	}
+
+	// Use ChainBuilder's UpdateWant API - let reconcile loop handle the rest
+	if targetExecution.Builder != nil {
+		targetExecution.Builder.UpdateWant(updatedWant)
+	}
+
+	targetExecution.Status = "updated"
+
+	// Return the updated want, not the entire execution
+	response := &WantExecution{
+		ID:      executionID,
+		Config:  mywant.Config{Wants: []*mywant.Want{updatedWant}},
+		Status:  "updated",
+		Results: nil,
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // deleteWant handles DELETE /api/v1/wants/{id} - deletes an individual want by its ID
@@ -945,10 +944,10 @@ func (s *Server) Start() error {
 	fmt.Printf("🚀 MyWant server starting on %s\n", addr)
 	fmt.Printf("📋 Available endpoints:\n")
 	fmt.Printf("  GET  /health                        - Health check\n")
-	fmt.Printf("  POST /api/v1/wants                 - Create want (YAML config)\n")
+	fmt.Printf("  POST /api/v1/wants                 - Create want (JSON/YAML want object)\n")
 	fmt.Printf("  GET  /api/v1/wants                 - List wants\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}            - Get want\n")
-	fmt.Printf("  PUT  /api/v1/wants/{id}            - Update want\n")
+	fmt.Printf("  PUT  /api/v1/wants/{id}            - Update want (JSON/YAML want object)\n")
 	fmt.Printf("  DELETE /api/v1/wants/{id}          - Delete want\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/status     - Get execution status\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
@@ -984,6 +983,7 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 	types.RegisterFibonacciWantTypes(builder)
 	types.RegisterPrimeWantTypes(builder)
 	types.RegisterTravelWantTypes(builder)
+	types.RegisterApprovalWantTypes(builder)
 	mywant.RegisterMonitorWantTypes(builder)
 
 	// Check each want type by trying to create a minimal want

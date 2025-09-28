@@ -5,7 +5,7 @@ import { getStatusColor, getStatusIcon, classNames } from '@/utils/helpers';
 interface StatusBadgeProps {
   status: WantExecutionStatus | WantPhase;
   showIcon?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
 }
 
@@ -19,6 +19,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   const icon = getStatusIcon(status);
 
   const sizeClasses = {
+    xs: 'px-1.5 py-0.5 text-xs',
     sm: 'px-2 py-1 text-xs',
     md: 'px-2.5 py-1.5 text-sm',
     lg: 'px-3 py-2 text-base'

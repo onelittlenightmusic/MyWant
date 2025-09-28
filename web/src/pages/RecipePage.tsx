@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, BookOpen, Edit2, Trash2, Eye, Menu } from 'lucide-react';
+import { Plus, BookOpen, Menu } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { GenericRecipe } from '@/types/recipe';
 import RecipeModal from '@/components/modals/RecipeModal';
 import { RecipeDetailsSidebar } from '@/components/sidebar/RecipeDetailsSidebar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { RecipeGrid } from '@/components/dashboard/RecipeGrid';
 import { classNames } from '@/utils/helpers';
 
 export default function RecipePage() {
@@ -59,10 +60,6 @@ export default function RecipePage() {
     }
   };
 
-  const formatParametersCount = (params?: Record<string, any>) => {
-    if (!params) return 0;
-    return Object.keys(params).length;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -177,89 +174,14 @@ export default function RecipePage() {
           )}
 
           {/* Recipes Grid */}
-          {recipes.length === 0 ? (
-            <div className="text-center py-12">
-              <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No recipes</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating a new recipe template.
-              </p>
-              <div className="mt-6">
-                <button
-                  onClick={handleCreateRecipe}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 mx-auto transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create Recipe
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recipes.map((recipe) => (
-                <div
-                  key={recipe.recipe.metadata.name}
-                  className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {recipe.recipe.metadata.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {recipe.recipe.metadata.description || 'No description'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Wants:</span>
-                      <span className="text-gray-900">{recipe.recipe.wants.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Parameters:</span>
-                      <span className="text-gray-900">
-                        {formatParametersCount(recipe.recipe.parameters)}
-                      </span>
-                    </div>
-                    {recipe.recipe.metadata.version && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Version:</span>
-                        <span className="text-gray-900">{recipe.recipe.metadata.version}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleViewRecipe(recipe)}
-                        className="text-blue-600 hover:text-blue-800 p-1"
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEditRecipe(recipe)}
-                        className="text-yellow-600 hover:text-yellow-800 p-1"
-                        title="Edit Recipe"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRecipe(recipe)}
-                        className="text-red-600 hover:text-red-800 p-1"
-                        title="Delete Recipe"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <RecipeGrid
+            recipes={recipes}
+            loading={loading}
+            selectedRecipe={selectedRecipe}
+            onViewRecipe={handleViewRecipe}
+            onEditRecipe={handleEditRecipe}
+            onDeleteRecipe={handleDeleteRecipe}
+          />
 
           {/* Modals */}
           <RecipeModal

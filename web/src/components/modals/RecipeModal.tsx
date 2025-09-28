@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Minus, FileText, Code } from 'lucide-react';
+import { Plus, Minus, FileText, Code, Save } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { YamlEditor } from '@/components/forms/YamlEditor';
+import { CreateSidebar } from '@/components/layout/CreateSidebar';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface RecipeModalProps {
   isOpen: boolean;
@@ -415,27 +417,37 @@ export default function RecipeModal({
     setFormData({ ...formData, wants: updated });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {mode === 'create' ? 'Create Recipe' : 'Edit Recipe'}
-            </h2>
+    <CreateSidebar
+      isOpen={isOpen}
+      onClose={onClose}
+      title={mode === 'create' ? 'Create Recipe' : 'Edit Recipe'}
+    >
+      <div className="p-8">
+        {/* Create/Update Button at Top */}
+        <form onSubmit={handleSubmit}>
+          <div className="mb-8">
             <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              type="submit"
+              disabled={loading || !formData.name}
+              className="inline-flex items-center justify-center px-6 py-3 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <X className="h-5 w-5" />
+              {loading ? (
+                <>
+                  <LoadingSpinner size="sm" color="white" className="mr-2" />
+                  {mode === 'edit' ? 'Updating...' : 'Creating...'}
+                </>
+              ) : (
+                <>
+                  <Save className="h-5 w-5 mr-2" />
+                  {mode === 'edit' ? 'Update Recipe' : 'Create Recipe'}
+                </>
+              )}
             </button>
           </div>
-        </div>
 
         {/* View Mode Toggle */}
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="mb-8">
           <div className="flex items-center space-x-4">
             <span className="text-sm font-medium text-gray-700">Edit Mode:</span>
             <div className="flex rounded-lg bg-gray-100 p-1">
@@ -467,7 +479,7 @@ export default function RecipeModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <div className="space-y-8">
           {viewMode === 'form' ? (
             <>
               {/* Basic Information */}
@@ -689,25 +701,9 @@ export default function RecipeModal({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !formData.name}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : mode === 'create' ? 'Create Recipe' : 'Update Recipe'}
-            </button>
           </div>
         </form>
       </div>
-    </div>
+    </CreateSidebar>
   );
 }
