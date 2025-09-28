@@ -206,6 +206,9 @@ type Want struct {
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
 	agentStateChanges map[string]interface{}        `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
+
+	// State synchronization
+	stateMutex sync.RWMutex `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status
@@ -283,7 +286,10 @@ func (n *Want) EndExecCycle() {
 }
 
 func (n *Want) AggregateChanges() {
-		// Handle state changes
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	// Handle state changes
 	if len(n.pendingStateChanges) > 0 {
 		// Create a single aggregated state history entry with complete state snapshot
 		if n.State == nil {
@@ -312,6 +318,9 @@ func (n *Want) GetStatus() WantStatus {
 
 // StoreState stores a key-value pair in the want's state
 func (n *Want) StoreState(key string, value interface{}) {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
 	// If we're in an exec cycle, batch the changes
 	if n.inExecCycle {
 		if n.pendingStateChanges == nil {
@@ -323,7 +332,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 
 	// Otherwise, store immediately (legacy behavior)
 	// Get previous value for notification
-	previousValue, _ := n.GetState(key)
+	previousValue, _ := n.getStateUnsafe(key)
 
 	// Store the state - preserve existing State to maintain parameterHistory
 	if n.State == nil {
@@ -506,6 +515,13 @@ func setNotifyParentStateUpdate(fn func(string, string, string, interface{})) {
 
 // GetState retrieves a value from the want's state
 func (n *Want) GetState(key string) (interface{}, bool) {
+	n.stateMutex.RLock()
+	defer n.stateMutex.RUnlock()
+	return n.getStateUnsafe(key)
+}
+
+// getStateUnsafe returns state without locking (for internal use when already locked)
+func (n *Want) getStateUnsafe(key string) (interface{}, bool) {
 	if n.State == nil {
 		return nil, false
 	}
@@ -515,6 +531,9 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 
 // GetAllState returns the entire state map
 func (n *Want) GetAllState() map[string]interface{} {
+	n.stateMutex.RLock()
+	defer n.stateMutex.RUnlock()
+
 	if n.State == nil {
 		return make(map[string]interface{})
 	}

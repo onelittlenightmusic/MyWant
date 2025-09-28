@@ -30,13 +30,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={classNames(
-          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200',
+          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white px-6 py-4 flex items-center justify-between z-10 border-b border-gray-200">
+        <div className="flex-shrink-0 bg-white px-6 py-4 flex items-center justify-between z-10 border-b border-gray-200">
           {title && (
             <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
           )}
@@ -50,7 +50,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-scroll min-h-0">
           {children}
         </div>
       </div>

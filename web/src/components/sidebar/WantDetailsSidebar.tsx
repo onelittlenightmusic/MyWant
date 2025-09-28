@@ -215,7 +215,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {loading && !selectedWantDetails ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
