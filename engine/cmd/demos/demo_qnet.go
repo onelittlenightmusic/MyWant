@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"os"
-	mywant "mywant/engine/src"
 	types "mywant/engine/cmd/types"
+	mywant "mywant/engine/src"
+	"os"
 )
 
 func main() {

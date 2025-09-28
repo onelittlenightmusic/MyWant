@@ -82,12 +82,12 @@ type ParameterUpdate struct {
 
 // AgentExecution represents information about an agent execution
 type AgentExecution struct {
-	AgentName   string    `json:"agent_name" yaml:"agent_name"`
-	AgentType   string    `json:"agent_type" yaml:"agent_type"`
-	StartTime   time.Time `json:"start_time" yaml:"start_time"`
-	EndTime     *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
-	Status      string    `json:"status" yaml:"status"` // "running", "completed", "failed"
-	Error       string    `json:"error,omitempty" yaml:"error,omitempty"`
+	AgentName string     `json:"agent_name" yaml:"agent_name"`
+	AgentType string     `json:"agent_type" yaml:"agent_type"`
+	StartTime time.Time  `json:"start_time" yaml:"start_time"`
+	EndTime   *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
+	Status    string     `json:"status" yaml:"status"` // "running", "completed", "failed"
+	Error     string     `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
 // ParameterUpdateListener represents a want that can receive parameter updates
@@ -118,8 +118,8 @@ type BasePacket struct {
 	data  interface{}
 }
 
-func (p *BasePacket) IsEnded() bool { return p.ended }
-func (p *BasePacket) SetEnded(ended bool) { p.ended = ended }
+func (p *BasePacket) IsEnded() bool        { return p.ended }
+func (p *BasePacket) SetEnded(ended bool)  { p.ended = ended }
 func (p *BasePacket) GetData() interface{} { return p.data }
 
 // ChainWant represents a want that can execute directly
@@ -191,9 +191,9 @@ type Want struct {
 	History  WantHistory            `json:"history" yaml:"history"`
 
 	// Agent execution information
-	CurrentAgent     string            `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
-	RunningAgents    []string          `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
-	AgentHistory     []AgentExecution  `json:"agent_history,omitempty" yaml:"agent_history,omitempty"`
+	CurrentAgent  string           `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
+	RunningAgents []string         `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
+	AgentHistory  []AgentExecution `json:"agent_history,omitempty" yaml:"agent_history,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
 	pendingStateChanges     map[string]interface{} `json:"-" yaml:"-"`
@@ -277,6 +277,13 @@ func (n *Want) EndExecCycle() {
 	}
 
 	// Handle state changes
+	n.AggregateChanges()
+
+	n.inExecCycle = false
+}
+
+func (n *Want) AggregateChanges() {
+		// Handle state changes
 	if len(n.pendingStateChanges) > 0 {
 		// Create a single aggregated state history entry with complete state snapshot
 		if n.State == nil {
@@ -291,14 +298,11 @@ func (n *Want) EndExecCycle() {
 		// Create one history entry with the complete state snapshot
 		n.addAggregatedStateHistory()
 	}
-
 	// Handle parameter changes
 	if len(n.pendingParameterChanges) > 0 {
 		// Create one aggregated parameter history entry
 		n.addAggregatedParameterHistory()
 	}
-
-	n.inExecCycle = false
 }
 
 // GetStatus returns the current want status
@@ -348,7 +352,15 @@ func (n *Want) StoreState(key string, value interface{}) {
 func (n *Want) addAggregatedStateHistory() {
 	// Skip history recording based on execution cycle count
 	// Default skip count is 100, so record only every 100th cycle
+	// Can be overridden via want parameters or config
 	skipCount := 100
+	if n.Spec.Params != nil {
+		if customSkip, exists := n.Spec.Params["state_history_skip_count"]; exists {
+			if skipVal, ok := customSkip.(int); ok {
+				skipCount = skipVal
+			}
+		}
+	}
 	if skipCount > 0 && n.execCycleCount%skipCount != 0 {
 		return // Skip this cycle
 	}
@@ -366,6 +378,9 @@ func (n *Want) addAggregatedStateHistory() {
 	}
 
 	// Append the new entry to History field
+	if n.History.StateHistory == nil {
+		n.History.StateHistory = make([]StateHistoryEntry, 0)
+	}
 	n.History.StateHistory = append(n.History.StateHistory, entry)
 }
 
@@ -423,6 +438,9 @@ func (n *Want) addToStateHistory(key string, value interface{}, previousValue in
 	}
 
 	// Add to state history in History field
+	if n.History.StateHistory == nil {
+		n.History.StateHistory = make([]StateHistoryEntry, 0)
+	}
 	n.History.StateHistory = append(n.History.StateHistory, entry)
 
 	// Limit history size (keep last 100 entries)
@@ -1669,6 +1687,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			if wantPtr.History.ParameterHistory == nil {
 				wantPtr.History.ParameterHistory = make([]StateHistoryEntry, 0)
 			}
+			if wantPtr.History.StateHistory == nil {
+				wantPtr.History.StateHistory = make([]StateHistoryEntry, 0)
+			}
 			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
 		}
 	} else {
@@ -2893,6 +2914,9 @@ func (n *Want) CommitStateChanges() {
 		StateValue: n.agentStateChanges,
 		Timestamp:  time.Now(),
 	}
+	if n.History.StateHistory == nil {
+		n.History.StateHistory = make([]StateHistoryEntry, 0)
+	}
 	n.History.StateHistory = append(n.History.StateHistory, historyEntry)
 
 	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
@@ -3014,5 +3038,3 @@ func (cb *ChainBuilder) controlLoop() {
 func (cb *ChainBuilder) startControlLoop() {
 	go cb.controlLoop()
 }
-
-

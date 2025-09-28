@@ -25,6 +25,8 @@ recipe:
         params:
           restaurant_type: restaurant_type
           duration_hours: dinner_duration
+        requires:
+          - restaurant_reservation
 
     # Hotel accommodation booking with agent support
     - metadata:

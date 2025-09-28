@@ -16,8 +16,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
-	mywant "mywant/engine/src"
 	types "mywant/engine/cmd/types"
+	mywant "mywant/engine/src"
 )
 
 // ServerConfig holds server configuration
@@ -28,28 +28,28 @@ type ServerConfig struct {
 
 // ErrorHistoryEntry represents an API error with detailed context
 type ErrorHistoryEntry struct {
-	ID          string                 `json:"id"`
-	Timestamp   string                 `json:"timestamp"`
-	Message     string                 `json:"message"`
-	Status      int                    `json:"status"`
-	Code        string                 `json:"code,omitempty"`
-	Type        string                 `json:"type,omitempty"`
-	Details     string                 `json:"details,omitempty"`
-	Endpoint    string                 `json:"endpoint"`
-	Method      string                 `json:"method"`
-	RequestData interface{}            `json:"request_data,omitempty"`
-	UserAgent   string                 `json:"user_agent,omitempty"`
-	Resolved    bool                   `json:"resolved"`
-	Notes       string                 `json:"notes,omitempty"`
+	ID          string      `json:"id"`
+	Timestamp   string      `json:"timestamp"`
+	Message     string      `json:"message"`
+	Status      int         `json:"status"`
+	Code        string      `json:"code,omitempty"`
+	Type        string      `json:"type,omitempty"`
+	Details     string      `json:"details,omitempty"`
+	Endpoint    string      `json:"endpoint"`
+	Method      string      `json:"method"`
+	RequestData interface{} `json:"request_data,omitempty"`
+	UserAgent   string      `json:"user_agent,omitempty"`
+	Resolved    bool        `json:"resolved"`
+	Notes       string      `json:"notes,omitempty"`
 }
 
 // Server represents the MyWant server
 type Server struct {
 	config         ServerConfig
-	wants          map[string]*WantExecution         // Store active want executions
-	agentRegistry  *mywant.AgentRegistry             // Agent and capability registry
+	wants          map[string]*WantExecution        // Store active want executions
+	agentRegistry  *mywant.AgentRegistry            // Agent and capability registry
 	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
-	errorHistory   []ErrorHistoryEntry               // Store error history
+	errorHistory   []ErrorHistoryEntry              // Store error history
 	router         *mux.Router
 }
 
@@ -409,12 +409,12 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	builder.SetAgentRegistry(s.agentRegistry)
 
 	// Register want types
-	types.RegisterQNetWantTypes(builder)              // QNet types (qnet numbers, qnet queue, qnet sink, etc.)
-	types.RegisterFibonacciWantTypes(builder)         // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
-	types.RegisterPrimeWantTypes(builder)             // Prime types (prime_numbers, prime_sieve)
-	types.RegisterTravelWantTypes(builder)            // Travel types (restaurant, hotel, buffet, travel_coordinator)
-	types.RegisterApprovalWantTypes(builder)          // Approval types (evidence, description, level1_coordinator, level2_coordinator)
-	mywant.RegisterMonitorWantTypes(builder)          // Monitor types (monitor, alert)
+	types.RegisterQNetWantTypes(builder)      // QNet types (qnet numbers, qnet queue, qnet sink, etc.)
+	types.RegisterFibonacciWantTypes(builder) // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
+	types.RegisterPrimeWantTypes(builder)     // Prime types (prime_numbers, prime_sieve)
+	types.RegisterTravelWantTypes(builder)    // Travel types (restaurant, hotel, buffet, travel_coordinator)
+	types.RegisterApprovalWantTypes(builder)  // Approval types (evidence, description, level1_coordinator, level2_coordinator)
+	mywant.RegisterMonitorWantTypes(builder)  // Monitor types (monitor, alert)
 
 	// Store the execution
 	s.wants[wantID] = execution
@@ -1133,7 +1133,6 @@ func (s *Server) Start() error {
 
 	return http.ListenAndServe(addr, s.router)
 }
-
 
 // validateWantTypes validates that all want types are known before execution
 func (s *Server) validateWantTypes(config mywant.Config) error {

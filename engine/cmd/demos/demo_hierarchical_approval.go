@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	mywant "mywant/engine/src"
 	"mywant/engine/cmd/types"
+	mywant "mywant/engine/src"
 	"os"
 	"time"
 )

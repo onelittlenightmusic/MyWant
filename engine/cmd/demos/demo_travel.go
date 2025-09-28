@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"os"
-	. "mywant/engine/src"
 	"mywant/engine/cmd/types"
+	. "mywant/engine/src"
+	"os"
 )
 
 func main() {

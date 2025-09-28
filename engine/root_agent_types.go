@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"sync"
 	mywant "mywant/engine/src"
+	"sync"
 )
 
 type AgentType string

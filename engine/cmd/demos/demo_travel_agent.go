@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	. "mywant/engine/src"
 	"mywant/engine/cmd/types"
+	. "mywant/engine/src"
 	"os"
 )
 
@@ -52,7 +52,7 @@ func main() {
 	// Dynamically register AgentPremium
 	agentPremium := types.NewAgentPremium(
 		"agent_premium",
-		[]string{"hotel_reservation"},  // Match the required capability in recipe
+		[]string{"hotel_reservation"}, // Match the required capability in recipe
 		[]string{"xxx"},
 		"platinum",
 	)
@@ -65,6 +65,22 @@ func main() {
 
 	agentRegistry.RegisterAgent(agentPremium)
 	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
+
+	// Dynamically register AgentRestaurant
+	agentRestaurant := types.NewAgentRestaurant(
+		"agent_restaurant",
+		[]string{"restaurant_reservation"}, // Match the required capability in recipe
+		[]string{"xxx"},
+	)
+
+	// Set a simple action that delegates to the AgentRestaurant.Exec() method
+	agentRestaurant.Action = func(ctx context.Context, want *Want) error {
+		fmt.Printf("[AGENT_RESTAURANT_ACTION] Simple action called, delegating to AgentRestaurant.Exec()\n")
+		return agentRestaurant.Exec(ctx, want)
+	}
+
+	agentRegistry.RegisterAgent(agentRestaurant)
+	fmt.Printf("🔧 Dynamically registered AgentRestaurant: %s\n", agentRestaurant.GetName())
 
 	// Set agent registry on the builder
 	builder.SetAgentRegistry(agentRegistry)

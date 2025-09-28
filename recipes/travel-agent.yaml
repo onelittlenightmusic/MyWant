@@ -14,6 +14,7 @@ recipe:
     hotel_type: "luxury"
     buffet_type: "international"
     dinner_duration: 2.0
+    state_history_skip_count: 1
 
   wants:
     # Dinner restaurant reservation with agent support
@@ -26,6 +27,7 @@ recipe:
         params:
           restaurant_type: restaurant_type
           duration_hours: dinner_duration
+          state_history_skip_count: state_history_skip_count
         requires:
           - restaurant_reservation
 

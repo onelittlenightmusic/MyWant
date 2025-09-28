@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	mywant "mywant/engine/src"
 	"mywant/engine/cmd/types"
+	mywant "mywant/engine/src"
 )
 
 func main() {

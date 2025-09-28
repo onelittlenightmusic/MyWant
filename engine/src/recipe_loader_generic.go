@@ -90,7 +90,7 @@ type GenericRecipeMetadata struct {
 	Name        string `yaml:"name" json:"name"`
 	Description string `yaml:"description" json:"description"`
 	Version     string `yaml:"version" json:"version"`
-	Type        string `yaml:"type,omitempty" json:"type,omitempty"`        // travel, qnet, fibonacci, etc.
+	Type        string `yaml:"type,omitempty" json:"type,omitempty"`               // travel, qnet, fibonacci, etc.
 	CustomType  string `yaml:"custom_type,omitempty" json:"custom_type,omitempty"` // "wait time in queue system", etc.
 }
 

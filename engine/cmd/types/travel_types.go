@@ -120,7 +120,8 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Check if already attempted using persistent state
-	attempted, _ := r.State["attempted"].(bool)
+	attemptedVal, _ := r.GetState("attempted")
+	attempted, _ := attemptedVal.(bool)
 
 	if len(outputs) == 0 {
 		return true
@@ -132,7 +133,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Mark as attempted in persistent state
-	r.State["attempted"] = true
+	r.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := r.tryAgentExecution(); agentSchedule != nil {
@@ -221,11 +222,8 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 
-	// Initialize stats map if not exists
-	if r.State == nil {
-		r.State = make(map[string]interface{})
-	}
-	r.State["total_processed"] = 1
+	// Store stats using thread-safe StoreState
+	r.StoreState("total_processed", 1)
 
 	// Store live state with reservation details
 	r.StoreState("total_processed", 1)
@@ -255,17 +253,37 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 
 		// Step 1: Execute MonitorRestaurant first to check for existing state
 		fmt.Printf("[RESTAURANT] Step 1: Executing MonitorRestaurant to check existing state\n")
-		if err := r.executeMonitorRestaurant(); err != nil {
+
+		// Create and execute MonitorRestaurant directly inline to avoid context issues
+		monitorAgent := NewMonitorRestaurant(
+			"restaurant_monitor",
+			[]string{"restaurant_agency"},
+			[]string{"xxx"},
+		)
+
+		ctx := context.Background()
+		if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
 			fmt.Printf("[RESTAURANT] MonitorRestaurant execution failed: %v\n", err)
 		}
 
+		r.AggregateChanges()
+
 		// Check if MonitorRestaurant found an existing schedule
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
+			fmt.Printf("[RESTAURANT] DEBUG: Found agent_result in state, type: %T, value: %+v\n", result, result)
 			if schedule, ok := result.(RestaurantSchedule); ok {
 				fmt.Printf("[RESTAURANT] MonitorRestaurant found existing schedule: %+v\n", schedule)
 				r.StoreState("execution_source", "monitor")
+
+				// Immediately set the schedule and complete the cycle
+				r.SetSchedule(schedule)
+				fmt.Printf("[RESTAURANT] MonitorRestaurant cycle completed - want finished\n")
 				return &schedule
+			} else {
+				fmt.Printf("[RESTAURANT] DEBUG: agent_result is not RestaurantSchedule type, it's: %T\n", result)
 			}
+		} else {
+			fmt.Printf("[RESTAURANT] DEBUG: No agent_result found in state - exists: %v, result: %v\n", exists, result)
 		}
 
 		// Step 2: No existing schedule found, execute AgentRestaurant
@@ -311,9 +329,20 @@ func (r *RestaurantWant) executeMonitorRestaurant() error {
 		[]string{"xxx"},
 	)
 
-	// Execute the monitor agent
+	// Execute the monitor agent on the want
 	ctx := context.Background()
-	return monitorAgent.Exec(ctx, &r.Want)
+	if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
+		return err
+	}
+
+	// Debug: Check if state was stored
+	if result, exists := r.GetState("agent_result"); exists {
+		fmt.Printf("[RESTAURANT] DEBUG: MonitorRestaurant stored agent_result: %+v\n", result)
+	} else {
+		fmt.Printf("[RESTAURANT] DEBUG: MonitorRestaurant did not store agent_result\n")
+	}
+
+	return nil
 }
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
@@ -429,7 +458,8 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Check if already attempted using persistent state
-	attempted, _ := h.State["attempted"].(bool)
+	attemptedVal, _ := h.GetState("attempted")
+	attempted, _ := attemptedVal.(bool)
 
 	if len(outputs) == 0 {
 		return true
@@ -441,7 +471,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Mark as attempted in persistent state
-	h.State["attempted"] = true
+	h.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := h.tryAgentExecution(); agentSchedule != nil {
@@ -531,11 +561,8 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 
-	// Initialize stats map if not exists
-	if h.State == nil {
-		h.State = make(map[string]interface{})
-	}
-	h.State["total_processed"] = 1
+	// Store stats using thread-safe StoreState
+	h.StoreState("total_processed", 1)
 
 	// Store live state with reservation details
 	h.StoreState("total_processed", 1)
@@ -575,8 +602,8 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[HOTEL] Checking state for agent_result, state keys: %v\n", getStateKeys(h.State))
-		if result, exists := h.State["agent_result"]; exists {
+		fmt.Printf("[HOTEL] Checking state for agent_result\n")
+		if result, exists := h.GetState("agent_result"); exists {
 			fmt.Printf("[HOTEL] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(HotelSchedule); ok {
 				fmt.Printf("[HOTEL] Successfully retrieved agent result: %+v\n", schedule)
@@ -679,7 +706,8 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	duration := 1*time.Hour + 30*time.Minute // Default 1.5 hour breakfast
 
 	// Check if already attempted using persistent state
-	attempted, _ := b.State["attempted"].(bool)
+	attemptedVal, _ := b.GetState("attempted")
+	attempted, _ := attemptedVal.(bool)
 
 	if len(outputs) == 0 {
 		return true
@@ -691,7 +719,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Mark as attempted in persistent state
-	b.State["attempted"] = true
+	b.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
@@ -775,11 +803,8 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 
-	// Initialize stats map if not exists
-	if b.State == nil {
-		b.State = make(map[string]interface{})
-	}
-	b.State["total_processed"] = 1
+	// Store stats using thread-safe StoreState
+	b.StoreState("total_processed", 1)
 
 	// Store live state with reservation details
 	b.StoreState("total_processed", 1)
@@ -819,8 +844,8 @@ func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[BUFFET] Checking state for agent_result, state keys: %v\n", getStateKeys(b.State))
-		if result, exists := b.State["agent_result"]; exists {
+		fmt.Printf("[BUFFET] Checking state for agent_result\n")
+		if result, exists := b.GetState("agent_result"); exists {
 			fmt.Printf("[BUFFET] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(BuffetSchedule); ok {
 				fmt.Printf("[BUFFET] Successfully retrieved agent result: %+v\n", schedule)
@@ -1000,10 +1025,11 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	}
 
 	// Use persistent state to track schedules
-	schedules, _ := t.State["schedules"].([]*TravelSchedule)
+	schedulesVal, _ := t.GetState("schedules")
+	schedules, _ := schedulesVal.([]*TravelSchedule)
 	if schedules == nil {
 		schedules = make([]*TravelSchedule, 0)
-		t.State["schedules"] = schedules
+		t.StoreState("schedules", schedules)
 	}
 
 	// Collect all schedules from child wants
@@ -1019,7 +1045,7 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	}
 
 	// Update persistent state
-	t.State["schedules"] = schedules
+	t.StoreState("schedules", schedules)
 
 	// When we have all schedules, create final itinerary
 	if len(schedules) >= 3 {
@@ -1048,10 +1074,7 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		}
 
 		// Initialize stats map if not exists
-		if t.State == nil {
-			t.State = make(map[string]interface{})
-		}
-		t.State["total_processed"] = len(allEvents)
+		t.StoreState("total_processed", len(allEvents))
 		fmt.Printf("\n✅ Travel itinerary completed with %d events!\n", len(allEvents))
 		return true
 	}

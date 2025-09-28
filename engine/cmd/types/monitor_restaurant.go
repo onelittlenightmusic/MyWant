@@ -69,6 +69,10 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 		return err
 	}
 
+	// Debug: Print parsed state
+	fmt.Printf("[MONITOR_RESTAURANT] DEBUG: Parsed state: %+v\n", restaurantState)
+	fmt.Printf("[MONITOR_RESTAURANT] DEBUG: Start time: %v, IsZero: %v\n", restaurantState.State.Start, restaurantState.State.Start.IsZero())
+
 	// Store the state information using StoreState
 	if !restaurantState.State.Start.IsZero() {
 		// Convert to RestaurantSchedule format
@@ -84,19 +88,22 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 			PremiumAmenities: []string{"monitoring_data"},
 		}
 
+		fmt.Printf("[MONITOR_RESTAURANT] DEBUG: About to store agent_result: %+v\n", schedule)
 		want.StoreState("agent_result", schedule)
 		want.StoreState("monitor_execution_count", m.ExecutionCount)
 		want.StoreState("monitor_source_file", filename)
+		fmt.Printf("[MONITOR_RESTAURANT] DEBUG: Stored agent_result successfully\n")
 
 		fmt.Printf("[MONITOR_RESTAURANT] Loaded existing schedule: %s from %s to %s\n",
 			restaurantState.State.Name,
 			restaurantState.State.Start.Format("15:04 Jan 2"),
 			restaurantState.State.End.Format("15:04 Jan 2"))
 	} else {
-		// No existing schedule found
+		// No existing schedule found - store explicit first record
+		want.StoreState("agent_result", nil)
 		want.StoreState("monitor_execution_count", m.ExecutionCount)
 		want.StoreState("monitor_source_file", filename)
-		fmt.Printf("[MONITOR_RESTAURANT] No existing schedule found in %s\n", filename)
+		fmt.Printf("[MONITOR_RESTAURANT] No existing schedule found in %s - stored first record\n", filename)
 	}
 
 	// Increment execution count for next call

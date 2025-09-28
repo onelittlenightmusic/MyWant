@@ -264,3 +264,144 @@ Memory reconciliation enables:
 - Want types in separate `*_types.go` files
 - Recipe files in `recipes/` directory
 - Config files in `config/` directory with `config-*` naming
+
+## System Requirements Specification
+
+### Want Requirements
+
+#### Core Structure
+- **Metadata**: `name`, `type`, `labels` for identification and connectivity
+- **Spec**: Configuration with `params`, `using` selectors, optional `Recipe` reference
+- **State**: Runtime data storage via `StoreState()` method (private access)
+- **History**: `ParameterHistory` and `StateHistory` for tracking changes
+- **Status**: Execution state (`idle`, `running`, `completed`, `failed`)
+
+#### Execution Lifecycle
+1. **BeginExecCycle()** - Start batching state changes
+2. **Exec()** - Main execution logic with channel I/O
+3. **EndExecCycle()** - Commit batched changes to state and history
+4. **State Persistence** - Survives across executions via memory reconciliation
+
+#### Key Methods
+- `StoreState(key, value)` - Store state changes (batched during execution)
+- `GetState(key)` - Retrieve state values (returns value, exists)
+- `SetSchedule()` - Apply schedule data and complete execution cycle
+
+#### State Management
+- **Batching Mode**: During execution cycle, `StoreState()` calls are batched in `pendingStateChanges`
+- **Immediate Mode**: Outside execution cycle, `StoreState()` immediately updates `want.State`
+- **History Recording**: State changes recorded in `StateHistory` with timestamps
+- **Memory Dumps**: State persisted to YAML files for reconciliation across executions
+
+### Agent Requirements
+
+#### Agent Types
+- **DoAgent**: Action-based agents that execute specific tasks
+- **MonitorAgent**: State monitoring and data loading from external sources
+
+#### Core Structure
+- **BaseAgent**: `Name`, `Capabilities`, `Uses`, `Type`
+- **Execution**: `Exec(ctx, want)` method that operates on want state
+- **State Management**: Must use `want.StoreState()` for state persistence
+
+#### Specialized Implementations
+- **AgentRestaurant**: Returns `RestaurantSchedule` with restaurant-specific timing (6-9 PM, 1.5-3 hours)
+- **AgentBuffet**: Returns `BuffetSchedule` with buffet-specific scheduling (lunch/dinner, 2-4 hours)
+- **MonitorRestaurant**: Reads initial state from YAML files (`restaurant0.yaml`, `restaurant1.yaml`)
+
+#### Execution Context
+- Agents execute **outside** the want's execution cycle context
+- `StoreState()` calls are **immediate** (not batched)
+- Results stored in `agent_result` state key
+- Two-step execution: MonitorAgent first, then ActionAgent conditionally
+
+#### Agent Integration Flow
+```go
+// Step 1: Execute MonitorRestaurant to check existing state
+monitorAgent := NewMonitorRestaurant(...)
+monitorAgent.Exec(ctx, &want)
+
+// Step 2: Only if no existing schedule found, execute AgentRestaurant
+if result, exists := want.GetState("agent_result"); !exists {
+    agentRestaurant.Exec(ctx, &want)
+}
+```
+
+### Recipe Requirements
+
+#### Recipe Structure
+```yaml
+recipe:
+  parameters:          # Input parameters for template substitution
+    count: 1000
+    rate: 10.0
+
+  wants:              # Array of want templates
+    - type: sequence   # Want type
+      labels:          # Label selectors for connectivity
+        role: source
+      params:          # Parameters (can reference recipe parameters)
+        count: count   # Simple parameter substitution
+      using:           # Optional connectivity selectors
+        - category: producer
+
+  coordinator:        # Optional orchestrating want
+    type: travel_coordinator
+    params:
+      display_name: display_name
+```
+
+#### Recipe Types
+
+##### Independent Wants (Travel Planning)
+- **No `using` selectors** - Execute in parallel
+- **Coordinator Want** - Orchestrates independent wants via input channels
+- Example: Restaurant, Hotel, Buffet reservations coordinated by TravelCoordinator
+
+##### Dependent Wants (Pipeline Processing)
+- **`using` selectors** - Form processing pipelines via label matching
+- **Label-based connectivity** - Flexible topology without hardcoded names
+- Example: Generator → Queue → Processor → Sink pipeline
+
+#### Recipe Processing
+1. **Parameter Substitution**: Simple reference by name (e.g., `count: count`)
+2. **Want Generation**: Recipe loader creates want instances with resolved parameters
+3. **Connectivity**: Automatic connection based on `using` label selectors
+4. **Name Generation**: Auto-generated if not specified in recipe
+
+#### Configuration Hierarchy
+- **Config Files** (`config-*-recipe.yaml`) - User interface, references recipes
+- **Recipe Files** (`recipes/*.yaml`) - Reusable component templates
+- **Want Types** (`*_types.go`) - Implementation layer
+- **Demo Programs** - Entry points that load and execute configs
+
+#### Key Features
+- **Memory Reconciliation**: State persistence across executions
+- **Dynamic Want Addition**: Runtime topology modification
+- **Owner References**: Parent-child relationships for lifecycle management
+- **Validation**: OpenAPI spec validation for configuration integrity
+
+### State Management Requirements
+
+#### State History Initialization
+All `StateHistory` fields must be properly initialized to prevent null reference errors:
+
+```go
+// Required in all state history append operations
+if want.History.StateHistory == nil {
+    want.History.StateHistory = make([]StateHistoryEntry, 0)
+}
+want.History.StateHistory = append(want.History.StateHistory, entry)
+```
+
+#### Critical Locations Requiring StateHistory Initialization
+- `addToStateHistory()` method - Individual state change tracking
+- `addAggregatedStateHistory()` method - Bulk state change tracking
+- Agent state commit operations - Batch agent state changes
+- Want creation/loading - Initial setup phase
+
+#### State Access Patterns
+- **Private State**: `want.state` field should not be accessed directly
+- **Controlled Access**: All state changes must use `StoreState()` method
+- **State Retrieval**: Use `GetState()` method which returns `(value, exists)`
+- **Encapsulation**: Maintains proper separation between internal state and public API
