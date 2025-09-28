@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	. "mywant/engine/src"
@@ -252,7 +253,23 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		// Store the requirements in want state for tracking
 		r.StoreState("agent_requirements", r.Spec.Requires)
 
-		// Use dynamic agent execution based on requirements
+		// Step 1: Execute MonitorRestaurant first to check for existing state
+		fmt.Printf("[RESTAURANT] Step 1: Executing MonitorRestaurant to check existing state\n")
+		if err := r.executeMonitorRestaurant(); err != nil {
+			fmt.Printf("[RESTAURANT] MonitorRestaurant execution failed: %v\n", err)
+		}
+
+		// Check if MonitorRestaurant found an existing schedule
+		if result, exists := r.GetState("agent_result"); exists && result != nil {
+			if schedule, ok := result.(RestaurantSchedule); ok {
+				fmt.Printf("[RESTAURANT] MonitorRestaurant found existing schedule: %+v\n", schedule)
+				r.StoreState("execution_source", "monitor")
+				return &schedule
+			}
+		}
+
+		// Step 2: No existing schedule found, execute AgentRestaurant
+		fmt.Printf("[RESTAURANT] Step 2: No existing schedule found, executing AgentRestaurant\n")
 		if err := r.ExecuteAgents(); err != nil {
 			fmt.Printf("[RESTAURANT] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
 			r.StoreState("agent_execution_status", "failed")
@@ -262,11 +279,12 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 
 		fmt.Printf("[RESTAURANT] Dynamic agent execution completed successfully\n")
 		r.StoreState("agent_execution_status", "completed")
+		r.StoreState("execution_source", "agent")
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[RESTAURANT] Checking state for agent_result, state keys: %v\n", getStateKeys(r.State))
-		if result, exists := r.State["agent_result"]; exists {
+		fmt.Printf("[RESTAURANT] Checking state for agent_result\n")
+		if result, exists := r.GetState("agent_result"); exists && result != nil {
 			fmt.Printf("[RESTAURANT] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(RestaurantSchedule); ok {
 				fmt.Printf("[RESTAURANT] Successfully retrieved agent result: %+v\n", schedule)
@@ -282,6 +300,20 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 
 	fmt.Printf("[RESTAURANT] No agent requirements specified\n")
 	return nil
+}
+
+// executeMonitorRestaurant executes the MonitorRestaurant agent to check for existing state
+func (r *RestaurantWant) executeMonitorRestaurant() error {
+	// Create a MonitorRestaurant instance
+	monitorAgent := NewMonitorRestaurant(
+		"restaurant_monitor",
+		[]string{"restaurant_agency"},
+		[]string{"xxx"},
+	)
+
+	// Execute the monitor agent
+	ctx := context.Background()
+	return monitorAgent.Exec(ctx, &r.Want)
 }
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
@@ -887,7 +919,6 @@ func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
 
 	// No need to send output here anymore - handled directly in Exec method
 }
-
 
 func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)

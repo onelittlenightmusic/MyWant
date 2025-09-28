@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	. "mywant/engine/src"
 	"mywant/engine/cmd/types"
+	. "mywant/engine/src"
 	"os"
 )
 
@@ -66,7 +66,7 @@ func main() {
 	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
 
 	// Dynamically register Restaurant Agent
-	agentRestaurant := types.NewAgentPremium(
+	agentRestaurant := types.NewAgentRestaurant(
 		"agent_restaurant_premium",
 		[]string{"restaurant_reservation"},
 		[]string{"xxx"},
@@ -82,7 +82,7 @@ func main() {
 	fmt.Printf("🔧 Dynamically registered Restaurant Agent: %s\n", agentRestaurant.GetName())
 
 	// Dynamically register Buffet Agent
-	agentBuffet := types.NewAgentPremium(
+	agentBuffet := types.NewAgentBuffet(
 		"agent_buffet_premium",
 		[]string{"buffet_reservation"},
 		[]string{"xxx"},

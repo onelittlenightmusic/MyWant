@@ -36,11 +36,8 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 	// Generate premium hotel booking schedule
 	schedule := a.generateHotelSchedule(want)
 
-	// Agent should not store state directly - store in temporary field for retrieval
-	if want.State == nil {
-		want.State = make(map[string]interface{})
-	}
-	want.State["agent_result"] = schedule
+	// Store the result using StoreState method
+	want.StoreState("agent_result", schedule)
 
 	fmt.Printf("[AGENT_PREMIUM] Premium hotel booking completed: %s from %s to %s\n",
 		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2"))
@@ -82,4 +79,3 @@ func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
 		PremiumAmenities:  []string{"spa_access", "concierge_service", "room_upgrade"},
 	}
 }
-
