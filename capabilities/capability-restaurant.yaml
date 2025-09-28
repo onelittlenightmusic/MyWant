@@ -1,0 +1,4 @@
+capabilities:
+  - name: restaurant_agency
+    gives:
+      - restaurant_reservation

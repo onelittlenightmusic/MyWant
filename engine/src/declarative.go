@@ -748,7 +748,12 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder.registerBuiltinWantTypes()
 
 	// Auto-register custom target types from recipes
-	err := ScanAndRegisterCustomTypes("recipes", builder.customRegistry)
+	// Try to find the recipes directory - check both "recipes" and "../recipes"
+	recipeDir := "recipes"
+	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
+		recipeDir = "../recipes"
+	}
+	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
 	if err != nil {
 		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
 	}
@@ -2325,7 +2330,11 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
 	} else {
 		// Fallback to current directory with memory subdirectory
+		// Try to find the memory directory - check both "memory" and "../memory"
 		memoryDir := "memory"
+		if _, err := os.Stat(memoryDir); os.IsNotExist(err) {
+			memoryDir = "../memory"
+		}
 		if err := os.MkdirAll(memoryDir, 0755); err != nil {
 			return fmt.Errorf("failed to create memory directory: %w", err)
 		}
@@ -2380,7 +2389,12 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		memoryDir := filepath.Dir(cb.memoryPath)
 		latestFilename = filepath.Join(memoryDir, "memory-0000-latest.yaml")
 	} else {
-		latestFilename = filepath.Join("memory", "memory-0000-latest.yaml")
+		// Use the same memoryDir logic as above
+		memoryDir := "memory"
+		if _, err := os.Stat(memoryDir); os.IsNotExist(err) {
+			memoryDir = "../memory"
+		}
+		latestFilename = filepath.Join(memoryDir, "memory-0000-latest.yaml")
 	}
 
 	// Copy the data to the latest file
@@ -3000,4 +3014,5 @@ func (cb *ChainBuilder) controlLoop() {
 func (cb *ChainBuilder) startControlLoop() {
 	go cb.controlLoop()
 }
+
 

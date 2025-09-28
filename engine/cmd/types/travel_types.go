@@ -133,6 +133,38 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Mark as attempted in persistent state
 	r.State["attempted"] = true
 
+	// Try to use agent system if available - agent completely overrides normal execution
+	if agentSchedule := r.tryAgentExecution(); agentSchedule != nil {
+		fmt.Printf("[RESTAURANT] Agent execution completed, processing agent result\n")
+
+		// Use the agent's schedule result
+		r.SetSchedule(*agentSchedule)
+
+		// Send the schedule to output channel
+		restaurantEvent := TimeSlot{
+			Start: agentSchedule.ReservationTime,
+			End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
+			Type:  "restaurant",
+			Name:  agentSchedule.ReservationName,
+		}
+
+		travelSchedule := &TravelSchedule{
+			Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
+			Events: []TimeSlot{restaurantEvent},
+		}
+
+		out <- travelSchedule
+		fmt.Printf("[RESTAURANT] Sent agent-generated schedule: %s from %s to %s\n",
+			agentSchedule.ReservationName,
+			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
+			restaurantEvent.End.Format("15:04 Jan 2"))
+
+		return true
+	}
+
+	// Normal restaurant execution (only runs if no agent match)
+	fmt.Printf("[RESTAURANT] No agent match, using standard restaurant logic\n")
+
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
 	if len(using) > 0 {
@@ -208,6 +240,84 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	out <- newSchedule
 	return true
+}
+
+// tryAgentExecution attempts to execute restaurant reservation using the agent system
+// Returns the RestaurantSchedule if successful, nil if no agent execution
+func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
+	// Check if this want has agent requirements
+	if len(r.Spec.Requires) > 0 {
+		fmt.Printf("[RESTAURANT] Want has agent requirements: %v\n", r.Spec.Requires)
+
+		// Store the requirements in want state for tracking
+		r.StoreState("agent_requirements", r.Spec.Requires)
+
+		// Use dynamic agent execution based on requirements
+		if err := r.ExecuteAgents(); err != nil {
+			fmt.Printf("[RESTAURANT] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			r.StoreState("agent_execution_status", "failed")
+			r.StoreState("agent_execution_error", err.Error())
+			return nil
+		}
+
+		fmt.Printf("[RESTAURANT] Dynamic agent execution completed successfully\n")
+		r.StoreState("agent_execution_status", "completed")
+
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+		fmt.Printf("[RESTAURANT] Checking state for agent_result, state keys: %v\n", getStateKeys(r.State))
+		if result, exists := r.State["agent_result"]; exists {
+			fmt.Printf("[RESTAURANT] Found agent_result in state: %+v\n", result)
+			if schedule, ok := result.(RestaurantSchedule); ok {
+				fmt.Printf("[RESTAURANT] Successfully retrieved agent result: %+v\n", schedule)
+				return &schedule
+			} else {
+				fmt.Printf("[RESTAURANT] agent_result is not RestaurantSchedule type: %T\n", result)
+			}
+		}
+
+		fmt.Printf("[RESTAURANT] Warning: Agent completed but no result found in state\n")
+		return nil
+	}
+
+	fmt.Printf("[RESTAURANT] No agent requirements specified\n")
+	return nil
+}
+
+// RestaurantSchedule represents a complete restaurant reservation schedule
+type RestaurantSchedule struct {
+	ReservationTime  time.Time `json:"reservation_time"`
+	DurationHours    float64   `json:"duration_hours"`
+	RestaurantType   string    `json:"restaurant_type"`
+	ReservationName  string    `json:"reservation_name"`
+	PremiumLevel     string    `json:"premium_level,omitempty"`
+	ServiceTier      string    `json:"service_tier,omitempty"`
+	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
+}
+
+// SetSchedule sets the restaurant reservation schedule and updates all related state
+func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
+	// Store basic restaurant booking information
+	r.Want.StoreState("attempted", true)
+	r.Want.StoreState("reservation_start_time", schedule.ReservationTime.Format("15:04"))
+	r.Want.StoreState("reservation_end_time", schedule.ReservationTime.Add(time.Duration(schedule.DurationHours*float64(time.Hour))).Format("15:04"))
+	r.Want.StoreState("restaurant_type", schedule.RestaurantType)
+	r.Want.StoreState("reservation_duration_hours", schedule.DurationHours)
+	r.Want.StoreState("reservation_name", schedule.ReservationName)
+	r.Want.StoreState("total_processed", 1)
+	r.Want.StoreState("schedule_date", schedule.ReservationTime.Format("2006-01-02"))
+
+	// Store premium information if provided
+	if schedule.PremiumLevel != "" {
+		r.Want.StoreState("premium_processed", true)
+		r.Want.StoreState("premium_level", schedule.PremiumLevel)
+	}
+	if schedule.ServiceTier != "" {
+		r.Want.StoreState("service_tier", schedule.ServiceTier)
+	}
+	if len(schedule.PremiumAmenities) > 0 {
+		r.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+	}
 }
 
 // HotelWant creates hotel stay reservations
@@ -551,6 +661,38 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Mark as attempted in persistent state
 	b.State["attempted"] = true
 
+	// Try to use agent system if available - agent completely overrides normal execution
+	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
+		fmt.Printf("[BUFFET] Agent execution completed, processing agent result\n")
+
+		// Use the agent's schedule result
+		b.SetSchedule(*agentSchedule)
+
+		// Send the schedule to output channel
+		buffetEvent := TimeSlot{
+			Start: agentSchedule.ReservationTime,
+			End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
+			Type:  "buffet",
+			Name:  agentSchedule.ReservationName,
+		}
+
+		travelSchedule := &TravelSchedule{
+			Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
+			Events: []TimeSlot{buffetEvent},
+		}
+
+		out <- travelSchedule
+		fmt.Printf("[BUFFET] Sent agent-generated schedule: %s from %s to %s\n",
+			agentSchedule.ReservationName,
+			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
+			buffetEvent.End.Format("15:04 Jan 2"))
+
+		return true
+	}
+
+	// Normal buffet execution (only runs if no agent match)
+	fmt.Printf("[BUFFET] No agent match, using standard buffet logic\n")
+
 	var existingSchedule *TravelSchedule
 	if len(using) > 0 {
 		select {
@@ -620,6 +762,83 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	out <- newSchedule
 	return true
+}
+
+// tryAgentExecution attempts to execute buffet reservation using the agent system
+// Returns the BuffetSchedule if successful, nil if no agent execution
+func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
+	// Check if this want has agent requirements
+	if len(b.Spec.Requires) > 0 {
+		fmt.Printf("[BUFFET] Want has agent requirements: %v\n", b.Spec.Requires)
+
+		// Store the requirements in want state for tracking
+		b.StoreState("agent_requirements", b.Spec.Requires)
+
+		// Use dynamic agent execution based on requirements
+		if err := b.ExecuteAgents(); err != nil {
+			fmt.Printf("[BUFFET] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			b.StoreState("agent_execution_status", "failed")
+			b.StoreState("agent_execution_error", err.Error())
+			return nil
+		}
+
+		fmt.Printf("[BUFFET] Dynamic agent execution completed successfully\n")
+		b.StoreState("agent_execution_status", "completed")
+
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+		fmt.Printf("[BUFFET] Checking state for agent_result, state keys: %v\n", getStateKeys(b.State))
+		if result, exists := b.State["agent_result"]; exists {
+			fmt.Printf("[BUFFET] Found agent_result in state: %+v\n", result)
+			if schedule, ok := result.(BuffetSchedule); ok {
+				fmt.Printf("[BUFFET] Successfully retrieved agent result: %+v\n", schedule)
+				return &schedule
+			} else {
+				fmt.Printf("[BUFFET] agent_result is not BuffetSchedule type: %T\n", result)
+			}
+		}
+
+		fmt.Printf("[BUFFET] Warning: Agent completed but no result found in state\n")
+		return nil
+	}
+
+	fmt.Printf("[BUFFET] No agent requirements specified\n")
+	return nil
+}
+
+// BuffetSchedule represents a complete buffet reservation schedule
+type BuffetSchedule struct {
+	ReservationTime  time.Time `json:"reservation_time"`
+	DurationHours    float64   `json:"duration_hours"`
+	BuffetType       string    `json:"buffet_type"`
+	ReservationName  string    `json:"reservation_name"`
+	PremiumLevel     string    `json:"premium_level,omitempty"`
+	ServiceTier      string    `json:"service_tier,omitempty"`
+	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
+}
+
+// SetSchedule sets the buffet reservation schedule and updates all related state
+func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
+	// Store basic buffet booking information
+	b.Want.StoreState("attempted", true)
+	b.Want.StoreState("buffet_start_time", schedule.ReservationTime.Format("15:04 Jan 2"))
+	b.Want.StoreState("buffet_end_time", schedule.ReservationTime.Add(time.Duration(schedule.DurationHours*float64(time.Hour))).Format("15:04 Jan 2"))
+	b.Want.StoreState("buffet_type", schedule.BuffetType)
+	b.Want.StoreState("buffet_duration_hours", schedule.DurationHours)
+	b.Want.StoreState("reservation_name", schedule.ReservationName)
+	b.Want.StoreState("total_processed", 1)
+
+	// Store premium information if provided
+	if schedule.PremiumLevel != "" {
+		b.Want.StoreState("premium_processed", true)
+		b.Want.StoreState("premium_level", schedule.PremiumLevel)
+	}
+	if schedule.ServiceTier != "" {
+		b.Want.StoreState("service_tier", schedule.ServiceTier)
+	}
+	if len(schedule.PremiumAmenities) > 0 {
+		b.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+	}
 }
 
 // Helper function to check time conflicts

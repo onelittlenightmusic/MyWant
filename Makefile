@@ -61,6 +61,12 @@ run-travel-recipe:
 run-travel-agent:
 	go run -C engine cmd/demos/demo_travel_agent.go ../config/config-travel-agent.yaml
 
+run-travel-agent-full:
+	go run -C engine cmd/demos/demo_travel_agent_full.go ../config/config-travel-agent-full.yaml
+
+run-travel-agent-direct:
+	go run -C engine cmd/demos/demo_travel_agent_full.go ../config/config-travel-agent-direct.yaml
+
 run-hierarchical-approval:
 	go run -C engine cmd/demos/demo_hierarchical_approval.go ../config/config-hierarchical-approval.yaml
 
@@ -191,6 +197,8 @@ help:
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
 	@echo "  run-travel-agent      - Travel with agent system integration"
+	@echo "  run-travel-agent-full - Complete travel system with all agents"
+	@echo "  run-travel-agent-direct - Direct config with all agents (no recipes)"
 	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"

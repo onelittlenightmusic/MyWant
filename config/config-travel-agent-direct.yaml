@@ -1,0 +1,57 @@
+wants:
+  # Restaurant reservation with agent support
+  - metadata:
+      name: fine dining restaurant
+      type: restaurant
+      labels:
+        role: scheduler
+        category: dining
+        priority: high
+    spec:
+      params:
+        restaurant_type: "fine dining"
+        duration_hours: 2.5
+      requires:
+        - restaurant_reservation
+
+  # Hotel booking with agent support
+  - metadata:
+      name: luxury hotel booking
+      type: hotel
+      labels:
+        role: scheduler
+        category: accommodation
+        priority: high
+    spec:
+      params:
+        hotel_type: "luxury"
+      requires:
+        - hotel_reservation
+
+  # Breakfast buffet with agent support
+  - metadata:
+      name: international breakfast buffet
+      type: buffet
+      labels:
+        role: scheduler
+        category: dining
+        priority: medium
+    spec:
+      params:
+        buffet_type: "international"
+      requires:
+        - buffet_reservation
+
+  # Travel coordinator to combine all schedules
+  - metadata:
+      name: agent travel coordinator
+      type: travel_coordinator
+      labels:
+        role: coordinator
+        category: travel
+        priority: critical
+    spec:
+      params:
+        template: "Complete Agent-Enabled Travel Itinerary"
+      using:
+        - role: scheduler

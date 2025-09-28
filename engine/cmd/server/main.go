@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -144,6 +145,11 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 
+	// Config CRUD endpoints - for loading recipe-based configurations
+	configs := api.PathPrefix("/configs").Subrouter()
+	configs.HandleFunc("", s.createConfig).Methods("POST")
+	configs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
 	// Agents CRUD endpoints
 	agents := api.PathPrefix("/agents").Subrouter()
 	agents.HandleFunc("", s.createAgent).Methods("POST")
@@ -179,6 +185,162 @@ func (s *Server) setupRoutes() {
 
 	// Serve static files (for future web UI)
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
+}
+
+// createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files
+// Uses the same logic as offline demo programs for DRY principle
+func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Read raw config data from request body and save to temporary file
+	configData := make([]byte, r.ContentLength)
+	r.Body.Read(configData)
+
+	// Generate unique ID for this configuration execution
+	configID := generateWantID()
+
+	// Create temporary config file
+	tempConfigPath := fmt.Sprintf("/tmp/config-%s.yaml", configID)
+	if err := os.WriteFile(tempConfigPath, configData, 0644); err != nil {
+		errorMsg := fmt.Sprintf("Failed to create temporary config file: %v", err)
+		s.logError(r, http.StatusInternalServerError, errorMsg, "file_creation", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+	defer os.Remove(tempConfigPath) // Clean up temp file
+
+	// Execute using the same logic as demo_travel_agent_full.go for DRY principle
+	config, builder, err := s.executeConfigLikeDemo(tempConfigPath, configID)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to execute config: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "execution", err.Error(), tempConfigPath)
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Create execution tracking
+	execution := &WantExecution{
+		ID:      configID,
+		Config:  config,
+		Status:  "completed",
+		Builder: builder,
+	}
+
+	// Store the execution
+	s.wants[configID] = execution
+
+	// Return created configuration
+	w.WriteHeader(http.StatusCreated)
+	response := map[string]interface{}{
+		"id":      configID,
+		"status":  "completed",
+		"wants":   len(config.Wants),
+		"message": "Configuration executed using demo program logic (DRY)",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// executeConfigLikeDemo executes config using the same logic as demo programs
+// This is the DRY implementation that reuses offline mode logic
+func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywant.Config, *mywant.ChainBuilder, error) {
+	// Step 1: Load configuration using automatic recipe loading (same as demo_travel_agent_full.go:23)
+	config, err := mywant.LoadConfigFromYAML(configPath)
+	if err != nil {
+		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
+	}
+
+	fmt.Printf("[SERVER] 📋 Loaded configuration with %d wants\n", len(config.Wants))
+	for _, want := range config.Wants {
+		fmt.Printf("[SERVER]   - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+		if len(want.Spec.Requires) > 0 {
+			fmt.Printf("[SERVER]     Requires: %v\n", want.Spec.Requires)
+		}
+	}
+
+	// Step 2: Create chain builder (same as demo_travel_agent_full.go:38)
+	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", configID)
+	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
+	builder.SetConfigInternal(config)
+
+	// Step 3: Create and configure agent registry (same as demo_travel_agent_full.go:40-50)
+	agentRegistry := mywant.NewAgentRegistry()
+
+	// Load capabilities and agents
+	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+		fmt.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+	}
+
+	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+		fmt.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+	}
+
+	// Register dynamic agents (same as demo_travel_agent_full.go:52-98)
+	s.registerDynamicAgents(agentRegistry)
+
+	// Set agent registry on the builder (same as demo_travel_agent_full.go:100)
+	builder.SetAgentRegistry(agentRegistry)
+
+	// Step 4: Register want types (same as demo_travel_agent_full.go:103)
+	types.RegisterTravelWantTypes(builder)
+	types.RegisterQNetWantTypes(builder)
+	types.RegisterFibonacciWantTypes(builder)
+	types.RegisterPrimeWantTypes(builder)
+	types.RegisterApprovalWantTypes(builder)
+	mywant.RegisterMonitorWantTypes(builder)
+
+	// Step 5: Execute (same as demo_travel_agent_full.go:106)
+	fmt.Println("[SERVER] 🚀 Executing configuration...")
+	builder.Execute()
+
+	fmt.Println("[SERVER] ✅ Configuration execution completed!")
+	return config, builder, nil
+}
+
+// registerDynamicAgents registers the same dynamic agents as demo_travel_agent_full.go
+func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
+	// Same agent registration as demo_travel_agent_full.go:52-98
+
+	// AgentPremium for hotel
+	agentPremium := types.NewAgentPremium(
+		"agent_premium",
+		[]string{"hotel_reservation"},
+		[]string{"xxx"},
+		"platinum",
+	)
+	agentPremium.Action = func(ctx context.Context, want *mywant.Want) error {
+		fmt.Printf("[SERVER][AGENT_PREMIUM_ACTION] Hotel agent called, delegating to AgentPremium.Exec()\n")
+		return agentPremium.Exec(ctx, want)
+	}
+	agentRegistry.RegisterAgent(agentPremium)
+	fmt.Printf("[SERVER] 🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
+
+	// Restaurant Agent
+	agentRestaurant := types.NewAgentPremium(
+		"agent_restaurant_premium",
+		[]string{"restaurant_reservation"},
+		[]string{"xxx"},
+		"premium",
+	)
+	agentRestaurant.Action = func(ctx context.Context, want *mywant.Want) error {
+		fmt.Printf("[SERVER][AGENT_RESTAURANT_ACTION] Restaurant agent called, processing reservation\n")
+		return agentRestaurant.Exec(ctx, want)
+	}
+	agentRegistry.RegisterAgent(agentRestaurant)
+	fmt.Printf("[SERVER] 🔧 Dynamically registered Restaurant Agent: %s\n", agentRestaurant.GetName())
+
+	// Buffet Agent
+	agentBuffet := types.NewAgentPremium(
+		"agent_buffet_premium",
+		[]string{"buffet_reservation"},
+		[]string{"xxx"},
+		"premium",
+	)
+	agentBuffet.Action = func(ctx context.Context, want *mywant.Want) error {
+		fmt.Printf("[SERVER][AGENT_BUFFET_ACTION] Buffet agent called, processing reservation\n")
+		return agentBuffet.Exec(ctx, want)
+	}
+	agentRegistry.RegisterAgent(agentBuffet)
+	fmt.Printf("[SERVER] 🔧 Dynamically registered Buffet Agent: %s\n", agentBuffet.GetName())
 }
 
 // createWant handles POST /api/v1/wants - creates a new want object
@@ -944,6 +1106,7 @@ func (s *Server) Start() error {
 	fmt.Printf("🚀 MyWant server starting on %s\n", addr)
 	fmt.Printf("📋 Available endpoints:\n")
 	fmt.Printf("  GET  /health                        - Health check\n")
+	fmt.Printf("  POST /api/v1/configs               - Create config (YAML config with recipe reference)\n")
 	fmt.Printf("  POST /api/v1/wants                 - Create want (JSON/YAML want object)\n")
 	fmt.Printf("  GET  /api/v1/wants                 - List wants\n")
 	fmt.Printf("  GET  /api/v1/wants/{id}            - Get want\n")

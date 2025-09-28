@@ -1,0 +1,15 @@
+wants:
+  - metadata:
+      name: full travel agent system
+      type: agent travel system
+      labels:
+        role: travel-planner
+    spec:
+      params:
+        prefix: vacation
+        display_name: "Complete Agent-Enabled Travel System"
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        buffet_type: "international"
+        dinner_duration: 2.5
+      recipe: travel-agent

@@ -1,0 +1,13 @@
+agents:
+  - name: agent_buffet_premium
+    type: do
+    capabilities:
+      - buffet_agency
+    uses:
+      - xxx
+  - name: buffet_monitor
+    type: monitor
+    capabilities:
+      - buffet_agency
+    uses:
+      - xxx

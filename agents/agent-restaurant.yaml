@@ -1,0 +1,13 @@
+agents:
+  - name: agent_restaurant_premium
+    type: do
+    capabilities:
+      - restaurant_agency
+    uses:
+      - xxx
+  - name: restaurant_monitor
+    type: monitor
+    capabilities:
+      - restaurant_agency
+    uses:
+      - xxx
