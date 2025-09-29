@@ -472,11 +472,11 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => (
     )}
 
     {/* Agent History */}
-    {want.agent_history && want.agent_history.length > 0 && (
+    {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
       <div className="bg-gray-50 rounded-lg p-4">
         <h4 className="text-sm font-medium text-gray-900 mb-3">Agent History</h4>
         <div className="space-y-3">
-          {want.agent_history.map((execution, index) => (
+          {want.history?.agentHistory?.map((execution, index) => (
             <div key={index} className="border border-gray-200 rounded-md p-3 bg-white">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium text-sm">{execution.agent_name}</span>
@@ -506,7 +506,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => (
       </div>
     )}
 
-    {!want.current_agent && (!want.running_agents || want.running_agents.length === 0) && (!want.agent_history || want.agent_history.length === 0) && (
+    {!want.current_agent && (!want.running_agents || want.running_agents.length === 0) && (!want.history?.agentHistory || want.history.agentHistory.length === 0) && (
       <div className="text-center py-8">
         <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
         <p className="text-gray-500">No agent information available</p>

@@ -11,7 +11,6 @@ export interface Want {
   suspended?: boolean; // Suspension state
   current_agent?: string; // Name of the agent currently executing for this want
   running_agents?: string[]; // Array of all currently running agent names
-  agent_history?: AgentExecution[]; // Complete history of agent executions for this want
 }
 
 export interface WantConfig {
@@ -94,6 +93,7 @@ export interface WantHistory {
     timestamp: string;
   }>;
   stateHistory?: Array<unknown>;
+  agentHistory?: AgentExecution[]; // Complete history of agent executions for this want
 }
 
 export interface CreateWantRequest {

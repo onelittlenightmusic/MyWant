@@ -85,19 +85,19 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           <StatusBadge status={want.status} size={sizes.statusSize} />
 
           {/* Agent indicator */}
-          {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.agent_history && want.agent_history.length > 0)) && (
+          {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
             <div className="flex items-center space-x-1" title="Agent-enabled want">
               <Bot className={`${sizes.iconSize} text-blue-600`} />
               {want.current_agent && (
                 <div className={`${sizes.agentDotSize} bg-green-500 rounded-full animate-pulse`} title="Agent running" />
               )}
-              {want.agent_history && want.agent_history.length > 0 && (
+              {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
                 <span className={classNames(
                   `${sizes.agentDotSize} rounded-full`,
-                  want.agent_history[want.agent_history.length - 1]?.status === 'completed' && 'bg-green-500',
-                  want.agent_history[want.agent_history.length - 1]?.status === 'failed' && 'bg-red-500',
-                  want.agent_history[want.agent_history.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
-                )} title={`Latest agent: ${want.agent_history[want.agent_history.length - 1]?.status || 'unknown'}`} />
+                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'completed' && 'bg-green-500',
+                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
+                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
+                )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
               )}
             </div>
           )}

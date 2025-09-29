@@ -180,6 +180,7 @@ type WantSpec struct {
 type WantHistory struct {
 	ParameterHistory []StateHistoryEntry `json:"parameterHistory" yaml:"parameterHistory"`
 	StateHistory     []StateHistoryEntry `json:"stateHistory" yaml:"stateHistory"`
+	AgentHistory     []AgentExecution    `json:"agentHistory,omitempty" yaml:"agentHistory,omitempty"`
 }
 
 // Want represents a processing unit in the chain
@@ -191,9 +192,8 @@ type Want struct {
 	History  WantHistory            `json:"history" yaml:"history"`
 
 	// Agent execution information
-	CurrentAgent  string           `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
-	RunningAgents []string         `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
-	AgentHistory  []AgentExecution `json:"agent_history,omitempty" yaml:"agent_history,omitempty"`
+	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
+	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
 	pendingStateChanges     map[string]interface{} `json:"-" yaml:"-"`
@@ -518,6 +518,41 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
 	return n.getStateUnsafe(key)
+}
+
+// migrateAgentHistoryFromState removes agent_history from state if it exists
+// This ensures agent history is only stored in the top-level AgentHistory field
+func (n *Want) migrateAgentHistoryFromState() {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	if n.State != nil {
+		if _, exists := n.State["agent_history"]; exists {
+			delete(n.State, "agent_history")
+			fmt.Printf("[MIGRATION] Removed agent_history from state for want %s\n", n.Metadata.Name)
+		}
+	}
+}
+
+// migrateAllWantsAgentHistory runs agent history migration on all wants
+func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
+	// Note: This function is called from compilePhase which is already protected by reconcileMutex
+	migratedCount := 0
+	for _, runtimeWant := range cb.wants {
+		if runtimeWant.want != nil {
+			// Check if migration is needed before running it
+			if runtimeWant.want.State != nil {
+				if _, exists := runtimeWant.want.State["agent_history"]; exists {
+					runtimeWant.want.migrateAgentHistoryFromState()
+					migratedCount++
+				}
+			}
+		}
+	}
+
+	if migratedCount > 0 {
+		fmt.Printf("[MIGRATION] Agent history migration completed for %d wants\n", migratedCount)
+	}
 }
 
 // getStateUnsafe returns state without locking (for internal use when already locked)
@@ -1147,6 +1182,9 @@ func (cb *ChainBuilder) compilePhase() error {
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
 		}
+
+		// Run migration to clean up any agent_history from state
+		cb.migrateAllWantsAgentHistory()
 
 		// Dump memory after initial load
 		if len(newConfig.Wants) > 0 {
@@ -2695,8 +2733,8 @@ func (n *Want) executeAgent(agent Agent) error {
 	if n.RunningAgents == nil {
 		n.RunningAgents = make([]string, 0)
 	}
-	if n.AgentHistory == nil {
-		n.AgentHistory = make([]AgentExecution, 0)
+	if n.History.AgentHistory == nil {
+		n.History.AgentHistory = make([]AgentExecution, 0)
 	}
 
 	// Add to running agents list
@@ -2714,17 +2752,16 @@ func (n *Want) executeAgent(agent Agent) error {
 		StartTime: time.Now(),
 		Status:    "running",
 	}
-	n.AgentHistory = append(n.AgentHistory, agentExec)
-	n.StoreState("agent_history", n.AgentHistory)
+	n.History.AgentHistory = append(n.History.AgentHistory, agentExec)
 
 	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
 	executeFunc := func() {
 		defer func() {
 			// Update agent execution record
-			for i := range n.AgentHistory {
-				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].EndTime == nil {
+			for i := range n.History.AgentHistory {
+				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].EndTime == nil {
 					endTime := time.Now()
-					n.AgentHistory[i].EndTime = &endTime
+					n.History.AgentHistory[i].EndTime = &endTime
 					break
 				}
 			}
@@ -2752,15 +2789,14 @@ func (n *Want) executeAgent(agent Agent) error {
 			if r := recover(); r != nil {
 				fmt.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
 				// Update agent execution record with panic info
-				for i := range n.AgentHistory {
-					if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
-						n.AgentHistory[i].Status = "failed"
-						n.AgentHistory[i].Error = fmt.Sprintf("Panic: %v", r)
+				for i := range n.History.AgentHistory {
+					if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
+						n.History.AgentHistory[i].Status = "failed"
+						n.History.AgentHistory[i].Error = fmt.Sprintf("Panic: %v", r)
 						break
 					}
 				}
-				// Update state with latest agent history
-				n.StoreState("agent_history", n.AgentHistory)
+				// AgentHistory is now managed separately from state
 			}
 			// Remove from running agents when done
 			delete(n.runningAgents, agent.GetName())
@@ -2769,25 +2805,23 @@ func (n *Want) executeAgent(agent Agent) error {
 		if err := agent.Exec(ctx, n); err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
 			// Update agent execution record with error
-			for i := range n.AgentHistory {
-				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
-					n.AgentHistory[i].Status = "failed"
-					n.AgentHistory[i].Error = err.Error()
+			for i := range n.History.AgentHistory {
+				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
+					n.History.AgentHistory[i].Status = "failed"
+					n.History.AgentHistory[i].Error = err.Error()
 					break
 				}
 			}
-			// Update state with latest agent history
-			n.StoreState("agent_history", n.AgentHistory)
+			// AgentHistory is now managed separately from state
 		} else {
 			// Mark as completed
-			for i := range n.AgentHistory {
-				if n.AgentHistory[i].AgentName == agent.GetName() && n.AgentHistory[i].Status == "running" {
-					n.AgentHistory[i].Status = "completed"
+			for i := range n.History.AgentHistory {
+				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
+					n.History.AgentHistory[i].Status = "completed"
 					break
 				}
 			}
-			// Update state with latest agent history
-			n.StoreState("agent_history", n.AgentHistory)
+			// AgentHistory is now managed separately from state
 		}
 	}
 
@@ -2814,11 +2848,11 @@ func (n *Want) StopAllAgents() {
 		cancel()
 
 		// Update agent execution records
-		for i := range n.AgentHistory {
-			if n.AgentHistory[i].AgentName == agentName && n.AgentHistory[i].Status == "running" {
+		for i := range n.History.AgentHistory {
+			if n.History.AgentHistory[i].AgentName == agentName && n.History.AgentHistory[i].Status == "running" {
 				endTime := time.Now()
-				n.AgentHistory[i].EndTime = &endTime
-				n.AgentHistory[i].Status = "terminated"
+				n.History.AgentHistory[i].EndTime = &endTime
+				n.History.AgentHistory[i].Status = "terminated"
 				break
 			}
 		}
@@ -2842,11 +2876,11 @@ func (n *Want) StopAgent(agentName string) {
 		delete(n.runningAgents, agentName)
 
 		// Update agent execution record
-		for i := range n.AgentHistory {
-			if n.AgentHistory[i].AgentName == agentName && n.AgentHistory[i].Status == "running" {
+		for i := range n.History.AgentHistory {
+			if n.History.AgentHistory[i].AgentName == agentName && n.History.AgentHistory[i].Status == "running" {
 				endTime := time.Now()
-				n.AgentHistory[i].EndTime = &endTime
-				n.AgentHistory[i].Status = "terminated"
+				n.History.AgentHistory[i].EndTime = &endTime
+				n.History.AgentHistory[i].Status = "terminated"
 				break
 			}
 		}

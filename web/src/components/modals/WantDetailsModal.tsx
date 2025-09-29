@@ -151,7 +151,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     wantDetails,
     current_agent: wantDetails?.current_agent,
     running_agents: wantDetails?.running_agents,
-    agent_history: wantDetails?.agent_history,
+    agent_history: wantDetails?.history?.agentHistory,
     state_agent_history: wantDetails?.state?.agent_history,
     state_current_agent: wantDetails?.state?.current_agent,
     state_running_agents: wantDetails?.state?.running_agents
@@ -159,7 +159,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
   const hasAgentData = (wantDetails?.current_agent ||
     (wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
-    (wantDetails?.agent_history && wantDetails.agent_history.length > 0) ||
+    (wantDetails?.history?.agentHistory && wantDetails.history.agentHistory.length > 0) ||
     (wantDetails?.state?.current_agent) ||
     (wantDetails?.state?.running_agents && Array.isArray(wantDetails.state.running_agents) && wantDetails.state.running_agents.length > 0) ||
     (wantDetails?.state?.agent_history && Array.isArray(wantDetails.state.agent_history) && wantDetails.state.agent_history.length > 0));
@@ -685,14 +685,14 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   )}
 
                   {/* Agent Execution History */}
-                  {((wantDetails?.agent_history && wantDetails.agent_history.length > 0) ||
+                  {((wantDetails?.history?.agentHistory && wantDetails.history.agentHistory.length > 0) ||
                     (wantDetails?.state?.agent_history && Array.isArray(wantDetails.state.agent_history) && wantDetails.state.agent_history.length > 0)) && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
                         <Clock className="h-4 w-4 mr-2" />
                         Execution History
                         {(() => {
-                          const agentHistory = wantDetails.agent_history || wantDetails.state?.agent_history || [];
+                          const agentHistory = wantDetails.history?.agentHistory || wantDetails.state?.agent_history || [];
                           return (
                             <span className="ml-2 text-xs text-gray-500">
                               ({agentHistory.length} execution{agentHistory.length !== 1 ? 's' : ''})
@@ -703,7 +703,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
                       <div className="space-y-3 max-h-96 overflow-y-auto">
                         {(() => {
-                          const agentHistory = wantDetails.agent_history || wantDetails.state?.agent_history || [];
+                          const agentHistory = wantDetails.history?.agentHistory || wantDetails.state?.agent_history || [];
                           return agentHistory.map((execution, index) => {
                           const getStatusIcon = (status: string) => {
                             switch (status) {
