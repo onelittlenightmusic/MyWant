@@ -66,16 +66,17 @@ const SAMPLE_CONFIGS = [
   },
   {
     name: 'Travel Planner',
-    description: 'Travel itinerary planning with hotels, restaurants, and coordination',
+    description: 'Travel itinerary planning with hotels, restaurants, and coordination using agents',
     config: {
       metadata: {
         name: 'travel-planner',
-        type: 'travel itinerary planner',
+        type: 'agent travel system',
         labels: {
           role: 'travel-planner'
         }
       },
       spec: {
+        recipe: 'Travel Agent System',
         params: {
           prefix: 'vacation',
           display_name: 'One Day Travel Itinerary',
