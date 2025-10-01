@@ -47,6 +47,7 @@ type ErrorHistoryEntry struct {
 type Server struct {
 	config         ServerConfig
 	wants          map[string]*WantExecution        // Store active want executions
+	globalBuilder  *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
 	agentRegistry  *mywant.AgentRegistry            // Agent and capability registry
 	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
 	errorHistory   []ErrorHistoryEntry              // Store error history
@@ -89,9 +90,16 @@ func NewServer(config ServerConfig) *Server {
 		fmt.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
 	}
 
+	// Create global builder for server mode with empty config
+	// This builder will have its reconcile loop started when server starts
+	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-server.yaml")
+	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
+	globalBuilder.SetAgentRegistry(agentRegistry)
+
 	return &Server{
 		config:         config,
 		wants:          make(map[string]*WantExecution),
+		globalBuilder:  globalBuilder,
 		agentRegistry:  agentRegistry,
 		recipeRegistry: recipeRegistry,
 		errorHistory:   make([]ErrorHistoryEntry, 0),
@@ -391,36 +399,21 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		newWant.Metadata.ID = fmt.Sprintf("want-%d", time.Now().UnixNano())
 	}
 
-	// Create want execution with builder
+	// Create want execution with global builder (server mode)
 	execution := &WantExecution{
-		ID:     wantID,
-		Config: config,
-		Status: "created",
+		ID:      wantID,
+		Config:  config,
+		Status:  "created",
+		Builder: s.globalBuilder, // Use shared global builder
 	}
-
-	// Create chain builder with memory path for dumping (use engine/memory directory)
-	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", wantID)
-	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
-	// Set the config directly since there's no SetConfig method
-	builder.SetConfigInternal(config)
-	execution.Builder = builder
-
-	// Set agent registry for agent-enabled wants
-	builder.SetAgentRegistry(s.agentRegistry)
-
-	// Register want types
-	types.RegisterQNetWantTypes(builder)      // QNet types (qnet numbers, qnet queue, qnet sink, etc.)
-	types.RegisterFibonacciWantTypes(builder) // Fibonacci types (fibonacci_numbers, fibonacci_sequence)
-	types.RegisterPrimeWantTypes(builder)     // Prime types (prime_numbers, prime_sieve)
-	types.RegisterTravelWantTypes(builder)    // Travel types (restaurant, hotel, buffet, travel_coordinator)
-	types.RegisterApprovalWantTypes(builder)  // Approval types (evidence, description, level1_coordinator, level2_coordinator)
-	mywant.RegisterMonitorWantTypes(builder)  // Monitor types (monitor, alert)
 
 	// Store the execution
 	s.wants[wantID] = execution
 
-	// Auto-execute for demo (as requested - run demo qnet)
-	go s.executeWantAsync(wantID)
+	// Add want to global builder - reconcile loop will pick it up automatically
+	s.globalBuilder.AddDynamicWants([]*mywant.Want{newWant})
+
+	fmt.Printf("[SERVER] Added want %s to global builder, reconcile loop will process it\n", wantID)
 
 	// Return created want
 	w.WriteHeader(http.StatusCreated)
@@ -438,16 +431,22 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		// Get current want states from the builder (builder always exists)
 		currentStates := execution.Builder.GetAllWantStates()
 		for _, want := range currentStates {
-			// Ensure state is populated by calling GetAllState()
-			if want.State == nil {
-				want.State = make(map[string]interface{})
+			// Create a snapshot copy of the want to avoid concurrent map access
+			wantCopy := &mywant.Want{
+				Metadata: want.Metadata,
+				Spec:     want.Spec,
+				Status:   want.GetStatus(),
+				History:  want.History,
+				State:    make(map[string]interface{}),
 			}
-			// Get current runtime state and update the want's state field
+
+			// Get current runtime state and copy to the snapshot
 			currentState := want.GetAllState()
 			for k, v := range currentState {
-				want.State[k] = v
+				wantCopy.State[k] = v
 			}
-			allWants = append(allWants, want)
+
+			allWants = append(allWants, wantCopy)
 		}
 	}
 
@@ -472,17 +471,23 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Ensure state is populated by calling GetAllState()
-				if want.State == nil {
-					want.State = make(map[string]interface{})
+				// Create a snapshot copy of the want to avoid concurrent map access
+				wantCopy := &mywant.Want{
+					Metadata: want.Metadata,
+					Spec:     want.Spec,
+					Status:   want.GetStatus(),
+					History:  want.History,
+					State:    make(map[string]interface{}),
 				}
-				// Get current runtime state and update the want's state field
+
+				// Get current runtime state and copy to the snapshot
 				currentState := want.GetAllState()
 				for k, v := range currentState {
-					want.State[k] = v
+					wantCopy.State[k] = v
 				}
-				// Return the individual want object
-				json.NewEncoder(w).Encode(want)
+
+				// Return the snapshot copy
+				json.NewEncoder(w).Encode(wantCopy)
 				return
 			}
 		}
@@ -707,80 +712,6 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Want not found", http.StatusNotFound)
-}
-
-// executeWantAsync executes a want configuration asynchronously
-func (s *Server) executeWantAsync(wantID string) {
-	want := s.wants[wantID]
-	if want == nil {
-		return
-	}
-
-	want.Status = "running"
-
-	// Builder is already created in createWant, just use it
-	builder := want.Builder
-
-	// Execute the chain
-	fmt.Printf("[SERVER] Executing want %s with %d wants\n", wantID, len(want.Config.Wants))
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("[SERVER] Want %s execution failed: %v\n", wantID, r)
-			want.Status = "failed"
-			want.Results = map[string]interface{}{
-				"error": fmt.Sprintf("Execution failed: %v", r),
-			}
-		}
-	}()
-
-	// Execute with error handling
-	err := func() error {
-		defer func() {
-			if r := recover(); r != nil {
-				want.Status = "failed"
-				want.Results = map[string]interface{}{
-					"error": fmt.Sprintf("Panic during execution: %v", r),
-				}
-			}
-		}()
-
-		builder.Execute()
-		return nil
-	}()
-
-	if err != nil {
-		want.Status = "failed"
-		want.Results = map[string]interface{}{
-			"error": err.Error(),
-		}
-		return
-	}
-
-	// Collect results
-	want.Status = "completed"
-	want.Results = make(map[string]interface{})
-
-	// Get final states
-	states := builder.GetAllWantStates()
-	want.Results["final_states"] = states
-	want.Results["want_count"] = len(states)
-
-	// Add execution summary
-	completedCount := 0
-	for _, state := range states {
-		if state.Status == "completed" {
-			completedCount++
-		}
-	}
-
-	want.Results["summary"] = map[string]interface{}{
-		"total_wants":     len(states),
-		"completed_wants": completedCount,
-		"status":          want.Status,
-	}
-
-	fmt.Printf("[SERVER] Want %s execution completed successfully\n", wantID)
 }
 
 // healthCheck handles GET /health - server health check
@@ -1101,6 +1032,19 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.setupRoutes()
+
+	// Register want types on global builder before starting reconcile loop
+	types.RegisterQNetWantTypes(s.globalBuilder)
+	types.RegisterFibonacciWantTypes(s.globalBuilder)
+	types.RegisterPrimeWantTypes(s.globalBuilder)
+	types.RegisterTravelWantTypes(s.globalBuilder)
+	types.RegisterApprovalWantTypes(s.globalBuilder)
+	mywant.RegisterMonitorWantTypes(s.globalBuilder)
+
+	// Start global builder's reconcile loop for server mode
+	fmt.Println("[SERVER] Starting global reconcile loop for server mode...")
+	go s.globalBuilder.Execute()
+
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	fmt.Printf("🚀 MyWant server starting on %s\n", addr)
