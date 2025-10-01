@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs
 
 # Code quality targets
 fmt:
@@ -22,10 +22,38 @@ lint:
 
 test:
 	@echo "🧪 Running tests..."
-	go test -v -C engine ./src/... ./cmd/server/... || echo "⚠️  Some tests failed or no tests found"
+	go test -C engine -v ./src/... ./cmd/server/... || echo "⚠️  Some tests failed or no tests found"
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
+
+# Test all run targets
+test-all-runs:
+	@echo "🧪 Testing all run targets..."
+	@failed_targets="" && \
+	for target in run-fibonacci-loop run-fibonacci-recipe run-prime run-qnet run-qnet-recipe run-travel run-travel-recipe run-travel-agent run-travel-agent-full run-travel-agent-direct run-hierarchical-approval; do \
+		echo "" && \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
+		echo "🔹 Testing $$target..." && \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
+		if timeout 10s make $$target 2>&1 | head -50; then \
+			echo "✅ $$target completed successfully" ; \
+		else \
+			echo "❌ $$target failed or timed out" && \
+			failed_targets="$$failed_targets $$target"; \
+		fi; \
+	done && \
+	echo "" && \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
+	echo "📊 Test Results Summary" && \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
+	if [ -z "$$failed_targets" ]; then \
+		echo "✅ All run targets passed!" && \
+		exit 0; \
+	else \
+		echo "❌ Failed targets:$$failed_targets" && \
+		exit 1; \
+	fi
 
 # Build the mywant library
 build: check
@@ -134,7 +162,7 @@ test-server-simple: build-server
 	echo "📝 Creating want with YAML config:" && \
 	curl -s -X POST http://localhost:8080/api/v1/wants \
 		-H "Content-Type: application/yaml" \
-		--data-binary @config/config-qnet-target.yaml && \
+		--data-binary @config/config-qnet.yaml && \
 	echo "" && \
 	echo "" && \
 	echo "📋 Listing all wants:" && \
@@ -173,11 +201,12 @@ help:
 	@echo "📋 Available targets:"
 	@echo ""
 	@echo "🔧 Code Quality:"
-	@echo "  fmt        - Format Go code"
-	@echo "  vet        - Run go vet"
-	@echo "  lint       - Run linter (requires golangci-lint)"
-	@echo "  test       - Run tests"
-	@echo "  check      - Run all code quality checks (fmt + vet + test)"
+	@echo "  fmt            - Format Go code"
+	@echo "  vet            - Run go vet"
+	@echo "  lint           - Run linter (requires golangci-lint)"
+	@echo "  test           - Run tests"
+	@echo "  check          - Run all code quality checks (fmt + vet + test)"
+	@echo "  test-all-runs  - Test all run targets (with 10s timeout each)"
 	@echo ""
 	@echo "🔨 Build:"
 	@echo "  build      - Build mywant library (with quality checks)"
