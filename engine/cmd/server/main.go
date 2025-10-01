@@ -1041,9 +1041,9 @@ func (s *Server) Start() error {
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 
-	// Start global builder's reconcile loop for server mode
+	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	fmt.Println("[SERVER] Starting global reconcile loop for server mode...")
-	go s.globalBuilder.Execute()
+	go s.globalBuilder.ExecuteWithMode(true)
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 

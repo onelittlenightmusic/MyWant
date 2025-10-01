@@ -1368,8 +1368,16 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 }
 
 // Execute starts the reconcile loop and initial want execution
+// For server mode, this runs indefinitely. For batch mode, it waits for completion.
 func (cb *ChainBuilder) Execute() {
-	fmt.Println("[RECONCILE] Starting reconcile loop execution")
+	cb.ExecuteWithMode(false) // Default: batch mode (waits for completion)
+}
+
+// ExecuteWithMode starts execution with specified mode
+// serverMode=true: runs indefinitely for server mode
+// serverMode=false: waits for wants to complete (batch mode)
+func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
+	fmt.Printf("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
 
 	// Initialize memory file if configured
 	if cb.memoryPath != "" {
@@ -1394,6 +1402,14 @@ func (cb *ChainBuilder) Execute() {
 	// Start reconcile loop in background - it will handle initial want creation
 	go cb.reconcileLoop()
 
+	// Server mode: run indefinitely, never stop reconcile loop
+	if serverMode {
+		fmt.Println("[RECONCILE] Server mode: reconcile loop running indefinitely")
+		// Keep running forever - reconcile loop handles all want lifecycle
+		select {} // Block forever
+	}
+
+	// Batch mode: wait for initial wants and completion
 	// Wait for initial wants to be created by reconcileLoop
 	for {
 		cb.reconcileMutex.Lock()
