@@ -48,13 +48,13 @@ type ChainBuilder struct {
 	config         Config                    // Current configuration
 
 	// Reconcile loop fields
-	reconcileStop      chan bool    // Stop signal for reconcile loop
-	reconcileTrigger   chan bool    // Trigger signal for immediate reconciliation
-	reconcileMutex     sync.RWMutex // Protect concurrent access
-	inReconciliation   bool         // Flag to prevent recursive reconciliation
-	running            bool         // Execution state
-	lastConfig         Config       // Last known config state
-	lastConfigHash     string       // Hash of last config for change detection
+	reconcileStop    chan bool    // Stop signal for reconcile loop
+	reconcileTrigger chan bool    // Trigger signal for immediate reconciliation
+	reconcileMutex   sync.RWMutex // Protect concurrent access
+	inReconciliation bool         // Flag to prevent recursive reconciliation
+	running          bool         // Execution state
+	lastConfig       Config       // Last known config state
+	lastConfigHash   string       // Hash of last config for change detection
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -266,7 +266,7 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 	// Check if it's a custom target type first
 	if cb.customRegistry.IsCustomType(wantType) {
-		return cb.createCustomTargetWant(want), nil
+		return cb.createCustomTargetWant(want)
 	}
 
 	// Fall back to standard type registration
@@ -302,10 +302,10 @@ func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (interface{}, error) 
 }
 
 // createCustomTargetWant creates a custom target want using the registry
-func (cb *ChainBuilder) createCustomTargetWant(want *Want) interface{} {
+func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) {
 	config, exists := cb.customRegistry.Get(want.Metadata.Type)
 	if !exists {
-		panic(fmt.Sprintf("Custom type '%s' not found in registry", want.Metadata.Type))
+		return nil, fmt.Errorf("custom type '%s' not found in registry", want.Metadata.Type)
 	}
 
 	fmt.Printf("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
@@ -323,7 +323,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) interface{} {
 	recipeLoader := NewGenericRecipeLoader("recipes")
 	target.SetRecipeLoader(recipeLoader)
 
-	return target
+	return target, nil
 }
 
 // mergeWithCustomDefaults merges user spec with custom type defaults
@@ -2287,7 +2287,7 @@ func (n *Want) StopAgent(agentName string) {
 // Can be called with either:
 // 1. Single key-value: StageStateChange("key", "value")
 // 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
-func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) {
+func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) error {
 	n.agentStateMutex.Lock()
 	defer n.agentStateMutex.Unlock()
 
@@ -2301,24 +2301,24 @@ func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) {
 			for k, v := range stateObject {
 				n.agentStateChanges[k] = v
 			}
-			return
+			return nil
 		}
 		// Invalid usage - no value provided and not a map
-		panic("StageStateChange: when called with single argument, it must be map[string]interface{}")
+		return fmt.Errorf("StageStateChange: when called with single argument, it must be map[string]interface{}")
 	}
 
 	// Handle single key-value case: StageStateChange("key", "value")
 	if len(value) == 1 {
 		if key, ok := keyOrObject.(string); ok {
 			n.agentStateChanges[key] = value[0]
-			return
+			return nil
 		}
 		// Invalid usage - first arg is not a string
-		panic("StageStateChange: when called with two arguments, first must be string")
+		return fmt.Errorf("StageStateChange: when called with two arguments, first must be string")
 	}
 
 	// Invalid usage - too many arguments
-	panic("StageStateChange: accepts either 1 argument (map) or 2 arguments (key, value)")
+	return fmt.Errorf("StageStateChange: accepts either 1 argument (map) or 2 arguments (key, value)")
 }
 
 // CommitStateChanges commits all staged state changes in a single atomic operation

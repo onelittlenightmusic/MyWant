@@ -374,13 +374,15 @@ func (r *AgentRegistry) hotelReservationAction(ctx context.Context, want *Want) 
 	fmt.Printf("Hotel reservation agent executing for want: %s\n", want.Metadata.Name)
 
 	// Stage all state changes as a single object
-	want.StageStateChange(map[string]interface{}{
+	if err := want.StageStateChange(map[string]interface{}{
 		"reservation_id": "HTL-12345",
 		"status":         "confirmed",
 		"hotel_name":     "Premium Hotel",
 		"check_in":       "2025-09-20",
 		"check_out":      "2025-09-22",
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to stage state changes: %w", err)
+	}
 
 	// Commit all changes at once
 	want.CommitStateChanges()
@@ -394,12 +396,14 @@ func (r *AgentRegistry) hotelReservationMonitor(ctx context.Context, want *Want)
 
 	if reservationID, exists := want.GetState("reservation_id"); exists {
 		// Stage all monitoring updates as a single object
-		want.StageStateChange(map[string]interface{}{
+		if err := want.StageStateChange(map[string]interface{}{
 			"reservation_id": reservationID, // Keep existing reservation ID
 			"status":         "confirmed",   // Confirm status
 			"last_checked":   "2025-09-17T10:00:00Z",
 			"room_ready":     true,
-		})
+		}); err != nil {
+			return fmt.Errorf("failed to stage monitoring updates: %w", err)
+		}
 
 		// Commit all monitoring updates at once
 		want.CommitStateChanges()
