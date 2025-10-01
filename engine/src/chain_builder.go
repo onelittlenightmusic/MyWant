@@ -48,11 +48,13 @@ type ChainBuilder struct {
 	config         Config                    // Current configuration
 
 	// Reconcile loop fields
-	reconcileStop  chan bool    // Stop signal for reconcile loop
-	reconcileMutex sync.RWMutex // Protect concurrent access
-	running        bool         // Execution state
-	lastConfig     Config       // Last known config state
-	lastConfigHash string       // Hash of last config for change detection
+	reconcileStop      chan bool    // Stop signal for reconcile loop
+	reconcileTrigger   chan bool    // Trigger signal for immediate reconciliation
+	reconcileMutex     sync.RWMutex // Protect concurrent access
+	inReconciliation   bool         // Flag to prevent recursive reconciliation
+	running            bool         // Execution state
+	lastConfig         Config       // Last known config state
+	lastConfigHash     string       // Hash of last config for change detection
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -103,16 +105,17 @@ func NewChainBuilderFromRecipe(recipeConfig *GenericRecipeConfig) *ChainBuilder 
 // NewChainBuilderWithPaths creates a new builder with config and memory file paths
 func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
-		configPath:     configPath,
-		memoryPath:     memoryPath,
-		wants:          make(map[string]*runtimeWant),
-		registry:       make(map[string]WantFactory),
-		customRegistry: NewCustomTargetTypeRegistry(),
-		reconcileStop:  make(chan bool),
-		pathMap:        make(map[string]Paths),
-		channels:       make(map[string]chain.Chan),
-		running:        false,
-		waitGroup:      &sync.WaitGroup{},
+		configPath:       configPath,
+		memoryPath:       memoryPath,
+		wants:            make(map[string]*runtimeWant),
+		registry:         make(map[string]WantFactory),
+		customRegistry:   NewCustomTargetTypeRegistry(),
+		reconcileStop:    make(chan bool),
+		reconcileTrigger: make(chan bool, 1), // Buffered to avoid blocking
+		pathMap:          make(map[string]Paths),
+		channels:         make(map[string]chain.Chan),
+		running:          false,
+		waitGroup:        &sync.WaitGroup{},
 		// Initialize suspend/resume control
 		suspended:   false,
 		suspendChan: make(chan bool),
@@ -430,6 +433,9 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-cb.reconcileStop:
 			fmt.Println("[RECONCILE] Stopping reconcile loop")
 			return
+		case <-cb.reconcileTrigger:
+			fmt.Println("[RECONCILE] Triggered reconciliation")
+			cb.reconcileWants()
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
 				fmt.Println("[RECONCILE] Detected config change")
@@ -446,6 +452,10 @@ func (cb *ChainBuilder) reconcileLoop() {
 func (cb *ChainBuilder) reconcileWants() {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
+
+	// Set flag to prevent recursive reconciliation
+	cb.inReconciliation = true
+	defer func() { cb.inReconciliation = false }()
 
 	fmt.Println("[RECONCILE] Starting reconciliation with separated phases")
 
@@ -471,11 +481,9 @@ func (cb *ChainBuilder) reconcileWants() {
 func (cb *ChainBuilder) compilePhase() error {
 	fmt.Println("[RECONCILE:COMPILE] Loading and validating configuration")
 
-	// Load new config
-	newConfig, err := cb.loadMemoryConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load memory config: %w", err)
-	}
+	// Use current config as source of truth during runtime
+	// Memory file is only loaded on initial startup
+	newConfig := cb.config
 
 	// Check if this is initial load (no lastConfig set)
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
@@ -780,16 +788,52 @@ func (cb *ChainBuilder) startPhase() {
 	// Start new wants if system is running
 	if cb.running {
 		startedCount := 0
+
+		// First pass: start idle wants
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
 				cb.startWant(wantName, want)
 				startedCount++
 			}
 		}
+
+		// Second pass: restart completed wants if their upstream is running/idle
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusCompleted {
+				if cb.shouldRestartCompletedWant(wantName, want) {
+					fmt.Printf("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
+					want.want.SetStatus(WantStatusIdle)
+					cb.startWant(wantName, want)
+					startedCount++
+				}
+			}
+		}
+
 		fmt.Printf("[RECONCILE:START] Started %d wants\n", startedCount)
 	} else {
 		fmt.Println("[RECONCILE:START] System not running, wants will be started later")
 	}
+}
+
+// shouldRestartCompletedWant checks if a completed want should restart
+// because its upstream wants are running or idle (have new data)
+func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtimeWant) bool {
+	// Check if any upstream wants (using) are running or idle
+	for _, usingSelector := range want.spec.Using {
+		for otherName, otherWant := range cb.wants {
+			if otherName == wantName {
+				continue
+			}
+			// Check if upstream matches selector and is running/idle
+			if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
+				status := otherWant.want.GetStatus()
+				if status == WantStatusRunning || status == WantStatusIdle {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // detectConfigChanges compares configs and returns change events
@@ -1188,6 +1232,16 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	delete(existingWant.State, "current_time")
 
 	fmt.Printf("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
+
+	// Trigger immediate reconciliation via channel (unless already in reconciliation)
+	if !cb.inReconciliation {
+		select {
+		case cb.reconcileTrigger <- true:
+			// Trigger sent successfully
+		default:
+			// Channel already has a pending trigger, skip
+		}
+	}
 }
 
 // deleteWant removes a want from runtime
@@ -1466,12 +1520,17 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 }
 
 // AddDynamicWants adds multiple wants to the configuration at runtime
+// and triggers reconciliation to start them
 func (cb *ChainBuilder) AddDynamicWants(wants []*Want) {
 	cb.reconcileMutex.Lock()
-	defer cb.reconcileMutex.Unlock()
 	for _, want := range wants {
 		cb.addDynamicWantUnsafe(want)
 	}
+	cb.reconcileMutex.Unlock()
+
+	// Trigger reconciliation to process newly added wants
+	// This will compile, connect, and start them
+	cb.reconcileWants()
 }
 
 // addDynamicWantUnsafe adds a want without acquiring the mutex (internal use)
