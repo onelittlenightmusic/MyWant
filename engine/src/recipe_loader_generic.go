@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // RecipeWant represents a want in recipe format (aligned with Want structure)
@@ -175,7 +174,6 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 			}
 		}
 
-		baseID := time.Now().UnixNano()
 		for i, recipeWant := range recipeContent.Wants {
 			// Convert recipe want to Want struct
 			want := recipeWant.ConvertToWant()
@@ -187,8 +185,11 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 
 			// Generate ID if missing
 			if want.Metadata.ID == "" {
-				want.Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
+				want.Metadata.ID = generateUUID()
 			}
+
+			// Namespace labels and using selectors with prefix to isolate child wants
+			grl.namespaceWantConnections(want, prefix)
 
 			// Process auto-connection if RecipeAgent is enabled
 			if recipeWant.RecipeAgent {
@@ -312,6 +313,31 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]interface{}, er
 	}
 
 	return recipeConfig.Config, recipeConfig.Parameters, nil
+}
+
+// namespaceWantConnections adds owner namespace to labels and using selectors to isolate child wants
+func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix string) {
+	// Namespace all labels with owner prefix
+	if want.Metadata.Labels != nil {
+		namespacedLabels := make(map[string]string)
+		for key, value := range want.Metadata.Labels {
+			// Add owner prefix to label values (not keys, to preserve matching logic)
+			namespacedLabels[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
+		}
+		want.Metadata.Labels = namespacedLabels
+	}
+
+	// Namespace all using selectors with owner prefix
+	if want.Spec.Using != nil {
+		for i := range want.Spec.Using {
+			namespacedSelector := make(map[string]string)
+			for key, value := range want.Spec.Using[i] {
+				// Add owner prefix to selector values (not keys)
+				namespacedSelector[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
+			}
+			want.Spec.Using[i] = namespacedSelector
+		}
+	}
 }
 
 // ProcessRecipeString is deprecated (no longer uses templating)

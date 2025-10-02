@@ -396,7 +396,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 
 	// Assign ID to the want if not already set
 	if newWant.Metadata.ID == "" {
-		newWant.Metadata.ID = fmt.Sprintf("want-%d", time.Now().UnixNano())
+		newWant.Metadata.ID = generateWantID()
 	}
 
 	// Create want execution with global builder (server mode)
@@ -411,7 +411,14 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	s.wants[wantID] = execution
 
 	// Add want to global builder - reconcile loop will pick it up automatically
-	s.globalBuilder.AddDynamicWants([]*mywant.Want{newWant})
+	if err := s.globalBuilder.AddDynamicWants([]*mywant.Want{newWant}); err != nil {
+		// Remove from wants map since it wasn't added to builder
+		delete(s.wants, wantID)
+		errorMsg := fmt.Sprintf("Failed to add want: %v", err)
+		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusConflict)
+		return
+	}
 
 	fmt.Printf("[SERVER] Added want %s to global builder, reconcile loop will process it\n", wantID)
 
@@ -425,11 +432,14 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Collect all wants from all executions in memory dump format
-	allWants := make([]*mywant.Want, 0)
+	// Use map to deduplicate wants by ID (same want may exist across multiple executions)
+	wantsByID := make(map[string]*mywant.Want)
 
-	for _, execution := range s.wants {
+	fmt.Printf("[LIST_WANTS] Processing %d executions\n", len(s.wants))
+	for execID, execution := range s.wants {
 		// Get current want states from the builder (builder always exists)
 		currentStates := execution.Builder.GetAllWantStates()
+		fmt.Printf("[LIST_WANTS] Execution %s has %d wants\n", execID, len(currentStates))
 		for _, want := range currentStates {
 			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
@@ -446,8 +456,17 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				wantCopy.State[k] = v
 			}
 
-			allWants = append(allWants, wantCopy)
+			// Store by ID to deduplicate (keep latest version)
+			fmt.Printf("[LIST_WANTS] Adding want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
+			wantsByID[want.Metadata.ID] = wantCopy
 		}
+	}
+	fmt.Printf("[LIST_WANTS] After deduplication: %d unique wants\n", len(wantsByID))
+
+	// Convert map to slice
+	allWants := make([]*mywant.Want, 0, len(wantsByID))
+	for _, want := range wantsByID {
+		allWants = append(allWants, want)
 	}
 
 	// Create memory dump format response
@@ -1247,11 +1266,19 @@ func generateErrorID() string {
 	return fmt.Sprintf("error-%s-%d", hex.EncodeToString(bytes), time.Now().Unix()%10000)
 }
 
-// generateWantID generates a unique ID for want execution
+// generateWantID generates a unique ID for want execution using UUID
 func generateWantID() string {
-	bytes := make([]byte, 6)
-	rand.Read(bytes)
-	return fmt.Sprintf("want-%s-%d", hex.EncodeToString(bytes), time.Now().Unix()%10000)
+	// Generate UUID v4 (random)
+	uuid := make([]byte, 16)
+	rand.Read(uuid)
+
+	// Set version (4) and variant bits
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant
+
+	// Format as UUID string: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
+		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
 // Recipe API handlers

@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"crypto/md5"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"mywant/engine/src/chain"
@@ -439,6 +440,13 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
 				fmt.Println("[RECONCILE] Detected config change")
+				// Load memory file into config before reconciling
+				if newConfig, err := cb.loadMemoryConfig(); err == nil {
+					cb.config = newConfig
+					fmt.Printf("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
+				} else {
+					fmt.Printf("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
+				}
 				cb.reconcileWants()
 			}
 		case <-statsTicker.C:
@@ -534,6 +542,41 @@ func (cb *ChainBuilder) connectPhase() error {
 	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
 
+	// Build parameter subscription connectivity for Target wants
+	// This references the owner-children relationships already established in OwnerReferences metadata
+	fmt.Printf("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)\n", len(cb.wants))
+	targetCount := 0
+	for wantName, runtimeWant := range cb.wants {
+		if target, ok := runtimeWant.function.(*Target); ok {
+			targetCount++
+
+			// Find children by checking OwnerReferences.UID in other wants
+			childCount := 0
+			ownerID := runtimeWant.want.Metadata.ID
+			for _, childRuntime := range cb.wants {
+				for _, ownerRef := range childRuntime.want.Metadata.OwnerReferences {
+					// Compare with owner's ID (UID field) for proper unique identification
+					if ownerRef.UID == ownerID {
+						childCount++
+						break
+					}
+				}
+			}
+
+			fmt.Printf("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)\n",
+				wantName, target.RecipePath, target.recipeLoader != nil, childCount)
+
+			if target.RecipePath != "" && target.recipeLoader != nil {
+				// Parse recipe to build parameter subscription map based on ownership
+				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
+					fmt.Printf("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v\n",
+						target.Metadata.Name, err)
+				}
+			}
+		}
+	}
+	fmt.Printf("[RECONCILE:CONNECT] Processed %d Target wants for subscription building\n", targetCount)
+
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
@@ -559,6 +602,86 @@ func (cb *ChainBuilder) connectPhase() error {
 	cb.channelMutex.Unlock()
 
 	fmt.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
+	return nil
+}
+
+// buildTargetParameterSubscriptions builds parameter subscription map using actual runtime child want names
+func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error {
+	// Read and parse the recipe file
+	recipeData, err := os.ReadFile(target.RecipePath)
+	if err != nil {
+		return fmt.Errorf("failed to read recipe file: %w", err)
+	}
+
+	var recipeDoc struct {
+		Recipe struct {
+			Parameters map[string]interface{} `yaml:"parameters"`
+			Wants      []struct {
+				Metadata struct {
+					Name string `yaml:"name"`
+					Type string `yaml:"type"`
+				} `yaml:"metadata"`
+				Spec struct {
+					Params map[string]interface{} `yaml:"params"`
+				} `yaml:"spec"`
+			} `yaml:"wants"`
+		} `yaml:"recipe"`
+	}
+
+	if err := yaml.Unmarshal(recipeData, &recipeDoc); err != nil {
+		return fmt.Errorf("failed to parse recipe YAML: %w", err)
+	}
+
+	// Initialize subscription map (clear existing to avoid duplicates on reconnection)
+	target.parameterSubscriptions = make(map[string][]string)
+
+	// Find actual runtime children by OwnerReference.UID
+	targetID := target.Metadata.ID
+	runtimeChildren := make(map[string]*Want) // Map: want type -> runtime want
+	for childWantName, childRuntime := range cb.wants {
+		for _, ownerRef := range childRuntime.want.Metadata.OwnerReferences {
+			if ownerRef.UID == targetID {
+				// This is a child of this target
+				childType := childRuntime.want.Metadata.Type
+				runtimeChildren[childType] = childRuntime.want
+				runtimeChildren[childWantName] = childRuntime.want // Also store by name for lookup
+				break
+			}
+		}
+	}
+
+	// Build subscription map using actual runtime child want names
+	for _, recipeWant := range recipeDoc.Recipe.Wants {
+		// Find the actual runtime child by type
+		childType := recipeWant.Metadata.Type
+		runtimeChild, exists := runtimeChildren[childType]
+		if !exists {
+			// Child not yet created, skip
+			continue
+		}
+
+		actualChildName := runtimeChild.Metadata.Name
+
+		// Iterate through child's params to find which parent params it uses
+		for childParamName, childParamValue := range recipeWant.Spec.Params {
+			// Check if this param value references a parent parameter (simple string match)
+			if paramRefStr, ok := childParamValue.(string); ok {
+				// If the value matches a parent parameter name, it's a subscription
+				if _, exists := target.RecipeParams[paramRefStr]; exists {
+					target.parameterSubscriptions[paramRefStr] = append(
+						target.parameterSubscriptions[paramRefStr],
+						actualChildName,
+					)
+					fmt.Printf("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)\n",
+						target.Metadata.Name, actualChildName, paramRefStr, childParamName)
+				}
+			}
+		}
+	}
+
+	fmt.Printf("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v\n",
+		target.Metadata.Name, target.parameterSubscriptions)
+
 	return nil
 }
 
@@ -1233,6 +1356,21 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 	fmt.Printf("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
 
+	// If this is a Target want with children, use Target's parameter update mechanism
+	// which automatically pushes updates to children
+	if changedParams != nil {
+		parentRuntime, exists := cb.wants[wantName]
+		if exists {
+			if target, ok := parentRuntime.function.(*Target); ok {
+				// Use Target's UpdateParameter which automatically pushes to children
+				for paramName, paramValue := range changedParams {
+					target.UpdateParameter(paramName, paramValue)
+				}
+				fmt.Printf("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
+			}
+		}
+	}
+
 	// Trigger immediate reconciliation via channel (unless already in reconciliation)
 	if !cb.inReconciliation {
 		select {
@@ -1521,27 +1659,35 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 
 // AddDynamicWants adds multiple wants to the configuration at runtime
 // and triggers reconciliation to start them
-func (cb *ChainBuilder) AddDynamicWants(wants []*Want) {
+func (cb *ChainBuilder) AddDynamicWants(wants []*Want) error {
 	cb.reconcileMutex.Lock()
 	for _, want := range wants {
-		cb.addDynamicWantUnsafe(want)
+		if err := cb.addDynamicWantUnsafe(want); err != nil {
+			cb.reconcileMutex.Unlock()
+			return err
+		}
 	}
 	cb.reconcileMutex.Unlock()
 
 	// Trigger reconciliation to process newly added wants
 	// This will compile, connect, and start them
 	cb.reconcileWants()
+	return nil
 }
 
 // addDynamicWantUnsafe adds a want without acquiring the mutex (internal use)
-func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) {
+func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
+	// Check for duplicate name and return error
+	if _, exists := cb.wants[want.Metadata.Name]; exists {
+		return fmt.Errorf("want with name '%s' already exists", want.Metadata.Name)
+	}
+
 	// Add want to the configuration
 	cb.config.Wants = append(cb.config.Wants, want)
 
-	// Create runtime want if it doesn't exist
-	if _, exists := cb.wants[want.Metadata.Name]; !exists {
-		cb.addWant(want)
-	}
+	// Create runtime want
+	cb.addWant(want)
+	return nil
 }
 
 // LoadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation (exported version)
@@ -1582,12 +1728,21 @@ func loadConfigFromYAML(filename string) (Config, error) {
 	return config, nil
 }
 
+// generateUUID generates a UUID v4 for want IDs
+func generateUUID() string {
+	uuid := make([]byte, 16)
+	rand.Read(uuid)
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant
+	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
+		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
+}
+
 // assignWantIDs assigns unique IDs to wants that don't have them
 func assignWantIDs(config *Config) {
-	baseID := time.Now().UnixNano()
 	for i := range config.Wants {
 		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = fmt.Sprintf("want-%d", baseID+int64(i))
+			config.Wants[i].Metadata.ID = generateUUID()
 		}
 	}
 }
@@ -1798,16 +1953,25 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		filename = filepath.Join(memoryDir, fmt.Sprintf("memory-%s.yaml", timestamp))
 	}
 
+	// Note: Caller must hold reconcileMutex lock for safe concurrent access
 	// Convert want map to slice to match config format, preserving runtime spec
 	wants := make([]*Want, 0, len(cb.wants))
 	for _, runtimeWant := range cb.wants {
+		// Deep copy State map to avoid concurrent access during YAML marshaling
+		stateCopy := make(map[string]interface{})
+		if runtimeWant.want.State != nil {
+			for k, v := range runtimeWant.want.State {
+				stateCopy[k] = v
+			}
+		}
+
 		// Use runtime spec to preserve using, but want state for stats/status
 		want := &Want{
 			Metadata: runtimeWant.metadata,
 			Spec:     runtimeWant.spec, // This preserves using
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
-			State:   runtimeWant.want.State,
+			State:   stateCopy,                // Use copy to avoid concurrent modification
 			History: runtimeWant.want.History, // Include history in memory dump
 		}
 
