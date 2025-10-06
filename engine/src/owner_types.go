@@ -26,16 +26,17 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 // Target represents a parent want that creates and manages child wants
 type Target struct {
 	Want
-	MaxDisplay   int
-	Description  string                 // Human-readable description of this target
-	RecipePath   string                 // Path to the recipe file to use for child creation
-	RecipeParams map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
-	paths        Paths
-	childWants   []*Want
-	childrenDone chan bool
-	builder      *ChainBuilder        // Reference to builder for dynamic want creation
-	recipeLoader *GenericRecipeLoader // Reference to generic recipe loader
-	stateMutex   sync.RWMutex         // Mutex to protect concurrent state updates
+	MaxDisplay            int
+	Description           string                 // Human-readable description of this target
+	RecipePath            string                 // Path to the recipe file to use for child creation
+	RecipeParams          map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
+	parameterSubscriptions map[string][]string   // Map of parameter names to child want names that subscribe to them
+	paths                 Paths
+	childWants            []*Want
+	childrenDone          chan bool
+	builder               *ChainBuilder        // Reference to builder for dynamic want creation
+	recipeLoader          *GenericRecipeLoader // Reference to generic recipe loader
+	stateMutex            sync.RWMutex         // Mutex to protect concurrent state updates
 }
 
 // NewTarget creates a new target want
@@ -47,11 +48,12 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
-		MaxDisplay:   1000,
-		RecipePath:   "../recipes/queue-system.yaml", // Default recipe path
-		RecipeParams: make(map[string]interface{}),
-		childWants:   make([]*Want, 0),
-		childrenDone: make(chan bool, 1),
+		MaxDisplay:             1000,
+		RecipePath:             "../recipes/queue-system.yaml", // Default recipe path
+		RecipeParams:           make(map[string]interface{}),
+		parameterSubscriptions: make(map[string][]string),
+		childWants:             make([]*Want, 0),
+		childrenDone:           make(chan bool, 1),
 	}
 
 	// Extract target-specific configuration from params
@@ -126,6 +128,10 @@ func (t *Target) resolveRecipeParameters() {
 	if _, hasCount := resolvedParams["count"]; !hasCount {
 		resolvedParams["count"] = t.MaxDisplay
 	}
+
+	// CRITICAL: Override prefix with target name to prevent label cross-contamination
+	// Each target must have a unique prefix to namespace its child wants' labels
+	resolvedParams["prefix"] = t.Metadata.Name
 
 	// Update recipe parameters with resolved values
 	t.RecipeParams = resolvedParams

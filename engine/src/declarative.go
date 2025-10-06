@@ -146,6 +146,7 @@ type OwnerReference struct {
 	APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
 	Kind               string `json:"kind" yaml:"kind"`
 	Name               string `json:"name" yaml:"name"`
+	UID                string `json:"uid" yaml:"uid"`
 	Controller         bool   `json:"controller,omitempty" yaml:"controller,omitempty"`
 	BlockOwnerDeletion bool   `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
 }
