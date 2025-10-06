@@ -65,163 +65,142 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   return (
     <>
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1 min-w-0">
-          <h3
-            className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors cursor-pointer`}
-            onClick={() => onView(want)}
-          >
-            {truncateText(wantName, sizes.textTruncate)}
-          </h3>
-          <p className={`${sizes.typeClass} text-gray-500 mt-1`}>
-            Type: <span className="font-medium">{wantType}</span>
-          </p>
-          <p className={`${sizes.idClass} text-gray-400 mt-1`}>
-            ID: {want.metadata?.id || want.id || 'N/A'}
-          </p>
-        </div>
+      <div className="mb-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h3
+              className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors cursor-pointer`}
+              onClick={() => onView(want)}
+            >
+              {truncateText(wantName, sizes.textTruncate)}
+            </h3>
+            <p className={`${sizes.typeClass} text-gray-500 mt-1 truncate`}>
+              Type: <span className="font-medium">{wantType}</span>
+            </p>
+          </div>
 
-        <div className="flex items-center space-x-2">
-          <StatusBadge status={want.status} size={sizes.statusSize} />
+          <div className="flex items-center space-x-2 ml-2">
+            <StatusBadge status={want.status} size={sizes.statusSize} />
 
-          {/* Agent indicator */}
-          {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
-            <div className="flex items-center space-x-1" title="Agent-enabled want">
-              <Bot className={`${sizes.iconSize} text-blue-600`} />
-              {want.current_agent && (
-                <div className={`${sizes.agentDotSize} bg-green-500 rounded-full animate-pulse`} title="Agent running" />
-              )}
-              {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
-                <span className={classNames(
-                  `${sizes.agentDotSize} rounded-full`,
-                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'completed' && 'bg-green-500',
-                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
-                  want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
-                )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
-              )}
-            </div>
-          )}
+            {/* Agent indicator */}
+            {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
+              <div className="flex items-center space-x-1" title="Agent-enabled want">
+                <Bot className={`${sizes.iconSize} text-blue-600`} />
+                {want.current_agent && (
+                  <div className={`${sizes.agentDotSize} bg-green-500 rounded-full animate-pulse`} title="Agent running" />
+                )}
+                {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
+                  <span className={classNames(
+                    `${sizes.agentDotSize} rounded-full`,
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'completed' && 'bg-green-500',
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
+                  )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
+                )}
+              </div>
+            )}
 
-          {/* Actions - only show for parent cards */}
-          {!isChild && (
-            <div className="relative group/menu">
-              <button className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-                <MoreHorizontal className={sizes.iconSize} />
-              </button>
+            {/* Actions - only show for parent cards */}
+            {!isChild && (
+              <div className="relative group/menu">
+                <button className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                  <MoreHorizontal className={sizes.iconSize} />
+                </button>
 
-              <div className="absolute right-0 top-8 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200">
-                <div className="py-1">
-                  <button
-                    onClick={() => onView(want)}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <Eye className={`${sizes.iconSize} mr-2`} />
-                    View Details
-                  </button>
-
-                  {!isRunning && onEdit && (
+                <div className="absolute right-0 top-8 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200">
+                  <div className="py-1">
                     <button
-                      onClick={() => onEdit(want)}
+                      onClick={() => onView(want)}
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      <Edit className={`${sizes.iconSize} mr-2`} />
-                      Edit
+                      <Eye className={`${sizes.iconSize} mr-2`} />
+                      View Details
                     </button>
-                  )}
 
-                  {canSuspendResume && !isSuspended && onSuspend && (
-                    <button
-                      onClick={() => onSuspend(want)}
-                      className="flex items-center w-full px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
-                      title="Suspend execution"
-                    >
-                      <Pause className={`${sizes.iconSize} mr-2`} />
-                      Suspend
-                    </button>
-                  )}
+                    {!isRunning && onEdit && (
+                      <button
+                        onClick={() => onEdit(want)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Edit className={`${sizes.iconSize} mr-2`} />
+                        Edit
+                      </button>
+                    )}
 
-                  {canSuspendResume && isSuspended && onResume && (
-                    <button
-                      onClick={() => onResume(want)}
-                      className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50"
-                      title="Resume execution"
-                    >
-                      <Play className={`${sizes.iconSize} mr-2`} />
-                      Resume
-                    </button>
-                  )}
+                    {canSuspendResume && !isSuspended && onSuspend && (
+                      <button
+                        onClick={() => onSuspend(want)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
+                        title="Suspend execution"
+                      >
+                        <Pause className={`${sizes.iconSize} mr-2`} />
+                        Suspend
+                      </button>
+                    )}
 
-                  {canControl && (
-                    <button
-                      onClick={() => {/* TODO: Implement stop/start */}}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      {isRunning ? (
-                        <>
-                          <Square className={`${sizes.iconSize} mr-2`} />
-                          Stop
-                        </>
-                      ) : (
-                        <>
-                          <Play className={`${sizes.iconSize} mr-2`} />
-                          Start
-                        </>
-                      )}
-                    </button>
-                  )}
+                    {canSuspendResume && isSuspended && onResume && (
+                      <button
+                        onClick={() => onResume(want)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50"
+                        title="Resume execution"
+                      >
+                        <Play className={`${sizes.iconSize} mr-2`} />
+                        Resume
+                      </button>
+                    )}
 
-                  <hr className="my-1" />
+                    {canControl && (
+                      <button
+                        onClick={() => {/* TODO: Implement stop/start */}}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        {isRunning ? (
+                          <>
+                            <Square className={`${sizes.iconSize} mr-2`} />
+                            Stop
+                          </>
+                        ) : (
+                          <>
+                            <Play className={`${sizes.iconSize} mr-2`} />
+                            Start
+                          </>
+                        )}
+                      </button>
+                    )}
 
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(want)}
-                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className={`${sizes.iconSize} mr-2`} />
-                      Delete
-                    </button>
-                  )}
+                    <hr className="my-1" />
+
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(want)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className={`${sizes.iconSize} mr-2`} />
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Simple view button for child cards */}
-          {isChild && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onView(want);
-              }}
-              className="p-1 text-gray-400 hover:text-gray-600"
-              title="View child details"
-            >
-              <Eye className={sizes.iconSize} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Labels */}
-      {Object.keys(labels).length > 0 && (
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-1">
-            {Object.entries(labels).slice(0, isChild ? 2 : 3).map(([key, value]) => (
-              <span
-                key={key}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            {/* Simple view button for child cards */}
+            {isChild && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onView(want);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600"
+                title="View child details"
               >
-                {key}: {value}
-              </span>
-            ))}
-            {Object.keys(labels).length > (isChild ? 2 : 3) && (
-              <span className="text-xs text-gray-500">
-                +{Object.keys(labels).length - (isChild ? 2 : 3)} more
-              </span>
+                <Eye className={sizes.iconSize} />
+              </button>
             )}
           </div>
         </div>
-      )}
+      </div>
+
 
       {/* Timeline - only for parent cards */}
       {!isChild && (

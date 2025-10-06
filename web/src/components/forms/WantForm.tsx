@@ -356,36 +356,54 @@ export const WantForm: React.FC<WantFormProps> = ({
   return (
     <CreateSidebar isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Want' : 'Create New Want'}>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Form Actions - At the very top */}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                {isEditing ? 'Update' : 'Create'}
+              </>
+            )}
+          </button>
+        </div>
+
         {/* Sample Selector */}
         {!isEditing && (
           <div className="border-b border-gray-200 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-medium text-gray-700">
-                Sample Configurations
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowSamples(!showSamples)}
-                className="text-blue-600 hover:text-blue-800 text-sm"
-              >
-                {showSamples ? 'Hide' : 'Show'} Samples
-              </button>
-            </div>
-            {showSamples && (
-              <div className="grid gap-2">
-                {SAMPLE_CONFIGS.map((sample, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => loadSampleConfig(sample)}
-                    className="text-left p-3 border border-gray-200 rounded-md hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="font-medium text-gray-900 text-sm">{sample.name}</div>
-                    <div className="text-xs text-gray-600 mt-1">{sample.description}</div>
-                  </button>
-                ))}
-              </div>
-            )}
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sample Configurations
+            </label>
+            <select
+              onChange={(e) => {
+                const index = parseInt(e.target.value);
+                if (!isNaN(index)) {
+                  loadSampleConfig(SAMPLE_CONFIGS[index]);
+                }
+              }}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+              defaultValue=""
+            >
+              <option value="" disabled>Select a sample configuration...</option>
+              {SAMPLE_CONFIGS.map((sample, index) => (
+                <option key={index} value={index}>
+                  {sample.name} - {sample.description}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 
@@ -653,31 +671,6 @@ export const WantForm: React.FC<WantFormProps> = ({
         {error && (
           <ErrorDisplay error={error} />
         )}
-
-        {/* Form Actions */}
-        <div className="flex gap-3 pt-4 border-t">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                {isEditing ? 'Update Want' : 'Create Want'}
-              </>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Cancel
-          </button>
-        </div>
       </form>
     </CreateSidebar>
   );

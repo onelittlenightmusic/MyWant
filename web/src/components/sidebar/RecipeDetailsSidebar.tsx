@@ -137,11 +137,10 @@ const WantsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
         >
           <div className="space-y-4">
             {/* Type */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Type:</span>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                {want.type || want.metadata?.type || 'Unknown type'}
-              </span>
+            <div>
+              <p className="text-sm text-gray-500">
+                Type: <span className="font-medium">{want.type || want.metadata?.type || 'Unknown type'}</span>
+              </p>
             </div>
 
             {/* Parameters */}
