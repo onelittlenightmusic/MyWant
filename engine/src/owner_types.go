@@ -162,6 +162,7 @@ func (t *Target) CreateChildWants() []*Want {
 				APIVersion:         "MyWant/v1",
 				Kind:               "Want",
 				Name:               t.Metadata.Name,
+				ID:                 t.Metadata.ID,
 				Controller:         true,
 				BlockOwnerDeletion: true,
 			},

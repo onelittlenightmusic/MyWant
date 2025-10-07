@@ -29,6 +29,7 @@ export interface OwnerReference {
   apiVersion: string;
   kind: string;
   name: string;
+  id?: string;
   controller: boolean;
   blockOwnerDeletion?: boolean;
 }

@@ -215,7 +215,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         {loading && !selectedWantDetails ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -373,9 +373,9 @@ const ConfigTab: React.FC<{
   onCancel: () => void;
   onConfigChange: (value: string) => void;
 }> = ({ want, isEditing, editedConfig, updateLoading, updateError, onEdit, onSave, onCancel, onConfigChange }) => (
-  <div className="p-8">
+  <div className="p-8 h-full flex flex-col">
     {!isEditing ? (
-      <div>
+      <div className="flex flex-col flex-1">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-medium text-gray-900">Configuration</h4>
           <button
@@ -386,17 +386,20 @@ const ConfigTab: React.FC<{
             Edit
           </button>
         </div>
-        <YamlEditor
-          value={stringifyYaml({
-            metadata: want.metadata,
-            spec: want.spec
-          })}
-          onChange={() => {}}
-          readOnly={true}
-        />
+        <div className="flex-1">
+          <YamlEditor
+            value={stringifyYaml({
+              metadata: want.metadata,
+              spec: want.spec
+            })}
+            onChange={() => {}}
+            readOnly={true}
+            height="100%"
+          />
+        </div>
       </div>
     ) : (
-      <div>
+      <div className="flex flex-col flex-1">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-medium text-gray-900">Edit Configuration</h4>
           <div className="flex space-x-2">
@@ -428,11 +431,14 @@ const ConfigTab: React.FC<{
           </div>
         )}
 
-        <YamlEditor
-          value={editedConfig}
-          onChange={onConfigChange}
-          readOnly={updateLoading}
-        />
+        <div className="flex-1">
+          <YamlEditor
+            value={editedConfig}
+            onChange={onConfigChange}
+            readOnly={updateLoading}
+            height="100%"
+          />
+        </div>
       </div>
     )}
   </div>
