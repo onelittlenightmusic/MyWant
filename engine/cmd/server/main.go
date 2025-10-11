@@ -663,9 +663,17 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				execution.Config.Wants = append(execution.Config.Wants[:configIndex], execution.Config.Wants[configIndex+1:]...)
 			}
 
-			// Remove from both completed and running executions
+			// If using global builder (server mode), update config and trigger reconciliation
 			if foundInBuilder && execution.Builder != nil {
-				fmt.Printf("[API] Want %s (%s) removed from execution\n", wantNameToDelete, wantID)
+				// Update builder's config
+				execution.Builder.SetConfigInternal(execution.Config)
+
+				// Trigger reconciliation to remove the want from runtime
+				if err := execution.Builder.TriggerReconcile(); err != nil {
+					fmt.Printf("[API] Warning: Failed to trigger reconciliation after deletion: %v\n", err)
+				}
+
+				fmt.Printf("[API] Want %s (%s) removed from execution and reconciliation triggered\n", wantNameToDelete, wantID)
 			}
 
 			// If no wants left, remove the entire execution

@@ -2637,6 +2637,17 @@ func (cb *ChainBuilder) IsRunning() bool {
 	return len(cb.wants) > 0
 }
 
+// TriggerReconcile triggers the reconciliation loop to process current config
+func (cb *ChainBuilder) TriggerReconcile() error {
+	select {
+	case cb.reconcileTrigger <- true:
+		fmt.Println("[RECONCILE] Reconciliation triggered")
+		return nil
+	default:
+		return fmt.Errorf("failed to trigger reconciliation - channel full")
+	}
+}
+
 // checkSuspension blocks execution if suspended until resumed
 func (cb *ChainBuilder) checkSuspension() {
 	cb.controlMutex.RLock()
