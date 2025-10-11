@@ -94,6 +94,11 @@ export const Dashboard: React.FC = () => {
         }
         await deleteWant(wantId);
         setDeleteWantState(null);
+
+        // Close the details sidebar if the deleted want is currently selected
+        if (selectedWant && (selectedWant.metadata?.id === wantId || selectedWant.id === wantId)) {
+          setSelectedWant(null);
+        }
       } catch (error) {
         console.error('Failed to delete want:', error);
       }

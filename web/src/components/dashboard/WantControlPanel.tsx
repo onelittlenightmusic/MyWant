@@ -59,7 +59,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
 
   return (
     <div className={classNames(
-      "fixed bottom-0 right-0 bg-white border-t border-gray-200 shadow-lg z-30 transition-all duration-300 ease-in-out",
+      "fixed bottom-0 right-0 bg-blue-50 border-t border-blue-200 shadow-lg z-30 transition-all duration-300 ease-in-out",
       sidebarMinimized ? "lg:left-20" : "lg:left-64",
       "left-0"
     )}>

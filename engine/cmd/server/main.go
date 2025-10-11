@@ -626,8 +626,11 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
+	fmt.Printf("[API_DELETE] Starting deletion for want ID: %s\n", wantID)
+
 	// Search for the want across all executions
 	for executionID, execution := range s.wants {
+		fmt.Printf("[API_DELETE] Checking execution %s\n", executionID)
 
 		var wantNameToDelete string
 		var foundInBuilder bool
@@ -635,10 +638,12 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		// Search in builder states if available
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
+			fmt.Printf("[API_DELETE] Builder has %d wants in runtime\n", len(currentStates))
 			for wantName, want := range currentStates {
 				if want.Metadata.ID == wantID {
 					wantNameToDelete = wantName
 					foundInBuilder = true
+					fmt.Printf("[API_DELETE] Found want in builder: %s\n", wantName)
 					break
 				}
 			}
@@ -652,6 +657,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					wantNameToDelete = want.Metadata.Name
 				}
 				configIndex = i
+				fmt.Printf("[API_DELETE] Found want in config at index %d\n", configIndex)
 				break
 			}
 		}
@@ -659,6 +665,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		// If want was found, delete it
 		if wantNameToDelete != "" {
 			fmt.Printf("[API] Before deletion: %d wants in config\n", len(execution.Config.Wants))
+			fmt.Printf("[API_DELETE] foundInBuilder=%v, configIndex=%d\n", foundInBuilder, configIndex)
 
 			// Remove from config if it exists there
 			if configIndex >= 0 {
@@ -670,9 +677,12 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 			// If using global builder (server mode), delete from runtime
 			if foundInBuilder && execution.Builder != nil {
+				fmt.Printf("[API_DELETE] Calling DeleteWantByID(%s)\n", wantID)
 				// Delete the want directly from runtime by ID
 				if err := execution.Builder.DeleteWantByID(wantID); err != nil {
 					fmt.Printf("[API] Warning: Failed to delete want from runtime: %v\n", err)
+				} else {
+					fmt.Printf("[API_DELETE] DeleteWantByID succeeded\n")
 				}
 
 				// Also update config if it was removed
@@ -681,6 +691,8 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				}
 
 				fmt.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
+			} else {
+				fmt.Printf("[API_DELETE] Skipping DeleteWantByID (foundInBuilder=%v)\n", foundInBuilder)
 			}
 
 			// If no wants left, remove the entire execution
@@ -692,6 +704,8 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	fmt.Printf("[API_DELETE] Want %s not found in any execution\n", wantID)
 
 	errorMsg := fmt.Sprintf("Want not found: %s", wantID)
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
