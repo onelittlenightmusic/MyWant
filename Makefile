@@ -258,7 +258,7 @@ restart-all:
 	@echo "🌐 Starting frontend in background..."
 	@cd web && npm run dev &
 	@echo "✅ Both processes started!"
-	@echo "🌐 Frontend: http://localhost:5173"
+	@echo "🌐 Frontend started. Check the console for the correct URL."
 	@echo "🔧 Backend: http://localhost:8080"
 
 # Default target
