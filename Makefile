@@ -3,8 +3,8 @@
 # Code quality targets
 fmt:
 	@echo "🔧 Formatting Go code..."
-	gofmt -w -s .
-	goimports -w . 2>/dev/null || echo "goimports not available, using gofmt only"
+	@find . -name "*.go" -not -path "./archive/*" -not -path "./web/*" | xargs gofmt -w -s
+	@find . -name "*.go" -not -path "./archive/*" -not -path "./web/*" | xargs goimports -w 2>/dev/null || echo "goimports not available, using gofmt only"
 
 vet:
 	@echo "🔍 Running go vet..."

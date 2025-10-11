@@ -555,8 +555,8 @@ func (cb *ChainBuilder) connectPhase() error {
 			ownerID := runtimeWant.want.Metadata.ID
 			for _, childRuntime := range cb.wants {
 				for _, ownerRef := range childRuntime.want.Metadata.OwnerReferences {
-					// Compare with owner's ID (UID field) for proper unique identification
-					if ownerRef.UID == ownerID {
+					// Compare with owner's ID for proper unique identification
+					if ownerRef.ID == ownerID {
 						childCount++
 						break
 					}
@@ -640,7 +640,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 	runtimeChildren := make(map[string]*Want) // Map: want type -> runtime want
 	for childWantName, childRuntime := range cb.wants {
 		for _, ownerRef := range childRuntime.want.Metadata.OwnerReferences {
-			if ownerRef.UID == targetID {
+			if ownerRef.ID == targetID {
 				// This is a child of this target
 				childType := childRuntime.want.Metadata.Type
 				runtimeChildren[childType] = childRuntime.want

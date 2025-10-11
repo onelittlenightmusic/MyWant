@@ -26,17 +26,17 @@ func extractIntParam(params map[string]interface{}, key string, defaultValue int
 // Target represents a parent want that creates and manages child wants
 type Target struct {
 	Want
-	MaxDisplay            int
-	Description           string                 // Human-readable description of this target
-	RecipePath            string                 // Path to the recipe file to use for child creation
-	RecipeParams          map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
-	parameterSubscriptions map[string][]string   // Map of parameter names to child want names that subscribe to them
-	paths                 Paths
-	childWants            []*Want
-	childrenDone          chan bool
-	builder               *ChainBuilder        // Reference to builder for dynamic want creation
-	recipeLoader          *GenericRecipeLoader // Reference to generic recipe loader
-	stateMutex            sync.RWMutex         // Mutex to protect concurrent state updates
+	MaxDisplay             int
+	Description            string                 // Human-readable description of this target
+	RecipePath             string                 // Path to the recipe file to use for child creation
+	RecipeParams           map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
+	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
+	paths                  Paths
+	childWants             []*Want
+	childrenDone           chan bool
+	builder                *ChainBuilder        // Reference to builder for dynamic want creation
+	recipeLoader           *GenericRecipeLoader // Reference to generic recipe loader
+	stateMutex             sync.RWMutex         // Mutex to protect concurrent state updates
 }
 
 // NewTarget creates a new target want
