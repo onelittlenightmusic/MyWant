@@ -963,6 +963,8 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
 
+	fmt.Printf("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
+
 	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
 	for _, want := range oldConfig.Wants {
@@ -998,6 +1000,7 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	// Find deletions
 	for name := range oldWants {
 		if _, exists := newWants[name]; !exists {
+			fmt.Printf("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventDelete,
 				WantName: name,
@@ -2646,6 +2649,29 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 	default:
 		return fmt.Errorf("failed to trigger reconciliation - channel full")
 	}
+}
+
+// DeleteWantByID removes a want from runtime by its ID
+func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+
+	// Find the want name by ID
+	var wantName string
+	for name, runtimeWant := range cb.wants {
+		if runtimeWant.want.Metadata.ID == wantID {
+			wantName = name
+			break
+		}
+	}
+
+	if wantName == "" {
+		return fmt.Errorf("want with ID %s not found in runtime", wantID)
+	}
+
+	cb.deleteWant(wantName)
+	fmt.Printf("[DELETE] Removed want %s (ID: %s) from runtime\n", wantName, wantID)
+	return nil
 }
 
 // checkSuspension blocks execution if suspended until resumed

@@ -658,22 +658,29 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 		// If want was found, delete it
 		if wantNameToDelete != "" {
-			// Remove from config first
+			fmt.Printf("[API] Before deletion: %d wants in config\n", len(execution.Config.Wants))
+
+			// Remove from config if it exists there
 			if configIndex >= 0 {
 				execution.Config.Wants = append(execution.Config.Wants[:configIndex], execution.Config.Wants[configIndex+1:]...)
+				fmt.Printf("[API] Removed from config, now %d wants in config\n", len(execution.Config.Wants))
+			} else {
+				fmt.Printf("[API] Want not in config (likely a dynamically created child want)\n")
 			}
 
-			// If using global builder (server mode), update config and trigger reconciliation
+			// If using global builder (server mode), delete from runtime
 			if foundInBuilder && execution.Builder != nil {
-				// Update builder's config
-				execution.Builder.SetConfigInternal(execution.Config)
-
-				// Trigger reconciliation to remove the want from runtime
-				if err := execution.Builder.TriggerReconcile(); err != nil {
-					fmt.Printf("[API] Warning: Failed to trigger reconciliation after deletion: %v\n", err)
+				// Delete the want directly from runtime by ID
+				if err := execution.Builder.DeleteWantByID(wantID); err != nil {
+					fmt.Printf("[API] Warning: Failed to delete want from runtime: %v\n", err)
 				}
 
-				fmt.Printf("[API] Want %s (%s) removed from execution and reconciliation triggered\n", wantNameToDelete, wantID)
+				// Also update config if it was removed
+				if configIndex >= 0 {
+					execution.Builder.SetConfigInternal(execution.Config)
+				}
+
+				fmt.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
 			}
 
 			// If no wants left, remove the entire execution
