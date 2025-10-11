@@ -49,23 +49,22 @@ export const WantCard: React.FC<WantCardProps> = ({
         onResume={onResume}
       />
 
-      {/* Children indicator in header */}
-      {hasChildren && (
-        <div className="absolute top-2 right-2 z-20 bg-white rounded-md shadow-sm border border-gray-200 px-2 py-1">
-          <div className="flex items-center space-x-1" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
-            <Users className="h-4 w-4 text-blue-600" />
-            <span className="text-xs text-blue-600 font-medium">{children!.length}</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-              className="p-0.5 rounded-sm hover:bg-blue-100 text-blue-600"
-              title={isExpanded ? 'Collapse children' : 'Expand children'}
-            >
-              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </button>
-          </div>
+      {/* Children indicator at bottom */}
+      {hasChildren && !isExpanded && (
+        <div className="mt-4 pt-3 border-t border-gray-200">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(true);
+            }}
+            className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              <span className="text-blue-600 font-medium">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+            </div>
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          </button>
         </div>
       )}
 

@@ -34,14 +34,17 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   };
 
   return (
-    <span className={classNames(
-      'inline-flex items-center gap-1 font-medium rounded-full border',
-      sizeClasses[size],
-      colorClasses[color as keyof typeof colorClasses],
-      className
-    )}>
+    <span
+      className={classNames(
+        'inline-flex items-center gap-1 font-medium rounded-full border group/status relative',
+        sizeClasses[size],
+        colorClasses[color as keyof typeof colorClasses],
+        className
+      )}
+      title={status}
+    >
       {showIcon && <span>{icon}</span>}
-      <span className="capitalize">{status}</span>
+      <span className="capitalize hidden group-hover/status:inline">{status}</span>
     </span>
   );
 };

@@ -72,10 +72,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors cursor-pointer`}
               onClick={() => onView(want)}
             >
-              {truncateText(wantName, sizes.textTruncate)}
+              {wantType}
             </h3>
             <p className={`${sizes.typeClass} text-gray-500 mt-1 truncate`}>
-              Type: <span className="font-medium">{wantType}</span>
+              {truncateText(wantName, sizes.textTruncate)}
             </p>
           </div>
 
