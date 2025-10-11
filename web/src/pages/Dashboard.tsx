@@ -246,6 +246,15 @@ export const Dashboard: React.FC = () => {
         onConfirm={handleDeleteWantConfirm}
         want={deleteWantState}
         loading={loading}
+        childrenCount={
+          deleteWantState
+            ? wants.filter(w =>
+                w.metadata?.ownerReferences?.some(
+                  ref => ref.id === deleteWantState.metadata?.id
+                )
+              ).length
+            : 0
+        }
       />
 
       {/* Control Panel */}

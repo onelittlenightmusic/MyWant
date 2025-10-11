@@ -2652,6 +2652,7 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 }
 
 // DeleteWantByID removes a want from runtime by its ID
+// If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
@@ -2669,8 +2670,28 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 		return fmt.Errorf("want with ID %s not found in runtime", wantID)
 	}
 
+	// Find and delete all children first (cascade deletion)
+	var childrenToDelete []string
+	for name, runtimeWant := range cb.wants {
+		if runtimeWant.want.Metadata.OwnerReferences != nil {
+			for _, ownerRef := range runtimeWant.want.Metadata.OwnerReferences {
+				if ownerRef.ID == wantID {
+					childrenToDelete = append(childrenToDelete, name)
+					break
+				}
+			}
+		}
+	}
+
+	// Delete children first
+	for _, childName := range childrenToDelete {
+		cb.deleteWant(childName)
+		fmt.Printf("[DELETE] Cascade: Removed child want %s\n", childName)
+	}
+
+	// Delete the parent want
 	cb.deleteWant(wantName)
-	fmt.Printf("[DELETE] Removed want %s (ID: %s) from runtime\n", wantName, wantID)
+	fmt.Printf("[DELETE] Removed want %s (ID: %s) from runtime (with %d children)\n", wantName, wantID, len(childrenToDelete))
 	return nil
 }
 

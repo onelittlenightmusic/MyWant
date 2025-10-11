@@ -9,6 +9,7 @@ interface ConfirmDeleteModalProps {
   onConfirm: () => void;
   want: Want | null;
   loading?: boolean;
+  childrenCount?: number;
 }
 
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
@@ -16,7 +17,8 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   onClose,
   onConfirm,
   want,
-  loading = false
+  loading = false,
+  childrenCount = 0
 }) => {
   if (!isOpen || !want) return null;
 
@@ -63,9 +65,18 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </div>
 
           {want.status === 'running' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
               <p className="text-sm text-yellow-800">
                 <strong>Warning:</strong> This want is currently running. Deleting it will stop the execution.
+              </p>
+            </div>
+          )}
+
+          {childrenCount > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
+              <p className="text-sm text-red-800">
+                <strong>Warning:</strong> This want has {childrenCount} child want{childrenCount > 1 ? 's' : ''}.
+                Deleting the parent will also delete all {childrenCount} child want{childrenCount > 1 ? 's' : ''}.
               </p>
             </div>
           )}
