@@ -24,6 +24,8 @@ interface WantStore {
   refreshWant: (id: string) => Promise<void>;
   suspendWant: (id: string) => Promise<void>;
   resumeWant: (id: string) => Promise<void>;
+  stopWant: (id: string) => Promise<void>;
+  startWant: (id: string) => Promise<void>;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -212,6 +214,56 @@ export const useWantStore = create<WantStore>()(
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to resume want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    stopWant: async (id: string) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.stopWant(id);
+
+        // Refresh the want status to get updated state
+        const status = await apiClient.getWantStatus(id);
+
+        set(state => ({
+          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: state.selectedWantDetails?.id === id ?
+            { ...state.selectedWantDetails, status: status.status } :
+            state.selectedWantDetails,
+          loading: false
+        }));
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to stop want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    startWant: async (id: string) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.startWant(id);
+
+        // Refresh the want status to get updated state
+        const status = await apiClient.getWantStatus(id);
+
+        set(state => ({
+          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: state.selectedWantDetails?.id === id ?
+            { ...state.selectedWantDetails, status: status.status } :
+            state.selectedWantDetails,
+          loading: false
+        }));
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to start want',
           loading: false
         });
         throw error;

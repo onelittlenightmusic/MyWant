@@ -2595,6 +2595,48 @@ func (cb *ChainBuilder) IsSuspended() bool {
 	return cb.suspended
 }
 
+// Stop stops execution by clearing all wants from the configuration
+func (cb *ChainBuilder) Stop() error {
+	fmt.Println("[STOP] Stopping chain execution by clearing all wants...")
+
+	// Clear the config wants which will trigger reconciliation to clean up
+	cb.reconcileMutex.Lock()
+	wantCount := len(cb.config.Wants)
+	cb.config.Wants = []*Want{}
+	cb.reconcileMutex.Unlock()
+
+	// Trigger reconciliation to process the empty config
+	select {
+	case cb.reconcileTrigger <- true:
+		fmt.Printf("[STOP] Cleared %d wants, reconcile loop will clean up execution\n", wantCount)
+	default:
+		fmt.Println("[STOP] Warning: Failed to trigger reconciliation")
+	}
+
+	return nil
+}
+
+// Start restarts execution by triggering reconciliation of existing configuration
+func (cb *ChainBuilder) Start() error {
+	fmt.Println("[START] Starting/restarting chain execution by triggering reconciliation...")
+
+	// Trigger reconciliation - this will reload from memory and restart wants
+	select {
+	case cb.reconcileTrigger <- true:
+		fmt.Println("[START] Reconciliation triggered")
+		return nil
+	default:
+		return fmt.Errorf("failed to trigger reconciliation - channel full")
+	}
+}
+
+// IsRunning returns whether the chain has any active wants
+func (cb *ChainBuilder) IsRunning() bool {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+	return len(cb.wants) > 0
+}
+
 // checkSuspension blocks execution if suspended until resumed
 func (cb *ChainBuilder) checkSuspension() {
 	cb.controlMutex.RLock()

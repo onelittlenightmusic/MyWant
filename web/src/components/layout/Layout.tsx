@@ -5,11 +5,28 @@ import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
+  sidebarMinimized?: boolean;
+  onSidebarMinimizedChange?: (minimized: boolean) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
+export const Layout: React.FC<LayoutProps> = ({
+  children,
+  sidebarMinimized: controlledMinimized,
+  onSidebarMinimizedChange
+}) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [internalMinimized, setInternalMinimized] = useState(false);
+
+  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : internalMinimized;
+
+  const handleMinimizeToggle = () => {
+    const newValue = !sidebarMinimized;
+    if (onSidebarMinimizedChange) {
+      onSidebarMinimizedChange(newValue);
+    } else {
+      setInternalMinimized(newValue);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -28,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         isOpen={sidebarOpen}
         isMinimized={sidebarMinimized}
         onClose={() => setSidebarOpen(false)}
-        onMinimizeToggle={() => setSidebarMinimized(!sidebarMinimized)}
+        onMinimizeToggle={handleMinimizeToggle}
       />
 
       {/* Main content */}

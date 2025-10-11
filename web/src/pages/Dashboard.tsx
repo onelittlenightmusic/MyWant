@@ -13,6 +13,7 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { WantControlPanel } from '@/components/dashboard/WantControlPanel';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -23,6 +24,8 @@ export const Dashboard: React.FC = () => {
     deleteWant,
     suspendWant,
     resumeWant,
+    stopWant,
+    startWant,
     clearError
   } = useWantStore();
 
@@ -31,6 +34,7 @@ export const Dashboard: React.FC = () => {
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [selectedWant, setSelectedWant] = useState<Want | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
+  const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,6 +120,26 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleStopWant = async (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if (!wantId) return;
+    try {
+      await stopWant(wantId);
+    } catch (error) {
+      console.error('Failed to stop want:', error);
+    }
+  };
+
+  const handleStartWant = async (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if (!wantId) return;
+    try {
+      await startWant(wantId);
+    } catch (error) {
+      console.error('Failed to start want:', error);
+    }
+  };
+
   const handleCloseModals = () => {
     setShowCreateForm(false);
     setEditingWant(null);
@@ -123,12 +147,15 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <Layout>
+    <Layout
+      sidebarMinimized={sidebarMinimized}
+      onSidebarMinimizedChange={setSidebarMinimized}
+    >
       {/* Header */}
       <Header onCreateWant={handleCreateWant} />
 
-      {/* Main content area */}
-      <main className="flex-1 p-6">
+      {/* Main content area with padding for fixed control panel */}
+      <main className="flex-1 p-6 pb-24">
           {/* Error message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -219,6 +246,18 @@ export const Dashboard: React.FC = () => {
         onConfirm={handleDeleteWantConfirm}
         want={deleteWantState}
         loading={loading}
+      />
+
+      {/* Control Panel */}
+      <WantControlPanel
+        selectedWant={selectedWant}
+        onStart={handleStartWant}
+        onStop={handleStopWant}
+        onSuspend={handleSuspendWant}
+        onResume={handleResumeWant}
+        onDelete={setDeleteWantState}
+        loading={loading}
+        sidebarMinimized={sidebarMinimized}
       />
     </Layout>
   );

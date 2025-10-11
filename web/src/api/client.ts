@@ -125,7 +125,7 @@ class MyWantApiClient {
     return response.data;
   }
 
-  // Suspend/Resume operations
+  // Suspend/Resume/Stop/Start operations
   async suspendWant(id: string): Promise<SuspendResumeResponse> {
     const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/suspend`);
     return response.data;
@@ -133,6 +133,16 @@ class MyWantApiClient {
 
   async resumeWant(id: string): Promise<SuspendResumeResponse> {
     const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/resume`);
+    return response.data;
+  }
+
+  async stopWant(id: string): Promise<SuspendResumeResponse> {
+    const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/stop`);
+    return response.data;
+  }
+
+  async startWant(id: string): Promise<SuspendResumeResponse> {
+    const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/start`);
     return response.data;
   }
 

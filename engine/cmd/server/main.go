@@ -152,6 +152,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/results", s.getWantResults).Methods("GET")
 	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
+	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
+	wants.HandleFunc("/{id}/start", s.startWant).Methods("POST")
 
 	// Config CRUD endpoints - for loading recipe-based configurations
 	configs := api.PathPrefix("/configs").Subrouter()
@@ -1043,6 +1045,104 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 		"message":   "Want execution resumed successfully",
 		"wantId":    wantID,
 		"suspended": false,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// stopWant handles POST /api/v1/wants/{id}/stop - stops want execution
+func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract want ID from URL path
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Find the want execution
+	execution, exists := s.wants[wantID]
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
+		})
+		return
+	}
+
+	// Check if builder exists
+	if execution.Builder == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Want execution has no active builder to stop",
+		})
+		return
+	}
+
+	// Stop the execution
+	if err := execution.Builder.Stop(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Failed to stop want execution: %v", err),
+		})
+		return
+	}
+
+	// Update execution status
+	execution.Status = "stopped"
+
+	// Return success response
+	response := map[string]interface{}{
+		"message":   "Want execution stopped successfully",
+		"wantId":    wantID,
+		"status":    "stopped",
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// startWant handles POST /api/v1/wants/{id}/start - starts/restarts want execution
+func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract want ID from URL path
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Find the want execution
+	execution, exists := s.wants[wantID]
+	if !exists {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
+		})
+		return
+	}
+
+	// Check if builder exists
+	if execution.Builder == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Want execution has no active builder to start",
+		})
+		return
+	}
+
+	// Start the execution
+	if err := execution.Builder.Start(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("Failed to start want execution: %v", err),
+		})
+		return
+	}
+
+	// Update execution status
+	execution.Status = "running"
+
+	// Return success response
+	response := map[string]interface{}{
+		"message":   "Want execution started successfully",
+		"wantId":    wantID,
+		"status":    "running",
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	json.NewEncoder(w).Encode(response)
