@@ -144,6 +144,55 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	return builder
 }
 
+// NewChainBuilderWithoutOwnerTypes creates a new ChainBuilder without auto-registering owner types
+// This allows manual control over registration order - register domain types first, then owner types
+func NewChainBuilderWithoutOwnerTypes(config Config) *ChainBuilder {
+	builder := NewChainBuilderWithPathsNoOwner("", "")
+	builder.config = config
+	return builder
+}
+
+// NewChainBuilderWithPathsNoOwner creates a new builder with config and memory file paths,
+// but without auto-registering owner types
+func NewChainBuilderWithPathsNoOwner(configPath, memoryPath string) *ChainBuilder {
+	builder := &ChainBuilder{
+		configPath:       configPath,
+		memoryPath:       memoryPath,
+		wants:            make(map[string]*runtimeWant),
+		registry:         make(map[string]WantFactory),
+		customRegistry:   NewCustomTargetTypeRegistry(),
+		reconcileStop:    make(chan bool),
+		reconcileTrigger: make(chan bool, 1), // Buffered to avoid blocking
+		pathMap:          make(map[string]Paths),
+		channels:         make(map[string]chain.Chan),
+		running:          false,
+		waitGroup:        &sync.WaitGroup{},
+		// Initialize suspend/resume control
+		suspended:   false,
+		suspendChan: make(chan bool),
+		resumeChan:  make(chan bool),
+		controlStop: make(chan bool),
+	}
+
+	// Register built-in want types
+	builder.registerBuiltinWantTypes()
+
+	// Auto-register custom target types from recipes
+	// Try to find the recipes directory - check both "recipes" and "../recipes"
+	recipeDir := "recipes"
+	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
+		recipeDir = "../recipes"
+	}
+	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
+	}
+
+	// DO NOT auto-register owner want types - caller will do this manually
+
+	return builder
+}
+
 // registerBuiltinWantTypes registers the default want type factories
 func (cb *ChainBuilder) registerBuiltinWantTypes() {
 	// No built-in types by default - they should be registered by domain-specific modules
@@ -283,6 +332,7 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 		return nil, fmt.Errorf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v",
 			wantType, availableTypes, customTypes)
 	}
+
 	wantInstance := factory(want.Metadata, want.Spec)
 
 	// Set agent registry if available and the want instance supports it
@@ -1173,6 +1223,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			History: wantConfig.History,
 		}
 
+		// Initialize subscription system even for failed wants
+		wantPtr.InitializeSubscriptionSystem()
+
 		runtimeWant := &runtimeWant{
 			metadata: wantConfig.Metadata,
 			spec:     wantConfig.Spec,
@@ -1255,6 +1308,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			History:  historyField,
 		}
 	}
+
+	// Initialize subscription system for the want
+	wantPtr.InitializeSubscriptionSystem()
 
 	runtimeWant := &runtimeWant{
 		metadata: wantConfig.Metadata,
@@ -1392,39 +1448,10 @@ func (cb *ChainBuilder) deleteWant(wantName string) {
 	delete(cb.wants, wantName)
 }
 
-// rebuildConnections is deprecated - functionality moved to connectPhase()
-// Kept for backward compatibility but now delegates to connectPhase()
-func (cb *ChainBuilder) rebuildConnections() {
-	fmt.Println("[RECONCILE] rebuildConnections() is deprecated, use connectPhase()")
-	if err := cb.connectPhase(); err != nil {
-		fmt.Printf("[RECONCILE] Connection rebuild failed: %v\n", err)
-	}
-
-	// Start wants if running (for backward compatibility)
-	if cb.running {
-		cb.startPhase()
-	}
-}
-
 // registerWantForNotifications registers a want with the notification system
 func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunction interface{}, wantPtr *Want) {
-	wantName := wantConfig.Metadata.Name
-
-	// 1. Register want in global registry for lookup
+	// Register want in global registry for lookup
 	RegisterWant(wantPtr)
-
-	// 2. Register as listener if it implements StateUpdateListener
-	if listener, ok := wantFunction.(StateUpdateListener); ok {
-		RegisterStateListener(wantName, listener)
-		fmt.Printf("[NOTIFICATION] Registered %s as state listener\n", wantName)
-	}
-
-	// 3. Register its state subscriptions if any
-	if len(wantConfig.Spec.StateSubscriptions) > 0 {
-		RegisterStateSubscriptions(wantName, wantConfig.Spec.StateSubscriptions)
-		fmt.Printf("[NOTIFICATION] Registered %d subscriptions for %s\n",
-			len(wantConfig.Spec.StateSubscriptions), wantName)
-	}
 }
 
 // startWant starts a single want

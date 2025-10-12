@@ -246,14 +246,10 @@ func RegisterMonitorWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) interface{} {
 		monitor := NewMonitorWant(metadata, spec)
 
-		// Register for notifications
-		RegisterStateListener(metadata.Name, monitor)
+		// Register want for lookup
 		RegisterWant(monitor.Want)
 
-		// Register subscriptions if any
-		if len(spec.StateSubscriptions) > 0 {
-			RegisterStateSubscriptions(metadata.Name, spec.StateSubscriptions)
-		}
+		// Legacy listener/subscription registration removed - Group A events now use unified subscription system
 
 		return monitor
 	})

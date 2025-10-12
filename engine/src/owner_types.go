@@ -1,15 +1,13 @@
 package mywant
 
 import (
+	"context"
 	"fmt"
 	"mywant/engine/src/chain"
 	"strings"
 	"sync"
+	"time"
 )
-
-// Global registry to track target instances for child notification
-var targetRegistry = make(map[string]*Target)
-var targetRegistryMutex sync.RWMutex
 
 // extractIntParam extracts an integer parameter with type conversion and default fallback
 func extractIntParam(params map[string]interface{}, key string, defaultValue int) int {
@@ -30,13 +28,15 @@ type Target struct {
 	Description            string                 // Human-readable description of this target
 	RecipePath             string                 // Path to the recipe file to use for child creation
 	RecipeParams           map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
-	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
+	parameterSubscriptions map[string][]string  // Map of parameter names to child want names that subscribe to them
 	paths                  Paths
 	childWants             []*Want
-	childrenDone           chan bool
+	completedChildren      map[string]bool      // Track which children have completed
+	childCompletionMutex   sync.Mutex           // Protect completedChildren map
 	builder                *ChainBuilder        // Reference to builder for dynamic want creation
 	recipeLoader           *GenericRecipeLoader // Reference to generic recipe loader
 	stateMutex             sync.RWMutex         // Mutex to protect concurrent state updates
+	childrenDone           chan bool            // Signal when all children complete
 }
 
 // NewTarget creates a new target want
@@ -53,7 +53,8 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		RecipeParams:           make(map[string]interface{}),
 		parameterSubscriptions: make(map[string][]string),
 		childWants:             make([]*Want, 0),
-		childrenDone:           make(chan bool, 1),
+		completedChildren:      make(map[string]bool),
+		childrenDone:           make(chan bool, 1), // Signal channel for subscription system
 	}
 
 	// Extract target-specific configuration from params
@@ -74,15 +75,82 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		}
 	}
 
-	// Register the target instance for child notification
-	targetRegistryMutex.Lock()
-	targetRegistry[metadata.Name] = target
-	targetRegistryMutex.Unlock()
-
 	// Register with want system
 	RegisterWant(&target.Want)
 
+	// Subscribe to OwnerCompletionEvents
+	target.subscribeToChildCompletion()
+
 	return target
+}
+
+// subscribeToChildCompletion subscribes the target to child completion events
+func (t *Target) subscribeToChildCompletion() {
+	subscription := &TargetCompletionSubscription{
+		target: t,
+	}
+	t.GetSubscriptionSystem().Subscribe(EventTypeOwnerCompletion, subscription)
+}
+
+// TargetCompletionSubscription handles child completion events for a target
+type TargetCompletionSubscription struct {
+	target *Target
+}
+
+// GetSubscriberName returns the subscriber name
+func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
+	return tcs.target.Metadata.Name + "-completion-handler"
+}
+
+// OnEvent handles the OwnerCompletionEvent
+func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	completionEvent, ok := event.(*OwnerCompletionEvent)
+	if !ok {
+		return EventResponse{
+			Handled: false,
+			Error:   fmt.Errorf("expected OwnerCompletionEvent, got %T", event),
+		}
+	}
+
+	// Only handle events targeted at this target
+	if completionEvent.TargetName != tcs.target.Metadata.Name {
+		return EventResponse{Handled: false}
+	}
+
+	// Track child completion
+	tcs.target.childCompletionMutex.Lock()
+	tcs.target.completedChildren[completionEvent.ChildName] = true
+	allComplete := tcs.target.checkAllChildrenComplete()
+	tcs.target.childCompletionMutex.Unlock()
+
+	// If all children are complete, signal the target via channel
+	if allComplete {
+		select {
+		case tcs.target.childrenDone <- true:
+			// Signal sent successfully
+		default:
+			// Channel already has signal, ignore
+		}
+	}
+
+	return EventResponse{
+		Handled:          true,
+		ExecutionControl: ExecutionContinue,
+	}
+}
+
+// checkAllChildrenComplete checks if all child wants have completed (must hold childCompletionMutex)
+func (t *Target) checkAllChildrenComplete() bool {
+	if len(t.childWants) == 0 {
+		return false
+	}
+
+	for _, child := range t.childWants {
+		if !t.completedChildren[child.Metadata.Name] {
+			return false
+		}
+	}
+	return true
 }
 
 // SetBuilder sets the ChainBuilder reference for dynamic want creation
@@ -193,9 +261,11 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 		}
 		t.builder.AddDynamicWants(childWants)
 
-		// Rebuild connections to include new wants
+		// Rebuild connections to include new wants via connectPhase
 		fmt.Printf("🔧 Rebuilding connections with dynamic wants...\n")
-		t.builder.rebuildConnections()
+		if err := t.builder.connectPhase(); err != nil {
+			fmt.Printf("❌ Target %s: Failed to rebuild connections: %v\n", t.Metadata.Name, err)
+		}
 	}
 
 	// Target waits for signal that all children have finished
@@ -215,15 +285,6 @@ func (t *Target) GetWant() *Want {
 	return &t.Want
 }
 
-// NotifyChildrenComplete signals that all child wants have completed
-func (t *Target) NotifyChildrenComplete() {
-	select {
-	case t.childrenDone <- true:
-		// Signal sent successfully
-	default:
-		// Channel already has signal, ignore
-	}
-}
 
 // UpdateParameter updates a parameter and pushes it to child wants
 func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
@@ -437,17 +498,6 @@ func (t *Target) addChildWantsToMemory() error {
 	return nil
 }
 
-// NotifyTargetCompletion notifies a target that its child has completed
-func NotifyTargetCompletion(targetName string, childName string) {
-	targetRegistryMutex.RLock()
-	target, exists := targetRegistry[targetName]
-	targetRegistryMutex.RUnlock()
-
-	if exists {
-		fmt.Printf("📢 Child %s notifying target %s of completion\n", childName, targetName)
-		target.NotifyChildrenComplete()
-	}
-}
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
@@ -482,8 +532,8 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
-			fmt.Printf("💬 Child %s completed, notifying target %s\n", oaw.WantName, oaw.TargetName)
-			NotifyTargetCompletion(oaw.TargetName, oaw.WantName)
+			// Emit OwnerCompletionEvent through unified subscription system
+			oaw.emitOwnerCompletionEvent()
 		}
 
 		return result
@@ -492,6 +542,30 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 		fmt.Printf("⚠️  Want %s: No Exec method available\n", oaw.WantName)
 		return true
 	}
+}
+
+// emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
+func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
+	// Get the child want
+	want := oaw.GetWant()
+	if want == nil {
+		return
+	}
+
+	// Create OwnerCompletionEvent
+	event := &OwnerCompletionEvent{
+		BaseEvent: BaseEvent{
+			EventType:  EventTypeOwnerCompletion,
+			SourceName: oaw.WantName,
+			TargetName: oaw.TargetName,
+			Timestamp:  time.Now(),
+			Priority:   10, // High priority for completion events
+		},
+		ChildName: oaw.WantName,
+	}
+
+	// Emit through subscription system (blocking mode)
+	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
 // GetWant returns the underlying want from the base want

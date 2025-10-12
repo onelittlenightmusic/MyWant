@@ -200,13 +200,33 @@ type Want struct {
 	agentStateChanges map[string]interface{}        `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
 
+	// Unified subscription event system
+	subscriptionSystem *UnifiedSubscriptionSystem `json:"-" yaml:"-"`
+
 	// State synchronization
 	stateMutex sync.RWMutex `json:"-" yaml:"-"`
 }
 
-// SetStatus updates the want's status
+// SetStatus updates the want's status and emits StatusChange event
 func (n *Want) SetStatus(status WantStatus) {
+	oldStatus := n.Status
 	n.Status = status
+
+	// Emit StatusChange event (Group B - synchronous control)
+	if oldStatus != status {
+		event := &StatusChangeEvent{
+			BaseEvent: BaseEvent{
+				EventType:  EventTypeStatusChange,
+				SourceName: n.Metadata.Name,
+				TargetName: "", // Broadcast to all subscribers
+				Timestamp:  time.Now(),
+				Priority:   5,
+			},
+			OldStatus: oldStatus,
+			NewStatus: status,
+		}
+		n.GetSubscriptionSystem().Emit(context.Background(), event)
+	}
 }
 
 // UpdateParameter updates a parameter and propagates the change to children
@@ -496,6 +516,19 @@ func (n *Want) GetParameter(paramName string) (interface{}, bool) {
 	return value, exists
 }
 
+// InitializeSubscriptionSystem initializes the subscription system for this want
+func (n *Want) InitializeSubscriptionSystem() {
+	if n.subscriptionSystem == nil {
+		n.subscriptionSystem = NewUnifiedSubscriptionSystem()
+	}
+}
+
+// GetSubscriptionSystem returns the GLOBAL subscription system
+// All wants share the same subscription system to enable cross-want event delivery
+func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
+	return GetGlobalSubscriptionSystem()
+}
+
 // notifyParentStateUpdate is a placeholder that will be overridden by owner_types
 var notifyParentStateUpdate = func(targetName, childName, key string, value interface{}) {
 	// Default: do nothing (will be overridden when owner_types is imported)
@@ -590,6 +623,20 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 
 	// Stop all running agents
 	n.StopAllAgents()
+
+	// Emit ProcessEnd event (Group B - synchronous control)
+	event := &ProcessEndEvent{
+		BaseEvent: BaseEvent{
+			EventType:  EventTypeProcessEnd,
+			SourceName: n.Metadata.Name,
+			TargetName: "", // Broadcast to all subscribers
+			Timestamp:  time.Now(),
+			Priority:   5,
+		},
+		FinalState: n.GetAllState(),
+		Success:    true,
+	}
+	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
 // OnProcessFail handles state storage when the want process fails
@@ -610,6 +657,20 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 
 	// Stop all running agents
 	n.StopAllAgents()
+
+	// Emit ProcessEnd event with failure (Group B - synchronous control)
+	event := &ProcessEndEvent{
+		BaseEvent: BaseEvent{
+			EventType:  EventTypeProcessEnd,
+			SourceName: n.Metadata.Name,
+			TargetName: "", // Broadcast to all subscribers
+			Timestamp:  time.Now(),
+			Priority:   5,
+		},
+		FinalState: n.GetAllState(),
+		Success:    false,
+	}
+	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
 // Config holds the complete declarative configuration

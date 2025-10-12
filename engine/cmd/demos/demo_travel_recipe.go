@@ -34,11 +34,14 @@ func main() {
 	}
 	fmt.Println()
 
-	// Create chain builder
-	builder := NewChainBuilder(config)
+	// Create chain builder (without auto-registration of owner types)
+	builder := NewChainBuilderWithoutOwnerTypes(config)
 
-	// Register travel want types
+	// Register travel want types FIRST (before owner wrapper)
 	types.RegisterTravelWantTypes(builder)
+
+	// THEN register owner types to wrap the already-registered travel types
+	RegisterOwnerWantTypes(builder)
 
 	fmt.Println("🏁 Executing recipe-based travel planning...")
 	builder.Execute()

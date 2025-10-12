@@ -90,9 +90,9 @@ func NewServer(config ServerConfig) *Server {
 		fmt.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
 	}
 
-	// Create global builder for server mode with empty config
+	// Create global builder for server mode with empty config (without auto-registering owner types)
 	// This builder will have its reconcile loop started when server starts
-	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-server.yaml")
+	globalBuilder := mywant.NewChainBuilderWithPathsNoOwner("", "engine/memory/memory-server.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetAgentRegistry(agentRegistry)
 
@@ -1182,12 +1182,16 @@ func (s *Server) Start() error {
 	s.setupRoutes()
 
 	// Register want types on global builder before starting reconcile loop
+	// IMPORTANT: Register domain types FIRST, then owner types to enable wrapping
 	types.RegisterQNetWantTypes(s.globalBuilder)
 	types.RegisterFibonacciWantTypes(s.globalBuilder)
 	types.RegisterPrimeWantTypes(s.globalBuilder)
 	types.RegisterTravelWantTypes(s.globalBuilder)
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
+
+	// THEN register owner types to wrap the already-registered domain types
+	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	fmt.Println("[SERVER] Starting global reconcile loop for server mode...")

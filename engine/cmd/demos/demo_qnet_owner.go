@@ -38,11 +38,14 @@ func main() {
 		}
 	}
 
-	// Create chain builder
-	builder := mywant.NewChainBuilder(config)
+	// Create chain builder (without auto-registration of owner types)
+	builder := mywant.NewChainBuilderWithoutOwnerTypes(config)
 
-	// Register want types
+	// Register want types FIRST (before owner wrapper)
 	types.RegisterQNetWantTypes(builder) // For qnet types (numbers, queue, sink, etc.)
+
+	// THEN register owner types to wrap the already-registered qnet types
+	mywant.RegisterOwnerWantTypes(builder)
 
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")
