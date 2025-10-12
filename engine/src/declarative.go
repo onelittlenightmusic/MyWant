@@ -529,16 +529,6 @@ func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
 }
 
-// notifyParentStateUpdate is a placeholder that will be overridden by owner_types
-var notifyParentStateUpdate = func(targetName, childName, key string, value interface{}) {
-	// Default: do nothing (will be overridden when owner_types is imported)
-}
-
-// setNotifyParentStateUpdate allows owner_types to override the notification function
-func setNotifyParentStateUpdate(fn func(string, string, string, interface{})) {
-	notifyParentStateUpdate = fn
-}
-
 // GetState retrieves a value from the want's state
 func (n *Want) GetState(key string) (interface{}, bool) {
 	n.stateMutex.RLock()

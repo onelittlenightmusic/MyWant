@@ -147,11 +147,6 @@ func sendOwnerChildNotifications(notification StateNotification) {
 			if ownerRef.Controller && ownerRef.Kind == "Want" {
 				// Emit through unified subscription system
 				emitOwnerChildStateEvent(notification, ownerRef.Name)
-
-				// Legacy: Call old Target system for backward compatibility
-				// This ensures existing Target behavior continues to work
-				notifyParentStateUpdate(ownerRef.Name, want.Metadata.Name,
-					notification.StateKey, notification.StateValue)
 				break
 			}
 		}

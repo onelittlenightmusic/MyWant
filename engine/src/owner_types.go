@@ -588,19 +588,8 @@ func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
 	// This is a placeholder for a more sophisticated hooking mechanism
 }
 
-// initializeStateNotifications sets up the state notification system
-func initializeStateNotifications() {
-	// Override the notification function in declarative.go
-	// Remove target state notification system
-}
-
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
-	// Note: Demo programs should also call RegisterQNetWantTypes if they use qnet types
-
-	// Initialize state update notification system
-	initializeStateNotifications()
-
 	// Initialize generic recipe loader
 	recipeLoader := NewGenericRecipeLoader("recipes")
 
@@ -612,33 +601,14 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		return target
 	})
 
-	// Generic OwnerAware wrapping: automatically wrap ALL registered want types
-	// to support owner references without hardcoding specific type names
-
-	// Create a copy of current registry to avoid modification during iteration
-	originalFactories := make(map[string]WantFactory)
-	for typeName, factory := range builder.registry {
-		originalFactories[typeName] = factory
-	}
-
-	// Override all want types to use OwnerAware wrapper when owner references exist
-	for typeName, originalFactory := range originalFactories {
-		// Skip target types as they already handle owner relationships
-		if typeName == "target" {
-			continue
-		}
-
-		// Create closure to capture variables
-		func(wantType string, factory WantFactory) {
-			builder.RegisterWantType(wantType, func(metadata Metadata, spec WantSpec) interface{} {
-				baseWant := factory(metadata, spec)
-				if len(metadata.OwnerReferences) > 0 {
-					return NewOwnerAwareWant(baseWant, metadata)
-				}
-				return baseWant
-			})
-		}(typeName, originalFactory)
-	}
+	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction()
+	// All wants with OwnerReferences are automatically wrapped at creation time,
+	// eliminating the need for registration-time wrapping and registration order dependencies.
+	//
+	// This means:
+	// 1. Domain types can be registered in any order (QNet, Travel, etc.)
+	// 2. No need for separate "NoOwner" builder variants
+	// 3. Wrapping happens at runtime based on actual metadata, not factory registration
 }
 
 // getResultFromSpec extracts a specific result value from child wants using recipe specification

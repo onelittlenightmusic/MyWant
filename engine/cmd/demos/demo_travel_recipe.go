@@ -34,14 +34,12 @@ func main() {
 	}
 	fmt.Println()
 
-	// Create chain builder (without auto-registration of owner types)
-	builder := NewChainBuilderWithoutOwnerTypes(config)
+	// Create chain builder with standard constructor
+	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+	builder := NewChainBuilder(config)
 
-	// Register travel want types FIRST (before owner wrapper)
+	// Register domain-specific want types
 	types.RegisterTravelWantTypes(builder)
-
-	// THEN register owner types to wrap the already-registered travel types
-	RegisterOwnerWantTypes(builder)
 
 	fmt.Println("🏁 Executing recipe-based travel planning...")
 	builder.Execute()

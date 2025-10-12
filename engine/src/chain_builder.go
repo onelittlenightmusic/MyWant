@@ -32,11 +32,6 @@ type ChangeEvent struct {
 	Want     *Want
 }
 
-// ParentNotifier interface for wants that can receive child completion notifications
-type ParentNotifier interface {
-	NotifyChildrenComplete()
-}
-
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop
 type ChainBuilder struct {
 	configPath     string                    // Path to original config file
@@ -140,55 +135,6 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 
 	// Auto-register owner want types for target system support
 	RegisterOwnerWantTypes(builder)
-
-	return builder
-}
-
-// NewChainBuilderWithoutOwnerTypes creates a new ChainBuilder without auto-registering owner types
-// This allows manual control over registration order - register domain types first, then owner types
-func NewChainBuilderWithoutOwnerTypes(config Config) *ChainBuilder {
-	builder := NewChainBuilderWithPathsNoOwner("", "")
-	builder.config = config
-	return builder
-}
-
-// NewChainBuilderWithPathsNoOwner creates a new builder with config and memory file paths,
-// but without auto-registering owner types
-func NewChainBuilderWithPathsNoOwner(configPath, memoryPath string) *ChainBuilder {
-	builder := &ChainBuilder{
-		configPath:       configPath,
-		memoryPath:       memoryPath,
-		wants:            make(map[string]*runtimeWant),
-		registry:         make(map[string]WantFactory),
-		customRegistry:   NewCustomTargetTypeRegistry(),
-		reconcileStop:    make(chan bool),
-		reconcileTrigger: make(chan bool, 1), // Buffered to avoid blocking
-		pathMap:          make(map[string]Paths),
-		channels:         make(map[string]chain.Chan),
-		running:          false,
-		waitGroup:        &sync.WaitGroup{},
-		// Initialize suspend/resume control
-		suspended:   false,
-		suspendChan: make(chan bool),
-		resumeChan:  make(chan bool),
-		controlStop: make(chan bool),
-	}
-
-	// Register built-in want types
-	builder.registerBuiltinWantTypes()
-
-	// Auto-register custom target types from recipes
-	// Try to find the recipes directory - check both "recipes" and "../recipes"
-	recipeDir := "recipes"
-	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
-		recipeDir = "../recipes"
-	}
-	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
-	if err != nil {
-		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
-	}
-
-	// DO NOT auto-register owner want types - caller will do this manually
 
 	return builder
 }
@@ -342,6 +288,12 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 		} else if w, ok := wantInstance.(*Want); ok {
 			w.SetAgentRegistry(cb.agentRegistry)
 		}
+	}
+
+	// Automatically wrap with OwnerAwareWant if the want has owner references
+	// This enables parent-child coordination via subscription events
+	if len(want.Metadata.OwnerReferences) > 0 {
+		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata)
 	}
 
 	return wantInstance, nil
@@ -1527,9 +1479,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 						runtimeWant.want.SetStatus(WantStatusCompleted)
 					}
 
-					// Check if this want completion should notify parent targets
-					cb.notifyParentTargetsOfChildCompletion(wantName)
-
 					break
 				}
 			}
@@ -2064,74 +2013,6 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		fmt.Printf("📝 Latest memory also saved to: %s\n", latestFilename)
 	}
 	return nil
-}
-
-// notifyParentTargetsOfChildCompletion checks if a completed want has owner references
-// and notifies parent Target wants when all their children have completed
-func (cb *ChainBuilder) notifyParentTargetsOfChildCompletion(completedWantName string) {
-	// Find the config want for this completed want
-	var completedWantConfig *Want
-	for _, wantConfig := range cb.config.Wants {
-		if wantConfig.Metadata.Name == completedWantName {
-			completedWantConfig = wantConfig
-			break
-		}
-	}
-
-	if completedWantConfig == nil || len(completedWantConfig.Metadata.OwnerReferences) == 0 {
-		return // No owner references
-	}
-
-	// For each owner reference, check if all siblings are complete
-	for _, ownerRef := range completedWantConfig.Metadata.OwnerReferences {
-		parentName := ownerRef.Name
-
-		// Check if parent is a Target want
-		parentRuntimeWant, exists := cb.wants[parentName]
-		if !exists {
-			continue
-		}
-
-		// Check if it implements child completion notification
-		if notifier, ok := parentRuntimeWant.function.(ParentNotifier); ok {
-			// Find all child wants with this parent
-			allChildrenComplete := true
-			childCount := 0
-			for _, wantConfig := range cb.config.Wants {
-				if wantConfig.Metadata.Name == parentName {
-					continue // Skip the parent itself
-				}
-
-				// Check if this want has ownerRef to this parent
-				hasOwnerRef := false
-				for _, childOwnerRef := range wantConfig.Metadata.OwnerReferences {
-					if childOwnerRef.Name == parentName {
-						hasOwnerRef = true
-						break
-					}
-				}
-
-				if hasOwnerRef {
-					childCount++
-					// This is a child - check if it's completed
-					if childRuntimeWant, exists := cb.wants[wantConfig.Metadata.Name]; exists {
-						if childRuntimeWant.want.GetStatus() != WantStatusCompleted {
-							allChildrenComplete = false
-							break
-						}
-					} else {
-						allChildrenComplete = false
-						break
-					}
-				}
-			}
-
-			if allChildrenComplete && childCount > 0 {
-				fmt.Printf("🎯 All children of target %s have completed, notifying...\n", parentName)
-				notifier.NotifyChildrenComplete()
-			}
-		}
-	}
 }
 
 // SetRecipeResult sets the recipe result definition for processing at the end of execution
