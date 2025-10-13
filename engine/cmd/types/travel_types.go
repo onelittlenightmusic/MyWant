@@ -1084,6 +1084,10 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 // RegisterTravelWantTypes registers all travel-related want types
 func RegisterTravelWantTypes(builder *ChainBuilder) {
+	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewFlightWant(metadata, spec)
+	})
+
 	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewRestaurantWant(metadata, spec)
 	})
@@ -1103,8 +1107,16 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
 func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
+	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) interface{} {
+		flight := NewFlightWant(metadata, spec)
+		flight.SetAgentRegistry(agentRegistry)
+		return flight
+	})
+
 	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewRestaurantWant(metadata, spec)
+		restaurant := NewRestaurantWant(metadata, spec)
+		restaurant.SetAgentRegistry(agentRegistry)
+		return restaurant
 	})
 
 	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
@@ -1114,7 +1126,9 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 	})
 
 	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewBuffetWant(metadata, spec)
+		buffet := NewBuffetWant(metadata, spec)
+		buffet.SetAgentRegistry(agentRegistry)
+		return buffet
 	})
 
 	builder.RegisterWantType("travel_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
