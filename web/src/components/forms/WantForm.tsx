@@ -107,6 +107,32 @@ const SAMPLE_CONFIGS = [
         }
       }
     }
+  },
+  {
+    name: 'Dynamic Travel Change',
+    description: 'Dynamic travel itinerary with flight booking and schedule changes',
+    config: {
+      metadata: {
+        name: 'dynamic-travel-planner',
+        type: 'dynamic travel change',
+        labels: {
+          role: 'dynamic-travel-planner'
+        }
+      },
+      spec: {
+        recipe: 'recipes/dynamic-travel-change.yaml',
+        params: {
+          prefix: 'dynamic-travel',
+          display_name: 'Dynamic Travel Itinerary with Flight',
+          flight_type: 'business class',
+          flight_duration: 12.0,
+          restaurant_type: 'fine dining',
+          hotel_type: 'luxury',
+          buffet_type: 'international',
+          dinner_duration: 2.0
+        }
+      }
+    }
   }
 ];
 
@@ -118,6 +144,7 @@ const WANT_TYPES = [
   { value: 'sequence', label: 'Sequence Generator', defaultParams: { count: 10, rate: 1.0 } },
   { value: 'travel_hotel', label: 'Hotel Booking', defaultParams: { hotel_type: 'luxury' } },
   { value: 'travel_restaurant', label: 'Restaurant Booking', defaultParams: { restaurant_type: 'fine dining' } },
+  { value: 'dynamic travel change', label: 'Dynamic Travel Change', defaultParams: { prefix: 'dynamic-travel', display_name: 'Dynamic Travel Itinerary with Flight', flight_type: 'business class', flight_duration: 12.0, restaurant_type: 'fine dining', hotel_type: 'luxury', buffet_type: 'international', dinner_duration: 2.0 } }
 ];
 
 export const WantForm: React.FC<WantFormProps> = ({

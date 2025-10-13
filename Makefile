@@ -31,7 +31,7 @@ check: fmt vet test
 test-all-runs:
 	@echo "🧪 Testing all run targets..."
 	@failed_targets="" && \
-	for target in run-fibonacci-loop run-fibonacci-recipe run-prime run-qnet run-qnet-recipe run-travel run-travel-recipe run-travel-agent run-travel-agent-full run-travel-agent-direct run-hierarchical-approval; do \
+	for target in run-fibonacci-loop run-fibonacci-recipe run-prime run-qnet run-qnet-recipe run-travel run-travel-recipe run-travel-agent run-travel-agent-full run-travel-agent-direct run-hierarchical-approval run-dynamic-travel-change; do \
 		echo "" && \
 		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
 		echo "🔹 Testing $$target..." && \
@@ -54,7 +54,6 @@ test-all-runs:
 		echo "❌ Failed targets:$$failed_targets" && \
 		exit 1; \
 	fi
-
 # Build the mywant library
 build: check
 	@echo "🔨 Building mywant library..."
@@ -97,6 +96,10 @@ run-travel-agent-direct:
 
 run-hierarchical-approval:
 	go run -C engine cmd/demos/demo_hierarchical_approval.go ../config/config-hierarchical-approval.yaml
+
+run-dynamic-travel-change:
+	go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-dynamic-travel-change.yaml
+
 
 # Build the mywant server binary
 build-server:
@@ -221,6 +224,7 @@ help:
 	@echo "  run-travel            - Travel planning example"
 	@echo "  run-sample-owner      - QNet with dynamic recipe loading"
 	@echo "  run-qnet-target       - QNet with target want"
+	@echo "  run-dynamic-travel-change - Run the dynamic travel change demo"
 	@echo "  run-hierarchical-approval - Hierarchical approval workflow"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
