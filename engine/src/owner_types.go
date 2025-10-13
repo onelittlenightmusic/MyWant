@@ -728,15 +728,6 @@ func (t *Target) toSnakeCase(str string) string {
 	return strings.ToLower(string(result))
 }
 
-// computeFallbackResult provides simple aggregation when recipe result definition is not available
-func (t *Target) computeFallbackResult() {
-	// Use mutex to prevent concurrent map access with state updates
-	t.stateMutex.Lock()
-	defer t.stateMutex.Unlock()
-
-	t.computeFallbackResultUnsafe()
-}
-
 // computeFallbackResultUnsafe provides simple aggregation without mutex protection (caller must hold mutex)
 func (t *Target) computeFallbackResultUnsafe() {
 	// Get all wants that might be child wants for this target

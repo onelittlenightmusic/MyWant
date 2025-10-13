@@ -119,9 +119,6 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		controlStop: make(chan bool),
 	}
 
-	// Register built-in want types
-	builder.registerBuiltinWantTypes()
-
 	// Auto-register custom target types from recipes
 	// Try to find the recipes directory - check both "recipes" and "../recipes"
 	recipeDir := "recipes"
@@ -137,11 +134,6 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	RegisterOwnerWantTypes(builder)
 
 	return builder
-}
-
-// registerBuiltinWantTypes registers the default want type factories
-func (cb *ChainBuilder) registerBuiltinWantTypes() {
-	// No built-in types by default - they should be registered by domain-specific modules
 }
 
 // RegisterWantType allows registering custom want types

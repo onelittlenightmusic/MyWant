@@ -120,27 +120,6 @@ type ChainWant interface {
 	GetWant() *Want
 }
 
-// createStartFunction converts generalized function to start function
-func createStartFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
-	return func(out chain.Chan) bool {
-		return generalizedFn([]chain.Chan{}, []chain.Chan{out})
-	}
-}
-
-// createProcessFunction converts generalized function to process function
-func createProcessFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan, chain.Chan) bool {
-	return func(in chain.Chan, out chain.Chan) bool {
-		return generalizedFn([]chain.Chan{in}, []chain.Chan{out})
-	}
-}
-
-// createEndFunction converts generalized function to end function
-func createEndFunction(generalizedFn func(using []chain.Chan, outputs []chain.Chan) bool) func(chain.Chan) bool {
-	return func(in chain.Chan) bool {
-		return generalizedFn([]chain.Chan{in}, []chain.Chan{})
-	}
-}
-
 // OwnerReference represents a reference to an owner object
 type OwnerReference struct {
 	APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
@@ -496,15 +475,6 @@ func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, p
 
 	fmt.Printf("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
 		n.Metadata.Name, paramName, previousValue, paramValue)
-}
-
-// Helper function to get state keys for debugging
-func getStateKeys(state map[string]interface{}) []string {
-	keys := make([]string, 0, len(state))
-	for k := range state {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 // GetParameter gets a parameter value from the want's spec
