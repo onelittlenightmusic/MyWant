@@ -1,0 +1,4 @@
+capabilities:
+  - name: flight_agency
+    gives:
+      - flight_booking

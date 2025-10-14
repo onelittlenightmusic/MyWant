@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	. "mywant/engine/src"
@@ -227,65 +226,64 @@ func (f *FlightWant) tryAgentExecution() *FlightSchedule {
 		// Store the requirements in want state for tracking
 		f.StoreState("agent_requirements", f.Spec.Requires)
 
-		// Step 1: Execute MonitorFlight first to check for existing state
-		fmt.Printf("[FLIGHT] Step 1: Executing MonitorFlight to check existing state\n")
-
-		// Create and execute MonitorFlight directly inline to avoid context issues
-		monitorAgent := NewMonitorFlight(
-			"flight_monitor",
-			[]string{"flight_agency"},
-			[]string{"xxx"},
-		)
-
-		ctx := context.Background()
-		if err := monitorAgent.Exec(ctx, &f.Want); err != nil {
-			fmt.Printf("[FLIGHT] MonitorFlight execution failed: %v\n", err)
-		}
-
-		f.AggregateChanges()
-
-		// Check if MonitorFlight found an existing schedule
-		if result, exists := f.GetState("agent_result"); exists && result != nil {
-			fmt.Printf("[FLIGHT] DEBUG: Found agent_result in state, type: %T, value: %+v\n", result, result)
-			if schedule, ok := result.(FlightSchedule); ok {
-				fmt.Printf("[FLIGHT] MonitorFlight found existing schedule: %+v\n", schedule)
-				f.StoreState("execution_source", "monitor")
-
-				// Immediately set the schedule and complete the cycle
-				f.SetSchedule(schedule)
-				fmt.Printf("[FLIGHT] MonitorFlight cycle completed - want finished\n")
-				return &schedule
-			} else {
-				fmt.Printf("[FLIGHT] DEBUG: agent_result is not FlightSchedule type, it's: %T\n", result)
-			}
-		} else {
-			fmt.Printf("[FLIGHT] DEBUG: No agent_result found in state - exists: %v, result: %v\n", exists, result)
-		}
-
-		// Step 2: No existing schedule found, execute AgentFlight
-		fmt.Printf("[FLIGHT] Step 2: No existing schedule found, executing AgentFlight\n")
+		// Execute agents via ExecuteAgents() which properly tracks agent history
+		fmt.Printf("[FLIGHT] Executing agents via ExecuteAgents() for proper tracking\n")
 		if err := f.ExecuteAgents(); err != nil {
-			fmt.Printf("[FLIGHT] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			fmt.Printf("[FLIGHT] Dynamic agent execution failed: %v\n", err)
 			f.StoreState("agent_execution_status", "failed")
 			f.StoreState("agent_execution_error", err.Error())
 			return nil
 		}
 
+		// Commit agent state changes
+		f.AggregateChanges()
+
 		fmt.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
 		f.StoreState("agent_execution_status", "completed")
-		f.StoreState("execution_source", "agent")
 
-		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[FLIGHT] Checking state for agent_result\n")
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			fmt.Printf("[FLIGHT] Found agent_result in state: %+v\n", result)
-			if schedule, ok := result.(FlightSchedule); ok {
-				fmt.Printf("[FLIGHT] Successfully retrieved agent result: %+v\n", schedule)
-				return &schedule
-			} else {
-				fmt.Printf("[FLIGHT] agent_result is not FlightSchedule type: %T\n", result)
+
+			// Handle both map[string]interface{} and FlightSchedule types
+			var schedule FlightSchedule
+			switch v := result.(type) {
+			case FlightSchedule:
+				schedule = v
+			case map[string]interface{}:
+				// Convert map to FlightSchedule
+				if dt, ok := v["departure_time"].(time.Time); ok {
+					schedule.DepartureTime = dt
+				}
+				if at, ok := v["arrival_time"].(time.Time); ok {
+					schedule.ArrivalTime = at
+				}
+				if ft, ok := v["flight_type"].(string); ok {
+					schedule.FlightType = ft
+				}
+				if fn, ok := v["flight_number"].(string); ok {
+					schedule.FlightNumber = fn
+				}
+				if rn, ok := v["reservation_name"].(string); ok {
+					schedule.ReservationName = rn
+				}
+				if pl, ok := v["premium_level"].(string); ok {
+					schedule.PremiumLevel = pl
+				}
+				if st, ok := v["service_tier"].(string); ok {
+					schedule.ServiceTier = st
+				}
+				if amenities, ok := v["premium_amenities"].([]string); ok {
+					schedule.PremiumAmenities = amenities
+				}
+			default:
+				fmt.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
+				return nil
 			}
+
+			fmt.Printf("[FLIGHT] Successfully retrieved agent result: %+v\n", schedule)
+			f.StoreState("execution_source", "agent")
+			return &schedule
 		}
 
 		fmt.Printf("[FLIGHT] Warning: Agent completed but no result found in state\n")

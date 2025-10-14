@@ -325,12 +325,12 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 		case "do":
 			baseAgent.Type = DoAgentType
 			doAgent := &DoAgent{BaseAgent: baseAgent}
-			r.setAgentAction(doAgent, agentDef.Name)
+			r.setAgentAction(doAgent)
 			agent = doAgent
 		case "monitor":
 			baseAgent.Type = MonitorAgentType
 			monitorAgent := &MonitorAgent{BaseAgent: baseAgent}
-			r.setAgentMonitor(monitorAgent, agentDef.Name)
+			r.setAgentMonitor(monitorAgent)
 			agent = monitorAgent
 		default:
 			return fmt.Errorf("unknown agent type: %s", agentDef.Type)
@@ -342,74 +342,30 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 	return nil
 }
 
-func (r *AgentRegistry) setAgentAction(agent *DoAgent, name string) {
-	switch name {
-	case "agent_premium":
-		agent.Action = r.hotelReservationAction
-	default:
-		agent.Action = r.defaultDoAction
-	}
+func (r *AgentRegistry) setAgentAction(agent *DoAgent) {
+	// All DoAgents use the same generic action - just initialize state
+	agent.Action = r.genericDoAction
 }
 
-func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent, name string) {
-	switch name {
-	case "hotel_monitor":
-		agent.Monitor = r.hotelReservationMonitor
-	default:
-		agent.Monitor = r.defaultMonitorAction
-	}
+func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent) {
+	// All MonitorAgents use the same generic monitor - just log monitoring
+	agent.Monitor = r.genericMonitorAction
 }
 
-func (r *AgentRegistry) defaultDoAction(ctx context.Context, want *Want) error {
-	fmt.Printf("DoAgent executing for want: %s\n", want.Metadata.Name)
+// genericDoAction is the default action for all DoAgents
+// Agents don't need special implementations - state initialization is externalized to want types
+func (r *AgentRegistry) genericDoAction(ctx context.Context, want *Want) error {
+	fmt.Printf("[AGENT] DoAgent executing for want: %s\n", want.Metadata.Name)
+	// State initialization happens in the want type's agent execution logic
+	// This is just a placeholder that confirms the agent executed
 	return nil
 }
 
-func (r *AgentRegistry) defaultMonitorAction(ctx context.Context, want *Want) error {
-	fmt.Printf("MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
-	return nil
-}
-
-func (r *AgentRegistry) hotelReservationAction(ctx context.Context, want *Want) error {
-	fmt.Printf("Hotel reservation agent executing for want: %s\n", want.Metadata.Name)
-
-	// Stage all state changes as a single object
-	if err := want.StageStateChange(map[string]interface{}{
-		"reservation_id": "HTL-12345",
-		"status":         "confirmed",
-		"hotel_name":     "Premium Hotel",
-		"check_in":       "2025-09-20",
-		"check_out":      "2025-09-22",
-	}); err != nil {
-		return fmt.Errorf("failed to stage state changes: %w", err)
-	}
-
-	// Commit all changes at once
-	want.CommitStateChanges()
-
-	fmt.Printf("Hotel reservation completed with object-based state update\n")
-	return nil
-}
-
-func (r *AgentRegistry) hotelReservationMonitor(ctx context.Context, want *Want) error {
-	fmt.Printf("Hotel reservation monitor checking status for want: %s\n", want.Metadata.Name)
-
-	if reservationID, exists := want.GetState("reservation_id"); exists {
-		// Stage all monitoring updates as a single object
-		if err := want.StageStateChange(map[string]interface{}{
-			"reservation_id": reservationID, // Keep existing reservation ID
-			"status":         "confirmed",   // Confirm status
-			"last_checked":   "2025-09-17T10:00:00Z",
-			"room_ready":     true,
-		}); err != nil {
-			return fmt.Errorf("failed to stage monitoring updates: %w", err)
-		}
-
-		// Commit all monitoring updates at once
-		want.CommitStateChanges()
-
-		fmt.Printf("Hotel reservation status updated with object-based commit\n")
-	}
-
+// genericMonitorAction is the default monitor for all MonitorAgents
+// Agents don't need special implementations - monitoring logic is externalized to want types
+func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) error {
+	fmt.Printf("[AGENT] MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
+	// Monitoring logic happens in the want type's agent execution logic
+	// This is just a placeholder that confirms the monitor executed
 	return nil
 }

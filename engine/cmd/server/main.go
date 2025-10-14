@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -95,6 +94,13 @@ func NewServer(config ServerConfig) *Server {
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-server.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetAgentRegistry(agentRegistry)
+
+	// Create temporary server instance to call registerDynamicAgents
+	tempServer := &Server{}
+
+	// Register dynamic agent implementations on global registry
+	// This provides the actual Action/Monitor functions for YAML-loaded agents
+	tempServer.registerDynamicAgents(agentRegistry)
 
 	return &Server{
 		config:         config,
@@ -306,51 +312,13 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	return config, builder, nil
 }
 
-// registerDynamicAgents registers the same dynamic agents as demo_travel_agent_full.go
+// registerDynamicAgents is no longer needed - all agents are loaded from YAML files
+// and get their implementations through agent_loader.go
 func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
-	// Same agent registration as demo_travel_agent_full.go:52-98
-
-	// AgentPremium for hotel
-	agentPremium := types.NewAgentPremium(
-		"agent_premium",
-		[]string{"hotel_reservation"},
-		[]string{"xxx"},
-		"platinum",
-	)
-	agentPremium.Action = func(ctx context.Context, want *mywant.Want) error {
-		fmt.Printf("[SERVER][AGENT_PREMIUM_ACTION] Hotel agent called, delegating to AgentPremium.Exec()\n")
-		return agentPremium.Exec(ctx, want)
-	}
-	agentRegistry.RegisterAgent(agentPremium)
-	fmt.Printf("[SERVER] 🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
-
-	// Restaurant Agent
-	agentRestaurant := types.NewAgentPremium(
-		"agent_restaurant_premium",
-		[]string{"restaurant_reservation"},
-		[]string{"xxx"},
-		"premium",
-	)
-	agentRestaurant.Action = func(ctx context.Context, want *mywant.Want) error {
-		fmt.Printf("[SERVER][AGENT_RESTAURANT_ACTION] Restaurant agent called, processing reservation\n")
-		return agentRestaurant.Exec(ctx, want)
-	}
-	agentRegistry.RegisterAgent(agentRestaurant)
-	fmt.Printf("[SERVER] 🔧 Dynamically registered Restaurant Agent: %s\n", agentRestaurant.GetName())
-
-	// Buffet Agent
-	agentBuffet := types.NewAgentPremium(
-		"agent_buffet_premium",
-		[]string{"buffet_reservation"},
-		[]string{"xxx"},
-		"premium",
-	)
-	agentBuffet.Action = func(ctx context.Context, want *mywant.Want) error {
-		fmt.Printf("[SERVER][AGENT_BUFFET_ACTION] Buffet agent called, processing reservation\n")
-		return agentBuffet.Exec(ctx, want)
-	}
-	agentRegistry.RegisterAgent(agentBuffet)
-	fmt.Printf("[SERVER] 🔧 Dynamically registered Buffet Agent: %s\n", agentBuffet.GetName())
+	// NOTE: All agents (hotel, restaurant, buffet, flight, etc.) are loaded from
+	// YAML files in agents/ directory. Their implementations are set via
+	// agent_loader.go's setAgentAction() and setAgentMonitor() methods.
+	fmt.Printf("[SERVER] All agents loaded from YAML files in agents/ directory\n")
 }
 
 // createWant handles POST /api/v1/wants - creates a new want object

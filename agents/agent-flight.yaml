@@ -1,0 +1,22 @@
+agents:
+  - name: agent_flight
+    type: do
+    capabilities:
+      - flight_agency
+    uses:
+      - xxx
+    logic:
+      type: generate_schedule
+      schedule_type: flight
+      premium_level: "premium"
+      amenities: ["priority_boarding", "lounge_access", "extra_baggage"]
+
+  - name: monitor_flight
+    type: monitor
+    capabilities:
+      - flight_agency
+    uses:
+      - xxx
+    logic:
+      type: monitor_file
+      test_data_path: "/Users/hiroyukiosaki/work/MyWant/test/initial"
