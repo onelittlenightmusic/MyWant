@@ -1,16 +1,20 @@
 recipe:
   # Recipe metadata - defines this as a custom target type with agent integration
   metadata:
-    name: "Dynamic Travel Change"
-    description: "Travel planning system with dynamic schedule changes and flight booking"
+    name: "Dynamic Travel Change with Flight API"
+    description: "Travel planning with API-based flight booking, automatic monitoring, and delay-triggered rebooking"
     custom_type: "dynamic travel change"
-    version: "1.0.0"
+    version: "2.0.0"
 
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "travel"
-    display_name: "Dynamic Travel Itinerary"
+    display_name: "Dynamic Travel Itinerary with Flight Monitoring"
+    server_url: "http://localhost:8081"
+    flight_number: "AA100"
     flight_type: "business class"
+    from: "New York"
+    to: "Los Angeles"
     restaurant_type: "fine dining"
     hotel_type: "luxury"
     buffet_type: "international"
@@ -18,17 +22,22 @@ recipe:
     flight_duration: 12.0
 
   wants:
-    # Flight booking - first in the travel schedule
+    # Flight booking with API agent - monitors and auto-reboks on delay
     - metadata:
         type: flight
         labels:
           role: scheduler
+          category: flight-api
       spec:
         params:
+          server_url: server_url
+          flight_number: flight_number
           flight_type: flight_type
+          from: from
+          to: to
           duration_hours: flight_duration
         requires:
-          - flight_booking
+          - flight_api_reservation
 
     # Dinner restaurant reservation
     - metadata:

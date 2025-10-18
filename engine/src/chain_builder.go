@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	"mywant/engine/src/chain"
 	"os"
 	"path/filepath"
@@ -110,7 +111,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	}
 	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
 	if err != nil {
-		fmt.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
+		log.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
 	}
 
 	// Auto-register owner want types for target system support
@@ -286,7 +287,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 		return nil, fmt.Errorf("custom type '%s' not found in registry", want.Metadata.Type)
 	}
 
-	fmt.Printf("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
+	log.Printf("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
 
 	// Merge custom type defaults with user-provided spec
 	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
@@ -398,7 +399,7 @@ func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
 // reconcileLoop main reconcile loop that handles both initial config load and dynamic changes
 func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
-	fmt.Println("[RECONCILE] Loading initial configuration")
+	log.Println("[RECONCILE] Loading initial configuration")
 	cb.reconcileWants()
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -409,20 +410,20 @@ func (cb *ChainBuilder) reconcileLoop() {
 	for {
 		select {
 		case <-cb.reconcileStop:
-			fmt.Println("[RECONCILE] Stopping reconcile loop")
+			log.Println("[RECONCILE] Stopping reconcile loop")
 			return
 		case <-cb.reconcileTrigger:
-			fmt.Println("[RECONCILE] Triggered reconciliation")
+			log.Println("[RECONCILE] Triggered reconciliation")
 			cb.reconcileWants()
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
-				fmt.Println("[RECONCILE] Detected config change")
+				log.Println("[RECONCILE] Detected config change")
 				// Load memory file into config before reconciling
 				if newConfig, err := cb.loadMemoryConfig(); err == nil {
 					cb.config = newConfig
-					fmt.Printf("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
+					log.Printf("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
 				} else {
-					fmt.Printf("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
+					log.Printf("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
 				}
 				cb.reconcileWants()
 			}
@@ -442,29 +443,29 @@ func (cb *ChainBuilder) reconcileWants() {
 	cb.inReconciliation = true
 	defer func() { cb.inReconciliation = false }()
 
-	fmt.Println("[RECONCILE] Starting reconciliation with separated phases")
+	log.Println("[RECONCILE] Starting reconciliation with separated phases")
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
-		fmt.Printf("[RECONCILE] Compile phase failed: %v\n", err)
+		log.Printf("[RECONCILE] Compile phase failed: %v\n", err)
 		return
 	}
 
 	// Phase 2: CONNECT - Establish want topology
 	if err := cb.connectPhase(); err != nil {
-		fmt.Printf("[RECONCILE] Connect phase failed: %v\n", err)
+		log.Printf("[RECONCILE] Connect phase failed: %v\n", err)
 		return
 	}
 
 	// Phase 3: START - Launch new/updated wants
 	cb.startPhase()
 
-	fmt.Println("[RECONCILE] All phases completed successfully")
+	log.Println("[RECONCILE] All phases completed successfully")
 }
 
 // compilePhase handles configuration loading and want creation/updates
 func (cb *ChainBuilder) compilePhase() error {
-	fmt.Println("[RECONCILE:COMPILE] Loading and validating configuration")
+	log.Println("[RECONCILE:COMPILE] Loading and validating configuration")
 
 	// Use current config as source of truth during runtime
 	// Memory file is only loaded on initial startup
@@ -474,7 +475,7 @@ func (cb *ChainBuilder) compilePhase() error {
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
 
 	if isInitialLoad {
-		fmt.Printf("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
+		log.Printf("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
 		// For initial load, treat all wants as new additions
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
@@ -485,20 +486,20 @@ func (cb *ChainBuilder) compilePhase() error {
 
 		// Dump memory after initial load
 		if len(newConfig.Wants) > 0 {
-			fmt.Println("[RECONCILE:MEMORY] Dumping memory after initial load...")
+			log.Println("[RECONCILE:MEMORY] Dumping memory after initial load...")
 			if err := cb.dumpWantMemoryToYAML(); err != nil {
-				fmt.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
+				log.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
 			}
 		}
 	} else {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
 		if len(changes) == 0 {
-			fmt.Println("[RECONCILE:COMPILE] No configuration changes detected")
+			log.Println("[RECONCILE:COMPILE] No configuration changes detected")
 			return nil
 		}
 
-		fmt.Printf("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
+		log.Printf("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
 
 		// Apply changes in reverse dependency order (sink to generator)
 		cb.applyWantChanges(changes)
@@ -508,20 +509,20 @@ func (cb *ChainBuilder) compilePhase() error {
 	cb.lastConfig = newConfig
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 
-	fmt.Println("[RECONCILE:COMPILE] Configuration compilation completed")
+	log.Println("[RECONCILE:COMPILE] Configuration compilation completed")
 	return nil
 }
 
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
-	fmt.Println("[RECONCILE:CONNECT] Establishing want topology")
+	log.Println("[RECONCILE:CONNECT] Establishing want topology")
 
 	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
 
 	// Build parameter subscription connectivity for Target wants
 	// This references the owner-children relationships already established in OwnerReferences metadata
-	fmt.Printf("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)\n", len(cb.wants))
+	log.Printf("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)\n", len(cb.wants))
 	targetCount := 0
 	for wantName, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
@@ -540,19 +541,19 @@ func (cb *ChainBuilder) connectPhase() error {
 				}
 			}
 
-			fmt.Printf("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)\n",
+			log.Printf("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)\n",
 				wantName, target.RecipePath, target.recipeLoader != nil, childCount)
 
 			if target.RecipePath != "" && target.recipeLoader != nil {
 				// Parse recipe to build parameter subscription map based on ownership
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
-					fmt.Printf("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v\n",
+					log.Printf("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v\n",
 						target.Metadata.Name, err)
 				}
 			}
 		}
 	}
-	fmt.Printf("[RECONCILE:CONNECT] Processed %d Target wants for subscription building\n", targetCount)
+	log.Printf("[RECONCILE:CONNECT] Processed %d Target wants for subscription building\n", targetCount)
 
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
@@ -578,7 +579,7 @@ func (cb *ChainBuilder) connectPhase() error {
 	}
 	cb.channelMutex.Unlock()
 
-	fmt.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
+	log.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
 	return nil
 }
 
@@ -649,14 +650,13 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 						target.parameterSubscriptions[paramRefStr],
 						actualChildName,
 					)
-					fmt.Printf("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)\n",
-						target.Metadata.Name, actualChildName, paramRefStr, childParamName)
-				}
+					log.Printf("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)\n",
+									target.Metadata.Name, actualChildName, paramRefStr, childParamName)				}
 			}
 		}
 	}
 
-	fmt.Printf("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v\n",
+	log.Printf("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v\n",
 		target.Metadata.Name, target.parameterSubscriptions)
 
 	return nil
@@ -664,7 +664,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 
 // processAutoConnections handles system-wide auto-connection for RecipeAgent wants
 func (cb *ChainBuilder) processAutoConnections() {
-	fmt.Println("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
+	log.Println("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
 
 	// Collect all wants with RecipeAgent enabled
 	autoConnectWants := make([]*runtimeWant, 0)
@@ -677,7 +677,7 @@ func (cb *ChainBuilder) processAutoConnections() {
 		want := runtimeWant.want
 		if cb.hasRecipeAgent(want) {
 			autoConnectWants = append(autoConnectWants, runtimeWant)
-			fmt.Printf("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
+			log.Printf("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
 		}
 	}
 
@@ -689,7 +689,7 @@ func (cb *ChainBuilder) processAutoConnections() {
 		runtimeWant.spec.Using = want.Spec.Using
 	}
 
-	fmt.Printf("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
+	log.Printf("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
 }
 
 // hasRecipeAgent checks if a want has RecipeAgent functionality enabled
@@ -711,7 +711,7 @@ func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
 
 // autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
 func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
-	fmt.Printf("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
+	log.Printf("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
 
 	// Look for approval_id in want's params or labels
 	approvalID := ""
@@ -733,11 +733,11 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	}
 
 	if approvalID == "" {
-		fmt.Printf("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
+		log.Printf("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
 		return
 	}
 
-	fmt.Printf("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
+	log.Printf("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
 
 	// Initialize using selectors if nil
 	if want.Spec.Using == nil {
@@ -813,21 +813,23 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 					if !duplicate {
 						want.Spec.Using = append(want.Spec.Using, selector)
 						connectionsAdded++
-						fmt.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
-							want.Metadata.Name, selector, otherWant.Metadata.Name)
+											log.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
+												want.Metadata.Name, selector, otherWant.Metadata.Name)
+						
 					} else {
-						fmt.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
-							want.Metadata.Name, selector)
+											log.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
+												want.Metadata.Name, selector)
+						
 					}
 				} else {
-					fmt.Printf("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
+					log.Printf("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
 						otherWant.Metadata.Name, role)
 				}
 			}
 		}
 	}
 
-	fmt.Printf("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
+	log.Printf("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
 		want.Metadata.Name, connectionsAdded)
 }
 
@@ -844,7 +846,7 @@ func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want)
 	if connectionKey != "" {
 		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
 		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
-		fmt.Printf("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
+		log.Printf("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
 			sourceWant.Metadata.Name, labelKey, consumerWant.Metadata.Name)
 	}
 }
@@ -883,7 +885,7 @@ func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
 
 // startPhase handles launching new/updated wants
 func (cb *ChainBuilder) startPhase() {
-	fmt.Println("[RECONCILE:START] Launching new and updated wants")
+	log.Println("[RECONCILE:START] Launching new and updated wants")
 
 	// Start new wants if system is running
 	if cb.running {
@@ -901,7 +903,7 @@ func (cb *ChainBuilder) startPhase() {
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusCompleted {
 				if cb.shouldRestartCompletedWant(wantName, want) {
-					fmt.Printf("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
+					log.Printf("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
@@ -909,9 +911,9 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		fmt.Printf("[RECONCILE:START] Started %d wants\n", startedCount)
+		log.Printf("[RECONCILE:START] Started %d wants\n", startedCount)
 	} else {
-		fmt.Println("[RECONCILE:START] System not running, wants will be started later")
+		log.Println("[RECONCILE:START] System not running, wants will be started later")
 	}
 }
 
@@ -940,7 +942,7 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
 
-	fmt.Printf("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
+	log.Printf("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
 
 	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
@@ -977,7 +979,7 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	// Find deletions
 	for name := range oldWants {
 		if _, exists := newWants[name]; !exists {
-			fmt.Printf("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
+			log.Printf("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventDelete,
 				WantName: name,
@@ -1007,15 +1009,15 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			fmt.Printf("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
+			log.Printf("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
 			cb.addDynamicWantUnsafe(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
-			fmt.Printf("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
+			log.Printf("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
 			cb.UpdateWant(change.Want)
 			hasWantChanges = true
 		case ChangeEventDelete:
-			fmt.Printf("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
+			log.Printf("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
 			cb.deleteWant(change.WantName)
 			hasWantChanges = true
 		}
@@ -1023,9 +1025,9 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 
 	// Dump memory after want additions/deletions/updates
 	if hasWantChanges {
-		fmt.Println("[RECONCILE:MEMORY] Dumping memory after want changes...")
+		log.Println("[RECONCILE:MEMORY] Dumping memory after want changes...")
 		if err := cb.dumpWantMemoryToYAML(); err != nil {
-			fmt.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
+			log.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
 		}
 	}
 
@@ -1132,12 +1134,12 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 
 // addWant adds a new want to the runtime (private method)
 func (cb *ChainBuilder) addWant(wantConfig *Want) {
-	fmt.Printf("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
+	log.Printf("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
 
 	// Create the function/want
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
-		fmt.Printf("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
+		log.Printf("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
 
 		// Create a failed want instead of returning error
 		wantPtr := &Want{
@@ -1182,8 +1184,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		wantPtr.History = wantConfig.History
 
 		// Initialize parameterHistory with initial parameter values if empty or nil
-		if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
-			fmt.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
+			if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
+				log.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
+		
 			// Create a deep copy of the parameters to avoid reference issues
 			paramsCopy := make(map[string]interface{})
 			for k, v := range wantConfig.Spec.Params {
@@ -1263,12 +1266,12 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 
 // UpdateWant updates an existing want in place and restarts execution
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-	fmt.Printf("[RECONCILE] Updating want by ID: %s\n", wantConfig.Metadata.ID)
+	log.Printf("[RECONCILE] Updating want by ID: %s\n", wantConfig.Metadata.ID)
 
 	// Find the existing want by metadata.id using universal search
 	existingWant, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
-		fmt.Printf("[RECONCILE:ERROR] Want with ID %s not found for update, adding as new\n", wantConfig.Metadata.ID)
+		log.Printf("[RECONCILE:ERROR] Want with ID %s not found for update, adding as new\n", wantConfig.Metadata.ID)
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
@@ -1300,7 +1303,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 				}
 				changedParams[paramName] = newValue
 
-				fmt.Printf("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
+				log.Printf("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
 			}
 		}
 	}
@@ -1340,7 +1343,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	delete(existingWant.State, "total_processed")
 	delete(existingWant.State, "current_time")
 
-	fmt.Printf("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
+	log.Printf("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
 
 	// If this is a Target want with children, use Target's parameter update mechanism
 	// which automatically pushes updates to children
@@ -1352,7 +1355,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 				for paramName, paramValue := range changedParams {
 					target.UpdateParameter(paramName, paramValue)
 				}
-				fmt.Printf("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
+				log.Printf("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
 			}
 		}
 	}
@@ -1370,7 +1373,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 // deleteWant removes a want from runtime
 func (cb *ChainBuilder) deleteWant(wantName string) {
-	fmt.Printf("[RECONCILE] Deleting want: %s\n", wantName)
+	log.Printf("[RECONCILE] Deleting want: %s\n", wantName)
 
 	delete(cb.wants, wantName)
 }
@@ -1429,7 +1432,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 			}()
 
-			fmt.Printf("[EXEC] Starting want %s with %d using, %d outputs\n",
+			log.Printf("[EXEC] Starting want %s with %d using, %d outputs\n",
 				wantName, len(usingChans), len(outputChans))
 
 			for {
@@ -1447,7 +1450,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 
 				if finished {
-					fmt.Printf("[EXEC] Want %s finished\n", wantName)
+					log.Printf("[EXEC] Want %s finished\n", wantName)
 
 					// Update want status to completed
 					if runtimeWant, exists := cb.wants[wantName]; exists {
@@ -1482,6 +1485,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
 			want.State = runtimeWant.want.State
+			want.History = runtimeWant.want.History // Include history in stats writes
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
 	}
@@ -1494,8 +1498,9 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 				Metadata: runtimeWant.metadata,
 				Spec:     runtimeWant.spec,
 				// Stats field removed - data now in State
-				Status: runtimeWant.want.Status,
-				State:  runtimeWant.want.State,
+				Status:  runtimeWant.want.Status,
+				State:   runtimeWant.want.State,
+				History: runtimeWant.want.History, // Include history in stats writes
 			}
 			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
 		}
@@ -1523,12 +1528,12 @@ func (cb *ChainBuilder) Execute() {
 // serverMode=true: runs indefinitely for server mode
 // serverMode=false: waits for wants to complete (batch mode)
 func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
-	fmt.Printf("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
+	log.Printf("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
 
 	// Initialize memory file if configured
 	if cb.memoryPath != "" {
 		if err := cb.copyConfigToMemory(); err != nil {
-			fmt.Printf("Warning: Failed to copy config to memory: %v\n", err)
+			log.Printf("Warning: Failed to copy config to memory: %v\n", err)
 		} else {
 			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 		}
@@ -1550,7 +1555,7 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Server mode: run indefinitely, never stop reconcile loop
 	if serverMode {
-		fmt.Println("[RECONCILE] Server mode: reconcile loop running indefinitely")
+		log.Println("[RECONCILE] Server mode: reconcile loop running indefinitely")
 		// Keep running forever - reconcile loop handles all want lifecycle
 		select {} // Block forever
 	}
@@ -1588,15 +1593,15 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.reconcileMutex.Unlock()
 
 	// Final memory dump - ensure it completes before returning
-	fmt.Println("[RECONCILE] Writing final memory dump...")
+	log.Println("[RECONCILE] Writing final memory dump...")
 	err := cb.dumpWantMemoryToYAML()
 	if err != nil {
-		fmt.Printf("Warning: Failed to dump want memory to YAML: %v\n", err)
+		log.Printf("Warning: Failed to dump want memory to YAML: %v\n", err)
 	} else {
-		fmt.Println("[RECONCILE] Memory dump completed successfully")
+		log.Println("[RECONCILE] Memory dump completed successfully")
 	}
 
-	fmt.Println("[RECONCILE] Execution completed")
+	log.Println("[RECONCILE] Execution completed")
 }
 
 // GetAllWantStates returns the states of all wants
@@ -1980,9 +1985,9 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		}
 	}
 
-	fmt.Printf("📝 Want memory dumped to: %s\n", filename)
+	log.Printf("📝 Want memory dumped to: %s\n", filename)
 	if err == nil {
-		fmt.Printf("📝 Latest memory also saved to: %s\n", latestFilename)
+		log.Printf("📝 Latest memory also saved to: %s\n", latestFilename)
 	}
 	return nil
 }

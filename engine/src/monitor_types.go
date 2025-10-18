@@ -1,7 +1,9 @@
 package mywant
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"mywant/engine/src/chain"
 	"strconv"
 	"time"
@@ -67,26 +69,68 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 
 // Exec implements the ChainWant interface
 func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
-	fmt.Printf("🔍 Monitor %s starting notification processing\n", mw.Want.Metadata.Name)
+	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusRunning)
 
-	// Start notification processing
-	mw.StartNotificationProcessing()
+	// Store initial state (if not already set)
+	if _, exists := mw.Want.GetState("start_time"); !exists {
+		mw.Want.StoreState("start_time", time.Now())
+		mw.Want.StoreState("status", "monitoring")
+		mw.Want.StoreState("alerts_triggered", 0)
+	}
 
-	// Store initial state
-	mw.Want.StoreState("start_time", time.Now())
-	mw.Want.StoreState("status", "monitoring")
-	mw.Want.StoreState("alerts_triggered", 0)
+	// Get the MonitorAgent from the registry
+	var monitorAgent *MonitorAgent
+	if agentRegistry := mw.Want.GetAgentRegistry(); agentRegistry != nil {
+		if agent, exists := agentRegistry.GetAgent(mw.Want.Metadata.Name); exists {
+			if ma, ok := agent.(*MonitorAgent); ok {
+				monitorAgent = ma
+			} else {
+				log.Printf("⚠️ Monitor %s agent is not a MonitorAgent type\n", mw.Want.Metadata.Name)
+				mw.Want.SetStatus(WantStatusFailed)
+				return true // Indicate completion (failure)
+			}
+		} else {
+			log.Printf("⚠️ Monitor %s agent not found in registry\n", mw.Want.Metadata.Name)
+			mw.Want.SetStatus(WantStatusFailed)
+			return true // Indicate completion (failure)
+		}
+	} else {
+		log.Printf("⚠️ Monitor %s has no AgentRegistry set\n", mw.Want.Metadata.Name)
+		mw.Want.SetStatus(WantStatusFailed)
+		return true // Indicate completion (failure)
+	}
 
-	// Monitor runs continuously - in a real implementation, you might want
-	// to add a shutdown mechanism or run for a specific duration
-	time.Sleep(5 * time.Second) // Demo: run for 5 seconds
+	if monitorAgent.Monitor == nil {
+		log.Printf("⚠️ Monitor %s agent has no Monitor function set\n", mw.Want.Metadata.Name)
+		mw.Want.SetStatus(WantStatusFailed)
+		return true // Indicate completion (failure)
+	}
 
-	mw.Want.SetStatus(WantStatusCompleted)
-	mw.StopNotificationProcessing()
+	// Start a goroutine for continuous monitoring
+	go func() {
+		ticker := time.NewTicker(10 * time.Second) // Use a default poll interval for now
+		defer ticker.Stop()
 
-	fmt.Printf("🔍 Monitor %s completed monitoring session\n", mw.Want.Metadata.Name)
-	return true
+		for {
+			select {
+			case <-mw.Want.GetStopChannel(): // Stop monitoring if want is stopped
+				log.Printf("🛑 Monitor %s stopping continuous monitoring\n", mw.Want.Metadata.Name)
+				mw.Want.SetStatus(WantStatusCompleted) // Mark as completed when stopped
+				return
+			case <-ticker.C:
+				err := monitorAgent.Monitor(context.Background(), mw.Want)
+				if err != nil {
+					log.Printf("❌ Monitor %s agent execution failed: %v\n", mw.Want.Metadata.Name, err)
+					// Optionally set want status to failed, but continue monitoring
+					// mw.Want.SetStatus(WantStatusFailed)
+				}
+			}
+		}
+	}()
+
+	log.Printf("🔍 Monitor %s continuous monitoring started\n", mw.Want.Metadata.Name)
+	return true // Indicate that this Exec call is "finished" (the goroutine is now handling monitoring)
 }
 
 // handleNotification overrides the base implementation with monitoring logic
@@ -171,7 +215,7 @@ func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold in
 	}
 
 	// Log alert
-	fmt.Printf("🚨 ALERT: %s\n", alert.Message)
+	log.Printf("🚨 ALERT: %s\n", alert.Message)
 
 	// Execute alert actions
 	mw.executeAlertActions(alert)
@@ -182,11 +226,11 @@ func (mw *MonitorWant) executeAlertActions(alert AlertRecord) {
 	for _, action := range mw.AlertActions {
 		switch action {
 		case "log":
-			fmt.Printf("📝 Alert logged: %s\n", alert.Message)
+			log.Printf("📝 Alert logged: %s\n", alert.Message)
 		case "store":
 			// Alert is already stored in mw.Alerts
 		default:
-			fmt.Printf("⚠️  Unknown alert action: %s\n", action)
+			log.Printf("⚠️  Unknown alert action: %s\n", action)
 		}
 	}
 }
@@ -254,5 +298,5 @@ func RegisterMonitorWantTypes(builder *ChainBuilder) {
 		return monitor
 	})
 
-	fmt.Println("📊 Monitor want types registered")
+	log.Println("📊 Monitor want types registered")
 }

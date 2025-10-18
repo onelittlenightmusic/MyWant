@@ -1,0 +1,17 @@
+wants:
+  - metadata:
+      name: flight-booking
+      type: flight
+      labels:
+        category: flight
+        priority: high
+    spec:
+      params:
+        server_url: "http://localhost:8081"
+        flight_number: "AA123"
+        from: "New York"
+        to: "Los Angeles"
+        departure_time: "2025-10-20T08:00:00Z"
+        arrival_time: "2025-10-20T11:30:00Z"
+      requires:
+        - flight_api_reservation

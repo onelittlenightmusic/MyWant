@@ -20,3 +20,21 @@ agents:
     logic:
       type: monitor_file
       test_data_path: "/Users/hiroyukiosaki/work/MyWant/test/initial"
+
+  - name: agent_flight_api
+    type: do
+    capabilities:
+      - flight_api_agency
+    uses: []
+    logic:
+      type: api_reservation
+      server_url: "http://localhost:8081"
+
+  - name: monitor_flight_api
+    type: monitor
+    capabilities:
+      - flight_api_agency
+    uses: []
+    logic:
+      type: api_polling
+      poll_interval: 10s

@@ -7,8 +7,12 @@ wants:
     spec:
       params:
         prefix: dynamic-travel
-        display_name: "Dynamic Travel Itinerary with Flight"
+        display_name: "Dynamic Travel Itinerary with Flight API"
+        server_url: "http://localhost:8081"
+        flight_number: "AA100"
         flight_type: "business class"
+        from: "New York"
+        to: "Los Angeles"
         flight_duration: 12.0
         restaurant_type: "fine dining"
         hotel_type: "luxury"

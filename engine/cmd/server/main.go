@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -69,11 +71,11 @@ func NewServer(config ServerConfig) *Server {
 
 	// Load capabilities and agents from directories if they exist
 	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
 	if err := agentRegistry.LoadAgents("agents/"); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
 
 	// Create recipe registry
@@ -81,12 +83,12 @@ func NewServer(config ServerConfig) *Server {
 
 	// Load recipes from recipes/ directory as custom types
 	if err := mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load recipes as custom types: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load recipes as custom types: %v\n", err)
 	}
 
 	// Also load the recipe files themselves into the recipe registry
 	if err := loadRecipeFilesIntoRegistry("recipes", recipeRegistry); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
 	}
 
 	// Create global builder for server mode with empty config
@@ -265,11 +267,11 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
 	}
 
-	fmt.Printf("[SERVER] 📋 Loaded configuration with %d wants\n", len(config.Wants))
+	log.Printf("[SERVER] 📋 Loaded configuration with %d wants\n", len(config.Wants))
 	for _, want := range config.Wants {
-		fmt.Printf("[SERVER]   - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+		log.Printf("[SERVER]   - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 		if len(want.Spec.Requires) > 0 {
-			fmt.Printf("[SERVER]     Requires: %v\n", want.Spec.Requires)
+			log.Printf("[SERVER]     Requires: %v\n", want.Spec.Requires)
 		}
 	}
 
@@ -283,11 +285,11 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 
 	// Load capabilities and agents
 	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
 	if err := agentRegistry.LoadAgents("agents/"); err != nil {
-		fmt.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
 
 	// Register dynamic agents (same as demo_travel_agent_full.go:52-98)
@@ -305,53 +307,100 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	mywant.RegisterMonitorWantTypes(builder)
 
 	// Step 5: Execute (same as demo_travel_agent_full.go:106)
-	fmt.Println("[SERVER] 🚀 Executing configuration...")
+	log.Println("[SERVER] 🚀 Executing configuration...")
 	builder.Execute()
 
-	fmt.Println("[SERVER] ✅ Configuration execution completed!")
+	log.Println("[SERVER] ✅ Configuration execution completed!")
 	return config, builder, nil
 }
 
-// registerDynamicAgents is no longer needed - all agents are loaded from YAML files
-// and get their implementations through agent_loader.go
+// registerDynamicAgents registers implementations for special agents loaded from YAML
 func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
-	// NOTE: All agents (hotel, restaurant, buffet, flight, etc.) are loaded from
-	// YAML files in agents/ directory. Their implementations are set via
-	// agent_loader.go's setAgentAction() and setAgentMonitor() methods.
-	fmt.Printf("[SERVER] All agents loaded from YAML files in agents/ directory\n")
+	log.Printf("[SERVER] Setting up dynamic agent implementations...\n")
+
+	// Override the generic implementations with specific ones for special agents
+	setupFlightAPIAgents(agentRegistry)
+	setupMonitorFlightAgents(agentRegistry)
+
+	log.Printf("[SERVER] Dynamic agent implementations registered\n")
+}
+
+// setupFlightAPIAgents sets up the Flight API agent implementations
+func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
+	// Get the agent_flight_api from registry if it exists
+	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
+		if doAgent, ok := agent.(*mywant.DoAgent); ok {
+			// Set up the Flight API agent with the actual implementation
+			flightAgent := types.NewAgentFlightAPI(
+				"agent_flight_api",
+				[]string{"flight_api_agency"},
+				[]string{},
+				"http://localhost:8081",
+			)
+			doAgent.Action = flightAgent.Exec
+			log.Printf("[SERVER] ✅ Set up agent_flight_api with real implementation\n")
+		}
+	}
+}
+
+// setupMonitorFlightAgents sets up the Monitor Flight agent implementations
+func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
+	// Get the monitor_flight_api from registry if it exists
+	if agent, exists := agentRegistry.GetAgent("monitor_flight_api"); exists {
+		if monitorAgent, ok := agent.(*mywant.MonitorAgent); ok {
+			// Set up the Monitor Flight agent with the actual implementation
+			flightMonitor := types.NewMonitorFlightAPI(
+				"monitor_flight_api",
+				[]string{"flight_api_agency"},
+				[]string{},
+				"http://localhost:8081",
+			)
+			monitorAgent.Monitor = flightMonitor.Exec
+			log.Printf("[SERVER] ✅ Set up monitor_flight_api with real implementation\n")
+		}
+	}
 }
 
 // createWant handles POST /api/v1/wants - creates a new want object
+// Supports two formats:
+// 1. Single Want object (JSON/YAML)
+// 2. Config object with wants array (for recipe-based configs)
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Parse want object directly
-	var newWant *mywant.Want
+	// Read request body using a buffer to handle both known and unknown content lengths
+	var buf bytes.Buffer
+	io.Copy(&buf, r.Body)
+	data := buf.Bytes()
+
+	// First try to parse as a Config (recipe-based with multiple wants)
+	var config mywant.Config
+	var configErr error
 
 	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		// Handle YAML want object directly
-		wantYAML := make([]byte, r.ContentLength)
-		r.Body.Read(wantYAML)
-
-		if err := yaml.Unmarshal(wantYAML, &newWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid YAML want: %v", err), http.StatusBadRequest)
-			return
-		}
+		configErr = yaml.Unmarshal(data, &config)
 	} else {
-		// Handle JSON want object directly
-		if err := json.NewDecoder(r.Body).Decode(&newWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON want: %v", err), http.StatusBadRequest)
+		configErr = json.Unmarshal(data, &config)
+	}
+
+	// If config parsing failed or has no wants, try parsing as single Want
+	if configErr != nil || len(config.Wants) == 0 {
+		var newWant *mywant.Want
+
+		if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+			configErr = yaml.Unmarshal(data, &newWant)
+		} else {
+			configErr = json.Unmarshal(data, &newWant)
+		}
+
+		if configErr != nil || newWant == nil {
+			http.Error(w, fmt.Sprintf("Invalid request: must be either a Want object or Config with wants array. Error: %v", configErr), http.StatusBadRequest)
 			return
 		}
-	}
 
-	if newWant == nil {
-		http.Error(w, "Want object is required", http.StatusBadRequest)
-		return
+		// Create config with single want
+		config = mywant.Config{Wants: []*mywant.Want{newWant}}
 	}
-
-	// Create config with single want
-	config := mywant.Config{Wants: []*mywant.Want{newWant}}
 
 	// Validate want type before proceeding
 	if err := s.validateWantTypes(config); err != nil {
@@ -361,40 +410,59 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate unique ID for this want execution
-	wantID := generateWantID()
-
-	// Assign ID to the want if not already set
-	if newWant.Metadata.ID == "" {
-		newWant.Metadata.ID = generateWantID()
+	// Assign IDs to all wants if not already set
+	for _, want := range config.Wants {
+		if want.Metadata.ID == "" {
+			want.Metadata.ID = generateWantID()
+		}
 	}
+
+	// Generate unique ID for this execution (group of wants)
+	executionID := generateWantID()
 
 	// Create want execution with global builder (server mode)
 	execution := &WantExecution{
-		ID:      wantID,
+		ID:      executionID,
 		Config:  config,
 		Status:  "created",
 		Builder: s.globalBuilder, // Use shared global builder
 	}
 
 	// Store the execution
-	s.wants[wantID] = execution
+	s.wants[executionID] = execution
 
-	// Add want to global builder - reconcile loop will pick it up automatically
-	if err := s.globalBuilder.AddDynamicWants([]*mywant.Want{newWant}); err != nil {
-		// Remove from wants map since it wasn't added to builder
-		delete(s.wants, wantID)
-		errorMsg := fmt.Sprintf("Failed to add want: %v", err)
+	// Add all wants to global builder - reconcile loop will pick them up automatically
+	if err := s.globalBuilder.AddDynamicWants(config.Wants); err != nil {
+		// Remove from wants map since they weren't added to builder
+		delete(s.wants, executionID)
+		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
 		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusConflict)
 		return
 	}
 
-	fmt.Printf("[SERVER] Added want %s to global builder, reconcile loop will process it\n", wantID)
+	log.Printf("[SERVER] Added %d wants to global builder (execution %s), reconcile loop will process them\n", len(config.Wants), executionID)
+	for _, want := range config.Wants {
+		log.Printf("[SERVER]   - %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+	}
 
-	// Return created want
+	// Return created execution with first want ID as reference
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(execution)
+	response := map[string]interface{}{
+		"id":        executionID,
+		"status":    execution.Status,
+		"wants":     len(config.Wants),
+		"want_ids":  make([]string, len(config.Wants)),
+		"message":   "Wants created and added to execution queue",
+	}
+	// Build list of want IDs
+	wantIDs := make([]string, len(config.Wants))
+	for i, want := range config.Wants {
+		wantIDs[i] = want.Metadata.ID
+	}
+	response["want_ids"] = wantIDs
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // listWants handles GET /api/v1/wants - lists all wants in memory dump format
@@ -405,11 +473,11 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	// Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
-	fmt.Printf("[LIST_WANTS] Processing %d executions\n", len(s.wants))
+	log.Printf("[LIST_WANTS] Processing %d executions\n", len(s.wants))
 	for execID, execution := range s.wants {
 		// Get current want states from the builder (builder always exists)
 		currentStates := execution.Builder.GetAllWantStates()
-		fmt.Printf("[LIST_WANTS] Execution %s has %d wants\n", execID, len(currentStates))
+		log.Printf("[LIST_WANTS] Execution %s has %d wants\n", execID, len(currentStates))
 		for _, want := range currentStates {
 			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
@@ -427,11 +495,11 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store by ID to deduplicate (keep latest version)
-			fmt.Printf("[LIST_WANTS] Adding want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
+			log.Printf("[LIST_WANTS] Adding want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
-	fmt.Printf("[LIST_WANTS] After deduplication: %d unique wants\n", len(wantsByID))
+	log.Printf("[LIST_WANTS] After deduplication: %d unique wants\n", len(wantsByID))
 
 	// Convert map to slice
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
@@ -594,11 +662,11 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	fmt.Printf("[API_DELETE] Starting deletion for want ID: %s\n", wantID)
+	log.Printf("[API_DELETE] Starting deletion for want ID: %s\n", wantID)
 
 	// Search for the want across all executions
 	for executionID, execution := range s.wants {
-		fmt.Printf("[API_DELETE] Checking execution %s\n", executionID)
+		log.Printf("[API_DELETE] Checking execution %s\n", executionID)
 
 		var wantNameToDelete string
 		var foundInBuilder bool
@@ -606,12 +674,12 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		// Search in builder states if available
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
-			fmt.Printf("[API_DELETE] Builder has %d wants in runtime\n", len(currentStates))
+			log.Printf("[API_DELETE] Builder has %d wants in runtime\n", len(currentStates))
 			for wantName, want := range currentStates {
 				if want.Metadata.ID == wantID {
 					wantNameToDelete = wantName
 					foundInBuilder = true
-					fmt.Printf("[API_DELETE] Found want in builder: %s\n", wantName)
+					log.Printf("[API_DELETE] Found want in builder: %s\n", wantName)
 					break
 				}
 			}
@@ -625,32 +693,32 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					wantNameToDelete = want.Metadata.Name
 				}
 				configIndex = i
-				fmt.Printf("[API_DELETE] Found want in config at index %d\n", configIndex)
+				log.Printf("[API_DELETE] Found want in config at index %d\n", configIndex)
 				break
 			}
 		}
 
 		// If want was found, delete it
 		if wantNameToDelete != "" {
-			fmt.Printf("[API] Before deletion: %d wants in config\n", len(execution.Config.Wants))
-			fmt.Printf("[API_DELETE] foundInBuilder=%v, configIndex=%d\n", foundInBuilder, configIndex)
+			log.Printf("[API] Before deletion: %d wants in config\n", len(execution.Config.Wants))
+			log.Printf("[API_DELETE] foundInBuilder=%v, configIndex=%d\n", foundInBuilder, configIndex)
 
 			// Remove from config if it exists there
 			if configIndex >= 0 {
 				execution.Config.Wants = append(execution.Config.Wants[:configIndex], execution.Config.Wants[configIndex+1:]...)
-				fmt.Printf("[API] Removed from config, now %d wants in config\n", len(execution.Config.Wants))
+				log.Printf("[API] Removed from config, now %d wants in config\n", len(execution.Config.Wants))
 			} else {
-				fmt.Printf("[API] Want not in config (likely a dynamically created child want)\n")
+				log.Printf("[API] Want not in config (likely a dynamically created child want)\n")
 			}
 
 			// If using global builder (server mode), delete from runtime
 			if foundInBuilder && execution.Builder != nil {
-				fmt.Printf("[API_DELETE] Calling DeleteWantByID(%s)\n", wantID)
+				log.Printf("[API_DELETE] Calling DeleteWantByID(%s)\n", wantID)
 				// Delete the want directly from runtime by ID
 				if err := execution.Builder.DeleteWantByID(wantID); err != nil {
-					fmt.Printf("[API] Warning: Failed to delete want from runtime: %v\n", err)
+					log.Printf("[API] Warning: Failed to delete want from runtime: %v\n", err)
 				} else {
-					fmt.Printf("[API_DELETE] DeleteWantByID succeeded\n")
+					log.Printf("[API_DELETE] DeleteWantByID succeeded\n")
 				}
 
 				// Also update config if it was removed
@@ -658,9 +726,9 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					execution.Builder.SetConfigInternal(execution.Config)
 				}
 
-				fmt.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
+				log.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
 			} else {
-				fmt.Printf("[API_DELETE] Skipping DeleteWantByID (foundInBuilder=%v)\n", foundInBuilder)
+				log.Printf("[API_DELETE] Skipping DeleteWantByID (foundInBuilder=%v)\n", foundInBuilder)
 			}
 
 			// If no wants left, remove the entire execution
@@ -673,7 +741,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Printf("[API_DELETE] Want %s not found in any execution\n", wantID)
+	log.Printf("[API_DELETE] Want %s not found in any execution\n", wantID)
 
 	errorMsg := fmt.Sprintf("Want not found: %s", wantID)
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
@@ -1160,38 +1228,38 @@ func (s *Server) Start() error {
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
-	fmt.Println("[SERVER] Starting global reconcile loop for server mode...")
+	log.Println("[SERVER] Starting global reconcile loop for server mode...")
 	go s.globalBuilder.ExecuteWithMode(true)
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
-	fmt.Printf("🚀 MyWant server starting on %s\n", addr)
-	fmt.Printf("📋 Available endpoints:\n")
-	fmt.Printf("  GET  /health                        - Health check\n")
-	fmt.Printf("  POST /api/v1/configs               - Create config (YAML config with recipe reference)\n")
-	fmt.Printf("  POST /api/v1/wants                 - Create want (JSON/YAML want object)\n")
-	fmt.Printf("  GET  /api/v1/wants                 - List wants\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}            - Get want\n")
-	fmt.Printf("  PUT  /api/v1/wants/{id}            - Update want (JSON/YAML want object)\n")
-	fmt.Printf("  DELETE /api/v1/wants/{id}          - Delete want\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}/status     - Get execution status\n")
-	fmt.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
-	fmt.Printf("  POST /api/v1/wants/{id}/suspend    - Suspend want execution\n")
-	fmt.Printf("  POST /api/v1/wants/{id}/resume     - Resume want execution\n")
-	fmt.Printf("  POST /api/v1/agents                - Create agent\n")
-	fmt.Printf("  GET  /api/v1/agents                - List agents\n")
-	fmt.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")
-	fmt.Printf("  DELETE /api/v1/agents/{name}       - Delete agent\n")
-	fmt.Printf("  POST /api/v1/capabilities          - Create capability\n")
-	fmt.Printf("  GET  /api/v1/capabilities          - List capabilities\n")
-	fmt.Printf("  GET  /api/v1/capabilities/{name}   - Get capability\n")
-	fmt.Printf("  DELETE /api/v1/capabilities/{name} - Delete capability\n")
-	fmt.Printf("  GET  /api/v1/capabilities/{name}/agents - Find agents by capability\n")
-	fmt.Printf("  GET  /api/v1/errors              - List error history\n")
-	fmt.Printf("  GET  /api/v1/errors/{id}         - Get error details\n")
-	fmt.Printf("  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)\n")
-	fmt.Printf("  DELETE /api/v1/errors/{id}       - Delete error entry\n")
-	fmt.Printf("\n")
+	log.Printf("🚀 MyWant server starting on %s\n", addr)
+	log.Printf("📋 Available endpoints:\n")
+	log.Printf("  GET  /health                        - Health check\n")
+	log.Printf("  POST /api/v1/configs               - Create config (YAML config with recipe reference)\n")
+	log.Printf("  POST /api/v1/wants                 - Create want (JSON/YAML want object)\n")
+	log.Printf("  GET  /api/v1/wants                 - List wants\n")
+	log.Printf("  GET  /api/v1/wants/{id}            - Get want\n")
+	log.Printf("  PUT  /api/v1/wants/{id}            - Update want (JSON/YAML want object)\n")
+	log.Printf("  DELETE /api/v1/wants/{id}          - Delete want\n")
+	log.Printf("  GET  /api/v1/wants/{id}/status     - Get execution status\n")
+	log.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
+	log.Printf("  POST /api/v1/wants/{id}/suspend    - Suspend want execution\n")
+	log.Printf("  POST /api/v1/wants/{id}/resume     - Resume want execution\n")
+	log.Printf("  POST /api/v1/agents                - Create agent\n")
+	log.Printf("  GET  /api/v1/agents                - List agents\n")
+	log.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")
+	log.Printf("  DELETE /api/v1/agents/{name}       - Delete agent\n")
+	log.Printf("  POST /api/v1/capabilities          - Create capability\n")
+	log.Printf("  GET  /api/v1/capabilities          - List capabilities\n")
+	log.Printf("  GET  /api/v1/capabilities/{name}   - Get capability\n")
+	log.Printf("  DELETE /api/v1/capabilities/{name} - Delete capability\n")
+	log.Printf("  GET  /api/v1/capabilities/{name}/agents - Find agents by capability\n")
+	log.Printf("  GET  /api/v1/errors              - List error history\n")
+	log.Printf("  GET  /api/v1/errors/{id}         - Get error details\n")
+	log.Printf("  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)\n")
+	log.Printf("  DELETE /api/v1/errors/{id}       - Delete error entry\n")
+	log.Printf("\n")
 
 	return http.ListenAndServe(addr, s.router)
 }
@@ -1483,7 +1551,7 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTargetTypeRegistry) error {
 	// Check if recipes directory exists
 	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
-		fmt.Printf("[SERVER] Recipe directory '%s' does not exist, skipping recipe loading\n", recipeDir)
+		log.Printf("[SERVER] Recipe directory '%s' does not exist, skipping recipe loading\n", recipeDir)
 		return nil
 	}
 
@@ -1496,7 +1564,7 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 		return fmt.Errorf("failed to list recipes: %v", err)
 	}
 
-	fmt.Printf("[SERVER] Loading %d recipe files into registry...\n", len(recipes))
+	log.Printf("[SERVER] Loading %d recipe files into registry...\n", len(recipes))
 
 	// Load each recipe file
 	loadedCount := 0
@@ -1506,13 +1574,13 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 		// Read and parse the recipe file directly
 		data, err := os.ReadFile(fullPath)
 		if err != nil {
-			fmt.Printf("[SERVER] Warning: Failed to read recipe %s: %v\n", relativePath, err)
+			log.Printf("[SERVER] Warning: Failed to read recipe %s: %v\n", relativePath, err)
 			continue
 		}
 
 		var recipe mywant.GenericRecipe
 		if err := yaml.Unmarshal(data, &recipe); err != nil {
-			fmt.Printf("[SERVER] Warning: Failed to parse recipe %s: %v\n", relativePath, err)
+			log.Printf("[SERVER] Warning: Failed to parse recipe %s: %v\n", relativePath, err)
 			continue
 		}
 
@@ -1525,21 +1593,35 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 
 		// Create the recipe in the registry
 		if err := registry.CreateRecipe(recipeID, &recipe); err != nil {
-			fmt.Printf("[SERVER] Warning: Failed to register recipe %s: %v\n", recipeID, err)
+			log.Printf("[SERVER] Warning: Failed to register recipe %s: %v\n", recipeID, err)
 			continue
 		}
 
-		fmt.Printf("[SERVER] ✅ Loaded recipe: %s\n", recipeID)
+		log.Printf("[SERVER] ✅ Loaded recipe: %s\n", recipeID)
 		loadedCount++
 	}
 
-	fmt.Printf("[SERVER] Successfully loaded %d/%d recipe files\n", loadedCount, len(recipes))
+	log.Printf("[SERVER] Successfully loaded %d/%d recipe files\n", loadedCount, len(recipes))
 	return nil
 }
 
 // loadRecipesFromDirectory loads all recipe files from a directory into the registry
 
 func main() {
+	// Create logs directory if it doesn't exist
+	if err := os.MkdirAll("./logs", 0755); err != nil {
+		log.Fatalf("Failed to create logs directory: %v", err)
+	}
+
+	// Configure logging to a file
+	logFile, err := os.OpenFile("./logs/mywant-backend.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
 	// Parse command line arguments
 	port := 8080
 	host := "localhost"

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	. "mywant/engine/src"
@@ -94,16 +95,37 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 	}
 
-	// Check if already attempted using persistent state
-	attemptedVal, _ := f.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
-
 	if len(outputs) == 0 {
 		return true
 	}
 	out := outputs[0]
 
+	// Check for delayed flights that need cancellation and rebooking
+	if f.shouldCancelAndRebook() {
+		fmt.Printf("[FLIGHT] Flight status is delayed, initiating cancellation and rebooking\n")
+		if err := f.cancelCurrentFlight(); err != nil {
+			fmt.Printf("[FLIGHT] Failed to cancel flight: %v\n", err)
+			f.StoreState("cancellation_status", "failed")
+			f.StoreState("cancellation_error", err.Error())
+			return true
+		}
+
+		// Reset state for new booking
+		f.StoreState("previous_flight_id", f.GetStateValue("flight_id"))
+		f.StoreState("previous_flight_status", "cancelled")
+		f.StoreState("flight_id", "")
+		f.StoreState("flight_status", "")
+		f.StoreState("attempted", false)
+
+		fmt.Printf("[FLIGHT] Cancelled flight, resetting for new booking\n")
+	}
+
+	// Check if already attempted using persistent state
+	attemptedVal, _ := f.GetState("attempted")
+	attempted, _ := attemptedVal.(bool)
+
 	if attempted {
+		// Already booked in this cycle
 		return true
 	}
 
@@ -283,6 +305,10 @@ func (f *FlightWant) tryAgentExecution() *FlightSchedule {
 
 			fmt.Printf("[FLIGHT] Successfully retrieved agent result: %+v\n", schedule)
 			f.StoreState("execution_source", "agent")
+
+			// Start continuous monitoring for this flight
+			f.StartContinuousMonitoring()
+
 			return &schedule
 		}
 
@@ -335,4 +361,119 @@ func (f *FlightWant) SetSchedule(schedule FlightSchedule) {
 // Helper function to check time conflicts
 func (f *FlightWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
+}
+
+// shouldCancelAndRebook checks if the current flight should be cancelled due to delay
+func (f *FlightWant) shouldCancelAndRebook() bool {
+	// Check if flight has been created
+	flightID, exists := f.GetState("flight_id")
+	if !exists || flightID == "" {
+		return false
+	}
+
+	// Check current flight status
+	statusVal, exists := f.GetState("flight_status")
+	if !exists {
+		return false
+	}
+
+	status, ok := statusVal.(string)
+	if !ok {
+		return false
+	}
+
+	// Cancel and rebook if delayed
+	if status == "delayed_one_day" {
+		fmt.Printf("[FLIGHT] Detected delayed_one_day status, will cancel and rebook\n")
+		return true
+	}
+
+	return false
+}
+
+// cancelCurrentFlight cancels the current flight reservation
+func (f *FlightWant) cancelCurrentFlight() error {
+	// Get the flight API agent if available
+	flightIDVal, exists := f.GetState("flight_id")
+	if !exists {
+		return fmt.Errorf("no active flight to cancel")
+	}
+
+	flightID, ok := flightIDVal.(string)
+	if !ok || flightID == "" {
+		return fmt.Errorf("invalid flight_id for cancellation")
+	}
+
+	// Get server URL from params
+	params := f.Spec.Params
+	serverURL, ok := params["server_url"].(string)
+	if !ok || serverURL == "" {
+		serverURL = "http://localhost:8081"
+	}
+
+	// Create a temporary agent for cancellation
+	agent := NewAgentFlightAPI("cancel-agent", []string{}, []string{}, serverURL)
+
+	// Execute cancellation - this will call DELETE API and update state
+	if err := agent.CancelFlight(context.Background(), &f.Want); err != nil {
+		fmt.Printf("[FLIGHT] Failed to execute cancellation: %v\n", err)
+		return err
+	}
+
+	fmt.Printf("[FLIGHT] Successfully cancelled flight %s\n", flightID)
+	f.StoreState("cancellation_successful", true)
+	f.StoreState("cancelled_flight_id", flightID)
+
+	return nil
+}
+
+// GetStateValue is a helper to safely get state value
+func (f *FlightWant) GetStateValue(key string) interface{} {
+	val, _ := f.GetState(key)
+	return val
+}
+
+// StartContinuousMonitoring starts a background goroutine to continuously poll flight status
+// This is called after the flight is successfully booked via agents
+func (f *FlightWant) StartContinuousMonitoring() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			// Check if flight has been booked
+			flightIDVal, exists := f.GetState("flight_id")
+			if !exists {
+				fmt.Printf("[FLIGHT-MONITOR] No flight_id found, stopping monitoring\n")
+				return
+			}
+
+			flightID, ok := flightIDVal.(string)
+			if !ok || flightID == "" {
+				fmt.Printf("[FLIGHT-MONITOR] Invalid flight_id, stopping monitoring\n")
+				return
+			}
+
+			// Get server URL from params
+			params := f.Spec.Params
+			serverURL, ok := params["server_url"].(string)
+			if !ok || serverURL == "" {
+				serverURL = "http://localhost:8081"
+			}
+
+			// Create monitor agent and poll
+			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
+			if err := monitor.Exec(context.Background(), &f.Want); err != nil {
+				fmt.Printf("[FLIGHT-MONITOR] Polling error: %v\n", err)
+			} else {
+				// Log the current status
+				if status, exists := f.GetState("flight_status"); exists {
+					fmt.Printf("[FLIGHT-MONITOR] Flight %s status: %v (polled at %s)\n",
+						flightID, status, time.Now().Format("15:04:05"))
+				}
+			}
+		}
+	}()
+
+	fmt.Printf("[FLIGHT] Started continuous monitoring for flight %s\n", f.Metadata.Name)
 }

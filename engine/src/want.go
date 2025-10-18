@@ -94,6 +94,9 @@ type Want struct {
 
 	// State synchronization
 	stateMutex sync.RWMutex `json:"-" yaml:"-"`
+
+	// Stop channel for graceful shutdown of want's goroutines
+	stopChannel chan struct{} `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status and emits StatusChange event
@@ -213,15 +216,40 @@ func (n *Want) AggregateChanges() {
 	}
 }
 
+// valuesEqual compares two interface{} values for equality
+// Handles different types properly including strings, numbers, booleans, etc.
+func (n *Want) valuesEqual(val1, val2 interface{}) bool {
+	// Handle nil cases
+	if val1 == nil && val2 == nil {
+		return true
+	}
+	if val1 == nil || val2 == nil {
+		return false
+	}
+
+	// Try direct comparison first (works for strings, numbers, booleans)
+	return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
+}
+
 // GetStatus returns the current want status
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
 
 // StoreState stores a key-value pair in the want's state
+// Only adds to state history if the value has actually changed
 func (n *Want) StoreState(key string, value interface{}) {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
+
+	// Get previous value to check if it's actually different
+	previousValue, exists := n.getStateUnsafe(key)
+
+	// Check if the value has actually changed
+	if exists && n.valuesEqual(previousValue, value) {
+		// No change, skip history update
+		return
+	}
 
 	// If we're in an exec cycle, batch the changes
 	if n.inExecCycle {
@@ -232,17 +260,14 @@ func (n *Want) StoreState(key string, value interface{}) {
 		return
 	}
 
-	// Otherwise, store immediately (legacy behavior)
-	// Get previous value for notification
-	previousValue, _ := n.getStateUnsafe(key)
-
+	// Value has changed, store it
 	// Store the state - preserve existing State to maintain parameterHistory
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
 
-	// Add to state history
+	// Add to state history only when value changes
 	n.addToStateHistory(key, value, previousValue)
 
 	// Create notification
@@ -453,6 +478,14 @@ func (n *Want) GetAllState() map[string]interface{} {
 		stateCopy[k] = v
 	}
 	return stateCopy
+}
+
+// GetStopChannel returns the stop channel for the want
+func (n *Want) GetStopChannel() chan struct{} {
+	if n.stopChannel == nil {
+		n.stopChannel = make(chan struct{})
+	}
+	return n.stopChannel
 }
 
 // OnProcessEnd handles state storage when the want process ends
