@@ -287,7 +287,8 @@ func (n *Want) StoreState(key string, value interface{}) {
 // Respects the execution cycle skipping logic (skip every N cycles)
 func (n *Want) addAggregatedStateHistory() {
 	// Skip history recording based on execution cycle count
-	// Default skip count is 100, so record only every 100th cycle
+	// Default skip count is 100, so record only every 100th cycle for normal exec cycles
+	// However, for batched monitor/agent cycles, always record if there are pending changes
 	// Can be overridden via want parameters or config
 	skipCount := 100
 	if n.Spec.Params != nil {
@@ -297,7 +298,11 @@ func (n *Want) addAggregatedStateHistory() {
 			}
 		}
 	}
-	if skipCount > 0 && n.execCycleCount%skipCount != 0 {
+
+	// Always record if this is a monitor agent batch (typically very few cycles total)
+	// Don't skip if we have pending changes that should be recorded
+	shouldSkip := skipCount > 0 && n.execCycleCount%skipCount != 0 && n.execCycleCount > 10
+	if shouldSkip {
 		return // Skip this cycle
 	}
 
