@@ -563,9 +563,6 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Store stats using thread-safe StoreState
 	h.StoreState("total_processed", 1)
-
-	// Store live state with reservation details
-	h.StoreState("total_processed", 1)
 	h.StoreState("hotel_type", hotelType)
 	h.StoreState("check_in_time", newEvent.Start.Format("15:04 Jan 2"))
 	h.StoreState("check_out_time", newEvent.End.Format("15:04 Jan 2"))

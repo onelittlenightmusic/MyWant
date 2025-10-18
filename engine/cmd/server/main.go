@@ -93,7 +93,7 @@ func NewServer(config ServerConfig) *Server {
 
 	// Create global builder for server mode with empty config
 	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
-	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-server.yaml")
+	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetAgentRegistry(agentRegistry)
 
@@ -499,6 +499,34 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
+
+	// If no wants from executions, also check global builder (for wants loaded from memory file)
+	if len(wantsByID) == 0 && s.globalBuilder != nil {
+		log.Printf("[LIST_WANTS] No wants in executions, checking global builder...\n")
+		currentStates := s.globalBuilder.GetAllWantStates()
+		log.Printf("[LIST_WANTS] Global builder has %d wants\n", len(currentStates))
+		for _, want := range currentStates {
+			// Create a snapshot copy of the want to avoid concurrent map access
+			wantCopy := &mywant.Want{
+				Metadata: want.Metadata,
+				Spec:     want.Spec,
+				Status:   want.GetStatus(),
+				History:  want.History,
+				State:    make(map[string]interface{}),
+			}
+
+			// Get current runtime state and copy to the snapshot
+			currentState := want.GetAllState()
+			for k, v := range currentState {
+				wantCopy.State[k] = v
+			}
+
+			// Store by ID to deduplicate (keep latest version)
+			log.Printf("[LIST_WANTS] Adding want %s (ID: %s) from global builder\n", want.Metadata.Name, want.Metadata.ID)
+			wantsByID[want.Metadata.ID] = wantCopy
+		}
+	}
+
 	log.Printf("[LIST_WANTS] After deduplication: %d unique wants\n", len(wantsByID))
 
 	// Convert map to slice

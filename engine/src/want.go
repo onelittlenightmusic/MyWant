@@ -285,26 +285,12 @@ func (n *Want) StoreState(key string, value interface{}) {
 
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
 // Respects the execution cycle skipping logic (skip every N cycles)
+// ALWAYS records batched changes (never skips when this is called from AggregateChanges)
 func (n *Want) addAggregatedStateHistory() {
-	// Skip history recording based on execution cycle count
-	// Default skip count is 100, so record only every 100th cycle for normal exec cycles
-	// However, for batched monitor/agent cycles, always record if there are pending changes
-	// Can be overridden via want parameters or config
-	skipCount := 100
-	if n.Spec.Params != nil {
-		if customSkip, exists := n.Spec.Params["state_history_skip_count"]; exists {
-			if skipVal, ok := customSkip.(int); ok {
-				skipCount = skipVal
-			}
-		}
-	}
-
-	// Always record if this is a monitor agent batch (typically very few cycles total)
-	// Don't skip if we have pending changes that should be recorded
-	shouldSkip := skipCount > 0 && n.execCycleCount%skipCount != 0 && n.execCycleCount > 10
-	if shouldSkip {
-		return // Skip this cycle
-	}
+	// Note: This method is called from AggregateChanges() which is called from EndExecCycle()
+	// It should ALWAYS record the aggregated batch, never skip it
+	// The purpose of batching is to have ONE entry per exec cycle, not many
+	// Skipping defeats the purpose of aggregation
 
 	if n.State == nil {
 		n.State = make(map[string]interface{})
