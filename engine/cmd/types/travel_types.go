@@ -1029,7 +1029,12 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	schedules, _ := schedulesVal.([]*TravelSchedule)
 	if schedules == nil {
 		schedules = make([]*TravelSchedule, 0)
-		t.StoreState("schedules", schedules)
+		// Batch initial schedules update
+		{
+			t.BeginExecCycle()
+			t.StoreState("schedules", schedules)
+			t.EndExecCycle()
+		}
 	}
 
 	// Collect all schedules from child wants
@@ -1044,8 +1049,12 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		}
 	}
 
-	// Update persistent state
-	t.StoreState("schedules", schedules)
+	// Update persistent state with collected schedules
+	{
+		t.BeginExecCycle()
+		t.StoreState("schedules", schedules)
+		t.EndExecCycle()
+	}
 
 	// When we have all schedules, create final itinerary
 	if len(schedules) >= 3 {
@@ -1073,8 +1082,12 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			fmt.Printf("   %s\n", event.Name)
 		}
 
-		// Initialize stats map if not exists
-		t.StoreState("total_processed", len(allEvents))
+		// Batch final coordinator state update
+		{
+			t.BeginExecCycle()
+			t.StoreState("total_processed", len(allEvents))
+			t.EndExecCycle()
+		}
 		fmt.Printf("\n✅ Travel itinerary completed with %d events!\n", len(allEvents))
 		return true
 	}
