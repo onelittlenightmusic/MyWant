@@ -36,8 +36,12 @@ func (a *AgentFlight) Exec(ctx context.Context, want *Want) error {
 	// Generate flight booking schedule
 	schedule := a.generateFlightSchedule(want)
 
-	// Store the result using StoreState method
-	want.StoreState("agent_result", schedule)
+	// Store the result using StoreState method (batched)
+	{
+		want.BeginExecCycle()
+		want.StoreState("agent_result", schedule)
+		want.EndExecCycle()
+	}
 
 	fmt.Printf("[AGENT_FLIGHT] Flight booking completed: %s departing at %s for %.1f hours\n",
 		schedule.FlightType, schedule.DepartureTime.Format("15:04 Jan 2"),
