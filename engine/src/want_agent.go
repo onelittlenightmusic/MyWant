@@ -62,9 +62,13 @@ func (n *Want) executeAgent(agent Agent) error {
 	n.RunningAgents = append(n.RunningAgents, agent.GetName())
 	n.CurrentAgent = agent.GetName()
 
-	// Store agent information in state for history tracking
-	n.StoreState("current_agent", agent.GetName())
-	n.StoreState("running_agents", n.RunningAgents)
+	// Store agent information in state for history tracking (batched to reduce history bloat)
+	{
+		n.BeginExecCycle()
+		n.StoreState("current_agent", agent.GetName())
+		n.StoreState("running_agents", n.RunningAgents)
+		n.EndExecCycle()
+	}
 
 	// Create agent execution record
 	agentExec := AgentExecution{
@@ -103,9 +107,13 @@ func (n *Want) executeAgent(agent Agent) error {
 				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 			}
 
-			// Update state with current agent and running agents info
-			n.StoreState("current_agent", n.CurrentAgent)
-			n.StoreState("running_agents", n.RunningAgents)
+			// Update state with current agent and running agents info (batched)
+			{
+				n.BeginExecCycle()
+				n.StoreState("current_agent", n.CurrentAgent)
+				n.StoreState("running_agents", n.RunningAgents)
+				n.EndExecCycle()
+			}
 
 			if r := recover(); r != nil {
 				fmt.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
