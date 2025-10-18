@@ -29,11 +29,11 @@ const (
 	EventTypeOwnerChildState EventType = "owner_child_state"
 
 	// Group B: Sync control (pre-execution) - for future use
-	EventTypePreExecution    EventType = "pre_execution"
-	EventTypeMonitorAgent    EventType = "monitor_agent"
-	EventTypeChannelEnd      EventType = "channel_end"
-	EventTypeStatusChange    EventType = "status_change"
-	EventTypeProcessEnd      EventType = "process_end"
+	EventTypePreExecution EventType = "pre_execution"
+	EventTypeMonitorAgent EventType = "monitor_agent"
+	EventTypeChannelEnd   EventType = "channel_end"
+	EventTypeStatusChange EventType = "status_change"
+	EventTypeProcessEnd   EventType = "process_end"
 
 	// Group C: Blocking coordination
 	EventTypeOwnerCompletion EventType = "owner_completion"
@@ -44,11 +44,11 @@ const (
 type ExecutionControl string
 
 const (
-	ExecutionContinue  ExecutionControl = "continue"   // Proceed with execution
-	ExecutionSkip      ExecutionControl = "skip"       // Skip this cycle
-	ExecutionTerminate ExecutionControl = "terminate"  // Stop want permanently
-	ExecutionBlock     ExecutionControl = "block"      // Wait for condition
-	ExecutionRestart   ExecutionControl = "restart"    // Restart from beginning
+	ExecutionContinue  ExecutionControl = "continue"  // Proceed with execution
+	ExecutionSkip      ExecutionControl = "skip"      // Skip this cycle
+	ExecutionTerminate ExecutionControl = "terminate" // Stop want permanently
+	ExecutionBlock     ExecutionControl = "block"     // Wait for condition
+	ExecutionRestart   ExecutionControl = "restart"   // Restart from beginning
 )
 
 // ProcessingMode defines when and how events are processed
@@ -56,8 +56,8 @@ type ProcessingMode int
 
 const (
 	ProcessAsync ProcessingMode = iota // Fire and forget - Group A
-	ProcessSync                         // Must process before Exec() - Group B
-	ProcessBlock                        // Wait for response - Group C
+	ProcessSync                        // Must process before Exec() - Group B
+	ProcessBlock                       // Wait for response - Group C
 )
 
 // WantEvent is the unified interface for all event types
@@ -72,8 +72,8 @@ type WantEvent interface {
 // EventResponse contains the result of event handling
 type EventResponse struct {
 	ExecutionControl ExecutionControl // For Group B/C
-	Handled          bool              // Whether event was processed
-	Error            error             // Any error during handling
+	Handled          bool             // Whether event was processed
+	Error            error            // Any error during handling
 }
 
 // EventSubscription is the unified interface for event handlers
@@ -91,11 +91,11 @@ type BaseEvent struct {
 	Priority   int
 }
 
-func (e *BaseEvent) GetEventType() EventType   { return e.EventType }
-func (e *BaseEvent) GetSourceName() string     { return e.SourceName }
-func (e *BaseEvent) GetTargetName() string     { return e.TargetName }
-func (e *BaseEvent) GetTimestamp() time.Time   { return e.Timestamp }
-func (e *BaseEvent) GetPriority() int          { return e.Priority }
+func (e *BaseEvent) GetEventType() EventType { return e.EventType }
+func (e *BaseEvent) GetSourceName() string   { return e.SourceName }
+func (e *BaseEvent) GetTargetName() string   { return e.TargetName }
+func (e *BaseEvent) GetTimestamp() time.Time { return e.Timestamp }
+func (e *BaseEvent) GetPriority() int        { return e.Priority }
 
 // StateChangeEvent represents a state change notification (Group A)
 type StateChangeEvent struct {

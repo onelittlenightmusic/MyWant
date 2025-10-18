@@ -178,7 +178,6 @@ func emitOwnerChildStateEvent(notification StateNotification, ownerName string) 
 	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
-
 // storeNotificationHistory stores notification for debugging
 func storeNotificationHistory(notification StateNotification) {
 	historyMutex.Lock()
@@ -218,4 +217,3 @@ func ClearNotificationHistory() {
 	defer historyMutex.Unlock()
 	notificationHistory = notificationHistory[:0]
 }
-

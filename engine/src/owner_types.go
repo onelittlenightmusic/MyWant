@@ -28,7 +28,7 @@ type Target struct {
 	Description            string                 // Human-readable description of this target
 	RecipePath             string                 // Path to the recipe file to use for child creation
 	RecipeParams           map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
-	parameterSubscriptions map[string][]string  // Map of parameter names to child want names that subscribe to them
+	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
 	paths                  Paths
 	childWants             []*Want
 	completedChildren      map[string]bool      // Track which children have completed
@@ -285,7 +285,6 @@ func (t *Target) GetWant() *Want {
 	return &t.Want
 }
 
-
 // UpdateParameter updates a parameter and pushes it to child wants
 func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 	// Update our own parameter first
@@ -497,7 +496,6 @@ func (t *Target) addChildWantsToMemory() error {
 	fmt.Printf("🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
 	return nil
 }
-
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {

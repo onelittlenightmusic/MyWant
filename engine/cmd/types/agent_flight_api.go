@@ -81,7 +81,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	departureTime, err := time.Parse(time.RFC3339, departureTimeStr)
 	if err != nil {
 		// Default to tomorrow morning
-		departureTime = time.Now().AddDate(0, 0, 1).Truncate(24*time.Hour).Add(8 * time.Hour)
+		departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
 	}
 
 	arrivalTimeStr, _ := params["arrival_time"].(string)

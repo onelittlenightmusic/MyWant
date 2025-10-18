@@ -24,10 +24,10 @@ type MonitorFlightAPI struct {
 
 // StatusChange represents a status change event
 type StatusChange struct {
-	Timestamp   time.Time
-	OldStatus   string
-	NewStatus   string
-	Details     string
+	Timestamp time.Time
+	OldStatus string
+	NewStatus string
+	Details   string
 }
 
 // NewMonitorFlightAPI creates a new flight API monitor agent
@@ -148,15 +148,19 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	// Store flight details in state (StoreState will only record if values change)
-	want.StoreState("flight_id", reservation.ID)
-	want.StoreState("flight_number", reservation.FlightNumber)
-	want.StoreState("from", reservation.From)
-	want.StoreState("to", reservation.To)
-	want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
-	want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
-	want.StoreState("status_message", reservation.StatusMessage)
-	want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+	// Batch flight detail state updates (in case any change)
+	{
+		want.BeginExecCycle()
+		want.StoreState("flight_id", reservation.ID)
+		want.StoreState("flight_number", reservation.FlightNumber)
+		want.StoreState("from", reservation.From)
+		want.StoreState("to", reservation.To)
+		want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
+		want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
+		want.StoreState("status_message", reservation.StatusMessage)
+		want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+		want.EndExecCycle()
+	}
 
 	// Check for status change
 	newStatus := reservation.Status
@@ -174,20 +178,37 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		}
 		m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
 
-		// Store status change info
-		want.StoreState("flight_status", newStatus)
-		want.StoreState("status_changed", true)
-		want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
-		want.StoreState("status_change_history_count", len(m.StatusChangeHistory))
+		// Batch all status change state updates into a single history entry
+		{
+			want.BeginExecCycle()
+			// Store status change info - all batched together
+			want.StoreState("flight_status", newStatus)
+			want.StoreState("status_changed", true)
+			want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
+			want.StoreState("status_change_history_count", len(m.StatusChangeHistory))
 
-		// Store complete flight info when status changes
-		schedule := FlightSchedule{
-			DepartureTime:   reservation.DepartureTime,
-			ArrivalTime:     reservation.ArrivalTime,
-			FlightNumber:    reservation.FlightNumber,
-			ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+			// Store complete flight info when status changes
+			schedule := FlightSchedule{
+				DepartureTime:   reservation.DepartureTime,
+				ArrivalTime:     reservation.ArrivalTime,
+				FlightNumber:    reservation.FlightNumber,
+				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+			}
+			want.StoreState("agent_result", schedule)
+
+			// Store all status history in state - also batched
+			statusHistoryStrs := make([]string, 0)
+			for _, change := range m.StatusChangeHistory {
+				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
+					change.Timestamp.Format("15:04:05"),
+					change.OldStatus,
+					change.NewStatus,
+					change.Details)
+				statusHistoryStrs = append(statusHistoryStrs, historyEntry)
+			}
+			want.StoreState("status_history", statusHistoryStrs)
+			want.EndExecCycle()
 		}
-		want.StoreState("agent_result", schedule)
 
 		m.LastKnownStatus = newStatus
 
@@ -195,23 +216,14 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		fmt.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)\n",
 			reservation.ID, newStatus, time.Now().Format("15:04:05"))
 	} else {
-		// No status change, but still update the flight_status (will be ignored by StoreState if unchanged)
-		want.StoreState("flight_status", newStatus)
-		want.StoreState("status_changed", false)
-		want.StoreState("last_poll_time", time.Now().Format(time.RFC3339))
+		// No status change - still batch the status field updates
+		{
+			want.BeginExecCycle()
+			want.StoreState("flight_status", newStatus)
+			want.StoreState("status_changed", false)
+			want.EndExecCycle()
+		}
 	}
-
-	// Store all status history in state
-	statusHistoryStrs := make([]string, 0)
-	for _, change := range m.StatusChangeHistory {
-		historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
-			change.Timestamp.Format("15:04:05"),
-			change.OldStatus,
-			change.NewStatus,
-			change.Details)
-		statusHistoryStrs = append(statusHistoryStrs, historyEntry)
-	}
-	want.StoreState("status_history", statusHistoryStrs)
 
 	fmt.Printf("[MonitorFlightAPI] Polling complete - Current status: %s\n", newStatus)
 

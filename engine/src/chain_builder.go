@@ -651,7 +651,8 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 						actualChildName,
 					)
 					log.Printf("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)\n",
-									target.Metadata.Name, actualChildName, paramRefStr, childParamName)				}
+						target.Metadata.Name, actualChildName, paramRefStr, childParamName)
+				}
 			}
 		}
 	}
@@ -813,13 +814,13 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 					if !duplicate {
 						want.Spec.Using = append(want.Spec.Using, selector)
 						connectionsAdded++
-											log.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
-												want.Metadata.Name, selector, otherWant.Metadata.Name)
-						
+						log.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
+							want.Metadata.Name, selector, otherWant.Metadata.Name)
+
 					} else {
-											log.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
-												want.Metadata.Name, selector)
-						
+						log.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
+							want.Metadata.Name, selector)
+
 					}
 				} else {
 					log.Printf("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
@@ -1184,9 +1185,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		wantPtr.History = wantConfig.History
 
 		// Initialize parameterHistory with initial parameter values if empty or nil
-			if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
-				log.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
-		
+		if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
+			log.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
+
 			// Create a deep copy of the parameters to avoid reference issues
 			paramsCopy := make(map[string]interface{})
 			for k, v := range wantConfig.Spec.Params {
@@ -1991,7 +1992,6 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 	}
 	return nil
 }
-
 
 // ==============================
 // Suspend/Resume Control Methods

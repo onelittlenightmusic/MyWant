@@ -12,8 +12,8 @@ import (
 
 // Server handles HTTP requests for flight reservations
 type Server struct {
-	store    *FlightStore
-	updater  *StatusUpdater
+	store   *FlightStore
+	updater *StatusUpdater
 }
 
 // NewServer creates a new server instance

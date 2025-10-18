@@ -9,10 +9,10 @@ import (
 type FlightStatus string
 
 const (
-	StatusConfirmed       FlightStatus = "confirmed"
-	StatusDetailsChanged  FlightStatus = "details_changed"
-	StatusDelayed         FlightStatus = "delayed_one_day"
-	StatusCancelled       FlightStatus = "cancelled"
+	StatusConfirmed      FlightStatus = "confirmed"
+	StatusDetailsChanged FlightStatus = "details_changed"
+	StatusDelayed        FlightStatus = "delayed_one_day"
+	StatusCancelled      FlightStatus = "cancelled"
 )
 
 // FlightReservation represents a flight booking
