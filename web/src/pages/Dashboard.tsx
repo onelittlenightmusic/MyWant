@@ -32,9 +32,15 @@ export const Dashboard: React.FC = () => {
   // UI State
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
-  const [selectedWant, setSelectedWant] = useState<Want | null>(null);
+  const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+
+  // Derive selectedWant from wants array using selectedWantId
+  // This ensures selectedWant always reflects the current data from polling
+  const selectedWant = selectedWantId
+    ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
+    : null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,24 +65,19 @@ export const Dashboard: React.FC = () => {
     }
   );
 
-  // Auto-sync selectedWant with updated wants array when status changes
-  // This ensures control panel buttons automatically refresh when want status changes
+  // Clear selection if selected want was deleted
   useEffect(() => {
-    if (selectedWant) {
-      const updatedWant = wants.find(w =>
-        (w.metadata?.id === selectedWant.metadata?.id) ||
-        (w.id === selectedWant.id)
+    if (selectedWantId) {
+      const stillExists = wants.some(w =>
+        (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)
       );
 
-      if (updatedWant && updatedWant.status !== selectedWant.status) {
-        // Status changed - update selectedWant to trigger button state refresh
-        setSelectedWant(updatedWant);
-      } else if (updatedWant && updatedWant.suspended !== selectedWant.suspended) {
-        // Suspension state changed - update selectedWant to trigger button state refresh
-        setSelectedWant(updatedWant);
+      // Only clear selection if the want was actually deleted
+      if (!stillExists) {
+        setSelectedWantId(null);
       }
     }
-  }, [wants, selectedWant]);
+  }, [wants, selectedWantId]);
 
   // Clear errors after 5 seconds
   useEffect(() => {
@@ -100,7 +101,8 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleViewWant = (want: Want) => {
-    setSelectedWant(want);
+    const wantId = want.metadata?.id || want.id;
+    setSelectedWantId(wantId || null);
   };
 
   const handleDeleteWantConfirm = async () => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { ChevronDown, Users } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
@@ -56,6 +56,15 @@ export const WantCard: React.FC<WantCardProps> = ({
     }
 
     onView(want);
+  };
+
+  // Handler for child card clicks - passes child directly without closure
+  const handleChildCardClick = (child: Want) => (e: React.MouseEvent) => {
+    if (e.defaultPrevented) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    onView(child);
   };
 
   return (
@@ -118,23 +127,19 @@ export const WantCard: React.FC<WantCardProps> = ({
               const idB = b.metadata?.id || b.id || '';
               return idA.localeCompare(idB);
             }).map((child, index) => {
+              const childId = child.metadata?.id || child.id || '';
               const isChildSelected = selectedWant && (
                 (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
                 (selectedWant.id && selectedWant.id === child.id)
               );
               return (
                 <div
-                  key={child.metadata?.id || `child-${index}`}
+                  key={childId || `child-${index}`}
                   className={classNames(
                     "p-3 bg-white rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer relative z-0",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
                   )}
-                  onClick={(e) => {
-                    if (e.defaultPrevented) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onView(child);
-                  }}
+                  onClick={handleChildCardClick(child)}
                 >
                 {/* Child want content using reusable component */}
                 <WantCardContent

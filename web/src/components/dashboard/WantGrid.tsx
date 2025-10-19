@@ -43,7 +43,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
     // Separate top-level wants (no owner references) and child wants
     const topLevelWants: WantWithChildren[] = [];
-    const childWantsByParent = new Map<string, Want[]>();
+    const childWantsByParentId = new Map<string, Want[]>();
 
     wants.forEach(want => {
       const hasOwnerReferences = want.metadata?.ownerReferences && want.metadata.ownerReferences.length > 0;
@@ -52,21 +52,22 @@ export const WantGrid: React.FC<WantGridProps> = ({
         // This is a top-level want
         topLevelWants.push({ ...want, children: [] });
       } else {
-        // This is a child want - group by parent
-        const parentName = want.metadata?.ownerReferences?.[0]?.name;
-        if (parentName) {
-          if (!childWantsByParent.has(parentName)) {
-            childWantsByParent.set(parentName, []);
+        // This is a child want - group by parent ID
+        const parentId = want.metadata?.ownerReferences?.[0]?.id;
+        if (parentId) {
+          if (!childWantsByParentId.has(parentId)) {
+            childWantsByParentId.set(parentId, []);
           }
-          childWantsByParent.get(parentName)!.push(want);
+          childWantsByParentId.get(parentId)!.push(want);
         }
       }
     });
 
     // Attach children to their parents
     topLevelWants.forEach(parentWant => {
-      if (parentWant.metadata?.name) {
-        const children = childWantsByParent.get(parentWant.metadata.name) || [];
+      const parentId = parentWant.metadata?.id;
+      if (parentId) {
+        const children = childWantsByParentId.get(parentId) || [];
         parentWant.children = children;
       }
     });
