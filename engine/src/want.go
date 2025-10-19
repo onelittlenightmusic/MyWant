@@ -329,12 +329,19 @@ func (n *Want) StoreState(key string, value interface{}) {
 // Uses differential checking to prevent duplicate entries when state hasn't actually changed
 // Only creates a history entry if the state differs from the last recorded state
 func (n *Want) addAggregatedStateHistory() {
+	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 
-	// Create a single entry with the complete state as object
-	stateSnapshot := n.copyCurrentState()
+	// Create a copy of current state while holding lock (use unsafe read since we already hold lock)
+	stateSnapshot := make(map[string]interface{})
+	for key, value := range n.State {
+		stateSnapshot[key] = value
+	}
 
 	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
 	if len(n.History.StateHistory) > 0 {
@@ -381,6 +388,10 @@ func (n *Want) addAggregatedParameterHistory() {
 		Timestamp:  time.Now(),
 	}
 
+	// CRITICAL: Protect History.ParameterHistory access with stateMutex to prevent concurrent slice mutations
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
 	// Append the new entry to parameter history
 	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
 
@@ -424,6 +435,10 @@ func (n *Want) addToStateHistory(key string, value interface{}, previousValue in
 		Timestamp:  time.Now(),
 	}
 
+	// CRITICAL: Protect History.StateHistory access with stateMutex to prevent concurrent slice mutations
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
 	// Add to state history in History field
 	if n.History.StateHistory == nil {
 		n.History.StateHistory = make([]StateHistoryEntry, 0)
@@ -449,6 +464,10 @@ func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, p
 		StateValue: paramMap,
 		Timestamp:  time.Now(),
 	}
+
+	// CRITICAL: Protect History.ParameterHistory access with stateMutex to prevent concurrent slice mutations
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
 
 	// Add to parameter history in History field
 	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
