@@ -69,12 +69,70 @@ make run-sample-owner        # Dynamic wants using recipes from recipes/ directo
 #### Direct Configuration Examples
 ```sh
 # Direct want definitions (no recipes)
-make run-qnet          # Uses config/config-qnet.yaml  
+make run-qnet          # Uses config/config-qnet.yaml
 make run-prime         # Uses config/config-prime.yaml
 make run-fibonacci     # Uses config/config-fibonacci.yaml
 make run-fibonacci-loop # Uses config/config-fibonacci-loop.yaml
 make run-travel        # Uses config/config-travel.yaml
 ```
+
+### Server Startup and Testing
+
+#### Building the Server Binary
+```sh
+# Build MyWant server
+make build-server      # Creates ./bin/mywant binary
+
+# Build Mock Flight Server
+make build-mock        # Creates ./bin/flight-server binary
+```
+
+#### Starting/Restarting Servers
+```sh
+# Start both MyWant server (8080) and Mock Flight Server (8081)
+make restart-all       # Kills existing servers and starts fresh
+                       # MyWant server listens on localhost:8080
+                       # Flight server listens on localhost:8081
+
+# Individual server start
+make run-server        # Start MyWant server on port 8080
+make run-mock          # Start Mock Flight Server on port 8081
+```
+
+#### Concurrent Stress Testing
+
+```sh
+# Main concurrent deployment test (recommended)
+make test-concurrent-deploy  # Tests concurrent want deployments with race condition detection
+                             # Deploys Travel Planner + Fibonacci Recipe concurrently
+                             # Verifies no "concurrent map read/write" panics
+                             # Takes ~15 seconds to complete
+
+# Check server status
+curl -s http://localhost:8080/api/v1/wants | jq '.wants | length'
+```
+
+**Test Workflow**:
+1. Deploys Travel Planner recipe (independent wants: restaurant, hotel, buffet)
+2. Waits 0.5 seconds
+3. Deploys Fibonacci Recipe concurrently (exercises state mutations)
+4. Waits 10 seconds for execution
+5. Verifies both deployments succeeded and no race conditions detected
+
+**Success Indicators**:
+- Both deployments return HTTP 201 (Created)
+- Server remains responsive throughout
+- No "concurrent map read/write" panic in logs
+- Execution completes without crashes
+
+**Race Condition Context**:
+The test specifically validates the fix for concurrent map access during:
+- Multiple goroutines writing to `Want.State` map
+- `AggregateChanges()` batching state updates
+- `addAggregatedStateHistory()` reading state snapshots
+- Concurrent execution of independent wants
+
+**Logs Location**: `logs/mywant-backend.log`
 
 ## Code Patterns
 
