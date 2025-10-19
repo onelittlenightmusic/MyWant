@@ -589,11 +589,8 @@ const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, 
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900">
-              {entry.wantName}
-            </div>
             {paramTimestamp && (
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-500">
                 {formatDate(paramTimestamp)}
               </div>
             )}
