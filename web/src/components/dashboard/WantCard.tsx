@@ -126,10 +126,12 @@ export const WantCard: React.FC<WantCardProps> = ({
                 <div
                   key={child.metadata?.id || `child-${index}`}
                   className={classNames(
-                    "p-3 bg-white rounded-md border hover:shadow-sm transition-all duration-200",
+                    "p-3 bg-white rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer relative z-0",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
                   )}
                   onClick={(e) => {
+                    if (e.defaultPrevented) return;
+                    e.preventDefault();
                     e.stopPropagation();
                     onView(child);
                   }}
