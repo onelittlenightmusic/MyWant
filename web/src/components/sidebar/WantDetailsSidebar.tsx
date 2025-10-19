@@ -532,6 +532,44 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => (
 );
 
 
+// Helper function to render JSON as itemized list
+const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
+  const items: React.ReactNode[] = [];
+
+  if (obj === null || obj === undefined) {
+    return [<span key="null" className="text-gray-600">null</span>];
+  }
+
+  if (typeof obj !== 'object') {
+    return [<span key="value">{String(obj)}</span>];
+  }
+
+  // Skip the opening braces and format as items
+  Object.entries(obj).forEach(([key, value], index) => {
+    const isNested = value !== null && typeof value === 'object' && !Array.isArray(value);
+    const isArray = Array.isArray(value);
+
+    if (isNested || isArray) {
+      items.push(
+        <div key={key} className={`${depth > 0 ? 'ml-4' : ''} mb-2`}>
+          <div className="font-medium text-gray-800 text-xs mb-1">{key}:</div>
+          <div className="ml-3 space-y-1">
+            {renderStateAsItems(value, depth + 1)}
+          </div>
+        </div>
+      );
+    } else {
+      items.push(
+        <div key={key} className={`${depth > 0 ? 'ml-4' : ''} text-xs text-gray-700 mb-1`}>
+          <span className="font-medium text-gray-800">{key}:</span> <span className="text-gray-600">{String(value)}</span>
+        </div>
+      );
+    }
+  });
+
+  return items;
+};
+
 // State History Item Component with expand/collapse
 const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, index }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -574,12 +612,12 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
         </div>
       </button>
 
-      {/* Expanded View */}
+      {/* Expanded View - Itemized Format */}
       {isExpanded && (
         <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <pre className="bg-white rounded p-3 text-xs overflow-auto whitespace-pre-wrap border font-mono">
-            {JSON.stringify(state, null, 2)}
-          </pre>
+          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border space-y-2">
+            {renderStateAsItems(state)}
+          </div>
         </div>
       )}
     </div>
