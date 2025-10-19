@@ -202,23 +202,26 @@ func (n *Want) AggregateChanges() {
 		// Clear pending changes after copying to prevent re-recording on next cycle
 		n.pendingStateChanges = make(map[string]interface{})
 	}
-	n.stateMutex.Unlock()
 
-	// Apply changes outside the lock
+	// Apply changes INSIDE the lock to prevent concurrent map read/write
 	if len(changesCopy) > 0 {
 		// Create a single aggregated state history entry with complete state snapshot
 		if n.State == nil {
 			n.State = make(map[string]interface{})
 		}
 
-		// Apply all pending changes to actual state
+		// Apply all pending changes to actual state (CRITICAL: must hold lock!)
 		for key, value := range changesCopy {
 			n.State[key] = value
 		}
+	}
+	n.stateMutex.Unlock()
 
-		// Create one history entry with the complete state snapshot
+	// Create history entries (each will acquire lock internally)
+	if len(changesCopy) > 0 {
 		n.addAggregatedStateHistory()
 	}
+
 	// Handle parameter changes
 	if len(n.pendingParameterChanges) > 0 {
 		// Create one aggregated parameter history entry
