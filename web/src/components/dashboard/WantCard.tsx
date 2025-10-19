@@ -35,13 +35,18 @@ export const WantCard: React.FC<WantCardProps> = ({
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
     const target = e.target as HTMLElement;
-    if (
-      target.closest('button') ||
-      target.closest('[role="button"]') ||
-      target.closest('.relative.group/menu')
-    ) {
+
+    // Check if click target is an interactive element
+    if (target.closest('button') || target.closest('[role="button"]')) {
       return;
     }
+
+    // Check if target is inside a menu dropdown (contains both 'group' and 'menu' in classList)
+    const parentWithMenu = target.closest('[class*="relative"][class*="group"]');
+    if (parentWithMenu && parentWithMenu.querySelector('[class*="bg-white"][class*="rounded"][class*="shadow"]')) {
+      return;
+    }
+
     onView(want);
   };
 
