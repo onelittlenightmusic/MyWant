@@ -636,7 +636,7 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
           )}
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-gray-900">
-              State Change #{index + 1}
+              #{index + 1}
             </div>
             {stateTimestamp && (
               <div className="text-xs text-gray-500 mt-1">
