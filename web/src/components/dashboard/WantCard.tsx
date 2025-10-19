@@ -32,12 +32,28 @@ export const WantCard: React.FC<WantCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const hasChildren = children && children.length > 0;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('[role="button"]') ||
+      target.closest('.relative.group/menu')
+    ) {
+      return;
+    }
+    onView(want);
+  };
+
   return (
-    <div className={classNames(
-      'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
-      selected ? 'border-blue-500 border-2' : 'border-gray-200',
-      className || ''
-    )}>
+    <div
+      onClick={handleCardClick}
+      className={classNames(
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
+        selected ? 'border-blue-500 border-2' : 'border-gray-200',
+        className || ''
+      )}
+    >
       {/* Parent want content using reusable component */}
       <WantCardContent
         want={want}

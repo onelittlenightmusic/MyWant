@@ -69,8 +69,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
-              className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors cursor-pointer`}
-              onClick={() => onView(want)}
+              className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors`}
             >
               {wantType}
             </h3>
