@@ -59,6 +59,25 @@ export const Dashboard: React.FC = () => {
     }
   );
 
+  // Auto-sync selectedWant with updated wants array when status changes
+  // This ensures control panel buttons automatically refresh when want status changes
+  useEffect(() => {
+    if (selectedWant) {
+      const updatedWant = wants.find(w =>
+        (w.metadata?.id === selectedWant.metadata?.id) ||
+        (w.id === selectedWant.id)
+      );
+
+      if (updatedWant && updatedWant.status !== selectedWant.status) {
+        // Status changed - update selectedWant to trigger button state refresh
+        setSelectedWant(updatedWant);
+      } else if (updatedWant && updatedWant.suspended !== selectedWant.suspended) {
+        // Suspension state changed - update selectedWant to trigger button state refresh
+        setSelectedWant(updatedWant);
+      }
+    }
+  }, [wants, selectedWant]);
+
   // Clear errors after 5 seconds
   useEffect(() => {
     if (error) {
