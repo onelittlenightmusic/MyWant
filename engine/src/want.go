@@ -277,7 +277,6 @@ func (n *Want) GetStatus() WantStatus {
 // Only adds to state history if the value has actually changed (differential tracking)
 func (n *Want) StoreState(key string, value interface{}) {
 	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
 
 	// Get previous value to check if it's actually different
 	previousValue, exists := n.getStateUnsafe(key)
@@ -285,6 +284,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 	// Check if the value has actually changed (DIFFERENTIAL CHECK)
 	if exists && n.valuesEqual(previousValue, value) {
 		// No change, skip entirely - don't even stage it
+		n.stateMutex.Unlock()
 		return
 	}
 
@@ -295,6 +295,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 		}
 		// Only stage if value is new or different (differential tracking)
 		n.pendingStateChanges[key] = value
+		n.stateMutex.Unlock()
 		return
 	}
 
@@ -312,7 +313,10 @@ func (n *Want) StoreState(key string, value interface{}) {
 	}
 	n.pendingStateChanges[key] = value
 
-	// Create notification
+	n.stateMutex.Unlock()
+
+	// Create and send notifications AFTER releasing the lock
+	// The notification data is already captured, so no need to hold the lock
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
 		StateKey:       key,
@@ -321,7 +325,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 		Timestamp:      time.Now(),
 	}
 
-	// Send notifications through the generalized system
+	// Send notifications (no lock needed - just passing data)
 	sendStateNotifications(notification)
 }
 
