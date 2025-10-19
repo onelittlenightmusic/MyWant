@@ -276,6 +276,31 @@ func (n *Want) GetStatus() WantStatus {
 // StoreState stores a key-value pair in the want's state
 // Only adds to state history if the value has actually changed (differential tracking)
 func (n *Want) StoreState(key string, value interface{}) {
+	// OPTIMIZATION: During exec cycle, we only batch to pendingStateChanges (no lock needed)
+	// Lock only needed when accessing/modifying State map outside exec cycle
+	if n.inExecCycle {
+		// Fast path: During Want.Exec(), just stage changes without lock
+		// No concurrent access to pendingStateChanges during a single execution
+		if n.pendingStateChanges == nil {
+			n.pendingStateChanges = make(map[string]interface{})
+		}
+
+		// Check if value actually changed (using existing state as reference)
+		n.stateMutex.Lock()
+		previousValue, exists := n.getStateUnsafe(key)
+		n.stateMutex.Unlock()
+
+		if exists && n.valuesEqual(previousValue, value) {
+			// No change, skip entirely
+			return
+		}
+
+		// Stage the change (no lock needed - pendingStateChanges is only accessed during this exec cycle)
+		n.pendingStateChanges[key] = value
+		return
+	}
+
+	// Slow path: Outside exec cycle, need lock to access/modify State
 	n.stateMutex.Lock()
 
 	// Get previous value to check if it's actually different
@@ -284,17 +309,6 @@ func (n *Want) StoreState(key string, value interface{}) {
 	// Check if the value has actually changed (DIFFERENTIAL CHECK)
 	if exists && n.valuesEqual(previousValue, value) {
 		// No change, skip entirely - don't even stage it
-		n.stateMutex.Unlock()
-		return
-	}
-
-	// If we're in an exec cycle, batch only the CHANGED values
-	if n.inExecCycle {
-		if n.pendingStateChanges == nil {
-			n.pendingStateChanges = make(map[string]interface{})
-		}
-		// Only stage if value is new or different (differential tracking)
-		n.pendingStateChanges[key] = value
 		n.stateMutex.Unlock()
 		return
 	}
