@@ -51,12 +51,22 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     }
   }, [isOpen, want, fetchWantDetails, fetchWantResults, fetchWants]);
 
+  // Auto-enable refresh when modal opens with running want
+  useEffect(() => {
+    if (isOpen && selectedWantDetails && selectedWantDetails.status === 'running') {
+      setAutoRefresh(true);
+    } else if (isOpen && selectedWantDetails && selectedWantDetails.status !== 'running' && autoRefresh) {
+      // Auto-disable when want stops running
+      setAutoRefresh(false);
+    }
+  }, [isOpen, selectedWantDetails?.status]);
+
   // Auto-refresh for running wants
   useEffect(() => {
     if (!isOpen || !want || !autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (want.status === 'running') {
+      if (selectedWantDetails && selectedWantDetails.status === 'running') {
         const wantId = want.metadata?.id || want.id;
         if (wantId) {
           fetchWantDetails(wantId);
@@ -67,7 +77,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isOpen, want, autoRefresh, fetchWantDetails, fetchWantResults, fetchWants]);
+  }, [isOpen, want, autoRefresh, selectedWantDetails?.status, fetchWantDetails, fetchWantResults, fetchWants]);
 
   const handleRefresh = () => {
     if (want) {

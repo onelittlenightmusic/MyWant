@@ -65,6 +65,16 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [want]);
 
+  // Auto-enable refresh for running wants
+  useEffect(() => {
+    if (want && selectedWantDetails && selectedWantDetails.status === 'running') {
+      setAutoRefresh(true);
+    } else if (want && selectedWantDetails && selectedWantDetails.status !== 'running' && autoRefresh) {
+      // Auto-disable when want stops running
+      setAutoRefresh(false);
+    }
+  }, [want, selectedWantDetails?.status]);
+
   // Auto refresh setup
   useEffect(() => {
     if (autoRefresh && want) {
