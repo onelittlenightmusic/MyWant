@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText } from 'lucide-react';
+import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -532,6 +532,60 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => (
 );
 
 
+// State History Item Component with expand/collapse
+const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, index }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Extract flight_status if it exists
+  const flightStatus = state.stateValue?.flight_status || state.flight_status;
+  const stateTimestamp = state.timestamp;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+      {/* Collapsed/Header View */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center space-x-3 flex-1 text-left">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900">
+              State Change #{index + 1}
+            </div>
+            {stateTimestamp && (
+              <div className="text-xs text-gray-500 mt-1">
+                {formatDate(stateTimestamp)}
+              </div>
+            )}
+          </div>
+          {/* Flight Status Highlight in Shrink Mode */}
+          {!isExpanded && flightStatus && (
+            <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
+              <span className="text-xs font-medium px-2 py-1 rounded bg-blue-100 text-blue-800">
+                Flight: {flightStatus}
+              </span>
+            </div>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded View */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <pre className="bg-white rounded p-3 text-xs overflow-auto whitespace-pre-wrap border font-mono">
+            {JSON.stringify(state, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasParameterHistory = want.history?.parameterHistory && want.history.parameterHistory.length > 0;
   const hasLogs = results?.logs && results.logs.length > 0;
@@ -582,14 +636,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
           <h4 className="text-base font-medium text-gray-900 mb-4">State History</h4>
           <div className="space-y-3">
             {want.history.stateHistory.map((state, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-md p-4">
-                <div className="text-sm font-medium text-gray-900 mb-2">
-                  State Change #{index + 1}
-                </div>
-                <pre className="bg-gray-50 rounded p-3 text-xs overflow-auto whitespace-pre-wrap border">
-                  {JSON.stringify(state, null, 2)}
-                </pre>
-              </div>
+              <StateHistoryItem key={index} state={state} index={index} />
             ))}
           </div>
         </div>
