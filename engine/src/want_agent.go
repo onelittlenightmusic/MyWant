@@ -131,6 +131,11 @@ func (n *Want) executeAgent(agent Agent) error {
 			delete(n.runningAgents, agent.GetName())
 		}()
 
+		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle
+		// This ensures all agent state changes are batched into a single history entry
+		// Individual agents should NOT call BeginExecCycle/EndExecCycle themselves
+		n.BeginExecCycle()
+
 		if err := agent.Exec(ctx, n); err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
 			// Update agent execution record with error
@@ -152,6 +157,9 @@ func (n *Want) executeAgent(agent Agent) error {
 			}
 			// AgentHistory is now managed separately from state
 		}
+
+		// FRAMEWORK-LEVEL: Commit all agent state changes
+		n.EndExecCycle()
 	}
 
 	// Execute synchronously for DO agents, asynchronously for MONITOR agents

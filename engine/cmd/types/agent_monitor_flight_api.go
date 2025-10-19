@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,11 +16,12 @@ import (
 // MonitorFlightAPI extends MonitorAgent to poll flight status from mock server
 type MonitorFlightAPI struct {
 	MonitorAgent
-	ServerURL           string
-	PollInterval        time.Duration
-	LastPollTime        time.Time
-	LastKnownStatus     string
-	StatusChangeHistory []StatusChange
+	ServerURL             string
+	PollInterval          time.Duration
+	LastPollTime          time.Time
+	LastKnownStatus       string
+	StatusChangeHistory   []StatusChange
+	LastRecordedStateHash string // Track last recorded state to avoid duplicate history entries
 }
 
 // StatusChange represents a status change event
@@ -49,6 +51,9 @@ func NewMonitorFlightAPI(name string, capabilities []string, uses []string, serv
 }
 
 // Exec polls the mock server for flight status updates
+// NOTE: This agent runs ONE TIME per ExecuteAgents() call
+// The continuous polling loop is handled by the Want's Exec method (FlightWant)
+// Individual agents should NOT implement their own polling loops
 func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Get flight ID from state (set by AgentFlightAPI)
 	flightID, exists := want.GetState("flight_id")
@@ -73,20 +78,14 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	}
 	fmt.Printf("[MonitorFlightAPI] Current m.LastKnownStatus: %s\n", m.LastKnownStatus)
 
-	// Restore status history from want state for persistence across execution cycles
-	// Clear current history to avoid duplicates if this is a re-execution
-	m.StatusChangeHistory = make([]StatusChange, 0)
+	// Restore status history from want state for persistence
+	// Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
 		if historyStrs, ok := historyI.([]interface{}); ok {
 			log.Printf("[MonitorFlightAPI] Restoring %d status history entries from state (interface{})", len(historyStrs))
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
-					// The format string needs to match exactly what was stored
-					// Example: "15:04:05: confirmed -> details_changed (Flight details updated)"
-					// We need to parse the timestamp, old status, new status, and details
-					// This is a simplified parsing, assuming the format "HH:MM:SS: OldStatus -> NewStatus (Details)"
-					// A more robust solution would involve storing StatusChange objects as JSON
-					// For now, let's try to parse the string
+					// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
 					var ts, os, ns, det string
 					n, err := fmt.Sscanf(entry, "%s: %s -> %s (%s)", &ts, &os, &ns, &det)
 					if err == nil && n == 4 {
@@ -94,12 +93,22 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 						if timeErr != nil {
 							parsedTime = time.Now() // Fallback
 						}
-						m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
-							Timestamp: parsedTime,
-							OldStatus: os,
-							NewStatus: ns,
-							Details:   det,
-						})
+						// Only add if not already in history
+						found := false
+						for _, existing := range m.StatusChangeHistory {
+							if existing.OldStatus == os && existing.NewStatus == ns && existing.Details == det {
+								found = true
+								break
+							}
+						}
+						if !found {
+							m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
+								Timestamp: parsedTime,
+								OldStatus: os,
+								NewStatus: ns,
+								Details:   det,
+							})
+						}
 					} else {
 						log.Printf("[MonitorFlightAPI] Failed to parse history entry (interface{}): %s, Error: %v, n=%d\n", entry, err, n)
 					}
@@ -115,12 +124,22 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 					if timeErr != nil {
 						parsedTime = time.Now() // Fallback
 					}
-					m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
-						Timestamp: parsedTime,
-						OldStatus: os,
-						NewStatus: ns,
-						Details:   det,
-					})
+					// Only add if not already in history
+					found := false
+					for _, existing := range m.StatusChangeHistory {
+						if existing.OldStatus == os && existing.NewStatus == ns && existing.Details == det {
+							found = true
+							break
+						}
+					}
+					if !found {
+						m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
+							Timestamp: parsedTime,
+							OldStatus: os,
+							NewStatus: ns,
+							Details:   det,
+						})
+					}
 				} else {
 					log.Printf("[MonitorFlightAPI] Failed to parse history entry ([]string): %s, Error: %v, n=%d\n", entry, err, n)
 				}
@@ -148,9 +167,20 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	// Batch flight detail state updates (in case any change)
-	{
-		want.BeginExecCycle()
+	// Check for status change first (differential history - only record if state changed)
+	newStatus := reservation.Status
+	oldStatus := m.LastKnownStatus
+	hasStateChange := newStatus != oldStatus
+
+	// Calculate hash of current reservation data for differential history
+	currentStateJSON, _ := json.Marshal(reservation)
+	currentStateHash := fmt.Sprintf("%x", md5.Sum(currentStateJSON))
+
+	// Only update state if state has actually changed (differential history)
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
+		// Store flight detail state updates
 		want.StoreState("flight_id", reservation.ID)
 		want.StoreState("flight_number", reservation.FlightNumber)
 		want.StoreState("from", reservation.From)
@@ -159,29 +189,20 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
 		want.StoreState("status_message", reservation.StatusMessage)
 		want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
-		want.EndExecCycle()
-	}
 
-	// Check for status change
-	newStatus := reservation.Status
-	oldStatus := m.LastKnownStatus
+		if hasStateChange {
+			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
 
-	if newStatus != oldStatus {
-		fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
+			// Record status change
+			statusChange := StatusChange{
+				Timestamp: time.Now(),
+				OldStatus: oldStatus,
+				NewStatus: newStatus,
+				Details:   reservation.StatusMessage,
+			}
+			m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
 
-		// Record status change
-		statusChange := StatusChange{
-			Timestamp: time.Now(),
-			OldStatus: oldStatus,
-			NewStatus: newStatus,
-			Details:   reservation.StatusMessage,
-		}
-		m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
-
-		// Batch all status change state updates into a single history entry
-		{
-			want.BeginExecCycle()
-			// Store status change info - all batched together
+			// Store status change info
 			want.StoreState("flight_status", newStatus)
 			want.StoreState("status_changed", true)
 			want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
@@ -196,7 +217,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			}
 			want.StoreState("agent_result", schedule)
 
-			// Store all status history in state - also batched
+			// Store all status history in state
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range m.StatusChangeHistory {
 				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
@@ -207,22 +228,24 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 				statusHistoryStrs = append(statusHistoryStrs, historyEntry)
 			}
 			want.StoreState("status_history", statusHistoryStrs)
-			want.EndExecCycle()
+
+			m.LastKnownStatus = newStatus
+
+			// Print status progression
+			fmt.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)\n",
+				reservation.ID, newStatus, time.Now().Format("15:04:05"))
+
+			// Update hash after successful commit
+			m.LastRecordedStateHash = currentStateHash
+			fmt.Printf("[MonitorFlightAPI] State recorded (hash: %s)\n", currentStateHash[:8])
+		} else {
+			// No status change - don't create history entry, but still update other flight details
+			fmt.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s\n", newStatus)
+			m.LastRecordedStateHash = currentStateHash
 		}
-
-		m.LastKnownStatus = newStatus
-
-		// Print status progression
-		fmt.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)\n",
-			reservation.ID, newStatus, time.Now().Format("15:04:05"))
 	} else {
-		// No status change - still batch the status field updates
-		{
-			want.BeginExecCycle()
-			want.StoreState("flight_status", newStatus)
-			want.StoreState("status_changed", false)
-			want.EndExecCycle()
-		}
+		// No state change - skip history entry
+		fmt.Printf("[MonitorFlightAPI] No state change detected, skipping history entry\n")
 	}
 
 	fmt.Printf("[MonitorFlightAPI] Polling complete - Current status: %s\n", newStatus)

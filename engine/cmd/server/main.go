@@ -441,6 +441,13 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trigger reconciliation to immediately process the newly added wants
+	if err := s.globalBuilder.TriggerReconcile(); err != nil {
+		log.Printf("[SERVER] Failed to trigger reconciliation: %v\n", err)
+	} else {
+		log.Printf("[SERVER] Sent reconciliation trigger\n")
+	}
+
 	log.Printf("[SERVER] Added %d wants to global builder (execution %s), reconcile loop will process them\n", len(config.Wants), executionID)
 	for _, want := range config.Wants {
 		log.Printf("[SERVER]   - %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
@@ -575,6 +582,30 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(wantCopy)
 				return
 			}
+		}
+	}
+
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Create a snapshot copy of the want to avoid concurrent map access
+			wantCopy := &mywant.Want{
+				Metadata: want.Metadata,
+				Spec:     want.Spec,
+				Status:   want.GetStatus(),
+				History:  want.History,
+				State:    make(map[string]interface{}),
+			}
+
+			// Get current runtime state and copy to the snapshot
+			currentState := want.GetAllState()
+			for k, v := range currentState {
+				wantCopy.State[k] = v
+			}
+
+			// Return the snapshot copy
+			json.NewEncoder(w).Encode(wantCopy)
+			return
 		}
 	}
 
@@ -769,7 +800,28 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("[API_DELETE] Want %s not found in any execution\n", wantID)
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		log.Printf("[API_DELETE] Searching in global builder...\n")
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			log.Printf("[API_DELETE] Found want in global builder: %s\n", want.Metadata.Name)
+
+			// Delete the want from the global builder
+			if err := s.globalBuilder.DeleteWantByID(wantID); err != nil {
+				log.Printf("[API] Warning: Failed to delete want from global builder: %v\n", err)
+				errorMsg := fmt.Sprintf("Failed to delete want: %v", err)
+				s.logError(r, http.StatusInternalServerError, errorMsg, "deletion", err.Error(), wantID)
+				http.Error(w, errorMsg, http.StatusInternalServerError)
+				return
+			}
+
+			log.Printf("[API_DELETE] Successfully deleted want from global builder\n")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+	}
+
+	log.Printf("[API_DELETE] Want %s not found in any execution or global builder\n", wantID)
 
 	errorMsg := fmt.Sprintf("Want not found: %s", wantID)
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
@@ -790,11 +842,24 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 				// Found the want, return its status
 				status := map[string]interface{}{
 					"id":     want.Metadata.ID,
-					"status": string(want.Status),
+					"status": string(want.GetStatus()),
 				}
 				json.NewEncoder(w).Encode(status)
 				return
 			}
+		}
+	}
+
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Found the want, return its status
+			status := map[string]interface{}{
+				"id":     want.Metadata.ID,
+				"status": string(want.GetStatus()),
+			}
+			json.NewEncoder(w).Encode(status)
+			return
 		}
 	}
 
@@ -817,11 +882,23 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 					want.State = make(map[string]interface{})
 				}
 				results := map[string]interface{}{
-					"data": want.State,
+					"data": want.GetAllState(),
 				}
 				json.NewEncoder(w).Encode(results)
 				return
 			}
+		}
+	}
+
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Found the want, return its results (stored in State)
+			results := map[string]interface{}{
+				"data": want.GetAllState(),
+			}
+			json.NewEncoder(w).Encode(results)
+			return
 		}
 	}
 

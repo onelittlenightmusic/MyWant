@@ -12,9 +12,12 @@ import (
 // FlightWant creates flight booking reservations
 type FlightWant struct {
 	Want
-	FlightType string
-	Duration   time.Duration
-	paths      Paths
+	FlightType          string
+	Duration            time.Duration
+	paths               Paths
+	monitoringStartTime time.Time
+	monitoringDuration  time.Duration // How long to monitor for status changes
+	monitoringActive    bool          // Whether monitoring is currently active
 }
 
 // NewFlightWant creates a new flight booking want
@@ -26,8 +29,10 @@ func NewFlightWant(metadata Metadata, spec WantSpec) *FlightWant {
 			Status:   WantStatusIdle,
 			State:    make(map[string]interface{}),
 		},
-		FlightType: "economy",
-		Duration:   12 * time.Hour, // Default 12 hour flight
+		FlightType:         "economy",
+		Duration:           12 * time.Hour, // Default 12 hour flight
+		monitoringActive:   false,
+		monitoringDuration: 60 * time.Second, // Monitor for 60 seconds after flight creation
 	}
 
 	if ft, ok := spec.Params["flight_type"]; ok {
@@ -80,6 +85,28 @@ func (f *FlightWant) GetWant() *Want {
 
 // Exec creates a flight booking reservation
 func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+	// Handle continuous monitoring phase
+	if f.monitoringActive {
+		// Continue running monitoring during the monitoring duration
+		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
+			// Still within monitoring window - just keep the want running
+			fmt.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
+				time.Since(f.monitoringStartTime), f.monitoringDuration)
+
+			// The monitoring agent will be triggered through the normal agent execution framework
+			// during the reconciliation loop. We just need to stay in the monitoring phase
+			// by returning false to keep the want running
+
+			// Return false to keep running through reconciliation cycles
+			return false
+		} else {
+			// Monitoring duration exceeded, complete the monitoring phase
+			fmt.Printf("[FLIGHT] Monitoring completed (total duration: %v)\n", time.Since(f.monitoringStartTime))
+			f.monitoringActive = false
+			return true
+		}
+	}
+
 	// Read parameters fresh each cycle - enables dynamic changes!
 	flightType := "economy"
 	if ft, ok := f.Spec.Params["flight_type"]; ok {
@@ -158,7 +185,16 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			agentSchedule.DepartureTime.Format("15:04 Jan 2"),
 			agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
 
-		return true
+		// Start continuous monitoring to capture all status changes
+		if !f.monitoringActive {
+			f.monitoringActive = true
+			f.monitoringStartTime = time.Now()
+			fmt.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
+		}
+
+		// Continue running to collect more status updates
+		// Return false to keep this want running through reconciliation cycles
+		return false
 	}
 
 	// Normal flight execution (only runs if no agent match)
@@ -219,10 +255,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 
-	// Store stats using thread-safe StoreState
-	f.StoreState("total_processed", 1)
-
-	// Store live state with reservation details
+	// Store flight details using thread-safe StoreState (batched to minimize history entries)
 	f.StoreState("total_processed", 1)
 	f.StoreState("flight_type", flightType)
 	f.StoreState("departure_time", newEvent.Start.Format("15:04 Jan 2"))

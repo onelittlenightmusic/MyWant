@@ -2106,31 +2106,45 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 // DeleteWantByID removes a want from runtime by its ID
 // If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
-	cb.reconcileMutex.Lock()
-	defer cb.reconcileMutex.Unlock()
-
 	fmt.Printf("[DELETE_BY_ID] Starting deletion for want ID: %s\n", wantID)
+
+	// Phase 1: Find the want name by ID (with lock held briefly)
+	cb.reconcileMutex.Lock()
 	fmt.Printf("[DELETE_BY_ID] Current runtime has %d wants\n", len(cb.wants))
 
-	// Find the want name by ID
 	var wantName string
-	for name, runtimeWant := range cb.wants {
-		fmt.Printf("[DELETE_BY_ID] Checking want %s (ID: %s)\n", name, runtimeWant.want.Metadata.ID)
-		if runtimeWant.want.Metadata.ID == wantID {
-			wantName = name
-			fmt.Printf("[DELETE_BY_ID] Found target want: %s\n", wantName)
-			break
+	wantsCopy := make([]string, 0, len(cb.wants))
+
+	// Collect all want names first
+	for name := range cb.wants {
+		wantsCopy = append(wantsCopy, name)
+	}
+	cb.reconcileMutex.Unlock()
+
+	// Search through the collected names for the target want
+	cb.reconcileMutex.RLock()
+	for _, name := range wantsCopy {
+		if runtimeWant, exists := cb.wants[name]; exists {
+			fmt.Printf("[DELETE_BY_ID] Checking want %s (ID: %s)\n", name, runtimeWant.want.Metadata.ID)
+			if runtimeWant.want.Metadata.ID == wantID {
+				wantName = name
+				fmt.Printf("[DELETE_BY_ID] Found target want: %s\n", wantName)
+				break
+			}
 		}
 	}
+	cb.reconcileMutex.RUnlock()
 
 	if wantName == "" {
 		fmt.Printf("[DELETE_BY_ID] ERROR: Want with ID %s not found in runtime\n", wantID)
 		return fmt.Errorf("want with ID %s not found in runtime", wantID)
 	}
 
-	// Find and delete all children first (cascade deletion)
+	// Phase 2: Find all children first (cascade deletion) with read lock
 	var childrenToDelete []string
 	fmt.Printf("[DELETE_BY_ID] Searching for children of want ID: %s\n", wantID)
+
+	cb.reconcileMutex.RLock()
 	for name, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.OwnerReferences != nil {
 			for _, ownerRef := range runtimeWant.want.Metadata.OwnerReferences {
@@ -2143,17 +2157,23 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 			}
 		}
 	}
+	cb.reconcileMutex.RUnlock()
 
 	fmt.Printf("[DELETE_BY_ID] Found %d children to delete\n", len(childrenToDelete))
 
-	// Delete children first
+	// Phase 3: Delete children first (with write lock for each deletion)
 	for _, childName := range childrenToDelete {
+		cb.reconcileMutex.Lock()
 		cb.deleteWant(childName)
+		cb.reconcileMutex.Unlock()
 		fmt.Printf("[DELETE] Cascade: Removed child want %s\n", childName)
 	}
 
-	// Delete the parent want
+	// Phase 4: Delete the parent want (with write lock)
+	cb.reconcileMutex.Lock()
 	cb.deleteWant(wantName)
+	cb.reconcileMutex.Unlock()
+
 	fmt.Printf("[DELETE] Removed want %s (ID: %s) from runtime (with %d children)\n", wantName, wantID, len(childrenToDelete))
 	return nil
 }

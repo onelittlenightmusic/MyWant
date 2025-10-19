@@ -32,16 +32,15 @@ func NewAgentFlight(name string, capabilities []string, uses []string, premiumLe
 }
 
 // Exec executes flight agent actions and returns FlightSchedule
+// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+// Individual agents should NOT call BeginExecCycle/EndExecCycle
 func (a *AgentFlight) Exec(ctx context.Context, want *Want) error {
 	// Generate flight booking schedule
 	schedule := a.generateFlightSchedule(want)
 
-	// Store the result using StoreState method (batched)
-	{
-		want.BeginExecCycle()
-		want.StoreState("agent_result", schedule)
-		want.EndExecCycle()
-	}
+	// Store the result using StoreState method
+	// NOTE: Wrapping is handled by the framework, not here
+	want.StoreState("agent_result", schedule)
 
 	fmt.Printf("[AGENT_FLIGHT] Flight booking completed: %s departing at %s for %.1f hours\n",
 		schedule.FlightType, schedule.DepartureTime.Format("15:04 Jan 2"),

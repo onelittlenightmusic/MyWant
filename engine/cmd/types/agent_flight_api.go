@@ -126,28 +126,26 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	// Store reservation in want state (batched to reduce history bloat)
-	{
-		want.BeginExecCycle()
-		want.StoreState("flight_id", reservation.ID)
-		want.StoreState("flight_status", reservation.Status)
-		want.StoreState("flight_number", reservation.FlightNumber)
-		want.StoreState("from", reservation.From)
-		want.StoreState("to", reservation.To)
-		want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
-		want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
-		want.StoreState("status_message", reservation.StatusMessage)
-		want.StoreState("created_at", reservation.CreatedAt.Format(time.RFC3339))
-		want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
-		want.StoreState("agent_result", FlightSchedule{
-			DepartureTime:   reservation.DepartureTime,
-			ArrivalTime:     reservation.ArrivalTime,
-			FlightType:      "api",
-			FlightNumber:    reservation.FlightNumber,
-			ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
-		})
-		want.EndExecCycle()
-	}
+	// Store reservation in want state
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+	want.StoreState("flight_id", reservation.ID)
+	want.StoreState("flight_status", reservation.Status)
+	want.StoreState("flight_number", reservation.FlightNumber)
+	want.StoreState("from", reservation.From)
+	want.StoreState("to", reservation.To)
+	want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
+	want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
+	want.StoreState("status_message", reservation.StatusMessage)
+	want.StoreState("created_at", reservation.CreatedAt.Format(time.RFC3339))
+	want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+	want.StoreState("agent_result", FlightSchedule{
+		DepartureTime:   reservation.DepartureTime,
+		ArrivalTime:     reservation.ArrivalTime,
+		FlightType:      "api",
+		FlightNumber:    reservation.FlightNumber,
+		ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+	})
 
 	fmt.Printf("[AgentFlightAPI] Created flight reservation: %s (ID: %s, Status: %s)\n",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
@@ -189,14 +187,11 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	// Update state (batched)
-	{
-		want.BeginExecCycle()
-		want.StoreState("flight_status", "cancelled")
-		want.StoreState("status_message", "Flight cancelled by agent")
-		want.StoreState("cancelled_at", time.Now().Format(time.RFC3339))
-		want.EndExecCycle()
-	}
+	// Update state
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework
+	want.StoreState("flight_status", "cancelled")
+	want.StoreState("status_message", "Flight cancelled by agent")
+	want.StoreState("cancelled_at", time.Now().Format(time.RFC3339))
 
 	fmt.Printf("[AgentFlightAPI] Cancelled flight: %s\n", flightIDStr)
 

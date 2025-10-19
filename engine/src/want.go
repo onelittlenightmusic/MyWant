@@ -191,18 +191,28 @@ func (n *Want) EndExecCycle() {
 }
 
 func (n *Want) AggregateChanges() {
+	// Lock to safely copy and clear pending changes
 	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-
-	// Handle state changes
+	changesCopy := make(map[string]interface{})
 	if len(n.pendingStateChanges) > 0 {
+		// Copy pending changes before releasing lock
+		for key, value := range n.pendingStateChanges {
+			changesCopy[key] = value
+		}
+		// Clear pending changes after copying to prevent re-recording on next cycle
+		n.pendingStateChanges = make(map[string]interface{})
+	}
+	n.stateMutex.Unlock()
+
+	// Apply changes outside the lock
+	if len(changesCopy) > 0 {
 		// Create a single aggregated state history entry with complete state snapshot
 		if n.State == nil {
 			n.State = make(map[string]interface{})
 		}
 
 		// Apply all pending changes to actual state
-		for key, value := range n.pendingStateChanges {
+		for key, value := range changesCopy {
 			n.State[key] = value
 		}
 
@@ -213,6 +223,9 @@ func (n *Want) AggregateChanges() {
 	if len(n.pendingParameterChanges) > 0 {
 		// Create one aggregated parameter history entry
 		n.addAggregatedParameterHistory()
+
+		// Clear pending parameter changes after aggregating
+		n.pendingParameterChanges = make(map[string]interface{})
 	}
 }
 
@@ -231,13 +244,37 @@ func (n *Want) valuesEqual(val1, val2 interface{}) bool {
 	return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
 }
 
+// stateSnapshotsEqual compares two state snapshots (maps) for deep equality
+// Returns true if both maps have identical keys and values
+func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) bool {
+	// Check if lengths match
+	if len(snapshot1) != len(snapshot2) {
+		return false
+	}
+
+	// Check if all keys and values match
+	for key, val1 := range snapshot1 {
+		val2, exists := snapshot2[key]
+		if !exists {
+			return false
+		}
+
+		// Use valuesEqual for comparison (handles different types)
+		if !n.valuesEqual(val1, val2) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetStatus returns the current want status
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
 
 // StoreState stores a key-value pair in the want's state
-// Only adds to state history if the value has actually changed
+// Only adds to state history if the value has actually changed (differential tracking)
 func (n *Want) StoreState(key string, value interface{}) {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
@@ -245,17 +282,18 @@ func (n *Want) StoreState(key string, value interface{}) {
 	// Get previous value to check if it's actually different
 	previousValue, exists := n.getStateUnsafe(key)
 
-	// Check if the value has actually changed
+	// Check if the value has actually changed (DIFFERENTIAL CHECK)
 	if exists && n.valuesEqual(previousValue, value) {
-		// No change, skip history update
+		// No change, skip entirely - don't even stage it
 		return
 	}
 
-	// If we're in an exec cycle, batch the changes
+	// If we're in an exec cycle, batch only the CHANGED values
 	if n.inExecCycle {
 		if n.pendingStateChanges == nil {
 			n.pendingStateChanges = make(map[string]interface{})
 		}
+		// Only stage if value is new or different (differential tracking)
 		n.pendingStateChanges[key] = value
 		return
 	}
@@ -267,8 +305,12 @@ func (n *Want) StoreState(key string, value interface{}) {
 	}
 	n.State[key] = value
 
-	// Add to state history only when value changes
-	n.addToStateHistory(key, value, previousValue)
+	// Outside exec cycle: Stage the change instead of creating immediate history entries
+	// This allows us to batch related changes and create minimal history entries
+	if n.pendingStateChanges == nil {
+		n.pendingStateChanges = make(map[string]interface{})
+	}
+	n.pendingStateChanges[key] = value
 
 	// Create notification
 	notification := StateNotification{
@@ -284,20 +326,35 @@ func (n *Want) StoreState(key string, value interface{}) {
 }
 
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
-// Respects the execution cycle skipping logic (skip every N cycles)
-// ALWAYS records batched changes (never skips when this is called from AggregateChanges)
+// Uses differential checking to prevent duplicate entries when state hasn't actually changed
+// Only creates a history entry if the state differs from the last recorded state
 func (n *Want) addAggregatedStateHistory() {
-	// Note: This method is called from AggregateChanges() which is called from EndExecCycle()
-	// It should ALWAYS record the aggregated batch, never skip it
-	// The purpose of batching is to have ONE entry per exec cycle, not many
-	// Skipping defeats the purpose of aggregation
-
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 
 	// Create a single entry with the complete state as object
 	stateSnapshot := n.copyCurrentState()
+
+	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
+	if len(n.History.StateHistory) > 0 {
+		lastEntry := n.History.StateHistory[len(n.History.StateHistory)-1]
+
+		// Convert interface{} to map[string]interface{} for comparison
+		lastState, ok := lastEntry.StateValue.(map[string]interface{})
+		if !ok {
+			// If lastState is not the expected type, proceed with recording
+			// This handles initialization or type changes
+			lastState = make(map[string]interface{})
+		}
+
+		// Compare current state with last recorded state
+		if n.stateSnapshotsEqual(lastState, stateSnapshot) {
+			// State hasn't changed, skip recording
+			return
+		}
+	}
+
 	entry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
 		StateValue: stateSnapshot,
@@ -341,6 +398,9 @@ func (n *Want) addAggregatedParameterHistory() {
 
 // copyCurrentState creates a copy of the current state
 func (n *Want) copyCurrentState() map[string]interface{} {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
 	stateCopy := make(map[string]interface{})
 	for key, value := range n.State {
 		stateCopy[key] = value
@@ -491,6 +551,9 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	// Store completion timestamp
 	n.StoreState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 
+	// Commit any pending state changes into a single batched history entry
+	n.CommitStateChanges()
+
 	// Store final statistics
 	// Stats are now stored directly in State - no separate stats field
 
@@ -524,6 +587,9 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	// Store error information
 	n.StoreState("error", err.Error())
 	n.StoreState("failure_time", fmt.Sprintf("%d", getCurrentTimestamp()))
+
+	// Commit any pending state changes into a single batched history entry
+	n.CommitStateChanges()
 
 	// Store statistics at failure
 	// Stats are now stored directly in State - no separate stats field

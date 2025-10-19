@@ -61,7 +61,15 @@ type DoAgent struct {
 
 func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
 	if a.Action != nil {
-		return a.Action(ctx, want)
+		// Begin batching cycle for all state changes from agent execution
+		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+		want.BeginExecCycle()
+
+		err := a.Action(ctx, want)
+
+		// Commit all staged state changes from the agent in a single batch
+		want.CommitStateChanges()
+		return err
 	}
 	return fmt.Errorf("no action defined for DoAgent %s", a.Name)
 }
@@ -74,7 +82,15 @@ type MonitorAgent struct {
 
 func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
 	if a.Monitor != nil {
-		return a.Monitor(ctx, want)
+		// Begin batching cycle for all state changes from agent execution
+		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+		want.BeginExecCycle()
+
+		err := a.Monitor(ctx, want)
+
+		// Commit all staged state changes from the agent in a single batch
+		want.CommitStateChanges()
+		return err
 	}
 	return fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
 }
