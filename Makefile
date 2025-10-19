@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy
 
 # Code quality targets
 fmt:
@@ -162,6 +162,24 @@ test-dynamic-travel-with-flight-api:
 	@echo ""
 	@echo "✅ Server mode test completed"
 
+# Test concurrent deployment (Travel Planner + Fibonacci)
+test-concurrent-deploy:
+	@echo "🧪 Testing Concurrent Deployment..."
+	@echo "======================================================"
+	@echo ""
+	@echo "📋 Prerequisites:"
+	@echo "  ✓ MyWant server running on http://localhost:8080"
+	@echo ""
+	@echo "📌 Test Scenario:"
+	@echo "  1. Deploy Travel Planner configuration"
+	@echo "  2. Wait 0.5 seconds"
+	@echo "  3. Deploy Fibonacci configuration concurrently"
+	@echo "  4. Monitor for goroutine issues or concurrent map access errors"
+	@echo ""
+	go run test_concurrent_deploy.go
+	@echo ""
+	@echo "✅ Concurrent deployment test completed!"
+
 # Build the mywant server binary
 build-server:
 	@echo "🏗️  Building mywant server..."
@@ -304,6 +322,7 @@ help:
 	@echo "🧪 Testing:"
 	@echo "  test-monitor-flight-api              - Test MonitorFlightAPI agent"
 	@echo "  test-dynamic-travel-with-flight-api  - Test dynamic travel with flight status changes (requires mock server running)"
+	@echo "  test-concurrent-deploy               - Test concurrent deployment (Travel Planner + Fibonacci)"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
