@@ -1438,7 +1438,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 			for {
 				// Begin execution cycle for batching state changes
-				if runtimeWant, exists := cb.wants[wantName]; exists {
+				cb.reconcileMutex.RLock()
+				runtimeWant, exists := cb.wants[wantName]
+				cb.reconcileMutex.RUnlock()
+				if exists {
 					runtimeWant.want.BeginExecCycle()
 				}
 
@@ -1446,7 +1449,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				finished := chainWant.Exec(usingChans, outputChans)
 
 				// End execution cycle and commit batched state changes
-				if runtimeWant, exists := cb.wants[wantName]; exists {
+				cb.reconcileMutex.RLock()
+				runtimeWant, exists = cb.wants[wantName]
+				cb.reconcileMutex.RUnlock()
+				if exists {
 					runtimeWant.want.EndExecCycle()
 				}
 
@@ -1454,7 +1460,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					log.Printf("[EXEC] Want %s finished\n", wantName)
 
 					// Update want status to completed
-					if runtimeWant, exists := cb.wants[wantName]; exists {
+					cb.reconcileMutex.RLock()
+					runtimeWant, exists := cb.wants[wantName]
+					cb.reconcileMutex.RUnlock()
+					if exists {
 						runtimeWant.want.SetStatus(WantStatusCompleted)
 					}
 
@@ -1914,13 +1923,8 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 	// Convert want map to slice to match config format, preserving runtime spec
 	wants := make([]*Want, 0, len(cb.wants))
 	for _, runtimeWant := range cb.wants {
-		// Deep copy State map to avoid concurrent access during YAML marshaling
-		stateCopy := make(map[string]interface{})
-		if runtimeWant.want.State != nil {
-			for k, v := range runtimeWant.want.State {
-				stateCopy[k] = v
-			}
-		}
+		// Use GetAllState() which safely handles mutex locking internally
+		stateCopy := runtimeWant.want.GetAllState()
 
 		// Use runtime spec to preserve using, but want state for stats/status
 		want := &Want{
