@@ -570,6 +570,49 @@ const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
   return items;
 };
 
+// Parameter History Item Component with expand/collapse
+const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, index }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const paramTimestamp = entry.timestamp;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+      {/* Collapsed/Header View */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center space-x-3 flex-1 text-left">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900">
+              {entry.wantName}
+            </div>
+            {paramTimestamp && (
+              <div className="text-xs text-gray-500 mt-1">
+                {formatDate(paramTimestamp)}
+              </div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded View - Itemized Format */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border space-y-2">
+            {renderStateAsItems(entry.stateValue || {})}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // State History Item Component with expand/collapse
 const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, index }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -636,17 +679,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
           <h4 className="text-base font-medium text-gray-900 mb-4">Parameter History</h4>
           <div className="space-y-3">
             {want.history!.parameterHistory!.map((entry, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-md p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-gray-900">{entry.wantName}</span>
-                  <span className="text-xs text-gray-500">{formatDate(entry.timestamp)}</span>
-                </div>
-                <div className="text-sm">
-                  <pre className="bg-gray-50 rounded p-3 text-xs overflow-auto whitespace-pre-wrap border">
-                    {JSON.stringify(entry.stateValue, null, 2)}
-                  </pre>
-                </div>
-              </div>
+              <ParameterHistoryItem key={index} entry={entry} index={index} />
             ))}
           </div>
         </div>
