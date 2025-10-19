@@ -574,8 +574,8 @@ const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
 const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, index }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Extract flight_status if it exists
-  const flightStatus = state.stateValue?.flight_status || state.flight_status;
+  // Extract flight_status if it exists in stateValue
+  const flightStatus = state.stateValue?.flight_status;
   const stateTimestamp = state.timestamp;
 
   return (
@@ -612,11 +612,11 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
         </div>
       </button>
 
-      {/* Expanded View - Itemized Format */}
+      {/* Expanded View - Itemized Format (only stateValue contents) */}
       {isExpanded && (
         <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
           <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border space-y-2">
-            {renderStateAsItems(state)}
+            {renderStateAsItems(state.stateValue || {})}
           </div>
         </div>
       )}
