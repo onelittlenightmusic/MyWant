@@ -455,15 +455,25 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 
 	// Return created execution with first want ID as reference
 	w.WriteHeader(http.StatusCreated)
+
+	// Safety check for invalid want count
+	wantCount := len(config.Wants)
+	if wantCount < 0 || wantCount > 1000000 {
+		errorMsg := fmt.Sprintf("Invalid want count after parsing: %d", wantCount)
+		s.logError(r, http.StatusInternalServerError, errorMsg, "parsing_error", "Invalid want count", "")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]interface{}{
 		"id":       executionID,
 		"status":   execution.Status,
-		"wants":    len(config.Wants),
-		"want_ids": make([]string, len(config.Wants)),
+		"wants":    wantCount,
+		"want_ids": make([]string, wantCount),
 		"message":  "Wants created and added to execution queue",
 	}
 	// Build list of want IDs
-	wantIDs := make([]string, len(config.Wants))
+	wantIDs := make([]string, wantCount)
 	for i, want := range config.Wants {
 		wantIDs[i] = want.Metadata.ID
 	}
