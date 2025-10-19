@@ -36,15 +36,23 @@ export const WantCard: React.FC<WantCardProps> = ({
     // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
     const target = e.target as HTMLElement;
 
-    // Check if click target is an interactive element
+    // Check if click target is an interactive element (button)
     if (target.closest('button') || target.closest('[role="button"]')) {
       return;
     }
 
-    // Check if target is inside a menu dropdown (contains both 'group' and 'menu' in classList)
-    const parentWithMenu = target.closest('[class*="relative"][class*="group"]');
-    if (parentWithMenu && parentWithMenu.querySelector('[class*="bg-white"][class*="rounded"][class*="shadow"]')) {
-      return;
+    // Check if target is inside an active menu dropdown
+    // Only check immediate parent with group/relative classes that has visible menu
+    let element = target as HTMLElement | null;
+    while (element && element !== e.currentTarget) {
+      if (element.className && element.className.includes('group/menu')) {
+        // Check if there's a visible dropdown menu
+        const menuDropdown = element.querySelector('[class*="opacity-100"][class*="visible"]');
+        if (menuDropdown) {
+          return;
+        }
+      }
+      element = element.parentElement;
     }
 
     onView(want);
