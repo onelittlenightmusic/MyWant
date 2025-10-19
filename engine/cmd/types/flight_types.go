@@ -496,7 +496,14 @@ func (f *FlightWant) StartContinuousMonitoring() {
 
 			// Create monitor agent and poll
 			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
-			if err := monitor.Exec(context.Background(), &f.Want); err != nil {
+
+			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls
+			// This prevents lock contention when multiple monitoring goroutines call StoreState
+			f.BeginExecCycle()
+			err := monitor.Exec(context.Background(), &f.Want)
+			f.EndExecCycle()
+
+			if err != nil {
 				fmt.Printf("[FLIGHT-MONITOR] Polling error: %v\n", err)
 			} else {
 				// Log the current status
