@@ -1584,7 +1584,16 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	}
 
 	// Start all initial wants
+	// Create a snapshot of wants while holding lock to avoid concurrent map iteration
+	cb.reconcileMutex.RLock()
+	wantSnapshot := make(map[string]*runtimeWant, len(cb.wants))
 	for wantName, want := range cb.wants {
+		wantSnapshot[wantName] = want
+	}
+	cb.reconcileMutex.RUnlock()
+
+	// Iterate over snapshot (no lock needed)
+	for wantName, want := range wantSnapshot {
 		cb.startWant(wantName, want)
 	}
 
