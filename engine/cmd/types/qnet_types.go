@@ -201,6 +201,10 @@ type Queue struct {
 	mywant.Want
 	ServiceTime float64
 	paths       mywant.Paths
+	// Batch mechanism for state updates
+	batchSize           int
+	batchUpdateInterval int
+	lastBatchCount      int
 }
 
 // NewQueue creates a new queue want
@@ -213,12 +217,23 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 			Status: mywant.WantStatusIdle,
 			State:  make(map[string]interface{}),
 		},
-		ServiceTime: 1.0,
+		ServiceTime:         1.0,
+		batchUpdateInterval: 100, // Default: update state every 100 packets
+		lastBatchCount:      0,
 	}
 
 	if st, ok := spec.Params["service_time"]; ok {
 		if stf, ok := st.(float64); ok {
 			queue.ServiceTime = stf
+		}
+	}
+
+	// Allow configurable batch update interval
+	if batchInterval, ok := spec.Params["batch_interval"]; ok {
+		if bi, ok := batchInterval.(float64); ok {
+			queue.batchUpdateInterval = int(bi)
+		} else if bi, ok := batchInterval.(int); ok {
+			queue.batchUpdateInterval = bi
 		}
 	}
 
@@ -265,7 +280,7 @@ func (q *Queue) GetWant() *mywant.Want {
 	return &q.Want
 }
 
-// Exec executes the queue processing directly
+// Exec executes the queue processing directly with batch mechanism
 func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Using direct Exec approach for dynamic parameter reading
 	if q.State == nil {
@@ -287,6 +302,9 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Check for termination packet and forward it
 	if packet.IsEnded() {
+		// Always flush batch and store final state when terminating
+		q.flushBatch(serverFreeTime, waitTimeSum, processedCount)
+
 		// Trigger OnEnded callback
 		if err := q.OnEnded(&packet); err != nil {
 			fmt.Printf("[QUEUE] OnEnded callback error: %v\n", err)
@@ -315,21 +333,35 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	waitTimeSum += waitTime
 	processedCount++
 
-	// Store updated state
+	// Store packet-specific info (always, even in batch mode)
+	q.StoreState("last_packet_wait_time", waitTime)
+
+	// Batch mechanism: only update statistics every N packets
+	if processedCount%q.batchUpdateInterval == 0 {
+		q.flushBatch(serverFreeTime, waitTimeSum, processedCount)
+		q.lastBatchCount = processedCount
+	}
+
+	out <- QueuePacket{Num: packet.Num, Time: finishTime}
+	return false
+}
+
+// flushBatch commits all accumulated statistics to state
+func (q *Queue) flushBatch(serverFreeTime, waitTimeSum float64, processedCount int) {
+	// Calculate average wait time
+	avgWaitTime := 0.0
+	if processedCount > 0 {
+		avgWaitTime = waitTimeSum / float64(processedCount)
+	}
+
+	// Batch update all statistics at once
 	q.StoreState("serverFreeTime", serverFreeTime)
 	q.StoreState("waitTimeSum", waitTimeSum)
 	q.StoreState("processedCount", processedCount)
-	q.StoreState("last_packet_wait_time", waitTime)
-
-	// Update live stats
-	avgWaitTime := waitTimeSum / float64(processedCount)
 	q.StoreState("average_wait_time", avgWaitTime)
 	q.StoreState("total_processed", processedCount)
 	q.StoreState("total_wait_time", waitTimeSum)
 	q.StoreState("current_server_free_time", serverFreeTime)
-
-	out <- QueuePacket{Num: packet.Num, Time: finishTime}
-	return false
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
