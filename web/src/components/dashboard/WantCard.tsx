@@ -95,10 +95,15 @@ export const WantCard: React.FC<WantCardProps> = ({
             height="80"
             style={{ opacity: 0.8, color: '#6366f1' }}
           >
-            <path
-              d="M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z"
-              fill="currentColor"
-            />
+            {/* Fuselage (main body) */}
+            <path d="M50 10 L55 35 L55 75 L50 85 L45 75 L45 35 Z" fill="currentColor" />
+            {/* Left wing */}
+            <path d="M45 40 L10 50 L45 50 Z" fill="currentColor" />
+            {/* Right wing */}
+            <path d="M55 40 L90 50 L55 50 Z" fill="currentColor" />
+            {/* Tail */}
+            <path d="M48 75 L35 80 L40 75 Z" fill="currentColor" />
+            <path d="M52 75 L65 80 L60 75 Z" fill="currentColor" />
           </svg>
         </div>
       )}
@@ -185,10 +190,15 @@ export const WantCard: React.FC<WantCardProps> = ({
                         height="50"
                         style={{ opacity: 0.8, color: '#6366f1' }}
                       >
-                        <path
-                          d="M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z"
-                          fill="currentColor"
-                        />
+                        {/* Fuselage (main body) */}
+                        <path d="M50 10 L55 35 L55 75 L50 85 L45 75 L45 35 Z" fill="currentColor" />
+                        {/* Left wing */}
+                        <path d="M45 40 L10 50 L45 50 Z" fill="currentColor" />
+                        {/* Right wing */}
+                        <path d="M55 40 L90 50 L55 50 Z" fill="currentColor" />
+                        {/* Tail */}
+                        <path d="M48 75 L35 80 L40 75 Z" fill="currentColor" />
+                        <path d="M52 75 L65 80 L60 75 Z" fill="currentColor" />
                       </svg>
                     </div>
                   )}
