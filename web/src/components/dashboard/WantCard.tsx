@@ -85,7 +85,8 @@ export const WantCard: React.FC<WantCardProps> = ({
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%23e0e7ff%22 opacity=%220.3%22/%3E%3C/svg%3E")',
+            backgroundColor: '#f0f4ff',
+            backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%236366f1%22 opacity=%220.6%22/%3E%3C/svg%3E")',
             backgroundSize: '200px 200px',
             backgroundPosition: 'right bottom',
             backgroundRepeat: 'no-repeat',
@@ -166,7 +167,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                     <div
                       className="absolute inset-0 pointer-events-none"
                       style={{
-                        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%23e0e7ff%22 opacity=%220.3%22/%3E%3C/svg%3E")',
+                        backgroundColor: '#f0f4ff',
+                        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%236366f1%22 opacity=%220.6%22/%3E%3C/svg%3E")',
                         backgroundSize: '200px 200px',
                         backgroundPosition: 'right bottom',
                         backgroundRepeat: 'no-repeat',
