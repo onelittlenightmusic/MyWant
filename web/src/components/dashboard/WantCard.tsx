@@ -175,7 +175,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                     />
                   )}
                   {/* Child want content using reusable component */}
-                  <div className="relative z-10 p-3 bg-white">
+                  <div className={classNames('relative z-10 p-3', isChildFlightWant ? 'bg-transparent' : 'bg-white')}>
                     <WantCardContent
                       want={child}
                       isChild={true}
