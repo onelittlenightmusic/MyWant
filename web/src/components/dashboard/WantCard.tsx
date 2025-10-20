@@ -90,20 +90,28 @@ export const WantCard: React.FC<WantCardProps> = ({
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 100 100"
+            viewBox="0 0 200 140"
             width="80"
             height="80"
             style={{ opacity: 0.8, color: '#6366f1' }}
           >
-            {/* Fuselage (main body) */}
-            <path d="M50 10 L55 35 L55 75 L50 85 L45 75 L45 35 Z" fill="currentColor" />
-            {/* Left wing */}
-            <path d="M45 40 L10 50 L45 50 Z" fill="currentColor" />
-            {/* Right wing */}
-            <path d="M55 40 L90 50 L55 50 Z" fill="currentColor" />
-            {/* Tail */}
-            <path d="M48 75 L35 80 L40 75 Z" fill="currentColor" />
-            <path d="M52 75 L65 80 L60 75 Z" fill="currentColor" />
+            {/* Fuselage */}
+            <ellipse cx="100" cy="70" rx="12" ry="50" fill="currentColor" />
+            {/* Cockpit/Nose */}
+            <circle cx="100" cy="25" r="8" fill="currentColor" />
+            {/* Main wings */}
+            <ellipse cx="100" cy="70" rx="80" ry="15" fill="currentColor" opacity="0.9" />
+            {/* Left wingtip */}
+            <polygon points="20,70 30,65 30,75" fill="currentColor" />
+            {/* Right wingtip */}
+            <polygon points="180,70 170,65 170,75" fill="currentColor" />
+            {/* Horizontal stabilizer (tail) */}
+            <ellipse cx="100" cy="105" rx="35" ry="8" fill="currentColor" opacity="0.7" />
+            {/* Vertical stabilizer (tail fin) */}
+            <polygon points="100,105 100,125 95,110" fill="currentColor" opacity="0.7" />
+            {/* Landing gear */}
+            <circle cx="95" cy="115" r="3" fill="currentColor" />
+            <circle cx="105" cy="115" r="3" fill="currentColor" />
           </svg>
         </div>
       )}
@@ -185,20 +193,28 @@ export const WantCard: React.FC<WantCardProps> = ({
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 100 100"
+                        viewBox="0 0 200 140"
                         width="50"
                         height="50"
                         style={{ opacity: 0.8, color: '#6366f1' }}
                       >
-                        {/* Fuselage (main body) */}
-                        <path d="M50 10 L55 35 L55 75 L50 85 L45 75 L45 35 Z" fill="currentColor" />
-                        {/* Left wing */}
-                        <path d="M45 40 L10 50 L45 50 Z" fill="currentColor" />
-                        {/* Right wing */}
-                        <path d="M55 40 L90 50 L55 50 Z" fill="currentColor" />
-                        {/* Tail */}
-                        <path d="M48 75 L35 80 L40 75 Z" fill="currentColor" />
-                        <path d="M52 75 L65 80 L60 75 Z" fill="currentColor" />
+                        {/* Fuselage */}
+                        <ellipse cx="100" cy="70" rx="12" ry="50" fill="currentColor" />
+                        {/* Cockpit/Nose */}
+                        <circle cx="100" cy="25" r="8" fill="currentColor" />
+                        {/* Main wings */}
+                        <ellipse cx="100" cy="70" rx="80" ry="15" fill="currentColor" opacity="0.9" />
+                        {/* Left wingtip */}
+                        <polygon points="20,70 30,65 30,75" fill="currentColor" />
+                        {/* Right wingtip */}
+                        <polygon points="180,70 170,65 170,75" fill="currentColor" />
+                        {/* Horizontal stabilizer (tail) */}
+                        <ellipse cx="100" cy="105" rx="35" ry="8" fill="currentColor" opacity="0.7" />
+                        {/* Vertical stabilizer (tail fin) */}
+                        <polygon points="100,105 100,125 95,110" fill="currentColor" opacity="0.7" />
+                        {/* Landing gear */}
+                        <circle cx="95" cy="115" r="3" fill="currentColor" />
+                        <circle cx="105" cy="115" r="3" fill="currentColor" />
                       </svg>
                     </div>
                   )}
