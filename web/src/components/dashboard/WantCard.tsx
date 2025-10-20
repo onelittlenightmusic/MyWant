@@ -74,7 +74,8 @@ export const WantCard: React.FC<WantCardProps> = ({
     <div
       onClick={handleCardClick}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
+        'hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden rounded-lg shadow-sm border p-6',
+        isFlightWant ? 'bg-transparent' : 'bg-white',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
@@ -93,7 +94,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         />
       )}
       {/* Parent want content using reusable component */}
-      <div className="relative z-10">
+      <div className={classNames('relative z-10', isFlightWant ? 'bg-white rounded' : '')}>
         <WantCardContent
           want={want}
           isChild={false}
