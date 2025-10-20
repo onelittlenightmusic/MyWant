@@ -67,14 +67,24 @@ export const WantCard: React.FC<WantCardProps> = ({
     onView(child);
   };
 
+  // Check if this is a flight want
+  const isFlightWant = want.metadata?.type === 'flight';
+
   return (
     <div
       onClick={handleCardClick}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
+      style={isFlightWant ? {
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%23e0e7ff%22 opacity=%220.3%22/%3E%3C/svg%3E")',
+        backgroundSize: '200px 200px',
+        backgroundPosition: 'right bottom',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      } : {}}
     >
       {/* Parent want content using reusable component */}
       <WantCardContent
