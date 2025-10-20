@@ -33,14 +33,16 @@ export const Dashboard: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
+  const [selectedWant, setSelectedWant] = useState<Want | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
 
-  // Derive selectedWant from wants array using selectedWantId
-  // This ensures selectedWant always reflects the current data from polling
-  const selectedWant = selectedWantId
-    ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
-    : null;
+  // TODO: Re-enable auto-refresh selection later (currently disabled for testing)
+  // // Derive selectedWant from wants array using selectedWantId
+  // // This ensures selectedWant always reflects the current data from polling
+  // const selectedWant = selectedWantId
+  //   ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
+  //   : null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -103,6 +105,7 @@ export const Dashboard: React.FC = () => {
   const handleViewWant = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
+    setSelectedWant(want);
   };
 
   const handleDeleteWantConfirm = async () => {
