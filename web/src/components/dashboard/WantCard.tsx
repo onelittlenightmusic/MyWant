@@ -83,16 +83,24 @@ export const WantCard: React.FC<WantCardProps> = ({
       {/* Background decoration for flight wants */}
       {isFlightWant && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 pointer-events-none flex items-center justify-end p-4"
           style={{
-            backgroundColor: '#f0f4ff',
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%236366f1%22 opacity=%220.6%22/%3E%3C/svg%3E")',
-            backgroundSize: '200px 200px',
-            backgroundPosition: 'right bottom',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            backgroundColor: '#f0f4ff'
           }}
-        />
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 100 100"
+            width="80"
+            height="80"
+            style={{ opacity: 0.8, color: '#6366f1' }}
+          >
+            <path
+              d="M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
       )}
       {/* Parent want content using reusable component */}
       <div className={classNames('relative z-10', isFlightWant ? 'bg-white rounded' : '')}>
@@ -165,16 +173,24 @@ export const WantCard: React.FC<WantCardProps> = ({
                   {/* Background decoration for flight want children */}
                   {isChildFlightWant && (
                     <div
-                      className="absolute inset-0 pointer-events-none"
+                      className="absolute inset-0 pointer-events-none flex items-center justify-end p-3"
                       style={{
-                        backgroundColor: '#f0f4ff',
-                        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cpath d=%22M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z%22 fill=%22%236366f1%22 opacity=%220.6%22/%3E%3C/svg%3E")',
-                        backgroundSize: '200px 200px',
-                        backgroundPosition: 'right bottom',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundAttachment: 'fixed'
+                        backgroundColor: '#f0f4ff'
                       }}
-                    />
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 100 100"
+                        width="50"
+                        height="50"
+                        style={{ opacity: 0.8, color: '#6366f1' }}
+                      >
+                        <path
+                          d="M50 10L60 30L80 40L60 50L50 70L40 50L20 40L40 30Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </div>
                   )}
                   {/* Child want content using reusable component */}
                   <div className={classNames('relative z-10 p-3', isChildFlightWant ? 'bg-transparent' : 'bg-white')}>
