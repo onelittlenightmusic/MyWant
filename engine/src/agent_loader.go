@@ -39,11 +39,27 @@ func (r *AgentRegistry) LoadCapabilities(path string) error {
 	return nil
 }
 
+// loadAgentSpec loads the agent OpenAPI spec, trying multiple possible paths
+func loadAgentSpec() (*openapi3.T, error) {
+	loader := openapi3.NewLoader()
+	specPaths := []string{"spec/agent-spec.yaml", "../spec/agent-spec.yaml"}
+
+	var lastErr error
+	for _, specPath := range specPaths {
+		if spec, err := loader.LoadFromFile(specPath); err == nil {
+			return spec, nil
+		} else {
+			lastErr = err
+		}
+	}
+
+	return nil, fmt.Errorf("failed to load agent OpenAPI spec from paths %v: %w", specPaths, lastErr)
+}
+
 // validateCapabilityWithSpec validates capability YAML data against the OpenAPI spec
 func validateCapabilityWithSpec(yamlData []byte) error {
 	// Load the OpenAPI spec for agents and capabilities
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile("spec/agent-spec.yaml")
+	spec, err := loadAgentSpec()
 	if err != nil {
 		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
 	}
@@ -177,8 +193,7 @@ func (r *AgentRegistry) LoadAgents(path string) error {
 // validateAgentWithSpec validates agent YAML data against the OpenAPI spec
 func validateAgentWithSpec(yamlData []byte) error {
 	// Load the OpenAPI spec for agents and capabilities
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile("spec/agent-spec.yaml")
+	spec, err := loadAgentSpec()
 	if err != nil {
 		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
 	}
