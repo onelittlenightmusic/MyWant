@@ -13,6 +13,9 @@ import (
 )
 
 // AgentFlightAPI creates and manages flight reservations via REST API
+// Provides two capabilities from flight_api_agency:
+// - create_flight: Exec() method creates new flight reservations via POST /api/flights
+// - cancel_flight: CancelFlight() method cancels existing flights via DELETE /api/flights/{id}
 type AgentFlightAPI struct {
 	DoAgent
 	ServerURL string
@@ -56,8 +59,46 @@ func NewAgentFlightAPI(name string, capabilities []string, uses []string, server
 	}
 }
 
-// Exec creates a flight reservation via POST API
+// Exec implements the Agent interface and handles both create_flight and cancel_flight actions
+// Reads the "flight_action" state to determine which action to perform
+// This satisfies the agent framework's requirement for Exec() method
 func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
+	// Check if there's a specific action to perform
+	actionVal, exists := want.GetState("flight_action")
+	if exists && actionVal != nil {
+		action, ok := actionVal.(string)
+		if ok {
+			switch action {
+			case "cancel_flight":
+				fmt.Printf("[AgentFlightAPI] Executing cancel_flight action\n")
+				if err := a.CancelFlight(ctx, want); err != nil {
+					return err
+				}
+				// Clear the action after completion
+				want.StoreState("flight_action", "")
+				return nil
+			case "create_flight":
+				fmt.Printf("[AgentFlightAPI] Executing create_flight action\n")
+				if err := a.CreateFlight(ctx, want); err != nil {
+					return err
+				}
+				// Clear the action after completion
+				want.StoreState("flight_action", "")
+				return nil
+			}
+		}
+	}
+
+	// Default to create_flight if no action specified
+	return a.CreateFlight(ctx, want)
+}
+
+// CreateFlight implements the create_flight capability
+// Creates a flight reservation via POST /api/flights to the mock server
+// Supports two date parameter formats:
+// 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
+// 2. departure_time: RFC3339 format - used directly
+func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// Get flight parameters from want params
 	params := want.Spec.Params
 
@@ -77,18 +118,40 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	}
 
 	// Parse departure and arrival times
-	departureTimeStr, _ := params["departure_time"].(string)
-	departureTime, err := time.Parse(time.RFC3339, departureTimeStr)
-	if err != nil {
-		// Default to tomorrow morning
-		departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
-	}
+	// First try to get departure_date parameter (YYYY-MM-DD format)
+	departureDate, _ := params["departure_date"].(string)
+	var departureTime time.Time
+	var arrivalTime time.Time
 
-	arrivalTimeStr, _ := params["arrival_time"].(string)
-	arrivalTime, err := time.Parse(time.RFC3339, arrivalTimeStr)
-	if err != nil {
-		// Default to 3.5 hours after departure
-		arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+	if departureDate != "" {
+		// Parse departure_date as YYYY-MM-DD and set to 8:00 AM on that date
+		parsedDate, err := time.Parse("2006-01-02", departureDate)
+		if err == nil {
+			// Set departure time to 8:00 AM on the given date
+			departureTime = parsedDate.Add(8 * time.Hour)
+			// Set arrival time to 3.5 hours after departure
+			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+		} else {
+			// Fall back to default if parsing fails
+			departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
+			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+		}
+	} else {
+		// Try to get departure_time parameter (RFC3339 format)
+		departureTimeStr, _ := params["departure_time"].(string)
+		var err error
+		departureTime, err = time.Parse(time.RFC3339, departureTimeStr)
+		if err != nil {
+			// Default to tomorrow morning
+			departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
+		}
+
+		arrivalTimeStr, _ := params["arrival_time"].(string)
+		arrivalTime, err = time.Parse(time.RFC3339, arrivalTimeStr)
+		if err != nil {
+			// Default to 3.5 hours after departure
+			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+		}
 	}
 
 	// Create flight request
@@ -153,7 +216,8 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// CancelFlight cancels a flight reservation via DELETE API
+// CancelFlight implements the cancel_flight capability
+// Cancels a flight reservation via DELETE /api/flights/{id} to the mock server
 func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	// Get flight ID from state
 	flightID, exists := want.GetState("flight_id")

@@ -175,6 +175,23 @@ export const Dashboard: React.FC = () => {
     setDeleteWantState(null);
   };
 
+  // Determine background style for flight, hotel, restaurant, and buffet wants
+  const getWantBackgroundImage = (type?: string) => {
+    if (type === 'flight') return '/resources/flight.png';
+    if (type === 'hotel') return '/resources/hotel.png';
+    if (type === 'restaurant') return '/resources/restaurant.png';
+    if (type === 'buffet') return '/resources/buffet.png';
+    return undefined;
+  };
+
+  const wantBackgroundImage = getWantBackgroundImage(selectedWant?.metadata?.type);
+  const sidebarBackgroundStyle = wantBackgroundImage ? {
+    backgroundImage: `url(${wantBackgroundImage})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed'
+  } : undefined;
+
   return (
     <Layout
       sidebarMinimized={sidebarMinimized}
@@ -258,6 +275,7 @@ export const Dashboard: React.FC = () => {
         isOpen={!!selectedWant}
         onClose={() => setSelectedWant(null)}
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
+        backgroundStyle={sidebarBackgroundStyle}
       >
         <WantDetailsSidebar want={selectedWant} />
       </RightSidebar>

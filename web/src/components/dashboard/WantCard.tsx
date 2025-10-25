@@ -67,56 +67,39 @@ export const WantCard: React.FC<WantCardProps> = ({
     onView(child);
   };
 
-  // Check if this is a flight want
+  // Check if this is a flight or hotel want
   const isFlightWant = want.metadata?.type === 'flight';
+  const isHotelWant = want.metadata?.type === 'hotel';
+
+  // Determine background image based on want type
+  const getBackgroundImage = (type?: string) => {
+    if (type === 'flight') return '/resources/flight.png';
+    if (type === 'hotel') return '/resources/hotel.png';
+    if (type === 'restaurant') return '/resources/restaurant.png';
+    if (type === 'buffet') return '/resources/buffet.png';
+    return undefined;
+  };
+
+  const backgroundImage = getBackgroundImage(want.metadata?.type);
 
   return (
     <div
       onClick={handleCardClick}
       className={classNames(
-        'hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden rounded-lg shadow-sm border p-6',
-        isFlightWant ? 'bg-transparent' : 'bg-white',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
+      style={backgroundImage ? {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: '100% auto',
+        backgroundPosition: 'center center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'scroll'
+      } : undefined}
     >
-      {/* Background decoration for flight wants */}
-      {isFlightWant && (
-        <div
-          className="absolute inset-0 pointer-events-none flex items-center justify-end p-4"
-          style={{
-            backgroundColor: '#f0f4ff'
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 200 140"
-            width="80"
-            height="80"
-            style={{ opacity: 0.8, color: '#6366f1' }}
-          >
-            {/* Fuselage */}
-            <ellipse cx="100" cy="70" rx="12" ry="50" fill="currentColor" />
-            {/* Cockpit/Nose */}
-            <circle cx="100" cy="25" r="8" fill="currentColor" />
-            {/* Main wings */}
-            <ellipse cx="100" cy="70" rx="80" ry="15" fill="currentColor" opacity="0.9" />
-            {/* Left wingtip */}
-            <polygon points="20,70 30,65 30,75" fill="currentColor" />
-            {/* Right wingtip */}
-            <polygon points="180,70 170,65 170,75" fill="currentColor" />
-            {/* Horizontal stabilizer (tail) */}
-            <ellipse cx="100" cy="105" rx="35" ry="8" fill="currentColor" opacity="0.7" />
-            {/* Vertical stabilizer (tail fin) */}
-            <polygon points="100,105 100,125 95,110" fill="currentColor" opacity="0.7" />
-            {/* Landing gear */}
-            <circle cx="95" cy="115" r="3" fill="currentColor" />
-            <circle cx="105" cy="115" r="3" fill="currentColor" />
-          </svg>
-        </div>
-      )}
       {/* Parent want content using reusable component */}
-      <div className={classNames('relative z-10', isFlightWant ? 'bg-white rounded' : '')}>
+      <div className={backgroundImage ? 'relative z-10 bg-white bg-opacity-70' : ''}>
         <WantCardContent
           want={want}
           isChild={false}
@@ -173,7 +156,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                 (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
                 (selectedWant.id && selectedWant.id === child.id)
               );
-              const isChildFlightWant = isFlightWant || child.metadata?.type === 'flight';
+              const childBackgroundImage = getBackgroundImage(child.metadata?.type);
+              const hasBackgroundImage = backgroundImage || childBackgroundImage;
               return (
                 <div
                   key={childId || `child-${index}`}
@@ -181,45 +165,17 @@ export const WantCard: React.FC<WantCardProps> = ({
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
                   )}
+                  style={childBackgroundImage ? {
+                    backgroundImage: `url(${childBackgroundImage})`,
+                    backgroundSize: '100% auto',
+                    backgroundPosition: 'center center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundAttachment: 'scroll'
+                  } : undefined}
                   onClick={handleChildCardClick(child)}
                 >
-                  {/* Background decoration for flight want children */}
-                  {isChildFlightWant && (
-                    <div
-                      className="absolute inset-0 pointer-events-none flex items-center justify-end p-3"
-                      style={{
-                        backgroundColor: '#f0f4ff'
-                      }}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 200 140"
-                        width="50"
-                        height="50"
-                        style={{ opacity: 0.8, color: '#6366f1' }}
-                      >
-                        {/* Fuselage */}
-                        <ellipse cx="100" cy="70" rx="12" ry="50" fill="currentColor" />
-                        {/* Cockpit/Nose */}
-                        <circle cx="100" cy="25" r="8" fill="currentColor" />
-                        {/* Main wings */}
-                        <ellipse cx="100" cy="70" rx="80" ry="15" fill="currentColor" opacity="0.9" />
-                        {/* Left wingtip */}
-                        <polygon points="20,70 30,65 30,75" fill="currentColor" />
-                        {/* Right wingtip */}
-                        <polygon points="180,70 170,65 170,75" fill="currentColor" />
-                        {/* Horizontal stabilizer (tail) */}
-                        <ellipse cx="100" cy="105" rx="35" ry="8" fill="currentColor" opacity="0.7" />
-                        {/* Vertical stabilizer (tail fin) */}
-                        <polygon points="100,105 100,125 95,110" fill="currentColor" opacity="0.7" />
-                        {/* Landing gear */}
-                        <circle cx="95" cy="115" r="3" fill="currentColor" />
-                        <circle cx="105" cy="115" r="3" fill="currentColor" />
-                      </svg>
-                    </div>
-                  )}
                   {/* Child want content using reusable component */}
-                  <div className={classNames('relative z-10 p-3', isChildFlightWant ? 'bg-transparent' : 'bg-white')}>
+                  <div className={classNames('p-3', hasBackgroundImage ? 'bg-white bg-opacity-70 relative z-10' : 'bg-white')}>
                     <WantCardContent
                       want={child}
                       isChild={true}

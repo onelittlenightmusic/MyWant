@@ -8,6 +8,7 @@ interface RightSidebarProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  backgroundStyle?: React.CSSProperties;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -15,7 +16,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   onClose,
   title,
   children,
-  className
+  className,
+  backgroundStyle
 }) => {
   return (
     <>
@@ -30,10 +32,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={classNames(
-          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col',
+          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
+        style={backgroundStyle}
       >
         {/* Header */}
         <div className="flex-shrink-0 bg-white px-6 py-4 flex items-center justify-between z-10 border-b border-gray-200">
@@ -50,8 +53,17 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-scroll min-h-0">
-          {children}
+        <div className="flex-1 overflow-y-scroll min-h-0 relative">
+          {/* Background overlay for flight wants */}
+          {backgroundStyle && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={backgroundStyle}
+            />
+          )}
+          <div className="relative z-10 bg-white bg-opacity-70">
+            {children}
+          </div>
         </div>
       </div>
     </>

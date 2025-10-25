@@ -13,6 +13,7 @@ wants:
         flight_type: "business class"
         from: "New York"
         to: "Los Angeles"
+        departure_date: "2026-12-20"
         flight_duration: 12.0
         restaurant_type: "fine dining"
         hotel_type: "luxury"

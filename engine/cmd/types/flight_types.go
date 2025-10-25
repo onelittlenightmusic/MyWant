@@ -14,6 +14,7 @@ type FlightWant struct {
 	Want
 	FlightType          string
 	Duration            time.Duration
+	DepartureDate       string        // Departure date in YYYY-MM-DD format
 	paths               Paths
 	monitoringStartTime time.Time
 	monitoringDuration  time.Duration // How long to monitor for status changes
@@ -31,6 +32,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) *FlightWant {
 		},
 		FlightType:         "economy",
 		Duration:           12 * time.Hour, // Default 12 hour flight
+		DepartureDate:      "2024-01-01",   // Default departure date
 		monitoringActive:   false,
 		monitoringDuration: 60 * time.Second, // Monitor for 60 seconds after flight creation
 	}
@@ -43,6 +45,11 @@ func NewFlightWant(metadata Metadata, spec WantSpec) *FlightWant {
 	if d, ok := spec.Params["duration_hours"]; ok {
 		if df, ok := d.(float64); ok {
 			flight.Duration = time.Duration(df * float64(time.Hour))
+		}
+	}
+	if dd, ok := spec.Params["departure_date"]; ok {
+		if dds, ok := dd.(string); ok {
+			flight.DepartureDate = dds
 		}
 	}
 
@@ -130,21 +137,18 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Check for delayed flights that need cancellation and rebooking
 	if f.shouldCancelAndRebook() {
 		fmt.Printf("[FLIGHT] Flight status is delayed, initiating cancellation and rebooking\n")
-		if err := f.cancelCurrentFlight(); err != nil {
-			fmt.Printf("[FLIGHT] Failed to cancel flight: %v\n", err)
-			f.StoreState("cancellation_status", "failed")
-			f.StoreState("cancellation_error", err.Error())
-			return true
-		}
 
-		// Reset state for new booking
+		// Set flight_action to cancel_flight so the agent executor will handle it
+		f.StoreState("flight_action", "cancel_flight")
+
+		// Reset state for new booking (but mark as not attempted so agent will run again)
 		f.StoreState("previous_flight_id", f.GetStateValue("flight_id"))
 		f.StoreState("previous_flight_status", "cancelled")
 		f.StoreState("flight_id", "")
 		f.StoreState("flight_status", "")
 		f.StoreState("attempted", false)
 
-		fmt.Printf("[FLIGHT] Cancelled flight, resetting for new booking\n")
+		fmt.Printf("[FLIGHT] Set flight_action to cancel_flight, resetting for new booking\n")
 	}
 
 	// Check if already attempted using persistent state
@@ -424,41 +428,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 	return false
 }
 
-// cancelCurrentFlight cancels the current flight reservation
-func (f *FlightWant) cancelCurrentFlight() error {
-	// Get the flight API agent if available
-	flightIDVal, exists := f.GetState("flight_id")
-	if !exists {
-		return fmt.Errorf("no active flight to cancel")
-	}
-
-	flightID, ok := flightIDVal.(string)
-	if !ok || flightID == "" {
-		return fmt.Errorf("invalid flight_id for cancellation")
-	}
-
-	// Get server URL from params
-	params := f.Spec.Params
-	serverURL, ok := params["server_url"].(string)
-	if !ok || serverURL == "" {
-		serverURL = "http://localhost:8081"
-	}
-
-	// Create a temporary agent for cancellation
-	agent := NewAgentFlightAPI("cancel-agent", []string{}, []string{}, serverURL)
-
-	// Execute cancellation - this will call DELETE API and update state
-	if err := agent.CancelFlight(context.Background(), &f.Want); err != nil {
-		fmt.Printf("[FLIGHT] Failed to execute cancellation: %v\n", err)
-		return err
-	}
-
-	fmt.Printf("[FLIGHT] Successfully cancelled flight %s\n", flightID)
-	f.StoreState("cancellation_successful", true)
-	f.StoreState("cancelled_flight_id", flightID)
-
-	return nil
-}
 
 // GetStateValue is a helper to safely get state value
 func (f *FlightWant) GetStateValue(key string) interface{} {

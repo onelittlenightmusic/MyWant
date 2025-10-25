@@ -15,6 +15,7 @@ recipe:
     flight_type: "business class"
     from: "New York"
     to: "Los Angeles"
+    departure_date: "2026-12-20"
     restaurant_type: "fine dining"
     hotel_type: "luxury"
     buffet_type: "international"
@@ -35,9 +36,10 @@ recipe:
           flight_type: flight_type
           from: from
           to: to
+          departure_date: departure_date
           duration_hours: flight_duration
         requires:
-          - flight_api_reservation
+          - create_flight
 
     # Dinner restaurant reservation
     - metadata:

@@ -27,6 +27,8 @@ type TabType = 'overview' | 'config' | 'logs' | 'agents';
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want
 }) => {
+  // Check if this is a flight want
+  const isFlightWant = want?.metadata?.type === 'flight';
   const {
     selectedWantDetails,
     selectedWantResults,
@@ -317,6 +319,18 @@ const OverviewTab: React.FC<{ want: Want }> = ({ want }) => (
                 {key}: {value}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Parameters */}
+      {want.spec?.params && Object.keys(want.spec.params).length > 0 && (
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Parameters</h4>
+          <div className="bg-white rounded p-4 overflow-auto max-h-64 border border-gray-200">
+            <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+              {JSON.stringify(want.spec.params, null, 2)}
+            </pre>
           </div>
         </div>
       )}
