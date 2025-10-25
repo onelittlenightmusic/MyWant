@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -98,13 +99,28 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 // Supports two date parameter formats:
 // 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
 // 2. departure_time: RFC3339 format - used directly
+// When rebooking (previous_flight_id exists), generates new flight number and adjusted departure time
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// Get flight parameters from want params
 	params := want.Spec.Params
 
+	// Check if this is a rebooking (previous_flight_id exists)
+	prevFlightID, hasPrevFlight := want.GetState("previous_flight_id")
+	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
+
 	flightNumber, _ := params["flight_number"].(string)
 	if flightNumber == "" {
 		flightNumber = "AA123"
+	}
+
+	// For rebooking, generate a different flight number
+	if isRebooking {
+		baseFlight := flightNumber
+		// Generate alternative flight numbers based on base flight
+		// e.g., AA100 -> AA101, AA102, etc.
+		flightSuffixes := []string{"A", "B", "C", "D", "E"}
+		flightNumber = baseFlight + flightSuffixes[rand.Intn(len(flightSuffixes))]
+		fmt.Printf("[AgentFlightAPI] Rebooking: Original flight %s -> New flight %s\n", baseFlight, flightNumber)
 	}
 
 	from, _ := params["from"].(string)
@@ -131,6 +147,15 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 			departureTime = parsedDate.Add(8 * time.Hour)
 			// Set arrival time to 3.5 hours after departure
 			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+
+			// For rebooking, schedule next available flight (add 2-4 hours to departure)
+			if isRebooking {
+				delayHours := 2 + time.Duration(rand.Intn(3))
+				departureTime = departureTime.Add(delayHours * time.Hour)
+				arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+				fmt.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)\n",
+					departureTime.Format(time.RFC3339))
+			}
 		} else {
 			// Fall back to default if parsing fails
 			departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
@@ -151,6 +176,15 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		if err != nil {
 			// Default to 3.5 hours after departure
 			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+		}
+
+		// For rebooking, schedule next available flight (add 2-4 hours to departure)
+		if isRebooking {
+			delayHours := 2 + time.Duration(rand.Intn(3))
+			departureTime = departureTime.Add(delayHours * time.Hour)
+			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+			fmt.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)\n",
+				departureTime.Format(time.RFC3339))
 		}
 	}
 
@@ -256,6 +290,17 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	want.StoreState("flight_status", "cancelled")
 	want.StoreState("status_message", "Flight cancelled by agent")
 	want.StoreState("cancelled_at", time.Now().Format(time.RFC3339))
+
+	// Save cancelled flight ID and clear current flight_id for rebooking
+	want.StoreState("previous_flight_id", flightIDStr)
+	want.StoreState("previous_flight_status", "cancelled")
+	want.StoreState("flight_id", "")
+	want.StoreState("flight_status", "")
+	want.StoreState("attempted", false)
+
+	// CRITICAL: Clear agent_result so tryAgentExecution returns nil for cancellation
+	// This allows the rebooking flow to detect the cancellation and trigger new flight creation
+	want.StoreState("agent_result", nil)
 
 	fmt.Printf("[AgentFlightAPI] Cancelled flight: %s\n", flightIDStr)
 

@@ -113,7 +113,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				fmt.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
 
 				// Set flight_action to cancel_flight so the agent executor will handle it
-				// Note: Do NOT clear flight_id yet - agent needs it to cancel the flight
+				// Note: Keep flight_id so agent can cancel it
 				f.StoreState("flight_action", "cancel_flight")
 
 				// Exit monitoring phase to trigger rebooking immediately
