@@ -19,6 +19,7 @@ type FlightWant struct {
 	monitoringStartTime time.Time
 	monitoringDuration  time.Duration // How long to monitor for status changes
 	monitoringActive    bool          // Whether monitoring is currently active
+	lastLogTime         time.Time     // Track last monitoring log time to reduce spam
 }
 
 // NewFlightWant creates a new flight booking want
@@ -97,8 +98,14 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		// Continue running monitoring during the monitoring duration
 		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
 			// Still within monitoring window - check for delays
-			fmt.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
-				time.Since(f.monitoringStartTime), f.monitoringDuration)
+			// Only log every 30 seconds to reduce spam
+			elapsed := time.Since(f.monitoringStartTime)
+			now := time.Now()
+			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
+				fmt.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
+					elapsed, f.monitoringDuration)
+				f.lastLogTime = now
+			}
 
 			// Check for delayed flights that need cancellation and rebooking
 			// This is checked during monitoring phase so rebooking can happen immediately
@@ -106,19 +113,16 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				fmt.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
 
 				// Set flight_action to cancel_flight so the agent executor will handle it
+				// Note: Do NOT clear flight_id yet - agent needs it to cancel the flight
 				f.StoreState("flight_action", "cancel_flight")
-
-				// Reset state for new booking (but mark as not attempted so agent will run again)
-				f.StoreState("previous_flight_id", f.GetStateValue("flight_id"))
-				f.StoreState("previous_flight_status", "cancelled")
-				f.StoreState("flight_id", "")
-				f.StoreState("flight_status", "")
-				f.StoreState("attempted", false)
-
-				fmt.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, resetting for new booking\n")
 
 				// Exit monitoring phase to trigger rebooking immediately
 				f.monitoringActive = false
+
+				// Reset attempted flag so agent can execute the cancellation action
+				f.StoreState("attempted", false)
+
+				fmt.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, waiting for agent cancellation\n")
 
 				// Return false to trigger the rebooking flow in next cycle
 				return false
@@ -206,6 +210,57 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		// Continue running to collect more status updates
 		// Return false to keep this want running through reconciliation cycles
 		return false
+	}
+
+	// Check if cancellation just completed (agent executed but no result)
+	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
+	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
+		// Flight was just cancelled, prepare for rebooking
+		fmt.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
+
+		// Reset attempted flag to allow agent to execute rebooking in this cycle
+		// This is critical - without resetting, the "attempted" check above will return true
+		f.StoreState("attempted", false)
+
+		// Don't return here - fall through to agent execution for rebooking
+		// The agent will see flight_id is empty and attempt rebooking
+
+		// Try rebooking immediately in this same cycle
+		if agentSchedule := f.tryAgentExecution(); agentSchedule != nil {
+			fmt.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
+
+			// Use the agent's schedule result
+			f.SetSchedule(*agentSchedule)
+
+			// Send the schedule to output channel
+			flightEvent := TimeSlot{
+				Start: agentSchedule.DepartureTime,
+				End:   agentSchedule.ArrivalTime,
+				Type:  "flight",
+				Name:  agentSchedule.ReservationName,
+			}
+
+			travelSchedule := &TravelSchedule{
+				Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
+				Events: []TimeSlot{flightEvent},
+			}
+
+			out <- travelSchedule
+			fmt.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
+				agentSchedule.ReservationName,
+				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
+				agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
+
+			// Start continuous monitoring for new flight
+			if !f.monitoringActive {
+				f.monitoringActive = true
+				f.monitoringStartTime = time.Now()
+				fmt.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
+			}
+
+			// Continue monitoring the new flight
+			return false
+		}
 	}
 
 	// Normal flight execution (only runs if agent execution didn't return a result)
@@ -300,9 +355,6 @@ func (f *FlightWant) tryAgentExecution() *FlightSchedule {
 			f.StoreState("agent_execution_error", err.Error())
 			return nil
 		}
-
-		// Commit agent state changes
-		f.AggregateChanges()
 
 		fmt.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
 		f.StoreState("agent_execution_status", "completed")
