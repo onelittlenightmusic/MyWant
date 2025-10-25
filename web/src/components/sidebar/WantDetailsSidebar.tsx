@@ -658,8 +658,8 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
           {/* Flight Status Highlight in Shrink Mode */}
           {!isExpanded && flightStatus && (
             <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
-              <span className="text-xs font-medium px-2 py-1 rounded bg-blue-100 text-blue-800">
-                Flight: {flightStatus}
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                {flightStatus}
               </span>
             </div>
           )}

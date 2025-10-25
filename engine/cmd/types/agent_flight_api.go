@@ -287,19 +287,19 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 
 	// Update state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework
-	want.StoreState("flight_status", "cancelled")
-	want.StoreState("status_message", "Flight cancelled by agent")
-	want.StoreState("cancelled_at", time.Now().Format(time.RFC3339))
+	want.StoreState("flight_status", "canceled")
+	want.StoreState("status_message", "Flight canceled by agent")
+	want.StoreState("canceled_at", time.Now().Format(time.RFC3339))
 
 	// Save cancelled flight ID and clear current flight_id for rebooking
 	want.StoreState("previous_flight_id", flightIDStr)
-	want.StoreState("previous_flight_status", "cancelled")
+	want.StoreState("previous_flight_status", "canceled")
 	want.StoreState("flight_id", "")
 	want.StoreState("flight_status", "")
 	want.StoreState("attempted", false)
 
-	// CRITICAL: Clear agent_result so tryAgentExecution returns nil for cancellation
-	// This allows the rebooking flow to detect the cancellation and trigger new flight creation
+	// Clear agent_result so rebooking code can detect cancellation happened
+	// (if agent_result still contains the old flight, code won't know cancellation occurred)
 	want.StoreState("agent_result", nil)
 
 	fmt.Printf("[AgentFlightAPI] Cancelled flight: %s\n", flightIDStr)
