@@ -164,8 +164,8 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		return true
 	}
 
-	// Normal restaurant execution (only runs if no agent match)
-	fmt.Printf("[RESTAURANT] No agent match, using standard restaurant logic\n")
+	// Normal restaurant execution (only runs if agent execution didn't return a result)
+	fmt.Printf("[RESTAURANT] Agent execution did not return result, using standard restaurant logic\n")
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
@@ -502,8 +502,8 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		return true
 	}
 
-	// Normal hotel execution (only runs if no agent match)
-	fmt.Printf("[HOTEL] No agent match, using standard hotel logic\n")
+	// Normal hotel execution (only runs if agent execution didn't return a result)
+	fmt.Printf("[HOTEL] Agent execution did not return result, using standard hotel logic\n")
 
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
@@ -747,8 +747,8 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		return true
 	}
 
-	// Normal buffet execution (only runs if no agent match)
-	fmt.Printf("[BUFFET] No agent match, using standard buffet logic\n")
+	// Normal buffet execution (only runs if agent execution didn't return a result)
+	fmt.Printf("[BUFFET] Agent execution did not return result, using standard buffet logic\n")
 
 	var existingSchedule *TravelSchedule
 	if len(using) > 0 {

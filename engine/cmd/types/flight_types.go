@@ -208,8 +208,8 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		return false
 	}
 
-	// Normal flight execution (only runs if no agent match)
-	fmt.Printf("[FLIGHT] No agent match, using standard flight logic\n")
+	// Normal flight execution (only runs if agent execution didn't return a result)
+	fmt.Printf("[FLIGHT] Agent execution did not return result, using standard flight logic\n")
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
