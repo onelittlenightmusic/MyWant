@@ -66,6 +66,12 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		return fmt.Errorf("flight_id is not a string")
 	}
 
+	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
+	if flightIDStr == "" {
+		fmt.Printf("[MonitorFlightAPI] Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)\n")
+		return nil
+	}
+
 	fmt.Printf("[MonitorFlightAPI] Polling flight status for ID: %s\n", flightIDStr)
 
 	// Restore last known status from want state for persistence across execution cycles
@@ -170,6 +176,10 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Check for status change first (differential history - only record if state changed)
 	newStatus := reservation.Status
 	oldStatus := m.LastKnownStatus
+
+	// When monitoring confirms a flight, set status to "confirmed"
+	// This is the final status after monitor api verification
+	confirmedStatus := "confirmed"
 	hasStateChange := newStatus != oldStatus
 
 	// Calculate hash of current reservation data for differential history
@@ -191,19 +201,19 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
 
 		if hasStateChange {
-			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
+			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, confirmedStatus)
 
 			// Record status change
 			statusChange := StatusChange{
 				Timestamp: time.Now(),
 				OldStatus: oldStatus,
-				NewStatus: newStatus,
+				NewStatus: confirmedStatus,
 				Details:   reservation.StatusMessage,
 			}
 			m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
 
 			// Store status change info
-			want.StoreState("flight_status", newStatus)
+			want.StoreState("flight_status", confirmedStatus)
 			want.StoreState("status_changed", true)
 			want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
 			want.StoreState("status_change_history_count", len(m.StatusChangeHistory))
@@ -229,18 +239,18 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			}
 			want.StoreState("status_history", statusHistoryStrs)
 
-			m.LastKnownStatus = newStatus
+			m.LastKnownStatus = confirmedStatus
 
 			// Print status progression
 			fmt.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)\n",
-				reservation.ID, newStatus, time.Now().Format("15:04:05"))
+				reservation.ID, confirmedStatus, time.Now().Format("15:04:05"))
 
 			// Update hash after successful commit
 			m.LastRecordedStateHash = currentStateHash
 			fmt.Printf("[MonitorFlightAPI] State recorded (hash: %s)\n", currentStateHash[:8])
 		} else {
 			// No status change - don't create history entry, but still update other flight details
-			fmt.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s\n", newStatus)
+			fmt.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s\n", confirmedStatus)
 			m.LastRecordedStateHash = currentStateHash
 		}
 	} else {
@@ -248,7 +258,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		fmt.Printf("[MonitorFlightAPI] No state change detected, skipping history entry\n")
 	}
 
-	fmt.Printf("[MonitorFlightAPI] Polling complete - Current status: %s\n", newStatus)
+	fmt.Printf("[MonitorFlightAPI] Polling complete - Current status: %s\n", confirmedStatus)
 
 	return nil
 }

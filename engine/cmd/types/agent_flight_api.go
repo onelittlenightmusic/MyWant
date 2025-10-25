@@ -96,6 +96,10 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 // CreateFlight implements the create_flight capability
 // Creates a flight reservation via POST /api/flights to the mock server
+// Flight status lifecycle:
+// 1. "in process" - while registration is in progress
+// 2. "created" - after successful API response
+// 3. "confirmed" - when monitor api checks the status
 // Supports two date parameter formats:
 // 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
 // 2. departure_time: RFC3339 format - used directly
@@ -103,6 +107,9 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// Get flight parameters from want params
 	params := want.Spec.Params
+
+	// Set initial status to "in process" before starting registration
+	want.StoreState("flight_status", "in process")
 
 	// Check if this is a rebooking (previous_flight_id exists)
 	prevFlightID, hasPrevFlight := want.GetState("previous_flight_id")
@@ -227,7 +234,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
 	// Individual agents should NOT call BeginExecCycle/EndExecCycle
 	want.StoreState("flight_id", reservation.ID)
-	want.StoreState("flight_status", reservation.Status)
+	want.StoreState("flight_status", "created")
 	want.StoreState("flight_number", reservation.FlightNumber)
 	want.StoreState("from", reservation.From)
 	want.StoreState("to", reservation.To)
