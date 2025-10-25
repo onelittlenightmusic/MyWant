@@ -96,9 +96,33 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	if f.monitoringActive {
 		// Continue running monitoring during the monitoring duration
 		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
-			// Still within monitoring window - just keep the want running
+			// Still within monitoring window - check for delays
 			fmt.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
 				time.Since(f.monitoringStartTime), f.monitoringDuration)
+
+			// Check for delayed flights that need cancellation and rebooking
+			// This is checked during monitoring phase so rebooking can happen immediately
+			if f.shouldCancelAndRebook() {
+				fmt.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
+
+				// Set flight_action to cancel_flight so the agent executor will handle it
+				f.StoreState("flight_action", "cancel_flight")
+
+				// Reset state for new booking (but mark as not attempted so agent will run again)
+				f.StoreState("previous_flight_id", f.GetStateValue("flight_id"))
+				f.StoreState("previous_flight_status", "cancelled")
+				f.StoreState("flight_id", "")
+				f.StoreState("flight_status", "")
+				f.StoreState("attempted", false)
+
+				fmt.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, resetting for new booking\n")
+
+				// Exit monitoring phase to trigger rebooking immediately
+				f.monitoringActive = false
+
+				// Return false to trigger the rebooking flow in next cycle
+				return false
+			}
 
 			// The monitoring agent will be triggered through the normal agent execution framework
 			// during the reconciliation loop. We just need to stay in the monitoring phase
@@ -133,23 +157,6 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		return true
 	}
 	out := outputs[0]
-
-	// Check for delayed flights that need cancellation and rebooking
-	if f.shouldCancelAndRebook() {
-		fmt.Printf("[FLIGHT] Flight status is delayed, initiating cancellation and rebooking\n")
-
-		// Set flight_action to cancel_flight so the agent executor will handle it
-		f.StoreState("flight_action", "cancel_flight")
-
-		// Reset state for new booking (but mark as not attempted so agent will run again)
-		f.StoreState("previous_flight_id", f.GetStateValue("flight_id"))
-		f.StoreState("previous_flight_status", "cancelled")
-		f.StoreState("flight_id", "")
-		f.StoreState("flight_status", "")
-		f.StoreState("attempted", false)
-
-		fmt.Printf("[FLIGHT] Set flight_action to cancel_flight, resetting for new booking\n")
-	}
 
 	// Check if already attempted using persistent state
 	attemptedVal, _ := f.GetState("attempted")
