@@ -718,7 +718,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
           <h4 className="text-base font-medium text-gray-900 mb-4">State History</h4>
           <div className="space-y-3">
             {want.history.stateHistory.slice().reverse().map((state, index) => (
-              <StateHistoryItem key={index} state={state} index={want.history.stateHistory.length - index} />
+              <StateHistoryItem key={index} state={state} index={want.history.stateHistory.length - index - 1} />
             ))}
           </div>
         </div>
