@@ -32,7 +32,21 @@ func (n *Want) ExecuteAgents() error {
 	}
 
 	for _, requirement := range n.Spec.Requires {
-		agents := n.agentRegistry.FindAgentsByGives(requirement)
+		var agents []Agent
+
+		// First, try to find agents by the requirement directly (if it's a "gives" value)
+		agents = n.agentRegistry.FindAgentsByGives(requirement)
+
+		// If not found, check if requirement is a capability name, then get agents for its "gives" values
+		if len(agents) == 0 {
+			if cap, exists := n.agentRegistry.GetCapability(requirement); exists {
+				for _, givesValue := range cap.Gives {
+					foundAgents := n.agentRegistry.FindAgentsByGives(givesValue)
+					agents = append(agents, foundAgents...)
+				}
+			}
+		}
+
 		for _, agent := range agents {
 			if err := n.executeAgent(agent); err != nil {
 				return fmt.Errorf("failed to execute agent %s: %w", agent.GetName(), err)

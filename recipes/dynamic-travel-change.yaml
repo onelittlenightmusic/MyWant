@@ -39,7 +39,7 @@ recipe:
           departure_date: departure_date
           duration_hours: flight_duration
         requires:
-          - flight_api_agency
+          - create_flight
 
     # Dinner restaurant reservation
     - metadata:
