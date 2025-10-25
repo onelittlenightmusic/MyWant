@@ -42,11 +42,27 @@ func (u *StatusUpdater) Stop() {
 }
 
 // ScheduleUpdates schedules status changes for a flight reservation
+// Only schedules detail change and delay transitions for AA100, not for rebooked flights (AA100A, AA100B, etc.)
 func (u *StatusUpdater) ScheduleUpdates(reservationID string) {
+	// Get the flight to check its flight number first (before locking)
+	reservation, exists := u.store.Get(reservationID)
+
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
 	if u.stopped {
+		return
+	}
+
+	if !exists {
+		return
+	}
+
+	// Only schedule status transitions for the base flight AA100
+	// Skip transitions for rebooked flights (AA100A, AA100B, AA100C, etc.)
+	if reservation.FlightNumber != "AA100" {
+		fmt.Printf("[StatusUpdater] Flight %s (%s): Skipping status transitions (not base flight AA100)\n", reservationID, reservation.FlightNumber)
+		u.timers[reservationID] = []*time.Timer{}
 		return
 	}
 
@@ -62,6 +78,7 @@ func (u *StatusUpdater) ScheduleUpdates(reservationID string) {
 
 	// Store timers for this reservation
 	u.timers[reservationID] = []*time.Timer{timer1, timer2}
+	fmt.Printf("[StatusUpdater] Flight %s (AA100): Scheduled status transitions (details_changed@20s, delayed@40s)\n", reservationID)
 }
 
 // CancelUpdates cancels all scheduled updates for a reservation
