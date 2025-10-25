@@ -463,3 +463,4 @@ want.History.StateHistory = append(want.History.StateHistory, entry)
 - **Controlled Access**: All state changes must use `StoreState()` method
 - **State Retrieval**: Use `GetState()` method which returns `(value, exists)`
 - **Encapsulation**: Maintains proper separation between internal state and public API
+- make run-dynamic-travel-change didn't wait until rebooking.

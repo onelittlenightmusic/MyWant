@@ -349,6 +349,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
 // Uses differential checking to prevent duplicate entries when state hasn't actually changed
 // Only creates a history entry if the state differs from the last recorded state
+// NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
 func (n *Want) addAggregatedStateHistory() {
 	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
@@ -359,8 +360,15 @@ func (n *Want) addAggregatedStateHistory() {
 	}
 
 	// Create a copy of current state while holding lock (use unsafe read since we already hold lock)
+	// IMPORTANT: Exclude agent metadata fields (current_agent, running_agents) from state history
+	// These are operational metadata tracked separately in AgentHistory, not actual want state
 	stateSnapshot := make(map[string]interface{})
 	for key, value := range n.State {
+		// Skip agent metadata fields - they cause false history duplicates since they change
+		// multiple times during agent execution but don't represent actual want state changes
+		if key == "current_agent" || key == "running_agents" {
+			continue
+		}
 		stateSnapshot[key] = value
 	}
 

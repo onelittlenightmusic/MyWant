@@ -91,6 +91,48 @@ func (f *FlightWant) GetWant() *Want {
 	return &f.Want
 }
 
+// extractFlightSchedule converts agent_result from state to FlightSchedule
+func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
+	// Handle both map[string]interface{} and FlightSchedule types
+	var schedule FlightSchedule
+	switch v := result.(type) {
+	case FlightSchedule:
+		return &v
+	case *FlightSchedule:
+		return v
+	case map[string]interface{}:
+		// Convert map to FlightSchedule
+		if dt, ok := v["departure_time"].(time.Time); ok {
+			schedule.DepartureTime = dt
+		}
+		if at, ok := v["arrival_time"].(time.Time); ok {
+			schedule.ArrivalTime = at
+		}
+		if ft, ok := v["flight_type"].(string); ok {
+			schedule.FlightType = ft
+		}
+		if fn, ok := v["flight_number"].(string); ok {
+			schedule.FlightNumber = fn
+		}
+		if rn, ok := v["reservation_name"].(string); ok {
+			schedule.ReservationName = rn
+		}
+		if pl, ok := v["premium_level"].(string); ok {
+			schedule.PremiumLevel = pl
+		}
+		if st, ok := v["service_tier"].(string); ok {
+			schedule.ServiceTier = st
+		}
+		if amenities, ok := v["premium_amenities"].([]string); ok {
+			schedule.PremiumAmenities = amenities
+		}
+		return &schedule
+	default:
+		fmt.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
+		return nil
+	}
+}
+
 // Exec creates a flight booking reservation
 func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Handle continuous monitoring phase
@@ -175,60 +217,16 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	f.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
-	if agentSchedule := f.tryAgentExecution(); agentSchedule != nil {
+	f.tryAgentExecution()
+
+	// Check if agent created a flight result (read from state, not return value)
+	agentResult, hasResult := f.GetState("agent_result")
+	if hasResult && agentResult != nil {
 		fmt.Printf("[FLIGHT] Agent execution completed, processing agent result\n")
 
-		// Use the agent's schedule result
-		f.SetSchedule(*agentSchedule)
-
-		// Send the schedule to output channel
-		flightEvent := TimeSlot{
-			Start: agentSchedule.DepartureTime,
-			End:   agentSchedule.ArrivalTime,
-			Type:  "flight",
-			Name:  agentSchedule.ReservationName,
-		}
-
-		travelSchedule := &TravelSchedule{
-			Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
-			Events: []TimeSlot{flightEvent},
-		}
-
-		out <- travelSchedule
-		fmt.Printf("[FLIGHT] Sent agent-generated schedule: %s from %s to %s\n",
-			agentSchedule.ReservationName,
-			agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-			agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
-
-		// Start continuous monitoring to capture all status changes
-		if !f.monitoringActive {
-			f.monitoringActive = true
-			f.monitoringStartTime = time.Now()
-			fmt.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
-		}
-
-		// Continue running to collect more status updates
-		// Return false to keep this want running through reconciliation cycles
-		return false
-	}
-
-	// Check if cancellation just completed (agent executed but no result)
-	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
-	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
-		// Flight was just cancelled, prepare for rebooking
-		fmt.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
-
-		// Reset attempted flag to allow agent to execute rebooking in this cycle
-		// This is critical - without resetting, the "attempted" check above will return true
-		f.StoreState("attempted", false)
-
-		// Don't return here - fall through to agent execution for rebooking
-		// The agent will see flight_id is empty and attempt rebooking
-
-		// Try rebooking immediately in this same cycle
-		if agentSchedule := f.tryAgentExecution(); agentSchedule != nil {
-			fmt.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
-
+		// Convert agent_result to FlightSchedule
+		agentSchedule := f.extractFlightSchedule(agentResult)
+		if agentSchedule != nil {
 			// Use the agent's schedule result
 			f.SetSchedule(*agentSchedule)
 
@@ -246,20 +244,80 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			}
 
 			out <- travelSchedule
-			fmt.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
+			fmt.Printf("[FLIGHT] Sent agent-generated schedule: %s from %s to %s\n",
 				agentSchedule.ReservationName,
 				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
 				agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
 
-			// Start continuous monitoring for new flight
+			// Start continuous monitoring to capture all status changes
 			if !f.monitoringActive {
 				f.monitoringActive = true
 				f.monitoringStartTime = time.Now()
-				fmt.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
+				fmt.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
 			}
 
-			// Continue monitoring the new flight
+			// Continue running to collect more status updates
+			// Return false to keep this want running through reconciliation cycles
 			return false
+		}
+	}
+
+	// Check if cancellation just completed (previous_flight_id exists)
+	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
+	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
+		// Flight was just cancelled, prepare for rebooking
+		fmt.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
+
+		// Reset attempted flag to allow agent to execute rebooking in this cycle
+		// This is critical - without resetting, the "attempted" check above will return true
+		f.StoreState("attempted", false)
+
+		// Don't return here - fall through to agent execution for rebooking
+		// The agent will see flight_id is empty and attempt rebooking
+
+		// Try rebooking immediately in this same cycle
+		f.tryAgentExecution()
+
+		// Check if rebooking created a new flight result (read from state, not return value)
+		agentResult, hasResult := f.GetState("agent_result")
+		if hasResult && agentResult != nil {
+			fmt.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
+
+			// Convert agent_result to FlightSchedule
+			agentSchedule := f.extractFlightSchedule(agentResult)
+			if agentSchedule != nil {
+				// Use the agent's schedule result
+				f.SetSchedule(*agentSchedule)
+
+				// Send the schedule to output channel
+				flightEvent := TimeSlot{
+					Start: agentSchedule.DepartureTime,
+					End:   agentSchedule.ArrivalTime,
+					Type:  "flight",
+					Name:  agentSchedule.ReservationName,
+				}
+
+				travelSchedule := &TravelSchedule{
+					Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
+					Events: []TimeSlot{flightEvent},
+				}
+
+				out <- travelSchedule
+				fmt.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
+					agentSchedule.ReservationName,
+					agentSchedule.DepartureTime.Format("15:04 Jan 2"),
+					agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
+
+				// Start continuous monitoring for new flight
+				if !f.monitoringActive {
+					f.monitoringActive = true
+					f.monitoringStartTime = time.Now()
+					fmt.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
+				}
+
+				// Continue monitoring the new flight
+				return false
+			}
 		}
 	}
 
@@ -339,7 +397,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 // tryAgentExecution attempts to execute flight booking using the agent system
 // Returns the FlightSchedule if successful, nil if no agent execution
-func (f *FlightWant) tryAgentExecution() *FlightSchedule {
+func (f *FlightWant) tryAgentExecution() {
 	// Check if this want has agent requirements
 	if len(f.Spec.Requires) > 0 {
 		fmt.Printf("[FLIGHT] Want has agent requirements: %v\n", f.Spec.Requires)
@@ -353,7 +411,7 @@ func (f *FlightWant) tryAgentExecution() *FlightSchedule {
 			fmt.Printf("[FLIGHT] Dynamic agent execution failed: %v\n", err)
 			f.StoreState("agent_execution_status", "failed")
 			f.StoreState("agent_execution_error", err.Error())
-			return nil
+			return
 		}
 
 		fmt.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
@@ -362,58 +420,19 @@ func (f *FlightWant) tryAgentExecution() *FlightSchedule {
 		// Check for agent_result in state
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			fmt.Printf("[FLIGHT] Found agent_result in state: %+v\n", result)
-
-			// Handle both map[string]interface{} and FlightSchedule types
-			var schedule FlightSchedule
-			switch v := result.(type) {
-			case FlightSchedule:
-				schedule = v
-			case map[string]interface{}:
-				// Convert map to FlightSchedule
-				if dt, ok := v["departure_time"].(time.Time); ok {
-					schedule.DepartureTime = dt
-				}
-				if at, ok := v["arrival_time"].(time.Time); ok {
-					schedule.ArrivalTime = at
-				}
-				if ft, ok := v["flight_type"].(string); ok {
-					schedule.FlightType = ft
-				}
-				if fn, ok := v["flight_number"].(string); ok {
-					schedule.FlightNumber = fn
-				}
-				if rn, ok := v["reservation_name"].(string); ok {
-					schedule.ReservationName = rn
-				}
-				if pl, ok := v["premium_level"].(string); ok {
-					schedule.PremiumLevel = pl
-				}
-				if st, ok := v["service_tier"].(string); ok {
-					schedule.ServiceTier = st
-				}
-				if amenities, ok := v["premium_amenities"].([]string); ok {
-					schedule.PremiumAmenities = amenities
-				}
-			default:
-				fmt.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
-				return nil
-			}
-
-			fmt.Printf("[FLIGHT] Successfully retrieved agent result: %+v\n", schedule)
 			f.StoreState("execution_source", "agent")
 
 			// Start continuous monitoring for this flight
 			f.StartContinuousMonitoring()
 
-			return &schedule
+			return
 		}
 
 		fmt.Printf("[FLIGHT] Warning: Agent completed but no result found in state\n")
-		return nil
+		return
 	}
 
 	fmt.Printf("[FLIGHT] No agent requirements specified\n")
-	return nil
 }
 
 // FlightSchedule represents a complete flight booking schedule

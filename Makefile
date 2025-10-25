@@ -98,7 +98,7 @@ run-hierarchical-approval:
 	go run -C engine cmd/demos/demo_hierarchical_approval.go ../config/config-hierarchical-approval.yaml
 
 run-dynamic-travel-change:
-	go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-dynamic-travel-change.yaml
+	timeout 140 go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-dynamic-travel-change.yaml 120
 
 run-flight:
 	go run -C engine cmd/demos/demo_flight.go ../config/config-flight.yaml
