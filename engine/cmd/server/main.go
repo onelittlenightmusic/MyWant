@@ -331,6 +331,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
 		if doAgent, ok := agent.(*mywant.DoAgent); ok {
 			// Set up the Flight API agent with the actual implementation
+			// Agent has flight_api_agency capability which gives: create_flight and cancel_flight
 			flightAgent := types.NewAgentFlightAPI(
 				"agent_flight_api",
 				[]string{"flight_api_agency"},
@@ -338,7 +339,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 				"http://localhost:8081",
 			)
 			doAgent.Action = flightAgent.Exec
-			log.Printf("[SERVER] ✅ Set up agent_flight_api with real implementation\n")
+			log.Printf("[SERVER] ✅ Set up agent_flight_api with real implementation (flight_api_agency)\n")
 		}
 	}
 }
@@ -349,14 +350,15 @@ func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
 	if agent, exists := agentRegistry.GetAgent("monitor_flight_api"); exists {
 		if monitorAgent, ok := agent.(*mywant.MonitorAgent); ok {
 			// Set up the Monitor Flight agent with the actual implementation
+			// Note: Monitor agents don't provide capabilities, they observe/monitor state
 			flightMonitor := types.NewMonitorFlightAPI(
 				"monitor_flight_api",
-				[]string{"flight_api_agency"},
+				[]string{},
 				[]string{},
 				"http://localhost:8081",
 			)
 			monitorAgent.Monitor = flightMonitor.Exec
-			log.Printf("[SERVER] ✅ Set up monitor_flight_api with real implementation\n")
+			log.Printf("[SERVER] ✅ Set up monitor_flight_api with real implementation (monitoring flight status updates)\n")
 		}
 	}
 }
