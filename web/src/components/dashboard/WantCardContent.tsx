@@ -79,8 +79,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 ml-2">
-            <StatusBadge status={want.status} size={sizes.statusSize} />
-
             {/* Agent indicator */}
             {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
               <div className="flex items-center space-x-1" title="Agent-enabled want">
@@ -98,6 +96,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 )}
               </div>
             )}
+
+            <StatusBadge status={want.status} size={sizes.statusSize} />
 
             {/* Actions - only show for parent cards */}
             {!isChild && (
