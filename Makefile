@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api
 
 # Code quality targets
 fmt:
@@ -180,6 +180,26 @@ test-concurrent-deploy:
 	@echo ""
 	@echo "✅ Concurrent deployment test completed!"
 
+# Test LLM inference API
+test-llm-api:
+	@echo "🧠 Testing LLM Inference API..."
+	@echo "======================================================="
+	@echo ""
+	@echo "📋 Prerequisites:"
+	@echo "  ✓ MyWant server running on http://localhost:8080"
+	@echo "  ✓ Ollama running (configure via GPT_BASE_URL env var)"
+	@echo ""
+	@echo "📌 Test Details:"
+	@echo "  - Endpoint: POST /api/v1/llm/query"
+	@echo "  - Default Model: gpt-oss:20b"
+	@echo "  - Server URL: $${GPT_BASE_URL:-localhost:11434}"
+	@echo ""
+	@echo "🔌 Testing LLM API with simple query..."
+	@echo ""
+	python3 test_llm_api.py
+	@echo ""
+	@echo "✅ LLM inference API test completed!"
+
 # Build the mywant server binary
 build-server:
 	@echo "🏗️  Building mywant server..."
@@ -323,6 +343,7 @@ help:
 	@echo "  test-monitor-flight-api              - Test MonitorFlightAPI agent"
 	@echo "  test-dynamic-travel-with-flight-api  - Test dynamic travel with flight status changes (requires mock server running)"
 	@echo "  test-concurrent-deploy               - Test concurrent deployment (Travel Planner + Fibonacci)"
+	@echo "  test-llm-api                         - Test LLM inference API (configure via GPT_BASE_URL env var)"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
