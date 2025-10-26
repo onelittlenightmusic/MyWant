@@ -37,9 +37,10 @@ type WantSpec struct {
 
 // WantHistory contains both parameter and state history
 type WantHistory struct {
-	ParameterHistory []StateHistoryEntry `json:"parameterHistory" yaml:"parameterHistory"`
-	StateHistory     []StateHistoryEntry `json:"stateHistory" yaml:"stateHistory"`
-	AgentHistory     []AgentExecution    `json:"agentHistory,omitempty" yaml:"agentHistory,omitempty"`
+	ParameterHistory    []StateHistoryEntry                  `json:"parameterHistory" yaml:"parameterHistory"`
+	StateHistory        []StateHistoryEntry                  `json:"stateHistory" yaml:"stateHistory"`
+	AgentHistory        []AgentExecution                     `json:"agentHistory,omitempty" yaml:"agentHistory,omitempty"`
+	GroupedAgentHistory map[string][]AgentExecution         `json:"groupedAgentHistory,omitempty" yaml:"groupedAgentHistory,omitempty"`
 }
 
 // WantStatus represents the current state of a want

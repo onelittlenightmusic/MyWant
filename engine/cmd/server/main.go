@@ -66,15 +66,14 @@ type WantExecution struct {
 
 // WantResponseWithGroupedAgents wraps a Want with grouped agent history
 type WantResponseWithGroupedAgents struct {
-	Metadata            mywant.Metadata                   `json:"metadata"`
-	Spec                mywant.WantSpec                   `json:"spec"`
-	Status              mywant.WantStatus                 `json:"status"`
-	History             mywant.WantHistory               `json:"history"`
-	State               map[string]interface{}            `json:"state"`
-	GroupedAgentHistory map[string][]mywant.AgentExecution `json:"groupedAgentHistory,omitempty"`
+	Metadata mywant.Metadata            `json:"metadata"`
+	Spec     mywant.WantSpec            `json:"spec"`
+	Status   mywant.WantStatus          `json:"status"`
+	History  mywant.WantHistory         `json:"history"`
+	State    map[string]interface{}     `json:"state"`
 }
 
-// buildWantResponse creates a response with grouped agent history
+// buildWantResponse creates a response with grouped agent history nested in history
 func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
 	response := &WantResponseWithGroupedAgents{
 		Metadata: want.Metadata,
@@ -84,10 +83,11 @@ func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
 		State:    want.State,
 	}
 
+	// Populate grouped agent history in the history field
 	if groupBy == "name" {
-		response.GroupedAgentHistory = want.GetAgentHistoryGroupedByName()
+		response.History.GroupedAgentHistory = want.GetAgentHistoryGroupedByName()
 	} else if groupBy == "type" {
-		response.GroupedAgentHistory = want.GetAgentHistoryGroupedByType()
+		response.History.GroupedAgentHistory = want.GetAgentHistoryGroupedByType()
 	}
 
 	return response
