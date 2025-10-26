@@ -205,6 +205,7 @@ type Queue struct {
 	batchSize           int
 	batchUpdateInterval int
 	lastBatchCount      int
+	cycleCount          int // Track cycles for history recording intervals
 }
 
 // NewQueue creates a new queue want
@@ -333,11 +334,13 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	waitTimeSum += waitTime
 	processedCount++
 
-	// Store packet-specific info (always, even in batch mode)
-	q.StoreState("last_packet_wait_time", waitTime)
+	// Increment cycle counter for batching history entries
+	q.cycleCount++
 
 	// Batch mechanism: only update statistics every N packets
 	if processedCount%q.batchUpdateInterval == 0 {
+		// Store packet-specific info only at batch intervals to reduce history entries
+		q.StoreState("last_packet_wait_time", waitTime)
 		q.flushBatch(serverFreeTime, waitTimeSum, processedCount)
 		q.lastBatchCount = processedCount
 	}
