@@ -8,6 +8,7 @@ interface WantCardContentProps {
   want: Want;
   isChild?: boolean;
   onView: (want: Want) => void;
+  onViewAgents?: (want: Want) => void;
   onEdit?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -18,6 +19,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   want,
   isChild = false,
   onView,
+  onViewAgents,
   onEdit,
   onDelete,
   onSuspend,
@@ -79,10 +81,19 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 ml-2">
-            {/* Agent indicator */}
+            {/* Agent indicator - clickable */}
             {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
-              <div className="flex items-center space-x-1" title="Agent-enabled want">
-                <Bot className={`${sizes.iconSize} text-blue-600`} />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onViewAgents) {
+                    onViewAgents(want);
+                  }
+                }}
+                className="flex items-center space-x-1 p-1 rounded-md hover:bg-blue-50 transition-colors cursor-pointer"
+                title="Click to view agent details"
+              >
+                <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800`} />
                 {want.current_agent && (
                   <div className={`${sizes.agentDotSize} bg-green-500 rounded-full animate-pulse`} title="Agent running" />
                 )}
@@ -94,7 +105,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
                   )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
                 )}
-              </div>
+              </button>
             )}
 
             <StatusBadge status={want.status} size={sizes.statusSize} />

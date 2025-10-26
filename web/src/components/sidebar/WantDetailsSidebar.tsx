@@ -20,12 +20,14 @@ import {
 
 interface WantDetailsSidebarProps {
   want: Want | null;
+  initialTab?: 'overview' | 'config' | 'logs' | 'agents';
 }
 
 type TabType = 'overview' | 'config' | 'logs' | 'agents';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
-  want
+  want,
+  initialTab = 'overview'
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -58,14 +60,14 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [want, fetchWantDetails, fetchWantResults, fetchWants]);
 
-  // Reset state when want changes
+  // Reset state when want changes and set initial tab
   useEffect(() => {
     if (want) {
-      setActiveTab('overview');
+      setActiveTab(initialTab);
       setIsEditing(false);
       setUpdateError(null);
     }
-  }, [want]);
+  }, [want, initialTab]);
 
   // Auto-enable refresh for running wants
   useEffect(() => {

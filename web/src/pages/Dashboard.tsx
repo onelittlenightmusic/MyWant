@@ -36,6 +36,7 @@ export const Dashboard: React.FC = () => {
   const [selectedWant, setSelectedWant] = useState<Want | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
 
   // TODO: Re-enable auto-refresh selection later (currently disabled for testing)
   // // Derive selectedWant from wants array using selectedWantId
@@ -106,6 +107,14 @@ export const Dashboard: React.FC = () => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
     setSelectedWant(want);
+    setSidebarInitialTab('overview');
+  };
+
+  const handleViewAgents = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    setSelectedWantId(wantId || null);
+    setSelectedWant(want);
+    setSidebarInitialTab('agents');
   };
 
   const handleDeleteWantConfirm = async () => {
@@ -262,6 +271,7 @@ export const Dashboard: React.FC = () => {
               statusFilters={statusFilters}
               selectedWant={selectedWant}
               onViewWant={handleViewWant}
+              onViewAgentsWant={handleViewAgents}
               onEditWant={handleEditWant}
               onDeleteWant={setDeleteWantState}
               onSuspendWant={handleSuspendWant}
@@ -277,7 +287,7 @@ export const Dashboard: React.FC = () => {
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
         backgroundStyle={sidebarBackgroundStyle}
       >
-        <WantDetailsSidebar want={selectedWant} />
+        <WantDetailsSidebar want={selectedWant} initialTab={sidebarInitialTab} />
       </RightSidebar>
 
       {/* Modals */}

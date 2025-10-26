@@ -10,6 +10,7 @@ interface WantCardProps {
   selected: boolean;
   selectedWant?: Want | null;
   onView: (want: Want) => void;
+  onViewAgents?: (want: Want) => void;
   onEdit: (want: Want) => void;
   onDelete: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -23,6 +24,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   selected,
   selectedWant,
   onView,
+  onViewAgents,
   onEdit,
   onDelete,
   onSuspend,
@@ -104,6 +106,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           want={want}
           isChild={false}
           onView={onView}
+          onViewAgents={onViewAgents}
           onEdit={onEdit}
           onDelete={onDelete}
           onSuspend={onSuspend}
