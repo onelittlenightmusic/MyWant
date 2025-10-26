@@ -333,7 +333,7 @@ func (n *Want) CommitStateChanges() {
 // GetStagedChanges returns a copy of currently staged changes (for debugging)
 func (n *Want) GetStagedChanges() map[string]interface{} {
 	n.agentStateMutex.RLock()
-	defer n.agentStateMutex.RUnlock()
+	defer n.agentStateMutex.Unlock()
 
 	if n.agentStateChanges == nil {
 		return make(map[string]interface{})
@@ -344,4 +344,60 @@ func (n *Want) GetStagedChanges() map[string]interface{} {
 		staged[k] = v
 	}
 	return staged
+}
+
+// GetAgentHistoryByName returns all agent executions for a specific agent name
+func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
+	if n.History.AgentHistory == nil {
+		return []AgentExecution{}
+	}
+
+	var result []AgentExecution
+	for _, exec := range n.History.AgentHistory {
+		if exec.AgentName == agentName {
+			result = append(result, exec)
+		}
+	}
+	return result
+}
+
+// GetAgentHistoryByType returns all agent executions for a specific agent type
+func (n *Want) GetAgentHistoryByType(agentType string) []AgentExecution {
+	if n.History.AgentHistory == nil {
+		return []AgentExecution{}
+	}
+
+	var result []AgentExecution
+	for _, exec := range n.History.AgentHistory {
+		if exec.AgentType == agentType {
+			result = append(result, exec)
+		}
+	}
+	return result
+}
+
+// GetAgentHistoryGroupedByName returns agent history grouped by agent name
+func (n *Want) GetAgentHistoryGroupedByName() map[string][]AgentExecution {
+	if n.History.AgentHistory == nil {
+		return make(map[string][]AgentExecution)
+	}
+
+	grouped := make(map[string][]AgentExecution)
+	for _, exec := range n.History.AgentHistory {
+		grouped[exec.AgentName] = append(grouped[exec.AgentName], exec)
+	}
+	return grouped
+}
+
+// GetAgentHistoryGroupedByType returns agent history grouped by agent type
+func (n *Want) GetAgentHistoryGroupedByType() map[string][]AgentExecution {
+	if n.History.AgentHistory == nil {
+		return make(map[string][]AgentExecution)
+	}
+
+	grouped := make(map[string][]AgentExecution)
+	for _, exec := range n.History.AgentHistory {
+		grouped[exec.AgentType] = append(grouped[exec.AgentType], exec)
+	}
+	return grouped
 }

@@ -64,6 +64,35 @@ type WantExecution struct {
 	Builder *mywant.ChainBuilder   `json:"-"` // Don't serialize builder
 }
 
+// WantResponseWithGroupedAgents wraps a Want with grouped agent history
+type WantResponseWithGroupedAgents struct {
+	Metadata            mywant.Metadata                   `json:"metadata"`
+	Spec                mywant.WantSpec                   `json:"spec"`
+	Status              mywant.WantStatus                 `json:"status"`
+	History             mywant.WantHistory               `json:"history"`
+	State               map[string]interface{}            `json:"state"`
+	GroupedAgentHistory map[string][]mywant.AgentExecution `json:"groupedAgentHistory,omitempty"`
+}
+
+// buildWantResponse creates a response with grouped agent history
+func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
+	response := &WantResponseWithGroupedAgents{
+		Metadata: want.Metadata,
+		Spec:     want.Spec,
+		Status:   want.Status,
+		History:  want.History,
+		State:    want.State,
+	}
+
+	if groupBy == "name" {
+		response.GroupedAgentHistory = want.GetAgentHistoryGroupedByName()
+	} else if groupBy == "type" {
+		response.GroupedAgentHistory = want.GetAgentHistoryGroupedByType()
+	}
+
+	return response
+}
+
 // NewServer creates a new MyWant server
 func NewServer(config ServerConfig) *Server {
 	// Create agent registry and load existing capabilities/agents
@@ -571,6 +600,9 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
+	// Get query parameters for grouping/filtering agent history
+	groupBy := r.URL.Query().Get("groupBy") // "name" or "type"
+
 	// Search for the want by metadata.id across all executions using universal search
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
@@ -588,6 +620,13 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				currentState := want.GetAllState()
 				for k, v := range currentState {
 					wantCopy.State[k] = v
+				}
+
+				// If groupBy is specified, return response with grouped agent history
+				if groupBy != "" {
+					response := buildWantResponse(wantCopy, groupBy)
+					json.NewEncoder(w).Encode(response)
+					return
 				}
 
 				// Return the snapshot copy
@@ -613,6 +652,13 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 			currentState := want.GetAllState()
 			for k, v := range currentState {
 				wantCopy.State[k] = v
+			}
+
+			// If groupBy is specified, return response with grouped agent history
+			if groupBy != "" {
+				response := buildWantResponse(wantCopy, groupBy)
+				json.NewEncoder(w).Encode(response)
+				return
 			}
 
 			// Return the snapshot copy
