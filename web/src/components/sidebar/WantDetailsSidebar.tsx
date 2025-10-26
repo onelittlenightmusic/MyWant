@@ -458,82 +458,199 @@ const ConfigTab: React.FC<{
   </div>
 );
 
-const AgentsTab: React.FC<{ want: Want }> = ({ want }) => (
-  <div className="p-8 space-y-6">
-    {/* Current Agent */}
-    {want.current_agent && (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <Bot className="h-5 w-5 text-blue-600 mr-2" />
-          <div>
-            <h4 className="text-sm font-medium text-blue-900">Current Agent</h4>
-            <p className="text-sm text-blue-700">{want.current_agent}</p>
-          </div>
-          <div className="ml-auto">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Running" />
-          </div>
-        </div>
-      </div>
-    )}
+interface AgentExecution {
+  agent_name: string;
+  agent_type: string;
+  start_time: string;
+  end_time?: string;
+  status: string;
+  error?: string;
+}
 
-    {/* Running Agents */}
-    {want.running_agents && want.running_agents.length > 0 && (
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Running Agents</h4>
-        <div className="space-y-2">
-          {want.running_agents.map((agent, index) => (
-            <div key={index} className="flex items-center justify-between">
-              <span className="text-sm text-gray-700">{agent}</span>
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
+  const [groupedAgents, setGroupedAgents] = useState<Record<string, AgentExecution[]> | null>(null);
+  const [groupBy, setGroupBy] = useState<'name' | 'type'>('name');
+  const [loadingGrouped, setLoadingGrouped] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  // Fetch grouped agent history
+  useEffect(() => {
+    const fetchGroupedAgents = async () => {
+      if (want?.metadata?.id) {
+        setLoadingGrouped(true);
+        try {
+          const response = await fetch(
+            `http://localhost:8080/api/v1/wants/${want.metadata.id}?groupBy=${groupBy}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.history?.groupedAgentHistory) {
+              setGroupedAgents(data.history.groupedAgentHistory);
+              // Auto-expand first group
+              const groups = Object.keys(data.history.groupedAgentHistory);
+              if (groups.length > 0) {
+                setExpandedGroups({ [groups[0]]: true });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch grouped agents:', error);
+        } finally {
+          setLoadingGrouped(false);
+        }
+      }
+    };
+
+    fetchGroupedAgents();
+  }, [want?.metadata?.id, groupBy]);
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
+  };
+
+  return (
+    <div className="p-8 space-y-6">
+      {/* Current Agent */}
+      {want.current_agent && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <Bot className="h-5 w-5 text-blue-600 mr-2" />
+            <div>
+              <h4 className="text-sm font-medium text-blue-900">Current Agent</h4>
+              <p className="text-sm text-blue-700">{want.current_agent}</p>
             </div>
-          ))}
+            <div className="ml-auto">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Running" />
+            </div>
+          </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Agent History */}
-    {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3">Agent History</h4>
-        <div className="space-y-3">
-          {want.history?.agentHistory?.map((execution, index) => (
-            <div key={index} className="border border-gray-200 rounded-md p-3 bg-white">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-sm">{execution.agent_name}</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">{execution.agent_type}</span>
-                  <div className={classNames(
-                    'w-2 h-2 rounded-full',
-                    execution.status === 'completed' && 'bg-green-500',
-                    execution.status === 'failed' && 'bg-red-500',
-                    execution.status === 'running' && 'bg-blue-500 animate-pulse',
-                    execution.status === 'terminated' && 'bg-gray-500'
-                  )} />
+      {/* Running Agents */}
+      {want.running_agents && want.running_agents.length > 0 && (
+        <div className="bg-gray-50 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">Running Agents</h4>
+          <div className="space-y-2">
+            {want.running_agents.map((agent, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <span className="text-sm text-gray-700">{agent}</span>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Grouped Agent History */}
+      {groupedAgents && Object.keys(groupedAgents).length > 0 && (
+        <div className="bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-medium text-gray-900">Agent Execution History</h4>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setGroupBy('name')}
+                className={classNames(
+                  'px-3 py-1 text-xs rounded-md font-medium transition-colors',
+                  groupBy === 'name'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                )}
+              >
+                By Name
+              </button>
+              <button
+                onClick={() => setGroupBy('type')}
+                className={classNames(
+                  'px-3 py-1 text-xs rounded-md font-medium transition-colors',
+                  groupBy === 'type'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                )}
+              >
+                By Type
+              </button>
+            </div>
+          </div>
+
+          {loadingGrouped && (
+            <div className="flex items-center justify-center py-4">
+              <LoadingSpinner />
+            </div>
+          )}
+
+          {!loadingGrouped && (
+            <div className="space-y-3">
+              {Object.entries(groupedAgents).map(([groupName, executions]) => (
+                <div key={groupName} className="border border-gray-200 rounded-md overflow-hidden">
+                  {/* Group Header */}
+                  <button
+                    onClick={() => toggleGroup(groupName)}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2">
+                      {expandedGroups[groupName] ? (
+                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                      )}
+                      <span className="font-medium text-sm text-gray-900">{groupName}</span>
+                      <span className="text-xs text-gray-500">({executions.length})</span>
+                    </div>
+                  </button>
+
+                  {/* Group Content */}
+                  {expandedGroups[groupName] && (
+                    <div className="px-3 py-2 bg-white border-t border-gray-200 space-y-2">
+                      {executions.map((execution, index) => (
+                        <div
+                          key={index}
+                          className="p-2 bg-gray-50 rounded border border-gray-200 text-xs"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-gray-800">{execution.agent_name}</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-500 text-xs">{execution.agent_type}</span>
+                              <div className={classNames(
+                                'w-2 h-2 rounded-full',
+                                execution.status === 'completed' && 'bg-green-500',
+                                execution.status === 'failed' && 'bg-red-500',
+                                execution.status === 'running' && 'bg-blue-500 animate-pulse',
+                                execution.status === 'terminated' && 'bg-gray-500'
+                              )} />
+                            </div>
+                          </div>
+                          <div className="text-gray-600 space-y-1">
+                            <div>Start: {formatDate(execution.start_time)}</div>
+                            {execution.end_time && (
+                              <div>End: {formatDate(execution.end_time)}</div>
+                            )}
+                            {execution.error && (
+                              <div className="text-red-600">Error: {execution.error}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="text-xs text-gray-600">
-                <div>Started: {formatDate(execution.start_time)}</div>
-                {execution.end_time && (
-                  <div>Ended: {formatDate(execution.end_time)}</div>
-                )}
-                {execution.error && (
-                  <div className="text-red-600 mt-1">Error: {execution.error}</div>
-                )}
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      </div>
-    )}
+      )}
 
-    {!want.current_agent && (!want.running_agents || want.running_agents.length === 0) && (!want.history?.agentHistory || want.history.agentHistory.length === 0) && (
-      <div className="text-center py-8">
-        <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">No agent information available</p>
-      </div>
-    )}
-  </div>
-);
+      {!want.current_agent && (!want.running_agents || want.running_agents.length === 0) && (!groupedAgents || Object.keys(groupedAgents).length === 0) && (
+        <div className="text-center py-8">
+          <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No agent information available</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 // Helper function to render JSON as itemized list
