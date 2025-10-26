@@ -54,6 +54,8 @@ type Numbers struct {
 	paths               mywant.Paths
 	batchUpdateInterval int // Batch interval for state history recording
 	cycleCount          int // Track cycles for history recording intervals
+	currentTime         float64 // Local state: current simulation time
+	currentCount        int     // Local state: current packet count
 }
 
 // PacketNumbers creates a new numbers want
@@ -150,67 +152,65 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Read count and rate parameters fresh each cycle
-	currentCount := g.Count // Default fallback
+	paramCount := g.Count // Default fallback
 	if c, ok := g.Spec.Params["count"]; ok {
 		if ci, ok := c.(int); ok {
-			currentCount = ci
+			paramCount = ci
 		} else if cf, ok := c.(float64); ok {
-			currentCount = int(cf)
+			paramCount = int(cf)
 		}
 	}
 
-	currentRate := g.Rate // Default fallback
+	paramRate := g.Rate // Default fallback
 	if r, ok := g.Spec.Params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
-			currentRate = rf
+			paramRate = rf
 		}
 	}
 
-	// Initialize state variables if not present
+	// Initialize state map if not present
 	if g.State == nil {
 		g.State = make(map[string]interface{})
 	}
-
-	// Get current time and count from state (persistent across calls)
-	t, _ := g.State["current_time"].(float64)
-	j, _ := g.State["current_count"].(int)
 
 	if len(outputs) == 0 {
 		return true
 	}
 	out := outputs[0]
 
-	if j >= currentCount {
-		// Store generation stats
-		g.StoreState("total_processed", j)
+	if g.currentCount >= paramCount {
+		// Store generation stats to state (for memory dump)
+		g.StoreState("total_processed", g.currentCount)
 		g.StoreState("average_wait_time", 0.0) // Generators don't have wait time
 		g.StoreState("total_wait_time", 0.0)
+		g.StoreState("current_time", g.currentTime)
+		g.StoreState("current_count", g.currentCount)
 
 		out <- QueuePacket{Num: -1, Time: 0}
-		fmt.Printf("[GENERATOR] Generated %d packets\n", j)
+		fmt.Printf("[GENERATOR] Generated %d packets\n", g.currentCount)
 		return true
 	}
-	j++
+	g.currentCount++
 
 	if useDeterministic {
 		// Deterministic inter-arrival time (rate = 1/interval)
-		t += 1.0 / currentRate
+		g.currentTime += 1.0 / paramRate
 	} else {
 		// Exponential inter-arrival time (rate = 1/mean_interval)
 		// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
-		t += ExpRand64() / currentRate
+		g.currentTime += ExpRand64() / paramRate
 	}
 
 	// Increment cycle counter for batching history entries
 	g.cycleCount++
 
-	// Batch mechanism: only update state every N packets to reduce history entries
-	if j%g.batchUpdateInterval == 0 {
-		g.StoreState("current_time", t)
-		g.StoreState("current_count", j)
+	// Batch mechanism: only update state history every N packets to reduce history entries
+	if g.currentCount%g.batchUpdateInterval == 0 {
+		g.StoreState("current_time", g.currentTime)
+		g.StoreState("current_count", g.currentCount)
 	}
 
-	out <- QueuePacket{Num: j, Time: t}
+	out <- QueuePacket{Num: g.currentCount, Time: g.currentTime}
 	return false
 }
 
@@ -224,6 +224,10 @@ type Queue struct {
 	batchUpdateInterval int
 	lastBatchCount      int
 	cycleCount          int // Track cycles for history recording intervals
+	// Local persistent state (not in State map, survives across cycles)
+	serverFreeTime float64 // When the server will be free
+	waitTimeSum    float64 // Accumulated wait time
+	processedCount int     // Number of packets processed
 }
 
 // NewQueue creates a new queue want
@@ -306,10 +310,8 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		q.State = make(map[string]interface{})
 	}
 
-	// Initialize persistent state variables
-	serverFreeTime, _ := q.State["serverFreeTime"].(float64)
-	waitTimeSum, _ := q.State["waitTimeSum"].(float64)
-	processedCount, _ := q.State["processedCount"].(int)
+	// Local persistent state variables are used instead of State map
+	// This ensures they persist across cycles without batching interference
 
 	if len(using) == 0 || len(outputs) == 0 {
 		return true
@@ -322,7 +324,7 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Check for termination packet and forward it
 	if packet.IsEnded() {
 		// Always flush batch and store final state when terminating
-		q.flushBatch(serverFreeTime, waitTimeSum, processedCount)
+		q.flushBatch()
 
 		// Trigger OnEnded callback
 		if err := q.OnEnded(&packet); err != nil {
@@ -335,7 +337,7 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Process the packet...
 	arrivalTime := packet.Time
-	startServiceTime := math.Max(arrivalTime, serverFreeTime)
+	startServiceTime := math.Max(arrivalTime, q.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
 
 	// Read service time from parameters (can change dynamically!)
@@ -347,20 +349,20 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	finishTime := startServiceTime + serviceTime
-	serverFreeTime = finishTime
+	q.serverFreeTime = finishTime
 
-	waitTimeSum += waitTime
-	processedCount++
+	q.waitTimeSum += waitTime
+	q.processedCount++
 
 	// Increment cycle counter for batching history entries
 	q.cycleCount++
 
 	// Batch mechanism: only update statistics every N packets
-	if processedCount%q.batchUpdateInterval == 0 {
+	if q.processedCount%q.batchUpdateInterval == 0 {
 		// Store packet-specific info only at batch intervals to reduce history entries
 		q.StoreState("last_packet_wait_time", waitTime)
-		q.flushBatch(serverFreeTime, waitTimeSum, processedCount)
-		q.lastBatchCount = processedCount
+		q.flushBatch()
+		q.lastBatchCount = q.processedCount
 	}
 
 	out <- QueuePacket{Num: packet.Num, Time: finishTime}
@@ -368,43 +370,38 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 }
 
 // flushBatch commits all accumulated statistics to state
-func (q *Queue) flushBatch(serverFreeTime, waitTimeSum float64, processedCount int) {
+func (q *Queue) flushBatch() {
 	// Calculate average wait time
 	avgWaitTime := 0.0
-	if processedCount > 0 {
-		avgWaitTime = waitTimeSum / float64(processedCount)
+	if q.processedCount > 0 {
+		avgWaitTime = q.waitTimeSum / float64(q.processedCount)
 	}
 
 	// Batch update all statistics at once
-	q.StoreState("serverFreeTime", serverFreeTime)
-	q.StoreState("waitTimeSum", waitTimeSum)
-	q.StoreState("processedCount", processedCount)
+	q.StoreState("serverFreeTime", q.serverFreeTime)
+	q.StoreState("waitTimeSum", q.waitTimeSum)
+	q.StoreState("processedCount", q.processedCount)
 	q.StoreState("average_wait_time", avgWaitTime)
-	q.StoreState("total_processed", processedCount)
-	q.StoreState("total_wait_time", waitTimeSum)
-	q.StoreState("current_server_free_time", serverFreeTime)
+	q.StoreState("total_processed", q.processedCount)
+	q.StoreState("total_wait_time", q.waitTimeSum)
+	q.StoreState("current_server_free_time", q.serverFreeTime)
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
 func (q *Queue) OnEnded(packet mywant.Packet) error {
-	// Extract queue-specific statistics from state
-	waitTimeSum, _ := q.State["waitTimeSum"].(float64)
-	processedCount, _ := q.State["processedCount"].(int)
-	serverFreeTime, _ := q.State["serverFreeTime"].(float64)
-
-	// Calculate final statistics
+	// Calculate final statistics from local persistent state
 	avgWaitTime := 0.0
-	if processedCount > 0 {
-		avgWaitTime = waitTimeSum / float64(processedCount)
+	if q.processedCount > 0 {
+		avgWaitTime = q.waitTimeSum / float64(q.processedCount)
 	}
 
 	// Store final state
 	q.StoreState("average_wait_time", avgWaitTime)
-	q.StoreState("total_processed", processedCount)
-	q.StoreState("total_wait_time", waitTimeSum)
-	q.StoreState("current_server_free_time", serverFreeTime)
+	q.StoreState("total_processed", q.processedCount)
+	q.StoreState("total_wait_time", q.waitTimeSum)
+	q.StoreState("current_server_free_time", q.serverFreeTime)
 
-	fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", processedCount, avgWaitTime)
+	fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", q.processedCount, avgWaitTime)
 	return nil
 }
 
