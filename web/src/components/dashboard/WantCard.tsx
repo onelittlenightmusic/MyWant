@@ -183,6 +183,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                       want={child}
                       isChild={true}
                       onView={onView}
+                      onViewAgents={onViewAgents}
                     />
                   </div>
                 </div>
