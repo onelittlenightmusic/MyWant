@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	. "mywant/engine/src"
@@ -92,62 +93,41 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
 					// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
-					var ts, os, ns, det string
-					n, err := fmt.Sscanf(entry, "%s: %s -> %s (%s)", &ts, &os, &ns, &det)
-					if err == nil && n == 4 {
-						parsedTime, timeErr := time.Parse("15:04:05", ts)
-						if timeErr != nil {
-							parsedTime = time.Now() // Fallback
-						}
+					if parsed, ok := parseStatusHistoryEntry(entry); ok {
 						// Only add if not already in history
 						found := false
 						for _, existing := range m.StatusChangeHistory {
-							if existing.OldStatus == os && existing.NewStatus == ns && existing.Details == det {
+							if existing.OldStatus == parsed.OldStatus && existing.NewStatus == parsed.NewStatus && existing.Details == parsed.Details {
 								found = true
 								break
 							}
 						}
 						if !found {
-							m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
-								Timestamp: parsedTime,
-								OldStatus: os,
-								NewStatus: ns,
-								Details:   det,
-							})
+							m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 						}
 					} else {
-						log.Printf("[MonitorFlightAPI] Failed to parse history entry (interface{}): %s, Error: %v, n=%d\n", entry, err, n)
+						log.Printf("[MonitorFlightAPI] Failed to parse history entry (interface{}): %s\n", entry)
 					}
 				}
 			}
 		} else if historyStrs, ok := historyI.([]string); ok {
 			log.Printf("[MonitorFlightAPI] Restoring %d status history entries from state ([]string)", len(historyStrs))
 			for _, entry := range historyStrs {
-				var ts, os, ns, det string
-				n, err := fmt.Sscanf(entry, "%s: %s -> %s (%s)", &ts, &os, &ns, &det)
-				if err == nil && n == 4 {
-					parsedTime, timeErr := time.Parse("15:04:05", ts)
-					if timeErr != nil {
-						parsedTime = time.Now() // Fallback
-					}
+				// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
+				if parsed, ok := parseStatusHistoryEntry(entry); ok {
 					// Only add if not already in history
 					found := false
 					for _, existing := range m.StatusChangeHistory {
-						if existing.OldStatus == os && existing.NewStatus == ns && existing.Details == det {
+						if existing.OldStatus == parsed.OldStatus && existing.NewStatus == parsed.NewStatus && existing.Details == parsed.Details {
 							found = true
 							break
 						}
 					}
 					if !found {
-						m.StatusChangeHistory = append(m.StatusChangeHistory, StatusChange{
-							Timestamp: parsedTime,
-							OldStatus: os,
-							NewStatus: ns,
-							Details:   det,
-						})
+						m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 					}
 				} else {
-					log.Printf("[MonitorFlightAPI] Failed to parse history entry ([]string): %s, Error: %v, n=%d\n", entry, err, n)
+					log.Printf("[MonitorFlightAPI] Failed to parse history entry ([]string): %s\n", entry)
 				}
 			}
 		}
@@ -267,4 +247,70 @@ func (m *MonitorFlightAPI) GetStatusChangeHistory() []StatusChange {
 // WasStatusChanged checks if status has changed since last check
 func (m *MonitorFlightAPI) WasStatusChanged() bool {
 	return len(m.StatusChangeHistory) > 0
+}
+
+// parseStatusHistoryEntry parses a status history entry with format:
+// "HH:MM:SS: OldStatus -> NewStatus (Details)"
+// This uses string manipulation instead of fmt.Sscanf to properly handle status strings with spaces
+func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
+	// Find the first colon that separates timestamp from status transition
+	colonIdx := findFirstColon(entry)
+	if colonIdx < 0 || colonIdx+2 >= len(entry) {
+		return StatusChange{}, false
+	}
+
+	// Extract timestamp part (before first colon)
+	timestampStr := entry[:colonIdx]
+	rest := strings.TrimSpace(entry[colonIdx+1:])
+
+	// Find " -> " arrow separator
+	arrowIdx := strings.Index(rest, " -> ")
+	if arrowIdx < 0 {
+		return StatusChange{}, false
+	}
+
+	// Extract old status (after colon, before arrow)
+	oldStatus := strings.TrimSpace(rest[:arrowIdx])
+	afterArrow := strings.TrimSpace(rest[arrowIdx+4:])
+
+	// Find the opening parenthesis for details
+	parenIdx := strings.Index(afterArrow, "(")
+	if parenIdx < 0 {
+		return StatusChange{}, false
+	}
+
+	// Extract new status (after arrow, before parenthesis)
+	newStatus := strings.TrimSpace(afterArrow[:parenIdx])
+
+	// Extract details (inside parentheses)
+	detailsPart := strings.TrimSpace(afterArrow[parenIdx:])
+	if len(detailsPart) < 2 || !strings.HasPrefix(detailsPart, "(") || !strings.HasSuffix(detailsPart, ")") {
+		return StatusChange{}, false
+	}
+
+	// Remove parentheses from details
+	details := strings.TrimSpace(detailsPart[1 : len(detailsPart)-1])
+
+	// Parse timestamp
+	parsedTime, err := time.Parse("15:04:05", timestampStr)
+	if err != nil {
+		parsedTime = time.Now() // Fallback
+	}
+
+	return StatusChange{
+		Timestamp: parsedTime,
+		OldStatus: oldStatus,
+		NewStatus: newStatus,
+		Details:   details,
+	}, true
+}
+
+// findFirstColon finds the index of the first colon in the string
+func findFirstColon(s string) int {
+	for i, ch := range s {
+		if ch == ':' {
+			return i
+		}
+	}
+	return -1
 }
