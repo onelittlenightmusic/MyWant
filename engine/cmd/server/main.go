@@ -73,6 +73,42 @@ type WantResponseWithGroupedAgents struct {
 	State    map[string]interface{} `json:"state"`
 }
 
+// LLMRequest represents a request to the LLM inference API
+type LLMRequest struct {
+	Message string `json:"message"`
+	Model   string `json:"model,omitempty"`
+}
+
+// LLMResponse represents a response from the LLM inference API
+type LLMResponse struct {
+	Response  string `json:"response"`
+	Model     string `json:"model"`
+	Timestamp string `json:"timestamp"`
+}
+
+// OllamaRequest represents the request format for Ollama API
+type OllamaRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Stream bool   `json:"stream"`
+}
+
+// OllamaResponse represents the response format from Ollama API
+type OllamaResponse struct {
+	Model              string `json:"model"`
+	CreatedAt          string `json:"created_at"`
+	Response           string `json:"response"`
+	Done               bool   `json:"done"`
+	DoneReason         string `json:"done_reason,omitempty"`
+	Context            []int  `json:"context,omitempty"`
+	TotalDuration      int64  `json:"total_duration,omitempty"`
+	LoadDuration       int64  `json:"load_duration,omitempty"`
+	PromptEvalCount    int    `json:"prompt_eval_count,omitempty"`
+	PromptEvalDuration int64  `json:"prompt_eval_duration,omitempty"`
+	EvalCount          int    `json:"eval_count,omitempty"`
+	EvalDuration       int64  `json:"eval_duration,omitempty"`
+}
+
 // buildWantResponse creates a response with grouped agent history nested in history
 func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
 	response := &WantResponseWithGroupedAgents{
@@ -227,11 +263,103 @@ func (s *Server) setupRoutes() {
 	errors.HandleFunc("/{id}", s.updateErrorHistoryEntry).Methods("PUT")
 	errors.HandleFunc("/{id}", s.deleteErrorHistoryEntry).Methods("DELETE")
 
+	// LLM inference endpoints
+	llm := api.PathPrefix("/llm").Subrouter()
+	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
+	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
+
 	// Health check endpoint
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 
 	// Serve static files (for future web UI)
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
+}
+
+// queryLLM handles POST /api/v1/llm/query - sends a query to the Ollama LLM
+func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse request
+	var req LLMRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorMsg := "Invalid request format"
+		s.logError(r, http.StatusBadRequest, errorMsg, "parse_error", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Use default model if not specified
+	model := req.Model
+	if model == "" {
+		model = "gpt-oss:20b"
+	}
+
+	// Call Ollama LLM
+	response, err := s.callOllamaLLM(model, req.Message)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to query LLM: %v", err)
+		s.logError(r, http.StatusInternalServerError, errorMsg, "llm_error", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// Return success
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// callOllamaLLM calls the Ollama LLM API
+func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error) {
+	// Get Ollama base URL from environment variable or use default
+	ollamaURL := os.Getenv("GPT_BASE_URL")
+	if ollamaURL == "" {
+		ollamaURL = "localhost:11434"
+	}
+
+	// Ensure URL has proper protocol
+	if !strings.HasPrefix(ollamaURL, "http://") && !strings.HasPrefix(ollamaURL, "https://") {
+		ollamaURL = "http://" + ollamaURL
+	}
+
+	// Create Ollama request
+	ollamaReq := OllamaRequest{
+		Model:  model,
+		Prompt: prompt,
+		Stream: false,
+	}
+
+	// Marshal request
+	reqBody, err := json.Marshal(ollamaReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Make HTTP request to Ollama
+	url := fmt.Sprintf("%s/api/generate", ollamaURL)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Ollama returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var ollamaResp OllamaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
+		return nil, fmt.Errorf("failed to decode Ollama response: %w", err)
+	}
+
+	// Return formatted response
+	return &LLMResponse{
+		Response:  ollamaResp.Response,
+		Model:     ollamaResp.Model,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}, nil
 }
 
 // createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files
