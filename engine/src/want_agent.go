@@ -21,6 +21,23 @@ func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
 
+// SetAgentActivity sets the activity description for an agent execution
+// This should be called by agents to describe what action was performed
+// Example: "Flight reservation has been created" or "Hotel booking confirmed"
+func (n *Want) SetAgentActivity(agentName string, activity string) {
+	if n.History.AgentHistory == nil {
+		return
+	}
+
+	// Find the last execution record for this agent and set the activity
+	for i := len(n.History.AgentHistory) - 1; i >= 0; i-- {
+		if n.History.AgentHistory[i].AgentName == agentName && n.History.AgentHistory[i].Status == "running" {
+			n.History.AgentHistory[i].Activity = activity
+			break
+		}
+	}
+}
+
 // ExecuteAgents finds and executes agents based on want requirements
 func (n *Want) ExecuteAgents() error {
 	if n.agentRegistry == nil {

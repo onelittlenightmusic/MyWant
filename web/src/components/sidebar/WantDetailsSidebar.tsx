@@ -465,6 +465,7 @@ interface AgentExecution {
   end_time?: string;
   status: string;
   error?: string;
+  activity?: string; // Description of agent action performed
 }
 
 const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
@@ -609,7 +610,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                           key={index}
                           className="p-2 bg-gray-50 rounded border border-gray-200 text-xs"
                         >
-                          <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-gray-800">{execution.agent_name}</span>
                             <div className="flex items-center space-x-2">
                               <span className="text-gray-500 text-xs">{execution.agent_type}</span>
@@ -622,6 +623,16 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                               )} />
                             </div>
                           </div>
+
+                          {/* Activity Label */}
+                          {execution.activity && (
+                            <div className="mb-2">
+                              <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                                {execution.activity}
+                              </span>
+                            </div>
+                          )}
+
                           <div className="text-gray-600 space-y-1">
                             <div>Start: {formatDate(execution.start_time)}</div>
                             {execution.end_time && (

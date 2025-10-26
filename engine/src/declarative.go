@@ -78,6 +78,7 @@ type AgentExecution struct {
 	EndTime   *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
 	Status    string     `json:"status" yaml:"status"` // "running", "completed", "failed"
 	Error     string     `json:"error,omitempty" yaml:"error,omitempty"`
+	Activity  string     `json:"activity,omitempty" yaml:"activity,omitempty"` // Description of agent action like "flight reservation has been created"
 }
 
 // ParameterUpdateListener represents a want that can receive parameter updates
