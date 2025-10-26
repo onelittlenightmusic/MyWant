@@ -271,6 +271,78 @@ func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) 
 	return true
 }
 
+// isSignificantStateFields checks if only minor/metadata fields have changed
+// Returns true if ONLY status-like fields have changed (fields ending with "_status")
+// Returns false if significant functional fields have changed
+func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) bool {
+	// Get all keys that changed
+	changedKeys := make(map[string]bool)
+
+	// Check for keys that exist in old but not new, or have different values
+	for key, oldVal := range oldState {
+		newVal, exists := newState[key]
+		if !exists || !n.valuesEqual(oldVal, newVal) {
+			changedKeys[key] = true
+		}
+	}
+
+	// Check for keys that exist in new but not old
+	for key := range newState {
+		if _, exists := oldState[key]; !exists {
+			changedKeys[key] = true
+		}
+	}
+
+	// If no changes, return true (only status, trivially)
+	if len(changedKeys) == 0 {
+		return true
+	}
+
+	// Check if ALL changed keys are status-like fields (ending with "_status")
+	for changedKey := range changedKeys {
+		// Status-like fields: end with "_status" or are known metadata fields
+		isStatusField := len(changedKey) >= 7 && changedKey[len(changedKey)-7:] == "_status"
+		isMetadataField := changedKey == "updated_at" || changedKey == "last_poll_time" ||
+			changedKey == "status_changed_at" || changedKey == "status_changed" ||
+			changedKey == "status_change_history_count"
+
+		if !isStatusField && !isMetadataField {
+			// A significant (non-status) field changed
+			return false
+		}
+	}
+
+	// All changed fields are status-like
+	return true
+}
+
+// getSignificantStateChanges extracts only the significant (non-status) changes between states
+// Returns a map of only the functional changes, excluding status and metadata fields
+func (n *Want) getSignificantStateChanges(oldState, newState map[string]interface{}) map[string]interface{} {
+	significantChanges := make(map[string]interface{})
+
+	// Check all keys in new state
+	for key, newVal := range newState {
+		// Skip status-like fields
+		isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
+		isMetadataField := key == "updated_at" || key == "last_poll_time" ||
+			key == "status_changed_at" || key == "status_changed" ||
+			key == "status_change_history_count"
+
+		if isStatusField || isMetadataField {
+			continue
+		}
+
+		// Include if it's a new key or has a different value
+		oldVal, exists := oldState[key]
+		if !exists || !n.valuesEqual(oldVal, newVal) {
+			significantChanges[key] = newVal
+		}
+	}
+
+	return significantChanges
+}
+
 // GetStatus returns the current want status
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
@@ -350,6 +422,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 // Uses differential checking to prevent duplicate entries when state hasn't actually changed
 // Only creates a history entry if the state differs from the last recorded state
 // NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
+// ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
 func (n *Want) addAggregatedStateHistory() {
 	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
@@ -387,6 +460,30 @@ func (n *Want) addAggregatedStateHistory() {
 		// Compare current state with last recorded state
 		if n.stateSnapshotsEqual(lastState, stateSnapshot) {
 			// State hasn't changed, skip recording
+			return
+		}
+
+		// SMART MERGING: If only status fields changed, merge into the previous entry
+		// This prevents duplicate history entries when only status_* fields are updated
+		if n.isOnlyStatusChange(lastState, stateSnapshot) {
+			// Update the last entry's state with the new status values
+			// This consolidates status-only updates into the previous functional change
+			if lastStateMap, ok := n.History.StateHistory[len(n.History.StateHistory)-1].StateValue.(map[string]interface{}); ok {
+				// Copy status and metadata fields from the new snapshot to the last entry
+				for key, newVal := range stateSnapshot {
+					// Copy status-like fields and metadata
+					isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
+					isMetadataField := key == "updated_at" || key == "last_poll_time" ||
+						key == "status_changed_at" || key == "status_changed" ||
+						key == "status_change_history_count"
+
+					if isStatusField || isMetadataField {
+						lastStateMap[key] = newVal
+					}
+				}
+				// Update timestamp to reflect the latest status change
+				n.History.StateHistory[len(n.History.StateHistory)-1].Timestamp = time.Now()
+			}
 			return
 		}
 	}
