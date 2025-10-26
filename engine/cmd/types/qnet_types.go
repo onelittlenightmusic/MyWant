@@ -52,8 +52,8 @@ type Numbers struct {
 	Rate                float64
 	Count               int
 	paths               mywant.Paths
-	batchUpdateInterval int // Batch interval for state history recording
-	cycleCount          int // Track cycles for history recording intervals
+	batchUpdateInterval int     // Batch interval for state history recording
+	cycleCount          int     // Track cycles for history recording intervals
 	currentTime         float64 // Local state: current simulation time
 	currentCount        int     // Local state: current packet count
 }

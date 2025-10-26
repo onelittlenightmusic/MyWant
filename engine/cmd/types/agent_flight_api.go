@@ -251,6 +251,11 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 	})
 
+	// Record activity description for agent history
+	activity := fmt.Sprintf("Flight reservation has been created for %s (Flight %s, %s → %s)",
+		reservation.FlightNumber, reservation.FlightNumber, reservation.From, reservation.To)
+	want.SetAgentActivity(a.Name, activity)
+
 	fmt.Printf("[AgentFlightAPI] Created flight reservation: %s (ID: %s, Status: %s)\n",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
 
@@ -308,6 +313,10 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	// Clear agent_result so rebooking code can detect cancellation happened
 	// (if agent_result still contains the old flight, code won't know cancellation occurred)
 	want.StoreState("agent_result", nil)
+
+	// Record activity description for agent history
+	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)
+	want.SetAgentActivity(a.Name, activity)
 
 	fmt.Printf("[AgentFlightAPI] Cancelled flight: %s\n", flightIDStr)
 

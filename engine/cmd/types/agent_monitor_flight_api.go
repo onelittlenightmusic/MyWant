@@ -194,6 +194,11 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
 			want.StoreState("status_change_history_count", len(m.StatusChangeHistory))
 
+			// Record activity description for agent history
+			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
+				oldStatus, newStatus, reservation.FlightNumber, reservation.StatusMessage)
+			want.SetAgentActivity(m.Name, activity)
+
 			// Store complete flight info when status changes
 			schedule := FlightSchedule{
 				DepartureTime:   reservation.DepartureTime,

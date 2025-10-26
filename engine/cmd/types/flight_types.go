@@ -14,7 +14,7 @@ type FlightWant struct {
 	Want
 	FlightType          string
 	Duration            time.Duration
-	DepartureDate       string        // Departure date in YYYY-MM-DD format
+	DepartureDate       string // Departure date in YYYY-MM-DD format
 	paths               Paths
 	monitoringStartTime time.Time
 	monitoringDuration  time.Duration // How long to monitor for status changes
@@ -505,7 +505,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 
 	return false
 }
-
 
 // GetStateValue is a helper to safely get state value
 func (f *FlightWant) GetStateValue(key string) interface{} {

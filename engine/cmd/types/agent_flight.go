@@ -42,6 +42,11 @@ func (a *AgentFlight) Exec(ctx context.Context, want *Want) error {
 	// NOTE: Wrapping is handled by the framework, not here
 	want.StoreState("agent_result", schedule)
 
+	// Record activity description for agent history
+	activity := fmt.Sprintf("Flight reservation has been confirmed for %s flight %s departing at %s",
+		schedule.FlightType, schedule.FlightNumber, schedule.DepartureTime.Format("15:04 Jan 2"))
+	want.SetAgentActivity(a.Name, activity)
+
 	fmt.Printf("[AGENT_FLIGHT] Flight booking completed: %s departing at %s for %.1f hours\n",
 		schedule.FlightType, schedule.DepartureTime.Format("15:04 Jan 2"),
 		schedule.ArrivalTime.Sub(schedule.DepartureTime).Hours())

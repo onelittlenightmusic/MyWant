@@ -39,6 +39,11 @@ func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
 	// Store the result using StoreState method
 	want.StoreState("agent_result", schedule)
 
+	// Record activity description for agent history
+	activity := fmt.Sprintf("Buffet reservation has been confirmed for %s buffet at %s for %.1f hours",
+		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours)
+	want.SetAgentActivity(a.Name, activity)
+
 	fmt.Printf("[AGENT_BUFFET] Buffet reservation completed: %s at %s for %.1f hours\n",
 		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours)
 

@@ -39,6 +39,14 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 	// Store the result using StoreState method
 	want.StoreState("agent_result", schedule)
 
+	// Record activity description for agent history
+	activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",
+		schedule.HotelType,
+		schedule.CheckInTime.Format("15:04 Jan 2"),
+		schedule.CheckOutTime.Format("15:04 Jan 2"),
+		a.PremiumLevel)
+	want.SetAgentActivity(a.Name, activity)
+
 	fmt.Printf("[AGENT_PREMIUM] Premium hotel booking completed: %s from %s to %s\n",
 		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2"))
 

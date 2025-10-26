@@ -66,11 +66,11 @@ type WantExecution struct {
 
 // WantResponseWithGroupedAgents wraps a Want with grouped agent history
 type WantResponseWithGroupedAgents struct {
-	Metadata mywant.Metadata            `json:"metadata"`
-	Spec     mywant.WantSpec            `json:"spec"`
-	Status   mywant.WantStatus          `json:"status"`
-	History  mywant.WantHistory         `json:"history"`
-	State    map[string]interface{}     `json:"state"`
+	Metadata mywant.Metadata        `json:"metadata"`
+	Spec     mywant.WantSpec        `json:"spec"`
+	Status   mywant.WantStatus      `json:"status"`
+	History  mywant.WantHistory     `json:"history"`
+	State    map[string]interface{} `json:"state"`
 }
 
 // buildWantResponse creates a response with grouped agent history nested in history
