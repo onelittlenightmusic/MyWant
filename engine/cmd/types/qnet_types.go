@@ -49,9 +49,11 @@ func ExpRand64() float64 {
 // Numbers creates packets and sends them downstream
 type Numbers struct {
 	mywant.Want
-	Rate  float64
-	Count int
-	paths mywant.Paths
+	Rate                float64
+	Count               int
+	paths               mywant.Paths
+	batchUpdateInterval int // Batch interval for state history recording
+	cycleCount          int // Track cycles for history recording intervals
 }
 
 // PacketNumbers creates a new numbers want
@@ -64,8 +66,10 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 			Status: mywant.WantStatusIdle,
 			State:  make(map[string]interface{}),
 		},
-		Rate:  1.0,
-		Count: 100,
+		Rate:                1.0,
+		Count:               100,
+		batchUpdateInterval: 100, // Default: update state every 100 packets
+		cycleCount:          0,
 	}
 
 	if r, ok := spec.Params["rate"]; ok {
@@ -78,6 +82,15 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 			gen.Count = ci
 		} else if cf, ok := c.(float64); ok {
 			gen.Count = int(cf)
+		}
+	}
+
+	// Allow configurable batch update interval
+	if batchInterval, ok := spec.Params["batch_interval"]; ok {
+		if bi, ok := batchInterval.(float64); ok {
+			gen.batchUpdateInterval = int(bi)
+		} else if bi, ok := batchInterval.(int); ok {
+			gen.batchUpdateInterval = bi
 		}
 	}
 
@@ -188,9 +201,14 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		t += ExpRand64() / currentRate
 	}
 
-	// Store state for next call
-	g.StoreState("current_time", t)
-	g.StoreState("current_count", j)
+	// Increment cycle counter for batching history entries
+	g.cycleCount++
+
+	// Batch mechanism: only update state every N packets to reduce history entries
+	if j%g.batchUpdateInterval == 0 {
+		g.StoreState("current_time", t)
+		g.StoreState("current_count", j)
+	}
 
 	out <- QueuePacket{Num: j, Time: t}
 	return false
