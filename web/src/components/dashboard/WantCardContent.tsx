@@ -183,19 +183,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               </div>
             )}
 
-            {/* Simple view button for child cards */}
-            {isChild && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onView(want);
-                }}
-                className="p-1 text-gray-400 hover:text-gray-600"
-                title="View child details"
-              >
-                <Eye className={sizes.iconSize} />
-              </button>
-            )}
           </div>
         </div>
       </div>
