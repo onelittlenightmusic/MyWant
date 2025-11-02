@@ -62,7 +62,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 func (e *EvidenceWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 0, // Outputs are optional - can work as standalone provider or broadcast to coordinators
+		RequiredOutputs: 1, // Must be connected to at least one coordinator
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "evidence",
@@ -165,7 +165,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 0, // Outputs are optional - can work as standalone provider or broadcast to coordinators
+		RequiredOutputs: 1, // Must be connected to at least one coordinator
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "description",

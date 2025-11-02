@@ -302,7 +302,14 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 	recipeLoader := NewGenericRecipeLoader("recipes")
 	target.SetRecipeLoader(recipeLoader)
 
-	return target, nil
+	// Automatically wrap with OwnerAwareWant if the custom target has owner references
+	// This enables parent-child coordination via subscription events (critical for nested targets)
+	var wantInstance interface{} = target
+	if len(want.Metadata.OwnerReferences) > 0 {
+		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata)
+	}
+
+	return wantInstance, nil
 }
 
 // mergeWithCustomDefaults merges user spec with custom type defaults
@@ -1465,6 +1472,14 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					cb.reconcileMutex.RUnlock()
 					if exists {
 						runtimeWant.want.SetStatus(WantStatusCompleted)
+					}
+
+					// Trigger reconciliation after want completes
+					// This allows Target wants that created children to be properly connected
+					// and allows idle children to be started
+					log.Printf("[EXEC] Triggering reconciliation after want %s completion\n", wantName)
+					if err := cb.TriggerReconcile(); err != nil {
+						log.Printf("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
 
 					break
