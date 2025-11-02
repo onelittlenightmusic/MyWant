@@ -62,9 +62,9 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 func (e *EvidenceWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1,
+		RequiredOutputs: 0, // Outputs are optional - can work as standalone provider or broadcast to coordinators
 		MaxInputs:       0,
-		MaxOutputs:      1,
+		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "evidence",
 		Description:     "Evidence provider for approval processes",
 	}
@@ -99,7 +99,6 @@ func (e *EvidenceWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	if len(outputs) == 0 {
 		return true
 	}
-	out := outputs[0]
 
 	if provided {
 		return true
@@ -122,9 +121,10 @@ func (e *EvidenceWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	e.StoreState("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
 	e.StoreState("total_processed", 1)
 
-	fmt.Printf("[EVIDENCE] Provided %s evidence for approval %s\n", e.EvidenceType, e.ApprovalID)
+	fmt.Printf("[EVIDENCE] Provided %s evidence for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, len(outputs))
 
-	out <- evidenceData
+	// Broadcast evidence to all output channels using SendPacketMulti
+	e.SendPacketMulti(evidenceData, outputs)
 	return true
 }
 
@@ -165,9 +165,9 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1,
+		RequiredOutputs: 0, // Outputs are optional - can work as standalone provider or broadcast to coordinators
 		MaxInputs:       0,
-		MaxOutputs:      1,
+		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "description",
 		Description:     "Description provider for approval processes",
 	}
@@ -202,7 +202,6 @@ func (d *DescriptionWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	if len(outputs) == 0 {
 		return true
 	}
-	out := outputs[0]
 
 	if provided {
 		return true
@@ -227,9 +226,10 @@ func (d *DescriptionWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	d.StoreState("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
 	d.StoreState("total_processed", 1)
 
-	fmt.Printf("[DESCRIPTION] Provided description: %s\n", description)
+	fmt.Printf("[DESCRIPTION] Provided description: %s to %d coordinator(s)\n", description, len(outputs))
 
-	out <- descriptionData
+	// Broadcast description to all output channels using SendPacketMulti
+	d.SendPacketMulti(descriptionData, outputs)
 	return true
 }
 
