@@ -304,13 +304,13 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	// Check if approval already processed
 	processed, _ := l.State["approval_processed"].(bool)
 
-	if len(outputs) == 0 {
-		return true
-	}
-	out := outputs[0]
-
 	if processed {
 		return true
+	}
+
+	var out chain.Chan
+	if len(outputs) > 0 {
+		out = outputs[0]
 	}
 
 	if len(using) < 2 {
@@ -351,7 +351,7 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 	// Process approval when both evidence and description are received
 	if evidenceReceived && descriptionReceived {
-		l.State["approval_processed"] = true
+		l.StoreState("approval_processed", true)
 
 		// Simulate Level 1 approval decision
 		result := &ApprovalResult{
@@ -385,7 +385,9 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
-		out <- result
+		if out != nil {
+			out <- result
+		}
 		return true
 	}
 
@@ -471,13 +473,13 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	// Check if final approval already processed
 	processed, _ := l.State["final_approval_processed"].(bool)
 
-	if len(outputs) == 0 {
-		return true
-	}
-	out := outputs[0]
-
 	if processed {
 		return true
+	}
+
+	var out chain.Chan
+	if len(outputs) > 0 {
+		out = outputs[0]
 	}
 
 	if len(using) < 2 {
@@ -518,7 +520,7 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 	// Process final approval when both evidence and description are received
 	if evidenceReceived && descriptionReceived {
-		l.State["final_approval_processed"] = true
+		l.StoreState("final_approval_processed", true)
 
 		// Simulate Level 2 final approval decision
 		result := &ApprovalResult{
@@ -553,7 +555,9 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
-		out <- result
+		if out != nil {
+			out <- result
+		}
 		return true
 	}
 
