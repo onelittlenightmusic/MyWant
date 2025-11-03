@@ -62,7 +62,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 func (e *EvidenceWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1, // Must be connected to at least one coordinator
+		RequiredOutputs: 0, // Can output to coordinators but not required
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "evidence",
@@ -165,7 +165,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1, // Must be connected to at least one coordinator
+		RequiredOutputs: 0, // Can output to coordinators but not required
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "description",
@@ -270,9 +270,9 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1Coordinat
 func (l *Level1CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  2, // evidence and description
-		RequiredOutputs: 1, // approval result
+		RequiredOutputs: 0, // coordinator doesn't output - it only processes inputs
 		MaxInputs:       2,
-		MaxOutputs:      1,
+		MaxOutputs:      1, // Can output approval result but not required
 		WantType:        "level1_coordinator",
 		Description:     "Level 1 approval coordinator",
 	}
@@ -418,9 +418,9 @@ func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) *Level2Coordinat
 func (l *Level2CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  2, // evidence and description
-		RequiredOutputs: 1, // final approval result
+		RequiredOutputs: 0, // coordinator doesn't output - it only processes inputs
 		MaxInputs:       2,
-		MaxOutputs:      1,
+		MaxOutputs:      1, // Can output approval result but not required
 		WantType:        "level2_coordinator",
 		Description:     "Level 2 approval coordinator",
 	}
