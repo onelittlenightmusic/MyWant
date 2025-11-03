@@ -308,11 +308,6 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		return true
 	}
 
-	var out chain.Chan
-	if len(outputs) > 0 {
-		out = outputs[0]
-	}
-
 	if len(using) < 2 {
 		return false // Wait for evidence and description
 	}
@@ -385,9 +380,6 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
-		if out != nil {
-			out <- result
-		}
 		return true
 	}
 
@@ -477,11 +469,6 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		return true
 	}
 
-	var out chain.Chan
-	if len(outputs) > 0 {
-		out = outputs[0]
-	}
-
 	if len(using) < 2 {
 		return false // Wait for evidence and description
 	}
@@ -555,9 +542,6 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
-		if out != nil {
-			out <- result
-		}
 		return true
 	}
 
