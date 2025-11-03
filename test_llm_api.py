@@ -8,12 +8,13 @@ import requests
 import json
 import sys
 import time
+import os
 
 def test_llm_api():
     """Test the LLM API endpoint"""
     url = "http://localhost:8080/api/v1/llm/query"
     headers = {"Content-Type": "application/json"}
-    test_message = "What is 2+2? Please answer briefly."
+    test_message = os.getenv("GPT_QUERY", "What is 2+2? Please answer briefly.")
     data = {"message": test_message, "model": "gpt-oss:20b"}
 
     print("📮 Sending request to " + url)

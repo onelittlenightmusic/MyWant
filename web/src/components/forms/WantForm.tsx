@@ -89,23 +89,62 @@ const SAMPLE_CONFIGS = [
     }
   },
   {
-    name: 'Level 1 Approval',
-    description: 'Single-level approval workflow with evidence and description',
+    name: 'Hierarchical Approval',
+    description: 'Hierarchical approval workflow with evidence, description, Level 1, and Level 2 approvals',
     config: {
-      metadata: {
-        name: 'level1-approval',
-        type: 'level 1 approval',
-        labels: {
-          role: 'approval-target',
-          approval_level: '1'
+      wants: [
+        {
+          metadata: {
+            name: 'evidence',
+            type: 'evidence',
+            labels: {
+              role: 'evidence-provider',
+              category: 'approval-data',
+              approval_id: 'approval-001'
+            }
+          },
+          spec: {
+            params: {
+              evidence_type: 'document',
+              approval_id: 'approval-001'
+            }
+          }
+        },
+        {
+          metadata: {
+            name: 'description',
+            type: 'description',
+            labels: {
+              role: 'description-provider',
+              category: 'approval-data',
+              approval_id: 'approval-001'
+            }
+          },
+          spec: {
+            params: {
+              description_format: 'Request for approval: %s',
+              approval_id: 'approval-001'
+            }
+          }
+        },
+        {
+          metadata: {
+            name: 'level1_approval',
+            type: 'level 1 approval',
+            labels: {
+              role: 'approval-target',
+              approval_level: '1'
+            }
+          },
+          spec: {
+            params: {
+              approval_id: 'approval-001',
+              coordinator_type: 'level1',
+              level2_authority: 'senior_manager'
+            }
+          }
         }
-      },
-      spec: {
-        params: {
-          approval_id: 'approval-001',
-          coordinator_type: 'level1'
-        }
-      }
+      ]
     }
   },
   {
@@ -239,6 +278,17 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   const loadSampleConfig = (sample: typeof SAMPLE_CONFIGS[0]) => {
     const config = sample.config;
+
+    // Check if this is a multi-want configuration (has 'wants' array)
+    if ((config as any).wants && Array.isArray((config as any).wants)) {
+      // For multi-want configs, just load the YAML representation
+      // This handles samples like "Hierarchical Approval" that deploy multiple wants at once
+      setYamlContent(stringifyYaml(config));
+      setShowSamples(false);
+      return;
+    }
+
+    // Single-want configuration handling
     setName(config.metadata.name);
     setType(config.metadata.type);
     const labels = config.metadata.labels || {};

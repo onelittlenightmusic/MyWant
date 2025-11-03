@@ -30,7 +30,8 @@ wants:
   # 1. Detect this is a recipe-based target type
   # 2. Load approval-level-1.yaml recipe
   # 3. Create Level 1 Coordinator child want
-  # 4. RecipeAgent=true will auto-connect coordinator to evidence + description
+  # 4. Level 2 Approval is created as child want within the recipe
+  # 5. RecipeAgent=true will auto-connect coordinators to evidence + description
   - metadata:
       name: level1_approval
       type: "level 1 approval"  # Matches custom_type in approval-level-1.yaml
@@ -41,21 +42,4 @@ wants:
       params:
         approval_id: "approval-001"
         coordinator_type: "level1"
-
-  # Level 2 Approval Target - uses "level 2 approval" custom type
-  # Reconcile loop will automatically:
-  # 1. Detect this is a recipe-based target type
-  # 2. Load approval-level-2.yaml recipe
-  # 3. Create Level 2 Coordinator child want
-  # 4. RecipeAgent=true will auto-connect coordinator to evidence + description
-  - metadata:
-      name: level2_approval
-      type: "level 2 approval"  # Matches custom_type in approval-level-2.yaml
-      labels:
-        role: approval-target
-        approval_level: "2"
-    spec:
-      params:
-        approval_id: "approval-001"
-        coordinator_type: "level2"
         level2_authority: "senior_manager"

@@ -193,7 +193,9 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 }
 
 // validateConnections validates that all wants have their connectivity requirements satisfied
-func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
+// Note: Validation warnings are logged but don't block execution - reconciliation will run again
+// once idle wants execute and create missing connections via child wants/autoconnection
+func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
 
@@ -206,30 +208,29 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) error {
 
 			// Check required using
 			if inCount < meta.RequiredInputs {
-				return fmt.Errorf("validation failed for want %s: want %s requires %d using, got %d",
+				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d inputs, got %d - will remain idle until inputs available\n",
 					wantName, meta.WantType, meta.RequiredInputs, inCount)
 			}
 
 			// Check required outputs
 			if outCount < meta.RequiredOutputs {
-				return fmt.Errorf("validation failed for want %s: want %s requires %d outputs, got %d",
+				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d outputs, got %d - will remain idle until outputs available\n",
 					wantName, meta.WantType, meta.RequiredOutputs, outCount)
 			}
 
 			// Check maximum using
 			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-				return fmt.Errorf("validation failed for want %s: want %s allows max %d using, got %d",
+				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d inputs, got %d\n",
 					wantName, meta.WantType, meta.MaxInputs, inCount)
 			}
 
 			// Check maximum outputs
 			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-				return fmt.Errorf("validation failed for want %s: want %s allows max %d outputs, got %d",
+				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d outputs, got %d\n",
 					wantName, meta.WantType, meta.MaxOutputs, outCount)
 			}
 		}
 	}
-	return nil
 }
 
 // createWantFunction creates the appropriate function based on want type using registry
@@ -565,10 +566,9 @@ func (cb *ChainBuilder) connectPhase() error {
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
-	// Validate connectivity requirements
-	if err := cb.validateConnections(cb.pathMap); err != nil {
-		return fmt.Errorf("connectivity validation failed: %w", err)
-	}
+	// Validate connectivity requirements (non-blocking - logs warnings only)
+	// Wants with missing connections will remain idle until reconciliation connects them
+	cb.validateConnections(cb.pathMap)
 
 	// Rebuild channels based on new topology
 	cb.channelMutex.Lock()
@@ -899,9 +899,32 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
-		// First pass: start idle wants
+		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
+				// Check if connectivity requirements are met
+				paths := cb.pathMap[wantName]
+				if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
+					meta := enhancedWant.GetConnectivityMetadata()
+					inCount := len(paths.In)
+					outCount := len(paths.Out)
+
+					// Log detailed info for debugging
+					log.Printf("[RECONCILE:START:DEBUG] Want %s (%s): inCount=%d (required=%d), outCount=%d (required=%d)\n",
+						wantName, meta.WantType, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+
+					// Skip if required connections are not met
+					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
+						log.Printf("[RECONCILE:START] Skipping idle want %s (%s) - %s requires %d inputs (%d avail), %d outputs (%d avail) - REMAIN IDLE\n",
+							wantName, meta.WantType, meta.Description, meta.RequiredInputs, inCount, meta.RequiredOutputs, outCount)
+						continue
+					}
+					log.Printf("[RECONCILE:START] Starting idle want %s (%s) - has required connections: %d inputs, %d outputs\n",
+						wantName, meta.WantType, inCount, outCount)
+				} else {
+					log.Printf("[RECONCILE:START] Starting idle want %s (non-enhanced, no connectivity check)\n", wantName)
+				}
+
 				cb.startWant(wantName, want)
 				startedCount++
 			}
@@ -919,7 +942,31 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		log.Printf("[RECONCILE:START] Started %d wants\n", startedCount)
+		log.Printf("[RECONCILE:START] Started %d wants in first pass\n", startedCount)
+
+		// Third pass: start any idle wants that now have required connections available
+		// This allows wants with inputs from just-completed upstream wants to execute
+		additionalStarted := 0
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusIdle {
+				// Check if connectivity requirements are now met
+				paths := cb.pathMap[wantName]
+				if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
+					meta := enhancedWant.GetConnectivityMetadata()
+					inCount := len(paths.In)
+					outCount := len(paths.Out)
+
+					// Start if required connections are now available
+					if inCount >= meta.RequiredInputs && outCount >= meta.RequiredOutputs {
+						log.Printf("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
+						cb.startWant(wantName, want)
+						additionalStarted++
+					}
+				}
+			}
+		}
+		log.Printf("[RECONCILE:START] Started %d additional wants in third pass\n", additionalStarted)
+		log.Printf("[RECONCILE:START] Total started: %d wants\n", startedCount+additionalStarted)
 	} else {
 		log.Println("[RECONCILE:START] System not running, wants will be started later")
 	}

@@ -757,3 +757,22 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
+
+// SendPacketMulti broadcasts a packet to all output channels
+// This method capsules multi-output broadcasting logic at the want level
+// Useful for scenarios where a want needs to provide output to multiple consumers
+// Example: Evidence provider sending evidence to multiple approval coordinators
+func (n *Want) SendPacketMulti(packet interface{}, outputs []Chan) error {
+	if len(outputs) == 0 {
+		return nil // No outputs to send to
+	}
+
+	for i, out := range outputs {
+		if out == nil {
+			fmt.Printf("[WARN] Output channel %d is nil in SendPacketMulti\n", i)
+			continue
+		}
+		out <- packet
+	}
+	return nil
+}
