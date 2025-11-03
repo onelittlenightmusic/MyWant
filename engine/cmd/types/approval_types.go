@@ -320,6 +320,8 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	// Collect evidence and description
 	evidenceReceived := false
 	descriptionReceived := false
+	var evidenceTimestamp time.Time
+	var descriptionTimestamp time.Time
 
 	for _, input := range using {
 		select {
@@ -327,12 +329,19 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true
+					evidenceTimestamp = approvalData.Timestamp
 					l.StoreState("evidence_received", true)
+					l.StoreState("evidence_type", approvalData.Evidence)
+					l.StoreState("evidence_provided", true)
+					l.StoreState("evidence_provided_at", approvalData.Timestamp.Format(time.RFC3339))
 				}
 				if approvalData.Description != "" {
 					descriptionReceived = true
+					descriptionTimestamp = approvalData.Timestamp
 					l.StoreState("description_received", true)
 					l.StoreState("description_text", approvalData.Description)
+					l.StoreState("description_provided", true)
+					l.StoreState("description_provided_at", approvalData.Timestamp.Format(time.RFC3339))
 				}
 			}
 		default:
@@ -354,13 +363,23 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			Comments:     "Level 1 approval granted",
 		}
 
-		// Store final state
+		// Store final state including evidence and description completion info
 		l.StoreState("approval_status", result.Status)
 		l.StoreState("approval_level", result.Level)
 		l.StoreState("approver_id", result.ApproverID)
 		l.StoreState("approval_time", result.ApprovalTime.Format(time.RFC3339))
 		l.StoreState("comments", result.Comments)
 		l.StoreState("total_processed", 1)
+
+		// Store evidence and description provider completion info for memory dump
+		l.StoreState("evidence_provider_complete", true)
+		l.StoreState("description_provider_complete", true)
+		if !evidenceTimestamp.IsZero() {
+			l.StoreState("evidence_received_at", evidenceTimestamp.Format(time.RFC3339))
+		}
+		if !descriptionTimestamp.IsZero() {
+			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
+		}
 
 		fmt.Printf("[LEVEL1] Approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,
@@ -468,6 +487,8 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	// Collect evidence and description
 	evidenceReceived := false
 	descriptionReceived := false
+	var evidenceTimestamp time.Time
+	var descriptionTimestamp time.Time
 
 	for _, input := range using {
 		select {
@@ -475,12 +496,19 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true
+					evidenceTimestamp = approvalData.Timestamp
 					l.StoreState("evidence_received", true)
+					l.StoreState("evidence_type", approvalData.Evidence)
+					l.StoreState("evidence_provided", true)
+					l.StoreState("evidence_provided_at", approvalData.Timestamp.Format(time.RFC3339))
 				}
 				if approvalData.Description != "" {
 					descriptionReceived = true
+					descriptionTimestamp = approvalData.Timestamp
 					l.StoreState("description_received", true)
 					l.StoreState("description_text", approvalData.Description)
+					l.StoreState("description_provided", true)
+					l.StoreState("description_provided_at", approvalData.Timestamp.Format(time.RFC3339))
 				}
 			}
 		default:
@@ -502,7 +530,7 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			Comments:     "Level 2 final approval granted",
 		}
 
-		// Store final state
+		// Store final state including evidence and description completion info
 		l.StoreState("final_approval_status", result.Status)
 		l.StoreState("approval_level", result.Level)
 		l.StoreState("approver_id", result.ApproverID)
@@ -510,6 +538,16 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		l.StoreState("level2_authority", l.Level2Authority)
 		l.StoreState("comments", result.Comments)
 		l.StoreState("total_processed", 1)
+
+		// Store evidence and description provider completion info for memory dump
+		l.StoreState("evidence_provider_complete", true)
+		l.StoreState("description_provider_complete", true)
+		if !evidenceTimestamp.IsZero() {
+			l.StoreState("evidence_received_at", evidenceTimestamp.Format(time.RFC3339))
+		}
+		if !descriptionTimestamp.IsZero() {
+			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
+		}
 
 		fmt.Printf("[LEVEL2] Final approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,
