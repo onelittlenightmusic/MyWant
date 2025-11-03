@@ -35,7 +35,7 @@ recipe:
           description_format: "Level 1 Approval: %s"
           approval_id: approval_id
 
-    # Level 1 Coordinator - connects to evidence and description via recipeAgent
+    # Level 1 Coordinator - connects to evidence and description
     - metadata:
         type: level1_coordinator
         labels:
@@ -47,7 +47,9 @@ recipe:
         params:
           approval_id: approval_id
           coordinator_type: coordinator_type
-      recipeAgent: true  # Automatically connects to evidence + description wants
+        using:
+          - role: evidence-provider
+          - role: description-provider
 
     # Level 2 Approval as child - created after Level 1 completes
     # This is a custom target type that will load approval-level-2.yaml recipe
