@@ -62,7 +62,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 func (e *EvidenceWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 0, // Can output to coordinators but not required
+		RequiredOutputs: 1, // Must have output connection to coordinator before executing
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "evidence",
@@ -165,7 +165,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 0, // Can output to coordinators but not required
+		RequiredOutputs: 1, // Must have output connection to coordinator before executing
 		MaxInputs:       0,
 		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
 		WantType:        "description",
@@ -270,9 +270,9 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1Coordinat
 func (l *Level1CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  2, // evidence and description
-		RequiredOutputs: 0, // coordinator doesn't output - it only processes inputs
+		RequiredOutputs: 0, // coordinator only processes, doesn't output
 		MaxInputs:       2,
-		MaxOutputs:      1, // Can output approval result but not required
+		MaxOutputs:      1, // Can output approval result
 		WantType:        "level1_coordinator",
 		Description:     "Level 1 approval coordinator",
 	}
