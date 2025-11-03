@@ -13,6 +13,28 @@ recipe:
     level2_authority: "senior_manager"
 
   wants:
+    # Evidence Provider for Level 1 - provides evidence data
+    - metadata:
+        type: evidence
+        labels:
+          role: evidence-provider
+          approval_level: "1"
+      spec:
+        params:
+          evidence_type: "document"
+          approval_id: approval_id
+
+    # Description Provider for Level 1 - provides description data
+    - metadata:
+        type: description
+        labels:
+          role: description-provider
+          approval_level: "1"
+      spec:
+        params:
+          description_format: "Level 1 Approval: %s"
+          approval_id: approval_id
+
     # Level 1 Coordinator - connects to evidence and description via recipeAgent
     - metadata:
         type: level1_coordinator
