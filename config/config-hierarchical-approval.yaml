@@ -1,37 +1,11 @@
 wants:
-  # Evidence want - created once, shared by all approval levels
-  - metadata:
-      name: evidence
-      type: evidence
-      labels:
-        role: evidence-provider
-        category: approval-data
-        approval_id: "approval-001"
-    spec:
-      params:
-        evidence_type: "document"
-        approval_id: "approval-001"
-
-  # Description want - created once, shared by all approval levels
-  - metadata:
-      name: description
-      type: description
-      labels:
-        role: description-provider
-        category: approval-data
-        approval_id: "approval-001"
-    spec:
-      params:
-        description_format: "Request for approval: %s"
-        approval_id: "approval-001"
-
   # Level 1 Approval Target - uses "level 1 approval" custom type
   # Reconcile loop will automatically:
   # 1. Detect this is a recipe-based target type
   # 2. Load approval-level-1.yaml recipe
-  # 3. Create Level 1 Coordinator child want
+  # 3. Create Evidence Provider, Description Provider, Level 1 Coordinator child wants
   # 4. Level 2 Approval is created as child want within the recipe
-  # 5. RecipeAgent=true will auto-connect coordinators to evidence + description
+  # 5. Explicit using selectors ensure proper connectivity between coordinators and providers
   - metadata:
       name: level1_approval
       type: "level 1 approval"  # Matches custom_type in approval-level-1.yaml
