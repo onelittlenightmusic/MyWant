@@ -1084,7 +1084,6 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			InfoLog("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
 			cb.addDynamicWantUnsafe(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
@@ -1209,8 +1208,6 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 
 // addWant adds a new want to the runtime (private method)
 func (cb *ChainBuilder) addWant(wantConfig *Want) {
-	InfoLog("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
-
 	// Create the function/want
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
