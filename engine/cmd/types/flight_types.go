@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	. "mywant/engine/src"
 	"mywant/engine/src/chain"
@@ -128,7 +129,7 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 		}
 		return &schedule
 	default:
-		fmt.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
+		log.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
 		return nil
 	}
 }
@@ -144,7 +145,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			elapsed := time.Since(f.monitoringStartTime)
 			now := time.Now()
 			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
-				fmt.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
+				log.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
 					elapsed, f.monitoringDuration)
 				f.lastLogTime = now
 			}
@@ -152,7 +153,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			// Check for delayed flights that need cancellation and rebooking
 			// This is checked during monitoring phase so rebooking can happen immediately
 			if f.shouldCancelAndRebook() {
-				fmt.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
+				log.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
 
 				// Set flight_action to cancel_flight so the agent executor will handle it
 				// Note: Keep flight_id so agent can cancel it
@@ -164,7 +165,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				// Reset attempted flag so agent can execute the cancellation action
 				f.StoreState("attempted", false)
 
-				fmt.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, waiting for agent cancellation\n")
+				log.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, waiting for agent cancellation\n")
 
 				// Return false to trigger the rebooking flow in next cycle
 				return false
@@ -178,7 +179,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			return false
 		} else {
 			// Monitoring duration exceeded, complete the monitoring phase
-			fmt.Printf("[FLIGHT] Monitoring completed (total duration: %v)\n", time.Since(f.monitoringStartTime))
+			log.Printf("[FLIGHT] Monitoring completed (total duration: %v)\n", time.Since(f.monitoringStartTime))
 			f.monitoringActive = false
 			return true
 		}
@@ -222,7 +223,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Check if agent created a flight result (read from state, not return value)
 	agentResult, hasResult := f.GetState("agent_result")
 	if hasResult && agentResult != nil {
-		fmt.Printf("[FLIGHT] Agent execution completed, processing agent result\n")
+		log.Printf("[FLIGHT] Agent execution completed, processing agent result\n")
 
 		// Convert agent_result to FlightSchedule
 		agentSchedule := f.extractFlightSchedule(agentResult)
@@ -244,7 +245,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			}
 
 			out <- travelSchedule
-			fmt.Printf("[FLIGHT] Sent agent-generated schedule: %s from %s to %s\n",
+			log.Printf("[FLIGHT] Sent agent-generated schedule: %s from %s to %s\n",
 				agentSchedule.ReservationName,
 				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
 				agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
@@ -253,7 +254,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			if !f.monitoringActive {
 				f.monitoringActive = true
 				f.monitoringStartTime = time.Now()
-				fmt.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
+				log.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
 			}
 
 			// Continue running to collect more status updates
@@ -266,7 +267,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
 	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
 		// Flight was just cancelled, prepare for rebooking
-		fmt.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
+		log.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
 
 		// Reset attempted flag to allow agent to execute rebooking in this cycle
 		// This is critical - without resetting, the "attempted" check above will return true
@@ -281,7 +282,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		// Check if rebooking created a new flight result (read from state, not return value)
 		agentResult, hasResult := f.GetState("agent_result")
 		if hasResult && agentResult != nil {
-			fmt.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
+			log.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
 
 			// Convert agent_result to FlightSchedule
 			agentSchedule := f.extractFlightSchedule(agentResult)
@@ -303,7 +304,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				}
 
 				out <- travelSchedule
-				fmt.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
+				log.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
 					agentSchedule.ReservationName,
 					agentSchedule.DepartureTime.Format("15:04 Jan 2"),
 					agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
@@ -312,7 +313,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				if !f.monitoringActive {
 					f.monitoringActive = true
 					f.monitoringStartTime = time.Now()
-					fmt.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
+					log.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
 				}
 
 				// Continue monitoring the new flight
@@ -322,7 +323,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Normal flight execution (only runs if agent execution didn't return a result)
-	fmt.Printf("[FLIGHT] Agent execution did not return result, using standard flight logic\n")
+	log.Printf("[FLIGHT] Agent execution did not return result, using standard flight logic\n")
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
@@ -360,7 +361,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 					departureTime = departureTime.Add(2 * time.Hour)
 					newEvent.Start = departureTime
 					newEvent.End = departureTime.Add(duration)
-					fmt.Printf("[FLIGHT] Conflict detected, retrying at %s\n", departureTime.Format("15:04"))
+					log.Printf("[FLIGHT] Conflict detected, retrying at %s\n", departureTime.Format("15:04"))
 					break
 				}
 			}
@@ -388,7 +389,7 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	f.StoreState("reservation_name", newEvent.Name)
 	f.StoreState("schedule_date", baseDate.Format("2006-01-02"))
 
-	fmt.Printf("[FLIGHT] Scheduled %s from %s to %s\n",
+	log.Printf("[FLIGHT] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
 	out <- newSchedule
@@ -400,26 +401,26 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 func (f *FlightWant) tryAgentExecution() {
 	// Check if this want has agent requirements
 	if len(f.Spec.Requires) > 0 {
-		fmt.Printf("[FLIGHT] Want has agent requirements: %v\n", f.Spec.Requires)
+		log.Printf("[FLIGHT] Want has agent requirements: %v\n", f.Spec.Requires)
 
 		// Store the requirements in want state for tracking
 		f.StoreState("agent_requirements", f.Spec.Requires)
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
-		fmt.Printf("[FLIGHT] Executing agents via ExecuteAgents() for proper tracking\n")
+		log.Printf("[FLIGHT] Executing agents via ExecuteAgents() for proper tracking\n")
 		if err := f.ExecuteAgents(); err != nil {
-			fmt.Printf("[FLIGHT] Dynamic agent execution failed: %v\n", err)
+			log.Printf("[FLIGHT] Dynamic agent execution failed: %v\n", err)
 			f.StoreState("agent_execution_status", "failed")
 			f.StoreState("agent_execution_error", err.Error())
 			return
 		}
 
-		fmt.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
+		log.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
 		f.StoreState("agent_execution_status", "completed")
 
 		// Check for agent_result in state
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
-			fmt.Printf("[FLIGHT] Found agent_result in state: %+v\n", result)
+			log.Printf("[FLIGHT] Found agent_result in state: %+v\n", result)
 			f.StoreState("execution_source", "agent")
 
 			// Start continuous monitoring for this flight
@@ -428,11 +429,11 @@ func (f *FlightWant) tryAgentExecution() {
 			return
 		}
 
-		fmt.Printf("[FLIGHT] Warning: Agent completed but no result found in state\n")
+		log.Printf("[FLIGHT] Warning: Agent completed but no result found in state\n")
 		return
 	}
 
-	fmt.Printf("[FLIGHT] No agent requirements specified\n")
+	log.Printf("[FLIGHT] No agent requirements specified\n")
 }
 
 // FlightSchedule represents a complete flight booking schedule
@@ -499,7 +500,7 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 
 	// Cancel and rebook if delayed
 	if status == "delayed_one_day" {
-		fmt.Printf("[FLIGHT] Detected delayed_one_day status, will cancel and rebook\n")
+		log.Printf("[FLIGHT] Detected delayed_one_day status, will cancel and rebook\n")
 		return true
 	}
 
@@ -523,13 +524,13 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			// Check if flight has been booked
 			flightIDVal, exists := f.GetState("flight_id")
 			if !exists {
-				fmt.Printf("[FLIGHT-MONITOR] No flight_id found, stopping monitoring\n")
+				log.Printf("[FLIGHT-MONITOR] No flight_id found, stopping monitoring\n")
 				return
 			}
 
 			flightID, ok := flightIDVal.(string)
 			if !ok || flightID == "" {
-				fmt.Printf("[FLIGHT-MONITOR] Invalid flight_id, stopping monitoring\n")
+				log.Printf("[FLIGHT-MONITOR] Invalid flight_id, stopping monitoring\n")
 				return
 			}
 
@@ -550,16 +551,16 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			f.EndExecCycle()
 
 			if err != nil {
-				fmt.Printf("[FLIGHT-MONITOR] Polling error: %v\n", err)
+				log.Printf("[FLIGHT-MONITOR] Polling error: %v\n", err)
 			} else {
 				// Log the current status
 				if status, exists := f.GetState("flight_status"); exists {
-					fmt.Printf("[FLIGHT-MONITOR] Flight %s status: %v (polled at %s)\n",
+					log.Printf("[FLIGHT-MONITOR] Flight %s status: %v (polled at %s)\n",
 						flightID, status, time.Now().Format("15:04:05"))
 				}
 			}
 		}
 	}()
 
-	fmt.Printf("[FLIGHT] Started continuous monitoring for flight %s\n", f.Metadata.Name)
+	log.Printf("[FLIGHT] Started continuous monitoring for flight %s\n", f.Metadata.Name)
 }

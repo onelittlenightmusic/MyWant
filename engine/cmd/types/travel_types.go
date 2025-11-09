@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	. "mywant/engine/src"
 	"mywant/engine/src/chain"
@@ -137,7 +138,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := r.tryAgentExecution(); agentSchedule != nil {
-		fmt.Printf("[RESTAURANT] Agent execution completed, processing agent result\n")
+		log.Printf("[RESTAURANT] Agent execution completed, processing agent result\n")
 
 		// Use the agent's schedule result
 		r.SetSchedule(*agentSchedule)
@@ -156,7 +157,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 
 		out <- travelSchedule
-		fmt.Printf("[RESTAURANT] Sent agent-generated schedule: %s from %s to %s\n",
+		log.Printf("[RESTAURANT] Sent agent-generated schedule: %s from %s to %s\n",
 			agentSchedule.ReservationName,
 			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
 			restaurantEvent.End.Format("15:04 Jan 2"))
@@ -165,7 +166,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Normal restaurant execution (only runs if agent execution didn't return a result)
-	fmt.Printf("[RESTAURANT] Agent execution did not return result, using standard restaurant logic\n")
+	log.Printf("[RESTAURANT] Agent execution did not return result, using standard restaurant logic\n")
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
@@ -203,7 +204,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 					dinnerStart = dinnerStart.Add(time.Hour)
 					newEvent.Start = dinnerStart
 					newEvent.End = dinnerStart.Add(duration)
-					fmt.Printf("[RESTAURANT] Conflict detected, retrying at %s\n", dinnerStart.Format("15:04"))
+					log.Printf("[RESTAURANT] Conflict detected, retrying at %s\n", dinnerStart.Format("15:04"))
 					break
 				}
 			}
@@ -234,7 +235,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	r.StoreState("reservation_name", newEvent.Name)
 	r.StoreState("schedule_date", baseDate.Format("2006-01-02"))
 
-	fmt.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
+	log.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04"), newEvent.End.Format("15:04"))
 
 	out <- newSchedule
@@ -246,13 +247,13 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	// Check if this want has agent requirements
 	if len(r.Spec.Requires) > 0 {
-		fmt.Printf("[RESTAURANT] Want has agent requirements: %v\n", r.Spec.Requires)
+		log.Printf("[RESTAURANT] Want has agent requirements: %v\n", r.Spec.Requires)
 
 		// Store the requirements in want state for tracking
 		r.StoreState("agent_requirements", r.Spec.Requires)
 
 		// Step 1: Execute MonitorRestaurant first to check for existing state
-		fmt.Printf("[RESTAURANT] Step 1: Executing MonitorRestaurant to check existing state\n")
+		log.Printf("[RESTAURANT] Step 1: Executing MonitorRestaurant to check existing state\n")
 
 		// Create and execute MonitorRestaurant directly inline to avoid context issues
 		monitorAgent := NewMonitorRestaurant(
@@ -263,60 +264,60 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 
 		ctx := context.Background()
 		if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
-			fmt.Printf("[RESTAURANT] MonitorRestaurant execution failed: %v\n", err)
+			log.Printf("[RESTAURANT] MonitorRestaurant execution failed: %v\n", err)
 		}
 
 		r.AggregateChanges()
 
 		// Check if MonitorRestaurant found an existing schedule
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
-			fmt.Printf("[RESTAURANT] DEBUG: Found agent_result in state, type: %T, value: %+v\n", result, result)
+			log.Printf("[RESTAURANT] DEBUG: Found agent_result in state, type: %T, value: %+v\n", result, result)
 			if schedule, ok := result.(RestaurantSchedule); ok {
-				fmt.Printf("[RESTAURANT] MonitorRestaurant found existing schedule: %+v\n", schedule)
+				log.Printf("[RESTAURANT] MonitorRestaurant found existing schedule: %+v\n", schedule)
 				r.StoreState("execution_source", "monitor")
 
 				// Immediately set the schedule and complete the cycle
 				r.SetSchedule(schedule)
-				fmt.Printf("[RESTAURANT] MonitorRestaurant cycle completed - want finished\n")
+				log.Printf("[RESTAURANT] MonitorRestaurant cycle completed - want finished\n")
 				return &schedule
 			} else {
-				fmt.Printf("[RESTAURANT] DEBUG: agent_result is not RestaurantSchedule type, it's: %T\n", result)
+				log.Printf("[RESTAURANT] DEBUG: agent_result is not RestaurantSchedule type, it's: %T\n", result)
 			}
 		} else {
-			fmt.Printf("[RESTAURANT] DEBUG: No agent_result found in state - exists: %v, result: %v\n", exists, result)
+			log.Printf("[RESTAURANT] DEBUG: No agent_result found in state - exists: %v, result: %v\n", exists, result)
 		}
 
 		// Step 2: No existing schedule found, execute AgentRestaurant
-		fmt.Printf("[RESTAURANT] Step 2: No existing schedule found, executing AgentRestaurant\n")
+		log.Printf("[RESTAURANT] Step 2: No existing schedule found, executing AgentRestaurant\n")
 		if err := r.ExecuteAgents(); err != nil {
-			fmt.Printf("[RESTAURANT] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			log.Printf("[RESTAURANT] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
 			r.StoreState("agent_execution_status", "failed")
 			r.StoreState("agent_execution_error", err.Error())
 			return nil
 		}
 
-		fmt.Printf("[RESTAURANT] Dynamic agent execution completed successfully\n")
+		log.Printf("[RESTAURANT] Dynamic agent execution completed successfully\n")
 		r.StoreState("agent_execution_status", "completed")
 		r.StoreState("execution_source", "agent")
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[RESTAURANT] Checking state for agent_result\n")
+		log.Printf("[RESTAURANT] Checking state for agent_result\n")
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
-			fmt.Printf("[RESTAURANT] Found agent_result in state: %+v\n", result)
+			log.Printf("[RESTAURANT] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(RestaurantSchedule); ok {
-				fmt.Printf("[RESTAURANT] Successfully retrieved agent result: %+v\n", schedule)
+				log.Printf("[RESTAURANT] Successfully retrieved agent result: %+v\n", schedule)
 				return &schedule
 			} else {
-				fmt.Printf("[RESTAURANT] agent_result is not RestaurantSchedule type: %T\n", result)
+				log.Printf("[RESTAURANT] agent_result is not RestaurantSchedule type: %T\n", result)
 			}
 		}
 
-		fmt.Printf("[RESTAURANT] Warning: Agent completed but no result found in state\n")
+		log.Printf("[RESTAURANT] Warning: Agent completed but no result found in state\n")
 		return nil
 	}
 
-	fmt.Printf("[RESTAURANT] No agent requirements specified\n")
+	log.Printf("[RESTAURANT] No agent requirements specified\n")
 	return nil
 }
 
@@ -337,9 +338,9 @@ func (r *RestaurantWant) executeMonitorRestaurant() error {
 
 	// Debug: Check if state was stored
 	if result, exists := r.GetState("agent_result"); exists {
-		fmt.Printf("[RESTAURANT] DEBUG: MonitorRestaurant stored agent_result: %+v\n", result)
+		log.Printf("[RESTAURANT] DEBUG: MonitorRestaurant stored agent_result: %+v\n", result)
 	} else {
-		fmt.Printf("[RESTAURANT] DEBUG: MonitorRestaurant did not store agent_result\n")
+		log.Printf("[RESTAURANT] DEBUG: MonitorRestaurant did not store agent_result\n")
 	}
 
 	return nil
@@ -475,7 +476,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := h.tryAgentExecution(); agentSchedule != nil {
-		fmt.Printf("[HOTEL] Agent execution completed, processing agent result\n")
+		log.Printf("[HOTEL] Agent execution completed, processing agent result\n")
 
 		// Use the agent's schedule result
 		h.SetSchedule(*agentSchedule)
@@ -494,7 +495,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 
 		out <- travelSchedule
-		fmt.Printf("[HOTEL] Sent agent-generated schedule: %s from %s to %s\n",
+		log.Printf("[HOTEL] Sent agent-generated schedule: %s from %s to %s\n",
 			agentSchedule.ReservationName,
 			agentSchedule.CheckInTime.Format("15:04 Jan 2"),
 			agentSchedule.CheckOutTime.Format("15:04 Jan 2"))
@@ -503,7 +504,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Normal hotel execution (only runs if agent execution didn't return a result)
-	fmt.Printf("[HOTEL] Agent execution did not return result, using standard hotel logic\n")
+	log.Printf("[HOTEL] Agent execution did not return result, using standard hotel logic\n")
 
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
@@ -543,7 +544,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 					// Adjust check-in time
 					checkInTime = checkInTime.Add(30 * time.Minute)
 					newEvent.Start = checkInTime
-					fmt.Printf("[HOTEL] Conflict detected, retrying check-in at %s\n", checkInTime.Format("15:04"))
+					log.Printf("[HOTEL] Conflict detected, retrying check-in at %s\n", checkInTime.Format("15:04"))
 					break
 				}
 			}
@@ -569,7 +570,7 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	h.StoreState("stay_duration_hours", newEvent.End.Sub(newEvent.Start).Hours())
 	h.StoreState("reservation_name", newEvent.Name)
 
-	fmt.Printf("[HOTEL] Scheduled %s from %s to %s\n",
+	log.Printf("[HOTEL] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
 	out <- newSchedule
@@ -581,40 +582,40 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 	// Check if this want has agent requirements
 	if len(h.Spec.Requires) > 0 {
-		fmt.Printf("[HOTEL] Want has agent requirements: %v\n", h.Spec.Requires)
+		log.Printf("[HOTEL] Want has agent requirements: %v\n", h.Spec.Requires)
 
 		// Store the requirements in want state for tracking
 		h.StoreState("agent_requirements", h.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := h.ExecuteAgents(); err != nil {
-			fmt.Printf("[HOTEL] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			log.Printf("[HOTEL] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
 			h.StoreState("agent_execution_status", "failed")
 			h.StoreState("agent_execution_error", err.Error())
 			return nil
 		}
 
-		fmt.Printf("[HOTEL] Dynamic agent execution completed successfully\n")
+		log.Printf("[HOTEL] Dynamic agent execution completed successfully\n")
 		h.StoreState("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[HOTEL] Checking state for agent_result\n")
+		log.Printf("[HOTEL] Checking state for agent_result\n")
 		if result, exists := h.GetState("agent_result"); exists {
-			fmt.Printf("[HOTEL] Found agent_result in state: %+v\n", result)
+			log.Printf("[HOTEL] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(HotelSchedule); ok {
-				fmt.Printf("[HOTEL] Successfully retrieved agent result: %+v\n", schedule)
+				log.Printf("[HOTEL] Successfully retrieved agent result: %+v\n", schedule)
 				return &schedule
 			} else {
-				fmt.Printf("[HOTEL] agent_result is not HotelSchedule type: %T\n", result)
+				log.Printf("[HOTEL] agent_result is not HotelSchedule type: %T\n", result)
 			}
 		}
 
-		fmt.Printf("[HOTEL] Warning: Agent completed but no result found in state\n")
+		log.Printf("[HOTEL] Warning: Agent completed but no result found in state\n")
 		return nil
 	}
 
-	fmt.Printf("[HOTEL] No agent requirements specified\n")
+	log.Printf("[HOTEL] No agent requirements specified\n")
 	return nil
 }
 
@@ -720,7 +721,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
-		fmt.Printf("[BUFFET] Agent execution completed, processing agent result\n")
+		log.Printf("[BUFFET] Agent execution completed, processing agent result\n")
 
 		// Use the agent's schedule result
 		b.SetSchedule(*agentSchedule)
@@ -739,7 +740,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 
 		out <- travelSchedule
-		fmt.Printf("[BUFFET] Sent agent-generated schedule: %s from %s to %s\n",
+		log.Printf("[BUFFET] Sent agent-generated schedule: %s from %s to %s\n",
 			agentSchedule.ReservationName,
 			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
 			buffetEvent.End.Format("15:04 Jan 2"))
@@ -748,7 +749,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Normal buffet execution (only runs if agent execution didn't return a result)
-	fmt.Printf("[BUFFET] Agent execution did not return result, using standard buffet logic\n")
+	log.Printf("[BUFFET] Agent execution did not return result, using standard buffet logic\n")
 
 	var existingSchedule *TravelSchedule
 	if len(using) > 0 {
@@ -782,7 +783,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 					buffetStart = buffetStart.Add(30 * time.Minute)
 					newEvent.Start = buffetStart
 					newEvent.End = buffetStart.Add(duration)
-					fmt.Printf("[BUFFET] Conflict detected, retrying at %s\n", buffetStart.Format("15:04"))
+					log.Printf("[BUFFET] Conflict detected, retrying at %s\n", buffetStart.Format("15:04"))
 					break
 				}
 			}
@@ -811,7 +812,7 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	b.StoreState("buffet_duration_hours", duration.Hours())
 	b.StoreState("reservation_name", newEvent.Name)
 
-	fmt.Printf("[BUFFET] Scheduled %s from %s to %s\n",
+	log.Printf("[BUFFET] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
 	out <- newSchedule
@@ -823,40 +824,40 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 	// Check if this want has agent requirements
 	if len(b.Spec.Requires) > 0 {
-		fmt.Printf("[BUFFET] Want has agent requirements: %v\n", b.Spec.Requires)
+		log.Printf("[BUFFET] Want has agent requirements: %v\n", b.Spec.Requires)
 
 		// Store the requirements in want state for tracking
 		b.StoreState("agent_requirements", b.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := b.ExecuteAgents(); err != nil {
-			fmt.Printf("[BUFFET] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
+			log.Printf("[BUFFET] Dynamic agent execution failed: %v, falling back to direct execution\n", err)
 			b.StoreState("agent_execution_status", "failed")
 			b.StoreState("agent_execution_error", err.Error())
 			return nil
 		}
 
-		fmt.Printf("[BUFFET] Dynamic agent execution completed successfully\n")
+		log.Printf("[BUFFET] Dynamic agent execution completed successfully\n")
 		b.StoreState("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result
 		// Check for agent_result in state
-		fmt.Printf("[BUFFET] Checking state for agent_result\n")
+		log.Printf("[BUFFET] Checking state for agent_result\n")
 		if result, exists := b.GetState("agent_result"); exists {
-			fmt.Printf("[BUFFET] Found agent_result in state: %+v\n", result)
+			log.Printf("[BUFFET] Found agent_result in state: %+v\n", result)
 			if schedule, ok := result.(BuffetSchedule); ok {
-				fmt.Printf("[BUFFET] Successfully retrieved agent result: %+v\n", schedule)
+				log.Printf("[BUFFET] Successfully retrieved agent result: %+v\n", schedule)
 				return &schedule
 			} else {
-				fmt.Printf("[BUFFET] agent_result is not BuffetSchedule type: %T\n", result)
+				log.Printf("[BUFFET] agent_result is not BuffetSchedule type: %T\n", result)
 			}
 		}
 
-		fmt.Printf("[BUFFET] Warning: Agent completed but no result found in state\n")
+		log.Printf("[BUFFET] Warning: Agent completed but no result found in state\n")
 		return nil
 	}
 
-	fmt.Printf("[BUFFET] No agent requirements specified\n")
+	log.Printf("[BUFFET] No agent requirements specified\n")
 	return nil
 }
 
