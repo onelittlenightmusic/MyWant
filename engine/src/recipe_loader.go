@@ -99,27 +99,27 @@ func NewRecipeLoader(recipeDir string) *RecipeLoader {
 // LoadRecipes loads all recipe files from the recipe directory
 func (rl *RecipeLoader) LoadRecipes() error {
 	if _, err := os.Stat(rl.recipeDir); os.IsNotExist(err) {
-		fmt.Printf("[RECIPE] Recipe directory %s does not exist, using hardcoded recipes\n", rl.recipeDir)
+		InfoLog("[RECIPE] Recipe directory %s does not exist, using hardcoded recipes\n", rl.recipeDir)
 		return rl.loadDefaultRecipes()
 	}
 
-	fmt.Printf("[RECIPE] Loading recipes from directory: %s\n", rl.recipeDir)
+	InfoLog("[RECIPE] Loading recipes from directory: %s\n", rl.recipeDir)
 	err := filepath.Walk(rl.recipeDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
-			fmt.Printf("[RECIPE] Loading recipe file: %s\n", path)
+			InfoLog("[RECIPE] Loading recipe file: %s\n", path)
 			return rl.loadRecipeFile(path)
 		}
 		return nil
 	})
 
 	// Show final recipe count
-	fmt.Printf("[RECIPE] Total recipes loaded: %d\n", len(rl.recipes))
+	InfoLog("[RECIPE] Total recipes loaded: %d\n", len(rl.recipes))
 	for name := range rl.recipes {
-		fmt.Printf("[RECIPE] Available recipe: %s\n", name)
+		InfoLog("[RECIPE] Available recipe: %s\n", name)
 	}
 
 	return err
@@ -149,11 +149,11 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 	baseName := filepath.Base(filename)
 	recipeName := baseName[:len(baseName)-len(filepath.Ext(baseName))]
 	rl.recipes[recipeName] = config
-	fmt.Printf("[RECIPE] Loaded recipe: %s\n", recipeName)
+	InfoLog("[RECIPE] Loaded recipe: %s\n", recipeName)
 
 	// Debug: Show recipe params and wants count
-	fmt.Printf("[RECIPE-PARAMS] Recipe params: %+v\n", config.Params)
-	fmt.Printf("[RECIPE-WANTS] Recipe wants count: %d\n", len(config.Wants))
+	InfoLog("[RECIPE-PARAMS] Recipe params: %+v\n", config.Params)
+	InfoLog("[RECIPE-WANTS] Recipe wants count: %d\n", len(config.Wants))
 
 	return nil
 }
@@ -168,7 +168,7 @@ type RecipeFile struct {
 func (rl *RecipeLoader) loadDefaultRecipes() error {
 	// Since we have recipe files in the recipes directory,
 	// we don't need complex default recipes anymore
-	fmt.Printf("[RECIPE] No recipe directory found, but using simplified defaults\n")
+	InfoLog("[RECIPE] No recipe directory found, but using simplified defaults\n")
 	return nil
 }
 
@@ -178,7 +178,7 @@ func (rl *RecipeLoader) GetRecipe(name string) (ChildRecipe, error) {
 	if !exists {
 		return ChildRecipe{}, fmt.Errorf("recipe %s not found", name)
 	}
-	fmt.Printf("[RECIPE-SOURCE] Using recipe '%s' with %d wants\n", name, len(recipe.Wants)+len(recipe.Children))
+	InfoLog("[RECIPE-SOURCE] Using recipe '%s' with %d wants\n", name, len(recipe.Wants)+len(recipe.Children))
 	return recipe, nil
 }
 
@@ -298,7 +298,7 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]string {
 	// Return empty map - all labels should be explicitly defined in recipes
 	labels := make(map[string]string)
-	fmt.Printf("[RECIPE] ⚠️  DEPRECATED: generateLabels called for type %s - labels should be defined in recipe YAML\n", wantType)
+	InfoLog("[RECIPE] ⚠️  DEPRECATED: generateLabels called for type %s - labels should be defined in recipe YAML\n", wantType)
 	return labels
 }
 
@@ -382,7 +382,7 @@ func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecip
 		}
 	}
 
-	fmt.Printf("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantRecipe.Spec.Params)
+	InfoLog("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantRecipe.Spec.Params)
 
 	return wantRecipe
 }

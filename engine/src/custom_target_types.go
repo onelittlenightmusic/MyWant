@@ -35,7 +35,7 @@ func (r *CustomTargetTypeRegistry) Register(config CustomTargetTypeConfig) {
 	defer r.mutex.Unlock()
 
 	r.customTypes[config.Name] = config
-	fmt.Printf("[RECIPE] 🎯 Registered custom target type: '%s'\n", config.Name)
+	InfoLog("[RECIPE] 🎯 Registered custom target type: '%s'\n", config.Name)
 }
 
 // Get retrieves a custom target type configuration
@@ -85,7 +85,7 @@ func (r *CustomTargetTypeRegistry) CreateRecipe(recipeID string, recipe *Generic
 	}
 
 	r.recipes[recipeID] = recipe
-	fmt.Printf("[RECIPE] 📝 Created recipe: '%s'\n", recipeID)
+	InfoLog("[RECIPE] 📝 Created recipe: '%s'\n", recipeID)
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (r *CustomTargetTypeRegistry) UpdateRecipe(recipeID string, recipe *Generic
 	}
 
 	r.recipes[recipeID] = recipe
-	fmt.Printf("[RECIPE] 📝 Updated recipe: '%s'\n", recipeID)
+	InfoLog("[RECIPE] 📝 Updated recipe: '%s'\n", recipeID)
 	return nil
 }
 
@@ -127,7 +127,7 @@ func (r *CustomTargetTypeRegistry) DeleteRecipe(recipeID string) error {
 	}
 
 	delete(r.recipes, recipeID)
-	fmt.Printf("[RECIPE] 🗑️  Deleted recipe: '%s'\n", recipeID)
+	InfoLog("[RECIPE] 🗑️  Deleted recipe: '%s'\n", recipeID)
 	return nil
 }
 

@@ -472,7 +472,7 @@ func validateRecipeWithSpec(yamlData []byte) error {
 		}
 	}
 
-	fmt.Printf("[VALIDATION] Recipe validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Recipe validated successfully against OpenAPI spec\n")
 	return nil
 }
 
@@ -657,7 +657,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		return fmt.Errorf("failed to list recipes: %w", err)
 	}
 
-	fmt.Printf("[RECIPE] 🔍 Scanning %d recipes for custom types...\n", len(recipes))
+	InfoLog("[RECIPE] 🔍 Scanning %d recipes for custom types...\n", len(recipes))
 
 	customTypeCount := 0
 	for _, relativePath := range recipes {
@@ -667,18 +667,18 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		// Get metadata for each recipe
 		metadata, err := grl.GetRecipeMetadata(fullPath)
 		if err != nil {
-			fmt.Printf("[RECIPE] ⚠️  Warning: failed to get metadata for %s: %v\n", relativePath, err)
+			InfoLog("[RECIPE] ⚠️  Warning: failed to get metadata for %s: %v\n", relativePath, err)
 			continue
 		}
 
 		// Check if recipe defines a custom type
 		if metadata.CustomType != "" {
-			fmt.Printf("[RECIPE] 🎯 Found custom type '%s' in recipe %s\n", metadata.CustomType, relativePath)
+			InfoLog("[RECIPE] 🎯 Found custom type '%s' in recipe %s\n", metadata.CustomType, relativePath)
 
 			// Get default parameters from recipe
 			defaultParams, err := grl.GetRecipeParameters(fullPath)
 			if err != nil {
-				fmt.Printf("[RECIPE] ⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
+				InfoLog("[RECIPE] ⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
 				defaultParams = make(map[string]interface{})
 			}
 
@@ -695,6 +695,6 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		}
 	}
 
-	fmt.Printf("[RECIPE] ✅ Registered %d custom types from recipes\n", customTypeCount)
+	InfoLog("[RECIPE] ✅ Registered %d custom types from recipes\n", customTypeCount)
 	return nil
 }

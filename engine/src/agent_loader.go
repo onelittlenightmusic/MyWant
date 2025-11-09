@@ -88,7 +88,7 @@ func validateCapabilityWithSpec(yamlData []byte) error {
 		return fmt.Errorf("capability structure validation failed: %w", err)
 	}
 
-	fmt.Printf("[VALIDATION] Capability validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Capability validated successfully against OpenAPI spec\n")
 	return nil
 }
 
@@ -222,7 +222,7 @@ func validateAgentWithSpec(yamlData []byte) error {
 		return fmt.Errorf("agent structure validation failed: %w", err)
 	}
 
-	fmt.Printf("[VALIDATION] Agent validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Agent validated successfully against OpenAPI spec\n")
 	return nil
 }
 
@@ -370,7 +370,7 @@ func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent) {
 // genericDoAction is the default action for all DoAgents
 // Agents don't need special implementations - state initialization is externalized to want types
 func (r *AgentRegistry) genericDoAction(ctx context.Context, want *Want) error {
-	fmt.Printf("[AGENT] DoAgent executing for want: %s\n", want.Metadata.Name)
+	InfoLog("[AGENT] DoAgent executing for want: %s\n", want.Metadata.Name)
 	// State initialization happens in the want type's agent execution logic
 	// This is just a placeholder that confirms the agent executed
 	return nil
@@ -379,7 +379,7 @@ func (r *AgentRegistry) genericDoAction(ctx context.Context, want *Want) error {
 // genericMonitorAction is the default monitor for all MonitorAgents
 // Agents don't need special implementations - monitoring logic is externalized to want types
 func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) error {
-	fmt.Printf("[AGENT] MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
+	InfoLog("[AGENT] MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
 	// Monitoring logic happens in the want type's agent execution logic
 	// This is just a placeholder that confirms the monitor executed
 	return nil
