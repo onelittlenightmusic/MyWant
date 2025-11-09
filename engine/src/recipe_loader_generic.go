@@ -667,7 +667,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		// Get metadata for each recipe
 		metadata, err := grl.GetRecipeMetadata(fullPath)
 		if err != nil {
-			fmt.Printf("⚠️  Warning: failed to get metadata for %s: %v\n", relativePath, err)
+			fmt.Printf("[RECIPE] ⚠️  Warning: failed to get metadata for %s: %v\n", relativePath, err)
 			continue
 		}
 
@@ -678,7 +678,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 			// Get default parameters from recipe
 			defaultParams, err := grl.GetRecipeParameters(fullPath)
 			if err != nil {
-				fmt.Printf("⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
+				fmt.Printf("[RECIPE] ⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
 				defaultParams = make(map[string]interface{})
 			}
 

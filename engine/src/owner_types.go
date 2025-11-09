@@ -174,7 +174,7 @@ func (t *Target) resolveRecipeParameters() {
 	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
-		fmt.Printf("⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
+		fmt.Printf("[TARGET] ⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
 
@@ -209,18 +209,18 @@ func (t *Target) resolveRecipeParameters() {
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
-		fmt.Printf("❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
+		fmt.Printf("[TARGET] ❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
 		return []*Want{}
 	}
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
-		fmt.Printf("❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
+		fmt.Printf("[TARGET] ❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
 		return []*Want{}
 	}
 
-	fmt.Printf("✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
+	fmt.Printf("[TARGET] ✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
 		t.Metadata.Name, t.RecipePath, len(config.Wants))
 
 	// Add owner references to all child wants
@@ -264,7 +264,7 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 		// This avoids deadlock by not trying to acquire locks already held by parent execution
 		fmt.Printf("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			fmt.Printf("⚠️  Warning: Failed to send child wants: %v\n", err)
+			fmt.Printf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
 		} else {
 			fmt.Printf("[TARGET] 🔧 Child wants sent to reconcile loop\n")
 		}
@@ -392,7 +392,7 @@ func (t *Target) computeTemplateResult() {
 	defer t.stateMutex.Unlock()
 
 	if t.recipeLoader == nil {
-		fmt.Printf("⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
+		fmt.Printf("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -400,13 +400,13 @@ func (t *Target) computeTemplateResult() {
 	// Get recipe result definition
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		fmt.Printf("⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
+		fmt.Printf("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
-		fmt.Printf("⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
+		fmt.Printf("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}

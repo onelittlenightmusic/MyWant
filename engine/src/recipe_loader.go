@@ -298,7 +298,7 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]string {
 	// Return empty map - all labels should be explicitly defined in recipes
 	labels := make(map[string]string)
-	fmt.Printf("⚠️  DEPRECATED: generateLabels called for type %s - labels should be defined in recipe YAML\n", wantType)
+	fmt.Printf("[RECIPE] ⚠️  DEPRECATED: generateLabels called for type %s - labels should be defined in recipe YAML\n", wantType)
 	return labels
 }
 
