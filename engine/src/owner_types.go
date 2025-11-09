@@ -248,37 +248,37 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Exec implements the ChainWant interface for Target with direct execution
 func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
-	fmt.Printf("🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
+	fmt.Printf("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 
 	// Dynamically create child wants
 	if t.builder != nil {
-		fmt.Printf("🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
+		fmt.Printf("[TARGET] 🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
 		childWants := t.CreateChildWants()
 
 		// Add child wants to the builder's configuration
 		for _, childWant := range childWants {
-			fmt.Printf("🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
+			fmt.Printf("[TARGET] 🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
 		}
 
 		// Send child wants to reconcile loop asynchronously
 		// This avoids deadlock by not trying to acquire locks already held by parent execution
-		fmt.Printf("🔧 Sending child wants to reconcile loop for async addition...\n")
+		fmt.Printf("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to send child wants: %v\n", err)
 		} else {
-			fmt.Printf("🔧 Child wants sent to reconcile loop\n")
+			fmt.Printf("[TARGET] 🔧 Child wants sent to reconcile loop\n")
 		}
 	}
 
 	// Target waits for signal that all children have finished
-	fmt.Printf("🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
+	fmt.Printf("[TARGET] 🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
 	<-t.childrenDone
-	fmt.Printf("🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
+	fmt.Printf("[TARGET] 🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
 
 	// Compute and store recipe result
 	t.computeTemplateResult()
 
-	fmt.Printf("🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
+	fmt.Printf("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 	return true
 }
 
@@ -300,13 +300,13 @@ func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 	// Push parameter change to child wants
 	t.PushParameterToChildren(paramName, paramValue)
 
-	fmt.Printf("🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+	fmt.Printf("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
 		t.Metadata.Name, paramName, paramValue)
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
-	fmt.Printf("🔄 Target %s: Changing parameter %s from %v to %v\n",
+	fmt.Printf("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
 		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
@@ -495,7 +495,7 @@ func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would
 	// interact with the ChainBuilder to add wants to the memory file
 	// For now, we'll assume the reconcile loop will pick up the wants
-	fmt.Printf("🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
+	fmt.Printf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
 	return nil
 }
 

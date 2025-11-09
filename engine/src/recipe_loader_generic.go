@@ -657,7 +657,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		return fmt.Errorf("failed to list recipes: %w", err)
 	}
 
-	fmt.Printf("🔍 Scanning %d recipes for custom types...\n", len(recipes))
+	fmt.Printf("[RECIPE] 🔍 Scanning %d recipes for custom types...\n", len(recipes))
 
 	customTypeCount := 0
 	for _, relativePath := range recipes {
@@ -673,7 +673,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 
 		// Check if recipe defines a custom type
 		if metadata.CustomType != "" {
-			fmt.Printf("🎯 Found custom type '%s' in recipe %s\n", metadata.CustomType, relativePath)
+			fmt.Printf("[RECIPE] 🎯 Found custom type '%s' in recipe %s\n", metadata.CustomType, relativePath)
 
 			// Get default parameters from recipe
 			defaultParams, err := grl.GetRecipeParameters(fullPath)
@@ -695,6 +695,6 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 		}
 	}
 
-	fmt.Printf("✅ Registered %d custom types from recipes\n", customTypeCount)
+	fmt.Printf("[RECIPE] ✅ Registered %d custom types from recipes\n", customTypeCount)
 	return nil
 }
