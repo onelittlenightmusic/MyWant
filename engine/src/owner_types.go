@@ -442,16 +442,7 @@ func (t *Target) computeTemplateResult() {
 
 	// Stats are now stored in State - no separate initialization needed
 
-	// CRITICAL: Protect all State modifications with stateMutex
-	t.stateMutex.Lock()
-	defer t.stateMutex.Unlock()
-
-	// Initialize State map if not exists
-	if t.State == nil {
-		t.State = make(map[string]interface{})
-	}
-
-	// Process all result specs from the new flat array format
+	// Process all result specs from the new flat array format (outside lock to avoid deadlock)
 	var primaryResult interface{}
 	metrics := make(map[string]interface{})
 
@@ -465,18 +456,41 @@ func (t *Target) computeTemplateResult() {
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		metrics[metricKey] = resultValue
-		t.State[metricKey] = resultValue
 
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			t.State["recipeResult"] = primaryResult
-			t.State["primaryResult"] = primaryResult
 			InfoLog("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
 		} else {
 			InfoLog("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
 		}
 	}
+
+	// Now acquire lock only for State modifications
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
+
+	// Initialize State map if not exists
+	if t.State == nil {
+		t.State = make(map[string]interface{})
+	}
+
+	// Apply all computed results to State
+	for i, resultSpec := range *recipeResult {
+		statName := strings.TrimPrefix(resultSpec.StatName, ".")
+		if statName == "" {
+			statName = "all_metrics"
+		}
+		metricKey := resultSpec.WantName + "_" + statName
+		t.State[metricKey] = metrics[metricKey]
+
+		// Set primary result for first item
+		if i == 0 {
+			t.State["recipeResult"] = primaryResult
+			t.State["primaryResult"] = primaryResult
+		}
+	}
+
 	t.State["metrics"] = metrics
 
 	// Store additional metadata
