@@ -1254,6 +1254,8 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Copy State from config (simple copy since History is separate)
 		if wantConfig.State != nil {
+			// CRITICAL: Protect State map access with stateMutex during reconciliation
+			wantPtr.stateMutex.Lock()
 			if wantPtr.State == nil {
 				wantPtr.State = make(map[string]interface{})
 			}
@@ -1261,6 +1263,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			for k, v := range wantConfig.State {
 				wantPtr.State[k] = v
 			}
+			wantPtr.stateMutex.Unlock()
 		}
 
 		// Copy History field from config

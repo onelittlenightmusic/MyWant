@@ -442,6 +442,10 @@ func (t *Target) computeTemplateResult() {
 
 	// Stats are now stored in State - no separate initialization needed
 
+	// CRITICAL: Protect all State modifications with stateMutex
+	t.stateMutex.Lock()
+	defer t.stateMutex.Unlock()
+
 	// Initialize State map if not exists
 	if t.State == nil {
 		t.State = make(map[string]interface{})
@@ -466,8 +470,6 @@ func (t *Target) computeTemplateResult() {
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			t.State["recipeResult"] = primaryResult
-			t.State["primaryResult"] = primaryResult
 			t.State["recipeResult"] = primaryResult
 			t.State["primaryResult"] = primaryResult
 			fmt.Printf("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)

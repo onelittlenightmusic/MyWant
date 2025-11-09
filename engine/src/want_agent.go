@@ -315,39 +315,52 @@ func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) e
 
 // CommitStateChanges commits all staged state changes in a single atomic operation
 func (n *Want) CommitStateChanges() {
+	// Step 1: Copy staged changes while holding agentStateMutex
 	n.agentStateMutex.Lock()
-	defer n.agentStateMutex.Unlock()
-
 	if len(n.agentStateChanges) == 0 {
+		n.agentStateMutex.Unlock()
 		return
 	}
 
-	// Create a single aggregated state history entry
+	// Create a copy of staged changes to apply
+	changesCopy := make(map[string]interface{})
+	for k, v := range n.agentStateChanges {
+		changesCopy[k] = v
+	}
+	changeCount := len(n.agentStateChanges)
+
+	// Clear staged changes while holding the lock
+	n.agentStateChanges = make(map[string]interface{})
+	n.agentStateMutex.Unlock()
+
+	// Step 2: Apply changes to State with stateMutex protection
+	n.stateMutex.Lock()
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 
 	// Apply all changes to current state
-	for key, value := range n.agentStateChanges {
+	for key, value := range changesCopy {
 		n.State[key] = value
 	}
+	n.stateMutex.Unlock()
 
-	// Add single history entry with all changes (one entry instead of multiple)
+	// Step 3: Add single history entry with all changes with stateMutex protection
 	historyEntry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
-		StateValue: n.agentStateChanges,
+		StateValue: changesCopy,
 		Timestamp:  time.Now(),
 	}
+
+	n.stateMutex.Lock()
 	if n.History.StateHistory == nil {
 		n.History.StateHistory = make([]StateHistoryEntry, 0)
 	}
 	n.History.StateHistory = append(n.History.StateHistory, historyEntry)
+	n.stateMutex.Unlock()
 
 	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
-		len(n.agentStateChanges), n.Metadata.Name)
-
-	// Clear staged changes
-	n.agentStateChanges = make(map[string]interface{})
+		changeCount, n.Metadata.Name)
 }
 
 // GetStagedChanges returns a copy of currently staged changes (for debugging)
