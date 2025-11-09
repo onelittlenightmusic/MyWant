@@ -558,7 +558,7 @@ func (cb *ChainBuilder) connectPhase() error {
 
 	// Build parameter subscription connectivity for Target wants
 	// This references the owner-children relationships already established in OwnerReferences metadata
-	log.Printf("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)\n", len(cb.wants))
+	DebugLog("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)", len(cb.wants))
 	targetCount := 0
 	for wantName, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
@@ -577,19 +577,19 @@ func (cb *ChainBuilder) connectPhase() error {
 				}
 			}
 
-			log.Printf("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)\n",
+			DebugLog("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)",
 				wantName, target.RecipePath, target.recipeLoader != nil, childCount)
 
 			if target.RecipePath != "" && target.recipeLoader != nil {
 				// Parse recipe to build parameter subscription map based on ownership
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
-					log.Printf("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v\n",
+					DebugLog("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v",
 						target.Metadata.Name, err)
 				}
 			}
 		}
 	}
-	log.Printf("[RECONCILE:CONNECT] Processed %d Target wants for subscription building\n", targetCount)
+	DebugLog("[RECONCILE:CONNECT] Processed %d Target wants for subscription building", targetCount)
 
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
@@ -685,14 +685,14 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 						target.parameterSubscriptions[paramRefStr],
 						actualChildName,
 					)
-					log.Printf("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)\n",
+					DebugLog("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)",
 						target.Metadata.Name, actualChildName, paramRefStr, childParamName)
 				}
 			}
 		}
 	}
 
-	log.Printf("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v\n",
+	DebugLog("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v",
 		target.Metadata.Name, target.parameterSubscriptions)
 
 	return nil

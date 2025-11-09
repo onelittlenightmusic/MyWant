@@ -1959,8 +1959,9 @@ func main() {
 		}
 	}
 
-	// Set global debug flag
+	// Set global debug flags (both server and engine)
 	GlobalDebugEnabled = debugEnabled
+	mywant.DebugLoggingEnabled = debugEnabled
 
 	// Create server config
 	config := ServerConfig{
