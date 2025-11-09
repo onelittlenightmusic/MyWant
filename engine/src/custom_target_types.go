@@ -113,7 +113,7 @@ func (r *CustomTargetTypeRegistry) UpdateRecipe(recipeID string, recipe *Generic
 	}
 
 	r.recipes[recipeID] = recipe
-	fmt.Printf("📝 Updated recipe: '%s'\n", recipeID)
+	fmt.Printf("[RECIPE] 📝 Updated recipe: '%s'\n", recipeID)
 	return nil
 }
 
@@ -127,7 +127,7 @@ func (r *CustomTargetTypeRegistry) DeleteRecipe(recipeID string) error {
 	}
 
 	delete(r.recipes, recipeID)
-	fmt.Printf("🗑️  Deleted recipe: '%s'\n", recipeID)
+	fmt.Printf("[RECIPE] 🗑️  Deleted recipe: '%s'\n", recipeID)
 	return nil
 }
 

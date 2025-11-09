@@ -334,7 +334,7 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue interface{
 				// Update the child's parameter
 				runtimeWant.want.UpdateParameter(childParamName, paramValue)
 
-				fmt.Printf("🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+				fmt.Printf("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
 					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
 			}
 		}
@@ -470,7 +470,7 @@ func (t *Target) computeTemplateResult() {
 			t.State["primaryResult"] = primaryResult
 			t.State["recipeResult"] = primaryResult
 			t.State["primaryResult"] = primaryResult
-			fmt.Printf("✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
+			fmt.Printf("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
 		} else {
 			fmt.Printf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
 		}
@@ -487,7 +487,7 @@ func (t *Target) computeTemplateResult() {
 		t.State["result"] = fmt.Sprintf("%s: %v", firstResult.Description, primaryResult)
 	}
 
-	fmt.Printf("✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
+	fmt.Printf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
 
 // addChildWantsToMemory adds child wants to the memory configuration
@@ -539,7 +539,7 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 		return result
 	} else {
 		// Fallback for non-ChainWant types
-		fmt.Printf("⚠️  Want %s: No Exec method available\n", oaw.WantName)
+		fmt.Printf("[TARGET] ⚠️  Want %s: No Exec method available\n", oaw.WantName)
 		return true
 	}
 }
@@ -615,7 +615,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
 	want, exists := childWants[spec.WantName]
 	if !exists {
-		fmt.Printf("⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
+		fmt.Printf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
 		return 0
 	}
 
@@ -656,7 +656,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return value
 	}
 
-	fmt.Printf("⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
+	fmt.Printf("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
 	return 0
 }
 
@@ -771,7 +771,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 	t.State["recipeResult"] = totalProcessed
 	t.State["recipePath"] = t.RecipePath
 	t.State["childCount"] = len(childWants)
-	fmt.Printf("✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+	fmt.Printf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 
 	// Store result in a standardized format for memory dumps
 	t.State["result"] = fmt.Sprintf("processed: %d", totalProcessed)
