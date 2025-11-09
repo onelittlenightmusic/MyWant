@@ -122,6 +122,51 @@ func (n *Want) SetStatus(status WantStatus) {
 	}
 }
 
+// ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
+// This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety
+// and preventing deadlocks from external callers
+func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
+	if sourceState == nil {
+		return
+	}
+
+	// CRITICAL: Protect State map access with stateMutex during reconciliation
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	// Initialize State map if not exists
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Copy all state data atomically
+	for k, v := range sourceState {
+		n.State[k] = v
+	}
+}
+
+// SetStateAtomic sets multiple state values atomically with proper mutex protection
+// This method handles ALL mutex locking internally so external callers don't need to manage synchronization
+func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
+	if stateData == nil {
+		return
+	}
+
+	// Acquire mutex to protect State map access
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	// Initialize State map if not exists
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	// Set all state data atomically
+	for k, v := range stateData {
+		n.State[k] = v
+	}
+}
+
 // UpdateParameter updates a parameter and propagates the change to children
 func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 	// Get previous value for history tracking
@@ -396,6 +441,22 @@ func (n *Want) StoreState(key string, value interface{}) {
 	sendStateNotifications(notification)
 }
 
+// GetState retrieves a state value atomically with mutex protection
+// This method encapsulates all stateMutex access for state reads, ensuring thread safety
+// Returns (value, exists) to indicate whether the key exists in state
+// All state reads must go through this method to maintain proper encapsulation
+func (n *Want) GetState(key string) (interface{}, bool) {
+	n.stateMutex.RLock()
+	defer n.stateMutex.RUnlock()
+
+	if n.State == nil {
+		return nil, false
+	}
+
+	value, exists := n.State[key]
+	return value, exists
+}
+
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
 // Uses differential checking to prevent duplicate entries when state hasn't actually changed
 // Only creates a history entry if the state differs from the last recorded state
@@ -573,13 +634,6 @@ func (n *Want) InitializeSubscriptionSystem() {
 // All wants share the same subscription system to enable cross-want event delivery
 func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
-}
-
-// GetState retrieves a value from the want's state
-func (n *Want) GetState(key string) (interface{}, bool) {
-	n.stateMutex.RLock()
-	defer n.stateMutex.RUnlock()
-	return n.getStateUnsafe(key)
 }
 
 // migrateAgentHistoryFromState removes agent_history from state if it exists

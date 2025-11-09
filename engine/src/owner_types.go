@@ -141,7 +141,17 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 // checkAllChildrenComplete checks if all child wants have completed (must hold childCompletionMutex)
 func (t *Target) checkAllChildrenComplete() bool {
-	if len(t.childWants) == 0 {
+	// If we have no children yet AND no completions have arrived, we can't be complete
+	// (children are still being added asynchronously)
+	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
+		InfoLog("[TARGET:CHECK] ⏳ No children added yet for target '%s' - waiting for children...\n", t.Metadata.Name)
+		return false
+	}
+
+	// If we have completed children but no childWants yet, they're still being added asynchronously
+	if len(t.childWants) == 0 && len(t.completedChildren) > 0 {
+		InfoLog("[TARGET:CHECK] ⏳ Children still being added for target '%s' (%d completions received, waiting for wants list)\n",
+			t.Metadata.Name, len(t.completedChildren))
 		return false
 	}
 
@@ -280,6 +290,7 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 
 	// Mark the target as completed
 	t.SetStatus(WantStatusCompleted)
+	InfoLog("[TARGET] ✅ Target %s: SetStatus(Completed) called, current status: %s\n", t.Metadata.Name, t.GetStatus())
 	InfoLog("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 	return true
 }
@@ -468,41 +479,32 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	// Now acquire lock only for State modifications
-	t.stateMutex.Lock()
-	defer t.stateMutex.Unlock()
-
-	// Initialize State map if not exists
-	if t.State == nil {
-		t.State = make(map[string]interface{})
-	}
-
-	// Apply all computed results to State
+	// Store all computed results through StoreState() which handles mutex protection
 	for i, resultSpec := range *recipeResult {
 		statName := strings.TrimPrefix(resultSpec.StatName, ".")
 		if statName == "" {
 			statName = "all_metrics"
 		}
 		metricKey := resultSpec.WantName + "_" + statName
-		t.State[metricKey] = metrics[metricKey]
+		t.StoreState(metricKey, metrics[metricKey])
 
 		// Set primary result for first item
 		if i == 0 {
-			t.State["recipeResult"] = primaryResult
-			t.State["primaryResult"] = primaryResult
+			t.StoreState("recipeResult", primaryResult)
+			t.StoreState("primaryResult", primaryResult)
 		}
 	}
 
-	t.State["metrics"] = metrics
+	t.StoreState("metrics", metrics)
 
-	// Store additional metadata
-	t.State["recipePath"] = t.RecipePath
-	t.State["childCount"] = len(childWantsByName)
+	// Store additional metadata through encapsulated method
+	t.StoreState("recipePath", t.RecipePath)
+	t.StoreState("childCount", len(childWantsByName))
 
 	// Store result in a standardized format for memory dumps
 	if len(*recipeResult) > 0 {
 		firstResult := (*recipeResult)[0]
-		t.State["result"] = fmt.Sprintf("%s: %v", firstResult.Description, primaryResult)
+		t.StoreState("result", fmt.Sprintf("%s: %v", firstResult.Description, primaryResult))
 	}
 
 	InfoLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
@@ -786,9 +788,9 @@ func (t *Target) computeFallbackResultUnsafe() {
 	}
 
 	// Store result in target's state
-	t.State["recipeResult"] = totalProcessed
-	t.State["recipePath"] = t.RecipePath
-	t.State["childCount"] = len(childWants)
+	t.StoreState("recipeResult", totalProcessed)
+	t.StoreState("recipePath", t.RecipePath)
+	t.StoreState("childCount", len(childWants))
 	InfoLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 
 	// Store result in a standardized format for memory dumps

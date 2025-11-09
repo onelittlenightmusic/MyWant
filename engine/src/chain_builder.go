@@ -1241,18 +1241,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if wantWithGetWant, ok := wantFunction.(interface{ GetWant() *Want }); ok {
 		wantPtr = wantWithGetWant.GetWant()
 
-		// Copy State from config (simple copy since History is separate)
+		// Copy State from config using encapsulated method
+		// This ensures proper mutex protection without exposing synchronization details
 		if wantConfig.State != nil {
-			// CRITICAL: Protect State map access with stateMutex during reconciliation
-			wantPtr.stateMutex.Lock()
-			if wantPtr.State == nil {
-				wantPtr.State = make(map[string]interface{})
-			}
-			// Copy all state data
-			for k, v := range wantConfig.State {
-				wantPtr.State[k] = v
-			}
-			wantPtr.stateMutex.Unlock()
+			wantPtr.ReconcileStateFromConfig(wantConfig.State)
 		}
 
 		// Copy History field from config

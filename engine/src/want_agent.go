@@ -333,17 +333,8 @@ func (n *Want) CommitStateChanges() {
 	n.agentStateChanges = make(map[string]interface{})
 	n.agentStateMutex.Unlock()
 
-	// Step 2: Apply changes to State with stateMutex protection
-	n.stateMutex.Lock()
-	if n.State == nil {
-		n.State = make(map[string]interface{})
-	}
-
-	// Apply all changes to current state
-	for key, value := range changesCopy {
-		n.State[key] = value
-	}
-	n.stateMutex.Unlock()
+	// Step 2: Apply changes to State using encapsulated method
+	n.SetStateAtomic(changesCopy)
 
 	// Step 3: Add single history entry with all changes with stateMutex protection
 	historyEntry := StateHistoryEntry{

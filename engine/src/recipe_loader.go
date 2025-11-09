@@ -475,11 +475,14 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 func (rl *RecipeLoader) extractWantStat(want *Want, statName string) (interface{}, error) {
 	switch statName {
 	case "AverageWaitTime", "averagewaittime":
-		return want.State["average_wait_time"], nil
+		value, _ := want.GetState("average_wait_time")
+		return value, nil
 	case "TotalProcessed", "totalprocessed":
-		return want.State["total_processed"], nil
+		value, _ := want.GetState("total_processed")
+		return value, nil
 	case "TotalWaitTime", "totalwaittime":
-		return want.State["total_wait_time"], nil
+		value, _ := want.GetState("total_wait_time")
+		return value, nil
 	default:
 		return nil, fmt.Errorf("unknown stat name: %s", statName)
 	}
