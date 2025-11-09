@@ -41,7 +41,7 @@ recipe:
         requires:
           - create_flight
 
-    # Dinner restaurant reservation
+    # Dinner restaurant reservation with agent processing
     - metadata:
         type: restaurant
         labels:
@@ -50,8 +50,10 @@ recipe:
         params:
           restaurant_type: restaurant_type
           duration_hours: dinner_duration
+        requires:
+          - restaurant_reservation
 
-    # Hotel accommodation booking with agent support
+    # Hotel accommodation booking with agent processing
     - metadata:
         type: hotel
         labels:
@@ -62,7 +64,7 @@ recipe:
         requires:
           - hotel_reservation
 
-    # Morning breakfast buffet
+    # Morning breakfast buffet with agent processing
     - metadata:
         type: buffet
         labels:
@@ -70,6 +72,8 @@ recipe:
       spec:
         params:
           buffet_type: buffet_type
+        requires:
+          - buffet_reservation
 
     # Travel coordinator that combines all schedules
     - metadata:

@@ -90,61 +90,23 @@ const SAMPLE_CONFIGS = [
   },
   {
     name: 'Hierarchical Approval',
-    description: 'Hierarchical approval workflow with evidence, description, Level 1, and Level 2 approvals',
+    description: 'Level 1 approval workflow',
     config: {
-      wants: [
-        {
-          metadata: {
-            name: 'evidence',
-            type: 'evidence',
-            labels: {
-              role: 'evidence-provider',
-              category: 'approval-data',
-              approval_id: 'approval-001'
-            }
-          },
-          spec: {
-            params: {
-              evidence_type: 'document',
-              approval_id: 'approval-001'
-            }
-          }
-        },
-        {
-          metadata: {
-            name: 'description',
-            type: 'description',
-            labels: {
-              role: 'description-provider',
-              category: 'approval-data',
-              approval_id: 'approval-001'
-            }
-          },
-          spec: {
-            params: {
-              description_format: 'Request for approval: %s',
-              approval_id: 'approval-001'
-            }
-          }
-        },
-        {
-          metadata: {
-            name: 'level1_approval',
-            type: 'level 1 approval',
-            labels: {
-              role: 'approval-target',
-              approval_level: '1'
-            }
-          },
-          spec: {
-            params: {
-              approval_id: 'approval-001',
-              coordinator_type: 'level1',
-              level2_authority: 'senior_manager'
-            }
-          }
+      metadata: {
+        name: 'level1_approval',
+        type: 'level 1 approval',
+        labels: {
+          role: 'approval-target',
+          approval_level: '1'
         }
-      ]
+      },
+      spec: {
+        params: {
+          approval_id: 'approval-001',
+          coordinator_type: 'level1',
+          level2_authority: 'senior_manager'
+        }
+      }
     }
   },
   {

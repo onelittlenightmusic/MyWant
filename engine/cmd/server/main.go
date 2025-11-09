@@ -23,8 +23,9 @@ import (
 
 // ServerConfig holds server configuration
 type ServerConfig struct {
-	Port int    `json:"port"`
-	Host string `json:"host"`
+	Port  int    `json:"port"`
+	Host  string `json:"host"`
+	Debug bool   `json:"debug"`
 }
 
 // ErrorHistoryEntry represents an API error with detailed context
@@ -424,11 +425,11 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
 	}
 
-	log.Printf("[SERVER] 📋 Loaded configuration with %d wants\n", len(config.Wants))
+	DebugLog("📋 Loaded configuration with %d wants", len(config.Wants))
 	for _, want := range config.Wants {
-		log.Printf("[SERVER]   - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+		DebugLog("   - %s (%s)", want.Metadata.Name, want.Metadata.Type)
 		if len(want.Spec.Requires) > 0 {
-			log.Printf("[SERVER]     Requires: %v\n", want.Spec.Requires)
+			DebugLog("     Requires: %v", want.Spec.Requires)
 		}
 	}
 
@@ -464,22 +465,22 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	mywant.RegisterMonitorWantTypes(builder)
 
 	// Step 5: Execute (same as demo_travel_agent_full.go:106)
-	log.Println("[SERVER] 🚀 Executing configuration...")
+	DebugLog("🚀 Executing configuration...")
 	builder.Execute()
 
-	log.Println("[SERVER] ✅ Configuration execution completed!")
+	DebugLog("✅ Configuration execution completed!")
 	return config, builder, nil
 }
 
 // registerDynamicAgents registers implementations for special agents loaded from YAML
 func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
-	log.Printf("[SERVER] Setting up dynamic agent implementations...\n")
+	DebugLog("Setting up dynamic agent implementations...")
 
 	// Override the generic implementations with specific ones for special agents
 	setupFlightAPIAgents(agentRegistry)
 	setupMonitorFlightAgents(agentRegistry)
 
-	log.Printf("[SERVER] Dynamic agent implementations registered\n")
+	DebugLog("Dynamic agent implementations registered")
 }
 
 // setupFlightAPIAgents sets up the Flight API agent implementations
@@ -496,7 +497,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 				"http://localhost:8081",
 			)
 			doAgent.Action = flightAgent.Exec
-			log.Printf("[SERVER] ✅ Set up agent_flight_api with real implementation (flight_api_agency)\n")
+			DebugLog("✅ Set up agent_flight_api with real implementation (flight_api_agency)")
 		}
 	}
 }
@@ -515,7 +516,7 @@ func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
 				"http://localhost:8081",
 			)
 			monitorAgent.Monitor = flightMonitor.Exec
-			log.Printf("[SERVER] ✅ Set up monitor_flight_api with real implementation (monitoring flight status updates)\n")
+			DebugLog("✅ Set up monitor_flight_api with real implementation (monitoring flight status updates)")
 		}
 	}
 }
@@ -610,9 +611,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	log.Printf("[SERVER] Added %d wants to global builder (execution %s), reconcile loop will process them\n", len(config.Wants), executionID)
+	DebugLog("Added %d wants to global builder (execution %s), reconcile loop will process them", len(config.Wants), executionID)
 	for _, want := range config.Wants {
-		log.Printf("[SERVER]   - %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+		DebugLog("   - %s (%s, ID: %s)", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 	}
 
 	// Return created execution with first want ID as reference
@@ -646,11 +647,11 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	// Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
-	log.Printf("[LIST_WANTS] Processing %d executions\n", len(s.wants))
+	DebugLog("Processing %d executions", len(s.wants))
 	for execID, execution := range s.wants {
 		// Get current want states from the builder (builder always exists)
 		currentStates := execution.Builder.GetAllWantStates()
-		log.Printf("[LIST_WANTS] Execution %s has %d wants\n", execID, len(currentStates))
+		DebugLog("Execution %s has %d wants", execID, len(currentStates))
 		for _, want := range currentStates {
 			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
@@ -668,16 +669,16 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store by ID to deduplicate (keep latest version)
-			log.Printf("[LIST_WANTS] Adding want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
+			InfoLog("Added want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
 
 	// If no wants from executions, also check global builder (for wants loaded from memory file)
 	if len(wantsByID) == 0 && s.globalBuilder != nil {
-		log.Printf("[LIST_WANTS] No wants in executions, checking global builder...\n")
+		DebugLog("No wants in executions, checking global builder...\n")
 		currentStates := s.globalBuilder.GetAllWantStates()
-		log.Printf("[LIST_WANTS] Global builder has %d wants\n", len(currentStates))
+		DebugLog("Global builder has %d wants\n", len(currentStates))
 		for _, want := range currentStates {
 			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
@@ -695,12 +696,12 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store by ID to deduplicate (keep latest version)
-			log.Printf("[LIST_WANTS] Adding want %s (ID: %s) from global builder\n", want.Metadata.Name, want.Metadata.ID)
+			InfoLog("Added want %s (ID: %s) from global builder\n", want.Metadata.Name, want.Metadata.ID)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
 
-	log.Printf("[LIST_WANTS] After deduplication: %d unique wants\n", len(wantsByID))
+	DebugLog("After deduplication: %d unique wants\n", len(wantsByID))
 
 	// Convert map to slice
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
@@ -904,11 +905,11 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	log.Printf("[API_DELETE] Starting deletion for want ID: %s\n", wantID)
+	InfoLog("Starting deletion for want ID: %s\n", wantID)
 
 	// Search for the want across all executions
 	for executionID, execution := range s.wants {
-		log.Printf("[API_DELETE] Checking execution %s\n", executionID)
+		DebugLog("Checking execution %s\n", executionID)
 
 		var wantNameToDelete string
 		var foundInBuilder bool
@@ -916,12 +917,12 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		// Search in builder states if available
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
-			log.Printf("[API_DELETE] Builder has %d wants in runtime\n", len(currentStates))
+			DebugLog("Builder has %d wants in runtime\n", len(currentStates))
 			for wantName, want := range currentStates {
 				if want.Metadata.ID == wantID {
 					wantNameToDelete = wantName
 					foundInBuilder = true
-					log.Printf("[API_DELETE] Found want in builder: %s\n", wantName)
+					DebugLog("Found want in builder: %s\n", wantName)
 					break
 				}
 			}
@@ -935,38 +936,38 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					wantNameToDelete = want.Metadata.Name
 				}
 				configIndex = i
-				log.Printf("[API_DELETE] Found want in config at index %d\n", configIndex)
+				DebugLog("Found want in config at index %d\n", configIndex)
 				break
 			}
 		}
 
 		// If want was found, delete it
 		if wantNameToDelete != "" {
-			log.Printf("[API] Before deletion: %d wants in config\n", len(execution.Config.Wants))
-			log.Printf("[API_DELETE] foundInBuilder=%v, configIndex=%d\n", foundInBuilder, configIndex)
+			DebugLog("Before deletion: %d wants in config\n", len(execution.Config.Wants))
+			DebugLog("foundInBuilder=%v, configIndex=%d\n", foundInBuilder, configIndex)
 
 			// Remove from config if it exists there
 			if configIndex >= 0 {
 				execution.Config.Wants = append(execution.Config.Wants[:configIndex], execution.Config.Wants[configIndex+1:]...)
-				log.Printf("[API] Removed from config, now %d wants in config\n", len(execution.Config.Wants))
+				DebugLog("Removed from config, now %d wants in config\n", len(execution.Config.Wants))
 			} else {
-				log.Printf("[API] Want not in config (likely a dynamically created child want)\n")
+				DebugLog("Want not in config (likely a dynamically created child want)\n")
 			}
 
 			// If using global builder (server mode), delete from runtime asynchronously
 			if foundInBuilder && execution.Builder != nil {
-				log.Printf("[API_DELETE] Sending async deletion request for want ID: %s\n", wantID)
+				InfoLog("Sending async deletion request for want ID: %s\n", wantID)
 
 				// Delete the want asynchronously
 				_, err := execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
 				if err != nil {
-					log.Printf("[API] Warning: Failed to send deletion request: %v\n", err)
+					ErrorLog("Failed to send deletion request: %v\n", err)
 				} else {
 					// Wait for want to be deleted (poll with timeout)
 					maxAttempts := 100
 					for attempt := 0; attempt < maxAttempts; attempt++ {
 						if execution.Builder.AreWantsDeleted([]string{wantID}) {
-							log.Printf("[API_DELETE] Want %s deletion confirmed\n", wantID)
+							InfoLog("Want %s deletion confirmed\n", wantID)
 							break
 						}
 						time.Sleep(10 * time.Millisecond)
@@ -978,9 +979,9 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					execution.Builder.SetConfigInternal(execution.Config)
 				}
 
-				log.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
+				InfoLog("Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
 			} else {
-				log.Printf("[API_DELETE] Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
+				DebugLog("Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
 			}
 
 			// If no wants left, remove the entire execution
@@ -995,14 +996,14 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 	// If not found in executions, also search in global builder (for wants loaded from memory file)
 	if s.globalBuilder != nil {
-		log.Printf("[API_DELETE] Searching in global builder...\n")
+		DebugLog("Searching in global builder...\n")
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			log.Printf("[API_DELETE] Found want in global builder: %s\n", want.Metadata.Name)
+			DebugLog("Found want in global builder: %s\n", want.Metadata.Name)
 
 			// Delete the want from the global builder asynchronously
 			_, err := s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
 			if err != nil {
-				log.Printf("[API] Warning: Failed to send deletion request: %v\n", err)
+				ErrorLog("Failed to send deletion request: %v\n", err)
 				errorMsg := fmt.Sprintf("Failed to delete want: %v", err)
 				s.logError(r, http.StatusInternalServerError, errorMsg, "deletion", err.Error(), wantID)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
@@ -1013,19 +1014,19 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			maxAttempts := 100
 			for attempt := 0; attempt < maxAttempts; attempt++ {
 				if s.globalBuilder.AreWantsDeleted([]string{wantID}) {
-					log.Printf("[API_DELETE] Want %s deletion confirmed from global builder\n", wantID)
+					InfoLog("Want %s deletion confirmed from global builder\n", wantID)
 					break
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
 
-			log.Printf("[API_DELETE] Successfully deleted want from global builder\n")
+			InfoLog("Successfully deleted want from global builder\n")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
 
-	log.Printf("[API_DELETE] Want %s not found in any execution or global builder\n", wantID)
+	ErrorLog("Want %s not found in any execution or global builder\n", wantID)
 
 	errorMsg := fmt.Sprintf("Want not found: %s", wantID)
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
@@ -1931,9 +1932,15 @@ func main() {
 	log.SetOutput(logFile)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	// Parse command line arguments
+	// Parse command line arguments: [port] [host] [debug]
+	// Examples:
+	//   ./server           - port 8080, localhost, no debug
+	//   ./server 8080      - port 8080, localhost, no debug
+	//   ./server 8080 0.0.0.0 - port 8080, 0.0.0.0, no debug
+	//   ./server 8080 0.0.0.0 debug - port 8080, 0.0.0.0, debug enabled
 	port := 8080
 	host := "localhost"
+	debugEnabled := false
 
 	if len(os.Args) > 1 {
 		if p, err := strconv.Atoi(os.Args[1]); err == nil {
@@ -1945,10 +1952,28 @@ func main() {
 		host = os.Args[2]
 	}
 
+	if len(os.Args) > 3 {
+		debugArg := strings.ToLower(os.Args[3])
+		if debugArg == "debug" || debugArg == "true" || debugArg == "1" {
+			debugEnabled = true
+		}
+	}
+
+	// Set global debug flag
+	GlobalDebugEnabled = debugEnabled
+
 	// Create server config
 	config := ServerConfig{
-		Port: port,
-		Host: host,
+		Port:  port,
+		Host:  host,
+		Debug: debugEnabled,
+	}
+
+	// Log startup info
+	if debugEnabled {
+		InfoLog("🐛 Debug mode ENABLED - verbose logging active")
+	} else {
+		InfoLog("ℹ️  Debug mode disabled - reduced logging (use 'debug' argument to enable)")
 	}
 
 	// Create and start server
