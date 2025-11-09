@@ -411,7 +411,7 @@ func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
 // reconcileLoop main reconcile loop that handles both initial config load and dynamic changes
 func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
-	log.Println("[RECONCILE] Loading initial configuration")
+	DebugLog("[RECONCILE] Loading initial configuration")
 	cb.reconcileWants()
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -453,11 +453,11 @@ func (cb *ChainBuilder) reconcileLoop() {
 			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
-				log.Println("[RECONCILE] Detected config change")
+				DebugLog("[RECONCILE] Detected config change")
 				// Load memory file into config before reconciling
 				if newConfig, err := cb.loadMemoryConfig(); err == nil {
 					cb.config = newConfig
-					log.Printf("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
+					DebugLog("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
 				} else {
 					log.Printf("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
 				}
@@ -479,7 +479,7 @@ func (cb *ChainBuilder) reconcileWants() {
 	cb.inReconciliation = true
 	defer func() { cb.inReconciliation = false }()
 
-	log.Println("[RECONCILE] Starting reconciliation with separated phases")
+	DebugLog("[RECONCILE] Starting reconciliation with separated phases")
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
@@ -496,12 +496,12 @@ func (cb *ChainBuilder) reconcileWants() {
 	// Phase 3: START - Launch new/updated wants
 	cb.startPhase()
 
-	log.Println("[RECONCILE] All phases completed successfully")
+	DebugLog("[RECONCILE] All phases completed successfully")
 }
 
 // compilePhase handles configuration loading and want creation/updates
 func (cb *ChainBuilder) compilePhase() error {
-	log.Println("[RECONCILE:COMPILE] Loading and validating configuration")
+	DebugLog("[RECONCILE:COMPILE] Loading and validating configuration")
 
 	// Use current config as source of truth during runtime
 	// Memory file is only loaded on initial startup
@@ -511,7 +511,7 @@ func (cb *ChainBuilder) compilePhase() error {
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
 
 	if isInitialLoad {
-		log.Printf("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
+		DebugLog("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
 		// For initial load, treat all wants as new additions
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
@@ -531,11 +531,11 @@ func (cb *ChainBuilder) compilePhase() error {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
 		if len(changes) == 0 {
-			log.Println("[RECONCILE:COMPILE] No configuration changes detected")
+			DebugLog("[RECONCILE:COMPILE] No configuration changes detected")
 			return nil
 		}
 
-		log.Printf("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
+		DebugLog("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
 
 		// Apply changes in reverse dependency order (sink to generator)
 		cb.applyWantChanges(changes)
@@ -545,13 +545,13 @@ func (cb *ChainBuilder) compilePhase() error {
 	cb.lastConfig = newConfig
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 
-	log.Println("[RECONCILE:COMPILE] Configuration compilation completed")
+	DebugLog("[RECONCILE:COMPILE] Configuration compilation completed")
 	return nil
 }
 
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
-	log.Println("[RECONCILE:CONNECT] Establishing want topology")
+	DebugLog("[RECONCILE:CONNECT] Establishing want topology")
 
 	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
@@ -614,7 +614,7 @@ func (cb *ChainBuilder) connectPhase() error {
 	}
 	cb.channelMutex.Unlock()
 
-	log.Printf("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
+	DebugLog("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
 	return nil
 }
 
@@ -700,7 +700,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 
 // processAutoConnections handles system-wide auto-connection for RecipeAgent wants
 func (cb *ChainBuilder) processAutoConnections() {
-	log.Println("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
+	DebugLog("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
 
 	// Collect all wants with RecipeAgent enabled
 	autoConnectWants := make([]*runtimeWant, 0)
@@ -713,7 +713,7 @@ func (cb *ChainBuilder) processAutoConnections() {
 		want := runtimeWant.want
 		if cb.hasRecipeAgent(want) {
 			autoConnectWants = append(autoConnectWants, runtimeWant)
-			log.Printf("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
+			DebugLog("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
 		}
 	}
 
@@ -725,7 +725,7 @@ func (cb *ChainBuilder) processAutoConnections() {
 		runtimeWant.spec.Using = want.Spec.Using
 	}
 
-	log.Printf("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
+	DebugLog("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
 }
 
 // hasRecipeAgent checks if a want has RecipeAgent functionality enabled
@@ -747,7 +747,7 @@ func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
 
 // autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
 func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
-	log.Printf("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
+	DebugLog("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
 
 	// Look for approval_id in want's params or labels
 	approvalID := ""
@@ -769,11 +769,11 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	}
 
 	if approvalID == "" {
-		log.Printf("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
+		DebugLog("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
 		return
 	}
 
-	log.Printf("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
+	DebugLog("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
 
 	// Initialize using selectors if nil
 	if want.Spec.Using == nil {
@@ -849,23 +849,23 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 					if !duplicate {
 						want.Spec.Using = append(want.Spec.Using, selector)
 						connectionsAdded++
-						log.Printf("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
+						DebugLog("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
 							want.Metadata.Name, selector, otherWant.Metadata.Name)
 
 					} else {
-						log.Printf("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
+						DebugLog("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
 							want.Metadata.Name, selector)
 
 					}
 				} else {
-					log.Printf("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
+					DebugLog("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
 						otherWant.Metadata.Name, role)
 				}
 			}
 		}
 	}
 
-	log.Printf("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
+	DebugLog("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
 		want.Metadata.Name, connectionsAdded)
 }
 
@@ -882,7 +882,7 @@ func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want)
 	if connectionKey != "" {
 		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
 		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
-		log.Printf("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
+		DebugLog("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
 			sourceWant.Metadata.Name, labelKey, consumerWant.Metadata.Name)
 	}
 }
@@ -921,7 +921,7 @@ func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
 
 // startPhase handles launching new/updated wants
 func (cb *ChainBuilder) startPhase() {
-	log.Println("[RECONCILE:START] Launching new and updated wants")
+	DebugLog("[RECONCILE:START] Launching new and updated wants")
 
 	// Start new wants if system is running
 	if cb.running {
@@ -938,19 +938,19 @@ func (cb *ChainBuilder) startPhase() {
 					outCount := len(paths.Out)
 
 					// Log detailed info for debugging
-					log.Printf("[RECONCILE:START:DEBUG] Want %s (%s): inCount=%d (required=%d), outCount=%d (required=%d)\n",
+					DebugLog("[RECONCILE:START:DEBUG] Want %s (%s): inCount=%d (required=%d), outCount=%d (required=%d)\n",
 						wantName, meta.WantType, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
 
 					// Skip if required connections are not met
 					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-						log.Printf("[RECONCILE:START] Skipping idle want %s (%s) - %s requires %d inputs (%d avail), %d outputs (%d avail) - REMAIN IDLE\n",
+						DebugLog("[RECONCILE:START] Skipping idle want %s (%s) - %s requires %d inputs (%d avail), %d outputs (%d avail) - REMAIN IDLE\n",
 							wantName, meta.WantType, meta.Description, meta.RequiredInputs, inCount, meta.RequiredOutputs, outCount)
 						continue
 					}
-					log.Printf("[RECONCILE:START] Starting idle want %s (%s) - has required connections: %d inputs, %d outputs\n",
+					DebugLog("[RECONCILE:START] Starting idle want %s (%s) - has required connections: %d inputs, %d outputs\n",
 						wantName, meta.WantType, inCount, outCount)
 				} else {
-					log.Printf("[RECONCILE:START] Starting idle want %s (non-enhanced, no connectivity check)\n", wantName)
+					DebugLog("[RECONCILE:START] Starting idle want %s (non-enhanced, no connectivity check)\n", wantName)
 				}
 
 				cb.startWant(wantName, want)
@@ -962,7 +962,7 @@ func (cb *ChainBuilder) startPhase() {
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusCompleted {
 				if cb.shouldRestartCompletedWant(wantName, want) {
-					log.Printf("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
+					DebugLog("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
@@ -970,7 +970,7 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		log.Printf("[RECONCILE:START] Started %d wants in first pass\n", startedCount)
+		DebugLog("[RECONCILE:START] Started %d wants in first pass\n", startedCount)
 
 		// Third pass: start any idle wants that now have required connections available
 		// This allows wants with inputs from just-completed upstream wants to execute
@@ -986,17 +986,17 @@ func (cb *ChainBuilder) startPhase() {
 
 					// Start if required connections are now available
 					if inCount >= meta.RequiredInputs && outCount >= meta.RequiredOutputs {
-						log.Printf("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
+						DebugLog("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
 						cb.startWant(wantName, want)
 						additionalStarted++
 					}
 				}
 			}
 		}
-		log.Printf("[RECONCILE:START] Started %d additional wants in third pass\n", additionalStarted)
-		log.Printf("[RECONCILE:START] Total started: %d wants\n", startedCount+additionalStarted)
+		DebugLog("[RECONCILE:START] Started %d additional wants in third pass\n", additionalStarted)
+		DebugLog("[RECONCILE:START] Total started: %d wants\n", startedCount+additionalStarted)
 	} else {
-		log.Println("[RECONCILE:START] System not running, wants will be started later")
+		DebugLog("[RECONCILE:START] System not running, wants will be started later")
 	}
 }
 

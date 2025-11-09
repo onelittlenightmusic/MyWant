@@ -1009,14 +1009,6 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 }
 
 func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
-	template := "travel itinerary"
-	if tmpl, ok := t.Spec.Params["template"]; ok {
-		if tmpls, ok := tmpl.(string); ok {
-			template = tmpls
-		}
-	}
-
 	if len(using) < 3 {
 		return true
 	}
@@ -1055,9 +1047,6 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 	// When we have all schedules, create final itinerary
 	if len(schedules) >= 3 {
-		fmt.Printf("\n🗓️  Final %s:\n", template)
-		fmt.Printf("=================================\n")
-
 		// Combine and sort all events
 		allEvents := make([]TimeSlot, 0)
 		for _, schedule := range schedules {
@@ -1073,19 +1062,12 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			}
 		}
 
-		for _, event := range allEvents {
-			fmt.Printf("📅 %s: %s - %s\n",
-				event.Type, event.Start.Format("Mon 15:04"), event.End.Format("15:04"))
-			fmt.Printf("   %s\n", event.Name)
-		}
-
 		// Batch final coordinator state update
 		{
 			t.BeginExecCycle()
 			t.StoreState("total_processed", len(allEvents))
 			t.EndExecCycle()
 		}
-		fmt.Printf("\n✅ Travel itinerary completed with %d events!\n", len(allEvents))
 		return true
 	}
 
