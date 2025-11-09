@@ -425,7 +425,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 			log.Println("[RECONCILE] Stopping reconcile loop")
 			return
 		case <-cb.reconcileTrigger:
-			log.Println("[RECONCILE] Triggered reconciliation")
+			DebugLog("[RECONCILE] Triggered reconciliation")
 			cb.reconcileWants()
 		case newWants := <-cb.addWantsChan:
 			log.Printf("[RECONCILE] Received %d wants to add asynchronously\n", len(newWants))
