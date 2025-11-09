@@ -671,7 +671,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store by ID to deduplicate (keep latest version)
-			InfoLog("Added want %s (ID: %s) from execution %s\n", want.Metadata.Name, want.Metadata.ID, execID)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -698,7 +697,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store by ID to deduplicate (keep latest version)
-			InfoLog("Added want %s (ID: %s) from global builder\n", want.Metadata.Name, want.Metadata.ID)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -985,9 +983,6 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				if configIndex >= 0 {
 					execution.Builder.SetConfigInternal(execution.Config)
 				}
-
-				// API-level logging for want deletion
-				InfoLog("[API:DELETE] Want deleted: %s (%s, ID: %s)\n", wantNameToDelete, wantTypeToDelete, wantID)
 			} else {
 				DebugLog("Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
 			}

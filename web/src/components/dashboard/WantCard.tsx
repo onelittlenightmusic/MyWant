@@ -79,6 +79,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     if (type === 'hotel') return '/resources/hotel.png';
     if (type === 'restaurant') return '/resources/restaurant.png';
     if (type === 'buffet') return '/resources/buffet.png';
+    if (type?.endsWith('coordinator')) return '/resources/agent.png';
     return undefined;
   };
 
