@@ -259,12 +259,14 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 		for _, childWant := range childWants {
 			fmt.Printf("🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
 		}
-		t.builder.AddDynamicWants(childWants)
 
-		// Rebuild connections to include new wants via connectPhase
-		fmt.Printf("🔧 Rebuilding connections with dynamic wants...\n")
-		if err := t.builder.connectPhase(); err != nil {
-			fmt.Printf("❌ Target %s: Failed to rebuild connections: %v\n", t.Metadata.Name, err)
+		// Send child wants to reconcile loop asynchronously
+		// This avoids deadlock by not trying to acquire locks already held by parent execution
+		fmt.Printf("🔧 Sending child wants to reconcile loop for async addition...\n")
+		if err := t.builder.AddWantsAsync(childWants); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to send child wants: %v\n", err)
+		} else {
+			fmt.Printf("🔧 Child wants sent to reconcile loop\n")
 		}
 	}
 

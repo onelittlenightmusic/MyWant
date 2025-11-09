@@ -45,13 +45,14 @@ type ChainBuilder struct {
 	config         Config                    // Current configuration
 
 	// Reconcile loop fields
-	reconcileStop    chan bool    // Stop signal for reconcile loop
-	reconcileTrigger chan bool    // Trigger signal for immediate reconciliation
-	reconcileMutex   sync.RWMutex // Protect concurrent access
-	inReconciliation bool         // Flag to prevent recursive reconciliation
-	running          bool         // Execution state
-	lastConfig       Config       // Last known config state
-	lastConfigHash   string       // Hash of last config for change detection
+	reconcileStop    chan bool           // Stop signal for reconcile loop
+	reconcileTrigger chan bool           // Buffered channel for reconciliation trigger signals
+	addWantsChan     chan []*Want        // Buffered channel for asynchronous want addition requests
+	reconcileMutex   sync.RWMutex        // Protect concurrent access
+	inReconciliation bool                // Flag to prevent recursive reconciliation
+	running          bool                // Execution state
+	lastConfig       Config              // Last known config state
+	lastConfigHash   string              // Hash of last config for change detection
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -91,7 +92,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		registry:         make(map[string]WantFactory),
 		customRegistry:   NewCustomTargetTypeRegistry(),
 		reconcileStop:    make(chan bool),
-		reconcileTrigger: make(chan bool, 1), // Buffered to avoid blocking
+		reconcileTrigger: make(chan bool, 10), // Buffered to avoid blocking on concurrent triggers
+		addWantsChan:     make(chan []*Want, 10), // Buffered to allow concurrent submissions
 		pathMap:          make(map[string]Paths),
 		channels:         make(map[string]chain.Chan),
 		running:          false,
@@ -422,6 +424,20 @@ func (cb *ChainBuilder) reconcileLoop() {
 			return
 		case <-cb.reconcileTrigger:
 			log.Println("[RECONCILE] Triggered reconciliation")
+			cb.reconcileWants()
+		case newWants := <-cb.addWantsChan:
+			log.Printf("[RECONCILE] Received %d wants to add asynchronously\n", len(newWants))
+			// Add wants to config and runtime
+			cb.reconcileMutex.Lock()
+			for _, want := range newWants {
+				if _, exists := cb.wants[want.Metadata.Name]; !exists {
+					cb.config.Wants = append(cb.config.Wants, want)
+					cb.addWant(want)
+					log.Printf("[RECONCILE] Added want: %s\n", want.Metadata.Name)
+				}
+			}
+			cb.reconcileMutex.Unlock()
+			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
@@ -1694,29 +1710,71 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	return states
 }
 
-// AddDynamicWants adds multiple wants to the configuration at runtime
-// and triggers reconciliation to start them
-func (cb *ChainBuilder) AddDynamicWants(wants []*Want) error {
-	cb.reconcileMutex.Lock()
-	for _, want := range wants {
-		if err := cb.addDynamicWantUnsafe(want); err != nil {
-			cb.reconcileMutex.Unlock()
-			return err
-		}
+// AddWantsAsync sends wants to be added asynchronously through the reconcile loop
+// This is the preferred method for adding wants from within executing Target wants
+// to avoid deadlock since the caller may already hold locks
+func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
+	select {
+	case cb.addWantsChan <- wants:
+		return nil
+	default:
+		return fmt.Errorf("failed to send wants to reconcile loop (channel full)")
 	}
-	cb.reconcileMutex.Unlock()
-
-	// Trigger reconciliation to process newly added wants
-	// This will compile, connect, and start them
-	cb.reconcileWants()
-	return nil
 }
 
-// addDynamicWantUnsafe adds a want without acquiring the mutex (internal use)
+// AddWantsAsyncWithTracking sends wants asynchronously and returns their IDs for tracking
+// The caller can use the returned IDs to poll with AreWantsAdded() to confirm addition
+func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, error) {
+	// Extract IDs from wants
+	ids := make([]string, len(wants))
+	for i, want := range wants {
+		if want.Metadata.ID == "" {
+			return nil, fmt.Errorf("want %s has no ID for tracking", want.Metadata.Name)
+		}
+		ids[i] = want.Metadata.ID
+	}
+
+	// Send wants asynchronously
+	if err := cb.AddWantsAsync(wants); err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
+// AreWantsAdded checks if all wants with the given IDs have been added to the runtime
+// Returns true only if ALL wants are present in the runtime
+func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
+	if len(wantIDs) == 0 {
+		return true
+	}
+
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
+	// Check if all wants are in the runtime
+	for _, id := range wantIDs {
+		found := false
+		for _, rw := range cb.wants {
+			if rw.want.Metadata.ID == id {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+// addDynamicWantUnsafe adds a want without acquiring the mutex (internal use only)
+// Must be called while holding reconcileMutex or within addWantsChan handler
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
-	// Check for duplicate name and return error
+	// Check for duplicate name and skip if exists (don't error, just log)
 	if _, exists := cb.wants[want.Metadata.Name]; exists {
-		return fmt.Errorf("want with name '%s' already exists", want.Metadata.Name)
+		log.Printf("[RECONCILE] Want %s already exists, skipping\n", want.Metadata.Name)
+		return nil
 	}
 
 	// Add want to the configuration

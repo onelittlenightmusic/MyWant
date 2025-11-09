@@ -590,8 +590,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	// Store the execution
 	s.wants[executionID] = execution
 
-	// Add all wants to global builder - reconcile loop will pick them up automatically
-	if err := s.globalBuilder.AddDynamicWants(config.Wants); err != nil {
+	// Add all wants to global builder asynchronously with tracking
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	if err != nil {
 		// Remove from wants map since they weren't added to builder
 		delete(s.wants, executionID)
 		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
@@ -600,11 +601,13 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trigger reconciliation to immediately process the newly added wants
-	if err := s.globalBuilder.TriggerReconcile(); err != nil {
-		log.Printf("[SERVER] Failed to trigger reconciliation: %v\n", err)
-	} else {
-		log.Printf("[SERVER] Sent reconciliation trigger\n")
+	// Wait for wants to be added to reconcile loop (poll with timeout)
+	maxAttempts := 100
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if s.globalBuilder.AreWantsAdded(wantIDs) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	log.Printf("[SERVER] Added %d wants to global builder (execution %s), reconcile loop will process them\n", len(config.Wants), executionID)
@@ -628,15 +631,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		"id":       executionID,
 		"status":   execution.Status,
 		"wants":    wantCount,
-		"want_ids": make([]string, wantCount),
+		"want_ids": wantIDs, // wantIDs already extracted from AddWantsAsyncWithTracking
 		"message":  "Wants created and added to execution queue",
 	}
-	// Build list of want IDs
-	wantIDs := make([]string, wantCount)
-	for i, want := range config.Wants {
-		wantIDs[i] = want.Metadata.ID
-	}
-	response["want_ids"] = wantIDs
 
 	json.NewEncoder(w).Encode(response)
 }

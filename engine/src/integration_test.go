@@ -116,7 +116,10 @@ func TestDynamicWantAddition(t *testing.T) {
 		Spec:     WantSpec{Params: make(map[string]interface{})},
 	}
 
-	builder.AddDynamicWants([]*Want{dynamicWant})
+	builder.AddWantsAsync([]*Want{dynamicWant})
+
+	// Give reconcile loop time to process the want
+	time.Sleep(100 * time.Millisecond)
 
 	// Verify want was added
 	if len(builder.config.Wants) != 1 {
