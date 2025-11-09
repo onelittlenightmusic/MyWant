@@ -2268,7 +2268,7 @@ func (cb *ChainBuilder) Start() error {
 	// Trigger reconciliation - this will reload from memory and restart wants
 	select {
 	case cb.reconcileTrigger <- true:
-		fmt.Println("[START] Reconciliation triggered")
+		DebugLog("[START] Reconciliation triggered")
 		return nil
 	default:
 		return fmt.Errorf("failed to trigger reconciliation - channel full")
@@ -2286,7 +2286,7 @@ func (cb *ChainBuilder) IsRunning() bool {
 func (cb *ChainBuilder) TriggerReconcile() error {
 	select {
 	case cb.reconcileTrigger <- true:
-		fmt.Println("[RECONCILE] Reconciliation triggered")
+		DebugLog("[RECONCILE] Reconciliation triggered")
 		return nil
 	default:
 		return fmt.Errorf("failed to trigger reconciliation - channel full")
