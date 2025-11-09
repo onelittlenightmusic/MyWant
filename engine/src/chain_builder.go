@@ -2203,11 +2203,11 @@ func (cb *ChainBuilder) Suspend() error {
 	// Signal suspension to control loop
 	select {
 	case cb.suspendChan <- true:
-		fmt.Println("[SUSPEND] Chain execution suspended")
+		InfoLog("[SUSPEND] Chain execution suspended")
 		return nil
 	default:
 		// Control loop not running, just mark as suspended
-		fmt.Println("[SUSPEND] Chain marked as suspended (control loop not active)")
+		InfoLog("[SUSPEND] Chain marked as suspended (control loop not active)")
 		return nil
 	}
 }
@@ -2226,11 +2226,11 @@ func (cb *ChainBuilder) Resume() error {
 	// Signal resume to control loop
 	select {
 	case cb.resumeChan <- true:
-		fmt.Println("[RESUME] Chain execution resumed")
+		InfoLog("[RESUME] Chain execution resumed")
 		return nil
 	default:
 		// Control loop not running, just mark as resumed
-		fmt.Println("[RESUME] Chain marked as resumed (control loop not active)")
+		InfoLog("[RESUME] Chain marked as resumed (control loop not active)")
 		return nil
 	}
 }
@@ -2244,7 +2244,7 @@ func (cb *ChainBuilder) IsSuspended() bool {
 
 // Stop stops execution by clearing all wants from the configuration
 func (cb *ChainBuilder) Stop() error {
-	fmt.Println("[STOP] Stopping chain execution by clearing all wants...")
+	InfoLog("[STOP] Stopping chain execution by clearing all wants...")
 
 	// Clear the config wants which will trigger reconciliation to clean up
 	cb.reconcileMutex.Lock()
@@ -2257,7 +2257,7 @@ func (cb *ChainBuilder) Stop() error {
 	case cb.reconcileTrigger <- true:
 		InfoLog("[STOP] Cleared %d wants, reconcile loop will clean up execution\n", wantCount)
 	default:
-		fmt.Println("[STOP] Warning: Failed to trigger reconciliation")
+		InfoLog("[STOP] Warning: Failed to trigger reconciliation")
 	}
 
 	return nil
@@ -2265,7 +2265,7 @@ func (cb *ChainBuilder) Stop() error {
 
 // Start restarts execution by triggering reconciliation of existing configuration
 func (cb *ChainBuilder) Start() error {
-	fmt.Println("[START] Starting/restarting chain execution by triggering reconciliation...")
+	InfoLog("[START] Starting/restarting chain execution by triggering reconciliation...")
 
 	// Trigger reconciliation - this will reload from memory and restart wants
 	select {
@@ -2370,20 +2370,20 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 
 // controlLoop handles suspend/resume signals in a separate goroutine
 func (cb *ChainBuilder) controlLoop() {
-	fmt.Println("[CONTROL] Starting suspension control loop")
+	InfoLog("[CONTROL] Starting suspension control loop")
 
 	for {
 		select {
 		case <-cb.suspendChan:
-			fmt.Println("[CONTROL] Processing suspend signal")
+			InfoLog("[CONTROL] Processing suspend signal")
 			// Suspend signal processed by Suspend() method
 
 		case <-cb.resumeChan:
-			fmt.Println("[CONTROL] Processing resume signal")
+			InfoLog("[CONTROL] Processing resume signal")
 			// Resume signal processed by Resume() method
 
 		case <-cb.controlStop:
-			fmt.Println("[CONTROL] Stopping suspension control loop")
+			InfoLog("[CONTROL] Stopping suspension control loop")
 			return
 		}
 	}

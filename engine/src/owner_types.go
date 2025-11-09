@@ -174,7 +174,7 @@ func (t *Target) resolveRecipeParameters() {
 	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
-		fmt.Printf("[TARGET] ⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
+		InfoLog("[TARGET] ⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
 
@@ -209,18 +209,18 @@ func (t *Target) resolveRecipeParameters() {
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
-		fmt.Printf("[TARGET] ❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
+		InfoLog("[TARGET] ❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
 		return []*Want{}
 	}
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
-		fmt.Printf("[TARGET] ❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
+		InfoLog("[TARGET] ❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
 		return []*Want{}
 	}
 
-	fmt.Printf("[TARGET] ✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
+	InfoLog("[TARGET] ✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
 		t.Metadata.Name, t.RecipePath, len(config.Wants))
 
 	// Add owner references to all child wants
@@ -248,37 +248,37 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Exec implements the ChainWant interface for Target with direct execution
 func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
-	fmt.Printf("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
+	InfoLog("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 
 	// Dynamically create child wants
 	if t.builder != nil {
-		fmt.Printf("[TARGET] 🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
+		InfoLog("[TARGET] 🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
 		childWants := t.CreateChildWants()
 
 		// Add child wants to the builder's configuration
 		for _, childWant := range childWants {
-			fmt.Printf("[TARGET] 🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
+			InfoLog("[TARGET] 🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
 		}
 
 		// Send child wants to reconcile loop asynchronously
 		// This avoids deadlock by not trying to acquire locks already held by parent execution
-		fmt.Printf("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
+		InfoLog("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			fmt.Printf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
+			InfoLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
 		} else {
-			fmt.Printf("[TARGET] 🔧 Child wants sent to reconcile loop\n")
+			InfoLog("[TARGET] 🔧 Child wants sent to reconcile loop\n")
 		}
 	}
 
 	// Target waits for signal that all children have finished
-	fmt.Printf("[TARGET] 🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
+	InfoLog("[TARGET] 🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
 	<-t.childrenDone
-	fmt.Printf("[TARGET] 🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
+	InfoLog("[TARGET] 🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
 
 	// Compute and store recipe result
 	t.computeTemplateResult()
 
-	fmt.Printf("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
+	InfoLog("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 	return true
 }
 
@@ -300,13 +300,13 @@ func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 	// Push parameter change to child wants
 	t.PushParameterToChildren(paramName, paramValue)
 
-	fmt.Printf("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+	InfoLog("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
 		t.Metadata.Name, paramName, paramValue)
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
-	fmt.Printf("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
+	InfoLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
 		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
@@ -334,7 +334,7 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue interface{
 				// Update the child's parameter
 				runtimeWant.want.UpdateParameter(childParamName, paramValue)
 
-				fmt.Printf("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+				InfoLog("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
 					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
 			}
 		}
@@ -392,7 +392,7 @@ func (t *Target) computeTemplateResult() {
 	defer t.stateMutex.Unlock()
 
 	if t.recipeLoader == nil {
-		fmt.Printf("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
+		InfoLog("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -400,13 +400,13 @@ func (t *Target) computeTemplateResult() {
 	// Get recipe result definition
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		fmt.Printf("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
+		InfoLog("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
-		fmt.Printf("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
+		InfoLog("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -438,7 +438,7 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	fmt.Printf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
+	InfoLog("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
 
 	// Stats are now stored in State - no separate initialization needed
 
@@ -472,9 +472,9 @@ func (t *Target) computeTemplateResult() {
 			primaryResult = resultValue
 			t.State["recipeResult"] = primaryResult
 			t.State["primaryResult"] = primaryResult
-			fmt.Printf("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
+			InfoLog("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
 		} else {
-			fmt.Printf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
+			InfoLog("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
 		}
 	}
 	t.State["metrics"] = metrics
@@ -489,7 +489,7 @@ func (t *Target) computeTemplateResult() {
 		t.State["result"] = fmt.Sprintf("%s: %v", firstResult.Description, primaryResult)
 	}
 
-	fmt.Printf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
+	InfoLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
 
 // addChildWantsToMemory adds child wants to the memory configuration
@@ -497,7 +497,7 @@ func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would
 	// interact with the ChainBuilder to add wants to the memory file
 	// For now, we'll assume the reconcile loop will pick up the wants
-	fmt.Printf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
+	InfoLog("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
 	return nil
 }
 
@@ -541,7 +541,7 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 		return result
 	} else {
 		// Fallback for non-ChainWant types
-		fmt.Printf("[TARGET] ⚠️  Want %s: No Exec method available\n", oaw.WantName)
+		InfoLog("[TARGET] ⚠️  Want %s: No Exec method available\n", oaw.WantName)
 		return true
 	}
 }
@@ -617,7 +617,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
 	want, exists := childWants[spec.WantName]
 	if !exists {
-		fmt.Printf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
+		InfoLog("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
 		return 0
 	}
 
@@ -658,7 +658,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return value
 	}
 
-	fmt.Printf("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
+	InfoLog("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
 	return 0
 }
 
@@ -746,7 +746,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 		}
 	}
 
-	fmt.Printf("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
+	InfoLog("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
 
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
@@ -773,7 +773,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 	t.State["recipeResult"] = totalProcessed
 	t.State["recipePath"] = t.RecipePath
 	t.State["childCount"] = len(childWants)
-	fmt.Printf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+	InfoLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 
 	// Store result in a standardized format for memory dumps
 	t.State["result"] = fmt.Sprintf("processed: %d", totalProcessed)
