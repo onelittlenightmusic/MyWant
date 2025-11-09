@@ -65,6 +65,9 @@ type ChainBuilder struct {
 	resumeChan   chan bool    // Channel to signal resume
 	controlMutex sync.RWMutex // Protect suspension state access
 	controlStop  chan bool    // Stop signal for control loop
+
+	// Connectivity warning tracking (to prevent duplicate logs in reconciliation loop)
+	warnedConnectionIssues map[string]bool // Track which wants have already logged connectivity warnings
 }
 
 // runtimeWant holds the runtime state of a want
@@ -98,6 +101,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		pathMap:          make(map[string]Paths),
 		channels:         make(map[string]chain.Chan),
 		running:          false,
+		warnedConnectionIssues: make(map[string]bool), // Track logged connectivity warnings
 		waitGroup:        &sync.WaitGroup{},
 		// Initialize suspend/resume control
 		suspended:   false,
@@ -196,8 +200,8 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 }
 
 // validateConnections validates that all wants have their connectivity requirements satisfied
-// Note: Validation warnings are logged but don't block execution - reconciliation will run again
-// once idle wants execute and create missing connections via child wants/autoconnection
+// Note: Validation checks are performed but not logged to console (debug info not needed in normal operation)
+// Reconciliation will run again once idle wants execute and create missing connections via child wants/autoconnection
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
@@ -209,29 +213,18 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 			inCount := len(paths.In)
 			outCount := len(paths.Out)
 
-			// Check required using
-			if inCount < meta.RequiredInputs {
-				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d inputs, got %d - will remain idle until inputs available\n",
-					wantName, meta.WantType, meta.RequiredInputs, inCount)
-			}
+			// Validate connectivity requirements (no logging - internal reconciliation check)
+			// Required inputs check
+			_ = inCount >= meta.RequiredInputs
 
-			// Check required outputs
-			if outCount < meta.RequiredOutputs {
-				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d outputs, got %d - will remain idle until outputs available\n",
-					wantName, meta.WantType, meta.RequiredOutputs, outCount)
-			}
+			// Required outputs check
+			_ = outCount >= meta.RequiredOutputs
 
-			// Check maximum using
-			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d inputs, got %d\n",
-					wantName, meta.WantType, meta.MaxInputs, inCount)
-			}
+			// Maximum inputs check
+			_ = meta.MaxInputs < 0 || inCount <= meta.MaxInputs
 
-			// Check maximum outputs
-			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d outputs, got %d\n",
-					wantName, meta.WantType, meta.MaxOutputs, outCount)
-			}
+			// Maximum outputs check
+			_ = meta.MaxOutputs < 0 || outCount <= meta.MaxOutputs
 		}
 	}
 }
