@@ -278,6 +278,8 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 	// Compute and store recipe result
 	t.computeTemplateResult()
 
+	// Mark the target as completed
+	t.SetStatus(WantStatusCompleted)
 	InfoLog("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 	return true
 }
