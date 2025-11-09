@@ -615,7 +615,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	for _, want := range config.Wants {
 		DebugLog("   - %s (%s, ID: %s)", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 		// API-level logging for want creation
-		InfoLog("Want created: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+		InfoLog("[API:CREATE] Want created: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 	}
 
 	// Return created execution with first want ID as reference
@@ -987,7 +987,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// API-level logging for want deletion
-				InfoLog("Want deleted: %s (%s, ID: %s)\n", wantNameToDelete, wantTypeToDelete, wantID)
+				InfoLog("[API:DELETE] Want deleted: %s (%s, ID: %s)\n", wantNameToDelete, wantTypeToDelete, wantID)
 			} else {
 				DebugLog("Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
 			}
