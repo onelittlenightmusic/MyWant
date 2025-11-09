@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 	"mywant/engine/src/chain"
 	"os"
 	"path/filepath"
@@ -115,7 +114,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	}
 	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
 	if err != nil {
-		log.Printf("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
+		InfoLog("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
 	}
 
 	// Auto-register owner want types for target system support
@@ -212,25 +211,25 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 
 			// Check required using
 			if inCount < meta.RequiredInputs {
-				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d inputs, got %d - will remain idle until inputs available\n",
+				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d inputs, got %d - will remain idle until inputs available\n",
 					wantName, meta.WantType, meta.RequiredInputs, inCount)
 			}
 
 			// Check required outputs
 			if outCount < meta.RequiredOutputs {
-				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d outputs, got %d - will remain idle until outputs available\n",
+				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) requires %d outputs, got %d - will remain idle until outputs available\n",
 					wantName, meta.WantType, meta.RequiredOutputs, outCount)
 			}
 
 			// Check maximum using
 			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d inputs, got %d\n",
+				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d inputs, got %d\n",
 					wantName, meta.WantType, meta.MaxInputs, inCount)
 			}
 
 			// Check maximum outputs
 			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-				log.Printf("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d outputs, got %d\n",
+				InfoLog("[RECONCILE:CONNECT:WARN] Want %s (%s) allows max %d outputs, got %d\n",
 					wantName, meta.WantType, meta.MaxOutputs, outCount)
 			}
 		}
@@ -292,7 +291,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 		return nil, fmt.Errorf("custom type '%s' not found in registry", want.Metadata.Type)
 	}
 
-	log.Printf("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
+	InfoLog("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
 
 	// Merge custom type defaults with user-provided spec
 	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
@@ -422,33 +421,33 @@ func (cb *ChainBuilder) reconcileLoop() {
 	for {
 		select {
 		case <-cb.reconcileStop:
-			log.Println("[RECONCILE] Stopping reconcile loop")
+			InfoLog("[RECONCILE] Stopping reconcile loop")
 			return
 		case <-cb.reconcileTrigger:
 			DebugLog("[RECONCILE] Triggered reconciliation")
 			cb.reconcileWants()
 		case newWants := <-cb.addWantsChan:
-			log.Printf("[RECONCILE] Received %d wants to add asynchronously\n", len(newWants))
+			InfoLog("[RECONCILE] Received %d wants to add asynchronously\n", len(newWants))
 			// Add wants to config and runtime
 			cb.reconcileMutex.Lock()
 			for _, want := range newWants {
 				if _, exists := cb.wants[want.Metadata.Name]; !exists {
 					cb.config.Wants = append(cb.config.Wants, want)
 					cb.addWant(want)
-					log.Printf("[RECONCILE] Added want: %s\n", want.Metadata.Name)
+					InfoLog("[RECONCILE] Added want: %s\n", want.Metadata.Name)
 				}
 			}
 			cb.reconcileMutex.Unlock()
 			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
 		case wantIDs := <-cb.deleteWantsChan:
-			log.Printf("[RECONCILE] Received %d wants to delete asynchronously\n", len(wantIDs))
+			InfoLog("[RECONCILE] Received %d wants to delete asynchronously\n", len(wantIDs))
 			// Delete wants asynchronously (non-blocking)
 			for _, wantID := range wantIDs {
 				if err := cb.DeleteWantByID(wantID); err != nil {
-					log.Printf("[RECONCILE] Warning: Failed to delete want %s: %v\n", wantID, err)
+					InfoLog("[RECONCILE] Warning: Failed to delete want %s: %v\n", wantID, err)
 				} else {
-					log.Printf("[RECONCILE] Deleted want: %s\n", wantID)
+					InfoLog("[RECONCILE] Deleted want: %s\n", wantID)
 				}
 			}
 		case <-ticker.C:
@@ -459,7 +458,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 					cb.config = newConfig
 					DebugLog("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
 				} else {
-					log.Printf("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
+					InfoLog("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
 				}
 				cb.reconcileWants()
 			}
@@ -483,13 +482,13 @@ func (cb *ChainBuilder) reconcileWants() {
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
-		log.Printf("[RECONCILE] Compile phase failed: %v\n", err)
+		InfoLog("[RECONCILE] Compile phase failed: %v\n", err)
 		return
 	}
 
 	// Phase 2: CONNECT - Establish want topology
 	if err := cb.connectPhase(); err != nil {
-		log.Printf("[RECONCILE] Connect phase failed: %v\n", err)
+		InfoLog("[RECONCILE] Connect phase failed: %v\n", err)
 		return
 	}
 
@@ -522,9 +521,9 @@ func (cb *ChainBuilder) compilePhase() error {
 
 		// Dump memory after initial load
 		if len(newConfig.Wants) > 0 {
-			log.Println("[RECONCILE:MEMORY] Dumping memory after initial load...")
+			InfoLog("[RECONCILE:MEMORY] Dumping memory after initial load...")
 			if err := cb.dumpWantMemoryToYAML(); err != nil {
-				log.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
+				InfoLog("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
 			}
 		}
 	} else {
@@ -1092,15 +1091,15 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			log.Printf("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
+			InfoLog("[RECONCILE:COMPILE] Adding want: %s\n", change.WantName)
 			cb.addDynamicWantUnsafe(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
-			log.Printf("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
+			InfoLog("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
 			cb.UpdateWant(change.Want)
 			hasWantChanges = true
 		case ChangeEventDelete:
-			log.Printf("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
+			InfoLog("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
 			cb.deleteWant(change.WantName)
 			hasWantChanges = true
 		}
@@ -1108,9 +1107,9 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 
 	// Dump memory after want additions/deletions/updates
 	if hasWantChanges {
-		log.Println("[RECONCILE:MEMORY] Dumping memory after want changes...")
+		InfoLog("[RECONCILE:MEMORY] Dumping memory after want changes...")
 		if err := cb.dumpWantMemoryToYAML(); err != nil {
-			log.Printf("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
+			InfoLog("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
 		}
 	}
 
@@ -1217,12 +1216,12 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 
 // addWant adds a new want to the runtime (private method)
 func (cb *ChainBuilder) addWant(wantConfig *Want) {
-	log.Printf("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
+	InfoLog("[RECONCILE] Adding want: %s\n", wantConfig.Metadata.Name)
 
 	// Create the function/want
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
-		log.Printf("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
+		InfoLog("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
 
 		// Create a failed want instead of returning error
 		wantPtr := &Want{
@@ -1271,7 +1270,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Initialize parameterHistory with initial parameter values if empty or nil
 		if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
-			log.Printf("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
+			InfoLog("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
 
 			// Create a deep copy of the parameters to avoid reference issues
 			paramsCopy := make(map[string]interface{})
@@ -1352,12 +1351,12 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 
 // UpdateWant updates an existing want in place and restarts execution
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-	log.Printf("[RECONCILE] Updating want by ID: %s\n", wantConfig.Metadata.ID)
+	InfoLog("[RECONCILE] Updating want by ID: %s\n", wantConfig.Metadata.ID)
 
 	// Find the existing want by metadata.id using universal search
 	existingWant, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
-		log.Printf("[RECONCILE:ERROR] Want with ID %s not found for update, adding as new\n", wantConfig.Metadata.ID)
+		InfoLog("[RECONCILE:ERROR] Want with ID %s not found for update, adding as new\n", wantConfig.Metadata.ID)
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
@@ -1389,7 +1388,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 				}
 				changedParams[paramName] = newValue
 
-				log.Printf("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
+				InfoLog("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
 			}
 		}
 	}
@@ -1429,7 +1428,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	delete(existingWant.State, "total_processed")
 	delete(existingWant.State, "current_time")
 
-	log.Printf("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
+	InfoLog("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
 
 	// If this is a Target want with children, use Target's parameter update mechanism
 	// which automatically pushes updates to children
@@ -1441,7 +1440,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 				for paramName, paramValue := range changedParams {
 					target.UpdateParameter(paramName, paramValue)
 				}
-				log.Printf("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
+				InfoLog("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
 			}
 		}
 	}
@@ -1459,7 +1458,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 // deleteWant removes a want from runtime
 func (cb *ChainBuilder) deleteWant(wantName string) {
-	log.Printf("[RECONCILE] Deleting want: %s\n", wantName)
+	InfoLog("[RECONCILE] Deleting want: %s\n", wantName)
 
 	delete(cb.wants, wantName)
 }
@@ -1557,7 +1556,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					// and allows idle children to be started
 					DebugLog("[EXEC] Triggering reconciliation after want %s completion\n", wantName)
 					if err := cb.TriggerReconcile(); err != nil {
-						log.Printf("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
+						InfoLog("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
 
 					break
@@ -1631,12 +1630,12 @@ func (cb *ChainBuilder) Execute() {
 // serverMode=true: runs indefinitely for server mode
 // serverMode=false: waits for wants to complete (batch mode)
 func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
-	log.Printf("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
+	InfoLog("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
 
 	// Initialize memory file if configured
 	if cb.memoryPath != "" {
 		if err := cb.copyConfigToMemory(); err != nil {
-			log.Printf("Warning: Failed to copy config to memory: %v\n", err)
+			InfoLog("Warning: Failed to copy config to memory: %v\n", err)
 		} else {
 			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 		}
@@ -1658,7 +1657,7 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Server mode: run indefinitely, never stop reconcile loop
 	if serverMode {
-		log.Println("[RECONCILE] Server mode: reconcile loop running indefinitely")
+		InfoLog("[RECONCILE] Server mode: reconcile loop running indefinitely")
 		// Keep running forever - reconcile loop handles all want lifecycle
 		select {} // Block forever
 	}
@@ -1705,15 +1704,15 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.reconcileMutex.Unlock()
 
 	// Final memory dump - ensure it completes before returning
-	log.Println("[RECONCILE] Writing final memory dump...")
+	InfoLog("[RECONCILE] Writing final memory dump...")
 	err := cb.dumpWantMemoryToYAML()
 	if err != nil {
-		log.Printf("Warning: Failed to dump want memory to YAML: %v\n", err)
+		InfoLog("Warning: Failed to dump want memory to YAML: %v\n", err)
 	} else {
-		log.Println("[RECONCILE] Memory dump completed successfully")
+		InfoLog("[RECONCILE] Memory dump completed successfully")
 	}
 
-	log.Println("[RECONCILE] Execution completed")
+	InfoLog("[RECONCILE] Execution completed")
 }
 
 // GetAllWantStates returns the states of all wants
@@ -1833,7 +1832,7 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	// Check for duplicate name and skip if exists (don't error, just log)
 	if _, exists := cb.wants[want.Metadata.Name]; exists {
-		log.Printf("[RECONCILE] Want %s already exists, skipping\n", want.Metadata.Name)
+		InfoLog("[RECONCILE] Want %s already exists, skipping\n", want.Metadata.Name)
 		return nil
 	}
 
@@ -2017,7 +2016,7 @@ func validateConfigWithSpec(yamlData []byte) error {
 		}
 	}
 
-	fmt.Printf("[VALIDATION] Config validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Config validated successfully against OpenAPI spec\n")
 	return nil
 }
 
@@ -2179,9 +2178,9 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		}
 	}
 
-	log.Printf("📝 Want memory dumped to: %s\n", filename)
+	InfoLog("📝 Want memory dumped to: %s\n", filename)
 	if err == nil {
-		log.Printf("📝 Latest memory also saved to: %s\n", latestFilename)
+		InfoLog("📝 Latest memory also saved to: %s\n", latestFilename)
 	}
 	return nil
 }
@@ -2256,7 +2255,7 @@ func (cb *ChainBuilder) Stop() error {
 	// Trigger reconciliation to process the empty config
 	select {
 	case cb.reconcileTrigger <- true:
-		fmt.Printf("[STOP] Cleared %d wants, reconcile loop will clean up execution\n", wantCount)
+		InfoLog("[STOP] Cleared %d wants, reconcile loop will clean up execution\n", wantCount)
 	default:
 		fmt.Println("[STOP] Warning: Failed to trigger reconciliation")
 	}
@@ -2297,11 +2296,11 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 // DeleteWantByID removes a want from runtime by its ID
 // If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
-	fmt.Printf("[DELETE_BY_ID] Starting deletion for want ID: %s\n", wantID)
+	InfoLog("[DELETE_BY_ID] Starting deletion for want ID: %s\n", wantID)
 
 	// Phase 1: Find the want name by ID (with lock held briefly)
 	cb.reconcileMutex.Lock()
-	fmt.Printf("[DELETE_BY_ID] Current runtime has %d wants\n", len(cb.wants))
+	InfoLog("[DELETE_BY_ID] Current runtime has %d wants\n", len(cb.wants))
 
 	var wantName string
 	wantsCopy := make([]string, 0, len(cb.wants))
@@ -2316,10 +2315,10 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.RLock()
 	for _, name := range wantsCopy {
 		if runtimeWant, exists := cb.wants[name]; exists {
-			fmt.Printf("[DELETE_BY_ID] Checking want %s (ID: %s)\n", name, runtimeWant.want.Metadata.ID)
+			InfoLog("[DELETE_BY_ID] Checking want %s (ID: %s)\n", name, runtimeWant.want.Metadata.ID)
 			if runtimeWant.want.Metadata.ID == wantID {
 				wantName = name
-				fmt.Printf("[DELETE_BY_ID] Found target want: %s\n", wantName)
+				InfoLog("[DELETE_BY_ID] Found target want: %s\n", wantName)
 				break
 			}
 		}
@@ -2327,22 +2326,22 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.RUnlock()
 
 	if wantName == "" {
-		fmt.Printf("[DELETE_BY_ID] ERROR: Want with ID %s not found in runtime\n", wantID)
+		InfoLog("[DELETE_BY_ID] ERROR: Want with ID %s not found in runtime\n", wantID)
 		return fmt.Errorf("want with ID %s not found in runtime", wantID)
 	}
 
 	// Phase 2: Find all children first (cascade deletion) with read lock
 	var childrenToDelete []string
-	fmt.Printf("[DELETE_BY_ID] Searching for children of want ID: %s\n", wantID)
+	InfoLog("[DELETE_BY_ID] Searching for children of want ID: %s\n", wantID)
 
 	cb.reconcileMutex.RLock()
 	for name, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.OwnerReferences != nil {
 			for _, ownerRef := range runtimeWant.want.Metadata.OwnerReferences {
-				fmt.Printf("[DELETE_BY_ID] Checking want %s - ownerRef.ID: %s\n", name, ownerRef.ID)
+				InfoLog("[DELETE_BY_ID] Checking want %s - ownerRef.ID: %s\n", name, ownerRef.ID)
 				if ownerRef.ID == wantID {
 					childrenToDelete = append(childrenToDelete, name)
-					fmt.Printf("[DELETE_BY_ID] Found child to delete: %s\n", name)
+					InfoLog("[DELETE_BY_ID] Found child to delete: %s\n", name)
 					break
 				}
 			}
@@ -2350,14 +2349,14 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	}
 	cb.reconcileMutex.RUnlock()
 
-	fmt.Printf("[DELETE_BY_ID] Found %d children to delete\n", len(childrenToDelete))
+	InfoLog("[DELETE_BY_ID] Found %d children to delete\n", len(childrenToDelete))
 
 	// Phase 3: Delete children first (with write lock for each deletion)
 	for _, childName := range childrenToDelete {
 		cb.reconcileMutex.Lock()
 		cb.deleteWant(childName)
 		cb.reconcileMutex.Unlock()
-		fmt.Printf("[DELETE] Cascade: Removed child want %s\n", childName)
+		InfoLog("[DELETE] Cascade: Removed child want %s\n", childName)
 	}
 
 	// Phase 4: Delete the parent want (with write lock)
@@ -2365,7 +2364,7 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.deleteWant(wantName)
 	cb.reconcileMutex.Unlock()
 
-	fmt.Printf("[DELETE] Removed want %s (ID: %s) from runtime (with %d children)\n", wantName, wantID, len(childrenToDelete))
+	InfoLog("[DELETE] Removed want %s (ID: %s) from runtime (with %d children)\n", wantName, wantID, len(childrenToDelete))
 	return nil
 }
 
