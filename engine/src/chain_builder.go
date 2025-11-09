@@ -1025,7 +1025,7 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
 
-	log.Printf("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
+	DebugLog("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
 
 	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
@@ -1062,7 +1062,7 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	// Find deletions
 	for name := range oldWants {
 		if _, exists := newWants[name]; !exists {
-			log.Printf("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
+			DebugLog("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventDelete,
 				WantName: name,
@@ -1515,7 +1515,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 			}()
 
-			log.Printf("[EXEC] Starting want %s with %d using, %d outputs\n",
+			DebugLog("[EXEC] Starting want %s with %d using, %d outputs\n",
 				wantName, len(usingChans), len(outputChans))
 
 			for {
@@ -1539,7 +1539,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 
 				if finished {
-					log.Printf("[EXEC] Want %s finished\n", wantName)
+					DebugLog("[EXEC] Want %s finished\n", wantName)
 
 					// Update want status to completed
 					cb.reconcileMutex.RLock()
@@ -1552,7 +1552,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					// Trigger reconciliation after want completes
 					// This allows Target wants that created children to be properly connected
 					// and allows idle children to be started
-					log.Printf("[EXEC] Triggering reconciliation after want %s completion\n", wantName)
+					DebugLog("[EXEC] Triggering reconciliation after want %s completion\n", wantName)
 					if err := cb.TriggerReconcile(); err != nil {
 						log.Printf("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
