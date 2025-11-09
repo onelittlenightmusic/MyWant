@@ -614,6 +614,8 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	DebugLog("Added %d wants to global builder (execution %s), reconcile loop will process them", len(config.Wants), executionID)
 	for _, want := range config.Wants {
 		DebugLog("   - %s (%s, ID: %s)", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+		// API-level logging for want creation
+		InfoLog("Want created: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 	}
 
 	// Return created execution with first want ID as reference
@@ -912,6 +914,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		DebugLog("Checking execution %s\n", executionID)
 
 		var wantNameToDelete string
+		var wantTypeToDelete string
 		var foundInBuilder bool
 
 		// Search in builder states if available
@@ -921,6 +924,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			for wantName, want := range currentStates {
 				if want.Metadata.ID == wantID {
 					wantNameToDelete = wantName
+					wantTypeToDelete = want.Metadata.Type
 					foundInBuilder = true
 					DebugLog("Found want in builder: %s\n", wantName)
 					break
@@ -934,6 +938,9 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			if want.Metadata.ID == wantID {
 				if wantNameToDelete == "" {
 					wantNameToDelete = want.Metadata.Name
+				}
+				if wantTypeToDelete == "" {
+					wantTypeToDelete = want.Metadata.Type
 				}
 				configIndex = i
 				DebugLog("Found want in config at index %d\n", configIndex)
@@ -956,7 +963,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 			// If using global builder (server mode), delete from runtime asynchronously
 			if foundInBuilder && execution.Builder != nil {
-				InfoLog("Sending async deletion request for want ID: %s\n", wantID)
+				DebugLog("Sending async deletion request for want ID: %s\n", wantID)
 
 				// Delete the want asynchronously
 				_, err := execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
@@ -967,7 +974,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					maxAttempts := 100
 					for attempt := 0; attempt < maxAttempts; attempt++ {
 						if execution.Builder.AreWantsDeleted([]string{wantID}) {
-							InfoLog("Want %s deletion confirmed\n", wantID)
+							DebugLog("Want %s deletion confirmed\n", wantID)
 							break
 						}
 						time.Sleep(10 * time.Millisecond)
@@ -979,7 +986,8 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					execution.Builder.SetConfigInternal(execution.Config)
 				}
 
-				InfoLog("Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
+				// API-level logging for want deletion
+				InfoLog("Want deleted: %s (%s, ID: %s)\n", wantNameToDelete, wantTypeToDelete, wantID)
 			} else {
 				DebugLog("Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
 			}
