@@ -523,39 +523,6 @@ func (n *Want) copyCurrentState() map[string]interface{} {
 	return stateCopy
 }
 
-// addToStateHistory adds a state change to the want's history
-func (n *Want) addToStateHistory(key string, value interface{}, previousValue interface{}) {
-	if n.State == nil {
-		n.State = make(map[string]interface{})
-	}
-
-	// Create new history entry (individual field tracking)
-	stateMap := map[string]interface{}{
-		key: value,
-	}
-	entry := StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: stateMap,
-		Timestamp:  time.Now(),
-	}
-
-	// CRITICAL: Protect History.StateHistory access with stateMutex to prevent concurrent slice mutations
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-
-	// Add to state history in History field
-	if n.History.StateHistory == nil {
-		n.History.StateHistory = make([]StateHistoryEntry, 0)
-	}
-	n.History.StateHistory = append(n.History.StateHistory, entry)
-
-	// Limit history size (keep last 100 entries)
-	maxHistorySize := 100
-	if len(n.History.StateHistory) > maxHistorySize {
-		n.History.StateHistory = n.History.StateHistory[len(n.History.StateHistory)-maxHistorySize:]
-	}
-}
-
 // addToParameterHistory adds a parameter change to the want's parameter history (for non-exec-cycle changes)
 func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, previousValue interface{}) {
 	// Create a single-parameter entry in aggregated format (like stateHistory)
