@@ -1,0 +1,320 @@
+================================================================================
+EXEC() METHOD CALL FLOW - COMPLETE VISUAL GUIDE
+================================================================================
+
+QUESTION: Where is Exec() called and how are using channels populated?
+ANSWER: In startWant() goroutine, from combined local and global paths
+
+================================================================================
+PHASE 1: CONFIGURATION SPECIFICATION
+================================================================================
+
+Developer defines WantSpec with both connection types:
+
+    WantSpec for "level2_coordinator" {
+        Using: [
+            {role: "evidence-provider"}      ← Local selector
+            {role: "description-provider"}   ← Local selector
+        ]
+        UsingGlobal: [
+            {approval_id: "A123"}            ← Global selector
+        ]
+    }
+
+================================================================================
+PHASE 2: PATH GENERATION (generatePathsFromConnections)
+================================================================================
+
+Called during reconciliation. Processes same want once, generates ALL paths.
+
+LOCAL USING SELECTORS (Lines 172-230):
+┌─────────────────────────────────────────────────────────┐
+│ for _, usingSelector := range want.spec.Using {         │
+│   for _, w := range cb.wants {                          │
+│     if matchesSelector(labels, selector) {              │
+│       // Found matching want                            │
+│       inPath := PathInfo{                               │
+│         Name: "evidence-provider_to_level2_coordinator" │
+│       }                                                  │
+│       paths.In = append(paths.In, inPath)   // Add [0]   │
+│     }                                                    │
+│   }                                                      │
+│ }                                                        │
+└─────────────────────────────────────────────────────────┘
+                              ↓
+GLOBAL USING SELECTORS (Lines 232-283):
+┌─────────────────────────────────────────────────────────┐
+│ for _, globalSelector := range want.spec.UsingGlobal {  │
+│   matchedWants := ResolveWantsUsingGlobalIndex(...)     │
+│   // Found matching want in global index                │
+│   inPath := PathInfo{                                   │
+│     Name: "provider_global_to_level2_coordinator"       │
+│   }                                                      │
+│   paths.In = append(paths.In, inPath)   // Add [1] [2]  │
+│ }                                                        │
+└─────────────────────────────────────────────────────────┘
+                              ↓
+RESULT STORED:
+┌─────────────────────────────────────────────────────────┐
+│ pathMap["level2_coordinator"] = Paths{                  │
+│   In: [                                                 │
+│     {Name: "evidence-provider_to_l2c", Active: true}   │
+│     {Name: "description-provider_to_l2c", Active: true}│
+│     {Name: "provider_global_to_l2c", Active: true}     │
+│   ]                                                      │
+│   Out: [...]                                            │
+│ }                                                        │
+└─────────────────────────────────────────────────────────┘
+
+KEY POINT: All paths (local and global) in SAME In[] array
+
+
+================================================================================
+PHASE 3: CHANNEL CREATION (reconciliation)
+================================================================================
+
+For each path in pathMap:
+┌─────────────────────────────────────────────────────────┐
+│ cb.channels = make(map[string]chain.Chan)               │
+│                                                          │
+│ cb.channels["evidence-provider_to_l2c"] = make(chan...) │
+│ cb.channels["desc-provider_to_l2c"] = make(chan...)     │
+│ cb.channels["provider_global_to_l2c"] = make(chan...)   │
+└─────────────────────────────────────────────────────────┘
+
+CHANNELS STORED IN MAP:
+    Key                            Value
+    ├─ "evidence-provider_to_l2c"     → [chan interface{}]
+    ├─ "description-provider_to_l2c"  → [chan interface{}]
+    └─ "provider_global_to_l2c"       → [chan interface{}]
+
+
+================================================================================
+PHASE 4: WANT EXECUTION (startWant)
+================================================================================
+
+Called for each want:
+
+    startWant("level2_coordinator", coordinatorRuntime)
+
+Step 1: Get paths
+┌──────────────────────────────┐
+│ paths := cb.pathMap["l2c"]   │
+└──────────────────────────────┘
+                 ↓
+Step 2: Build using channels
+┌──────────────────────────────────────────────────────┐
+│ usingChans := []chain.Chan{}                         │
+│                                                       │
+│ for _, usingPath := range paths.In {  // All 3!     │
+│   if usingPath.Active {                              │
+│     ch := cb.channels[usingPath.Name]  // Lookup    │
+│     usingChans = append(usingChans, ch)              │
+│   }                                                   │
+│ }                                                     │
+│                                                       │
+│ Result: usingChans = [                               │
+│   cb.channels["evidence-provider_to_l2c"],           │
+│   cb.channels["description-provider_to_l2c"],        │
+│   cb.channels["provider_global_to_l2c"]              │
+│ ]                                                     │
+└──────────────────────────────────────────────────────┘
+                 ↓
+Step 3: Build output channels (same process)
+┌──────────────────────────────┐
+│ outputChans = [...]          │
+└──────────────────────────────┘
+                 ↓
+Step 4: Launch goroutine to execute
+┌──────────────────────────────────────────────────────┐
+│ go func() {                                          │
+│   for {                                              │
+│     runtimeWant.BeginExecCycle()                     │
+│                                                       │
+│     finished := chainWant.Exec(                      │
+│       usingChans,    // [0]=evidence, [1]=desc,      │
+│       outputChans    // [2]=global provider          │
+│     )                                                │
+│                                                       │
+│     runtimeWant.EndExecCycle()                       │
+│     if finished { break }                            │
+│   }                                                   │
+│ }()                                                  │
+└──────────────────────────────────────────────────────┘
+
+
+================================================================================
+PHASE 5: EXECUTION (Inside Exec() method)
+================================================================================
+
+Level2CoordinatorWant.Exec(using, outputs):
+
+    func (l *Level2CoordinatorWant) Exec(
+      using []chain.Chan,           // [0]=evidence, [1]=desc, [2]=global
+      outputs []chain.Chan
+    ) bool {
+      
+      // Process ALL input channels
+      for _, input := range using {  // Iterates indices 0, 1, 2
+        select {
+        case data := <-input:
+          if approvalData, ok := data.(*ApprovalData); ok {
+            if approvalData.Evidence != nil {
+              // Could be from [0] local or [2] global
+              // No way to tell - doesn't matter!
+              l.StoreState("evidence_received", true)
+            }
+            if approvalData.Description != "" {
+              // Could be from [1] local
+              l.StoreState("description_received", true)
+            }
+          }
+        default:
+        }
+      }
+      
+      // When both received from any combination:
+      if evidenceReceived && descriptionReceived {
+        l.StoreState("final_approval_processed", true)
+        return true
+      }
+      
+      return false
+    }
+
+
+DATA FLOW TIMELINE:
+┌──────────────┐
+│ Time T₁      │
+├──────────────┤
+│ Evidence     │ sends on using[0]
+│ Provider     │ writes to cb.channels[...]
+└──────────────┘
+                 ↓ (buffered channel)
+┌──────────────┐
+│ Time T₂      │
+├──────────────┤
+│ Description  │ sends on using[1]
+│ Provider     │ writes to cb.channels[...]
+└──────────────┘
+                 ↓ (buffered channel)
+┌──────────────┐
+│ Time T₃      │
+├──────────────┤
+│ Level2Coord  │ reads from using[0], [1], [2]
+│ Exec()       │ detects both received
+│              │ stores state
+│              │ returns true
+└──────────────┘
+                 ↓
+                Finished, loop breaks
+
+
+================================================================================
+PHASE 6: STATE BATCHING
+================================================================================
+
+Execution cycle wraps Exec() with state management:
+
+┌────────────────────────────────────────────────────────────────┐
+│ BEFORE EXEC: BeginExecCycle()                                  │
+├────────────────────────────────────────────────────────────────┤
+│ n.stateMutex.Lock()                                            │
+│ n.inExecCycle = true                                           │
+│ n.pendingStateChanges = {}                                     │
+│ n.stateMutex.Unlock()                                          │
+└────────────────────────────────────────────────────────────────┘
+                              ↓
+┌────────────────────────────────────────────────────────────────┐
+│ DURING EXEC: StoreState() batches changes                      │
+├────────────────────────────────────────────────────────────────┤
+│ If inExecCycle {                                               │
+│   pendingStateChanges["evidence_received"] = true              │
+│   pendingStateChanges["description_received"] = true           │
+│   // NO LOCK - fast path, only accessed during this cycle     │
+│ }                                                              │
+└────────────────────────────────────────────────────────────────┘
+                              ↓
+┌────────────────────────────────────────────────────────────────┐
+│ AFTER EXEC: EndExecCycle()                                     │
+├────────────────────────────────────────────────────────────────┤
+│ n.stateMutex.Lock()                                            │
+│ for key, value := range n.pendingStateChanges {                │
+│   n.State[key] = value    // Apply changes                     │
+│ }                                                              │
+│ n.addAggregatedStateHistory()  // Create history entries       │
+│ n.pendingStateChanges = {}                                     │
+│ n.inExecCycle = false                                          │
+│ n.stateMutex.Unlock()                                          │
+└────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+KEY INSIGHT: UNIFIED CHANNEL HANDLING
+================================================================================
+
+                    Want Specification
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+            Using[]              UsingGlobal[]
+            (local)              (cross-recipe)
+                │                       │
+                └───────────┬───────────┘
+                            │
+            generatePathsFromConnections()
+                            │
+            ┌───────────────┴───────────────┐
+            │ Create PathInfo for each      │
+            │ - Local: "X_to_Y"            │
+            │ - Global: "X_global_to_Y"    │
+            │ Both added to paths.In[]      │
+            └───────────────┬───────────────┘
+                            │
+            Channel lookup and creation
+            cb.channels[path.Name] = make(chan)
+                            │
+            ┌───────────────┴───────────────┐
+            │ startWant() builds usingChans │
+            │ by iterating paths.In[]       │
+            │ All channels in same array    │
+            └───────────────┬───────────────┘
+                            │
+            Exec(usingChans, outputChans)
+                            │
+            ┌───────────────┴───────────────────────┐
+            │ Processes ALL channels identically    │
+            │ No distinction between source types   │
+            │ Single loop over usingChans array     │
+            └───────────────────────────────────────┘
+
+
+================================================================================
+ANSWER TO ORIGINAL QUESTIONS
+================================================================================
+
+Q1: Where is Exec() called?
+A:  chain_builder.go:1630 in startWant() function
+    Inside a loop in a goroutine for repeated execution
+
+Q2: How is using populated - local using or also usingGlobal?
+A:  BOTH - combined in paths.In[] array in generatePathsFromConnections()
+    Local using selectors processed first (lines 172-230)
+    Global using selectors processed second (lines 232-283)
+    Both added to SAME paths.In array
+
+Q3: How are paths converted to channels?
+A:  Three steps:
+    1. generatePathsFromConnections() creates PathInfo objects
+       - Local: name = "{provider}_to_{consumer}"
+       - Global: name = "{provider}_global_to_{consumer}"
+    2. Channels created in cb.channels map indexed by path name
+    3. startWant() looks up channels from map and appends to usingChans
+
+Q4: Does Level 2 coordinator receive usingGlobal input channels?
+A:  YES - through the same using parameter
+    No special handling or distinction
+    All channels processed in identical loop
+    Can't tell if data came from local or global source
+
+================================================================================
