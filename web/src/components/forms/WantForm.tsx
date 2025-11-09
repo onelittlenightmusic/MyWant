@@ -151,27 +151,31 @@ const SAMPLE_CONFIGS = [
     name: 'Dynamic Travel Change',
     description: 'Dynamic travel itinerary with flight booking and schedule changes',
     config: {
-      metadata: {
-        name: 'dynamic-travel-planner',
-        type: 'dynamic travel change',
-        labels: {
-          role: 'dynamic-travel-planner'
+      wants: [
+        {
+          metadata: {
+            name: 'dynamic-travel-planner',
+            type: 'dynamic travel change',
+            labels: {
+              role: 'dynamic-travel-planner'
+            }
+          },
+          spec: {
+            recipe: 'recipes/dynamic-travel-change.yaml',
+            params: {
+              prefix: 'dynamic-travel',
+              display_name: 'Dynamic Travel Itinerary with Flight',
+              flight_type: 'business class',
+              departure_date: '2026-12-20',
+              flight_duration: 12.0,
+              restaurant_type: 'fine dining',
+              hotel_type: 'luxury',
+              buffet_type: 'international',
+              dinner_duration: 2.0
+            }
+          }
         }
-      },
-      spec: {
-        recipe: 'recipes/dynamic-travel-change.yaml',
-        params: {
-          prefix: 'dynamic-travel',
-          display_name: 'Dynamic Travel Itinerary with Flight',
-          flight_type: 'business class',
-          departure_date: '2026-12-20',
-          flight_duration: 12.0,
-          restaurant_type: 'fine dining',
-          hotel_type: 'luxury',
-          buffet_type: 'international',
-          dinner_duration: 2.0
-        }
-      }
+      ]
     }
   }
 ];
