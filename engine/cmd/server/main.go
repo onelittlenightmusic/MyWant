@@ -953,14 +953,24 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[API] Want not in config (likely a dynamically created child want)\n")
 			}
 
-			// If using global builder (server mode), delete from runtime
+			// If using global builder (server mode), delete from runtime asynchronously
 			if foundInBuilder && execution.Builder != nil {
-				log.Printf("[API_DELETE] Calling DeleteWantByID(%s)\n", wantID)
-				// Delete the want directly from runtime by ID
-				if err := execution.Builder.DeleteWantByID(wantID); err != nil {
-					log.Printf("[API] Warning: Failed to delete want from runtime: %v\n", err)
+				log.Printf("[API_DELETE] Sending async deletion request for want ID: %s\n", wantID)
+
+				// Delete the want asynchronously
+				_, err := execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
+				if err != nil {
+					log.Printf("[API] Warning: Failed to send deletion request: %v\n", err)
 				} else {
-					log.Printf("[API_DELETE] DeleteWantByID succeeded\n")
+					// Wait for want to be deleted (poll with timeout)
+					maxAttempts := 100
+					for attempt := 0; attempt < maxAttempts; attempt++ {
+						if execution.Builder.AreWantsDeleted([]string{wantID}) {
+							log.Printf("[API_DELETE] Want %s deletion confirmed\n", wantID)
+							break
+						}
+						time.Sleep(10 * time.Millisecond)
+					}
 				}
 
 				// Also update config if it was removed
@@ -970,7 +980,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 				log.Printf("[API] Want %s (%s) removed from runtime\n", wantNameToDelete, wantID)
 			} else {
-				log.Printf("[API_DELETE] Skipping DeleteWantByID (foundInBuilder=%v)\n", foundInBuilder)
+				log.Printf("[API_DELETE] Skipping deletion (foundInBuilder=%v)\n", foundInBuilder)
 			}
 
 			// If no wants left, remove the entire execution
@@ -989,13 +999,24 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			log.Printf("[API_DELETE] Found want in global builder: %s\n", want.Metadata.Name)
 
-			// Delete the want from the global builder
-			if err := s.globalBuilder.DeleteWantByID(wantID); err != nil {
-				log.Printf("[API] Warning: Failed to delete want from global builder: %v\n", err)
+			// Delete the want from the global builder asynchronously
+			_, err := s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
+			if err != nil {
+				log.Printf("[API] Warning: Failed to send deletion request: %v\n", err)
 				errorMsg := fmt.Sprintf("Failed to delete want: %v", err)
 				s.logError(r, http.StatusInternalServerError, errorMsg, "deletion", err.Error(), wantID)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
+			}
+
+			// Wait for want to be deleted (poll with timeout)
+			maxAttempts := 100
+			for attempt := 0; attempt < maxAttempts; attempt++ {
+				if s.globalBuilder.AreWantsDeleted([]string{wantID}) {
+					log.Printf("[API_DELETE] Want %s deletion confirmed from global builder\n", wantID)
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
 			}
 
 			log.Printf("[API_DELETE] Successfully deleted want from global builder\n")

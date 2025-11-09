@@ -48,6 +48,7 @@ type ChainBuilder struct {
 	reconcileStop    chan bool           // Stop signal for reconcile loop
 	reconcileTrigger chan bool           // Buffered channel for reconciliation trigger signals
 	addWantsChan     chan []*Want        // Buffered channel for asynchronous want addition requests
+	deleteWantsChan  chan []string       // Buffered channel for asynchronous want deletion requests (want IDs)
 	reconcileMutex   sync.RWMutex        // Protect concurrent access
 	inReconciliation bool                // Flag to prevent recursive reconciliation
 	running          bool                // Execution state
@@ -94,6 +95,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		reconcileStop:    make(chan bool),
 		reconcileTrigger: make(chan bool, 10), // Buffered to avoid blocking on concurrent triggers
 		addWantsChan:     make(chan []*Want, 10), // Buffered to allow concurrent submissions
+		deleteWantsChan:  make(chan []string, 10), // Buffered to allow concurrent deletion requests
 		pathMap:          make(map[string]Paths),
 		channels:         make(map[string]chain.Chan),
 		running:          false,
@@ -439,6 +441,16 @@ func (cb *ChainBuilder) reconcileLoop() {
 			cb.reconcileMutex.Unlock()
 			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
+		case wantIDs := <-cb.deleteWantsChan:
+			log.Printf("[RECONCILE] Received %d wants to delete asynchronously\n", len(wantIDs))
+			// Delete wants asynchronously (non-blocking)
+			for _, wantID := range wantIDs {
+				if err := cb.DeleteWantByID(wantID); err != nil {
+					log.Printf("[RECONCILE] Warning: Failed to delete want %s: %v\n", wantID, err)
+				} else {
+					log.Printf("[RECONCILE] Deleted want: %s\n", wantID)
+				}
+			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
 				log.Println("[RECONCILE] Detected config change")
@@ -1768,6 +1780,51 @@ func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
 
 	return true
 }
+
+// DeleteWantsAsync sends want IDs to be deleted asynchronously through the reconcile loop
+// This is the preferred method for deleting wants to avoid race conditions
+func (cb *ChainBuilder) DeleteWantsAsync(wantIDs []string) error {
+	select {
+	case cb.deleteWantsChan <- wantIDs:
+		return nil
+	default:
+		return fmt.Errorf("failed to send wants to delete through reconcile loop (channel full)")
+	}
+}
+
+// DeleteWantsAsyncWithTracking sends want IDs to be deleted asynchronously and returns them for tracking
+// The caller can use the returned IDs to poll with AreWantsDeleted() to confirm deletion
+func (cb *ChainBuilder) DeleteWantsAsyncWithTracking(wantIDs []string) ([]string, error) {
+	if err := cb.DeleteWantsAsync(wantIDs); err != nil {
+		return nil, err
+	}
+	return wantIDs, nil
+}
+
+// AreWantsDeleted checks if all wants with the given IDs have been removed from the runtime
+// Returns true only if ALL wants are no longer present in the runtime
+func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
+	if len(wantIDs) == 0 {
+		return true
+	}
+
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
+	// Check if all wants are deleted (not in runtime)
+	for _, id := range wantIDs {
+		for _, rw := range cb.wants {
+			if rw.want.Metadata.ID == id {
+				// Found the want, so it's not deleted yet
+				return false
+			}
+		}
+	}
+
+	// All wants are gone
+	return true
+}
+
 // addDynamicWantUnsafe adds a want without acquiring the mutex (internal use only)
 // Must be called while holding reconcileMutex or within addWantsChan handler
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
