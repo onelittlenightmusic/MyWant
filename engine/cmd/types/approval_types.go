@@ -121,7 +121,7 @@ func (e *EvidenceWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	e.StoreState("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
 	e.StoreState("total_processed", 1)
 
-	fmt.Printf("[EVIDENCE] Provided %s evidence for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, len(outputs))
+	InfoLog("[EVIDENCE] ✅ Evidence %s provided for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, len(outputs))
 
 	// Broadcast evidence to all output channels using SendPacketMulti
 	e.SendPacketMulti(evidenceData, outputs)
@@ -226,7 +226,7 @@ func (d *DescriptionWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	d.StoreState("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
 	d.StoreState("total_processed", 1)
 
-	fmt.Printf("[DESCRIPTION] Provided description: %s to %d coordinator(s)\n", description, len(outputs))
+	InfoLog("[DESCRIPTION] 📝 Description provided: %s to %d coordinator(s)\n", description, len(outputs))
 
 	// Broadcast description to all output channels using SendPacketMulti
 	d.SendPacketMulti(descriptionData, outputs)
@@ -376,7 +376,7 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
 		}
 
-		fmt.Printf("[LEVEL1] Approval %s: %s by %s at %s\n",
+		InfoLog("[LEVEL1] ✅ Approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
@@ -538,7 +538,7 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
 		}
 
-		fmt.Printf("[LEVEL2] Final approval %s: %s by %s at %s\n",
+		InfoLog("[LEVEL2] ✅ Final approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,
 			result.ApprovalTime.Format("15:04:05"))
 
