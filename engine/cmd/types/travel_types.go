@@ -85,16 +85,6 @@ func (r *RestaurantWant) InitializePaths(inCount, outCount int) {
 	r.paths.Out = make([]PathInfo, outCount)
 }
 
-func (r *RestaurantWant) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return r.State
-}
-
-func (r *RestaurantWant) Process(paths Paths) bool {
-	r.paths = paths
-	return false
-}
-
 func (r *RestaurantWant) GetType() string {
 	return "restaurant"
 }
@@ -431,16 +421,6 @@ func (h *HotelWant) InitializePaths(inCount, outCount int) {
 	h.paths.Out = make([]PathInfo, outCount)
 }
 
-func (h *HotelWant) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return h.State
-}
-
-func (h *HotelWant) Process(paths Paths) bool {
-	h.paths = paths
-	return false
-}
-
 func (h *HotelWant) GetType() string {
 	return "hotel"
 }
@@ -672,16 +652,6 @@ func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
 func (b *BuffetWant) InitializePaths(inCount, outCount int) {
 	b.paths.In = make([]PathInfo, inCount)
 	b.paths.Out = make([]PathInfo, outCount)
-}
-
-func (b *BuffetWant) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return b.State
-}
-
-func (b *BuffetWant) Process(paths Paths) bool {
-	b.paths = paths
-	return false
 }
 
 func (b *BuffetWant) GetType() string {
@@ -989,16 +959,6 @@ func (t *TravelCoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 func (t *TravelCoordinatorWant) InitializePaths(inCount, outCount int) {
 	t.paths.In = make([]PathInfo, inCount)
 	t.paths.Out = make([]PathInfo, outCount)
-}
-
-func (t *TravelCoordinatorWant) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return t.State
-}
-
-func (t *TravelCoordinatorWant) Process(paths Paths) bool {
-	t.paths = paths
-	return false
 }
 
 func (t *TravelCoordinatorWant) GetType() string {

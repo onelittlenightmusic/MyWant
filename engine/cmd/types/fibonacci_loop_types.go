@@ -61,16 +61,6 @@ func (g *SeedNumbers) GetConnectivityMetadata() ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this seed numbers generator
-func (g *SeedNumbers) GetStats() map[string]interface{} {
-	return g.State
-}
-
-// Process processes using enhanced paths
-func (g *SeedNumbers) Process(paths Paths) bool {
-	g.paths = paths
-	return false
-}
 
 // GetType returns the want type
 func (g *SeedNumbers) GetType() string {
@@ -161,16 +151,6 @@ func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this computer
-func (c *FibonacciComputer) GetStats() map[string]interface{} {
-	return c.State
-}
-
-// Process processes using enhanced paths
-func (c *FibonacciComputer) Process(paths Paths) bool {
-	c.paths = paths
-	return false
-}
 
 // GetType returns the want type
 func (c *FibonacciComputer) GetType() string {
@@ -293,16 +273,6 @@ func (m *FibonacciMerger) GetConnectivityMetadata() ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this merger
-func (m *FibonacciMerger) GetStats() map[string]interface{} {
-	return m.State
-}
-
-// Process processes using enhanced paths
-func (m *FibonacciMerger) Process(paths Paths) bool {
-	m.paths = paths
-	return false
-}
 
 // GetType returns the want type
 func (m *FibonacciMerger) GetType() string {

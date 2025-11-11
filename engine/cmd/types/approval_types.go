@@ -75,15 +75,6 @@ func (e *EvidenceWant) InitializePaths(inCount, outCount int) {
 	e.paths.Out = make([]PathInfo, outCount)
 }
 
-func (e *EvidenceWant) GetStats() map[string]interface{} {
-	return e.State
-}
-
-func (e *EvidenceWant) Process(paths Paths) bool {
-	e.paths = paths
-	return false
-}
-
 func (e *EvidenceWant) GetType() string {
 	return "evidence"
 }
@@ -176,15 +167,6 @@ func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
 func (d *DescriptionWant) InitializePaths(inCount, outCount int) {
 	d.paths.In = make([]PathInfo, inCount)
 	d.paths.Out = make([]PathInfo, outCount)
-}
-
-func (d *DescriptionWant) GetStats() map[string]interface{} {
-	return d.State
-}
-
-func (d *DescriptionWant) Process(paths Paths) bool {
-	d.paths = paths
-	return false
 }
 
 func (d *DescriptionWant) GetType() string {
@@ -281,15 +263,6 @@ func (l *Level1CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 func (l *Level1CoordinatorWant) InitializePaths(inCount, outCount int) {
 	l.paths.In = make([]PathInfo, inCount)
 	l.paths.Out = make([]PathInfo, outCount)
-}
-
-func (l *Level1CoordinatorWant) GetStats() map[string]interface{} {
-	return l.State
-}
-
-func (l *Level1CoordinatorWant) Process(paths Paths) bool {
-	l.paths = paths
-	return false
 }
 
 func (l *Level1CoordinatorWant) GetType() string {
@@ -442,15 +415,6 @@ func (l *Level2CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
 func (l *Level2CoordinatorWant) InitializePaths(inCount, outCount int) {
 	l.paths.In = make([]PathInfo, inCount)
 	l.paths.Out = make([]PathInfo, outCount)
-}
-
-func (l *Level2CoordinatorWant) GetStats() map[string]interface{} {
-	return l.State
-}
-
-func (l *Level2CoordinatorWant) Process(paths Paths) bool {
-	l.paths = paths
-	return false
 }
 
 func (l *Level2CoordinatorWant) GetType() string {

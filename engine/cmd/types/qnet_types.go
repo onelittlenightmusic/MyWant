@@ -117,17 +117,6 @@ func (g *Numbers) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this numbers generator
-func (g *Numbers) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return g.State
-}
-
-// Process processes using enhanced paths (for enhanced node compatibility)
-func (g *Numbers) Process(paths mywant.Paths) bool {
-	g.paths = paths
-	return false // Not used in current implementation
-}
 
 // GetType returns the want type
 func (g *Numbers) GetType() string {
@@ -281,17 +270,6 @@ func (q *Queue) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this queue
-func (q *Queue) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return q.State
-}
-
-// Process processes using enhanced paths
-func (q *Queue) Process(paths mywant.Paths) bool {
-	q.paths = paths
-	return false // Not used in current implementation
-}
 
 // GetType returns the want type
 func (q *Queue) GetType() string {
@@ -451,17 +429,6 @@ func (c *Combiner) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this combiner
-func (c *Combiner) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return c.State
-}
-
-// Process processes using enhanced paths
-func (c *Combiner) Process(paths mywant.Paths) bool {
-	c.paths = paths
-	return false // Not used in current implementation
-}
 
 // GetType returns the want type
 func (c *Combiner) GetType() string {
@@ -572,17 +539,6 @@ func (s *Sink) GetConnectivityMetadata() mywant.ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this sink
-func (s *Sink) GetStats() map[string]interface{} {
-	// Stats are now dynamic, just return the map directly
-	return s.State
-}
-
-// Process processes using enhanced paths
-func (s *Sink) Process(paths mywant.Paths) bool {
-	s.paths = paths
-	return false // Not used in current implementation
-}
 
 // GetType returns the want type
 func (s *Sink) GetType() string {

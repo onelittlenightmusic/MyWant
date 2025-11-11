@@ -75,15 +75,6 @@ func (f *FlightWant) InitializePaths(inCount, outCount int) {
 	f.paths.Out = make([]PathInfo, outCount)
 }
 
-func (f *FlightWant) GetStats() map[string]interface{} {
-	return f.State
-}
-
-func (f *FlightWant) Process(paths Paths) bool {
-	f.paths = paths
-	return false
-}
-
 func (f *FlightWant) GetType() string {
 	return "flight"
 }

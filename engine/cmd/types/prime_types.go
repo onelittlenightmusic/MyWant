@@ -224,16 +224,6 @@ func (f *PrimeSequence) GetConnectivityMetadata() ConnectivityMetadata {
 	}
 }
 
-// GetStats returns the stats for this sequence
-func (f *PrimeSequence) GetStats() map[string]interface{} {
-	return f.State
-}
-
-// Process processes using enhanced paths
-func (f *PrimeSequence) Process(paths Paths) bool {
-	f.paths = paths
-	return false
-}
 
 // GetType returns the want type
 func (f *PrimeSequence) GetType() string {

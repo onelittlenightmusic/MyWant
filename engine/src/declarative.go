@@ -204,8 +204,6 @@ type ConnectivityMetadata struct {
 type EnhancedBaseWant interface {
 	InitializePaths(inCount, outCount int)
 	GetConnectivityMetadata() ConnectivityMetadata
-	GetStats() map[string]interface{}
-	Process(paths Paths) bool
 	GetType() string
 }
 
