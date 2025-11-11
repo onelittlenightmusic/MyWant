@@ -161,6 +161,7 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
     if (type === 'hotel') return '/resources/hotel.png';
     if (type === 'restaurant') return '/resources/restaurant.png';
     if (type === 'buffet') return '/resources/buffet.png';
+    if (type === 'evidence') return '/resources/evidence.png';
     if (type?.endsWith('coordinator')) return '/resources/agent.png';
     return undefined;
   };
