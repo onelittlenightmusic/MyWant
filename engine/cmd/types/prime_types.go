@@ -122,7 +122,22 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 		}
 	}
 
+	// Set fields for base Want methods
+	filter.WantType = "prime_sequence"
+	filter.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0,
+		MaxInputs:       1,
+		MaxOutputs:      -1,
+		WantType:        "prime_sequence",
+		Description:     "Prime number sequence",
+	}
+
 	return filter
+}
+
+func (f *PrimeSequence) GetWant() *Want {
+	return &f.Want
 }
 
 // Exec returns the generalized chain function for the filter
@@ -206,35 +221,6 @@ func (f *PrimeSequence) Exec(using []Chan, outputs []Chan) bool {
 	return true
 }
 
-// InitializePaths initializes the paths for this sequence
-func (f *PrimeSequence) InitializePaths(inCount int, outCount int) {
-	f.paths.In = make([]PathInfo, inCount)
-	f.paths.Out = make([]PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for prime sequence
-func (f *PrimeSequence) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 0, // Optional output
-		MaxInputs:       1,
-		MaxOutputs:      -1,
-		WantType:        "prime_sequence",
-		Description:     "Prime number sequence",
-	}
-}
-
-
-// GetType returns the want type
-func (f *PrimeSequence) GetType() string {
-	return "prime_sequence"
-}
-
-// GetWant returns the underlying Want
-func (f *PrimeSequence) GetWant() *Want {
-	return &f.Want
-}
-
 // PrimeSink collects and displays results
 type PrimeSink struct {
 	Want
@@ -244,7 +230,7 @@ type PrimeSink struct {
 
 // NewPrimeSink creates a new prime sink want
 func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
-	return &PrimeSink{
+	sink := &PrimeSink{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     spec,
@@ -254,6 +240,23 @@ func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
 		},
 		Received: 0,
 	}
+
+	// Set fields for base Want methods
+	sink.WantType = "prime_sink"
+	sink.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0,
+		MaxInputs:       -1,
+		MaxOutputs:      0,
+		WantType:        "prime_sink",
+		Description:     "Prime sink/collector",
+	}
+
+	return sink
+}
+
+func (s *PrimeSink) GetWant() *Want {
+	return &s.Want
 }
 
 // Exec returns the generalized chain function for the sink
@@ -286,11 +289,6 @@ func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
 	s.State["total_processed"] = received
 
 	return true
-}
-
-// GetWant returns the underlying Want
-func (s *PrimeSink) GetWant() *Want {
-	return &s.Want
 }
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder

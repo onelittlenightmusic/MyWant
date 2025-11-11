@@ -98,6 +98,11 @@ type Want struct {
 
 	// Stop channel for graceful shutdown of want's goroutines
 	stopChannel chan struct{} `json:"-" yaml:"-"`
+
+	// Fields for eliminating duplicate methods in want types
+	WantType             string               `json:"-" yaml:"-"`
+	paths                Paths                `json:"-" yaml:"-"`
+	ConnectivityMetadata ConnectivityMetadata `json:"-" yaml:"-"`
 }
 
 // SetStatus updates the want's status and emits StatusChange event
@@ -773,4 +778,23 @@ func (n *Want) SendPacketMulti(packet interface{}, outputs []Chan) error {
 		out <- packet
 	}
 	return nil
+}
+
+// InitializePaths initializes the paths for this want
+// This method eliminates the need for duplicate implementations in all want types
+func (n *Want) InitializePaths(inCount, outCount int) {
+	n.paths.In = make([]PathInfo, inCount)
+	n.paths.Out = make([]PathInfo, outCount)
+}
+
+// GetType returns the want type
+// This method eliminates the need for duplicate implementations in all want types
+func (n *Want) GetType() string {
+	return n.WantType
+}
+
+// GetConnectivityMetadata returns the connectivity metadata
+// This method eliminates the need for duplicate implementations in all want types
+func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
+	return n.ConnectivityMetadata
 }

@@ -40,18 +40,9 @@ func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbe
 		}
 	}
 
-	return gen
-}
-
-// InitializePaths initializes the paths for this seed numbers generator
-func (g *SeedNumbers) InitializePaths(inCount, outCount int) {
-	g.paths.In = make([]PathInfo, inCount)
-	g.paths.Out = make([]PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for seed numbers generator
-func (g *SeedNumbers) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	gen.WantType = "seed_numbers"
+	gen.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       0,
@@ -59,12 +50,8 @@ func (g *SeedNumbers) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "seed_numbers",
 		Description:     "Fibonacci seed generator",
 	}
-}
 
-
-// GetType returns the want type
-func (g *SeedNumbers) GetType() string {
-	return "seed_numbers"
+	return gen
 }
 
 // GetWant returns the embedded Want
@@ -122,7 +109,7 @@ type FibonacciComputer struct {
 
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *FibonacciComputer {
-	return &FibonacciComputer{
+	computer := &FibonacciComputer{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -131,17 +118,10 @@ func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *Fib
 			State:  make(map[string]interface{}),
 		},
 	}
-}
 
-// InitializePaths initializes the paths for this computer
-func (c *FibonacciComputer) InitializePaths(inCount, outCount int) {
-	c.paths.In = make([]PathInfo, inCount)
-	c.paths.Out = make([]PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for fibonacci computer
-func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	computer.WantType = "fibonacci_computer"
+	computer.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -149,12 +129,8 @@ func (c *FibonacciComputer) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "fibonacci_computer",
 		Description:     "Fibonacci number computer",
 	}
-}
 
-
-// GetType returns the want type
-func (c *FibonacciComputer) GetType() string {
-	return "fibonacci_computer"
+	return computer
 }
 
 // GetWant returns the embedded Want
@@ -244,7 +220,7 @@ type FibonacciMerger struct {
 
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *FibonacciMerger {
-	return &FibonacciMerger{
+	merger := &FibonacciMerger{
 		Want: Want{
 			Metadata: metadata,
 			Spec:     WantSpec{Params: params},
@@ -253,30 +229,19 @@ func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *Fibon
 			State:  make(map[string]interface{}),
 		},
 	}
-}
 
-// InitializePaths initializes the paths for this merger
-func (m *FibonacciMerger) InitializePaths(inCount, outCount int) {
-	m.paths.In = make([]PathInfo, inCount)
-	m.paths.Out = make([]PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for fibonacci merger
-func (m *FibonacciMerger) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	merger.WantType = "fibonacci_merger"
+	merger.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  2,
-		RequiredOutputs: 1, // Only to computer
+		RequiredOutputs: 1,
 		MaxInputs:       2,
-		MaxOutputs:      -1,
+		MaxOutputs:      1,
 		WantType:        "fibonacci_merger",
-		Description:     "Fibonacci sequence merger",
+		Description:     "Fibonacci merger",
 	}
-}
 
-
-// GetType returns the want type
-func (m *FibonacciMerger) GetType() string {
-	return "fibonacci_merger"
+	return merger
 }
 
 // GetWant returns the embedded Want

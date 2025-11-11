@@ -116,7 +116,22 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 		}
 	}
 
+	// Set fields for base Want methods
+	filter.WantType = "fibonacci_sequence"
+	filter.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0,
+		MaxInputs:       1,
+		MaxOutputs:      0,
+		WantType:        "fibonacci_sequence",
+		Description:     "Fibonacci number sequence filter (terminal)",
+	}
+
 	return filter
+}
+
+func (f *FibonacciSequence) GetWant() *Want {
+	return &f.Want
 }
 
 // Exec returns the generalized chain function for the filter
@@ -197,35 +212,6 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 	}
 
 	return true
-}
-
-// InitializePaths initializes the paths for this sequence
-func (f *FibonacciSequence) InitializePaths(inCount, outCount int) {
-	f.paths.In = make([]PathInfo, inCount)
-	f.paths.Out = make([]PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for fibonacci sequence
-func (f *FibonacciSequence) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 0, // No outputs - this is a terminal want
-		MaxInputs:       1,
-		MaxOutputs:      0, // Terminal want - no outputs allowed
-		WantType:        "fibonacci_sequence",
-		Description:     "Fibonacci number sequence filter (terminal)",
-	}
-}
-
-
-// GetType returns the want type
-func (f *FibonacciSequence) GetType() string {
-	return "fibonacci_sequence"
-}
-
-// GetWant returns the underlying Want
-func (f *FibonacciSequence) GetWant() *Want {
-	return &f.Want
 }
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder

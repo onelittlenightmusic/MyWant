@@ -65,12 +65,9 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) *RestaurantWant {
 		}
 	}
 
-	return restaurant
-}
-
-// GetConnectivityMetadata returns connectivity requirements
-func (r *RestaurantWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	restaurant.WantType = "restaurant"
+	restaurant.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -78,15 +75,8 @@ func (r *RestaurantWant) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "restaurant",
 		Description:     "Restaurant reservation scheduling want",
 	}
-}
 
-func (r *RestaurantWant) InitializePaths(inCount, outCount int) {
-	r.paths.In = make([]PathInfo, inCount)
-	r.paths.Out = make([]PathInfo, outCount)
-}
-
-func (r *RestaurantWant) GetType() string {
-	return "restaurant"
+	return restaurant
 }
 
 func (r *RestaurantWant) GetWant() *Want {
@@ -402,11 +392,9 @@ func NewHotelWant(metadata Metadata, spec WantSpec) *HotelWant {
 		}
 	}
 
-	return hotel
-}
-
-func (h *HotelWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	hotel.WantType = "hotel"
+	hotel.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -414,15 +402,8 @@ func (h *HotelWant) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "hotel",
 		Description:     "Hotel reservation scheduling want",
 	}
-}
 
-func (h *HotelWant) InitializePaths(inCount, outCount int) {
-	h.paths.In = make([]PathInfo, inCount)
-	h.paths.Out = make([]PathInfo, outCount)
-}
-
-func (h *HotelWant) GetType() string {
-	return "hotel"
+	return hotel
 }
 
 func (h *HotelWant) GetWant() *Want {
@@ -635,11 +616,9 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) *BuffetWant {
 		}
 	}
 
-	return buffet
-}
-
-func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	buffet.WantType = "buffet"
+	buffet.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -647,15 +626,8 @@ func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "buffet",
 		Description:     "Breakfast buffet scheduling want",
 	}
-}
 
-func (b *BuffetWant) InitializePaths(inCount, outCount int) {
-	b.paths.In = make([]PathInfo, inCount)
-	b.paths.Out = make([]PathInfo, outCount)
-}
-
-func (b *BuffetWant) GetType() string {
-	return "buffet"
+	return buffet
 }
 
 func (b *BuffetWant) GetWant() *Want {
@@ -942,27 +914,18 @@ func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) *TravelCoordinat
 		}
 	}
 
-	return coordinator
-}
-
-func (t *TravelCoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  3, // restaurant, hotel, buffet
-		RequiredOutputs: 0, // final output
+	// Set fields for base Want methods
+	coordinator.WantType = "travel_coordinator"
+	coordinator.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  3,
+		RequiredOutputs: 0,
 		MaxInputs:       3,
 		MaxOutputs:      0,
 		WantType:        "travel_coordinator",
 		Description:     "Travel itinerary coordinator want",
 	}
-}
 
-func (t *TravelCoordinatorWant) InitializePaths(inCount, outCount int) {
-	t.paths.In = make([]PathInfo, inCount)
-	t.paths.Out = make([]PathInfo, outCount)
-}
-
-func (t *TravelCoordinatorWant) GetType() string {
-	return "travel_coordinator"
+	return coordinator
 }
 
 func (t *TravelCoordinatorWant) GetWant() *Want {

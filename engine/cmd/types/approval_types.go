@@ -56,27 +56,18 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 		}
 	}
 
-	return evidence
-}
-
-func (e *EvidenceWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	evidence.WantType = "evidence"
+	evidence.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1, // Must have output connection to coordinator before executing
+		RequiredOutputs: 1,
 		MaxInputs:       0,
-		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
+		MaxOutputs:      -1,
 		WantType:        "evidence",
 		Description:     "Evidence provider for approval processes",
 	}
-}
 
-func (e *EvidenceWant) InitializePaths(inCount, outCount int) {
-	e.paths.In = make([]PathInfo, inCount)
-	e.paths.Out = make([]PathInfo, outCount)
-}
-
-func (e *EvidenceWant) GetType() string {
-	return "evidence"
+	return evidence
 }
 
 func (e *EvidenceWant) GetWant() *Want {
@@ -150,27 +141,18 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 		}
 	}
 
-	return description
-}
-
-func (d *DescriptionWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	description.WantType = "description"
+	description.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
-		RequiredOutputs: 1, // Must have output connection to coordinator before executing
+		RequiredOutputs: 1,
 		MaxInputs:       0,
-		MaxOutputs:      -1, // Unlimited outputs - broadcasts to all connected coordinators
+		MaxOutputs:      -1,
 		WantType:        "description",
 		Description:     "Description provider for approval processes",
 	}
-}
 
-func (d *DescriptionWant) InitializePaths(inCount, outCount int) {
-	d.paths.In = make([]PathInfo, inCount)
-	d.paths.Out = make([]PathInfo, outCount)
-}
-
-func (d *DescriptionWant) GetType() string {
-	return "description"
+	return description
 }
 
 func (d *DescriptionWant) GetWant() *Want {
@@ -246,27 +228,18 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1Coordinat
 		}
 	}
 
-	return coordinator
-}
-
-func (l *Level1CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  2, // evidence and description
-		RequiredOutputs: 0, // coordinator only processes, doesn't output
+	// Set fields for base Want methods
+	coordinator.WantType = "level1_coordinator"
+	coordinator.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  2,
+		RequiredOutputs: 0,
 		MaxInputs:       2,
-		MaxOutputs:      1, // Can output approval result
+		MaxOutputs:      1,
 		WantType:        "level1_coordinator",
 		Description:     "Level 1 approval coordinator",
 	}
-}
 
-func (l *Level1CoordinatorWant) InitializePaths(inCount, outCount int) {
-	l.paths.In = make([]PathInfo, inCount)
-	l.paths.Out = make([]PathInfo, outCount)
-}
-
-func (l *Level1CoordinatorWant) GetType() string {
-	return "level1_coordinator"
+	return coordinator
 }
 
 func (l *Level1CoordinatorWant) GetWant() *Want {
@@ -398,27 +371,18 @@ func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) *Level2Coordinat
 		}
 	}
 
-	return coordinator
-}
-
-func (l *Level2CoordinatorWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  2, // evidence and description
-		RequiredOutputs: 0, // coordinator doesn't output - it only processes inputs
+	// Set fields for base Want methods
+	coordinator.WantType = "level2_coordinator"
+	coordinator.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  2,
+		RequiredOutputs: 0,
 		MaxInputs:       2,
-		MaxOutputs:      1, // Can output approval result but not required
+		MaxOutputs:      1,
 		WantType:        "level2_coordinator",
 		Description:     "Level 2 approval coordinator",
 	}
-}
 
-func (l *Level2CoordinatorWant) InitializePaths(inCount, outCount int) {
-	l.paths.In = make([]PathInfo, inCount)
-	l.paths.Out = make([]PathInfo, outCount)
-}
-
-func (l *Level2CoordinatorWant) GetType() string {
-	return "level2_coordinator"
+	return coordinator
 }
 
 func (l *Level2CoordinatorWant) GetWant() *Want {

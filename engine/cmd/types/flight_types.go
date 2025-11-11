@@ -55,12 +55,9 @@ func NewFlightWant(metadata Metadata, spec WantSpec) *FlightWant {
 		}
 	}
 
-	return flight
-}
-
-// GetConnectivityMetadata returns connectivity requirements
-func (f *FlightWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
+	// Set fields for base Want methods
+	flight.WantType = "flight"
+	flight.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -68,15 +65,8 @@ func (f *FlightWant) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "flight",
 		Description:     "Flight booking scheduling want",
 	}
-}
 
-func (f *FlightWant) InitializePaths(inCount, outCount int) {
-	f.paths.In = make([]PathInfo, inCount)
-	f.paths.Out = make([]PathInfo, outCount)
-}
-
-func (f *FlightWant) GetType() string {
-	return "flight"
+	return flight
 }
 
 func (f *FlightWant) GetWant() *Want {

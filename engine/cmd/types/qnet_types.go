@@ -96,31 +96,18 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 		}
 	}
 
-	return gen
-}
-
-// InitializePaths initializes the paths for this numbers generator
-func (g *Numbers) InitializePaths(inCount, outCount int) {
-	g.paths.In = make([]mywant.PathInfo, inCount)
-	g.paths.Out = make([]mywant.PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for numbers generator
-func (g *Numbers) GetConnectivityMetadata() mywant.ConnectivityMetadata {
-	return mywant.ConnectivityMetadata{
-		RequiredInputs:  0,  // Generators don't need using
-		RequiredOutputs: 1,  // Must have at least one output
-		MaxInputs:       0,  // No using allowed
-		MaxOutputs:      -1, // Unlimited outputs
+	// Set fields for base Want methods
+	gen.WantType = "sequence"
+	gen.ConnectivityMetadata = mywant.ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       0,
+		MaxOutputs:      -1,
 		WantType:        "sequence",
 		Description:     "Packet generator want",
 	}
-}
 
-
-// GetType returns the want type
-func (g *Numbers) GetType() string {
-	return "numbers"
+	return gen
 }
 
 // Getmywant.Want returns the embedded mywant.Want
@@ -249,31 +236,18 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 		}
 	}
 
-	return queue
-}
-
-// InitializePaths initializes the paths for this queue
-func (q *Queue) InitializePaths(inCount, outCount int) {
-	q.paths.In = make([]mywant.PathInfo, inCount)
-	q.paths.Out = make([]mywant.PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for queue
-func (q *Queue) GetConnectivityMetadata() mywant.ConnectivityMetadata {
-	return mywant.ConnectivityMetadata{
-		RequiredInputs:  1,  // Queues need at least one using
-		RequiredOutputs: 1,  // Must have at least one output
-		MaxInputs:       1,  // Only one using supported
-		MaxOutputs:      -1, // Unlimited outputs
+	// Set fields for base Want methods
+	queue.WantType = "queue"
+	queue.ConnectivityMetadata = mywant.ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      -1,
 		WantType:        "queue",
 		Description:     "Queue processing want",
 	}
-}
 
-
-// GetType returns the want type
-func (q *Queue) GetType() string {
-	return "queue"
+	return queue
 }
 
 // Getmywant.Want returns the embedded mywant.Want
@@ -408,31 +382,18 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 		}
 	}
 
-	return combiner
-}
-
-// InitializePaths initializes the paths for this combiner
-func (c *Combiner) InitializePaths(inCount, outCount int) {
-	c.paths.In = make([]mywant.PathInfo, inCount)
-	c.paths.Out = make([]mywant.PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for combiner
-func (c *Combiner) GetConnectivityMetadata() mywant.ConnectivityMetadata {
-	return mywant.ConnectivityMetadata{
-		RequiredInputs:  2,  // Combiners need at least two using
-		RequiredOutputs: 1,  // Must have at least one output
-		MaxInputs:       -1, // Unlimited using
-		MaxOutputs:      -1, // Unlimited outputs
+	// Set fields for base Want methods
+	combiner.WantType = "combiner"
+	combiner.ConnectivityMetadata = mywant.ConnectivityMetadata{
+		RequiredInputs:  2,
+		RequiredOutputs: 1,
+		MaxInputs:       -1,
+		MaxOutputs:      -1,
 		WantType:        "combiner",
 		Description:     "Stream combiner want",
 	}
-}
 
-
-// GetType returns the want type
-func (c *Combiner) GetType() string {
-	return "combiner"
+	return combiner
 }
 
 // Getmywant.Want returns the embedded mywant.Want
@@ -509,7 +470,7 @@ type Sink struct {
 
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
-	return &Sink{
+	sink := &Sink{
 		Want: mywant.Want{
 			Metadata: metadata,
 			Spec:     spec,
@@ -519,30 +480,19 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
 		},
 		Received: 0,
 	}
-}
 
-// InitializePaths initializes the paths for this sink
-func (s *Sink) InitializePaths(inCount, outCount int) {
-	s.paths.In = make([]mywant.PathInfo, inCount)
-	s.paths.Out = make([]mywant.PathInfo, outCount)
-}
-
-// GetConnectivityMetadata returns connectivity requirements for sink
-func (s *Sink) GetConnectivityMetadata() mywant.ConnectivityMetadata {
-	return mywant.ConnectivityMetadata{
-		RequiredInputs:  1,  // Sinks need at least one using
-		RequiredOutputs: 0,  // Sinks don't need outputs
-		MaxInputs:       -1, // Unlimited using
-		MaxOutputs:      0,  // No outputs allowed
+	// Set fields for base Want methods
+	sink.WantType = "sink"
+	sink.ConnectivityMetadata = mywant.ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0,
+		MaxInputs:       -1,
+		MaxOutputs:      0,
 		WantType:        "sink",
 		Description:     "Data sink/collector want",
 	}
-}
 
-
-// GetType returns the want type
-func (s *Sink) GetType() string {
-	return "sink"
+	return sink
 }
 
 // Getmywant.Want returns the embedded mywant.Want
