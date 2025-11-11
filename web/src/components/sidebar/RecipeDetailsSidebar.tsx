@@ -155,25 +155,48 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
   const params = want.params || want.spec?.params || {};
   const using = want.using || want.spec?.using || [];
 
-  return (
-    <div className={classNames(
-      "relative overflow-hidden rounded-md border bg-white p-3 hover:shadow-sm transition-all duration-200",
-      "border-gray-200 hover:border-gray-300"
-    )}>
-      {/* Header with Type and Name */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-900 truncate">
-            {wantType}
-          </h4>
-          <p className="text-xs text-gray-500 mt-1 truncate">
-            {wantName}
-          </p>
-        </div>
-      </div>
+  // Get background image based on want type (same logic as WantCard)
+  const getBackgroundImage = (type: string) => {
+    if (type === 'flight') return '/resources/flight.png';
+    if (type === 'hotel') return '/resources/hotel.png';
+    if (type === 'restaurant') return '/resources/restaurant.png';
+    if (type === 'buffet') return '/resources/buffet.png';
+    if (type?.endsWith('coordinator')) return '/resources/agent.png';
+    return undefined;
+  };
 
-      {/* Content Grid */}
-      <div className="space-y-3">
+  const backgroundImage = getBackgroundImage(wantType);
+
+  return (
+    <div
+      className={classNames(
+        "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-default",
+        "border-gray-200 hover:border-gray-300"
+      )}
+      style={backgroundImage ? {
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: '100% auto',
+        backgroundPosition: 'center center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'scroll'
+      } : { backgroundColor: 'white' }}
+    >
+      {/* Content wrapper with semi-transparent background */}
+      <div className={classNames('p-3', backgroundImage ? 'bg-white bg-opacity-70 relative z-10' : 'bg-white')}>
+        {/* Header with Type and Name */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-semibold text-gray-900 truncate">
+              {wantType}
+            </h4>
+            <p className="text-xs text-gray-500 mt-1 truncate">
+              {wantName}
+            </p>
+          </div>
+        </div>
+
+        {/* Content Grid */}
+        <div className="space-y-3">
         {/* Parameters Section */}
         {Object.keys(params).length > 0 && (
           <div>
@@ -218,6 +241,7 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
