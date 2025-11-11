@@ -69,7 +69,7 @@ func (g *FibonacciNumbers) Exec(using []Chan, outputs []Chan) bool {
 }
 
 // GetWant returns the underlying Want
-func (g *FibonacciNumbers) GetWant() *Want {
+func (g *FibonacciNumbers) GetWant() interface{} {
 	return &g.Want
 }
 
@@ -124,7 +124,7 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 	return filter
 }
 
-func (f *FibonacciSequence) GetWant() *Want {
+func (f *FibonacciSequence) GetWant() interface{} {
 	return &f.Want
 }
 
@@ -210,6 +210,7 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
+	// Note: fibonacci wants use spec.Params directly, so they need closures
 	builder.RegisterWantType("fibonacci_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciNumbers(metadata, spec.Params)
 	})

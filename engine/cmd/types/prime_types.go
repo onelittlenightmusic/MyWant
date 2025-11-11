@@ -85,7 +85,7 @@ func (g *PrimeNumbers) Exec(using []Chan, outputs []Chan) bool {
 }
 
 // GetWant returns the underlying Want
-func (g *PrimeNumbers) GetWant() *Want {
+func (g *PrimeNumbers) GetWant() interface{} {
 	return &g.Want
 }
 
@@ -130,7 +130,7 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 	return filter
 }
 
-func (f *PrimeSequence) GetWant() *Want {
+func (f *PrimeSequence) GetWant() interface{} {
 	return &f.Want
 }
 
@@ -223,7 +223,7 @@ type PrimeSink struct {
 }
 
 // NewPrimeSink creates a new prime sink want
-func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
+func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} {
 	sink := &PrimeSink{
 		Want:     Want{},
 		Received: 0,
@@ -246,7 +246,7 @@ func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
 	return sink
 }
 
-func (s *PrimeSink) GetWant() *Want {
+func (s *PrimeSink) GetWant() interface{} {
 	return &s.Want
 }
 
@@ -284,6 +284,7 @@ func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
+	// Note: prime_numbers and prime_sequence use spec.Params directly, so they need closures
 	builder.RegisterWantType("prime_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewPrimeNumbers(metadata, spec.Params)
 	})
@@ -292,8 +293,5 @@ func RegisterPrimeWantTypes(builder *ChainBuilder) {
 		return NewPrimeSequence(metadata, spec.Params)
 	})
 
-	// Register sink type for collecting results
-	builder.RegisterWantType("prime_sink", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeSink(metadata, spec)
-	})
+	builder.RegisterWantType("prime_sink", NewPrimeSink)
 }

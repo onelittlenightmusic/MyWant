@@ -52,7 +52,7 @@ func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbe
 }
 
 // GetWant returns the embedded Want
-func (g *SeedNumbers) GetWant() *Want {
+func (g *SeedNumbers) GetWant() interface{} {
 	return &g.Want
 }
 
@@ -128,7 +128,7 @@ func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *Fib
 }
 
 // GetWant returns the embedded Want
-func (c *FibonacciComputer) GetWant() *Want {
+func (c *FibonacciComputer) GetWant() interface{} {
 	return &c.Want
 }
 
@@ -236,7 +236,7 @@ func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *Fibon
 }
 
 // GetWant returns the embedded Want
-func (m *FibonacciMerger) GetWant() *Want {
+func (m *FibonacciMerger) GetWant() interface{} {
 	return &m.Want
 }
 
@@ -304,17 +304,15 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
-	// Register seed numbers type
+	// Note: fibonacci loop wants use spec.Params directly, so they need closures
 	builder.RegisterWantType("seed_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewSeedNumbers(metadata, spec.Params)
 	})
 
-	// Register fibonacci computer type
 	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciComputer(metadata, spec.Params)
 	})
 
-	// Register fibonacci merger type
 	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewFibonacciMerger(metadata, spec.Params)
 	})

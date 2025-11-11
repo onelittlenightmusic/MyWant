@@ -41,7 +41,7 @@ type RestaurantWant struct {
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
-func NewRestaurantWant(metadata Metadata, spec WantSpec) *RestaurantWant {
+func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	restaurant := &RestaurantWant{
 		Want:           Want{},
 		RestaurantType: "casual",
@@ -369,7 +369,7 @@ type HotelWant struct {
 }
 
 // NewHotelWant creates a new hotel reservation want
-func NewHotelWant(metadata Metadata, spec WantSpec) *HotelWant {
+func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	hotel := &HotelWant{
 		Want:      Want{},
 		HotelType: "standard",
@@ -591,7 +591,7 @@ type BuffetWant struct {
 	paths      Paths
 }
 
-func NewBuffetWant(metadata Metadata, spec WantSpec) *BuffetWant {
+func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	buffet := &BuffetWant{
 		Want:       Want{},
 		BuffetType: "continental",
@@ -887,7 +887,7 @@ type TravelCoordinatorWant struct {
 	paths    Paths
 }
 
-func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) *TravelCoordinatorWant {
+func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator := &TravelCoordinatorWant{
 		Want:     Want{},
 		Template: "travel itinerary",
@@ -988,25 +988,11 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 // RegisterTravelWantTypes registers all travel-related want types
 func RegisterTravelWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFlightWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewRestaurantWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewHotelWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewBuffetWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("travel_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewTravelCoordinatorWant(metadata, spec)
-	})
+	builder.RegisterWantType("flight", NewFlightWant)
+	builder.RegisterWantType("restaurant", NewRestaurantWant)
+	builder.RegisterWantType("hotel", NewHotelWant)
+	builder.RegisterWantType("buffet", NewBuffetWant)
+	builder.RegisterWantType("travel_coordinator", NewTravelCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support

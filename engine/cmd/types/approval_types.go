@@ -33,7 +33,7 @@ type EvidenceWant struct {
 	paths        Paths
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
+func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 	evidence := &EvidenceWant{
 		Want:         Want{},
 		EvidenceType: "document",
@@ -116,7 +116,7 @@ type DescriptionWant struct {
 	paths             Paths
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
+func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 	description := &DescriptionWant{
 		Want:              Want{},
 		DescriptionFormat: "Request for approval: %s",
@@ -201,7 +201,7 @@ type Level1CoordinatorWant struct {
 	paths           Paths
 }
 
-func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1CoordinatorWant {
+func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator := &Level1CoordinatorWant{
 		Want:            Want{},
 		CoordinatorType: "level1",
@@ -236,7 +236,7 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1Coordinat
 	return coordinator
 }
 
-func (l *Level1CoordinatorWant) GetWant() *Want {
+func (l *Level1CoordinatorWant) GetWant() interface{} {
 	return &l.Want
 }
 
@@ -335,7 +335,7 @@ type Level2CoordinatorWant struct {
 	paths           Paths
 }
 
-func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) *Level2CoordinatorWant {
+func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator := &Level2CoordinatorWant{
 		Want:            Want{},
 		CoordinatorType: "level2",
@@ -377,7 +377,7 @@ func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) *Level2Coordinat
 	return coordinator
 }
 
-func (l *Level2CoordinatorWant) GetWant() *Want {
+func (l *Level2CoordinatorWant) GetWant() interface{} {
 	return &l.Want
 }
 
@@ -470,19 +470,8 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("evidence", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewEvidenceWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("description", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewDescriptionWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("level1_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewLevel1CoordinatorWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("level2_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewLevel2CoordinatorWant(metadata, spec)
-	})
+	builder.RegisterWantType("evidence", NewEvidenceWant)
+	builder.RegisterWantType("description", NewDescriptionWant)
+	builder.RegisterWantType("level1_coordinator", NewLevel1CoordinatorWant)
+	builder.RegisterWantType("level2_coordinator", NewLevel2CoordinatorWant)
 }
