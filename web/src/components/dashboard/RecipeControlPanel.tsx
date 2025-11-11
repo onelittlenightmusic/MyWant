@@ -86,25 +86,9 @@ export const RecipeControlPanel: React.FC<RecipeControlPanelProps> = ({
       "left-0"
     )}>
       <div className="px-6 py-3">
-        <div className="flex items-center justify-between">
-          {/* Recipe Info */}
-          <div className="flex-1 min-w-0">
-            {selectedRecipe ? (
-              <p className="text-sm font-medium text-gray-700">
-                {selectedRecipe.recipe.metadata.name}
-                {hasExample && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Ready to Deploy
-                  </span>
-                )}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-500">No recipe selected</p>
-            )}
-          </div>
-
+        <div className="flex items-center justify-start gap-4">
           {/* Control Buttons */}
-          <div className="flex items-center space-x-2 flex-wrap gap-y-2 ml-4">
+          <div className="flex items-center space-x-2 flex-wrap gap-y-2">
             {/* Deploy */}
             <button
               onClick={handleDeploy}
@@ -177,6 +161,22 @@ export const RecipeControlPanel: React.FC<RecipeControlPanelProps> = ({
             >
               <span>Delete</span>
             </button>
+          </div>
+
+          {/* Recipe Info */}
+          <div className="flex-1 min-w-0">
+            {selectedRecipe ? (
+              <p className="text-sm font-medium text-gray-700">
+                {selectedRecipe.recipe.metadata.name}
+                {hasExample && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Ready to Deploy
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500">No recipe selected</p>
+            )}
           </div>
         </div>
       </div>
