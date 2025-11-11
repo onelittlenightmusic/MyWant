@@ -13,7 +13,7 @@ type PrimeNumbers struct {
 }
 
 // NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNumbers {
+func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 	gen := &PrimeNumbers{
 		Want:  Want{},
 		Start: 2,
@@ -21,16 +21,16 @@ func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNum
 	}
 
 	// Initialize base Want fields
-	gen.Init(metadata, WantSpec{Params: params})
+	gen.Init(metadata, spec)
 
-	if s, ok := params["start"]; ok {
+	if s, ok := spec.Params["start"]; ok {
 		if si, ok := s.(int); ok {
 			gen.Start = si
 		} else if sf, ok := s.(float64); ok {
 			gen.Start = int(sf)
 		}
 	}
-	if e, ok := params["end"]; ok {
+	if e, ok := spec.Params["end"]; ok {
 		if ei, ok := e.(int); ok {
 			gen.End = ei
 		} else if ef, ok := e.(float64); ok {
@@ -98,7 +98,7 @@ type PrimeSequence struct {
 }
 
 // NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSequence {
+func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 	filter := &PrimeSequence{
 		Want:        Want{},
 		Prime:       2,
@@ -106,9 +106,9 @@ func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSe
 	}
 
 	// Initialize base Want fields
-	filter.Init(metadata, WantSpec{Params: params})
+	filter.Init(metadata, spec)
 
-	if p, ok := params["prime"]; ok {
+	if p, ok := spec.Params["prime"]; ok {
 		if pi, ok := p.(int); ok {
 			filter.Prime = pi
 		} else if pf, ok := p.(float64); ok {
@@ -284,14 +284,7 @@ func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
-	// Note: prime_numbers and prime_sequence use spec.Params directly, so they need closures
-	builder.RegisterWantType("prime_numbers", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeNumbers(metadata, spec.Params)
-	})
-
-	builder.RegisterWantType("prime_sequence", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewPrimeSequence(metadata, spec.Params)
-	})
-
+	builder.RegisterWantType("prime_numbers", NewPrimeNumbers)
+	builder.RegisterWantType("prime_sequence", NewPrimeSequence)
 	builder.RegisterWantType("prime_sink", NewPrimeSink)
 }

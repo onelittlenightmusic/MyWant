@@ -20,16 +20,16 @@ type SeedNumbers struct {
 }
 
 // NewSeedNumbers creates a new seed numbers want
-func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbers {
+func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 	gen := &SeedNumbers{
 		Want:     Want{},
 		MaxCount: 15,
 	}
 
 	// Initialize base Want fields
-	gen.Init(metadata, WantSpec{Params: params})
+	gen.Init(metadata, spec)
 
-	if c, ok := params["max_count"]; ok {
+	if c, ok := spec.Params["max_count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.MaxCount = ci
 		} else if cf, ok := c.(float64); ok {
@@ -105,13 +105,13 @@ type FibonacciComputer struct {
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
-func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *FibonacciComputer {
+func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 	computer := &FibonacciComputer{
 		Want: Want{},
 	}
 
 	// Initialize base Want fields
-	computer.Init(metadata, WantSpec{Params: params})
+	computer.Init(metadata, spec)
 
 	// Set fields for base Want methods
 	computer.WantType = "fibonacci_computer"
@@ -213,13 +213,13 @@ type FibonacciMerger struct {
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
-func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *FibonacciMerger {
+func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 	merger := &FibonacciMerger{
 		Want: Want{},
 	}
 
 	// Initialize base Want fields
-	merger.Init(metadata, WantSpec{Params: params})
+	merger.Init(metadata, spec)
 
 	// Set fields for base Want methods
 	merger.WantType = "fibonacci_merger"
@@ -304,16 +304,7 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
-	// Note: fibonacci loop wants take params directly, so they need closures to adapt the signature
-	builder.RegisterWantType("seed_numbers", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewSeedNumbers(metadata, spec.Params)
-	})
-
-	builder.RegisterWantType("fibonacci_computer", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciComputer(metadata, spec.Params)
-	})
-
-	builder.RegisterWantType("fibonacci_merger", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciMerger(metadata, spec.Params)
-	})
+	builder.RegisterWantType("seed_numbers", NewSeedNumbers)
+	builder.RegisterWantType("fibonacci_computer", NewFibonacciComputer)
+	builder.RegisterWantType("fibonacci_merger", NewFibonacciMerger)
 }

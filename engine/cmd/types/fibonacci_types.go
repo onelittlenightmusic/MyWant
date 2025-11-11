@@ -12,16 +12,16 @@ type FibonacciNumbers struct {
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *FibonacciNumbers {
+func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 	gen := &FibonacciNumbers{
 		Want:  Want{},
 		Count: 20,
 	}
 
 	// Initialize base Want fields
-	gen.Init(metadata, WantSpec{Params: params})
+	gen.Init(metadata, spec)
 
-	if c, ok := params["count"]; ok {
+	if c, ok := spec.Params["count"]; ok {
 		if ci, ok := c.(int); ok {
 			gen.Count = ci
 		} else if cf, ok := c.(float64); ok {
@@ -83,7 +83,7 @@ type FibonacciSequence struct {
 }
 
 // NewFibonacciSequence creates a new fibonacci sequence want
-func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *FibonacciSequence {
+func NewFibonacciSequence(metadata Metadata, spec WantSpec) interface{} {
 	filter := &FibonacciSequence{
 		Want:     Want{},
 		MinValue: 0,
@@ -92,9 +92,9 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 	}
 
 	// Initialize base Want fields
-	filter.Init(metadata, WantSpec{Params: params})
+	filter.Init(metadata, spec)
 
-	if min, ok := params["min_value"]; ok {
+	if min, ok := spec.Params["min_value"]; ok {
 		if mini, ok := min.(int); ok {
 			filter.MinValue = mini
 		} else if minf, ok := min.(float64); ok {
@@ -102,7 +102,7 @@ func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *Fib
 		}
 	}
 
-	if max, ok := params["max_value"]; ok {
+	if max, ok := spec.Params["max_value"]; ok {
 		if maxi, ok := max.(int); ok {
 			filter.MaxValue = maxi
 		} else if maxf, ok := max.(float64); ok {
@@ -210,12 +210,6 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
-	// Note: fibonacci wants use spec.Params directly, so they need closures
-	builder.RegisterWantType("fibonacci_numbers", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciNumbers(metadata, spec.Params)
-	})
-
-	builder.RegisterWantType("fibonacci_sequence", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewFibonacciSequence(metadata, spec.Params)
-	})
+	builder.RegisterWantType("fibonacci_numbers", NewFibonacciNumbers)
+	builder.RegisterWantType("fibonacci_sequence", NewFibonacciSequence)
 }
