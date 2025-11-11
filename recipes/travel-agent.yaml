@@ -80,3 +80,13 @@ recipe:
     - want_name: "buffet"
       stat_name: ".total_processed"
       description: "Buffet reservations completed"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "travel-agent-demo"
+          type: "agent travel system"
+          labels:
+            recipe: "Travel Agent System"
+        spec:
+          params: {}

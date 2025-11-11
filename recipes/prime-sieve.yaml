@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Prime Sieve"
+    description: "Prime number generation and filtering pipeline"
+    custom_type: "prime sieve"
+    version: "1.0.0"
+
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "prime"
@@ -37,3 +44,13 @@ recipe:
     - want_name: "prime_sequence"
       stat_name: "."
       description: "All metrics from prime sequence filter"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "prime-sieve-demo"
+          type: "prime sieve"
+          labels:
+            recipe: "Prime Sieve"
+        spec:
+          params: {}

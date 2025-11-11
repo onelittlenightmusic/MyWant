@@ -50,3 +50,19 @@ recipe:
     - want_name: "fibonacci_sequence"
       stat_name: "."
       description: "All metrics from fibonacci sequence filter"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "fibonacci-sequence-demo"
+          type: "fibonacci sequence"
+          labels:
+            recipe: "Fibonacci Sequence"
+        spec:
+          params:
+            prefix: "fibonacci"
+            display_name: "Fibonacci Sequence Generator"
+            count: 10
+            min_value: 0
+            max_value: 1000000
+            description: "Generates and filters fibonacci numbers"

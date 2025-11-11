@@ -101,3 +101,13 @@ recipe:
     - want_name: "buffet"
       stat_name: ".total_processed"
       description: "Buffet reservations completed"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "dynamic-travel-change-demo"
+          type: "dynamic travel change"
+          labels:
+            recipe: "Dynamic Travel Change with Flight API"
+        spec:
+          params: {}

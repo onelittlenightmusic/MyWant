@@ -55,3 +55,16 @@ recipe:
     - want_name: "level2_coordinator"
       stat_name: ".final_approval_status"
       description: "Level 2 final approval status"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "approval-level-2-demo"
+          type: "level 2 approval"
+          labels:
+            recipe: "Level 2 Approval"
+        spec:
+          params:
+            approval_id: "approval-001"
+            coordinator_type: "level2"
+            level2_authority: "senior_manager"

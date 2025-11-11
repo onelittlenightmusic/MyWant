@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Fibonacci Pipeline"
+    description: "Fibonacci number generation and processing pipeline"
+    custom_type: "fibonacci pipeline"
+    version: "1.0.0"
+
   # Recipe parameters - these are the configurable values
   parameters:
     prefix: "fibonacci"
@@ -22,3 +29,14 @@ recipe:
     - want_name: "fibonacci_generator"
       stat_name: ".total_processed"
       description: "Total fibonacci numbers generated"
+
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "fibonacci-pipeline-demo"
+          type: "fibonacci pipeline"
+          labels:
+            recipe: "Fibonacci Pipeline"
+        spec:
+          params: {}

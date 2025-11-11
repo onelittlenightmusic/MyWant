@@ -69,3 +69,13 @@ recipe:
     - want_name: "buffet"
       stat_name: ".total_processed"
       description: "Buffet reservations completed"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "travel-itinerary-agent-demo"
+          type: "agent travel itinerary planner"
+          labels:
+            recipe: "Travel Itinerary with Agents"
+        spec:
+          params: {}

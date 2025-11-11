@@ -1,4 +1,11 @@
 recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "QNet Pipeline"
+    description: "Dual-stream queueing network with parameterized connections"
+    custom_type: "qnet pipeline"
+    version: "1.0.0"
+
   # QNet Recipe - Dual-stream queueing network with parameterized connections
   # This recipe defines the using field connections declaratively rather than hardcoded
 
@@ -123,3 +130,13 @@ recipe:
       - want_name: "queue-final"
         stat_name: "."
         description: "All metrics in final queue"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "qnet-pipeline-demo"
+          type: "qnet pipeline"
+          labels:
+            recipe: "QNet Pipeline"
+        spec:
+          params: {}

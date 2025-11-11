@@ -66,3 +66,19 @@ recipe:
     - want_name: "queue"
       stat_name: "."
       description: "All metrics from queue system"
+
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "queue-system-demo"
+          type: "wait time in queue system"
+          labels:
+            recipe: "Queue System"
+        spec:
+          params:
+            prefix: "queue-system"
+            count: 1000
+            rate: 10.0
+            service_time: 0.05
+            deterministic: false
