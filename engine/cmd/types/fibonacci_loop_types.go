@@ -304,7 +304,7 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
-	// Note: fibonacci loop wants use spec.Params directly, so they need closures
+	// Note: fibonacci loop wants take params directly, so they need closures to adapt the signature
 	builder.RegisterWantType("seed_numbers", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewSeedNumbers(metadata, spec.Params)
 	})
