@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { BookOpen, Settings, List, FileText } from 'lucide-react';
+import { BookOpen, Settings, List, FileText, Copy } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
+import { classNames } from '@/utils/helpers';
 import {
   DetailsSidebar,
   TabContent,
@@ -129,81 +130,98 @@ const ParametersTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
 
 const WantsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
   <TabContent>
-    <div className="space-y-4">
-      {recipe.recipe.wants.map((want, index) => (
-        <TabSection
-          key={index}
-          title={`Want ${index + 1}${(want.metadata?.name || want.name) ? ` (${want.metadata?.name || want.name})` : ''}`}
-        >
-          <div className="space-y-4">
-            {/* Type */}
-            <div>
-              <p className="text-sm text-gray-500">
-                Type: <span className="font-medium">{want.type || want.metadata?.type || 'Unknown type'}</span>
-              </p>
-            </div>
-
-            {/* Parameters */}
-            <div>
-              <h5 className="text-sm font-medium text-gray-700 mb-2">Parameters</h5>
-              <pre className="text-xs text-gray-900 bg-gray-50 p-3 rounded border overflow-x-auto whitespace-pre-wrap">
-                {formatWantParams(want.params || want.spec?.params)}
-              </pre>
-            </div>
-
-            {/* Using selectors */}
-            {want.using && want.using.length > 0 && (
-              <div>
-                <h5 className="text-sm font-medium text-gray-700 mb-2">Using Selectors</h5>
-                <div className="space-y-2">
-                  {want.using.map((selector, selectorIndex) => (
-                    <div key={selectorIndex} className="text-xs bg-gray-50 p-2 rounded border">
-                      {Object.entries(selector).map(([key, value]) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-gray-600">{key}:</span>
-                          <span className="text-gray-900 font-mono">{value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Labels */}
-            {((want.metadata?.labels && Object.keys(want.metadata.labels).length > 0) ||
-              (want.labels && Object.keys(want.labels).length > 0)) && (
-              <div>
-                <h5 className="text-sm font-medium text-gray-700 mb-2">Labels</h5>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(want.metadata?.labels || want.labels || {}).map(([key, value]) => (
-                    <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      {key}={value}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Requirements */}
-            {want.requires && want.requires.length > 0 && (
-              <div>
-                <h5 className="text-sm font-medium text-gray-700 mb-2">Requirements</h5>
-                <div className="flex flex-wrap gap-1">
-                  {want.requires.map((req, reqIndex) => (
-                    <span key={reqIndex} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                      {req}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </TabSection>
-      ))}
-    </div>
+    {recipe.recipe.wants && recipe.recipe.wants.length > 0 ? (
+      <div className="space-y-3">
+        {recipe.recipe.wants.map((want, index) => (
+          <RecipeWantCard key={index} want={want} index={index} />
+        ))}
+      </div>
+    ) : (
+      <EmptyState icon={List} message="No wants defined for this recipe" />
+    )}
   </TabContent>
 );
+
+// Child want card component for recipe wants display
+interface RecipeWantCardProps {
+  want: any;
+  index: number;
+}
+
+const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
+  const wantType = want.type || want.metadata?.type || 'unknown';
+  const wantName = want.metadata?.name || want.name || `Want ${index + 1}`;
+  const labels = want.metadata?.labels || want.labels || {};
+  const params = want.params || want.spec?.params || {};
+  const using = want.using || want.spec?.using || [];
+
+  return (
+    <div className={classNames(
+      "relative overflow-hidden rounded-md border bg-white p-3 hover:shadow-sm transition-all duration-200",
+      "border-gray-200 hover:border-gray-300"
+    )}>
+      {/* Header with Type and Name */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold text-gray-900 truncate">
+            {wantType}
+          </h4>
+          <p className="text-xs text-gray-500 mt-1 truncate">
+            {wantName}
+          </p>
+        </div>
+      </div>
+
+      {/* Content Grid */}
+      <div className="space-y-3">
+        {/* Parameters Section */}
+        {Object.keys(params).length > 0 && (
+          <div>
+            <h5 className="text-xs font-medium text-gray-700 mb-1">Parameters</h5>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(params).map(([key, value]) => (
+                <span key={key} className="text-xs bg-blue-50 text-blue-800 px-2 py-1 rounded border border-blue-200">
+                  <span className="font-medium">{key}:</span> {String(value).substring(0, 20)}
+                  {String(value).length > 20 ? '...' : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Labels Section */}
+        {Object.keys(labels).length > 0 && (
+          <div>
+            <h5 className="text-xs font-medium text-gray-700 mb-1">Labels</h5>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(labels).map(([key, value]) => (
+                <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded border border-green-300">
+                  {key}={value}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Using Selectors Section */}
+        {using && using.length > 0 && (
+          <div>
+            <h5 className="text-xs font-medium text-gray-700 mb-1">Dependencies</h5>
+            <div className="flex flex-wrap gap-1">
+              {using.map((selector, idx) => (
+                <span key={idx} className="text-xs bg-amber-50 text-amber-800 px-2 py-1 rounded border border-amber-200">
+                  {Object.entries(selector as Record<string, string>)
+                    .map(([k, v]) => `${k}:${v}`)
+                    .join(', ')}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const ResultsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
   <TabContent>
