@@ -798,3 +798,20 @@ func (n *Want) GetType() string {
 func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
 	return n.ConnectivityMetadata
 }
+
+// Init initializes the Want base type with metadata and spec, plus type-specific fields
+// This is a helper method used by all want constructors to reduce boilerplate
+// Usage in want types:
+//   func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
+//       w := &MyWant{Want: Want{}}
+//       w.Init(metadata, spec)  // Common initialization
+//       w.WantType = "my_type"  // Type-specific fields
+//       w.ConnectivityMetadata = ConnectivityMetadata{...}
+//       return w
+//   }
+func (n *Want) Init(metadata Metadata, spec WantSpec) {
+	n.Metadata = metadata
+	n.Spec = spec
+	n.Status = WantStatusIdle
+	n.State = make(map[string]interface{})
+}

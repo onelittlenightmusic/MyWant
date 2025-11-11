@@ -14,15 +14,12 @@ type FibonacciNumbers struct {
 // NewFibonacciNumbers creates a new fibonacci numbers want
 func NewFibonacciNumbers(metadata Metadata, params map[string]interface{}) *FibonacciNumbers {
 	gen := &FibonacciNumbers{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:  Want{},
 		Count: 20,
 	}
+
+	// Initialize base Want fields
+	gen.Init(metadata, WantSpec{Params: params})
 
 	if c, ok := params["count"]; ok {
 		if ci, ok := c.(int); ok {
@@ -88,17 +85,14 @@ type FibonacciSequence struct {
 // NewFibonacciSequence creates a new fibonacci sequence want
 func NewFibonacciSequence(metadata Metadata, params map[string]interface{}) *FibonacciSequence {
 	filter := &FibonacciSequence{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:     Want{},
 		MinValue: 0,
 		MaxValue: 1000000,
 		filtered: make([]int, 0),
 	}
+
+	// Initialize base Want fields
+	filter.Init(metadata, WantSpec{Params: params})
 
 	if min, ok := params["min_value"]; ok {
 		if mini, ok := min.(int); ok {

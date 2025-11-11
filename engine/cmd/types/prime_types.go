@@ -15,16 +15,13 @@ type PrimeNumbers struct {
 // NewPrimeNumbers creates a new prime numbers want
 func NewPrimeNumbers(metadata Metadata, params map[string]interface{}) *PrimeNumbers {
 	gen := &PrimeNumbers{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:  Want{},
 		Start: 2,
 		End:   100,
 	}
+
+	// Initialize base Want fields
+	gen.Init(metadata, WantSpec{Params: params})
 
 	if s, ok := params["start"]; ok {
 		if si, ok := s.(int); ok {
@@ -103,16 +100,13 @@ type PrimeSequence struct {
 // NewPrimeSequence creates a new prime sequence want
 func NewPrimeSequence(metadata Metadata, params map[string]interface{}) *PrimeSequence {
 	filter := &PrimeSequence{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:        Want{},
 		Prime:       2,
 		foundPrimes: make([]int, 0),
 	}
+
+	// Initialize base Want fields
+	filter.Init(metadata, WantSpec{Params: params})
 
 	if p, ok := params["prime"]; ok {
 		if pi, ok := p.(int); ok {
@@ -231,15 +225,12 @@ type PrimeSink struct {
 // NewPrimeSink creates a new prime sink want
 func NewPrimeSink(metadata Metadata, spec WantSpec) *PrimeSink {
 	sink := &PrimeSink{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:     Want{},
 		Received: 0,
 	}
+
+	// Initialize base Want fields
+	sink.Init(metadata, spec)
 
 	// Set fields for base Want methods
 	sink.WantType = "prime_sink"

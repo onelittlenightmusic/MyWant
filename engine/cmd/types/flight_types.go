@@ -26,18 +26,16 @@ type FlightWant struct {
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) *FlightWant {
 	flight := &FlightWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
+		Want:               Want{},
 		FlightType:         "economy",
 		Duration:           12 * time.Hour, // Default 12 hour flight
 		DepartureDate:      "2024-01-01",   // Default departure date
 		monitoringActive:   false,
 		monitoringDuration: 60 * time.Second, // Monitor for 60 seconds after flight creation
 	}
+
+	// Initialize base Want fields
+	flight.Init(metadata, spec)
 
 	if ft, ok := spec.Params["flight_type"]; ok {
 		if fts, ok := ft.(string); ok {

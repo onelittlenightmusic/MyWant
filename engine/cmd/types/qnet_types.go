@@ -61,18 +61,15 @@ type Numbers struct {
 // PacketNumbers creates a new numbers want
 func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *Numbers {
 	gen := &Numbers{
-		Want: mywant.Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: mywant.WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:                mywant.Want{},
 		Rate:                1.0,
 		Count:               100,
 		batchUpdateInterval: 100, // Default: update state every 100 packets
 		cycleCount:          0,
 	}
+
+	// Initialize base Want fields
+	gen.Init(metadata, spec)
 
 	if r, ok := spec.Params["rate"]; ok {
 		if rf, ok := r.(float64); ok {
@@ -209,17 +206,14 @@ type Queue struct {
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *Queue {
 	queue := &Queue{
-		Want: mywant.Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: mywant.WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:                mywant.Want{},
 		ServiceTime:         1.0,
 		batchUpdateInterval: 100, // Default: update state every 100 packets
 		lastBatchCount:      0,
 	}
+
+	// Initialize base Want fields
+	queue.Init(metadata, spec)
 
 	if st, ok := spec.Params["service_time"]; ok {
 		if stf, ok := st.(float64); ok {
@@ -366,15 +360,12 @@ type Combiner struct {
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *Combiner {
 	combiner := &Combiner{
-		Want: mywant.Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: mywant.WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:      mywant.Want{},
 		Operation: "merge",
 	}
+
+	// Initialize base Want fields
+	combiner.Init(metadata, spec)
 
 	if op, ok := spec.Params["operation"]; ok {
 		if ops, ok := op.(string); ok {
@@ -471,15 +462,12 @@ type Sink struct {
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *Sink {
 	sink := &Sink{
-		Want: mywant.Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: mywant.WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:     mywant.Want{},
 		Received: 0,
 	}
+
+	// Initialize base Want fields
+	sink.Init(metadata, spec)
 
 	// Set fields for base Want methods
 	sink.WantType = "sink"

@@ -43,16 +43,13 @@ type RestaurantWant struct {
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) *RestaurantWant {
 	restaurant := &RestaurantWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:           Want{},
 		RestaurantType: "casual",
 		Duration:       2 * time.Hour, // Default 2 hour dinner
 	}
+
+	// Initialize base Want fields
+	restaurant.Init(metadata, spec)
 
 	if rt, ok := spec.Params["restaurant_type"]; ok {
 		if rts, ok := rt.(string); ok {
@@ -374,17 +371,14 @@ type HotelWant struct {
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) *HotelWant {
 	hotel := &HotelWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:      Want{},
 		HotelType: "standard",
 		CheckIn:   22 * time.Hour, // 10 PM
 		CheckOut:  8 * time.Hour,  // 8 AM next day
 	}
+
+	// Initialize base Want fields
+	hotel.Init(metadata, spec)
 
 	if ht, ok := spec.Params["hotel_type"]; ok {
 		if hts, ok := ht.(string); ok {
@@ -599,16 +593,13 @@ type BuffetWant struct {
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) *BuffetWant {
 	buffet := &BuffetWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:       Want{},
 		BuffetType: "continental",
 		Duration:   1*time.Hour + 30*time.Minute, // 1.5 hour breakfast
 	}
+
+	// Initialize base Want fields
+	buffet.Init(metadata, spec)
 
 	if bt, ok := spec.Params["buffet_type"]; ok {
 		if bts, ok := bt.(string); ok {
@@ -898,15 +889,12 @@ type TravelCoordinatorWant struct {
 
 func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) *TravelCoordinatorWant {
 	coordinator := &TravelCoordinatorWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:     Want{},
 		Template: "travel itinerary",
 	}
+
+	// Initialize base Want fields
+	coordinator.Init(metadata, spec)
 
 	if tmpl, ok := spec.Params["template"]; ok {
 		if tmpls, ok := tmpl.(string); ok {

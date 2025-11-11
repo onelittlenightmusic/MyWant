@@ -35,14 +35,12 @@ type EvidenceWant struct {
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) *EvidenceWant {
 	evidence := &EvidenceWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
+		Want:         Want{},
 		EvidenceType: "document",
 	}
+
+	// Initialize base Want fields
+	evidence.Init(metadata, spec)
 
 	if et, ok := spec.Params["evidence_type"]; ok {
 		if ets, ok := et.(string); ok {
@@ -120,14 +118,12 @@ type DescriptionWant struct {
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) *DescriptionWant {
 	description := &DescriptionWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
+		Want:              Want{},
 		DescriptionFormat: "Request for approval: %s",
 	}
+
+	// Initialize base Want fields
+	description.Init(metadata, spec)
 
 	if df, ok := spec.Params["description_format"]; ok {
 		if dfs, ok := df.(string); ok {
@@ -207,14 +203,12 @@ type Level1CoordinatorWant struct {
 
 func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Level1CoordinatorWant {
 	coordinator := &Level1CoordinatorWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
+		Want:            Want{},
 		CoordinatorType: "level1",
 	}
+
+	// Initialize base Want fields
+	coordinator.Init(metadata, spec)
 
 	if aid, ok := spec.Params["approval_id"]; ok {
 		if aids, ok := aid.(string); ok {
@@ -343,15 +337,13 @@ type Level2CoordinatorWant struct {
 
 func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) *Level2CoordinatorWant {
 	coordinator := &Level2CoordinatorWant{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
-		},
+		Want:            Want{},
 		CoordinatorType: "level2",
 		Level2Authority: "senior_manager",
 	}
+
+	// Initialize base Want fields
+	coordinator.Init(metadata, spec)
 
 	if aid, ok := spec.Params["approval_id"]; ok {
 		if aids, ok := aid.(string); ok {

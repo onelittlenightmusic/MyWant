@@ -22,15 +22,12 @@ type SeedNumbers struct {
 // NewSeedNumbers creates a new seed numbers want
 func NewSeedNumbers(metadata Metadata, params map[string]interface{}) *SeedNumbers {
 	gen := &SeedNumbers{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want:     Want{},
 		MaxCount: 15,
 	}
+
+	// Initialize base Want fields
+	gen.Init(metadata, WantSpec{Params: params})
 
 	if c, ok := params["max_count"]; ok {
 		if ci, ok := c.(int); ok {
@@ -110,14 +107,11 @@ type FibonacciComputer struct {
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, params map[string]interface{}) *FibonacciComputer {
 	computer := &FibonacciComputer{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want: Want{},
 	}
+
+	// Initialize base Want fields
+	computer.Init(metadata, WantSpec{Params: params})
 
 	// Set fields for base Want methods
 	computer.WantType = "fibonacci_computer"
@@ -221,14 +215,11 @@ type FibonacciMerger struct {
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, params map[string]interface{}) *FibonacciMerger {
 	merger := &FibonacciMerger{
-		Want: Want{
-			Metadata: metadata,
-			Spec:     WantSpec{Params: params},
-			// Stats field removed - using State instead
-			Status: WantStatusIdle,
-			State:  make(map[string]interface{}),
-		},
+		Want: Want{},
 	}
+
+	// Initialize base Want fields
+	merger.Init(metadata, WantSpec{Params: params})
 
 	// Set fields for base Want methods
 	merger.WantType = "fibonacci_merger"
