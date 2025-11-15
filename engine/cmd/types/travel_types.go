@@ -913,8 +913,18 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 
 func (t *TravelCoordinatorWant) Exec() bool {
 	// Ensure all input channels are available
-	if t.paths.GetInCount() < 3 {
+	inCount := t.paths.GetInCount()
+	InfoLog("[TRAVEL_COORDINATOR] Exec called. Input channel count: %d\n", inCount)
+	InfoLog("[TRAVEL_COORDINATOR] Want paths.In length: %d, paths.Out length: %d\n", len(t.paths.In), len(t.paths.Out))
+
+	// Debug: Print all input path details
+	for i, pathInfo := range t.paths.In {
+		InfoLog("[TRAVEL_COORDINATOR] Input path %d: Name=%s, Channel=%v, Active=%v\n", i, pathInfo.Name, pathInfo.Channel != nil, pathInfo.Active)
+	}
+
+	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
+		InfoLog("[TRAVEL_COORDINATOR] Waiting for 3 input channels, currently have %d. Returning false.\n", inCount)
 		return false
 	}
 

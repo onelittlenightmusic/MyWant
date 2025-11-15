@@ -168,11 +168,24 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
 
+		// Debug logging for this want's using selectors
+		if len(want.spec.Using) > 0 {
+			DebugLog("[PATH_GEN] Want %s has %d using selectors. Current labels: %v",
+				wantName, len(want.spec.Using), want.metadata.Labels)
+		}
+
 		// Process using connections for this want
-		for _, usingSelector := range want.spec.Using {
+		for selectorIdx, usingSelector := range want.spec.Using {
+			DebugLog("[PATH_GEN] Processing using selector %d: %v for want %s", selectorIdx, usingSelector, wantName)
+
+			matchCount := 0
 			// Find wants that match this using selector
 			for otherName, otherWant := range cb.wants {
 				if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
+					matchCount++
+					DebugLog("[PATH_GEN] Match found! Want %s matches selector %v (labels: %v)",
+						otherName, usingSelector, otherWant.metadata.Labels)
+
 					// Create using path for current want
 					// Create a channel directly typed as chain.Chan
 					ch := make(chain.Chan, 10)
@@ -193,6 +206,9 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					otherPaths.Out = append(otherPaths.Out, outPath)
 					pathMap[otherName] = otherPaths
 				}
+			}
+			if matchCount == 0 {
+				DebugLog("[PATH_GEN] NO MATCHES for selector %v on want %s", usingSelector, wantName)
 			}
 		}
 		pathMap[wantName] = paths
@@ -1484,7 +1500,23 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		return
 	}
 
-	paths := cb.pathMap[wantName]
+	// For dynamically added wants (especially coordinators with using selectors),
+	// we need to regenerate paths on-demand to include any newly added child wants
+	// This is critical because child wants are often added AFTER their coordinator is registered
+	paths, pathsExist := cb.pathMap[wantName]
+
+	// If this want has using selectors and paths haven't been set yet (or are empty),
+	// regenerate paths to include newly added wants
+	if !pathsExist || (len(paths.In) == 0 && len(want.want.Spec.Using) > 0) {
+		DebugLog("[EXEC] Regenerating paths for want %s (has using selectors: %v)",
+			wantName, len(want.want.Spec.Using) > 0)
+		// Regenerate paths from current state of wants
+		newPathMap := cb.generatePathsFromConnections()
+		cb.pathMap = newPathMap
+		paths = newPathMap[wantName]
+		DebugLog("[EXEC] After regeneration: want %s has %d input paths, %d output paths",
+			wantName, len(paths.In), len(paths.Out))
+	}
 
 	// Prepare active input and output channels - set them in the want's paths
 	var activeInputPaths []PathInfo
