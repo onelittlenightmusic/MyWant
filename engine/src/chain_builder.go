@@ -1252,35 +1252,84 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		return
 	}
 
-	// Initialize State map (simple copy since History is separate)
-	stateMap := make(map[string]interface{})
-	if wantConfig.State != nil {
-		// Copy all state data
-		for k, v := range wantConfig.State {
-			stateMap[k] = v
+	// Try to extract Want pointer from the want function (if it has one embedded)
+	var wantPtr *Want
+
+	// First try direct *Want pointer
+	if w, ok := wantFunction.(*Want); ok {
+		wantPtr = w
+		InfoLog("[RECONCILE] Using direct *Want from want function for '%s'\n", wantConfig.Metadata.Name)
+	} else {
+		// Try to extract embedded Want via reflection
+		wantPtr = extractWantViaReflection(wantFunction)
+		if wantPtr != nil {
+			InfoLog("[RECONCILE] Extracted embedded Want for '%s' via reflection\n", wantConfig.Metadata.Name)
 		}
 	}
 
-	// Copy History field from config
-	historyField := wantConfig.History
+	// If no Want was found in the want function, create a new one
+	// (This handles want types that don't embed or return a Want)
+	if wantPtr == nil {
+		InfoLog("[RECONCILE] Creating new Want instance for '%s' (no embedded Want found)\n", wantConfig.Metadata.Name)
 
-	// Initialize parameterHistory with initial parameters if empty
-	if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
-		// Create one entry with all initial parameters as object
-		entry := StateHistoryEntry{
-			WantName:   wantConfig.Metadata.Name,
-			StateValue: wantConfig.Spec.Params,
-			Timestamp:  time.Now(),
+		// Initialize State map (simple copy since History is separate)
+		stateMap := make(map[string]interface{})
+		if wantConfig.State != nil {
+			// Copy all state data
+			for k, v := range wantConfig.State {
+				stateMap[k] = v
+			}
 		}
-		historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
-	}
 
-	wantPtr := &Want{
-		Metadata: wantConfig.Metadata,
-		Spec:     wantConfig.Spec,
-		Status:   WantStatusIdle,
-		State:    stateMap,
-		History:  historyField,
+		// Copy History field from config
+		historyField := wantConfig.History
+
+		// Initialize parameterHistory with initial parameters if empty
+		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+			// Create one entry with all initial parameters as object
+			entry := StateHistoryEntry{
+				WantName:   wantConfig.Metadata.Name,
+				StateValue: wantConfig.Spec.Params,
+				Timestamp:  time.Now(),
+			}
+			historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
+		}
+
+		wantPtr = &Want{
+			Metadata: wantConfig.Metadata,
+			Spec:     wantConfig.Spec,
+			Status:   WantStatusIdle,
+			State:    stateMap,
+			History:  historyField,
+		}
+	} else {
+		// Update the extracted Want with metadata and config info
+		wantPtr.Metadata = wantConfig.Metadata
+		wantPtr.Spec = wantConfig.Spec
+		wantPtr.Status = WantStatusIdle
+
+		// Merge state data if provided
+		if wantConfig.State != nil {
+			if wantPtr.State == nil {
+				wantPtr.State = make(map[string]interface{})
+			}
+			for k, v := range wantConfig.State {
+				wantPtr.State[k] = v
+			}
+		}
+
+		// Update history
+		wantPtr.History = wantConfig.History
+
+		// Initialize parameterHistory with initial parameters if empty
+		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+			entry := StateHistoryEntry{
+				WantName:   wantConfig.Metadata.Name,
+				StateValue: wantConfig.Spec.Params,
+				Timestamp:  time.Now(),
+			}
+			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
+		}
 	}
 
 	// Initialize subscription system for the want
