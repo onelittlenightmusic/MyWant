@@ -90,9 +90,11 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 		}
 
 		fmt.Printf("[MONITOR_FLIGHT] DEBUG: About to store agent_result: %+v\n", schedule)
-		want.StoreState("agent_result", schedule)
-		want.StoreState("monitor_execution_count", m.ExecutionCount)
-		want.StoreState("monitor_source_file", filename)
+		want.StoreStateMulti(map[string]interface{}{
+			"agent_result":            schedule,
+			"monitor_execution_count": m.ExecutionCount,
+			"monitor_source_file":     filename,
+		})
 		fmt.Printf("[MONITOR_FLIGHT] DEBUG: Stored agent_result successfully\n")
 
 		fmt.Printf("[MONITOR_FLIGHT] Loaded existing schedule: %s from %s to %s\n",
@@ -101,9 +103,11 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 			flightState.State.ArrivalTime.Format("15:04 Jan 2"))
 	} else {
 		// No existing schedule found - store explicit first record
-		want.StoreState("agent_result", nil)
-		want.StoreState("monitor_execution_count", m.ExecutionCount)
-		want.StoreState("monitor_source_file", filename)
+		want.StoreStateMulti(map[string]interface{}{
+			"agent_result":            nil,
+			"monitor_execution_count": m.ExecutionCount,
+			"monitor_source_file":     filename,
+		})
 		fmt.Printf("[MONITOR_FLIGHT] No existing schedule found in %s - stored first record\n", filename)
 	}
 

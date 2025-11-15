@@ -234,23 +234,23 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
 	// Individual agents should NOT call BeginExecCycle/EndExecCycle
 	want.StoreStateMulti(map[string]interface{}{
-		"flight_id": reservation.ID,
-		"flight_status": "created",
-		"flight_number": reservation.FlightNumber,
-		"from": reservation.From,
-		"to": reservation.To,
+		"flight_id":      reservation.ID,
+		"flight_status":  "created",
+		"flight_number":  reservation.FlightNumber,
+		"from":           reservation.From,
+		"to":             reservation.To,
 		"departure_time": reservation.DepartureTime.Format(time.RFC3339),
-		"arrival_time": reservation.ArrivalTime.Format(time.RFC3339),
+		"arrival_time":   reservation.ArrivalTime.Format(time.RFC3339),
 		"status_message": reservation.StatusMessage,
-		"created_at": reservation.CreatedAt.Format(time.RFC3339),
-		"updated_at": reservation.UpdatedAt.Format(time.RFC3339),
-	})
-	want.StoreState("agent_result", FlightSchedule{
-		DepartureTime:   reservation.DepartureTime,
-		ArrivalTime:     reservation.ArrivalTime,
-		FlightType:      "api",
-		FlightNumber:    reservation.FlightNumber,
-		ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+		"created_at":     reservation.CreatedAt.Format(time.RFC3339),
+		"updated_at":     reservation.UpdatedAt.Format(time.RFC3339),
+		"agent_result": FlightSchedule{
+			DepartureTime:   reservation.DepartureTime,
+			ArrivalTime:     reservation.ArrivalTime,
+			FlightType:      "api",
+			FlightNumber:    reservation.FlightNumber,
+			ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+		},
 	})
 
 	// Record activity description for agent history
@@ -302,23 +302,15 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	// Update state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework
 	want.StoreStateMulti(map[string]interface{}{
-		"flight_status": "canceled",
-		"status_message": "Flight canceled by agent",
-		"canceled_at": time.Now().Format(time.RFC3339),
-	})
-
-	// Save cancelled flight ID and clear current flight_id for rebooking
-	want.StoreStateMulti(map[string]interface{}{
-		"previous_flight_id": flightIDStr,
+		"flight_status":          "canceled",
+		"status_message":         "Flight canceled by agent",
+		"canceled_at":            time.Now().Format(time.RFC3339),
+		"previous_flight_id":     flightIDStr,
 		"previous_flight_status": "canceled",
-		"flight_id": "",
-		"flight_status": "",
-		"attempted": false,
+		"flight_id":              "",
+		"attempted":              false,
+		"agent_result":           nil,
 	})
-
-	// Clear agent_result so rebooking code can detect cancellation happened
-	// (if agent_result still contains the old flight, code won't know cancellation occurred)
-	want.StoreState("agent_result", nil)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)

@@ -254,7 +254,7 @@ func TestOwnerReferenceGeneration(t *testing.T) {
 	if ownerRef.Name != "parent" {
 		t.Error("Owner reference name incorrect")
 	}
-	if ownerRef.APIVersion != "MyWant/v1" {
+	if ownerRef.APIVersion != "mywant/v1" {
 		t.Error("Owner reference API version incorrect")
 	}
 	if ownerRef.Kind != "Want" {

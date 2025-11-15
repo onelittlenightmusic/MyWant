@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	mywant "mywant/engine/src"
-	"mywant/engine/src/chain"
 )
 
 // QueuePacket represents data flowing through the chain
@@ -113,7 +112,7 @@ func (g *Numbers) GetWant() *mywant.Want {
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
-func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (g *Numbers) Exec() bool {
 	// Read parameters fresh each cycle - this enables dynamic param changes!
 	useDeterministic := false
 	if det, ok := g.Spec.Params["deterministic"]; ok {
@@ -146,18 +145,20 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		g.State = make(map[string]interface{})
 	}
 
-	if len(outputs) == 0 {
+	out, skipExec := g.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if g.currentCount >= paramCount {
 		// Store generation stats to state (for memory dump)
-		g.StoreState("total_processed", g.currentCount)
-		g.StoreState("average_wait_time", 0.0) // Generators don't have wait time
-		g.StoreState("total_wait_time", 0.0)
-		g.StoreState("current_time", g.currentTime)
-		g.StoreState("current_count", g.currentCount)
+		g.StoreStateMulti(map[string]interface{}{
+			"total_processed":   g.currentCount,
+			"average_wait_time": 0.0, // Generators don't have wait time
+			"total_wait_time":   0.0,
+			"current_time":      g.currentTime,
+			"current_count":     g.currentCount,
+		})
 
 		out <- QueuePacket{Num: -1, Time: 0}
 		fmt.Printf("[GENERATOR] Generated %d packets\n", g.currentCount)
@@ -179,8 +180,10 @@ func (g *Numbers) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Batch mechanism: only update state history every N packets to reduce history entries
 	if g.currentCount%g.batchUpdateInterval == 0 {
-		g.StoreState("current_time", g.currentTime)
-		g.StoreState("current_count", g.currentCount)
+		g.StoreStateMulti(map[string]interface{}{
+			"current_time":  g.currentTime,
+			"current_count": g.currentCount,
+		})
 	}
 
 	out <- QueuePacket{Num: g.currentCount, Time: g.currentTime}
@@ -250,7 +253,7 @@ func (q *Queue) GetWant() *mywant.Want {
 }
 
 // Exec executes the queue processing directly with batch mechanism
-func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (q *Queue) Exec() bool {
 	// Using direct Exec approach for dynamic parameter reading
 	if q.State == nil {
 		q.State = make(map[string]interface{})
@@ -259,11 +262,11 @@ func (q *Queue) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Local persistent state variables are used instead of State map
 	// This ensures they persist across cycles without batching interference
 
-	if len(using) == 0 || len(outputs) == 0 {
+	// Get input and output channels safely
+	in, out, skipExec := q.GetInputAndOutputChannels()
+	if skipExec || out == nil {
 		return true
 	}
-	in := using[0]
-	out := outputs[0]
 
 	packet := (<-in).(QueuePacket)
 
@@ -324,13 +327,15 @@ func (q *Queue) flushBatch() {
 	}
 
 	// Batch update all statistics at once
-	q.StoreState("serverFreeTime", q.serverFreeTime)
-	q.StoreState("waitTimeSum", q.waitTimeSum)
-	q.StoreState("processedCount", q.processedCount)
-	q.StoreState("average_wait_time", avgWaitTime)
-	q.StoreState("total_processed", q.processedCount)
-	q.StoreState("total_wait_time", q.waitTimeSum)
-	q.StoreState("current_server_free_time", q.serverFreeTime)
+	q.StoreStateMulti(map[string]interface{}{
+		"serverFreeTime":           q.serverFreeTime,
+		"waitTimeSum":              q.waitTimeSum,
+		"processedCount":           q.processedCount,
+		"average_wait_time":        avgWaitTime,
+		"total_processed":          q.processedCount,
+		"total_wait_time":          q.waitTimeSum,
+		"current_server_free_time": q.serverFreeTime,
+	})
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
@@ -342,10 +347,12 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 	}
 
 	// Store final state
-	q.StoreState("average_wait_time", avgWaitTime)
-	q.StoreState("total_processed", q.processedCount)
-	q.StoreState("total_wait_time", q.waitTimeSum)
-	q.StoreState("current_server_free_time", q.serverFreeTime)
+	q.StoreStateMulti(map[string]interface{}{
+		"average_wait_time":        avgWaitTime,
+		"total_processed":          q.processedCount,
+		"total_wait_time":          q.waitTimeSum,
+		"current_server_free_time": q.serverFreeTime,
+	})
 
 	fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", q.processedCount, avgWaitTime)
 	return nil
@@ -393,7 +400,7 @@ func (c *Combiner) GetWant() *mywant.Want {
 }
 
 // Exec executes the combiner directly
-func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (c *Combiner) Exec() bool {
 	// Initialize state if needed
 	if c.State == nil {
 		c.State = make(map[string]interface{})
@@ -402,15 +409,16 @@ func (c *Combiner) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	// Get persistent state
 	processed, _ := c.State["processed"].(int)
 
-	if len(using) == 0 || len(outputs) == 0 {
+	// Validate channels are available
+	if c.paths.GetInCount() == 0 || c.paths.GetOutCount() == 0 {
 		return true
 	}
-	out := outputs[0]
+	out, _ := c.GetOutputChannel(0)
 
 	// Simple combiner: just forward all packets from all inputs
-	for _, in := range using {
+	for i := 0; i < c.paths.GetInCount(); i++ {
 		select {
-		case packet, ok := <-in:
+		case packet, ok := <-c.paths.In[i].Channel:
 			if !ok {
 				continue
 			}
@@ -444,9 +452,11 @@ func (c *Combiner) OnEnded(packet mywant.Packet) error {
 	processed, _ := c.State["processed"].(int)
 
 	// Store final state
-	c.StoreState("total_processed", processed)
-	c.StoreState("average_wait_time", 0.0) // Combiners don't add wait time
-	c.StoreState("total_wait_time", 0.0)
+	c.StoreStateMulti(map[string]interface{}{
+		"total_processed":   processed,
+		"average_wait_time": 0.0, // Combiners don't add wait time
+		"total_wait_time":   0.0,
+	})
 
 	fmt.Printf("[COMBINER] Processed %d packets\n", processed)
 	return nil
@@ -489,12 +499,12 @@ func (s *Sink) GetWant() *mywant.Want {
 }
 
 // Exec executes the sink directly
-func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
-	// If no using configured, this sink shouldn't run
-	if len(using) == 0 {
+func (s *Sink) Exec() bool {
+	// Validate input channel is available
+	in, skipExec := s.GetFirstInputChannel()
+	if skipExec {
 		return true
 	}
-	in := using[0]
 
 	// Block waiting for data from using channel
 	packet := (<-in).(QueuePacket)
@@ -515,9 +525,11 @@ func (s *Sink) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 // OnEnded implements PacketHandler interface for Sink termination callbacks
 func (s *Sink) OnEnded(packet mywant.Packet) error {
 	// Store final state
-	s.StoreState("total_processed", s.Received)
-	s.StoreState("average_wait_time", 0.0) // Sinks don't add wait time
-	s.StoreState("total_wait_time", 0.0)
+	s.StoreStateMulti(map[string]interface{}{
+		"total_processed":   s.Received,
+		"average_wait_time": 0.0, // Sinks don't add wait time
+		"total_wait_time":   0.0,
+	})
 
 	fmt.Printf("[SINK] Received %d packets\n", s.Received)
 	return nil

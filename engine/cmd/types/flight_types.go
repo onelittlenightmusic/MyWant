@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	. "mywant/engine/src"
-	"mywant/engine/src/chain"
 	"time"
 )
 
@@ -114,7 +113,7 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 }
 
 // Exec creates a flight booking reservation
-func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (f *FlightWant) Exec() bool {
 	// Handle continuous monitoring phase
 	if f.monitoringActive {
 		// Continue running monitoring during the monitoring duration
@@ -179,10 +178,10 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 		}
 	}
 
-	if len(outputs) == 0 {
+	out, skipExec := f.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	// Check if already attempted using persistent state
 	attemptedVal, _ := f.GetState("attempted")
@@ -306,9 +305,10 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
-	if len(using) > 0 {
+	if f.paths.GetInCount() > 0 {
+		in, _ := f.GetInputChannel(0)
 		select {
-		case schedData := <-using[0]:
+		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				existingSchedule = schedule
 			}
@@ -360,13 +360,15 @@ func (f *FlightWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store flight details using thread-safe StoreState (batched to minimize history entries)
-	f.StoreState("total_processed", 1)
-	f.StoreState("flight_type", flightType)
-	f.StoreState("departure_time", newEvent.Start.Format("15:04 Jan 2"))
-	f.StoreState("arrival_time", newEvent.End.Format("15:04 Jan 2"))
-	f.StoreState("flight_duration_hours", duration.Hours())
-	f.StoreState("reservation_name", newEvent.Name)
-	f.StoreState("schedule_date", baseDate.Format("2006-01-02"))
+	f.StoreStateMulti(map[string]interface{}{
+		"total_processed":       1,
+		"flight_type":           flightType,
+		"departure_time":        newEvent.Start.Format("15:04 Jan 2"),
+		"arrival_time":          newEvent.End.Format("15:04 Jan 2"),
+		"flight_duration_hours": duration.Hours(),
+		"reservation_name":      newEvent.Name,
+		"schedule_date":         baseDate.Format("2006-01-02"),
+	})
 
 	log.Printf("[FLIGHT] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))

@@ -238,7 +238,7 @@ func (t *Target) CreateChildWants() []*Want {
 	for i := range config.Wants {
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
 			{
-				APIVersion:         "MyWant/v1",
+				APIVersion:         "mywant/v1",
 				Kind:               "Want",
 				Name:               t.Metadata.Name,
 				ID:                 t.Metadata.ID,

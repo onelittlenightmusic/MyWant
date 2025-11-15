@@ -42,7 +42,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the numbers generator
-func (g *PrimeNumbers) Exec(using []Chan, outputs []Chan) bool {
+func (g *PrimeNumbers) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	start := 2
 	if s, ok := g.Spec.Params["start"]; ok {
@@ -63,19 +63,20 @@ func (g *PrimeNumbers) Exec(using []Chan, outputs []Chan) bool {
 	}
 
 	// Check if already completed using persistent state
-	completed, _ := g.State["completed"].(bool)
+	completed, _ := g.GetStateBool("completed", false)
 
-	if len(outputs) == 0 {
+	// Validate output channel is available
+	out, skipExec := g.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if completed {
 		return true
 	}
 
 	// Mark as completed in persistent state
-	g.State["completed"] = true
+	g.StoreState("completed", true)
 
 	for i := start; i <= end; i++ {
 		out <- i
@@ -135,17 +136,17 @@ func (f *PrimeSequence) GetWant() interface{} {
 }
 
 // Exec returns the generalized chain function for the filter
-func (f *PrimeSequence) Exec(using []Chan, outputs []Chan) bool {
+func (f *PrimeSequence) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	// Note: prime parameter available but not used in current implementation
-	if len(using) == 0 {
+	in, skipExec := f.GetFirstInputChannel()
+	if skipExec {
 		return true
 	}
-	in := using[0]
 
 	var out Chan
-	if len(outputs) > 0 {
-		out = outputs[0]
+	if f.paths.GetOutCount() > 0 {
+		out, _ = f.GetOutputChannel(0)
 	}
 
 	// Get persistent foundPrimes slice or create new one
@@ -184,9 +185,11 @@ func (f *PrimeSequence) Exec(using []Chan, outputs []Chan) bool {
 					out <- val
 				}
 				// Update live state immediately when prime is found
-				f.StoreState("foundPrimes", foundPrimes)
-				f.StoreState("primeCount", len(foundPrimes))
-				f.StoreState("lastPrimeFound", val)
+				f.StoreStateMulti(map[string]interface{}{
+					"foundPrimes":    foundPrimes,
+					"primeCount":     len(foundPrimes),
+					"lastPrimeFound": val,
+				})
 			}
 
 			if f.State == nil {
@@ -199,8 +202,10 @@ func (f *PrimeSequence) Exec(using []Chan, outputs []Chan) bool {
 			}
 
 			// Update live state for each processed number
-			f.StoreState("total_processed", f.State["total_processed"])
-			f.StoreState("last_number_processed", val)
+			f.StoreStateMulti(map[string]interface{}{
+				"total_processed":       f.State["total_processed"],
+				"last_number_processed": val,
+			})
 		}
 	}
 	if out != nil {
@@ -209,8 +214,10 @@ func (f *PrimeSequence) Exec(using []Chan, outputs []Chan) bool {
 
 	// Store found primes in state for collection
 	f.State["foundPrimes"] = foundPrimes
-	f.StoreState("foundPrimes", foundPrimes)
-	f.StoreState("primeCount", len(foundPrimes))
+	f.StoreStateMulti(map[string]interface{}{
+		"foundPrimes": foundPrimes,
+		"primeCount":  len(foundPrimes),
+	})
 
 	return true
 }
@@ -251,8 +258,10 @@ func (s *PrimeSink) GetWant() interface{} {
 }
 
 // Exec returns the generalized chain function for the sink
-func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
-	if len(using) == 0 {
+func (s *PrimeSink) Exec() bool {
+	// Validate input channel is available
+	in, skipExec := s.GetFirstInputChannel()
+	if skipExec {
 		return true
 	}
 
@@ -260,7 +269,7 @@ func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
 	received, _ := s.State["received"].(int)
 
 	primes := make([]int, 0)
-	for val := range using[0] {
+	for val := range in {
 		if prime, ok := val.(int); ok {
 			primes = append(primes, prime)
 			received++
@@ -271,8 +280,10 @@ func (s *PrimeSink) Exec(using []Chan, outputs []Chan) bool {
 	s.State["received"] = received
 
 	// Store collected primes in state
-	s.StoreState("primes", primes)
-	s.StoreState("total_received", received)
+	s.StoreStateMulti(map[string]interface{}{
+		"primes":         primes,
+		"total_received": received,
+	})
 
 	if s.State == nil {
 		s.State = make(map[string]interface{})

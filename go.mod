@@ -1,4 +1,4 @@
-module MyWant
+module mywant
 
 go 1.25.3
 

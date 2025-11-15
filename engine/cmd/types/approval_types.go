@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	. "mywant/engine/src"
-	"mywant/engine/src/chain"
 	"time"
 )
 
@@ -72,20 +71,16 @@ func (e *EvidenceWant) GetWant() *Want {
 	return &e.Want
 }
 
-func (e *EvidenceWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (e *EvidenceWant) Exec() bool {
 	// Check if already provided evidence
-	provided, _ := e.State["evidence_provided"].(bool)
-
-	if len(outputs) == 0 {
-		return true
-	}
+	provided, _ := e.GetStateBool("evidence_provided", false)
 
 	if provided {
 		return true
 	}
 
 	// Mark as provided in state
-	e.State["evidence_provided"] = true
+	e.StoreState("evidence_provided", true)
 
 	// Create evidence data
 	evidenceData := &ApprovalData{
@@ -96,14 +91,20 @@ func (e *EvidenceWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store state
-	e.StoreState("evidence_type", e.EvidenceType)
-	e.StoreState("approval_id", e.ApprovalID)
-	e.StoreState("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
-	e.StoreState("total_processed", 1)
+	e.StoreStateMulti(map[string]interface{}{
+		"evidence_type":        e.EvidenceType,
+		"approval_id":          e.ApprovalID,
+		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
+		"total_processed":      1,
+	})
 
-	InfoLog("[EVIDENCE] ✅ Evidence %s provided for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, len(outputs))
+	InfoLog("[EVIDENCE] ✅ Evidence %s provided for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, e.paths.GetOutCount())
 
 	// Broadcast evidence to all output channels using SendPacketMulti
+	outputs := make([]Chan, e.paths.GetOutCount())
+	for i := 0; i < e.paths.GetOutCount(); i++ {
+		outputs[i] = e.paths.Out[i].Channel
+	}
 	e.SendPacketMulti(evidenceData, outputs)
 	return true
 }
@@ -155,20 +156,16 @@ func (d *DescriptionWant) GetWant() *Want {
 	return &d.Want
 }
 
-func (d *DescriptionWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (d *DescriptionWant) Exec() bool {
 	// Check if already provided description
-	provided, _ := d.State["description_provided"].(bool)
-
-	if len(outputs) == 0 {
-		return true
-	}
+	provided, _ := d.GetStateBool("description_provided", false)
 
 	if provided {
 		return true
 	}
 
 	// Mark as provided in state
-	d.State["description_provided"] = true
+	d.StoreState("description_provided", true)
 
 	// Create description data
 	description := fmt.Sprintf(d.DescriptionFormat, d.ApprovalID)
@@ -180,15 +177,21 @@ func (d *DescriptionWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store state
-	d.StoreState("description_format", d.DescriptionFormat)
-	d.StoreState("approval_id", d.ApprovalID)
-	d.StoreState("description", description)
-	d.StoreState("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
-	d.StoreState("total_processed", 1)
+	d.StoreStateMulti(map[string]interface{}{
+		"description_format":      d.DescriptionFormat,
+		"approval_id":             d.ApprovalID,
+		"description":             description,
+		"description_provided_at": descriptionData.Timestamp.Format(time.RFC3339),
+		"total_processed":         1,
+	})
 
-	InfoLog("[DESCRIPTION] 📝 Description provided: %s to %d coordinator(s)\n", description, len(outputs))
+	InfoLog("[DESCRIPTION] 📝 Description provided: %s to %d coordinator(s)\n", description, d.paths.GetOutCount())
 
 	// Broadcast description to all output channels using SendPacketMulti
+	outputs := make([]Chan, d.paths.GetOutCount())
+	for i := 0; i < d.paths.GetOutCount(); i++ {
+		outputs[i] = d.paths.Out[i].Channel
+	}
 	d.SendPacketMulti(descriptionData, outputs)
 	return true
 }
@@ -240,15 +243,15 @@ func (l *Level1CoordinatorWant) GetWant() interface{} {
 	return &l.Want
 }
 
-func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (l *Level1CoordinatorWant) Exec() bool {
 	// Check if approval already processed
-	processed, _ := l.State["approval_processed"].(bool)
+	processed, _ := l.GetStateBool("approval_processed", false)
 
 	if processed {
 		return true
 	}
 
-	if len(using) < 2 {
+	if l.paths.GetInCount() < 2 {
 		return false // Wait for evidence and description
 	}
 
@@ -258,25 +261,29 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	var evidenceTimestamp time.Time
 	var descriptionTimestamp time.Time
 
-	for _, input := range using {
+	for i := 0; i < l.paths.GetInCount(); i++ {
 		select {
-		case data := <-input:
+		case data := <-l.paths.In[i].Channel:
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true
 					evidenceTimestamp = approvalData.Timestamp
-					l.StoreState("evidence_received", true)
-					l.StoreState("evidence_type", approvalData.Evidence)
-					l.StoreState("evidence_provided", true)
-					l.StoreState("evidence_provided_at", approvalData.Timestamp.Format(time.RFC3339))
+					l.StoreStateMulti(map[string]interface{}{
+						"evidence_received":    true,
+						"evidence_type":        approvalData.Evidence,
+						"evidence_provided":    true,
+						"evidence_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+					})
 				}
 				if approvalData.Description != "" {
 					descriptionReceived = true
 					descriptionTimestamp = approvalData.Timestamp
-					l.StoreState("description_received", true)
-					l.StoreState("description_text", approvalData.Description)
-					l.StoreState("description_provided", true)
-					l.StoreState("description_provided_at", approvalData.Timestamp.Format(time.RFC3339))
+					l.StoreStateMulti(map[string]interface{}{
+						"description_received":    true,
+						"description_text":        approvalData.Description,
+						"description_provided":    true,
+						"description_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+					})
 				}
 			}
 		default:
@@ -299,22 +306,23 @@ func (l *Level1CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		}
 
 		// Store final state including evidence and description completion info
-		l.StoreState("approval_status", result.Status)
-		l.StoreState("approval_level", result.Level)
-		l.StoreState("approver_id", result.ApproverID)
-		l.StoreState("approval_time", result.ApprovalTime.Format(time.RFC3339))
-		l.StoreState("comments", result.Comments)
-		l.StoreState("total_processed", 1)
-
-		// Store evidence and description provider completion info for memory dump
-		l.StoreState("evidence_provider_complete", true)
-		l.StoreState("description_provider_complete", true)
+		stateUpdates := map[string]interface{}{
+			"approval_status":             result.Status,
+			"approval_level":              result.Level,
+			"approver_id":                 result.ApproverID,
+			"approval_time":               result.ApprovalTime.Format(time.RFC3339),
+			"comments":                    result.Comments,
+			"total_processed":             1,
+			"evidence_provider_complete":  true,
+			"description_provider_complete": true,
+		}
 		if !evidenceTimestamp.IsZero() {
-			l.StoreState("evidence_received_at", evidenceTimestamp.Format(time.RFC3339))
+			stateUpdates["evidence_received_at"] = evidenceTimestamp.Format(time.RFC3339)
 		}
 		if !descriptionTimestamp.IsZero() {
-			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
+			stateUpdates["description_received_at"] = descriptionTimestamp.Format(time.RFC3339)
 		}
+		l.StoreStateMulti(stateUpdates)
 
 		InfoLog("[LEVEL1] ✅ Approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,
@@ -381,15 +389,15 @@ func (l *Level2CoordinatorWant) GetWant() interface{} {
 	return &l.Want
 }
 
-func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (l *Level2CoordinatorWant) Exec() bool {
 	// Check if final approval already processed
-	processed, _ := l.State["final_approval_processed"].(bool)
+	processed, _ := l.GetStateBool("final_approval_processed", false)
 
 	if processed {
 		return true
 	}
 
-	if len(using) < 2 {
+	if l.paths.GetInCount() < 2 {
 		return false // Wait for evidence and description
 	}
 
@@ -399,25 +407,29 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	var evidenceTimestamp time.Time
 	var descriptionTimestamp time.Time
 
-	for _, input := range using {
+	for i := 0; i < l.paths.GetInCount(); i++ {
 		select {
-		case data := <-input:
+		case data := <-l.paths.In[i].Channel:
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true
 					evidenceTimestamp = approvalData.Timestamp
-					l.StoreState("evidence_received", true)
-					l.StoreState("evidence_type", approvalData.Evidence)
-					l.StoreState("evidence_provided", true)
-					l.StoreState("evidence_provided_at", approvalData.Timestamp.Format(time.RFC3339))
+					l.StoreStateMulti(map[string]interface{}{
+						"evidence_received":    true,
+						"evidence_type":        approvalData.Evidence,
+						"evidence_provided":    true,
+						"evidence_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+					})
 				}
 				if approvalData.Description != "" {
 					descriptionReceived = true
 					descriptionTimestamp = approvalData.Timestamp
-					l.StoreState("description_received", true)
-					l.StoreState("description_text", approvalData.Description)
-					l.StoreState("description_provided", true)
-					l.StoreState("description_provided_at", approvalData.Timestamp.Format(time.RFC3339))
+					l.StoreStateMulti(map[string]interface{}{
+						"description_received":    true,
+						"description_text":        approvalData.Description,
+						"description_provided":    true,
+						"description_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+					})
 				}
 			}
 		default:
@@ -440,23 +452,24 @@ func (l *Level2CoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 		}
 
 		// Store final state including evidence and description completion info
-		l.StoreState("final_approval_status", result.Status)
-		l.StoreState("approval_level", result.Level)
-		l.StoreState("approver_id", result.ApproverID)
-		l.StoreState("approval_time", result.ApprovalTime.Format(time.RFC3339))
-		l.StoreState("level2_authority", l.Level2Authority)
-		l.StoreState("comments", result.Comments)
-		l.StoreState("total_processed", 1)
-
-		// Store evidence and description provider completion info for memory dump
-		l.StoreState("evidence_provider_complete", true)
-		l.StoreState("description_provider_complete", true)
+		stateUpdates := map[string]interface{}{
+			"final_approval_status":       result.Status,
+			"approval_level":              result.Level,
+			"approver_id":                 result.ApproverID,
+			"approval_time":               result.ApprovalTime.Format(time.RFC3339),
+			"level2_authority":            l.Level2Authority,
+			"comments":                    result.Comments,
+			"total_processed":             1,
+			"evidence_provider_complete":  true,
+			"description_provider_complete": true,
+		}
 		if !evidenceTimestamp.IsZero() {
-			l.StoreState("evidence_received_at", evidenceTimestamp.Format(time.RFC3339))
+			stateUpdates["evidence_received_at"] = evidenceTimestamp.Format(time.RFC3339)
 		}
 		if !descriptionTimestamp.IsZero() {
-			l.StoreState("description_received_at", descriptionTimestamp.Format(time.RFC3339))
+			stateUpdates["description_received_at"] = descriptionTimestamp.Format(time.RFC3339)
 		}
+		l.StoreStateMulti(stateUpdates)
 
 		InfoLog("[LEVEL2] ✅ Final approval %s: %s by %s at %s\n",
 			result.ApprovalID, result.Status, result.ApproverID,

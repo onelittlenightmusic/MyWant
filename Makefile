@@ -395,6 +395,8 @@ restart-all:
 	@pkill -f "./bin/flight-server" || echo "No mock server process found"
 	@pkill -f "vite" || echo "No vite process found"
 	@sleep 2
+	@echo "🧹 Cleaning Go build cache..."
+	@go clean -cache
 	@echo "🏗️  Building backend..."
 	@$(MAKE) build-server
 	@mkdir -p logs

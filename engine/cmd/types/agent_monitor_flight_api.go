@@ -166,17 +166,16 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
 	// Individual agents should NOT call BeginExecCycle/EndExecCycle
 	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
-		// Store flight detail state updates
-		want.StoreStateMulti(map[string]interface{}{
-			"flight_id": reservation.ID,
-			"flight_number": reservation.FlightNumber,
-			"from": reservation.From,
-			"to": reservation.To,
+		updates := map[string]interface{}{
+			"flight_id":      reservation.ID,
+			"flight_number":  reservation.FlightNumber,
+			"from":           reservation.From,
+			"to":             reservation.To,
 			"departure_time": reservation.DepartureTime.Format(time.RFC3339),
-			"arrival_time": reservation.ArrivalTime.Format(time.RFC3339),
+			"arrival_time":   reservation.ArrivalTime.Format(time.RFC3339),
 			"status_message": reservation.StatusMessage,
-			"updated_at": reservation.UpdatedAt.Format(time.RFC3339),
-		})
+			"updated_at":     reservation.UpdatedAt.Format(time.RFC3339),
+		}
 
 		if hasStateChange {
 			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
@@ -190,13 +189,10 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			}
 			m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
 
-			// Store status change info - use actual newStatus from mock server
-			want.StoreStateMulti(map[string]interface{}{
-				"flight_status": newStatus,
-				"status_changed": true,
-				"status_changed_at": time.Now().Format(time.RFC3339),
-				"status_change_history_count": len(m.StatusChangeHistory),
-			})
+			updates["flight_status"] = newStatus
+			updates["status_changed"] = true
+			updates["status_changed_at"] = time.Now().Format(time.RFC3339)
+			updates["status_change_history_count"] = len(m.StatusChangeHistory)
 
 			// Record activity description for agent history
 			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
@@ -210,7 +206,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 				FlightNumber:    reservation.FlightNumber,
 				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 			}
-			want.StoreState("agent_result", schedule)
+			updates["agent_result"] = schedule
 
 			// Store all status history in state
 			statusHistoryStrs := make([]string, 0)
@@ -222,7 +218,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 					change.Details)
 				statusHistoryStrs = append(statusHistoryStrs, historyEntry)
 			}
-			want.StoreState("status_history", statusHistoryStrs)
+			updates["status_history"] = statusHistoryStrs
 
 			m.LastKnownStatus = newStatus
 
@@ -238,6 +234,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			fmt.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s\n", newStatus)
 			m.LastRecordedStateHash = currentStateHash
 		}
+		want.StoreStateMulti(updates)
 	} else {
 		// No state change - skip history entry
 		fmt.Printf("[MonitorFlightAPI] No state change detected, skipping history entry\n")

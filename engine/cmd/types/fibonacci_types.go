@@ -33,7 +33,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the numbers generator
-func (g *FibonacciNumbers) Exec(using []Chan, outputs []Chan) bool {
+func (g *FibonacciNumbers) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	count := 20
 	if c, ok := g.Spec.Params["count"]; ok {
@@ -45,19 +45,20 @@ func (g *FibonacciNumbers) Exec(using []Chan, outputs []Chan) bool {
 	}
 
 	// Check if already completed using persistent state
-	completed, _ := g.State["completed"].(bool)
+	completed, _ := g.GetStateBool("completed", false)
 
-	if len(outputs) == 0 {
+	// Validate output channel is available
+	out, skipExec := g.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if completed {
 		return true
 	}
 
 	// Mark as completed in persistent state
-	g.State["completed"] = true
+	g.StoreState("completed", true)
 
 	a, b := 0, 1
 	for i := 0; i < count; i++ {
@@ -129,7 +130,7 @@ func (f *FibonacciSequence) GetWant() interface{} {
 }
 
 // Exec returns the generalized chain function for the filter
-func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
+func (f *FibonacciSequence) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	minValue := 0
 	if min, ok := f.Spec.Params["min_value"]; ok {
@@ -149,10 +150,11 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 		}
 	}
 
-	if len(using) == 0 {
+	// Validate input channel is available
+	in, skipExec := f.GetFirstInputChannel()
+	if skipExec {
 		return true
 	}
-	in := using[0]
 
 	// Get persistent filtered slice or create new one
 	filtered, _ := f.State["filtered"].([]int)
@@ -167,9 +169,10 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 			if val >= minValue && val <= maxValue {
 				filtered = append(filtered, val)
 				// Update state immediately when number is filtered
-				f.State["filtered"] = filtered
-				f.StoreState("filtered", filtered)
-				f.StoreState("count", len(filtered))
+				f.StoreStateMulti(map[string]interface{}{
+					"filtered": filtered,
+					"count":    len(filtered),
+				})
 			}
 			if f.State == nil {
 				f.State = make(map[string]interface{})
@@ -183,14 +186,15 @@ func (f *FibonacciSequence) Exec(using []Chan, outputs []Chan) bool {
 	}
 
 	// Close any output channels (though this should be the end point)
-	for _, out := range outputs {
-		close(out)
+	for i := 0; i < f.paths.GetOutCount(); i++ {
+		close(f.paths.Out[i].Channel)
 	}
 
 	// Final state update to ensure consistency (in case no numbers were filtered)
-	f.State["filtered"] = filtered
-	f.StoreState("filtered", filtered)
-	f.StoreState("count", len(filtered))
+	f.StoreStateMulti(map[string]interface{}{
+		"filtered": filtered,
+		"count":    len(filtered),
+	})
 
 	// Display collected results
 	println("🔢 Filtered fibonacci numbers:", len(filtered), "numbers between", minValue, "and", maxValue)

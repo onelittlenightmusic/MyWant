@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	. "mywant/engine/src"
-	"mywant/engine/src/chain"
 	"time"
 )
 
@@ -81,7 +80,7 @@ func (r *RestaurantWant) GetWant() *Want {
 }
 
 // Exec creates a restaurant reservation
-func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (r *RestaurantWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	restaurantType := "casual"
 	if rt, ok := r.Spec.Params["restaurant_type"]; ok {
@@ -101,10 +100,10 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	if len(outputs) == 0 {
+	out, skipExec := r.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if attempted {
 		return true
@@ -147,9 +146,10 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
-	if len(using) > 0 {
+	if r.paths.GetInCount() > 0 {
+		in, _ := r.GetInputChannel(0)
 		select {
-		case schedData := <-using[0]:
+		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				existingSchedule = schedule
 			}
@@ -201,16 +201,15 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store stats using thread-safe StoreState
-	r.StoreState("total_processed", 1)
-
-	// Store live state with reservation details
-	r.StoreState("total_processed", 1)
-	r.StoreState("reservation_type", restaurantType)
-	r.StoreState("reservation_start_time", newEvent.Start.Format("15:04"))
-	r.StoreState("reservation_end_time", newEvent.End.Format("15:04"))
-	r.StoreState("reservation_duration_hours", duration.Hours())
-	r.StoreState("reservation_name", newEvent.Name)
-	r.StoreState("schedule_date", baseDate.Format("2006-01-02"))
+	r.StoreStateMulti(map[string]interface{}{
+		"total_processed":            1,
+		"reservation_type":           restaurantType,
+		"reservation_start_time":     newEvent.Start.Format("15:04"),
+		"reservation_end_time":       newEvent.End.Format("15:04"),
+		"reservation_duration_hours": duration.Hours(),
+		"reservation_name":           newEvent.Name,
+		"schedule_date":              baseDate.Format("2006-01-02"),
+	})
 
 	log.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04"), newEvent.End.Format("15:04"))
@@ -404,7 +403,7 @@ func (h *HotelWant) GetWant() *Want {
 	return &h.Want
 }
 
-func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (h *HotelWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	hotelType := "standard"
 	if ht, ok := h.Spec.Params["hotel_type"]; ok {
@@ -417,10 +416,10 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	if len(outputs) == 0 {
+	out, skipExec := h.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if attempted {
 		return true
@@ -463,9 +462,10 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
-	if len(using) > 0 {
+	if h.paths.GetInCount() > 0 {
+		in, _ := h.GetInputChannel(0)
 		select {
-		case schedData := <-using[0]:
+		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				existingSchedule = schedule
 			}
@@ -518,12 +518,14 @@ func (h *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store stats using thread-safe StoreState
-	h.StoreState("total_processed", 1)
-	h.StoreState("hotel_type", hotelType)
-	h.StoreState("check_in_time", newEvent.Start.Format("15:04 Jan 2"))
-	h.StoreState("check_out_time", newEvent.End.Format("15:04 Jan 2"))
-	h.StoreState("stay_duration_hours", newEvent.End.Sub(newEvent.Start).Hours())
-	h.StoreState("reservation_name", newEvent.Name)
+	h.StoreStateMulti(map[string]interface{}{
+		"total_processed":     1,
+		"hotel_type":          hotelType,
+		"check_in_time":       newEvent.Start.Format("15:04 Jan 2"),
+		"check_out_time":      newEvent.End.Format("15:04 Jan 2"),
+		"stay_duration_hours": newEvent.End.Sub(newEvent.Start).Hours(),
+		"reservation_name":    newEvent.Name,
+	})
 
 	log.Printf("[HOTEL] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
@@ -625,7 +627,7 @@ func (b *BuffetWant) GetWant() *Want {
 	return &b.Want
 }
 
-func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (b *BuffetWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	buffetType := "continental"
 	if bt, ok := b.Spec.Params["buffet_type"]; ok {
@@ -640,10 +642,10 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	if len(outputs) == 0 {
+	out, skipExec := b.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if attempted {
 		return true
@@ -685,9 +687,10 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	log.Printf("[BUFFET] Agent execution did not return result, using standard buffet logic\n")
 
 	var existingSchedule *TravelSchedule
-	if len(using) > 0 {
+	if b.paths.GetInCount() > 0 {
+		in, _ := b.GetInputChannel(0)
 		select {
-		case schedData := <-using[0]:
+		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				existingSchedule = schedule
 			}
@@ -735,15 +738,14 @@ func (b *BuffetWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	}
 
 	// Store stats using thread-safe StoreState
-	b.StoreState("total_processed", 1)
-
-	// Store live state with reservation details
-	b.StoreState("total_processed", 1)
-	b.StoreState("buffet_type", buffetType)
-	b.StoreState("buffet_start_time", newEvent.Start.Format("15:04 Jan 2"))
-	b.StoreState("buffet_end_time", newEvent.End.Format("15:04 Jan 2"))
-	b.StoreState("buffet_duration_hours", duration.Hours())
-	b.StoreState("reservation_name", newEvent.Name)
+	b.StoreStateMulti(map[string]interface{}{
+		"total_processed":       1,
+		"buffet_type":           buffetType,
+		"buffet_start_time":     newEvent.Start.Format("15:04 Jan 2"),
+		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
+		"buffet_duration_hours": duration.Hours(),
+		"reservation_name":      newEvent.Name,
+	})
 
 	log.Printf("[BUFFET] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
@@ -920,8 +922,8 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 	return &t.Want
 }
 
-func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
-	if len(using) < 3 {
+func (t *TravelCoordinatorWant) Exec() bool {
+	if t.paths.GetInCount() < 3 {
 		return true
 	}
 
@@ -939,9 +941,9 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 	}
 
 	// Collect all schedules from child wants
-	for _, input := range using {
+	for i := 0; i < t.paths.GetInCount(); i++ {
 		select {
-		case schedData := <-input:
+		case schedData := <-t.paths.In[i].Channel:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				schedules = append(schedules, schedule)
 			}
