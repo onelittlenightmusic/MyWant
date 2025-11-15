@@ -29,13 +29,8 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
-	if c, ok := spec.Params["max_count"]; ok {
-		if ci, ok := c.(int); ok {
-			gen.MaxCount = ci
-		} else if cf, ok := c.(float64); ok {
-			gen.MaxCount = int(cf)
-		}
-	}
+	// Extract max_count parameter with automatic type conversion
+	gen.MaxCount = gen.GetIntParam("max_count", 15)
 
 	// Set fields for base Want methods
 	gen.WantType = "seed_numbers"
@@ -51,37 +46,26 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 	return gen
 }
 
-// GetWant returns the embedded Want
-func (g *SeedNumbers) GetWant() interface{} {
-	return &g.Want
-}
-
 // Exec returns the generalized chain function for the seed numbers generator
 func (g *SeedNumbers) Exec(using []Chan, outputs []Chan) bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	maxCount := 15
-	if c, ok := g.Spec.Params["max_count"]; ok {
-		if ci, ok := c.(int); ok {
-			maxCount = ci
-		} else if cf, ok := c.(float64); ok {
-			maxCount = int(cf)
-		}
-	}
+	maxCount := g.GetIntParam("max_count", 15)
 
 	// Check if already completed using persistent state
-	completed, _ := g.State["completed"].(bool)
+	completed, _ := g.GetStateBool("completed", false)
 
-	if len(outputs) == 0 {
+	// Validate output channel is available
+	out, skipExec := g.GetFirstOutputChannel()
+	if skipExec {
 		return true
 	}
-	out := outputs[0]
 
 	if completed {
 		return true
 	}
 
 	// Mark as completed in persistent state
-	g.State["completed"] = true
+	g.StoreState("completed", true)
 
 	// Send initial seeds: 0 and 1
 	out <- FibonacciSeed{Value: 0, Position: 0, IsEnd: false}
@@ -90,10 +74,8 @@ func (g *SeedNumbers) Exec(using []Chan, outputs []Chan) bool {
 	// Send end marker with max count info
 	out <- FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true}
 
-	if g.State == nil {
-		g.State = make(map[string]interface{})
-	}
-	g.State["total_processed"] = 2
+	// Store final statistics
+	g.StoreState("total_processed", 2)
 	fmt.Printf("[SEED] Generated initial seeds: 0, 1 (max_count: %d)\n", maxCount)
 	return true
 }
@@ -127,41 +109,36 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 	return computer
 }
 
-// GetWant returns the embedded Want
-func (c *FibonacciComputer) GetWant() interface{} {
-	return &c.Want
-}
-
 // Exec returns the generalized chain function for the fibonacci computer
 func (c *FibonacciComputer) Exec(using []Chan, outputs []Chan) bool {
-	if len(using) == 0 || len(outputs) == 0 {
+	// Get input and output channels safely
+	in, out, skipExec := c.GetInputAndOutputChannels()
+	if skipExec || out == nil {
 		return true
 	}
-	in := using[0]
-	out := outputs[0]
 
 	// Initialize persistent state variables
-	prev, _ := c.State["prev"].(int)
-	current, _ := c.State["current"].(int)
+	prev, _ := c.GetStateInt("prev", 0)
+	current, _ := c.GetStateInt("current", 0)
 	if current == 0 {
 		current = 1
 	}
-	position, _ := c.State["position"].(int)
+	position, _ := c.GetStateInt("position", 0)
 	if position == 0 {
 		position = 2
 	}
-	maxCount, _ := c.State["maxCount"].(int)
+	maxCount, _ := c.GetStateInt("maxCount", 0)
 	if maxCount == 0 {
 		maxCount = 15
 	}
-	processed, _ := c.State["processed"].(int)
-	initialized, _ := c.State["initialized"].(bool)
+	processed, _ := c.GetStateInt("processed", 0)
+	initialized, _ := c.GetStateBool("initialized", false)
 
 	seed := (<-in).(FibonacciSeed)
 
 	if seed.IsEnd {
 		maxCount = seed.Value
-		c.State["maxCount"] = maxCount
+		c.StoreState("maxCount", maxCount)
 		fmt.Printf("[COMPUTER] Received max count: %d\n", maxCount)
 
 		// After getting max count, start computing all remaining fibonacci numbers
@@ -178,11 +155,13 @@ func (c *FibonacciComputer) Exec(using []Chan, outputs []Chan) bool {
 		out <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
 
 		// Update persistent state
-		c.State["prev"] = prev
-		c.State["current"] = current
-		c.State["position"] = position
-		c.State["processed"] = processed
-		c.State["total_processed"] = processed
+		c.StoreStateMulti(map[string]interface{}{
+			"prev": prev,
+			"current": current,
+			"position": position,
+			"processed": processed,
+			"total_processed": processed,
+		})
 
 		fmt.Printf("[COMPUTER] Computed %d fibonacci numbers\n", processed)
 		return true
@@ -192,13 +171,15 @@ func (c *FibonacciComputer) Exec(using []Chan, outputs []Chan) bool {
 	if !initialized {
 		if seed.Position == 0 {
 			prev = seed.Value
-			c.State["prev"] = prev
+			c.StoreState("prev", prev)
 			return false
 		} else if seed.Position == 1 {
 			current = seed.Value
 			initialized = true
-			c.State["current"] = current
-			c.State["initialized"] = initialized
+			c.StoreStateMulti(map[string]interface{}{
+				"current": current,
+				"initialized": initialized,
+			})
 			return false
 		}
 	}
@@ -235,11 +216,6 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 	return merger
 }
 
-// GetWant returns the embedded Want
-func (m *FibonacciMerger) GetWant() interface{} {
-	return &m.Want
-}
-
 // Exec returns the generalized chain function for the fibonacci merger
 func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 	if len(using) < 2 || len(outputs) < 1 {
@@ -247,10 +223,10 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 	}
 
 	// Use persistent state for closure variables
-	seedUsingClosed, _ := m.State["seedUsingClosed"].(bool)
-	computedUsingClosed, _ := m.State["computedUsingClosed"].(bool)
-	processed, _ := m.State["processed"].(int)
-	maxCountReceived, _ := m.State["maxCountReceived"].(bool)
+	seedUsingClosed, _ := m.GetStateBool("seedUsingClosed", false)
+	computedUsingClosed, _ := m.GetStateBool("computedUsingClosed", false)
+	processed, _ := m.GetStateInt("processed", 0)
+	maxCountReceived, _ := m.GetStateBool("maxCountReceived", false)
 
 	seedIn := using[0]        // From seed generator
 	computedIn := using[1]    // From fibonacci computer (feedback loop)
@@ -262,39 +238,36 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 		fibSeed := seed.(FibonacciSeed)
 		if fibSeed.IsEnd {
 			seedUsingClosed = true
-			m.State["seedUsingClosed"] = seedUsingClosed
+			m.StoreState("seedUsingClosed", seedUsingClosed)
 			if !maxCountReceived {
 				// Forward end signal to computer to set max count
 				computerOut <- fibSeed
 				maxCountReceived = true
-				m.State["maxCountReceived"] = maxCountReceived
+				m.StoreState("maxCountReceived", maxCountReceived)
 			}
 		} else {
 			computerOut <- fibSeed                                      // Send to computer for processing
 			fmt.Printf("F(%d) = %d\n", fibSeed.Position, fibSeed.Value) // Display directly
 			processed++
-			m.State["processed"] = processed
+			m.StoreState("processed", processed)
 		}
 
 	case computed := <-computedIn:
 		fibSeed := computed.(FibonacciSeed)
 		if fibSeed.IsEnd {
 			computedUsingClosed = true
-			m.State["computedUsingClosed"] = computedUsingClosed
+			m.StoreState("computedUsingClosed", computedUsingClosed)
 		} else {
 			// Display computed values directly
 			fmt.Printf("F(%d) = %d\n", fibSeed.Position, fibSeed.Value)
 			processed++
-			m.State["processed"] = processed
+			m.StoreState("processed", processed)
 		}
 	}
 
 	// End when both using are closed
 	if seedUsingClosed && computedUsingClosed {
-		if m.State == nil {
-			m.State = make(map[string]interface{})
-		}
-		m.State["total_processed"] = processed
+		m.StoreState("total_processed", processed)
 		fmt.Printf("[MERGER] Merged %d fibonacci values\n", processed)
 		return true
 	}

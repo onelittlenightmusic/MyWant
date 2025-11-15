@@ -446,6 +446,65 @@ func (n *Want) StoreState(key string, value interface{}) {
 	sendStateNotifications(notification)
 }
 
+// StoreStateMulti stores multiple state values in a single operation, more efficient than multiple StoreState calls
+// Batches all updates together to minimize lock contention and history entries
+// Usage:
+//   want.StoreStateMulti(map[string]interface{}{
+//       "description_received": true,
+//       "description_text": "some text",
+//       "description_provided": true,
+//   })
+func (n *Want) StoreStateMulti(updates map[string]interface{}) {
+	// CRITICAL: Use mutex to protect both State and pendingStateChanges
+	n.stateMutex.Lock()
+
+	// Collect all notifications before releasing the lock
+	var notifications []StateNotification
+
+	// Process each update
+	for key, value := range updates {
+		// Get previous value to check if it's actually different
+		previousValue, exists := n.getStateUnsafe(key)
+
+		// Check if the value has actually changed (DIFFERENTIAL CHECK)
+		if exists && n.valuesEqual(previousValue, value) {
+			// No change, skip this key
+			continue
+		}
+
+		// Value has changed, store it
+		// Store the state - preserve existing State to maintain history
+		if n.State == nil {
+			n.State = make(map[string]interface{})
+		}
+		n.State[key] = value
+
+		// Stage the change in pending state changes
+		if n.pendingStateChanges == nil {
+			n.pendingStateChanges = make(map[string]interface{})
+		}
+		n.pendingStateChanges[key] = value
+
+		// Prepare notification for this change
+		notification := StateNotification{
+			SourceWantName: n.Metadata.Name,
+			StateKey:       key,
+			StateValue:     value,
+			PreviousValue:  previousValue,
+			Timestamp:      time.Now(),
+		}
+		notifications = append(notifications, notification)
+	}
+
+	n.stateMutex.Unlock()
+
+	// Send notifications AFTER releasing the lock
+	// Batch all notifications together
+	for _, notification := range notifications {
+		sendStateNotifications(notification)
+	}
+}
+
 // GetState retrieves a state value atomically with mutex protection
 // This method encapsulates all stateMutex access for state reads, ensuring thread safety
 // Returns (value, exists) to indicate whether the key exists in state
@@ -460,6 +519,63 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 
 	value, exists := n.State[key]
 	return value, exists
+}
+
+// GetStateBool retrieves a boolean state value with type assertion
+// Returns (defaultValue, false) if the key doesn't exist or the value is not a bool
+// Usage:
+//   provided, ok := want.GetStateBool("description_provided", false)
+//   if ok {
+//       // provided is a valid bool
+//   }
+func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		return defaultValue, false
+	}
+	if boolVal, ok := value.(bool); ok {
+		return boolVal, true
+	}
+	return defaultValue, false
+}
+
+// GetStateInt retrieves an integer state value with type assertion
+// Supports both int and float64 types
+// Returns (defaultValue, false) if the key doesn't exist or the value cannot be converted to int
+// Usage:
+//   count, ok := want.GetStateInt("total_processed", 0)
+//   if ok {
+//       // count is a valid int
+//   }
+func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		return defaultValue, false
+	}
+	if intVal, ok := value.(int); ok {
+		return intVal, true
+	} else if floatVal, ok := value.(float64); ok {
+		return int(floatVal), true
+	}
+	return defaultValue, false
+}
+
+// GetStateString retrieves a string state value with type assertion
+// Returns (defaultValue, false) if the key doesn't exist or the value is not a string
+// Usage:
+//   name, ok := want.GetStateString("current_name", "unknown")
+//   if ok {
+//       // name is a valid string
+//   }
+func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		return defaultValue, false
+	}
+	if strVal, ok := value.(string); ok {
+		return strVal, true
+	}
+	return defaultValue, false
 }
 
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
@@ -815,3 +931,90 @@ func (n *Want) Init(metadata Metadata, spec WantSpec) {
 	n.Status = WantStatusIdle
 	n.State = make(map[string]interface{})
 }
+
+// GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion
+// Supports both int and float64 types, returning the provided default if not found
+// Usage:
+//   count := want.GetIntParam("count", 100)  // Returns int, converts float64 if needed
+func (n *Want) GetIntParam(key string, defaultValue int) int {
+	if value, ok := n.Spec.Params[key]; ok {
+		if intVal, ok := value.(int); ok {
+			return intVal
+		} else if floatVal, ok := value.(float64); ok {
+			return int(floatVal)
+		}
+	}
+	return defaultValue
+}
+
+// GetFloatParam extracts a float parameter from WantSpec.Params with automatic type conversion
+// Supports both float64 and int types, returning the provided default if not found
+// Usage:
+//   rate := want.GetFloatParam("rate", 1.0)  // Returns float64, converts int if needed
+func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
+	if value, ok := n.Spec.Params[key]; ok {
+		if floatVal, ok := value.(float64); ok {
+			return floatVal
+		} else if intVal, ok := value.(int); ok {
+			return float64(intVal)
+		}
+	}
+	return defaultValue
+}
+
+// GetStringParam extracts a string parameter from WantSpec.Params
+// Returns the provided default if not found or if the value is not a string
+// Usage:
+//   name := want.GetStringParam("name", "default_name")
+func (n *Want) GetStringParam(key string, defaultValue string) string {
+	if value, ok := n.Spec.Params[key]; ok {
+		if strVal, ok := value.(string); ok {
+			return strVal
+		}
+	}
+	return defaultValue
+}
+
+// GetBoolParam extracts a bool parameter from WantSpec.Params with automatic type conversion
+func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
+	if value, ok := n.Spec.Params[key]; ok {
+		if boolVal, ok := value.(bool); ok {
+			return boolVal
+		} else if strVal, ok := value.(string); ok {
+			return strVal == "true" || strVal == "True" || strVal == "TRUE" || strVal == "1"
+		}
+	}
+	return defaultValue
+}
+
+// IncrementIntState increments an integer value in State by 1
+// If the key doesn't exist, initializes it to 1
+// Returns the new value after increment
+// Usage:
+//   count := want.IncrementIntState("total_processed")  // Returns new count
+func (n *Want) IncrementIntState(key string) int {
+	// Initialize state if needed
+	if n.State == nil {
+		n.State = make(map[string]interface{})
+	}
+
+	var newValue int
+	if val, exists := n.State[key]; exists {
+		if intVal, ok := val.(int); ok {
+			newValue = intVal + 1
+		} else {
+			newValue = 1
+		}
+	} else {
+		newValue = 1
+	}
+
+	n.State[key] = newValue
+	if n.pendingStateChanges == nil {
+		n.pendingStateChanges = make(map[string]interface{})
+	}
+	n.pendingStateChanges[key] = newValue
+
+	return newValue
+}
+
