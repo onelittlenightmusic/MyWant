@@ -112,6 +112,10 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
+	// Log all completion events for debugging
+	InfoLog("[TARGET:COMPLETION] Received completion event for child '%s' targeting target '%s' (my target: '%s')\n",
+		completionEvent.ChildName, completionEvent.TargetName, tcs.target.Metadata.Name)
+
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
 		return EventResponse{Handled: false}
@@ -120,16 +124,21 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	// Track child completion
 	tcs.target.childCompletionMutex.Lock()
 	tcs.target.completedChildren[completionEvent.ChildName] = true
+	InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Child '%s' marked complete (%d/%d completed)\n",
+		tcs.target.Metadata.Name, completionEvent.ChildName, len(tcs.target.completedChildren), len(tcs.target.childWants))
 	allComplete := tcs.target.checkAllChildrenComplete()
 	tcs.target.childCompletionMutex.Unlock()
 
 	// If all children are complete, signal the target via channel
 	if allComplete {
+		InfoLog("[TARGET:COMPLETION] 🎉 Target '%s': ALL children complete! Signaling completion...\n", tcs.target.Metadata.Name)
 		select {
 		case tcs.target.childrenDone <- true:
 			// Signal sent successfully
+			InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Completion signal sent successfully\n", tcs.target.Metadata.Name)
 		default:
 			// Channel already has signal, ignore
+			InfoLog("[TARGET:COMPLETION] ⚠️  Target '%s': Completion signal already sent or buffered\n", tcs.target.Metadata.Name)
 		}
 	}
 
@@ -583,20 +592,27 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec() bool {
+	// Log execution start
+	InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s' executing (target: '%s')\n", oaw.WantName, oaw.TargetName)
+
 	// Call the original Exec method directly
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
 		result := chainWant.Exec()
+		InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s': BaseWant.Exec() returned %v\n", oaw.WantName, result)
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
 			// Emit OwnerCompletionEvent through unified subscription system
+			InfoLog("[TARGET:WRAPPER] ✅ OwnerAwareWant '%s': Will emit completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
 			oaw.emitOwnerCompletionEvent()
+		} else {
+			InfoLog("[TARGET:WRAPPER] ⚠️  OwnerAwareWant '%s': result=%v, TargetName='%s' - skipping completion event\n", oaw.WantName, result, oaw.TargetName)
 		}
 
 		return result
 	} else {
 		// Fallback for non-ChainWant types
-		InfoLog("[TARGET] ⚠️  Want %s: No Exec method available\n", oaw.WantName)
+		InfoLog("[TARGET:WRAPPER] ⚠️  Want '%s': No ChainWant implementation found (type: %T)\n", oaw.WantName, oaw.BaseWant)
 		return true
 	}
 }
@@ -624,8 +640,17 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 		ChildName: oaw.WantName,
 	}
 
+	// Log the emission for debugging
+	if oaw.TargetName != "" {
+		InfoLog("[TARGET:COMPLETION] 📤 Want '%s': Emitting completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
+	}
+
 	// Emit through subscription system (blocking mode)
 	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)
+
+	if oaw.TargetName != "" {
+		InfoLog("[TARGET:COMPLETION] ✅ Want '%s': Completion event emitted to target '%s'\n", oaw.WantName, oaw.TargetName)
+	}
 }
 
 // setupStateNotifications sets up state change monitoring for this want

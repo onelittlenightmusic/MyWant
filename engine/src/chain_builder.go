@@ -270,7 +270,9 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	// Automatically wrap with OwnerAwareWant if the want has owner references
 	// This enables parent-child coordination via subscription events
 	if len(want.Metadata.OwnerReferences) > 0 {
+		InfoLog("[WANT:CREATE] Wrapping want '%s' with OwnerAwareWant (owner refs: %d)\n", want.Metadata.Name, len(want.Metadata.OwnerReferences))
 		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, wantPtr)
+		InfoLog("[WANT:CREATE] ✅ Want '%s' wrapped with OwnerAwareWant\n", want.Metadata.Name)
 	}
 
 	return wantInstance, nil
