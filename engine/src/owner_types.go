@@ -3,7 +3,6 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"mywant/engine/src/chain"
 	"reflect"
 	"strings"
 	"sync"
@@ -258,7 +257,7 @@ func (t *Target) CreateChildWants() []*Want {
 }
 
 // Exec implements the ChainWant interface for Target with direct execution
-func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (t *Target) Exec() bool {
 	InfoLog("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 
 	// Dynamically create child wants
