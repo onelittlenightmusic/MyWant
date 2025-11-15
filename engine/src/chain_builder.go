@@ -260,6 +260,15 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	var wantPtr *Want
 	if w, ok := wantInstance.(*Want); ok {
 		wantPtr = w
+		InfoLog("[WANT:CREATE] Direct *Want pointer found for '%s'\n", want.Metadata.Name)
+	} else {
+		// For types that embed Want, extract the Want pointer via reflection
+		wantPtr = extractWantViaReflection(wantInstance)
+		if wantPtr != nil {
+			InfoLog("[WANT:CREATE] Extracted Want pointer via reflection for '%s'\n", want.Metadata.Name)
+		} else {
+			InfoLog("[WANT:CREATE] ⚠️  No Want pointer found (direct or embedded) for '%s'\n", want.Metadata.Name)
+		}
 	}
 
 	// Set agent registry if available
@@ -1514,6 +1523,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 
+	InfoLog("[MEMORY] writeStatsToMemory: config_wants=%d, runtime_wants=%d\n", len(cb.config.Wants), len(cb.wants))
+
 	// Create a comprehensive config that includes ALL wants (both config and runtime)
 	updatedConfig := Config{
 		Wants: make([]*Want, 0),
@@ -1530,6 +1541,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Status = runtimeWant.want.Status
 			want.State = runtimeWant.want.State
 			want.History = runtimeWant.want.History // Include history in stats writes
+			InfoLog("[MEMORY] Updated config want '%s': status=%s, state_size=%d\n", want.Metadata.Name, want.Status, len(want.State))
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
 	}
@@ -1538,6 +1550,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	for wantName, runtimeWant := range cb.wants {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
+			InfoLog("[MEMORY] Writing runtime-only want '%s' with state size: %d\n", wantName, len(runtimeWant.want.State))
 			wantConfig := &Want{
 				Metadata: runtimeWant.metadata,
 				Spec:     runtimeWant.spec,
