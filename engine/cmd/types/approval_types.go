@@ -41,17 +41,9 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	evidence.Init(metadata, spec)
 
-	if et, ok := spec.Params["evidence_type"]; ok {
-		if ets, ok := et.(string); ok {
-			evidence.EvidenceType = ets
-		}
-	}
+	evidence.EvidenceType = evidence.GetStringParam("evidence_type", "document")
 
-	if aid, ok := spec.Params["approval_id"]; ok {
-		if aids, ok := aid.(string); ok {
-			evidence.ApprovalID = aids
-		}
-	}
+	evidence.ApprovalID = evidence.GetStringParam("approval_id", "")
 
 	// Set fields for base Want methods
 	evidence.WantType = "evidence"
@@ -126,17 +118,9 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	description.Init(metadata, spec)
 
-	if df, ok := spec.Params["description_format"]; ok {
-		if dfs, ok := df.(string); ok {
-			description.DescriptionFormat = dfs
-		}
-	}
+	description.DescriptionFormat = description.GetStringParam("description_format", "Request for approval: %s")
 
-	if aid, ok := spec.Params["approval_id"]; ok {
-		if aids, ok := aid.(string); ok {
-			description.ApprovalID = aids
-		}
-	}
+	description.ApprovalID = description.GetStringParam("approval_id", "")
 
 	// Set fields for base Want methods
 	description.WantType = "description"
@@ -213,17 +197,9 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
 
-	if aid, ok := spec.Params["approval_id"]; ok {
-		if aids, ok := aid.(string); ok {
-			coordinator.ApprovalID = aids
-		}
-	}
+	coordinator.ApprovalID = coordinator.GetStringParam("approval_id", "")
 
-	if ct, ok := spec.Params["coordinator_type"]; ok {
-		if cts, ok := ct.(string); ok {
-			coordinator.CoordinatorType = cts
-		}
-	}
+	coordinator.CoordinatorType = coordinator.GetStringParam("coordinator_type", "level1")
 
 	// Set fields for base Want methods
 	coordinator.WantType = "level1_coordinator"
@@ -353,23 +329,11 @@ func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
 
-	if aid, ok := spec.Params["approval_id"]; ok {
-		if aids, ok := aid.(string); ok {
-			coordinator.ApprovalID = aids
-		}
-	}
+	coordinator.ApprovalID = coordinator.GetStringParam("approval_id", "")
 
-	if ct, ok := spec.Params["coordinator_type"]; ok {
-		if cts, ok := ct.(string); ok {
-			coordinator.CoordinatorType = cts
-		}
-	}
+	coordinator.CoordinatorType = coordinator.GetStringParam("coordinator_type", "level2")
 
-	if l2a, ok := spec.Params["level2_authority"]; ok {
-		if l2as, ok := l2a.(string); ok {
-			coordinator.Level2Authority = l2as
-		}
-	}
+	coordinator.Level2Authority = coordinator.GetStringParam("level2_authority", "senior_manager")
 
 	// Set fields for base Want methods
 	coordinator.WantType = "level2_coordinator"

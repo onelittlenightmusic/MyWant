@@ -70,27 +70,11 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
-	if r, ok := spec.Params["rate"]; ok {
-		if rf, ok := r.(float64); ok {
-			gen.Rate = rf
-		}
-	}
-	if c, ok := spec.Params["count"]; ok {
-		if ci, ok := c.(int); ok {
-			gen.Count = ci
-		} else if cf, ok := c.(float64); ok {
-			gen.Count = int(cf)
-		}
-	}
+	gen.Rate = gen.GetFloatParam("rate", 1.0)
+	gen.Count = gen.GetIntParam("count", 100)
 
 	// Allow configurable batch update interval
-	if batchInterval, ok := spec.Params["batch_interval"]; ok {
-		if bi, ok := batchInterval.(float64); ok {
-			gen.batchUpdateInterval = int(bi)
-		} else if bi, ok := batchInterval.(int); ok {
-			gen.batchUpdateInterval = bi
-		}
-	}
+	gen.batchUpdateInterval = gen.GetIntParam("batch_interval", 100)
 
 	// Set fields for base Want methods
 	gen.WantType = "sequence"
@@ -114,31 +98,12 @@ func (g *Numbers) GetWant() *mywant.Want {
 // Exec executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Exec() bool {
 	// Read parameters fresh each cycle - this enables dynamic param changes!
-	useDeterministic := false
-	if det, ok := g.Spec.Params["deterministic"]; ok {
-		if detBool, ok := det.(bool); ok {
-			useDeterministic = detBool
-		} else if detStr, ok := det.(string); ok {
-			useDeterministic = (detStr == "true")
-		}
-	}
+	useDeterministic := g.GetBoolParam("deterministic", false)
 
 	// Read count and rate parameters fresh each cycle
-	paramCount := g.Count // Default fallback
-	if c, ok := g.Spec.Params["count"]; ok {
-		if ci, ok := c.(int); ok {
-			paramCount = ci
-		} else if cf, ok := c.(float64); ok {
-			paramCount = int(cf)
-		}
-	}
+	paramCount := g.GetIntParam("count", g.Count)
 
-	paramRate := g.Rate // Default fallback
-	if r, ok := g.Spec.Params["rate"]; ok {
-		if rf, ok := r.(float64); ok {
-			paramRate = rf
-		}
-	}
+	paramRate := g.GetFloatParam("rate", g.Rate)
 
 	// Initialize state map if not present
 	if g.State == nil {
@@ -218,20 +183,10 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	// Initialize base Want fields
 	queue.Init(metadata, spec)
 
-	if st, ok := spec.Params["service_time"]; ok {
-		if stf, ok := st.(float64); ok {
-			queue.ServiceTime = stf
-		}
-	}
+	queue.ServiceTime = queue.GetFloatParam("service_time", 1.0)
 
 	// Allow configurable batch update interval
-	if batchInterval, ok := spec.Params["batch_interval"]; ok {
-		if bi, ok := batchInterval.(float64); ok {
-			queue.batchUpdateInterval = int(bi)
-		} else if bi, ok := batchInterval.(int); ok {
-			queue.batchUpdateInterval = bi
-		}
-	}
+	queue.batchUpdateInterval = queue.GetIntParam("batch_interval", 100)
 
 	// Set fields for base Want methods
 	queue.WantType = "queue"
@@ -290,12 +245,7 @@ func (q *Queue) Exec() bool {
 	waitTime := startServiceTime - arrivalTime
 
 	// Read service time from parameters (can change dynamically!)
-	serviceTime := q.ServiceTime
-	if st, ok := q.Spec.Params["service_time"]; ok {
-		if stFloat, ok := st.(float64); ok {
-			serviceTime = stFloat
-		}
-	}
+	serviceTime := q.GetFloatParam("service_time", q.ServiceTime)
 
 	finishTime := startServiceTime + serviceTime
 	q.serverFreeTime = finishTime
@@ -374,11 +324,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	// Initialize base Want fields
 	combiner.Init(metadata, spec)
 
-	if op, ok := spec.Params["operation"]; ok {
-		if ops, ok := op.(string); ok {
-			combiner.Operation = ops
-		}
-	}
+	combiner.Operation = combiner.GetStringParam("operation", "merge")
 
 	// Set fields for base Want methods
 	combiner.WantType = "combiner"

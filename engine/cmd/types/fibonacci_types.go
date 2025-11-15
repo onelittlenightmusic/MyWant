@@ -21,13 +21,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
-	if c, ok := spec.Params["count"]; ok {
-		if ci, ok := c.(int); ok {
-			gen.Count = ci
-		} else if cf, ok := c.(float64); ok {
-			gen.Count = int(cf)
-		}
-	}
+	gen.Count = gen.GetIntParam("count", 20)
 
 	return gen
 }
@@ -35,14 +29,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 // Exec returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	count := 20
-	if c, ok := g.Spec.Params["count"]; ok {
-		if ci, ok := c.(int); ok {
-			count = ci
-		} else if cf, ok := c.(float64); ok {
-			count = int(cf)
-		}
-	}
+	count := g.GetIntParam("count", 20)
 
 	// Check if already completed using persistent state
 	completed, _ := g.GetStateBool("completed", false)
@@ -95,21 +82,9 @@ func NewFibonacciSequence(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	filter.Init(metadata, spec)
 
-	if min, ok := spec.Params["min_value"]; ok {
-		if mini, ok := min.(int); ok {
-			filter.MinValue = mini
-		} else if minf, ok := min.(float64); ok {
-			filter.MinValue = int(minf)
-		}
-	}
+	filter.MinValue = filter.GetIntParam("min_value", 0)
 
-	if max, ok := spec.Params["max_value"]; ok {
-		if maxi, ok := max.(int); ok {
-			filter.MaxValue = maxi
-		} else if maxf, ok := max.(float64); ok {
-			filter.MaxValue = int(maxf)
-		}
-	}
+	filter.MaxValue = filter.GetIntParam("max_value", 1000000)
 
 	// Set fields for base Want methods
 	filter.WantType = "fibonacci_sequence"
@@ -132,23 +107,9 @@ func (f *FibonacciSequence) GetWant() interface{} {
 // Exec returns the generalized chain function for the filter
 func (f *FibonacciSequence) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	minValue := 0
-	if min, ok := f.Spec.Params["min_value"]; ok {
-		if mini, ok := min.(int); ok {
-			minValue = mini
-		} else if minf, ok := min.(float64); ok {
-			minValue = int(minf)
-		}
-	}
+	minValue := f.GetIntParam("min_value", 0)
 
-	maxValue := 1000000
-	if max, ok := f.Spec.Params["max_value"]; ok {
-		if maxi, ok := max.(int); ok {
-			maxValue = maxi
-		} else if maxf, ok := max.(float64); ok {
-			maxValue = int(maxf)
-		}
-	}
+	maxValue := f.GetIntParam("max_value", 1000000)
 
 	// Validate input channel is available
 	in, skipExec := f.GetFirstInputChannel()

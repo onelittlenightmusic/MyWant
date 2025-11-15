@@ -164,19 +164,9 @@ func (f *FlightWant) Exec() bool {
 	}
 
 	// Read parameters fresh each cycle - enables dynamic changes!
-	flightType := "economy"
-	if ft, ok := f.Spec.Params["flight_type"]; ok {
-		if fts, ok := ft.(string); ok {
-			flightType = fts
-		}
-	}
+	flightType := f.GetStringParam("flight_type", "economy")
 
-	duration := 12 * time.Hour // Default 12 hour flight
-	if d, ok := f.Spec.Params["duration_hours"]; ok {
-		if df, ok := d.(float64); ok {
-			duration = time.Duration(df * float64(time.Hour))
-		}
-	}
+	duration := time.Duration(f.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
 
 	out, skipExec := f.GetFirstOutputChannel()
 	if skipExec {

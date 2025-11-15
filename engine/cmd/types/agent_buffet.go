@@ -72,12 +72,7 @@ func (a *AgentBuffet) generateBuffetSchedule(want *Want) BuffetSchedule {
 	durationHours := 2.0 + rand.Float64()*2.0 // 2-4 hours
 
 	// Extract buffet type from want parameters
-	buffetType := "international" // default
-	if bt, ok := want.Spec.Params["buffet_type"]; ok {
-		if bts, ok := bt.(string); ok {
-			buffetType = bts
-		}
-	}
+	buffetType := want.GetStringParam("buffet_type", "international")
 
 	// Create and return structured buffet schedule
 	return BuffetSchedule{

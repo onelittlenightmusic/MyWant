@@ -100,10 +100,8 @@ func (r *RestaurantWant) Exec() bool {
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	out, skipExec := r.GetFirstOutputChannel()
-	if skipExec {
-		return true
-	}
+	// Get output channel, but don't skip execution if not available yet
+	out, outChannelAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -119,24 +117,28 @@ func (r *RestaurantWant) Exec() bool {
 		// Use the agent's schedule result
 		r.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel
-		restaurantEvent := TimeSlot{
-			Start: agentSchedule.ReservationTime,
-			End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
-			Type:  "restaurant",
-			Name:  agentSchedule.ReservationName,
-		}
+		// Send the schedule to output channel only if available
+		if outChannelAvailable {
+			restaurantEvent := TimeSlot{
+				Start: agentSchedule.ReservationTime,
+				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
+				Type:  "restaurant",
+				Name:  agentSchedule.ReservationName,
+			}
 
-		travelSchedule := &TravelSchedule{
-			Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
-			Events: []TimeSlot{restaurantEvent},
-		}
+			travelSchedule := &TravelSchedule{
+				Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
+				Events: []TimeSlot{restaurantEvent},
+			}
 
-		out <- travelSchedule
-		log.Printf("[RESTAURANT] Sent agent-generated schedule: %s from %s to %s\n",
-			agentSchedule.ReservationName,
-			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
-			restaurantEvent.End.Format("15:04 Jan 2"))
+			out <- travelSchedule
+			log.Printf("[RESTAURANT] Sent agent-generated schedule: %s from %s to %s\n",
+				agentSchedule.ReservationName,
+				agentSchedule.ReservationTime.Format("15:04 Jan 2"),
+				restaurantEvent.End.Format("15:04 Jan 2"))
+		} else {
+			log.Printf("[RESTAURANT] Output channel not available, skipping sending agent-generated schedule.\n")
+		}
 
 		return true
 	}
@@ -147,14 +149,16 @@ func (r *RestaurantWant) Exec() bool {
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
 	if r.paths.GetInCount() > 0 {
-		in, _ := r.GetInputChannel(0)
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				existingSchedule = schedule
+		in, inChannelAvailable := r.GetInputChannel(0)
+		if inChannelAvailable {
+			select {
+			case schedData := <-in:
+				if schedule, ok := schedData.(*TravelSchedule); ok {
+					existingSchedule = schedule
+				}
+			default:
+				// No input data available
 			}
-		default:
-			// No input data available
 		}
 	}
 
@@ -214,7 +218,13 @@ func (r *RestaurantWant) Exec() bool {
 	log.Printf("[RESTAURANT] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04"), newEvent.End.Format("15:04"))
 
-	out <- newSchedule
+	// Send to output channel only if available
+	if outChannelAvailable {
+		out <- newSchedule
+	} else {
+		log.Printf("[RESTAURANT] Output channel not available, skipping sending generated schedule.\n")
+	}
+
 	return true
 }
 
@@ -416,10 +426,8 @@ func (h *HotelWant) Exec() bool {
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	out, skipExec := h.GetFirstOutputChannel()
-	if skipExec {
-		return true
-	}
+	// Get output channel, but don't skip execution if not available yet
+	out, outChannelAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -435,24 +443,28 @@ func (h *HotelWant) Exec() bool {
 		// Use the agent's schedule result
 		h.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel
-		hotelEvent := TimeSlot{
-			Start: agentSchedule.CheckInTime,
-			End:   agentSchedule.CheckOutTime,
-			Type:  "hotel",
-			Name:  agentSchedule.ReservationName,
-		}
+		// Send the schedule to output channel only if available
+		if outChannelAvailable {
+			hotelEvent := TimeSlot{
+				Start: agentSchedule.CheckInTime,
+				End:   agentSchedule.CheckOutTime,
+				Type:  "hotel",
+				Name:  agentSchedule.ReservationName,
+			}
 
-		travelSchedule := &TravelSchedule{
-			Date:   agentSchedule.CheckInTime.Truncate(24 * time.Hour),
-			Events: []TimeSlot{hotelEvent},
-		}
+			travelSchedule := &TravelSchedule{
+				Date:   agentSchedule.CheckInTime.Truncate(24 * time.Hour),
+				Events: []TimeSlot{hotelEvent},
+			}
 
-		out <- travelSchedule
-		log.Printf("[HOTEL] Sent agent-generated schedule: %s from %s to %s\n",
-			agentSchedule.ReservationName,
-			agentSchedule.CheckInTime.Format("15:04 Jan 2"),
-			agentSchedule.CheckOutTime.Format("15:04 Jan 2"))
+			out <- travelSchedule
+			log.Printf("[HOTEL] Sent agent-generated schedule: %s from %s to %s\n",
+				agentSchedule.ReservationName,
+				agentSchedule.CheckInTime.Format("15:04 Jan 2"),
+				agentSchedule.CheckOutTime.Format("15:04 Jan 2"))
+		} else {
+			log.Printf("[HOTEL] Output channel not available, skipping sending agent-generated schedule.\n")
+		}
 
 		return true
 	}
@@ -463,14 +475,16 @@ func (h *HotelWant) Exec() bool {
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
 	if h.paths.GetInCount() > 0 {
-		in, _ := h.GetInputChannel(0)
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				existingSchedule = schedule
+		in, inChannelAvailable := h.GetInputChannel(0)
+		if inChannelAvailable {
+			select {
+			case schedData := <-in:
+				if schedule, ok := schedData.(*TravelSchedule); ok {
+					existingSchedule = schedule
+				}
+			default:
+				// No input data
 			}
-		default:
-			// No input data
 		}
 	}
 
@@ -530,7 +544,13 @@ func (h *HotelWant) Exec() bool {
 	log.Printf("[HOTEL] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
-	out <- newSchedule
+	// Send to output channel only if available
+	if outChannelAvailable {
+		out <- newSchedule
+	} else {
+		log.Printf("[HOTEL] Output channel not available, skipping sending generated schedule.\n")
+	}
+
 	return true
 }
 
@@ -642,10 +662,8 @@ func (b *BuffetWant) Exec() bool {
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	out, skipExec := b.GetFirstOutputChannel()
-	if skipExec {
-		return true
-	}
+	// Get output channel, but don't skip execution if not available yet
+	out, outChannelAvailable := b.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -661,24 +679,28 @@ func (b *BuffetWant) Exec() bool {
 		// Use the agent's schedule result
 		b.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel
-		buffetEvent := TimeSlot{
-			Start: agentSchedule.ReservationTime,
-			End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
-			Type:  "buffet",
-			Name:  agentSchedule.ReservationName,
-		}
+		// Send the schedule to output channel only if available
+		if outChannelAvailable {
+			buffetEvent := TimeSlot{
+				Start: agentSchedule.ReservationTime,
+				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
+				Type:  "buffet",
+				Name:  agentSchedule.ReservationName,
+			}
 
-		travelSchedule := &TravelSchedule{
-			Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
-			Events: []TimeSlot{buffetEvent},
-		}
+			travelSchedule := &TravelSchedule{
+				Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
+				Events: []TimeSlot{buffetEvent},
+			}
 
-		out <- travelSchedule
-		log.Printf("[BUFFET] Sent agent-generated schedule: %s from %s to %s\n",
-			agentSchedule.ReservationName,
-			agentSchedule.ReservationTime.Format("15:04 Jan 2"),
-			buffetEvent.End.Format("15:04 Jan 2"))
+			out <- travelSchedule
+			log.Printf("[BUFFET] Sent agent-generated schedule: %s from %s to %s\n",
+				agentSchedule.ReservationName,
+				agentSchedule.ReservationTime.Format("15:04 Jan 2"),
+				buffetEvent.End.Format("15:04 Jan 2"))
+		} else {
+			log.Printf("[BUFFET] Output channel not available, skipping sending agent-generated schedule.\n")
+		}
 
 		return true
 	}
@@ -688,13 +710,15 @@ func (b *BuffetWant) Exec() bool {
 
 	var existingSchedule *TravelSchedule
 	if b.paths.GetInCount() > 0 {
-		in, _ := b.GetInputChannel(0)
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				existingSchedule = schedule
+		in, inChannelAvailable := b.GetInputChannel(0)
+		if inChannelAvailable {
+			select {
+			case schedData := <-in:
+				if schedule, ok := schedData.(*TravelSchedule); ok {
+					existingSchedule = schedule
+				}
+			default:
 			}
-		default:
 		}
 	}
 
@@ -750,7 +774,13 @@ func (b *BuffetWant) Exec() bool {
 	log.Printf("[BUFFET] Scheduled %s from %s to %s\n",
 		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
 
-	out <- newSchedule
+	// Send to output channel only if available
+	if outChannelAvailable {
+		out <- newSchedule
+	} else {
+		log.Printf("[BUFFET] Output channel not available, skipping sending generated schedule.\n")
+	}
+
 	return true
 }
 
@@ -923,8 +953,10 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 }
 
 func (t *TravelCoordinatorWant) Exec() bool {
+	// Ensure all input channels are available
 	if t.paths.GetInCount() < 3 {
-		return true
+		// If not all inputs are connected yet, return false to retry later
+		return false
 	}
 
 	// Use persistent state to track schedules
@@ -932,35 +964,33 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	schedules, _ := schedulesVal.([]*TravelSchedule)
 	if schedules == nil {
 		schedules = make([]*TravelSchedule, 0)
-		// Batch initial schedules update
-		{
-			t.BeginExecCycle()
-			t.StoreState("schedules", schedules)
-			t.EndExecCycle()
-		}
 	}
 
-	// Collect all schedules from child wants
+	// Collect all available schedules from child wants in this cycle
+	// Use a non-blocking read to avoid deadlocks if a channel is empty
 	for i := 0; i < t.paths.GetInCount(); i++ {
 		select {
 		case schedData := <-t.paths.In[i].Channel:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				schedules = append(schedules, schedule)
+				InfoLog("[TRAVEL_COORDINATOR] Received schedule from child: %v\n", schedule)
 			}
 		default:
-			// No more data on this channel
+			// No data on this channel in this cycle, continue to next channel
 		}
 	}
 
 	// Update persistent state with collected schedules
-	{
-		t.BeginExecCycle()
-		t.StoreState("schedules", schedules)
-		t.EndExecCycle()
-	}
+	// Use StoreStateMulti for batching
+	t.StoreStateMulti(map[string]interface{}{
+		"schedules": schedules,
+		"total_processed": len(schedules), // Track how many schedules have been collected
+	})
 
 	// When we have all schedules, create final itinerary
-	if len(schedules) >= 3 {
+	if len(schedules) >= t.paths.GetInCount() { // Check if all expected schedules are collected
+		InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, combining events...\n", len(schedules))
+
 		// Combine and sort all events
 		allEvents := make([]TimeSlot, 0)
 		for _, schedule := range schedules {
@@ -968,6 +998,7 @@ func (t *TravelCoordinatorWant) Exec() bool {
 		}
 
 		// Sort events by start time
+		// (Sorting logic remains the same)
 		for i := 0; i < len(allEvents)-1; i++ {
 			for j := i + 1; j < len(allEvents); j++ {
 				if allEvents[i].Start.After(allEvents[j].Start) {
@@ -977,14 +1008,16 @@ func (t *TravelCoordinatorWant) Exec() bool {
 		}
 
 		// Batch final coordinator state update
-		{
-			t.BeginExecCycle()
-			t.StoreState("total_processed", len(allEvents))
-			t.EndExecCycle()
-		}
-		return true
+		t.StoreStateMulti(map[string]interface{}{
+			"schedules":       schedules, // Store final schedules
+			"total_processed": len(allEvents),
+			"final_itinerary": allEvents, // Store the combined and sorted itinerary
+		})
+		InfoLog("[TRAVEL_COORDINATOR] Final itinerary created with %d events. Coordinator completed.\n", len(allEvents))
+		return true // All schedules collected and processed, coordinator is complete
 	}
 
+	InfoLog("[TRAVEL_COORDINATOR] Waiting for more schedules. Collected %d of %d.\n", len(schedules), t.paths.GetInCount())
 	return false // Continue waiting for more schedules
 }
 

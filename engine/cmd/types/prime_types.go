@@ -23,20 +23,8 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
-	if s, ok := spec.Params["start"]; ok {
-		if si, ok := s.(int); ok {
-			gen.Start = si
-		} else if sf, ok := s.(float64); ok {
-			gen.Start = int(sf)
-		}
-	}
-	if e, ok := spec.Params["end"]; ok {
-		if ei, ok := e.(int); ok {
-			gen.End = ei
-		} else if ef, ok := e.(float64); ok {
-			gen.End = int(ef)
-		}
-	}
+	gen.Start = gen.GetIntParam("start", 2)
+	gen.End = gen.GetIntParam("end", 100)
 
 	return gen
 }
@@ -44,23 +32,9 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 // Exec returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	start := 2
-	if s, ok := g.Spec.Params["start"]; ok {
-		if si, ok := s.(int); ok {
-			start = si
-		} else if sf, ok := s.(float64); ok {
-			start = int(sf)
-		}
-	}
+	start := g.GetIntParam("start", 2)
 
-	end := 100
-	if e, ok := g.Spec.Params["end"]; ok {
-		if ei, ok := e.(int); ok {
-			end = ei
-		} else if ef, ok := e.(float64); ok {
-			end = int(ef)
-		}
-	}
+	end := g.GetIntParam("end", 100)
 
 	// Check if already completed using persistent state
 	completed, _ := g.GetStateBool("completed", false)
@@ -109,13 +83,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	filter.Init(metadata, spec)
 
-	if p, ok := spec.Params["prime"]; ok {
-		if pi, ok := p.(int); ok {
-			filter.Prime = pi
-		} else if pf, ok := p.(float64); ok {
-			filter.Prime = int(pf)
-		}
-	}
+	filter.Prime = filter.GetIntParam("prime", 2)
 
 	// Set fields for base Want methods
 	filter.WantType = "prime_sequence"

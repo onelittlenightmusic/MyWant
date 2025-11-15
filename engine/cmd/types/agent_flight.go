@@ -69,12 +69,7 @@ func (a *AgentFlight) generateFlightSchedule(want *Want) FlightSchedule {
 	arrivalTime := departureTime.Add(time.Duration(durationHours * float64(time.Hour)))
 
 	// Extract flight type from want parameters
-	flightType := "economy" // default
-	if ft, ok := want.Spec.Params["flight_type"]; ok {
-		if fts, ok := ft.(string); ok {
-			flightType = fts
-		}
-	}
+	flightType := want.GetStringParam("flight_type", "economy")
 
 	// Generate flight number
 	flightNumber := fmt.Sprintf("FL%d", 100+rand.Intn(900))

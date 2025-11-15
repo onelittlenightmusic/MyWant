@@ -64,12 +64,7 @@ func (a *AgentRestaurant) generateRestaurantSchedule(want *Want) RestaurantSched
 	durationHours := 1.5 + rand.Float64()*1.5 // 1.5-3 hours
 
 	// Extract restaurant type from want parameters
-	restaurantType := "fine dining" // default
-	if rt, ok := want.Spec.Params["restaurant_type"]; ok {
-		if rts, ok := rt.(string); ok {
-			restaurantType = rts
-		}
-	}
+	restaurantType := want.GetStringParam("restaurant_type", "fine dining")
 
 	// Create and return structured restaurant schedule
 	return RestaurantSchedule{

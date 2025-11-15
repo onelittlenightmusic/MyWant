@@ -59,8 +59,12 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 	// Read the YAML file
 	data, err := os.ReadFile(filepath)
 	if err != nil {
-		log.Printf("[MONITOR_RESTAURANT] Error reading %s: %v\n", filepath, err)
-		return err
+		if os.IsNotExist(err) {
+			log.Printf("[MONITOR_RESTAURANT] No initial state file found at %s, proceeding without existing schedule.\n", filepath)
+		} else {
+			log.Printf("[MONITOR_RESTAURANT] Error reading %s: %v\n", filepath, err)
+			return err
+		}
 	}
 
 	// Parse the YAML content

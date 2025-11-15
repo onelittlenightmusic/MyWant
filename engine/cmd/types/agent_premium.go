@@ -68,12 +68,7 @@ func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
 		11+rand.Intn(2), rand.Intn(60), 0, 0, time.Local) // 11 AM - 1 PM late check-out
 
 	// Extract hotel type from want parameters
-	hotelType := "luxury" // default
-	if ht, ok := want.Spec.Params["hotel_type"]; ok {
-		if hts, ok := ht.(string); ok {
-			hotelType = hts
-		}
-	}
+	hotelType := want.GetStringParam("hotel_type", "luxury")
 
 	// Create and return structured hotel schedule
 	return HotelSchedule{
