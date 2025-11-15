@@ -930,6 +930,10 @@ func (n *Want) Init(metadata Metadata, spec WantSpec) {
 	n.Spec = spec
 	n.Status = WantStatusIdle
 	n.State = make(map[string]interface{})
+	// Initialize paths field to avoid nil reference errors
+	// This is critical for the new Exec() signature that uses paths field
+	n.paths.In = []PathInfo{}
+	n.paths.Out = []PathInfo{}
 }
 
 // GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion
