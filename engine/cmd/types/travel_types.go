@@ -50,16 +50,8 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	restaurant.Init(metadata, spec)
 
-	if rt, ok := spec.Params["restaurant_type"]; ok {
-		if rts, ok := rt.(string); ok {
-			restaurant.RestaurantType = rts
-		}
-	}
-	if d, ok := spec.Params["duration_hours"]; ok {
-		if df, ok := d.(float64); ok {
-			restaurant.Duration = time.Duration(df * float64(time.Hour))
-		}
-	}
+	restaurant.RestaurantType = restaurant.GetStringParam("restaurant_type", "casual")
+	restaurant.Duration = time.Duration(restaurant.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
 
 	// Set fields for base Want methods
 	restaurant.WantType = "restaurant"
@@ -82,19 +74,8 @@ func (r *RestaurantWant) GetWant() *Want {
 // Exec creates a restaurant reservation
 func (r *RestaurantWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	restaurantType := "casual"
-	if rt, ok := r.Spec.Params["restaurant_type"]; ok {
-		if rts, ok := rt.(string); ok {
-			restaurantType = rts
-		}
-	}
-
-	duration := 2 * time.Hour // Default 2 hour dinner
-	if d, ok := r.Spec.Params["duration_hours"]; ok {
-		if df, ok := d.(float64); ok {
-			duration = time.Duration(df * float64(time.Hour))
-		}
-	}
+	restaurantType := r.GetStringParam("restaurant_type", "casual")
+	duration := time.Duration(r.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
 
 	// Check if already attempted using persistent state
 	attemptedVal, _ := r.GetState("attempted")
@@ -182,7 +163,7 @@ func (r *RestaurantWant) Exec() bool {
 				if r.hasTimeConflict(newEvent, event) {
 					conflict = true
 					// Retry with different time
-					dinnerStart = dinnerStart.Add(time.Hour)
+				dinnerStart = dinnerStart.Add(time.Hour)
 					newEvent.Start = dinnerStart
 					newEvent.End = dinnerStart.Add(duration)
 					log.Printf("[RESTAURANT] Conflict detected, retrying at %s\n", dinnerStart.Format("15:04"))
@@ -263,7 +244,7 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 				r.StoreState("execution_source", "monitor")
 
 				// Immediately set the schedule and complete the cycle
-				r.SetSchedule(schedule)
+			r.SetSchedule(schedule)
 				log.Printf("[RESTAURANT] MonitorRestaurant cycle completed - want finished\n")
 				return &schedule
 			} else {
@@ -389,11 +370,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	hotel.Init(metadata, spec)
 
-	if ht, ok := spec.Params["hotel_type"]; ok {
-		if hts, ok := ht.(string); ok {
-			hotel.HotelType = hts
-		}
-	}
+	hotel.HotelType = hotel.GetStringParam("hotel_type", "standard")
 
 	// Set fields for base Want methods
 	hotel.WantType = "hotel"
@@ -415,12 +392,7 @@ func (h *HotelWant) GetWant() *Want {
 
 func (h *HotelWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	hotelType := "standard"
-	if ht, ok := h.Spec.Params["hotel_type"]; ok {
-		if hts, ok := ht.(string); ok {
-			hotelType = hts
-		}
-	}
+	hotelType := h.GetStringParam("hotel_type", "standard")
 
 	// Check if already attempted using persistent state
 	attemptedVal, _ := h.GetState("attempted")
@@ -562,7 +534,7 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 		log.Printf("[HOTEL] Want has agent requirements: %v\n", h.Spec.Requires)
 
 		// Store the requirements in want state for tracking
-		h.StoreState("agent_requirements", h.Spec.Requires)
+	h.StoreState("agent_requirements", h.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := h.ExecuteAgents(); err != nil {
@@ -623,11 +595,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	buffet.Init(metadata, spec)
 
-	if bt, ok := spec.Params["buffet_type"]; ok {
-		if bts, ok := bt.(string); ok {
-			buffet.BuffetType = bts
-		}
-	}
+	buffet.BuffetType = buffet.GetStringParam("buffet_type", "continental")
 
 	// Set fields for base Want methods
 	buffet.WantType = "buffet"
@@ -649,12 +617,7 @@ func (b *BuffetWant) GetWant() *Want {
 
 func (b *BuffetWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
-	buffetType := "continental"
-	if bt, ok := b.Spec.Params["buffet_type"]; ok {
-		if bts, ok := bt.(string); ok {
-			buffetType = bts
-		}
-	}
+	buffetType := b.GetStringParam("buffet_type", "continental")
 
 	duration := 1*time.Hour + 30*time.Minute // Default 1.5 hour breakfast
 
@@ -677,7 +640,7 @@ func (b *BuffetWant) Exec() bool {
 		log.Printf("[BUFFET] Agent execution completed, processing agent result\n")
 
 		// Use the agent's schedule result
-		b.SetSchedule(*agentSchedule)
+	b.SetSchedule(*agentSchedule)
 
 		// Send the schedule to output channel only if available
 		if outChannelAvailable {
@@ -740,7 +703,7 @@ func (b *BuffetWant) Exec() bool {
 			for _, event := range existingSchedule.Events {
 				if b.hasTimeConflict(newEvent, event) {
 					conflict = true
-					buffetStart = buffetStart.Add(30 * time.Minute)
+				buffetStart = buffetStart.Add(30 * time.Minute)
 					newEvent.Start = buffetStart
 					newEvent.End = buffetStart.Add(duration)
 					log.Printf("[BUFFET] Conflict detected, retrying at %s\n", buffetStart.Format("15:04"))
@@ -792,7 +755,7 @@ func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 		log.Printf("[BUFFET] Want has agent requirements: %v\n", b.Spec.Requires)
 
 		// Store the requirements in want state for tracking
-		b.StoreState("agent_requirements", b.Spec.Requires)
+	b.StoreState("agent_requirements", b.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := b.ExecuteAgents(); err != nil {
@@ -928,11 +891,7 @@ func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
 
-	if tmpl, ok := spec.Params["template"]; ok {
-		if tmpls, ok := tmpl.(string); ok {
-			coordinator.Template = tmpls
-		}
-	}
+	coordinator.Template = coordinator.GetStringParam("template", "travel itinerary")
 
 	// Set fields for base Want methods
 	coordinator.WantType = "travel_coordinator"

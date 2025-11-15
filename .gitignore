@@ -28,3 +28,4 @@ engine/memory/
 **/memory-*.yaml
 
 logs/
+tmp/

@@ -36,21 +36,9 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	// Initialize base Want fields
 	flight.Init(metadata, spec)
 
-	if ft, ok := spec.Params["flight_type"]; ok {
-		if fts, ok := ft.(string); ok {
-			flight.FlightType = fts
-		}
-	}
-	if d, ok := spec.Params["duration_hours"]; ok {
-		if df, ok := d.(float64); ok {
-			flight.Duration = time.Duration(df * float64(time.Hour))
-		}
-	}
-	if dd, ok := spec.Params["departure_date"]; ok {
-		if dds, ok := dd.(string); ok {
-			flight.DepartureDate = dds
-		}
-	}
+	flight.FlightType = flight.GetStringParam("flight_type", "economy")
+	flight.Duration = time.Duration(flight.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
+	flight.DepartureDate = flight.GetStringParam("departure_date", "2024-01-01")
 
 	// Set fields for base Want methods
 	flight.WantType = "flight"
@@ -194,8 +182,8 @@ func (f *FlightWant) Exec() bool {
 		log.Printf("[FLIGHT] Agent execution completed, processing agent result\n")
 
 		// Convert agent_result to FlightSchedule
-		agentSchedule := f.extractFlightSchedule(agentResult)
-		if agentSchedule != nil {
+	agentSchedule := f.extractFlightSchedule(agentResult)
+	if agentSchedule != nil {
 			// Use the agent's schedule result
 			f.SetSchedule(*agentSchedule)
 
@@ -248,13 +236,13 @@ func (f *FlightWant) Exec() bool {
 		f.tryAgentExecution()
 
 		// Check if rebooking created a new flight result (read from state, not return value)
-		agentResult, hasResult := f.GetState("agent_result")
-		if hasResult && agentResult != nil {
+	agentResult, hasResult := f.GetState("agent_result")
+	if hasResult && agentResult != nil {
 			log.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
 
 			// Convert agent_result to FlightSchedule
-			agentSchedule := f.extractFlightSchedule(agentResult)
-			if agentSchedule != nil {
+	agentSchedule := f.extractFlightSchedule(agentResult)
+	if agentSchedule != nil {
 				// Use the agent's schedule result
 				f.SetSchedule(*agentSchedule)
 
@@ -453,8 +441,8 @@ func (f *FlightWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 // shouldCancelAndRebook checks if the current flight should be cancelled due to delay
 func (f *FlightWant) shouldCancelAndRebook() bool {
 	// Check if flight has been created
-	flightID, exists := f.GetState("flight_id")
-	if !exists || flightID == "" {
+	flightIDVal, exists := f.GetState("flight_id")
+	if !exists || flightIDVal == "" {
 		return false
 	}
 
