@@ -913,7 +913,15 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 
 func (t *TravelCoordinatorWant) Exec() bool {
 	// Ensure all input channels are available
-	if t.paths.GetInCount() < 3 {
+	inCount := t.paths.GetInCount()
+
+	// If no channels are connected, this might be for independent child wants
+	// that don't feed back through channels. Mark as completed.
+	if inCount == 0 {
+		return true
+	}
+
+	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
 		return false
 	}
@@ -927,7 +935,7 @@ func (t *TravelCoordinatorWant) Exec() bool {
 
 	// Collect all available schedules from child wants in this cycle
 	// Use a non-blocking read to avoid deadlocks if a channel is empty
-	for i := 0; i < t.paths.GetInCount(); i++ {
+	for i := 0; i < inCount; i++ {
 		select {
 		case schedData := <-t.paths.In[i].Channel:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
@@ -947,7 +955,7 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	})
 
 	// When we have all schedules, create final itinerary
-	if len(schedules) >= t.paths.GetInCount() { // Check if all expected schedules are collected
+	if len(schedules) >= inCount { // Check if all expected schedules are collected
 		InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, combining events...\n", len(schedules))
 
 		// Combine and sort all events
