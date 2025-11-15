@@ -574,13 +574,24 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 		if elem.Kind() == reflect.Struct {
 			// Look for a field named "Want"
 			wantField := elem.FieldByName("Want")
-			if wantField.IsValid() && wantField.Kind() == reflect.Struct {
-				// Get the address of the Want field
-				if wantField.CanAddr() {
-					wantAddr := wantField.Addr()
-					// Type assert to *Want
-					if want, ok := wantAddr.Interface().(*Want); ok {
-						return want
+
+			if wantField.IsValid() {
+				// Case 1: Embedded Want struct (e.g., RestaurantWant.Want)
+				if wantField.Kind() == reflect.Struct {
+					// Get the address of the Want field
+					if wantField.CanAddr() {
+						wantAddr := wantField.Addr()
+						// Type assert to *Want
+						if want, ok := wantAddr.Interface().(*Want); ok {
+							return want
+						}
+					}
+				} else if wantField.Kind() == reflect.Ptr {
+					// Case 2: Want pointer field (e.g., OwnerAwareWant.Want is *Want)
+					if !wantField.IsNil() {
+						if want, ok := wantField.Interface().(*Want); ok {
+							return want
+						}
 					}
 				}
 			}
