@@ -47,7 +47,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
-func (g *SeedNumbers) Exec(using []Chan, outputs []Chan) bool {
+func (g *SeedNumbers) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	maxCount := g.GetIntParam("max_count", 15)
 
@@ -110,7 +110,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
-func (c *FibonacciComputer) Exec(using []Chan, outputs []Chan) bool {
+func (c *FibonacciComputer) Exec() bool {
 	// Get input and output channels safely
 	in, out, skipExec := c.GetInputAndOutputChannels()
 	if skipExec || out == nil {
