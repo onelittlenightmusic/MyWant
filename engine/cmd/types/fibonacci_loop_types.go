@@ -217,8 +217,8 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the fibonacci merger
-func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
-	if len(using) < 2 || len(outputs) < 1 {
+func (m *FibonacciMerger) Exec() bool {
+	if m.paths.GetInCount() < 2 || m.paths.GetOutCount() < 1 {
 		return true
 	}
 
@@ -228,9 +228,9 @@ func (m *FibonacciMerger) Exec(using []Chan, outputs []Chan) bool {
 	processed, _ := m.GetStateInt("processed", 0)
 	maxCountReceived, _ := m.GetStateBool("maxCountReceived", false)
 
-	seedIn := using[0]        // From seed generator
-	computedIn := using[1]    // From fibonacci computer (feedback loop)
-	computerOut := outputs[0] // To fibonacci computer
+	seedIn, _ := m.GetInputChannel(0)        // From seed generator
+	computedIn, _ := m.GetInputChannel(1)    // From fibonacci computer (feedback loop)
+	computerOut, _ := m.GetOutputChannel(0) // To fibonacci computer
 
 	// Handle both using with blocking select
 	select {
