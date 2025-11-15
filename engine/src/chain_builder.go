@@ -231,20 +231,53 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 			inCount := len(paths.In)
 			outCount := len(paths.Out)
 
-			// Validate connectivity requirements (no logging - internal reconciliation check)
-			// Required inputs check
-			_ = inCount >= meta.RequiredInputs
+			// Store connectivity status for reconcile loop decision
+			// If required inputs not met, mark want as waiting for connections
+			if inCount < meta.RequiredInputs {
+				DebugLog("[RECONCILE:CONNECT] Want %s needs %d inputs but has %d (waiting for connections)",
+					wantName, meta.RequiredInputs, inCount)
+			}
+			if outCount < meta.RequiredOutputs {
+				DebugLog("[RECONCILE:CONNECT] Want %s needs %d outputs but has %d (waiting for connections)",
+					wantName, meta.RequiredOutputs, outCount)
+			}
 
-			// Required outputs check
-			_ = outCount >= meta.RequiredOutputs
-
-			// Maximum inputs check
-			_ = meta.MaxInputs < 0 || inCount <= meta.MaxInputs
-
-			// Maximum outputs check
-			_ = meta.MaxOutputs < 0 || outCount <= meta.MaxOutputs
+			// Validate constraints
+			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
+				DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d inputs but max is %d",
+					wantName, inCount, meta.MaxInputs)
+			}
+			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
+				DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d outputs but max is %d",
+					wantName, outCount, meta.MaxOutputs)
+			}
 		}
 	}
+}
+
+// isConnectivitySatisfied checks if a want's connectivity requirements are met
+func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWant, pathMap map[string]Paths) bool {
+	paths := pathMap[wantName]
+
+	// Check if this is an enhanced want that has connectivity requirements
+	if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
+		meta := enhancedWant.GetConnectivityMetadata()
+
+		inCount := len(paths.In)
+		outCount := len(paths.Out)
+
+		// If want has required inputs, check if they're satisfied
+		if meta.RequiredInputs > 0 && inCount < meta.RequiredInputs {
+			return false
+		}
+
+		// If want has required outputs, check if they're satisfied
+		if meta.RequiredOutputs > 0 && outCount < meta.RequiredOutputs {
+			return false
+		}
+	}
+
+	return true
 }
 
 // createWantFunction creates the appropriate function based on want type using registry
@@ -1500,22 +1533,20 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		return
 	}
 
-	// For dynamically added wants (especially coordinators with using selectors),
-	// we need to regenerate paths on-demand to include any newly added child wants
-	// This is critical because child wants are often added AFTER their coordinator is registered
-	paths, pathsExist := cb.pathMap[wantName]
+	// Check if this want's connectivity requirements are satisfied
+	// If not, skip execution - the reconcile loop will retry once connections are available
+	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
+		DebugLog("[EXEC] Skipping want %s - connectivity requirements not yet satisfied",
+			wantName)
+		return
+	}
 
-	// If this want has using selectors and paths haven't been set yet (or are empty),
-	// regenerate paths to include newly added wants
-	if !pathsExist || (len(paths.In) == 0 && len(want.want.Spec.Using) > 0) {
-		DebugLog("[EXEC] Regenerating paths for want %s (has using selectors: %v)",
-			wantName, len(want.want.Spec.Using) > 0)
-		// Regenerate paths from current state of wants
-		newPathMap := cb.generatePathsFromConnections()
-		cb.pathMap = newPathMap
-		paths = newPathMap[wantName]
-		DebugLog("[EXEC] After regeneration: want %s has %d input paths, %d output paths",
-			wantName, len(paths.In), len(paths.Out))
+	// Paths are guaranteed to exist and be valid at this point
+	paths, pathsExist := cb.pathMap[wantName]
+	if !pathsExist {
+		DebugLog("[EXEC] ERROR: Want %s has satisfied connectivity but no paths in pathMap",
+			wantName)
+		return
 	}
 
 	// Prepare active input and output channels - set them in the want's paths
