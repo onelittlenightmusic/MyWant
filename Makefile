@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api
 
 # Code quality targets
 fmt:
@@ -199,6 +199,28 @@ test-llm-api:
 	python3 test_llm_api.py
 	@echo ""
 	@echo "✅ LLM inference API test completed!"
+
+# Test Recipe API
+test-recipe-api:
+	@echo "🍳 Testing Recipe API..."
+	@echo "======================================================="
+	@echo ""
+	@echo "📋 Prerequisites:"
+	@echo "  ✓ MyWant server running on http://localhost:8080"
+	@echo ""
+	@echo "📌 Test Coverage:"
+	@echo "  1. Create new recipe via API"
+	@echo "  2. List all recipes"
+	@echo "  3. Get specific recipe"
+	@echo "  4. Load recipe from YAML file"
+	@echo "  5. Update recipe"
+	@echo "  6. Delete recipe"
+	@echo ""
+	@echo "🔌 Running recipe API tests..."
+	@echo ""
+	go run test_recipe_api.go
+	@echo ""
+	@echo "✅ Recipe API test completed!"
 
 # Build the mywant server binary
 build-server:

@@ -464,3 +464,6 @@ want.History.StateHistory = append(want.History.StateHistory, entry)
 - **State Retrieval**: Use `GetState()` method which returns `(value, exists)`
 - **Encapsulation**: Maintains proper separation between internal state and public API
 - make run-dynamic-travel-change didn't wait until rebooking.
+- frontend recipe card should have control bar to have deploy button of the recipe so that selected recipe can be deployed in one click as want.
+- 直接のStateへのアクセスも全部GetStateに変換したい。\
+    provided, _ := d.State["description_provided"].(bool)

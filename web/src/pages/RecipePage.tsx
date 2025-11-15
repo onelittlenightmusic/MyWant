@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, BookOpen, Menu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, BookOpen, Menu, Check, AlertCircle } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { GenericRecipe } from '@/types/recipe';
 import RecipeModal from '@/components/modals/RecipeModal';
@@ -7,6 +7,7 @@ import { RecipeDetailsSidebar } from '@/components/sidebar/RecipeDetailsSidebar'
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { RecipeGrid } from '@/components/dashboard/RecipeGrid';
+import { RecipeControlPanel } from '@/components/dashboard/RecipeControlPanel';
 import { classNames } from '@/utils/helpers';
 
 export default function RecipePage() {
@@ -27,10 +28,21 @@ export default function RecipePage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<GenericRecipe | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchRecipes();
   }, [fetchRecipes]);
+
+  // Auto-dismiss notifications after 5 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const handleCreateRecipe = () => {
     setSelectedRecipe(null);
@@ -181,6 +193,7 @@ export default function RecipePage() {
             onViewRecipe={handleViewRecipe}
             onEditRecipe={handleEditRecipe}
             onDeleteRecipe={handleDeleteRecipe}
+            onSelectRecipe={setSelectedRecipe}
           />
 
           {/* Modals */}
@@ -224,7 +237,34 @@ export default function RecipePage() {
             </div>
           )}
 
+          {/* Notification Toast */}
+          {notification && (
+            <div className={classNames(
+              'fixed top-4 right-4 px-4 py-3 rounded-md shadow-lg flex items-center space-x-2 z-50 animate-fade-in',
+              notification.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            )}>
+              {notification.type === 'success' ? (
+                <Check className="h-5 w-5" />
+              ) : (
+                <AlertCircle className="h-5 w-5" />
+              )}
+              <span className="text-sm font-medium">{notification.message}</span>
+            </div>
+          )}
         </main>
+
+        {/* Recipe Control Panel */}
+        <RecipeControlPanel
+          selectedRecipe={selectedRecipe}
+          onEdit={handleEditRecipe}
+          onDelete={handleDeleteRecipe}
+          onDeploySuccess={(message) => setNotification({ message, type: 'success' })}
+          onDeployError={(error) => setNotification({ message: error, type: 'error' })}
+          loading={loading}
+          sidebarMinimized={sidebarMinimized}
+        />
 
         {/* Right Sidebar for Recipe Details */}
         <RightSidebar

@@ -1,0 +1,205 @@
+wantType:
+  metadata:
+    name: "travel_coordinator"
+    title: "Travel Itinerary Coordinator"
+    description: "Orchestrates multiple independent travel wants (restaurant, hotel, buffet, flight) into a unified itinerary"
+    version: "1.0"
+    category: "travel"
+    pattern: "coordinator"
+
+  parameters:
+    - name: "display_name"
+      description: "Name/title of the travel itinerary"
+      type: "string"
+      default: "My Trip"
+      required: false
+      example: "European Vacation 2024"
+
+    - name: "include_summary"
+      description: "Whether to include summary statistics in output"
+      type: "bool"
+      default: true
+      required: false
+
+    - name: "output_format"
+      description: "Format for itinerary output"
+      type: "string"
+      default: "detailed"
+      required: false
+      validation:
+        enum: ["summary", "detailed", "json", "text"]
+      example: "detailed"
+
+    - name: "timezone"
+      description: "Timezone for all timestamps in itinerary"
+      type: "string"
+      default: "UTC"
+      required: false
+      validation:
+        enum: ["UTC", "EST", "CST", "MST", "PST", "GMT", "CET", "JST", "AEST"]
+
+    - name: "include_costs"
+      description: "Include cost calculations and budgeting"
+      type: "bool"
+      default: true
+      required: false
+
+  state:
+    - name: "itinerary"
+      description: "Complete unified travel itinerary with all reservations"
+      type: "map[string]interface{}"
+      persistent: true
+      example: |
+        {
+          "restaurant": {...},
+          "hotel": {...},
+          "buffet": {...},
+          "flight": {...}
+        }
+
+    - name: "coordination_status"
+      description: "Overall status of all connected wants (all_confirmed, partial, failed)"
+      type: "string"
+      persistent: true
+      example: "all_confirmed"
+
+    - name: "completion_time"
+      description: "ISO8601 timestamp when all reservations were finalized"
+      type: "string"
+      persistent: true
+
+    - name: "total_cost"
+      description: "Total estimated cost of entire trip"
+      type: "float64"
+      persistent: true
+      example: 2500.75
+
+    - name: "reservations_completed"
+      description: "Number of reservations successfully booked"
+      type: "int"
+      persistent: true
+      example: 4
+
+    - name: "reservations_failed"
+      description: "Number of reservation attempts that failed"
+      type: "int"
+      persistent: true
+      example: 0
+
+    - name: "last_updated"
+      description: "ISO8601 timestamp of last coordination update"
+      type: "string"
+      persistent: true
+
+    - name: "itinerary_summary"
+      description: "Text summary of the complete itinerary"
+      type: "string"
+      persistent: true
+      example: |
+        Trip: European Vacation 2024
+        - Flight: Depart SF 08:00 → Arrive Paris 18:00
+        - Hotel: Le Marais (3 nights)
+        - Restaurant: Le Jules Verne, 19:30
+        - Buffet: Montmartre Brasserie, 20:00
+        Total Cost: $2500.75
+
+    - name: "notification_sent"
+      description: "Whether notification/confirmation was sent to user"
+      type: "bool"
+      persistent: true
+      example: true
+
+  connectivity:
+    inputs:
+      - name: "reservations"
+        type: "want"
+        description: "Individual independent reservation wants (restaurant, hotel, buffet, flight)"
+        required: false
+        multiple: true
+    outputs:
+      - name: "itinerary"
+        type: "state"
+        description: "Complete coordinated travel itinerary"
+
+  agents: []
+
+  constraints:
+    - description: "At least one input want should be connected for meaningful itinerary"
+      validation: "len(using) > 0 OR len(using) == 0 (coordinator can work standalone)"
+
+    - description: "Output format must be valid enumerated option"
+      validation: "output_format in [summary, detailed, json, text]"
+
+    - description: "Timezone must be valid IANA timezone identifier"
+      validation: "timezone is valid"
+
+  examples:
+    - name: "Full European itinerary"
+      description: "Complete trip coordinating flight, hotel, restaurant, and buffet"
+      params:
+        display_name: "Paris & Lyon 2024"
+        include_summary: true
+        output_format: "detailed"
+        timezone: "CET"
+        include_costs: true
+      expectedBehavior: |
+        1. Collects reservation data from all connected wants (flight, hotel, restaurant, buffet)
+        2. Merges into unified itinerary with common format
+        3. Calculates total costs
+        4. Generates comprehensive summary
+        5. Outputs in specified format with all details and pricing
+      connectedTo: ["flight", "hotel", "restaurant", "buffet"]
+
+    - name: "Weekend city break"
+      description: "Short trip coordinating hotel and restaurant only"
+      params:
+        display_name: "NYC Weekend Getaway"
+        include_summary: true
+        output_format: "summary"
+        timezone: "EST"
+        include_costs: true
+      expectedBehavior: |
+        1. Coordinates hotel (2 nights) and restaurant reservations
+        2. Creates compact summary itinerary
+        3. Calculates weekend trip budget
+      connectedTo: ["hotel", "restaurant"]
+
+    - name: "Just restaurant coordination"
+      description: "Coordinator with single restaurant want"
+      params:
+        display_name: "Dinner Tonight"
+        include_summary: false
+        output_format: "json"
+        include_costs: false
+      expectedBehavior: |
+        1. Collects restaurant reservation data
+        2. Outputs as JSON for API consumption
+      connectedTo: ["restaurant"]
+
+    - name: "Multi-city trip"
+      description: "Complex trip with flights, hotels, restaurants across multiple cities"
+      params:
+        display_name: "European Grand Tour"
+        include_summary: true
+        output_format: "detailed"
+        timezone: "UTC"
+        include_costs: true
+      expectedBehavior: |
+        1. Coordinates all bookings across multiple cities
+        2. Orders chronologically by date/time
+        3. Shows travel between locations (flights, transfers)
+        4. Generates comprehensive multi-day itinerary
+        5. Calculates total trip cost with per-location breakdown
+      connectedTo: ["flight", "flight", "hotel", "hotel", "restaurant", "restaurant", "buffet"]
+
+  relatedTypes:
+    - "restaurant"
+    - "hotel"
+    - "buffet"
+    - "flight"
+
+  seeAlso:
+    - "travel-itinerary recipe"
+    - "travel domain patterns"
+    - "Independent wants execution"
+    - "Coordinator pattern documentation"

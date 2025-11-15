@@ -9,6 +9,7 @@ interface RecipeCardProps {
   onView: (recipe: GenericRecipe) => void;
   onEdit: (recipe: GenericRecipe) => void;
   onDelete: (recipe: GenericRecipe) => void;
+  onSelect?: (recipe: GenericRecipe) => void;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   onView,
   onEdit,
   onDelete,
+  onSelect,
   className
 }) => {
   const recipeName = recipe.recipe.metadata.name || 'Unnamed Recipe';
@@ -32,11 +34,13 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   };
 
   return (
-    <div className={classNames(
-      'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
-      selected ? 'border-blue-500 border-2' : 'border-gray-200',
-      className || ''
-    )}>
+    <div
+      onClick={() => onSelect?.(recipe)}
+      className={classNames(
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
+        selected ? 'border-blue-500 border-2' : 'border-gray-200',
+        className || ''
+      )}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">

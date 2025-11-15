@@ -1,0 +1,273 @@
+# Want Type Template
+# Copy this file and customize for your want type
+# Save to: want_types/{pattern}/{name}.yaml
+
+wantType:
+  # =====================================================================
+  # METADATA LAYER - Identity and Classification
+  # =====================================================================
+  metadata:
+    name: "example_want"                  # Unique identifier (lowercase, no spaces)
+    title: "Example Want Type"            # Human-readable name
+    description: |                        # Multi-line description
+      This is an example want type that demonstrates all available fields.
+      Use this as a template for creating new want types.
+
+    version: "1.0"                        # Semantic versioning
+    category: "example"                   # For grouping (travel, queue, math, etc)
+    pattern: "generator"                  # Choose one: generator | processor | sink | coordinator | independent
+
+  # =====================================================================
+  # PARAMETERS - What configuration does this want accept?
+  # =====================================================================
+  parameters:
+    - name: "param_name"                  # Parameter identifier
+      description: "What this parameter does"
+      type: "string"                      # Go type: int, float64, string, bool, []string, map[string]interface{}, interface{}
+      default: "default_value"            # Default value (optional)
+      required: false                     # Is this mandatory?
+      validation:
+        # Validation rules (all optional)
+        min: 0                            # For numeric types
+        max: 100
+        pattern: "^[a-z]+$"              # Regex pattern for strings
+        enum: ["option1", "option2"]     # Allowed values
+      example: "example_value"
+
+    # Add more parameters as needed
+    - name: "count"
+      description: "Number of items to process"
+      type: "int"
+      default: 10
+      required: false
+      validation:
+        min: 1
+        max: 10000
+      example: 100
+
+  # =====================================================================
+  # STATE - What data does this want store and track?
+  # =====================================================================
+  state:
+    - name: "state_key_name"              # State key identifier
+      description: "What this state tracks"
+      type: "int"                         # Go type
+      persistent: true                    # Survives execution cycles?
+      example: 42
+
+    - name: "counter"
+      description: "Total count of items processed"
+      type: "int"
+      persistent: true
+      example: 100
+
+    - name: "completion_time"
+      description: "When processing finished"
+      type: "string"
+      persistent: true
+
+  # =====================================================================
+  # CONNECTIVITY - How does this want connect to other wants?
+  # =====================================================================
+  connectivity:
+    # INPUT CHANNELS - What does this want consume?
+    inputs:
+      - name: "input_name"                # Input channel identifier
+        type: "want"                      # "want" | "agent" | "external"
+        description: "What this input provides"
+        required: true                    # Must be connected?
+
+      # For coordinator pattern (multiple inputs)
+      - name: "items"
+        type: "want"
+        description: "Items to coordinate"
+        required: false
+        multiple: true                    # Can connect multiple wants?
+
+    # OUTPUT CHANNELS - What does this want produce?
+    outputs:
+      - name: "output_name"               # Output channel identifier
+        type: "want"                      # "want" | "state" | "event" | "agent"
+        description: "What this output provides"
+
+  # =====================================================================
+  # AGENTS - Does this want use agents?
+  # =====================================================================
+  agents:
+    - name: "AgentName"                   # Agent type name
+      role: "action"                      # monitor | action | validator | transformer
+      description: "What this agent does"
+      example: "AgentName executes the core business logic"
+
+    - name: "MonitorAgentName"
+      role: "monitor"
+      description: "Checks initial state before action"
+      example: "MonitorAgentName loads existing data"
+
+  # =====================================================================
+  # CONSTRAINTS - What business rules must be satisfied?
+  # =====================================================================
+  constraints:
+    - description: "Rule description in natural language"
+      validation: "Mathematical or logical expression"
+
+    - description: "Count must be positive"
+      validation: "count > 0"
+
+    - description: "Time must be within service hours"
+      validation: "preferred_time >= '06:00' and preferred_time <= '23:00'"
+
+  # =====================================================================
+  # EXAMPLES - How is this want type used in practice?
+  # =====================================================================
+  examples:
+    - name: "Basic Usage"
+      description: "Simple example with default parameters"
+      params:
+        param_name: "value"
+      expectedBehavior: |
+        1. First step of execution
+        2. Second step
+        3. Final result
+      connectedTo: ["other_want_type"]
+
+    - name: "Advanced Usage"
+      description: "More complex scenario with custom parameters"
+      params:
+        param_name: "custom_value"
+        count: 500
+      expectedBehavior: |
+        1. Custom behavior based on parameters
+        2. Different execution path
+      connectedTo: ["want_type_1", "want_type_2"]
+
+  # =====================================================================
+  # RELATED TYPES - What other want types work with this one?
+  # =====================================================================
+  relatedTypes:
+    - "related_want_type_1"
+    - "related_want_type_2"
+    - "related_want_type_3"
+
+  # =====================================================================
+  # DOCUMENTATION LINKS
+  # =====================================================================
+  seeAlso:
+    - "recipe-name recipe documentation"
+    - "pattern documentation"
+    - "agent implementation details"
+
+---
+
+# =====================================================================
+# GUIDELINES FOR FILLING OUT THIS TEMPLATE
+# =====================================================================
+
+# PATTERN SELECTION:
+# - generator: No inputs, produces output (e.g., Numbers, FibonacciNumbers)
+# - processor: Has inputs and outputs (e.g., Queue, Combiner)
+# - sink: Terminal node with inputs, no outputs (e.g., Sink, PrimeSink)
+# - coordinator: Orchestrates independent wants (e.g., TravelCoordinator)
+# - independent: Standalone, no connections (e.g., Restaurant, Hotel)
+
+# PARAMETER TYPES:
+# Go type names exactly:
+#   - int (whole numbers)
+#   - float64 (decimals)
+#   - string (text)
+#   - bool (true/false)
+#   - []string (array of strings)
+#   - map[string]interface{} (key-value pairs)
+#   - interface{} (any type)
+
+# STATE PERSISTENCE:
+# persistent: true  - State saved to file, survives restarts
+# persistent: false - State is temporary, discarded on exit
+
+# CONNECTIVITY TYPES:
+# type: "want"      - Input/output to other wants (default)
+# type: "agent"     - Input/output from agents
+# type: "state"     - Output to want state (not to other wants)
+# type: "event"     - Event notifications
+
+# AGENT ROLES:
+# role: "monitor"        - Checks initial state before action
+# role: "action"         - Performs business logic
+# role: "validator"      - Validates constraints
+# role: "transformer"    - Transforms data
+
+# EXAMPLES:
+# - Always include at least 2-3 realistic examples
+# - Show different parameter combinations
+# - Describe what happens when want executes
+# - List what other wants this typically connects to
+
+# VALIDATION RULES:
+# min/max - For numeric comparisons
+# pattern - Regex for strings (e.g., "^[0-9]{3}-[0-9]{4}$" for phone)
+# enum - List of allowed values
+# All are optional; include only what you need
+
+---
+
+# EXAMPLES OF FILLED-IN SECTIONS
+
+# Example 1: Simple Parameters
+# parameters:
+#   - name: "rate"
+#     description: "Items per second"
+#     type: "float64"
+#     default: 1.0
+#     validation:
+#       min: 0.1
+#       max: 1000
+#     example: 10.5
+
+# Example 2: Enum Parameters
+# parameters:
+#   - name: "priority"
+#     description: "Priority level"
+#     type: "string"
+#     default: "normal"
+#     validation:
+#       enum: ["low", "normal", "high", "critical"]
+#     example: "high"
+
+# Example 3: String Validation with Pattern
+# parameters:
+#   - name: "email"
+#     description: "Email address"
+#     type: "string"
+#     validation:
+#       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+#     example: "user@example.com"
+
+# Example 4: Multiple State Keys
+# state:
+#   - name: "pending_items"
+#     type: "int"
+#     persistent: true
+#   - name: "processed_items"
+#     type: "int"
+#     persistent: true
+#   - name: "current_processing"
+#     type: "map[string]interface{}"
+#     persistent: false
+
+# Example 5: Multiple Inputs
+# connectivity:
+#   inputs:
+#     - name: "events"
+#       type: "want"
+#       required: true
+#     - name: "filters"
+#       type: "want"
+#       required: false
+#       multiple: true
+
+# Example 6: Complex Constraints
+# constraints:
+#   - description: "Rate must be achievable with service time"
+#     validation: "rate * service_time <= max_concurrency"
+#   - description: "Timeout must exceed processing time"
+#     validation: "timeout > service_time"

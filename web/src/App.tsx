@@ -5,6 +5,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { ErrorHistoryPage } from '@/pages/ErrorHistoryPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import RecipePage from '@/pages/RecipePage';
+import WantTypePage from '@/pages/WantTypePage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/recipes" element={<RecipePage />} />
+            <Route path="/want-types" element={<WantTypePage />} />
             <Route path="/errors" element={<ErrorHistoryPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

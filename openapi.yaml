@@ -20,6 +20,8 @@ info:
     - Create, read, update, and delete recipe configurations
     - Recipes serve as reusable templates for generating want configurations
     - Support parameter substitution and validation
+    - **Example field**: Each recipe can include a top-level `example` field containing
+      pre-configured want deployments for one-click recipe deployment from the frontend UI
 
   version: 1.0.0
   contact:
@@ -990,6 +992,32 @@ components:
                     type: string
                   description:
                     type: string
+            example:
+              type: object
+              description: |
+                One-click deployment configuration for the recipe.
+                Contains pre-configured want deployments that can be immediately executed
+                by the frontend UI to demonstrate or quickly deploy the recipe.
+                The example.wants array uses the same format as the Config/wants array
+                and can be POST'd directly to /api/v1/wants for instant recipe deployment.
+              properties:
+                wants:
+                  type: array
+                  description: Array of want configurations for one-click deployment
+                  items:
+                    $ref: '#/components/schemas/Want'
+              example:
+                wants:
+                  - metadata:
+                      name: "travel-itinerary-demo"
+                      type: "owner"
+                      labels:
+                        recipe: "Travel Itinerary with Agents"
+                    spec:
+                      params:
+                        restaurant_type: "fine dining"
+                        hotel_type: "luxury"
+                        buffet_type: "international"
           required:
             - metadata
             - wants

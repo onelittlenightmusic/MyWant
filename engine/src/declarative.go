@@ -115,8 +115,7 @@ func (p *BasePacket) GetData() interface{} { return p.data }
 
 // ChainWant represents a want that can execute directly
 type ChainWant interface {
-	Exec(using []chain.Chan, outputs []chain.Chan) bool
-	GetWant() *Want
+	Exec() bool
 }
 
 // migrateAllWantsAgentHistory runs agent history migration on all wants
@@ -147,7 +146,7 @@ type Config struct {
 
 // PathInfo represents connection information for a single path
 type PathInfo struct {
-	Channel chan interface{}
+	Channel chain.Chan
 	Name    string
 	Active  bool
 }

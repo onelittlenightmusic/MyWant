@@ -1,0 +1,95 @@
+wantType:
+  metadata:
+    name: "numbers"
+    title: "Number Generator"
+    description: "Generates a sequence of integers from start to count"
+    version: "1.0"
+    category: "math"
+    pattern: "generator"
+
+  parameters:
+    - name: "start"
+      description: "Starting number"
+      type: "int"
+      default: 0
+      required: false
+      validation:
+        min: 0
+      example: 0
+
+    - name: "count"
+      description: "How many numbers to generate"
+      type: "int"
+      default: 10
+      required: false
+      validation:
+        min: 1
+      example: 100
+
+  state:
+    - name: "current"
+      description: "Current number being generated"
+      type: "int"
+      persistent: true
+      example: 42
+
+    - name: "generated_count"
+      description: "Total numbers generated so far"
+      type: "int"
+      persistent: true
+      example: 50
+
+    - name: "completion_time"
+      description: "When generation was completed"
+      type: "string"
+      persistent: true
+
+  connectivity:
+    inputs: []
+    outputs:
+      - name: "numbers"
+        type: "want"
+        description: "Stream of generated numbers"
+
+  agents: []
+
+  constraints:
+    - description: "Count must be positive"
+      validation: "count > 0"
+    - description: "Start value must be non-negative"
+      validation: "start >= 0"
+
+  examples:
+    - name: "Generate first 100 numbers"
+      description: "Creates a generator for numbers 0-99"
+      params:
+        start: 0
+        count: 100
+      expectedBehavior: "Outputs integers 0 through 99 on the numbers output"
+      connectedTo: ["queue"]
+
+    - name: "Generate numbers 50-149"
+      description: "Offset number generation"
+      params:
+        start: 50
+        count: 100
+      expectedBehavior: "Outputs integers 50 through 149"
+      connectedTo: ["queue", "combiner"]
+
+    - name: "Small number set"
+      description: "Just 10 numbers for testing"
+      params:
+        start: 0
+        count: 10
+      expectedBehavior: "Outputs integers 0 through 9"
+      connectedTo: []
+
+  relatedTypes:
+    - "fibonacci_numbers"
+    - "prime_numbers"
+    - "queue"
+    - "combiner"
+
+  seeAlso:
+    - "queue-system recipe"
+    - "qnet-pipeline recipe"

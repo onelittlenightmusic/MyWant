@@ -174,8 +174,10 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 			for otherName, otherWant := range cb.wants {
 				if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
 					// Create using path for current want
+					// Create a channel directly typed as chain.Chan
+					ch := make(chain.Chan, 10)
 					inPath := PathInfo{
-						Channel: make(chan interface{}, 10),
+						Channel: ch,
 						Name:    fmt.Sprintf("%s_to_%s", otherName, wantName),
 						Active:  true,
 					}
@@ -254,19 +256,21 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 	wantInstance := factory(want.Metadata, want.Spec)
 
-	// Set agent registry if available and the want instance supports it
-	if cb.agentRegistry != nil {
-		if wantWithGetWant, ok := wantInstance.(interface{ GetWant() *Want }); ok {
-			wantWithGetWant.GetWant().SetAgentRegistry(cb.agentRegistry)
-		} else if w, ok := wantInstance.(*Want); ok {
-			w.SetAgentRegistry(cb.agentRegistry)
-		}
+	// Extract Want pointer for agent registry and wrapping
+	var wantPtr *Want
+	if w, ok := wantInstance.(*Want); ok {
+		wantPtr = w
+	}
+
+	// Set agent registry if available
+	if cb.agentRegistry != nil && wantPtr != nil {
+		wantPtr.SetAgentRegistry(cb.agentRegistry)
 	}
 
 	// Automatically wrap with OwnerAwareWant if the want has owner references
 	// This enables parent-child coordination via subscription events
 	if len(want.Metadata.OwnerReferences) > 0 {
-		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata)
+		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, wantPtr)
 	}
 
 	return wantInstance, nil
@@ -303,7 +307,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 	// This enables parent-child coordination via subscription events (critical for nested targets)
 	var wantInstance interface{} = target
 	if len(want.Metadata.OwnerReferences) > 0 {
-		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata)
+		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, &target.Want)
 	}
 
 	return wantInstance, nil
@@ -1237,73 +1241,35 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		return
 	}
 
-	var wantPtr *Want
-	if wantWithGetWant, ok := wantFunction.(interface{ GetWant() *Want }); ok {
-		wantPtr = wantWithGetWant.GetWant()
-
-		// Copy State from config using encapsulated method
-		// This ensures proper mutex protection without exposing synchronization details
-		if wantConfig.State != nil {
-			wantPtr.ReconcileStateFromConfig(wantConfig.State)
+	// Initialize State map (simple copy since History is separate)
+	stateMap := make(map[string]interface{})
+	if wantConfig.State != nil {
+		// Copy all state data
+		for k, v := range wantConfig.State {
+			stateMap[k] = v
 		}
+	}
 
-		// Copy History field from config
-		wantPtr.History = wantConfig.History
+	// Copy History field from config
+	historyField := wantConfig.History
 
-		// Initialize parameterHistory with initial parameter values if empty or nil
-		if (wantPtr.History.ParameterHistory == nil || len(wantPtr.History.ParameterHistory) == 0) && wantConfig.Spec.Params != nil {
-			InfoLog("[RECONCILE] Recording initial parameter history for want %s: %v\n", wantConfig.Metadata.Name, wantConfig.Spec.Params)
-
-			// Create a deep copy of the parameters to avoid reference issues
-			paramsCopy := make(map[string]interface{})
-			for k, v := range wantConfig.Spec.Params {
-				paramsCopy[k] = v
-			}
-			// Create one entry with all initial parameters as object
-			entry := StateHistoryEntry{
-				WantName:   wantConfig.Metadata.Name,
-				StateValue: paramsCopy,
-				Timestamp:  time.Now(),
-			}
-			if wantPtr.History.ParameterHistory == nil {
-				wantPtr.History.ParameterHistory = make([]StateHistoryEntry, 0)
-			}
-			if wantPtr.History.StateHistory == nil {
-				wantPtr.History.StateHistory = make([]StateHistoryEntry, 0)
-			}
-			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
+	// Initialize parameterHistory with initial parameters if empty
+	if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+		// Create one entry with all initial parameters as object
+		entry := StateHistoryEntry{
+			WantName:   wantConfig.Metadata.Name,
+			StateValue: wantConfig.Spec.Params,
+			Timestamp:  time.Now(),
 		}
-	} else {
-		// Initialize State map (simple copy since History is separate)
-		stateMap := make(map[string]interface{})
-		if wantConfig.State != nil {
-			// Copy all state data
-			for k, v := range wantConfig.State {
-				stateMap[k] = v
-			}
-		}
+		historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
+	}
 
-		// Copy History field from config
-		historyField := wantConfig.History
-
-		// Initialize parameterHistory with initial parameters if empty
-		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
-			// Create one entry with all initial parameters as object
-			entry := StateHistoryEntry{
-				WantName:   wantConfig.Metadata.Name,
-				StateValue: wantConfig.Spec.Params,
-				Timestamp:  time.Now(),
-			}
-			historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
-		}
-
-		wantPtr = &Want{
-			Metadata: wantConfig.Metadata,
-			Spec:     wantConfig.Spec,
-			Status:   WantStatusIdle,
-			State:    stateMap,
-			History:  historyField,
-		}
+	wantPtr := &Want{
+		Metadata: wantConfig.Metadata,
+		Spec:     wantConfig.Spec,
+		Status:   WantStatusIdle,
+		State:    stateMap,
+		History:  historyField,
 	}
 
 	// Initialize subscription system for the want
@@ -1460,29 +1426,18 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	paths := cb.pathMap[wantName]
 
-	// Prepare using channels
-	var usingChans []chain.Chan
-	for _, usingPath := range paths.In {
-		if usingPath.Active {
-			channelKey := usingPath.Name
-			cb.channelMutex.RLock()
-			if ch, exists := cb.channels[channelKey]; exists {
-				usingChans = append(usingChans, ch)
-			}
-			cb.channelMutex.RUnlock()
+	// Prepare active input and output channels - set them in the want's paths
+	var activeInputPaths []PathInfo
+	for _, inputPath := range paths.In {
+		if inputPath.Active {
+			activeInputPaths = append(activeInputPaths, inputPath)
 		}
 	}
 
-	// Prepare output channels
-	var outputChans []chain.Chan
+	var activeOutputPaths []PathInfo
 	for _, outputPath := range paths.Out {
 		if outputPath.Active {
-			channelKey := outputPath.Name
-			cb.channelMutex.RLock()
-			if ch, exists := cb.channels[channelKey]; exists {
-				outputChans = append(outputChans, ch)
-			}
-			cb.channelMutex.RUnlock()
+			activeOutputPaths = append(activeOutputPaths, outputPath)
 		}
 	}
 
@@ -1500,7 +1455,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			}()
 
 			DebugLog("[EXEC] Starting want %s with %d using, %d outputs\n",
-				wantName, len(usingChans), len(outputChans))
+				wantName, len(activeInputPaths), len(activeOutputPaths))
 
 			for {
 				// Begin execution cycle for batching state changes
@@ -1508,11 +1463,14 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				runtimeWant, exists := cb.wants[wantName]
 				cb.reconcileMutex.RUnlock()
 				if exists {
+					// Set the resolved paths with actual channels before execution
+					runtimeWant.want.paths.In = activeInputPaths
+					runtimeWant.want.paths.Out = activeOutputPaths
 					runtimeWant.want.BeginExecCycle()
 				}
 
-				// Direct call - parameters can be read fresh each cycle
-				finished := chainWant.Exec(usingChans, outputChans)
+				// Direct call - no parameters needed, channels are in want.paths
+				finished := chainWant.Exec()
 
 				// End execution cycle and commit batched state changes
 				cb.reconcileMutex.RLock()

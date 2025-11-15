@@ -1,0 +1,130 @@
+wantType:
+  metadata:
+    name: "description"
+    title: "Approval Request Description"
+    description: |
+      Independent want that provides description data for multi-level approval
+      processes. Generates human-readable descriptions of approval requests
+      that accompany evidence data through the approval workflow.
+
+      Works alongside evidence want to provide complete context for approval
+      coordinators making decisions on requests.
+
+    version: "1.0"
+    category: "approval"
+    pattern: "independent"
+
+  parameters:
+    - name: "description_format"
+      description: "Template string for formatting description (supports %s substitution)"
+      type: "string"
+      default: "Request for approval: %s"
+      required: false
+      example: "Expense approval request: %s"
+
+    - name: "approval_id"
+      description: "ID of the approval process this description supports"
+      type: "string"
+      default: ""
+      required: false
+      example: "APR-2024-001"
+
+  state:
+    - name: "description_provided"
+      description: "Whether description has been generated and sent"
+      type: "bool"
+      persistent: true
+      example: true
+
+    - name: "description_format"
+      description: "Format template used for description"
+      type: "string"
+      persistent: true
+
+    - name: "approval_id"
+      description: "Associated approval process ID"
+      type: "string"
+      persistent: true
+      example: "APR-2024-001"
+
+    - name: "description"
+      description: "Generated description text"
+      type: "string"
+      persistent: true
+      example: "Request for approval: APR-2024-001"
+
+    - name: "description_provided_at"
+      description: "Timestamp when description was generated"
+      type: "string"
+      persistent: true
+
+    - name: "total_processed"
+      description: "Count of description packets generated"
+      type: "int"
+      persistent: true
+      example: 1
+
+  connectivity:
+    inputs: []
+
+    outputs:
+      - name: "description_data"
+        type: "want"
+        description: "ApprovalData containing description for approval coordinator"
+        multiple: true
+
+  agents: []
+
+  constraints:
+    - description: "Description format must contain template"
+      validation: "description_format length > 0"
+
+    - description: "Description must be provided exactly once"
+      validation: "description_provided flag prevents duplication"
+
+  examples:
+    - name: "Expense Approval"
+      description: "Request description for expense approval"
+      params:
+        description_format: "Expense approval request: %s"
+        approval_id: "EXP-2024-001"
+      expectedBehavior: |
+        1. Description want generates formatted request
+        2. Creates ApprovalData with description
+        3. Broadcasts to all output channels
+        4. Works alongside evidence want
+        5. Provides context for approval coordinator
+      connectedTo: ["evidence", "level1_coordinator"]
+
+    - name: "Change Request Approval"
+      description: "Description for change request approval"
+      params:
+        description_format: "Change request approval needed for: %s"
+        approval_id: "CHG-2024-042"
+      expectedBehavior: |
+        1. Description generates change request context
+        2. Sends alongside supporting evidence
+        3. Coordinator uses for decision making
+        4. Timestamp recorded for audit trail
+      connectedTo: ["evidence", "coordinator"]
+
+    - name: "Access Request"
+      description: "Description for access request approval"
+      params:
+        description_format: "Access request approval for: %s"
+        approval_id: "ACC-2024-X"
+      expectedBehavior: |
+        1. Description generates access request context
+        2. Combined with evidence of need
+        3. Sent to multi-level approval coordinator
+        4. Used for audit and compliance tracking
+      connectedTo: ["evidence", "level1_coordinator"]
+
+  relatedTypes:
+    - "evidence"
+    - "level1_coordinator"
+
+  seeAlso:
+    - "Approval request formatting"
+    - "Multi-level approval workflows"
+    - "Description-evidence pairing patterns"

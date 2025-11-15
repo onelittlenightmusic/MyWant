@@ -1,0 +1,116 @@
+wantType:
+  metadata:
+    name: "combiner"
+    title: "Stream Combiner"
+    description: |
+      Processor that combines multiple input streams into a single output stream.
+      Accepts packets from multiple upstream sources and forwards them downstream,
+      implementing various combination strategies (merge, interleave, etc).
+
+      Used in complex queueing systems where multiple data sources need to be
+      unified into a single pipeline for further processing.
+
+    version: "1.0"
+    category: "queue"
+    pattern: "processor"
+
+  parameters:
+    - name: "operation"
+      description: "Combination strategy (merge, interleave, round-robin)"
+      type: "string"
+      default: "merge"
+      required: false
+      validation:
+        enum: ["merge", "interleave", "round-robin"]
+      example: "interleave"
+
+  state:
+    - name: "processed"
+      description: "Number of packets processed from input streams"
+      type: "int"
+      persistent: true
+      example: 150
+
+    - name: "total_processed"
+      description: "Final count of all packets combined"
+      type: "int"
+      persistent: true
+      example: 150
+
+    - name: "average_wait_time"
+      description: "Average wait time for packets (typically 0 for combiners)"
+      type: "float64"
+      persistent: true
+      example: 0.0
+
+    - name: "total_wait_time"
+      description: "Total accumulated wait time"
+      type: "float64"
+      persistent: true
+      example: 0.0
+
+  connectivity:
+    inputs:
+      - name: "upstream_streams"
+        type: "want"
+        description: "Multiple input streams to combine"
+        required: true
+        multiple: true
+
+    outputs:
+      - name: "combined_stream"
+        type: "want"
+        description: "Single output stream with all packets"
+
+  agents: []
+
+  constraints:
+    - description: "Operation must be valid strategy"
+      validation: "operation in [merge, interleave, round-robin]"
+
+    - description: "At least 2 inputs required for meaningful combination"
+      validation: "number_of_inputs >= 2"
+
+  examples:
+    - name: "Merge Two Queues"
+      description: "Combine packets from two queue processors"
+      params:
+        operation: "merge"
+      expectedBehavior: |
+        1. Receives packets from two upstream queues
+        2. Forwards all packets sequentially
+        3. Counts total packets processed
+        4. Terminates when both inputs end
+        5. Sends termination signal downstream
+      connectedTo: ["queue", "sink"]
+
+    - name: "Interleave Multiple Streams"
+      description: "Alternate packets from multiple sources"
+      params:
+        operation: "interleave"
+      expectedBehavior: |
+        1. Receives packets from multiple sources
+        2. Interleaves packets in round-robin fashion
+        3. Maintains fairness across all inputs
+        4. Useful for load balancing
+      connectedTo: ["qnet queue", "sink"]
+
+    - name: "Round-Robin Combination"
+      description: "Distribute packets in round-robin from 3+ sources"
+      params:
+        operation: "round-robin"
+      expectedBehavior: |
+        1. Receives from 3+ parallel sources
+        2. Combines using round-robin selection
+        3. Balances load across multiple streams
+      connectedTo: ["numbers", "queue", "sink"]
+
+  relatedTypes:
+    - "queue"
+    - "sink"
+    - "collector"
+
+  seeAlso:
+    - "Queue processor documentation"
+    - "Stream combination patterns"
+    - "Multi-input processor coordination"

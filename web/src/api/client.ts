@@ -26,6 +26,11 @@ import {
   RecipeCreateResponse,
   RecipeUpdateResponse,
 } from '@/types/recipe';
+import {
+  WantTypeListResponse,
+  WantTypeDetailResponse,
+  WantTypeExamplesResponse,
+} from '@/types/wantType';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -234,6 +239,26 @@ class MyWantApiClient {
 
   async deleteRecipe(id: string): Promise<void> {
     await this.client.delete(`/api/v1/recipes/${id}`);
+  }
+
+  // Want Type management
+  async listWantTypes(category?: string, pattern?: string): Promise<WantTypeListResponse> {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (pattern) params.append('pattern', pattern);
+    const url = `/api/v1/want-types${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await this.client.get<WantTypeListResponse>(url);
+    return response.data;
+  }
+
+  async getWantType(name: string): Promise<WantTypeDetailResponse> {
+    const response = await this.client.get<WantTypeDetailResponse>(`/api/v1/want-types/${name}`);
+    return response.data;
+  }
+
+  async getWantTypeExamples(name: string): Promise<WantTypeExamplesResponse> {
+    const response = await this.client.get<WantTypeExamplesResponse>(`/api/v1/want-types/${name}/examples`);
+    return response.data;
   }
 }
 

@@ -1,0 +1,118 @@
+wantType:
+  metadata:
+    name: "prime_sieve"
+    title: "Prime Number Sieve Sink"
+    description: |
+      Terminal sink that collects prime numbers identified by upstream sieve
+      processing. Uses the Sieve of Eratosthenes algorithm to filter numbers
+      and collect only primes.
+
+      This sink accumulates prime numbers and computes final statistics on
+      the sieve output, useful for analyzing prime distribution and
+      performance metrics.
+
+    version: "1.0"
+    category: "mathematics"
+    pattern: "sink"
+
+  parameters: []
+
+  state:
+    - name: "primes"
+      description: "Array of collected prime numbers"
+      type: "[]int"
+      persistent: true
+      example: [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
+
+    - name: "received"
+      description: "Count of prime values received"
+      type: "int"
+      persistent: true
+      example: 168
+
+    - name: "total_received"
+      description: "Total count of primes in collected set"
+      type: "int"
+      persistent: true
+      example: 168
+
+    - name: "total_processed"
+      description: "Final count of all primes collected"
+      type: "int"
+      persistent: true
+      example: 168
+
+    - name: "largest_prime"
+      description: "Largest prime number in the collected set"
+      type: "int"
+      persistent: true
+      example: 997
+
+    - name: "smallest_prime"
+      description: "Smallest prime number (typically 2)"
+      type: "int"
+      persistent: true
+      example: 2
+
+  connectivity:
+    inputs:
+      - name: "prime_stream"
+        type: "want"
+        description: "Stream of prime numbers from sieve processor"
+        required: true
+
+    outputs: []
+
+  agents: []
+
+  constraints:
+    - description: "Must receive stream from prime sieve"
+      validation: "input comes from prime_sequence processor"
+
+    - description: "All collected values must be prime"
+      validation: "primes array contains only prime numbers"
+
+  examples:
+    - name: "Collect Primes 2-100"
+      description: "Collect primes from range 2 to 100"
+      params: {}
+      expectedBehavior: |
+        1. Receives numbers 2-100 from prime_numbers generator
+        2. prime_sequence filters to identify: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, ...
+        3. prime_sieve collects all 25 primes in this range
+        4. Stores in primes array: [2, 3, 5, 7, 11, ...]
+        5. Reports: 25 primes, largest=97, smallest=2
+      connectedTo: ["prime_sequence"]
+
+    - name: "Collect Primes 2-1000"
+      description: "Sieve and collect primes from larger range"
+      params: {}
+      expectedBehavior: |
+        1. Receives 1000 numbers from generator
+        2. prime_sequence applies sieve algorithm
+        3. Filters down to 168 primes
+        4. prime_sieve collects all 168 values
+        5. Statistics: largest_prime=997, count=168
+      connectedTo: ["prime_sequence"]
+
+    - name: "Large Range Primes 2-10000"
+      description: "Collect 1229 primes from range 2-10000"
+      params: {}
+      expectedBehavior: |
+        1. Receives 10000 numbers
+        2. Sieve algorithm efficiently filters
+        3. Collects 1229 prime numbers
+        4. Demonstrates sieve performance on larger sets
+        5. Final statistics for analysis
+      connectedTo: ["prime_sequence"]
+
+  relatedTypes:
+    - "prime_sequence"
+    - "prime_numbers"
+    - "sink"
+    - "prime_sink"
+
+  seeAlso:
+    - "Sieve of Eratosthenes algorithm"
+    - "Prime number mathematics"
+    - "Pipeline sink statistics collection"

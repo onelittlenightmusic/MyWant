@@ -47,13 +47,14 @@ type ErrorHistoryEntry struct {
 
 // Server represents the MyWant server
 type Server struct {
-	config         ServerConfig
-	wants          map[string]*WantExecution        // Store active want executions
-	globalBuilder  *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
-	agentRegistry  *mywant.AgentRegistry            // Agent and capability registry
-	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
-	errorHistory   []ErrorHistoryEntry              // Store error history
-	router         *mux.Router
+	config            ServerConfig
+	wants             map[string]*WantExecution        // Store active want executions
+	globalBuilder     *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
+	agentRegistry     *mywant.AgentRegistry            // Agent and capability registry
+	recipeRegistry    *mywant.CustomTargetTypeRegistry // Recipe registry
+	wantTypeLoader    *mywant.WantTypeLoader           // Want type definitions loader
+	errorHistory      []ErrorHistoryEntry              // Store error history
+	router            *mux.Router
 }
 
 // WantExecution represents a running want execution
@@ -157,6 +158,15 @@ func NewServer(config ServerConfig) *Server {
 		log.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
 	}
 
+	// Load want type definitions
+	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
+	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
+		log.Printf("[SERVER] Warning: Failed to load want type definitions: %v\n", err)
+	} else {
+		stats := wantTypeLoader.GetStats()
+		log.Printf("[SERVER] Loaded want type definitions: %v\n", stats)
+	}
+
 	// Create global builder for server mode with empty config
 	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
@@ -171,13 +181,14 @@ func NewServer(config ServerConfig) *Server {
 	tempServer.registerDynamicAgents(agentRegistry)
 
 	return &Server{
-		config:         config,
-		wants:          make(map[string]*WantExecution),
-		globalBuilder:  globalBuilder,
-		agentRegistry:  agentRegistry,
-		recipeRegistry: recipeRegistry,
-		errorHistory:   make([]ErrorHistoryEntry, 0),
-		router:         mux.NewRouter(),
+		config:            config,
+		wants:             make(map[string]*WantExecution),
+		globalBuilder:     globalBuilder,
+		agentRegistry:     agentRegistry,
+		recipeRegistry:    recipeRegistry,
+		wantTypeLoader:    wantTypeLoader,
+		errorHistory:      make([]ErrorHistoryEntry, 0),
+		router:            mux.NewRouter(),
 	}
 }
 
@@ -256,6 +267,15 @@ func (s *Server) setupRoutes() {
 	recipes.HandleFunc("/{id}", s.getRecipe).Methods("GET")
 	recipes.HandleFunc("/{id}", s.updateRecipe).Methods("PUT")
 	recipes.HandleFunc("/{id}", s.deleteRecipe).Methods("DELETE")
+
+	// Want Type endpoints - for discovery and introspection
+	wantTypes := api.PathPrefix("/want-types").Subrouter()
+	wantTypes.HandleFunc("", s.listWantTypes).Methods("GET")
+	wantTypes.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	wantTypes.HandleFunc("/{name}", s.getWantType).Methods("GET")
+	wantTypes.HandleFunc("/{name}", s.handleOptions).Methods("OPTIONS")
+	wantTypes.HandleFunc("/{name}/examples", s.getWantTypeExamples).Methods("GET")
+	wantTypes.HandleFunc("/{name}/examples", s.handleOptions).Methods("OPTIONS")
 
 	// Error history endpoints
 	errors := api.PathPrefix("/errors").Subrouter()
@@ -1919,6 +1939,124 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 }
 
 // loadRecipesFromDirectory loads all recipe files from a directory into the registry
+
+// listWantTypes handles GET /api/v1/want-types
+func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.wantTypeLoader == nil {
+		http.Error(w, "Want type loader not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Get query parameters for filtering
+	category := r.URL.Query().Get("category")
+	pattern := r.URL.Query().Get("pattern")
+
+	var defs []*mywant.WantTypeDefinition
+
+	if category != "" {
+		defs = s.wantTypeLoader.ListByCategory(category)
+	} else if pattern != "" {
+		defs = s.wantTypeLoader.ListByPattern(pattern)
+	} else {
+		defs = s.wantTypeLoader.GetAll()
+	}
+
+	// Build response with minimal info for listing
+	type WantTypeListItem struct {
+		Name     string `json:"name"`
+		Title    string `json:"title"`
+		Category string `json:"category"`
+		Pattern  string `json:"pattern"`
+		Version  string `json:"version"`
+	}
+
+	items := make([]WantTypeListItem, len(defs))
+	for i, def := range defs {
+		items[i] = WantTypeListItem{
+			Name:     def.Metadata.Name,
+			Title:    def.Metadata.Title,
+			Category: def.Metadata.Category,
+			Pattern:  def.Metadata.Pattern,
+			Version:  def.Metadata.Version,
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"wantTypes": items,
+		"count":     len(items),
+	})
+}
+
+// getWantType handles GET /api/v1/want-types/{name}
+func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.wantTypeLoader == nil {
+		http.Error(w, "Want type loader not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Extract name from URL
+	parts := strings.Split(r.URL.Path, "/")
+	var name string
+	for i, part := range parts {
+		if part == "want-types" && i+1 < len(parts) {
+			name = parts[i+1]
+			break
+		}
+	}
+
+	if name == "" || name == "examples" {
+		http.Error(w, "Invalid want type name", http.StatusBadRequest)
+		return
+	}
+
+	def := s.wantTypeLoader.GetDefinition(name)
+	if def == nil {
+		http.Error(w, fmt.Sprintf("Want type not found: %s", name), http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(def)
+}
+
+// getWantTypeExamples handles GET /api/v1/want-types/{name}/examples
+func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.wantTypeLoader == nil {
+		http.Error(w, "Want type loader not initialized", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Extract name from URL
+	parts := strings.Split(r.URL.Path, "/")
+	var name string
+	for i, part := range parts {
+		if part == "want-types" && i+1 < len(parts) {
+			name = parts[i+1]
+			break
+		}
+	}
+
+	if name == "" {
+		http.Error(w, "Invalid want type name", http.StatusBadRequest)
+		return
+	}
+
+	def := s.wantTypeLoader.GetDefinition(name)
+	if def == nil {
+		http.Error(w, fmt.Sprintf("Want type not found: %s", name), http.StatusNotFound)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"name":     name,
+		"examples": def.Examples,
+	})
+}
 
 func main() {
 	// Create logs directory if it doesn't exist

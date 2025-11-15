@@ -1,0 +1,221 @@
+wantType:
+  # =====================================================================
+  # METADATA LAYER - Identity and Classification
+  # =====================================================================
+  metadata:
+    name: "hotel"
+    title: "Hotel Reservation"
+    description: |
+      Hotel reservation want type for travel planning. Schedules hotel stays
+      with configurable hotel type (standard, luxury, budget). Handles check-in/check-out
+      timing and supports agent-based booking for persistent state management.
+
+      This independent want operates in parallel with other travel components
+      (restaurant, buffet) and outputs scheduling conflicts to be resolved by
+      the travel coordinator.
+
+    version: "1.0"
+    category: "travel"
+    pattern: "independent"
+
+  # =====================================================================
+  # PARAMETERS - What configuration does this hotel accept?
+  # =====================================================================
+  parameters:
+    - name: "hotel_type"
+      description: "Classification of hotel (standard, luxury, budget, boutique)"
+      type: "string"
+      default: "standard"
+      required: false
+      validation:
+        enum: ["standard", "luxury", "budget", "boutique"]
+      example: "luxury"
+
+  # =====================================================================
+  # STATE - What data does this hotel want store and track?
+  # =====================================================================
+  state:
+    - name: "attempted"
+      description: "Whether reservation attempt has been made"
+      type: "bool"
+      persistent: true
+      example: true
+
+    - name: "total_processed"
+      description: "Count of successful reservations"
+      type: "int"
+      persistent: true
+      example: 1
+
+    - name: "hotel_type"
+      description: "Type of hotel booked"
+      type: "string"
+      persistent: true
+      example: "luxury"
+
+    - name: "check_in_time"
+      description: "Check-in time formatted as HH:MM Jan 2"
+      type: "string"
+      persistent: true
+      example: "22:00 Nov 14"
+
+    - name: "check_out_time"
+      description: "Check-out time formatted as HH:MM Jan 2"
+      type: "string"
+      persistent: true
+      example: "09:00 Nov 15"
+
+    - name: "stay_duration_hours"
+      description: "Total duration of stay in hours"
+      type: "float64"
+      persistent: true
+      example: 11.0
+
+    - name: "reservation_name"
+      description: "Human-readable name of the reservation"
+      type: "string"
+      persistent: true
+      example: "traveler hotel stay at luxury hotel"
+
+    - name: "premium_processed"
+      description: "Whether premium features were applied"
+      type: "bool"
+      persistent: true
+      example: false
+
+    - name: "premium_level"
+      description: "Premium tier if applicable (gold, platinum, vip)"
+      type: "string"
+      persistent: true
+      example: "platinum"
+
+    - name: "service_tier"
+      description: "Service tier selected (concierge, standard, express)"
+      type: "string"
+      persistent: true
+      example: "concierge"
+
+    - name: "premium_amenities"
+      description: "Array of premium amenities included (spa, suite upgrade, late checkout)"
+      type: "[]string"
+      persistent: true
+      example: ["spa", "suite upgrade"]
+
+    - name: "agent_requirements"
+      description: "Requirements passed to agent system"
+      type: "[]string"
+      persistent: false
+
+    - name: "agent_execution_status"
+      description: "Status of agent execution (completed, failed, pending)"
+      type: "string"
+      persistent: true
+      example: "completed"
+
+    - name: "agent_execution_error"
+      description: "Error message if agent execution failed"
+      type: "string"
+      persistent: true
+
+  # =====================================================================
+  # CONNECTIVITY - How does this hotel connect to other wants?
+  # =====================================================================
+  connectivity:
+    inputs:
+      - name: "existing_schedule"
+        type: "want"
+        description: "Optional existing travel schedule to check for conflicts"
+        required: false
+
+    outputs:
+      - name: "travel_schedule"
+        type: "want"
+        description: "Hotel reservation as TravelSchedule with check-in/check-out times"
+
+  # =====================================================================
+  # AGENTS - Does this want use agents?
+  # =====================================================================
+  agents:
+    - name: "MonitorHotel"
+      role: "monitor"
+      description: "Checks for existing hotel reservations before creating new ones"
+      example: "MonitorHotel loads existing hotel state from persistent memory"
+
+    - name: "AgentHotel"
+      role: "action"
+      description: "Creates hotel reservation with selected parameters"
+      example: "AgentHotel executes booking logic and returns HotelSchedule"
+
+  # =====================================================================
+  # CONSTRAINTS - What business rules must be satisfied?
+  # =====================================================================
+  constraints:
+    - description: "Hotel type must be valid"
+      validation: "hotel_type in [standard, luxury, budget, boutique]"
+
+    - description: "Check-in cannot be after check-out"
+      validation: "check_in_time < check_out_time"
+
+    - description: "Stay duration must be positive"
+      validation: "stay_duration_hours > 0"
+
+    - description: "No time conflicts with other travel events"
+      validation: "hotel_times do not overlap with restaurant and buffet times"
+
+  # =====================================================================
+  # EXAMPLES - How is this hotel want type used in practice?
+  # =====================================================================
+  examples:
+    - name: "Standard Hotel Booking"
+      description: "Simple hotel booking with default standard type"
+      params:
+        hotel_type: "standard"
+      expectedBehavior: |
+        1. Hotel want checks if existing schedule exists
+        2. Schedules check-in between 8 PM - midnight
+        3. Schedules check-out between 7-10 AM next day
+        4. Duration typically 11-14 hours
+        5. Sends TravelSchedule with hotel event to coordinator
+        6. Updates state with reservation details
+      connectedTo: ["restaurant", "buffet", "travel_coordinator"]
+
+    - name: "Luxury Hotel with Premium Service"
+      description: "High-end hotel booking with concierge service"
+      params:
+        hotel_type: "luxury"
+      expectedBehavior: |
+        1. Hotel want creates premium reservation
+        2. Applies concierge service tier and premium amenities
+        3. Stores premium_level, service_tier, and amenity list in state
+        4. Check-in/check-out times adjusted for convenience
+        5. Outputs schedule formatted for premium experience
+      connectedTo: ["restaurant", "buffet", "travel_coordinator"]
+
+    - name: "Budget Hotel with Conflict Resolution"
+      description: "Cost-effective booking that resolves timing conflicts"
+      params:
+        hotel_type: "budget"
+      expectedBehavior: |
+        1. Hotel receives existing schedule from coordinator
+        2. Detects conflict with restaurant reservation
+        3. Retries check-in time up to 3 times
+        4. Successfully schedules around restaurant dinner
+        5. Sends updated schedule with resolved times
+      connectedTo: ["restaurant", "buffet", "travel_coordinator"]
+
+  # =====================================================================
+  # RELATED TYPES - What other want types work with this one?
+  # =====================================================================
+  relatedTypes:
+    - "restaurant"
+    - "buffet"
+    - "travel_coordinator"
+    - "flight"
+
+  # =====================================================================
+  # DOCUMENTATION LINKS
+  # =====================================================================
+  seeAlso:
+    - "Travel Itinerary recipe documentation"
+    - "Travel coordinator pattern for independent wants"
+    - "Agent system documentation for hotel booking"

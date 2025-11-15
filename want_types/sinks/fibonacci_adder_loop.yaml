@@ -1,0 +1,100 @@
+wantType:
+  metadata:
+    name: "fibonacci_adder_loop"
+    title: "Fibonacci Loop Adder / Merger"
+    description: |
+      Terminal sink that receives computed Fibonacci numbers and optionally
+      aggregates/merges them. Part of the fibonacci_loop pattern for combining
+      results from loop-based computation.
+
+      Can accumulate numbers for statistical analysis or serve as collection
+      point for the iterative Fibonacci computation pipeline.
+
+    version: "1.0"
+    category: "mathematics"
+    pattern: "sink"
+
+  parameters: []
+
+  state:
+    - name: "numbers"
+      description: "Array of collected Fibonacci numbers"
+      type: "[]int"
+      persistent: true
+      example: [0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377]
+
+    - name: "count"
+      description: "Total count of numbers collected"
+      type: "int"
+      persistent: true
+      example: 15
+
+    - name: "sum"
+      description: "Sum of all collected Fibonacci numbers"
+      type: "int"
+      persistent: true
+      example: 986
+
+    - name: "largest"
+      description: "Largest Fibonacci number collected"
+      type: "int"
+      persistent: true
+      example: 377
+
+    - name: "smallest"
+      description: "Smallest Fibonacci number collected"
+      type: "int"
+      persistent: true
+      example: 0
+
+    - name: "total_processed"
+      description: "Final count of numbers processed"
+      type: "int"
+      persistent: true
+      example: 15
+
+  connectivity:
+    inputs:
+      - name: "fibonacci_stream"
+        type: "want"
+        description: "Computed Fibonacci numbers from loop processor"
+        required: true
+
+    outputs: []
+
+  agents: []
+
+  constraints:
+    - description: "Must receive from fibonacci loop"
+      validation: "input from fibonacci_loop processor"
+
+  examples:
+    - name: "Collect Loop Fibonacci"
+      description: "Collect and aggregate fibonacci_loop results"
+      params: {}
+      expectedBehavior: |
+        1. Receives 0 from position 0
+        2. Receives 1 from position 1
+        3. Continues receiving computed values
+        4. Accumulates all: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377
+        5. Computes sum=986, largest=377
+        6. Stores complete sequence for analysis
+      connectedTo: ["fibonacci_loop"]
+
+    - name: "Aggregate Statistics"
+      description: "Compute statistics on Fibonacci sequence"
+      params: {}
+      expectedBehavior: |
+        1. Collects all Fibonacci numbers
+        2. Computes: count, sum, min, max
+        3. Useful for analyzing growth pattern
+        4. Can verify correctness of computation
+      connectedTo: ["fibonacci_loop"]
+
+  relatedTypes:
+    - "fibonacci_loop"
+    - "fibonacci_source_loop"
+
+  seeAlso:
+    - "Fibonacci loop aggregation"
+    - "Sequence collection and statistics"

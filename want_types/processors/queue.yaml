@@ -1,0 +1,134 @@
+wantType:
+  metadata:
+    name: "queue"
+    title: "Queue Processor"
+    description: "FIFO queue with configurable service time for processing items"
+    version: "1.0"
+    category: "queue"
+    pattern: "processor"
+
+  parameters:
+    - name: "service_time"
+      description: "Time to process each item in seconds"
+      type: "float64"
+      default: 0.1
+      required: false
+      validation:
+        min: 0.01
+        max: 3600
+      example: 0.1
+
+    - name: "max_queue_size"
+      description: "Maximum items in queue (-1 = unlimited)"
+      type: "int"
+      default: -1
+      required: false
+      validation:
+        min: -1
+      example: 1000
+
+    - name: "priority_mode"
+      description: "Whether to prioritize items (FIFO or priority)"
+      type: "string"
+      default: "fifo"
+      required: false
+      validation:
+        enum: ["fifo", "priority"]
+
+  state:
+    - name: "queued_items"
+      description: "Current number of items waiting in queue"
+      type: "int"
+      persistent: true
+      example: 42
+
+    - name: "processed_count"
+      description: "Total items processed since startup"
+      type: "int"
+      persistent: true
+      example: 1000
+
+    - name: "discarded_count"
+      description: "Items discarded due to max_queue_size limit"
+      type: "int"
+      persistent: true
+      example: 0
+
+    - name: "current_item"
+      description: "Item currently being processed"
+      type: "interface{}"
+      persistent: false
+
+    - name: "avg_wait_time"
+      description: "Average time items wait in queue"
+      type: "float64"
+      persistent: true
+      example: 0.5
+
+    - name: "queue_start_time"
+      description: "When queue processing started"
+      type: "string"
+      persistent: true
+
+  connectivity:
+    inputs:
+      - name: "input"
+        type: "want"
+        description: "Items to queue for processing"
+        required: true
+    outputs:
+      - name: "output"
+        type: "want"
+        description: "Processed items (after service_time delay)"
+
+  agents: []
+
+  constraints:
+    - description: "Service time must be positive"
+      validation: "service_time > 0"
+    - description: "Max queue size must be positive or -1 (unlimited)"
+      validation: "max_queue_size > 0 or max_queue_size == -1"
+
+  examples:
+    - name: "Basic queue processing"
+      description: "Queue with 0.1s service time"
+      params:
+        service_time: 0.1
+      expectedBehavior: "Items flow through queue, each taking 0.1s to process"
+      connectedTo: ["numbers"]
+
+    - name: "Slow queue"
+      description: "Queue with 0.5s service time (simulation of slower processor)"
+      params:
+        service_time: 0.5
+        max_queue_size: 500
+      expectedBehavior: "Items queue up and wait for processing with longer delays"
+      connectedTo: ["fibonacci_sequence"]
+
+    - name: "High-throughput queue"
+      description: "Fast queue for quick item processing"
+      params:
+        service_time: 0.01
+        max_queue_size: 10000
+      expectedBehavior: "Items process very quickly with large queue buffer"
+      connectedTo: ["numbers", "combiner"]
+
+    - name: "Queue with strict size limit"
+      description: "Queue that discards items when full"
+      params:
+        service_time: 0.2
+        max_queue_size: 100
+      expectedBehavior: "Items beyond 100 are rejected/discarded"
+      connectedTo: ["prime_sequence"]
+
+  relatedTypes:
+    - "numbers"
+    - "combiner"
+    - "sink"
+    - "fibonacci_sequence"
+    - "prime_sequence"
+
+  seeAlso:
+    - "queue-system recipe"
+    - "qnet-pipeline recipe"
+    - "qnet-using recipe"

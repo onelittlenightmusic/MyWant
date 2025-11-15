@@ -11,6 +11,7 @@ interface RecipeGridProps {
   onViewRecipe: (recipe: GenericRecipe) => void;
   onEditRecipe: (recipe: GenericRecipe) => void;
   onDeleteRecipe: (recipe: GenericRecipe) => void;
+  onSelectRecipe?: (recipe: GenericRecipe) => void;
 }
 
 export const RecipeGrid: React.FC<RecipeGridProps> = ({
@@ -20,7 +21,8 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
   selectedRecipe,
   onViewRecipe,
   onEditRecipe,
-  onDeleteRecipe
+  onDeleteRecipe,
+  onSelectRecipe
 }) => {
   const filteredRecipes = useMemo(() => {
     return recipes.filter(recipe => {
@@ -119,6 +121,7 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
           onView={onViewRecipe}
           onEdit={onEditRecipe}
           onDelete={onDeleteRecipe}
+          onSelect={onSelectRecipe}
         />
       ))}
     </div>

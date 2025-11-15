@@ -1,0 +1,161 @@
+wantType:
+  # =====================================================================
+  # METADATA LAYER - Identity and Classification
+  # =====================================================================
+  metadata:
+    name: "prime_numbers"
+    title: "Prime Number Range Generator"
+    description: |
+      Generator that produces all numbers within a specified range. Output values
+      are intended to be filtered downstream by prime_sequence to identify which
+      numbers are actually prime.
+
+      This is a pure generator (no inputs) that produces integer output values
+      sequentially. The actual primality testing is delegated to downstream
+      processors using the Sieve of Eratosthenes algorithm.
+
+    version: "1.0"
+    category: "mathematics"
+    pattern: "generator"
+
+  # =====================================================================
+  # PARAMETERS - What configuration does this generator accept?
+  # =====================================================================
+  parameters:
+    - name: "start"
+      description: "Starting number of range (inclusive)"
+      type: "int"
+      default: 2
+      required: false
+      validation:
+        min: 2
+        max: 1000000
+      example: 2
+
+    - name: "end"
+      description: "Ending number of range (inclusive)"
+      type: "int"
+      default: 100
+      required: false
+      validation:
+        min: 2
+        max: 1000000
+      example: 1000
+
+  # =====================================================================
+  # STATE - What data does this generator store and track?
+  # =====================================================================
+  state:
+    - name: "completed"
+      description: "Whether generation cycle has completed"
+      type: "bool"
+      persistent: true
+      example: true
+
+    - name: "generated_count"
+      description: "Total number of values generated (end - start + 1)"
+      type: "int"
+      persistent: true
+      example: 100
+
+    - name: "start_value"
+      description: "Starting value used for generation"
+      type: "int"
+      persistent: true
+      example: 2
+
+    - name: "end_value"
+      description: "Ending value used for generation"
+      type: "int"
+      persistent: true
+      example: 100
+
+  # =====================================================================
+  # CONNECTIVITY - How does this generator connect to other wants?
+  # =====================================================================
+  connectivity:
+    inputs: []
+
+    outputs:
+      - name: "number_stream"
+        type: "want"
+        description: "Stream of integers from start to end"
+
+  # =====================================================================
+  # AGENTS - Does this want use agents?
+  # =====================================================================
+  agents: []
+
+  # =====================================================================
+  # CONSTRAINTS - What business rules must be satisfied?
+  # =====================================================================
+  constraints:
+    - description: "Start must be at least 2 (smallest prime)"
+      validation: "start >= 2"
+
+    - description: "End must be at least as large as start"
+      validation: "end >= start"
+
+    - description: "Both must be within reasonable bounds"
+      validation: "start >= 2 and end <= 1000000"
+
+  # =====================================================================
+  # EXAMPLES - How is this generator want type used in practice?
+  # =====================================================================
+  examples:
+    - name: "Small Prime Range"
+      description: "Generate numbers 2-100 for sieving"
+      params:
+        start: 2
+        end: 100
+      expectedBehavior: |
+        1. Generator produces numbers 2, 3, 4, 5, ..., 100
+        2. Outputs 99 total numbers
+        3. Closes output channel
+        4. Sets completed flag
+        5. Downstream prime_sequence filters to find: 2, 3, 5, 7, 11, ...
+      connectedTo: ["prime_sequence", "prime_sink"]
+
+    - name: "Medium Prime Range"
+      description: "Generate numbers 2-1000 for larger sieve"
+      params:
+        start: 2
+        end: 1000
+      expectedBehavior: |
+        1. Generator produces numbers 2-1000
+        2. Outputs 999 numbers
+        3. prime_sequence uses Eratosthenes algorithm to filter
+        4. Result: 168 primes between 2 and 1000
+        5. Demonstrates sieve efficiency on larger range
+      connectedTo: ["prime_sequence", "prime_sink"]
+
+    - name: "Custom Range (Skip to 500)"
+      description: "Generate numbers from 500-600 to find primes in that range"
+      params:
+        start: 500
+        end: 600
+      expectedBehavior: |
+        1. Generator produces numbers 500-600
+        2. Outputs 101 numbers
+        3. prime_sequence identifies primes: 503, 509, 521, 523, 541, ...
+        4. Result: 16 primes in this range
+        5. Demonstrates sieve on arbitrary number ranges
+      connectedTo: ["prime_sequence", "prime_sink"]
+
+  # =====================================================================
+  # RELATED TYPES - What other want types work with this one?
+  # =====================================================================
+  relatedTypes:
+    - "prime_sequence"
+    - "prime_sieve"
+    - "fibonacci_numbers"
+    - "numbers"
+    - "sink"
+
+  # =====================================================================
+  # DOCUMENTATION LINKS
+  # =====================================================================
+  seeAlso:
+    - "Sieve of Eratosthenes algorithm documentation"
+    - "Generator pattern for data production"
+    - "Prime number mathematical properties"

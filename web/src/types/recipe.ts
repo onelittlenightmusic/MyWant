@@ -31,11 +31,16 @@ export interface RecipeResultSpec {
   description?: string;
 }
 
+export interface RecipeExample {
+  wants: RecipeWant[];
+}
+
 export interface RecipeContent {
   metadata: RecipeMetadata;
   parameters?: Record<string, any>;
   wants: RecipeWant[];
   result?: RecipeResultSpec[];
+  example?: RecipeExample;
 }
 
 export interface GenericRecipe {

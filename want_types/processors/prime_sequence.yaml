@@ -1,0 +1,126 @@
+wantType:
+  metadata:
+    name: "prime_sequence"
+    title: "Prime Sequence Sieve"
+    description: |
+      Processor that filters numbers to identify primes using the Sieve of
+      Eratosthenes algorithm. Receives a stream of numbers and outputs only
+      the prime numbers, using previously found primes for efficient checking.
+
+      This is a key component in prime-finding pipelines, connecting number
+      generators to prime collectors/sinks.
+
+    version: "1.0"
+    category: "mathematics"
+    pattern: "processor"
+
+  parameters:
+    - name: "prime"
+      description: "Prime number for sieve (not actively used, for configuration)"
+      type: "int"
+      default: 2
+      required: false
+      validation:
+        min: 2
+        max: 1000000
+      example: 2
+
+  state:
+    - name: "foundPrimes"
+      description: "Array of identified prime numbers"
+      type: "[]int"
+      persistent: true
+      example: [2, 3, 5, 7, 11, 13]
+
+    - name: "primeCount"
+      description: "Total count of primes identified"
+      type: "int"
+      persistent: true
+      example: 25
+
+    - name: "lastPrimeFound"
+      description: "Most recent prime identified"
+      type: "int"
+      persistent: true
+      example: 97
+
+    - name: "total_processed"
+      description: "Total numbers processed through sieve"
+      type: "int"
+      persistent: true
+      example: 100
+
+    - name: "last_number_processed"
+      description: "Last number examined"
+      type: "int"
+      persistent: true
+      example: 100
+
+  connectivity:
+    inputs:
+      - name: "number_stream"
+        type: "want"
+        description: "Stream of numbers to test for primality"
+        required: true
+
+    outputs:
+      - name: "prime_stream"
+        type: "want"
+        description: "Stream of identified prime numbers"
+
+  agents: []
+
+  constraints:
+    - description: "Sieve algorithm validates correctly"
+      validation: "all output numbers are prime"
+
+    - description: "Input numbers must be integers"
+      validation: "number_stream contains int values"
+
+  examples:
+    - name: "Sieve Range 2-100"
+      description: "Apply sieve to numbers 2-100"
+      params:
+        prime: 2
+      expectedBehavior: |
+        1. Receives numbers 2, 3, 4, 5, ..., 100
+        2. Identifies 2 as prime (first)
+        3. Uses 2 to eliminate multiples
+        4. Identifies 3, uses it as sieve
+        5. Continues until all tested
+        6. Outputs: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, ..., 97 (25 total)
+      connectedTo: ["prime_numbers", "prime_sieve"]
+
+    - name: "Large Range Sieve"
+      description: "Sieve 1000 numbers to find primes"
+      params:
+        prime: 2
+      expectedBehavior: |
+        1. Processes numbers 2-1000
+        2. Identifies all 168 primes
+        3. Uses memoized primes for efficiency
+        4. Outputs filtered prime stream
+        5. Demonstrates sieve algorithm correctness
+      connectedTo: ["prime_numbers", "prime_sieve"]
+
+    - name: "Custom Prime Range"
+      description: "Sieve numbers from 100-200"
+      params:
+        prime: 2
+      expectedBehavior: |
+        1. Receives 100-200 number range
+        2. Applies sieve algorithm
+        3. Identifies 21 primes in this range
+        4. Outputs: 101, 103, 107, 109, 113, ...
+        5. Useful for analyzing prime distribution
+      connectedTo: ["prime_numbers", "prime_sink"]
+
+  relatedTypes:
+    - "prime_numbers"
+    - "prime_sieve"
+    - "prime_sink"
+
+  seeAlso:
+    - "Sieve of Eratosthenes algorithm"
+    - "Prime identification patterns"
+    - "Memoization in sieves"

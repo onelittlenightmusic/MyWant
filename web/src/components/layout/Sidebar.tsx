@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Heart, Bot, BookOpen, AlertTriangle, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { X, Heart, Bot, BookOpen, AlertTriangle, Zap, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface SidebarProps {
@@ -40,6 +40,14 @@ const getMenuItems = () => {
 const getAdvancedItems = () => {
   const currentPath = getCurrentPath();
   return [
+    {
+      id: 'wantTypes',
+      label: 'Want Types',
+      icon: Zap,
+      href: '/want-types',
+      active: currentPath === '/want-types',
+      disabled: false
+    },
     {
       id: 'recipes',
       label: 'Recipes',

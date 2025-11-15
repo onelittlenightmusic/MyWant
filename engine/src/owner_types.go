@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"mywant/engine/src/chain"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -295,10 +296,6 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 	return true
 }
 
-// GetWant returns the underlying want
-func (t *Target) GetWant() *Want {
-	return &t.Want
-}
 
 // UpdateParameter updates a parameter and pushes it to child wants
 func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
@@ -522,12 +519,14 @@ func (t *Target) addChildWantsToMemory() error {
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
 	BaseWant   interface{} // The original want (Generator, Queue, Sink, etc.)
+	Want       *Want       // Direct reference to Want (extracted at creation time)
 	TargetName string
 	WantName   string
 }
 
 // NewOwnerAwareWant creates a wrapper that adds parent notification to any want
-func NewOwnerAwareWant(baseWant interface{}, metadata Metadata) *OwnerAwareWant {
+// wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
+func NewOwnerAwareWant(baseWant interface{}, metadata Metadata, wantPtr *Want) *OwnerAwareWant {
 	// Find target name from owner references
 	targetName := ""
 	for _, ownerRef := range metadata.OwnerReferences {
@@ -537,18 +536,57 @@ func NewOwnerAwareWant(baseWant interface{}, metadata Metadata) *OwnerAwareWant 
 		}
 	}
 
+	// If wantPtr is nil, try to extract it using reflection for custom types with embedded Want
+	if wantPtr == nil {
+		wantPtr = extractWantViaReflection(baseWant)
+	}
+
 	return &OwnerAwareWant{
 		BaseWant:   baseWant,
+		Want:       wantPtr,
 		TargetName: targetName,
 		WantName:   metadata.Name,
 	}
 }
 
+// extractWantViaReflection extracts Want pointer from custom types with embedded Want field
+func extractWantViaReflection(baseWant interface{}) *Want {
+	if baseWant == nil {
+		return nil
+	}
+
+	// Use reflection to inspect the value
+	v := reflect.ValueOf(baseWant)
+
+	// Handle pointer types
+	if v.Kind() == reflect.Ptr {
+		elem := v.Elem()
+
+		// Try to find a Want field in the struct
+		if elem.Kind() == reflect.Struct {
+			// Look for a field named "Want"
+			wantField := elem.FieldByName("Want")
+			if wantField.IsValid() && wantField.Kind() == reflect.Struct {
+				// Get the address of the Want field
+				if wantField.CanAddr() {
+					wantAddr := wantField.Addr()
+					// Type assert to *Want
+					if want, ok := wantAddr.Interface().(*Want); ok {
+						return want
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // Exec wraps the base want's execution to add completion notification
-func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
+func (oaw *OwnerAwareWant) Exec() bool {
 	// Call the original Exec method directly
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
-		result := chainWant.Exec(inputs, outputs)
+		result := chainWant.Exec()
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
@@ -566,9 +604,12 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 
 // emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
 func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
-	// Get the child want
-	want := oaw.GetWant()
-	if want == nil {
+	// Use the Want pointer stored at creation time
+	if oaw.Want == nil {
+		// Only log warnings if we actually have a target (not a standalone want)
+		if oaw.TargetName != "" {
+			InfoLog("[TARGET] ⚠️  OwnerAwareWant %s: Want pointer is nil, cannot emit completion event\n", oaw.WantName)
+		}
 		return
 	}
 
@@ -585,25 +626,15 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 	}
 
 	// Emit through subscription system (blocking mode)
-	want.GetSubscriptionSystem().Emit(context.Background(), event)
-}
-
-// GetWant returns the underlying want from the base want
-func (oaw *OwnerAwareWant) GetWant() *Want {
-	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
-		want := chainWant.GetWant()
-		if want != nil && oaw.TargetName != "" {
-			// Store reference for notifications and return original want
-			// We'll hook into StoreState calls via a different mechanism
-			oaw.setupStateNotifications(want)
-		}
-		return want
-	}
-	return nil
+	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
 // setupStateNotifications sets up state change monitoring for this want
 func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
+	// Set the Want reference if not already set
+	if oaw.Want == nil {
+		oaw.Want = want
+	}
 	// For now, we'll rely on the child wants to call our notification method directly
 	// This is a placeholder for a more sophisticated hooking mechanism
 }

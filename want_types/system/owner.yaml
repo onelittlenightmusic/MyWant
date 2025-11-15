@@ -1,0 +1,106 @@
+wantType:
+  metadata:
+    name: "owner"
+    title: "Owner Reference Want"
+    description: |
+      System want type for managing owner-based relationships and lifecycle
+      management. Used to define parent-child relationships where one want
+      owns or manages other wants.
+
+      Enables hierarchical want organization and owner-referenced lifecycle
+      management for complex multi-want deployments.
+
+    version: "1.0"
+    category: "system"
+    pattern: "independent"
+
+  parameters:
+    - name: "owner_id"
+      description: "Unique identifier for the owner"
+      type: "string"
+      required: true
+      example: "owner-travel-planner"
+
+    - name: "owner_type"
+      description: "Type classification of owner (user, system, coordinator)"
+      type: "string"
+      default: "system"
+      required: false
+      validation:
+        enum: ["user", "system", "coordinator", "manager"]
+      example: "coordinator"
+
+  state:
+    - name: "owner_id"
+      description: "Stored owner identifier"
+      type: "string"
+      persistent: true
+      example: "owner-travel-planner"
+
+    - name: "owned_wants"
+      description: "Array of want IDs owned by this owner"
+      type: "[]string"
+      persistent: true
+      example: ["restaurant", "hotel", "buffet"]
+
+    - name: "lifecycle_state"
+      description: "Lifecycle state (active, inactive, archived)"
+      type: "string"
+      persistent: true
+      example: "active"
+
+    - name: "created_at"
+      description: "Timestamp when owner relationship created"
+      type: "string"
+      persistent: true
+
+    - name: "total_owned"
+      description: "Count of wants owned"
+      type: "int"
+      persistent: true
+      example: 3
+
+  connectivity:
+    inputs: []
+    outputs: []
+
+  agents: []
+
+  constraints:
+    - description: "Owner ID must be non-empty"
+      validation: "owner_id length > 0"
+
+    - description: "Owner type must be valid"
+      validation: "owner_type in [user, system, coordinator, manager]"
+
+  examples:
+    - name: "Travel Planner Owner"
+      description: "Owner managing multiple travel wants"
+      params:
+        owner_id: "owner-travel-planner"
+        owner_type: "coordinator"
+      expectedBehavior: |
+        1. Creates owner relationship
+        2. Manages restaurant, hotel, buffet wants
+        3. Coordinates lifecycle of child wants
+        4. Enables bulk operations on owned wants
+      connectedTo: []
+
+    - name: "System Owner"
+      description: "System-level want owner"
+      params:
+        owner_id: "system-owner"
+        owner_type: "system"
+      expectedBehavior: |
+        1. Establishes system-level ownership
+        2. Can own multiple independent want chains
+        3. Enables centralized lifecycle management
+      connectedTo: []
+
+  relatedTypes:
+    - "custom_target"
+
+  seeAlso:
+    - "Owner-based want lifecycle management"
+    - "Hierarchical want organization"
+    - "Parent-child want relationships"

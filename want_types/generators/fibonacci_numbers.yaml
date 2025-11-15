@@ -1,0 +1,138 @@
+wantType:
+  # =====================================================================
+  # METADATA LAYER - Identity and Classification
+  # =====================================================================
+  metadata:
+    name: "fibonacci_numbers"
+    title: "Fibonacci Number Generator"
+    description: |
+      Generator that produces Fibonacci sequence numbers. Generates a configurable
+      number of Fibonacci values starting from 0, 1 and continuing the sequence
+      where each number is the sum of the previous two.
+
+      This is a pure generator (no inputs) that produces integer output values.
+      Useful for testing pipeline systems with mathematical sequences.
+
+    version: "1.0"
+    category: "mathematics"
+    pattern: "generator"
+
+  # =====================================================================
+  # PARAMETERS - What configuration does this generator accept?
+  # =====================================================================
+  parameters:
+    - name: "count"
+      description: "Number of Fibonacci values to generate"
+      type: "int"
+      default: 20
+      required: false
+      validation:
+        min: 1
+        max: 10000
+      example: 50
+
+  # =====================================================================
+  # STATE - What data does this generator store and track?
+  # =====================================================================
+  state:
+    - name: "completed"
+      description: "Whether generation cycle has completed"
+      type: "bool"
+      persistent: true
+      example: true
+
+    - name: "generated_count"
+      description: "Number of values generated in this cycle"
+      type: "int"
+      persistent: true
+      example: 20
+
+    - name: "max_value_generated"
+      description: "Largest Fibonacci number generated"
+      type: "int"
+      persistent: true
+      example: 4181
+
+  # =====================================================================
+  # CONNECTIVITY - How does this generator connect to other wants?
+  # =====================================================================
+  connectivity:
+    inputs: []
+
+    outputs:
+      - name: "fibonacci_stream"
+        type: "want"
+        description: "Stream of integer Fibonacci numbers"
+
+  # =====================================================================
+  # AGENTS - Does this want use agents?
+  # =====================================================================
+  agents: []
+
+  # =====================================================================
+  # CONSTRAINTS - What business rules must be satisfied?
+  # =====================================================================
+  constraints:
+    - description: "Count must be positive"
+      validation: "count > 0"
+
+    - description: "Count must be within reasonable bounds"
+      validation: "count <= 10000"
+
+    - description: "Generator is deterministic"
+      validation: "Same count parameter always produces same sequence"
+
+  # =====================================================================
+  # EXAMPLES - How is this generator want type used in practice?
+  # =====================================================================
+  examples:
+    - name: "Small Fibonacci Sequence"
+      description: "Generate first 10 Fibonacci numbers"
+      params:
+        count: 10
+      expectedBehavior: |
+        1. Generator starts execution
+        2. Produces: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
+        3. Closes output channel
+        4. Sets completed flag in state
+        5. Ready to process results
+      connectedTo: ["fibonacci_sequence", "queue", "sink"]
+
+    - name: "Large Fibonacci Sequence"
+      description: "Generate 100 Fibonacci numbers for testing throughput"
+      params:
+        count: 100
+      expectedBehavior: |
+        1. Generator produces 100 Fibonacci values
+        2. Values grow exponentially (up to ~3.5 billion)
+        3. Useful for testing processor capacity
+        4. Sink can count/aggregate the stream
+      connectedTo: ["fibonacci_sequence", "sink"]
+
+    - name: "Single Number"
+      description: "Generate just the first Fibonacci number (0)"
+      params:
+        count: 1
+      expectedBehavior: |
+        1. Generator produces just 0
+        2. Immediately completes
+        3. Useful for testing pipeline initialization
+      connectedTo: ["sink"]
+
+  # =====================================================================
+  # RELATED TYPES - What other want types work with this one?
+  # =====================================================================
+  relatedTypes:
+    - "fibonacci_sequence"
+    - "prime_numbers"
+    - "numbers"
+    - "queue"
+    - "sink"
+
+  # =====================================================================
+  # DOCUMENTATION LINKS
+  # =====================================================================
+  seeAlso:
+    - "Generator pattern documentation"
+    - "Pipeline architecture for data processing"
+    - "Fibonacci sequence mathematical background"

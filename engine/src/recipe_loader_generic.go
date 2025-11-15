@@ -41,12 +41,18 @@ type RecipeResultSpec struct {
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 }
 
+// RecipeExample represents example deployment configuration for one-click deployment
+type RecipeExample struct {
+	Wants []RecipeWant `yaml:"wants,omitempty" json:"wants,omitempty"`
+}
+
 // RecipeContent contains the actual recipe data
 type RecipeContent struct {
 	Metadata   GenericRecipeMetadata  `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	Wants      []RecipeWant           `yaml:"wants,omitempty" json:"wants,omitempty"`
 	Parameters map[string]interface{} `yaml:"parameters,omitempty" json:"parameters,omitempty"`
 	Result     *RecipeResult          `yaml:"result,omitempty" json:"result,omitempty"`
+	Example    *RecipeExample         `yaml:"example,omitempty" json:"example,omitempty"`
 }
 
 // ConvertToWant converts a RecipeWant to a Want
