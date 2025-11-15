@@ -167,14 +167,16 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Individual agents should NOT call BeginExecCycle/EndExecCycle
 	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
 		// Store flight detail state updates
-		want.StoreState("flight_id", reservation.ID)
-		want.StoreState("flight_number", reservation.FlightNumber)
-		want.StoreState("from", reservation.From)
-		want.StoreState("to", reservation.To)
-		want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
-		want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
-		want.StoreState("status_message", reservation.StatusMessage)
-		want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+		want.StoreStateMulti(map[string]interface{}{
+			"flight_id": reservation.ID,
+			"flight_number": reservation.FlightNumber,
+			"from": reservation.From,
+			"to": reservation.To,
+			"departure_time": reservation.DepartureTime.Format(time.RFC3339),
+			"arrival_time": reservation.ArrivalTime.Format(time.RFC3339),
+			"status_message": reservation.StatusMessage,
+			"updated_at": reservation.UpdatedAt.Format(time.RFC3339),
+		})
 
 		if hasStateChange {
 			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
@@ -189,10 +191,12 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
 
 			// Store status change info - use actual newStatus from mock server
-			want.StoreState("flight_status", newStatus)
-			want.StoreState("status_changed", true)
-			want.StoreState("status_changed_at", time.Now().Format(time.RFC3339))
-			want.StoreState("status_change_history_count", len(m.StatusChangeHistory))
+			want.StoreStateMulti(map[string]interface{}{
+				"flight_status": newStatus,
+				"status_changed": true,
+				"status_changed_at": time.Now().Format(time.RFC3339),
+				"status_change_history_count": len(m.StatusChangeHistory),
+			})
 
 			// Record activity description for agent history
 			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",

@@ -233,16 +233,18 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// Store reservation in want state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
 	// Individual agents should NOT call BeginExecCycle/EndExecCycle
-	want.StoreState("flight_id", reservation.ID)
-	want.StoreState("flight_status", "created")
-	want.StoreState("flight_number", reservation.FlightNumber)
-	want.StoreState("from", reservation.From)
-	want.StoreState("to", reservation.To)
-	want.StoreState("departure_time", reservation.DepartureTime.Format(time.RFC3339))
-	want.StoreState("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
-	want.StoreState("status_message", reservation.StatusMessage)
-	want.StoreState("created_at", reservation.CreatedAt.Format(time.RFC3339))
-	want.StoreState("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+	want.StoreStateMulti(map[string]interface{}{
+		"flight_id": reservation.ID,
+		"flight_status": "created",
+		"flight_number": reservation.FlightNumber,
+		"from": reservation.From,
+		"to": reservation.To,
+		"departure_time": reservation.DepartureTime.Format(time.RFC3339),
+		"arrival_time": reservation.ArrivalTime.Format(time.RFC3339),
+		"status_message": reservation.StatusMessage,
+		"created_at": reservation.CreatedAt.Format(time.RFC3339),
+		"updated_at": reservation.UpdatedAt.Format(time.RFC3339),
+	})
 	want.StoreState("agent_result", FlightSchedule{
 		DepartureTime:   reservation.DepartureTime,
 		ArrivalTime:     reservation.ArrivalTime,
@@ -299,16 +301,20 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 
 	// Update state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework
-	want.StoreState("flight_status", "canceled")
-	want.StoreState("status_message", "Flight canceled by agent")
-	want.StoreState("canceled_at", time.Now().Format(time.RFC3339))
+	want.StoreStateMulti(map[string]interface{}{
+		"flight_status": "canceled",
+		"status_message": "Flight canceled by agent",
+		"canceled_at": time.Now().Format(time.RFC3339),
+	})
 
 	// Save cancelled flight ID and clear current flight_id for rebooking
-	want.StoreState("previous_flight_id", flightIDStr)
-	want.StoreState("previous_flight_status", "canceled")
-	want.StoreState("flight_id", "")
-	want.StoreState("flight_status", "")
-	want.StoreState("attempted", false)
+	want.StoreStateMulti(map[string]interface{}{
+		"previous_flight_id": flightIDStr,
+		"previous_flight_status": "canceled",
+		"flight_id": "",
+		"flight_status": "",
+		"attempted": false,
+	})
 
 	// Clear agent_result so rebooking code can detect cancellation happened
 	// (if agent_result still contains the old flight, code won't know cancellation occurred)
