@@ -912,19 +912,26 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 }
 
 func (t *TravelCoordinatorWant) Exec() bool {
+	// Slow down execution to every 1 second to reduce CPU usage and logs
+	lastExecVal, _ := t.GetState("last_exec_time")
+	lastExecTime, _ := lastExecVal.(time.Time)
+	if !lastExecTime.IsZero() && time.Since(lastExecTime) < time.Second {
+		return false
+	}
+	t.StoreState("last_exec_time", time.Now())
+
 	// Ensure all input channels are available
 	inCount := t.paths.GetInCount()
-	InfoLog("[TRAVEL_COORDINATOR] Exec called. Input channel count: %d\n", inCount)
-	InfoLog("[TRAVEL_COORDINATOR] Want paths.In length: %d, paths.Out length: %d\n", len(t.paths.In), len(t.paths.Out))
-
-	// Debug: Print all input path details
-	for i, pathInfo := range t.paths.In {
-		InfoLog("[TRAVEL_COORDINATOR] Input path %d: Name=%s, Channel=%v, Active=%v\n", i, pathInfo.Name, pathInfo.Channel != nil, pathInfo.Active)
-	}
 
 	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
-		InfoLog("[TRAVEL_COORDINATOR] Waiting for 3 input channels, currently have %d. Returning false.\n", inCount)
+		// Only log if connection count has changed
+		prevCountVal, _ := t.GetState("prev_in_count")
+		prevCount, _ := prevCountVal.(int)
+		if prevCount != inCount {
+			InfoLog("[TRAVEL_COORDINATOR] Waiting for 3 input channels, currently have %d.\n", inCount)
+			t.StoreState("prev_in_count", inCount)
+		}
 		return false
 	}
 
@@ -937,12 +944,14 @@ func (t *TravelCoordinatorWant) Exec() bool {
 
 	// Collect all available schedules from child wants in this cycle
 	// Use a non-blocking read to avoid deadlocks if a channel is empty
+	newScheduleReceived := false
 	for i := 0; i < t.paths.GetInCount(); i++ {
 		select {
 		case schedData := <-t.paths.In[i].Channel:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				schedules = append(schedules, schedule)
-				InfoLog("[TRAVEL_COORDINATOR] Received schedule from child: %v\n", schedule)
+				newScheduleReceived = true
+				InfoLog("[TRAVEL_COORDINATOR] Received schedule from child (want #%d): %d events\n", i+1, len(schedule.Events))
 			}
 		default:
 			// No data on this channel in this cycle, continue to next channel
@@ -986,7 +995,10 @@ func (t *TravelCoordinatorWant) Exec() bool {
 		return true // All schedules collected and processed, coordinator is complete
 	}
 
-	InfoLog("[TRAVEL_COORDINATOR] Waiting for more schedules. Collected %d of %d.\n", len(schedules), t.paths.GetInCount())
+	// Only log when a new schedule was received
+	if newScheduleReceived {
+		InfoLog("[TRAVEL_COORDINATOR] Waiting for more schedules. Collected %d of %d.\n", len(schedules), t.paths.GetInCount())
+	}
 	return false // Continue waiting for more schedules
 }
 
