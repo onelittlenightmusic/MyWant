@@ -227,7 +227,14 @@ func (l *Level1CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	if l.paths.GetInCount() < 2 {
+	inCount := l.paths.GetInCount()
+
+	// If no channels are connected, mark as completed
+	if inCount == 0 {
+		return true
+	}
+
+	if inCount < 2 {
 		return false // Wait for evidence and description
 	}
 
@@ -361,7 +368,14 @@ func (l *Level2CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	if l.paths.GetInCount() < 2 {
+	inCount := l.paths.GetInCount()
+
+	// If no channels are connected, mark as completed
+	if inCount == 0 {
+		return true
+	}
+
+	if inCount < 2 {
 		return false // Wait for evidence and description
 	}
 
