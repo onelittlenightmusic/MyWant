@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"mywant/engine/src/chain"
 	"reflect"
 	"strings"
 	"sync"
@@ -626,6 +627,57 @@ func (oaw *OwnerAwareWant) Exec() bool {
 		InfoLog("[TARGET:WRAPPER] ⚠️  Want '%s': No ChainWant implementation found (type: %T)\n", oaw.WantName, oaw.BaseWant)
 		return true
 	}
+}
+
+// Channel delegation methods for OwnerAwareWant
+// These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
+
+// GetInputChannel delegates to the stored Want
+func (oaw *OwnerAwareWant) GetInputChannel(index int) (chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetInputChannel(index)
+	}
+	return nil, true
+}
+
+// GetOutputChannel delegates to the stored Want
+func (oaw *OwnerAwareWant) GetOutputChannel(index int) (chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetOutputChannel(index)
+	}
+	return nil, true
+}
+
+// GetFirstInputChannel delegates to the stored Want
+func (oaw *OwnerAwareWant) GetFirstInputChannel() (chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetFirstInputChannel()
+	}
+	return nil, true
+}
+
+// GetFirstOutputChannel delegates to the stored Want
+func (oaw *OwnerAwareWant) GetFirstOutputChannel() (chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetFirstOutputChannel()
+	}
+	return nil, true
+}
+
+// GetInputAndOutputChannels delegates to the stored Want
+func (oaw *OwnerAwareWant) GetInputAndOutputChannels() (chain.Chan, chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetInputAndOutputChannels()
+	}
+	return nil, nil, true
+}
+
+// GetInputAndOutputChannelsAt delegates to the stored Want
+func (oaw *OwnerAwareWant) GetInputAndOutputChannelsAt(inIndex, outIndex int) (chain.Chan, chain.Chan, bool) {
+	if oaw.Want != nil {
+		return oaw.Want.GetInputAndOutputChannelsAt(inIndex, outIndex)
+	}
+	return nil, nil, true
 }
 
 // emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
