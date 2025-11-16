@@ -83,6 +83,11 @@ func (r *RestaurantWant) Exec() bool {
 	// Get output channel, but don't skip execution if not available yet
 	out, outChannelAvailable := r.GetFirstOutputChannel()
 
+	// DEBUG: Log output channel availability at execution start
+	log.Printf("[RESTAURANT] ========== Exec() CALLED at %s ==========\n", time.Now().Format("15:04:05.000"))
+	log.Printf("[RESTAURANT] Exec() start - Output channel available: %v, OutCount: %d\n", outChannelAvailable, r.GetOutCount())
+	log.Printf("[RESTAURANT] Want paths state: In=%d, Out=%d\n", r.GetInCount(), r.GetOutCount())
+
 	if attempted {
 		return true
 	}
@@ -200,9 +205,11 @@ func (r *RestaurantWant) Exec() bool {
 
 	// Send to output channel only if available
 	if outChannelAvailable {
+		log.Printf("[RESTAURANT] Sending schedule to output channel (OutCount=%d)...\n", r.GetOutCount())
 		out <- newSchedule
+		log.Printf("[RESTAURANT] Schedule sent successfully to output channel\n")
 	} else {
-		log.Printf("[RESTAURANT] Output channel not available, skipping sending generated schedule.\n")
+		log.Printf("[RESTAURANT] Output channel not available (OutCount=%d), skipping sending generated schedule.\n", r.GetOutCount())
 	}
 
 	return true
@@ -399,6 +406,9 @@ func (h *HotelWant) Exec() bool {
 	// Get output channel, but don't skip execution if not available yet
 	out, outChannelAvailable := h.GetFirstOutputChannel()
 
+	// DEBUG: Log output channel availability at execution start
+	log.Printf("[HOTEL] Exec() start - Output channel available: %v, OutCount: %d\n", outChannelAvailable, h.GetOutCount())
+
 	if attempted {
 		return true
 	}
@@ -516,9 +526,11 @@ func (h *HotelWant) Exec() bool {
 
 	// Send to output channel only if available
 	if outChannelAvailable {
+		log.Printf("[HOTEL] Sending schedule to output channel (OutCount=%d)...\n", h.GetOutCount())
 		out <- newSchedule
+		log.Printf("[HOTEL] Schedule sent successfully to output channel\n")
 	} else {
-		log.Printf("[HOTEL] Output channel not available, skipping sending generated schedule.\n")
+		log.Printf("[HOTEL] Output channel not available (OutCount=%d), skipping sending generated schedule.\n", h.GetOutCount())
 	}
 
 	return true
@@ -624,6 +636,9 @@ func (b *BuffetWant) Exec() bool {
 
 	// Get output channel, but don't skip execution if not available yet
 	out, outChannelAvailable := b.GetFirstOutputChannel()
+
+	// DEBUG: Log output channel availability at execution start
+	log.Printf("[BUFFET] Exec() start - Output channel available: %v, OutCount: %d\n", outChannelAvailable, b.GetOutCount())
 
 	if attempted {
 		return true
@@ -736,9 +751,11 @@ func (b *BuffetWant) Exec() bool {
 
 	// Send to output channel only if available
 	if outChannelAvailable {
+		log.Printf("[BUFFET] Sending schedule to output channel (OutCount=%d)...\n", b.GetOutCount())
 		out <- newSchedule
+		log.Printf("[BUFFET] Schedule sent successfully to output channel\n")
 	} else {
-		log.Printf("[BUFFET] Output channel not available, skipping sending generated schedule.\n")
+		log.Printf("[BUFFET] Output channel not available (OutCount=%d), skipping sending generated schedule.\n", b.GetOutCount())
 	}
 
 	return true
@@ -908,29 +925,17 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 }
 
 func (t *TravelCoordinatorWant) Exec() bool {
-	// Slow down execution to every 1 second to reduce CPU usage and logs
-	lastExecVal, _ := t.GetState("last_exec_time")
-	lastExecTime, _ := lastExecVal.(time.Time)
-	if !lastExecTime.IsZero() && time.Since(lastExecTime) < time.Second {
-		return false
-	}
-	t.StoreState("last_exec_time", time.Now())
-
 	// Ensure all input channels are available
 	inCount := t.GetInCount()
 
-	// Log for debugging
-	InfoLog("[TRAVEL_COORDINATOR] Exec called: InCount=%d\n", inCount)
+	// If no channels are connected, this might be for independent child wants
+	// that don't feed back through channels. Mark as completed.
+	if inCount == 0 {
+		return true
+	}
 
 	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
-		// Only log if connection count has changed
-		prevCountVal, _ := t.GetState("prev_in_count")
-		prevCount, _ := prevCountVal.(int)
-		if prevCount != inCount {
-			InfoLog("[TRAVEL_COORDINATOR] Waiting for 3 input channels, currently have %d.\n", inCount)
-			t.StoreState("prev_in_count", inCount)
-		}
 		return false
 	}
 

@@ -651,6 +651,30 @@ func (cb *ChainBuilder) connectPhase() error {
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
+	// DEBUG: Log what paths were generated
+	DebugLog("[RECONCILE:CONNECT] Generated pathMap: %d entries\n", len(cb.pathMap))
+	for wantName, paths := range cb.pathMap {
+		DebugLog("[RECONCILE:CONNECT] Want '%s': In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
+		for i, outPath := range paths.Out {
+			DebugLog("[RECONCILE:CONNECT]   Out[%d]: Name=%s, Active=%v\n", i, outPath.Name, outPath.Active)
+		}
+	}
+
+	// CRITICAL FIX: Synchronize generated paths to individual Want structs
+	// This ensures child wants can access their output channels when they execute
+	// NOTE: Caller (reconcileWants) already holds reconcileMutex, so we don't lock here
+	for wantName, paths := range cb.pathMap {
+		if runtimeWant, exists := cb.wants[wantName]; exists {
+			// Update the want's paths field with the generated paths
+			// This makes output/input channels available to the want during execution
+			runtimeWant.want.paths.In = paths.In
+			runtimeWant.want.paths.Out = paths.Out
+			DebugLog("[RECONCILE:CONNECT] Synchronized paths for '%s': Set In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
+		} else {
+			DebugLog("[RECONCILE:CONNECT] Want '%s' NOT FOUND in cb.wants (unable to sync paths)\n", wantName)
+		}
+	}
+
 	// Validate connectivity requirements (non-blocking - logs warnings only)
 	// Wants with missing connections will remain idle until reconciliation connects them
 	cb.validateConnections(cb.pathMap)
@@ -1539,6 +1563,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		DebugLog("[EXEC] Skipping want %s - connectivity requirements not yet satisfied",
 			wantName)
+		// Set to Idle state so the Third pass in reconcile can retry this want
+		want.want.SetStatus(WantStatusIdle)
 		return
 	}
 
@@ -1562,6 +1588,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		DebugLog("[EXEC] Want %s connectivity requirements not satisfied, triggering reconciliation",
 			wantName)
+		// Set to Idle state so the Third pass in reconcile can retry this want
+		want.want.SetStatus(WantStatusIdle)
 		// Trigger reconciliation to retry path generation and connection
 		if err := cb.TriggerReconcile(); err != nil {
 			DebugLog("[EXEC] Failed to trigger reconcile for %s: %v", wantName, err)

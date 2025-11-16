@@ -112,10 +112,6 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
-	// Log all completion events for debugging
-	InfoLog("[TARGET:COMPLETION] Received completion event for child '%s' targeting target '%s' (my target: '%s')\n",
-		completionEvent.ChildName, completionEvent.TargetName, tcs.target.Metadata.Name)
-
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
 		return EventResponse{Handled: false}
@@ -124,21 +120,17 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	// Track child completion
 	tcs.target.childCompletionMutex.Lock()
 	tcs.target.completedChildren[completionEvent.ChildName] = true
-	InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Child '%s' marked complete (%d/%d completed)\n",
-		tcs.target.Metadata.Name, completionEvent.ChildName, len(tcs.target.completedChildren), len(tcs.target.childWants))
 	allComplete := tcs.target.checkAllChildrenComplete()
 	tcs.target.childCompletionMutex.Unlock()
 
-	// If all children are complete, signal the target via channel
+	// If all children are complete, signal the target via channel (only for old-style blocking)
+	// Note: New implementation uses polling in Exec(), not channel-based signaling
 	if allComplete {
-		InfoLog("[TARGET:COMPLETION] 🎉 Target '%s': ALL children complete! Signaling completion...\n", tcs.target.Metadata.Name)
 		select {
 		case tcs.target.childrenDone <- true:
-			// Signal sent successfully
-			InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Completion signal sent successfully\n", tcs.target.Metadata.Name)
+			// Signal sent (legacy support)
 		default:
 			// Channel already has signal, ignore
-			InfoLog("[TARGET:COMPLETION] ⚠️  Target '%s': Completion signal already sent or buffered\n", tcs.target.Metadata.Name)
 		}
 	}
 
@@ -153,14 +145,11 @@ func (t *Target) checkAllChildrenComplete() bool {
 	// If we have no children yet AND no completions have arrived, we can't be complete
 	// (children are still being added asynchronously)
 	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
-		InfoLog("[TARGET:CHECK] ⏳ No children added yet for target '%s' - waiting for children...\n", t.Metadata.Name)
 		return false
 	}
 
 	// If we have completed children but no childWants yet, they're still being added asynchronously
 	if len(t.childWants) == 0 && len(t.completedChildren) > 0 {
-		InfoLog("[TARGET:CHECK] ⏳ Children still being added for target '%s' (%d completions received, waiting for wants list)\n",
-			t.Metadata.Name, len(t.completedChildren))
 		return false
 	}
 
@@ -193,7 +182,6 @@ func (t *Target) resolveRecipeParameters() {
 	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
-		InfoLog("[TARGET] ⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
 
@@ -228,19 +216,14 @@ func (t *Target) resolveRecipeParameters() {
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
-		InfoLog("[TARGET] ❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
 		return []*Want{}
 	}
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
-		InfoLog("[TARGET] ❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
 		return []*Want{}
 	}
-
-	InfoLog("[TARGET] ✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
-		t.Metadata.Name, t.RecipePath, len(config.Wants))
 
 	// Add owner references to all child wants
 	for i := range config.Wants {
@@ -699,17 +682,8 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 		ChildName: oaw.WantName,
 	}
 
-	// Log the emission for debugging
-	if oaw.TargetName != "" {
-		InfoLog("[TARGET:COMPLETION] 📤 Want '%s': Emitting completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
-	}
-
 	// Emit through subscription system (blocking mode)
 	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)
-
-	if oaw.TargetName != "" {
-		InfoLog("[TARGET:COMPLETION] ✅ Want '%s': Completion event emitted to target '%s'\n", oaw.WantName, oaw.TargetName)
-	}
 }
 
 // setupStateNotifications sets up state change monitoring for this want
