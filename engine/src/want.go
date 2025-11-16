@@ -915,6 +915,21 @@ func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
 	return n.ConnectivityMetadata
 }
 
+// GetInCount returns the number of input paths
+func (n *Want) GetInCount() int {
+	return n.paths.GetInCount()
+}
+
+// GetOutCount returns the number of output paths
+func (n *Want) GetOutCount() int {
+	return n.paths.GetOutCount()
+}
+
+// GetPaths returns the paths field
+func (n *Want) GetPaths() *Paths {
+	return &n.paths
+}
+
 // Init initializes the Want base type with metadata and spec, plus type-specific fields
 // This is a helper method used by all want constructors to reduce boilerplate
 // Usage in want types:

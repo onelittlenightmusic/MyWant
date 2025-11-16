@@ -1,0 +1,30 @@
+🔍 Scanning 0 recipes for custom types...
+✅ Registered 0 custom types from recipes
+[SERVER] Recipe directory 'recipes' does not exist, skipping recipe loading
+🚀 MyWant server starting on localhost:8080
+📋 Available endpoints:
+  GET  /health                        - Health check
+  POST /api/v1/configs               - Create config (YAML config with recipe reference)
+  POST /api/v1/wants                 - Create want (JSON/YAML want object)
+  GET  /api/v1/wants                 - List wants
+  GET  /api/v1/wants/{id}            - Get want
+  PUT  /api/v1/wants/{id}            - Update want (JSON/YAML want object)
+  DELETE /api/v1/wants/{id}          - Delete want
+  GET  /api/v1/wants/{id}/status     - Get execution status
+  GET  /api/v1/wants/{id}/results    - Get execution results
+  POST /api/v1/wants/{id}/suspend    - Suspend want execution
+  POST /api/v1/wants/{id}/resume     - Resume want execution
+  POST /api/v1/agents                - Create agent
+  GET  /api/v1/agents                - List agents
+  GET  /api/v1/agents/{name}         - Get agent
+  DELETE /api/v1/agents/{name}       - Delete agent
+  POST /api/v1/capabilities          - Create capability
+  GET  /api/v1/capabilities          - List capabilities
+  GET  /api/v1/capabilities/{name}   - Get capability
+  DELETE /api/v1/capabilities/{name} - Delete capability
+  GET  /api/v1/capabilities/{name}/agents - Find agents by capability
+  GET  /api/v1/errors              - List error history
+  GET  /api/v1/errors/{id}         - Get error details
+  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)
+  DELETE /api/v1/errors/{id}       - Delete error entry
+

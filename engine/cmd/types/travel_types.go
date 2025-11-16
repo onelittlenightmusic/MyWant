@@ -36,7 +36,6 @@ type RestaurantWant struct {
 	Want
 	RestaurantType string
 	Duration       time.Duration
-	paths          Paths
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
@@ -129,7 +128,7 @@ func (r *RestaurantWant) Exec() bool {
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
-	if r.paths.GetInCount() > 0 {
+	if r.GetInCount() > 0 {
 		in, inChannelAvailable := r.GetInputChannel(0)
 		if inChannelAvailable {
 			select {
@@ -355,7 +354,6 @@ type HotelWant struct {
 	HotelType string
 	CheckIn   time.Duration
 	CheckOut  time.Duration
-	paths     Paths
 }
 
 // NewHotelWant creates a new hotel reservation want
@@ -446,7 +444,7 @@ func (h *HotelWant) Exec() bool {
 
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
-	if h.paths.GetInCount() > 0 {
+	if h.GetInCount() > 0 {
 		in, inChannelAvailable := h.GetInputChannel(0)
 		if inChannelAvailable {
 			select {
@@ -582,7 +580,6 @@ type BuffetWant struct {
 	Want
 	BuffetType string
 	Duration   time.Duration
-	paths      Paths
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
@@ -672,7 +669,7 @@ func (b *BuffetWant) Exec() bool {
 	log.Printf("[BUFFET] Agent execution did not return result, using standard buffet logic\n")
 
 	var existingSchedule *TravelSchedule
-	if b.paths.GetInCount() > 0 {
+	if b.GetInCount() > 0 {
 		in, inChannelAvailable := b.GetInputChannel(0)
 		if inChannelAvailable {
 			select {
@@ -879,7 +876,6 @@ func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 type TravelCoordinatorWant struct {
 	Want
 	Template string
-	paths    Paths
 }
 
 func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
@@ -921,7 +917,10 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	t.StoreState("last_exec_time", time.Now())
 
 	// Ensure all input channels are available
-	inCount := t.paths.GetInCount()
+	inCount := t.GetInCount()
+
+	// Log for debugging
+	InfoLog("[TRAVEL_COORDINATOR] Exec called: InCount=%d\n", inCount)
 
 	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
@@ -935,6 +934,9 @@ func (t *TravelCoordinatorWant) Exec() bool {
 		return false
 	}
 
+	// All inputs are now connected
+	InfoLog("[TRAVEL_COORDINATOR] All 3 inputs connected, proceeding with execution.\n")
+
 	// Use persistent state to track schedules
 	schedulesVal, _ := t.GetState("schedules")
 	schedules, _ := schedulesVal.([]*TravelSchedule)
@@ -945,9 +947,13 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	// Collect all available schedules from child wants in this cycle
 	// Use a non-blocking read to avoid deadlocks if a channel is empty
 	newScheduleReceived := false
-	for i := 0; i < t.paths.GetInCount(); i++ {
+	for i := 0; i < t.GetInCount(); i++ {
+		in, inChannelAvailable := t.GetInputChannel(i)
+		if !inChannelAvailable {
+			continue
+		}
 		select {
-		case schedData := <-t.paths.In[i].Channel:
+		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				schedules = append(schedules, schedule)
 				newScheduleReceived = true
@@ -966,7 +972,7 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	})
 
 	// When we have all schedules, create final itinerary
-	if len(schedules) >= t.paths.GetInCount() { // Check if all expected schedules are collected
+	if len(schedules) >= t.GetInCount() { // Check if all expected schedules are collected
 		InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, combining events...\n", len(schedules))
 
 		// Combine and sort all events
@@ -997,7 +1003,7 @@ func (t *TravelCoordinatorWant) Exec() bool {
 
 	// Only log when a new schedule was received
 	if newScheduleReceived {
-		InfoLog("[TRAVEL_COORDINATOR] Waiting for more schedules. Collected %d of %d.\n", len(schedules), t.paths.GetInCount())
+		InfoLog("[TRAVEL_COORDINATOR] Waiting for more schedules. Collected %d of %d.\n", len(schedules), t.GetInCount())
 	}
 	return false // Continue waiting for more schedules
 }

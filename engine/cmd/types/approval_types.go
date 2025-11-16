@@ -237,9 +237,13 @@ func (l *Level1CoordinatorWant) Exec() bool {
 	var evidenceTimestamp time.Time
 	var descriptionTimestamp time.Time
 
-	for i := 0; i < l.paths.GetInCount(); i++ {
+	for i := 0; i < l.GetInCount(); i++ {
+		in, inChannelAvailable := l.GetInputChannel(i)
+		if !inChannelAvailable {
+			continue
+		}
 		select {
-		case data := <-l.paths.In[i].Channel:
+		case data := <-in:
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true
@@ -371,9 +375,13 @@ func (l *Level2CoordinatorWant) Exec() bool {
 	var evidenceTimestamp time.Time
 	var descriptionTimestamp time.Time
 
-	for i := 0; i < l.paths.GetInCount(); i++ {
+	for i := 0; i < l.GetInCount(); i++ {
+		in, inChannelAvailable := l.GetInputChannel(i)
+		if !inChannelAvailable {
+			continue
+		}
 		select {
-		case data := <-l.paths.In[i].Channel:
+		case data := <-in:
 			if approvalData, ok := data.(*ApprovalData); ok {
 				if approvalData.Evidence != nil {
 					evidenceReceived = true

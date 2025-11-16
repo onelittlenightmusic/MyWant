@@ -30,7 +30,6 @@ type Target struct {
 	RecipePath             string                 // Path to the recipe file to use for child creation
 	RecipeParams           map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
 	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
-	paths                  Paths
 	childWants             []*Want
 	completedChildren      map[string]bool      // Track which children have completed
 	childCompletionMutex   sync.Mutex           // Protect completedChildren map
@@ -268,40 +267,45 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Exec implements the ChainWant interface for Target with direct execution
 func (t *Target) Exec() bool {
-	InfoLog("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
+	// Check if children have already been created
+	childrenCreatedVal, _ := t.GetState("children_created")
+	childrenCreated, _ := childrenCreatedVal.(bool)
 
-	// Dynamically create child wants
-	if t.builder != nil {
-		InfoLog("[TARGET] 🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
+	// Phase 1: Create child wants (only once)
+	if !childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 
-		// Add child wants to the builder's configuration
-		for _, childWant := range childWants {
-			InfoLog("[TARGET] 🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
-		}
-
 		// Send child wants to reconcile loop asynchronously
-		// This avoids deadlock by not trying to acquire locks already held by parent execution
-		InfoLog("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			InfoLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
-		} else {
-			InfoLog("[TARGET] 🔧 Child wants sent to reconcile loop\n")
+			return false
 		}
+
+		// Mark that we've created children
+		t.StoreState("children_created", true)
+		return false // Not complete yet, waiting for children
 	}
 
-	// Target waits for signal that all children have finished
-	InfoLog("[TARGET] 🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
-	<-t.childrenDone
-	InfoLog("[TARGET] 🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
+	// Phase 2: Check if all children have completed
+	if childrenCreated {
+		t.childCompletionMutex.Lock()
+		allComplete := t.checkAllChildrenComplete()
+		t.childCompletionMutex.Unlock()
 
-	// Compute and store recipe result
-	t.computeTemplateResult()
+		if allComplete {
+			// Compute and store recipe result
+			t.computeTemplateResult()
 
-	// Mark the target as completed
-	t.SetStatus(WantStatusCompleted)
-	InfoLog("[TARGET] ✅ Target %s: SetStatus(Completed) called, current status: %s\n", t.Metadata.Name, t.GetStatus())
-	InfoLog("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
+			// Mark the target as completed
+			t.SetStatus(WantStatusCompleted)
+			return true
+		}
+
+		// Children not all complete yet
+		return false
+	}
+
+	// No builder, mark as complete
 	return true
 }
 
@@ -604,27 +608,19 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec() bool {
-	// Log execution start
-	InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s' executing (target: '%s')\n", oaw.WantName, oaw.TargetName)
-
 	// Call the original Exec method directly
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
 		result := chainWant.Exec()
-		InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s': BaseWant.Exec() returned %v\n", oaw.WantName, result)
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
 			// Emit OwnerCompletionEvent through unified subscription system
-			InfoLog("[TARGET:WRAPPER] ✅ OwnerAwareWant '%s': Will emit completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
 			oaw.emitOwnerCompletionEvent()
-		} else {
-			InfoLog("[TARGET:WRAPPER] ⚠️  OwnerAwareWant '%s': result=%v, TargetName='%s' - skipping completion event\n", oaw.WantName, result, oaw.TargetName)
 		}
 
 		return result
 	} else {
 		// Fallback for non-ChainWant types
-		InfoLog("[TARGET:WRAPPER] ⚠️  Want '%s': No ChainWant implementation found (type: %T)\n", oaw.WantName, oaw.BaseWant)
 		return true
 	}
 }

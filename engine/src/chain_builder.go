@@ -266,6 +266,7 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 		inCount := len(paths.In)
 		outCount := len(paths.Out)
 
+		// For all wants, enforce normal connectivity requirements
 		// If want has required inputs, check if they're satisfied
 		if meta.RequiredInputs > 0 && inCount < meta.RequiredInputs {
 			return false
@@ -1541,12 +1542,34 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		return
 	}
 
-	// Paths are guaranteed to exist and be valid at this point
+	// Get paths for this want - they should already be built by the Reconcile loop
+	// For wants with no 'using' selectors (entry points), paths will be empty which is fine
 	paths, pathsExist := cb.pathMap[wantName]
-	if !pathsExist {
-		DebugLog("[EXEC] ERROR: Want %s has satisfied connectivity but no paths in pathMap",
+
+	// Check if this want has any using selectors (dependencies on other wants)
+	hasUsingSelectors := len(want.want.Spec.Using) > 0
+
+	// Only require paths if the want has 'using' selectors
+	// Entry point wants (like Target) don't need paths
+	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
+		DebugLog("[EXEC] ERROR: Want %s has using selectors but no input paths in pathMap",
 			wantName)
 		return
+	}
+
+	// Check if connectivity requirements are satisfied before executing
+	// If not satisfied, skip execution but DO NOT return - let Reconcile loop try again
+	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
+		DebugLog("[EXEC] Want %s connectivity requirements not satisfied, waiting for paths",
+			wantName)
+		// Don't execute - will be retried in next Reconcile loop iteration
+		return
+	}
+
+	// Initialize pathMap entry if it doesn't exist yet (for entry point wants)
+	if !pathsExist {
+		cb.pathMap[wantName] = Paths{In: []PathInfo{}, Out: []PathInfo{}}
+		paths = cb.pathMap[wantName]
 	}
 
 	// Prepare active input and output channels - set them in the want's paths
@@ -1635,8 +1658,6 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 
-	InfoLog("[MEMORY] writeStatsToMemory: config_wants=%d, runtime_wants=%d\n", len(cb.config.Wants), len(cb.wants))
-
 	// Create a comprehensive config that includes ALL wants (both config and runtime)
 	updatedConfig := Config{
 		Wants: make([]*Want, 0),
@@ -1653,7 +1674,6 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Status = runtimeWant.want.Status
 			want.State = runtimeWant.want.State
 			want.History = runtimeWant.want.History // Include history in stats writes
-			InfoLog("[MEMORY] Updated config want '%s': status=%s, state_size=%d\n", want.Metadata.Name, want.Status, len(want.State))
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
 	}
@@ -1662,7 +1682,6 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	for wantName, runtimeWant := range cb.wants {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
-			InfoLog("[MEMORY] Writing runtime-only want '%s' with state size: %d\n", wantName, len(runtimeWant.want.State))
 			wantConfig := &Want{
 				Metadata: runtimeWant.metadata,
 				Spec:     runtimeWant.spec,
