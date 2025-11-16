@@ -98,3 +98,13 @@ func (n *Want) GetInputAndOutputChannelsAt(inIndex, outIndex int) (chain.Chan, c
 	out, _ := n.GetOutputChannel(outIndex)
 	return in, out, false
 }
+
+// SetPaths sets both input and output paths for this want
+// This is the proper way to synchronize paths instead of direct field access
+//
+// Usage:
+//   w.SetPaths(inPaths, outPaths)
+func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
+	n.paths.In = inPaths
+	n.paths.Out = outPaths
+}

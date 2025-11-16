@@ -16,7 +16,7 @@ recipe:
     dinner_duration: 2.0
 
   wants:
-    # Dinner restaurant reservation
+    # Dinner restaurant reservation (independent)
     - metadata:
         type: restaurant
         labels:
@@ -26,7 +26,7 @@ recipe:
           restaurant_type: restaurant_type
           duration_hours: dinner_duration
 
-    # Hotel accommodation booking
+    # Hotel accommodation booking (independent)
     - metadata:
         type: hotel
         labels:
@@ -35,7 +35,7 @@ recipe:
         params:
           hotel_type: hotel_type
 
-    # Morning breakfast buffet
+    # Morning breakfast buffet (independent)
     - metadata:
         type: buffet
         labels:
@@ -44,9 +44,11 @@ recipe:
         params:
           buffet_type: buffet_type
 
-    # Travel coordinator that combines all schedules
+    # Travel coordinator that combines all schedules from schedulers
     - metadata:
         type: travel_coordinator
+        labels:
+          role: coordinator
       spec:
         params:
           display_name: display_name

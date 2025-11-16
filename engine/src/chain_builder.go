@@ -154,11 +154,11 @@ func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector m
 
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
-	pathMap := make(map[string]Paths)
+	pathMap := make(map[string]*Paths)
 
 	// Initialize empty paths for all wants
 	for wantName := range cb.wants {
-		pathMap[wantName] = Paths{
+		pathMap[wantName] = &Paths{
 			In:  []PathInfo{},
 			Out: []PathInfo{},
 		}
@@ -170,20 +170,20 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 		// Debug logging for this want's using selectors
 		if len(want.spec.Using) > 0 {
-			DebugLog("[PATH_GEN] Want %s has %d using selectors. Current labels: %v",
+			DebugLog("[PATH_GEN] Want %s has %d using selectors. Current labels: %v\n",
 				wantName, len(want.spec.Using), want.metadata.Labels)
 		}
 
 		// Process using connections for this want
 		for selectorIdx, usingSelector := range want.spec.Using {
-			DebugLog("[PATH_GEN] Processing using selector %d: %v for want %s", selectorIdx, usingSelector, wantName)
+			DebugLog("[PATH_GEN] Processing using selector %d: %v for want %s\n", selectorIdx, usingSelector, wantName)
 
 			matchCount := 0
 			// Find wants that match this using selector
 			for otherName, otherWant := range cb.wants {
 				if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
 					matchCount++
-					DebugLog("[PATH_GEN] Match found! Want %s matches selector %v (labels: %v)",
+					DebugLog("[PATH_GEN] Match found! Want %s matches selector %v (labels: %v)\n",
 						otherName, usingSelector, otherWant.metadata.Labels)
 
 					// Create using path for current want
@@ -204,17 +204,23 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						Active:  true,
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
-					pathMap[otherName] = otherPaths
+					DebugLog("[PATH_GEN] Created output path for %s: %s\n", otherName, outPath.Name)
 				}
 			}
 			if matchCount == 0 {
-				DebugLog("[PATH_GEN] NO MATCHES for selector %v on want %s", usingSelector, wantName)
+				DebugLog("[PATH_GEN] NO MATCHES for selector %v on want %s\n", usingSelector, wantName)
 			}
 		}
-		pathMap[wantName] = paths
 	}
 
-	return pathMap
+	// Convert pointers back to values for the return type
+	result := make(map[string]Paths)
+	for wantName, pathsPtr := range pathMap {
+		DebugLog("[PATH_GEN_RESULT] Want %s: %d input paths, %d output paths\n",
+			wantName, len(pathsPtr.In), len(pathsPtr.Out))
+		result[wantName] = *pathsPtr
+	}
+	return result
 }
 
 // validateConnections validates that all wants have their connectivity requirements satisfied
@@ -485,28 +491,34 @@ func (cb *ChainBuilder) reconcileLoop() {
 			DebugLog("[RECONCILE] Triggered reconciliation")
 			cb.reconcileWants()
 		case newWants := <-cb.addWantsChan:
-			InfoLog("[RECONCILE] Received %d wants to add asynchronously\n", len(newWants))
 			// Add wants to config and runtime
 			cb.reconcileMutex.Lock()
+			addedCount := 0
 			for _, want := range newWants {
 				if _, exists := cb.wants[want.Metadata.Name]; !exists {
 					cb.config.Wants = append(cb.config.Wants, want)
 					cb.addWant(want)
-					InfoLog("[RECONCILE] Added want: %s\n", want.Metadata.Name)
+					addedCount++
 				}
 			}
 			cb.reconcileMutex.Unlock()
+			if addedCount > 0 {
+				InfoLog("[RECONCILE] Added %d wants asynchronously\n", addedCount)
+			}
 			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
 		case wantIDs := <-cb.deleteWantsChan:
-			InfoLog("[RECONCILE] Received %d wants to delete asynchronously\n", len(wantIDs))
 			// Delete wants asynchronously (non-blocking)
+			deletedCount := 0
 			for _, wantID := range wantIDs {
 				if err := cb.DeleteWantByID(wantID); err != nil {
 					InfoLog("[RECONCILE] Warning: Failed to delete want %s: %v\n", wantID, err)
 				} else {
-					InfoLog("[RECONCILE] Deleted want: %s\n", wantID)
+					deletedCount++
 				}
+			}
+			if deletedCount > 0 {
+				InfoLog("[RECONCILE] Deleted %d wants asynchronously\n", deletedCount)
 			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
@@ -577,12 +589,9 @@ func (cb *ChainBuilder) compilePhase() error {
 		// Run migration to clean up any agent_history from state
 		cb.migrateAllWantsAgentHistory()
 
-		// Dump memory after initial load
+		// Dump memory after initial load (silent - routine operation)
 		if len(newConfig.Wants) > 0 {
-			InfoLog("[RECONCILE:MEMORY] Dumping memory after initial load...")
-			if err := cb.dumpWantMemoryToYAML(); err != nil {
-				InfoLog("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
-			}
+			cb.dumpWantMemoryToYAML()
 		}
 	} else {
 		// Detect changes for ongoing updates
@@ -1176,22 +1185,17 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 			cb.addDynamicWantUnsafe(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
-			InfoLog("[RECONCILE:COMPILE] Updating want: %s\n", change.WantName)
 			cb.UpdateWant(change.Want)
 			hasWantChanges = true
 		case ChangeEventDelete:
-			InfoLog("[RECONCILE:COMPILE] Deleting want: %s\n", change.WantName)
 			cb.deleteWant(change.WantName)
 			hasWantChanges = true
 		}
 	}
 
-	// Dump memory after want additions/deletions/updates
+	// Dump memory after want additions/deletions/updates (silent - routine operation)
 	if hasWantChanges {
-		InfoLog("[RECONCILE:MEMORY] Dumping memory after want changes...")
-		if err := cb.dumpWantMemoryToYAML(); err != nil {
-			InfoLog("[RECONCILE:MEMORY] Warning: Failed to dump memory: %v\n", err)
-		}
+		cb.dumpWantMemoryToYAML()
 	}
 
 	// Note: Connections rebuilt in connectPhase(), not here
@@ -1433,12 +1437,10 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 
 // UpdateWant updates an existing want in place and restarts execution
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-	InfoLog("[RECONCILE] Updating want by ID: %s\n", wantConfig.Metadata.ID)
-
 	// Find the existing want by metadata.id using universal search
 	existingWant, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
-		InfoLog("[RECONCILE:ERROR] Want with ID %s not found for update, adding as new\n", wantConfig.Metadata.ID)
+		// Want not found, add as new
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
@@ -1469,8 +1471,6 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 					changedParams = make(map[string]interface{})
 				}
 				changedParams[paramName] = newValue
-
-				InfoLog("[RECONCILE] Parameter updated: %s = %v (was: %v)\n", paramName, newValue, oldValue)
 			}
 		}
 	}
@@ -1510,8 +1510,6 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	delete(existingWant.State, "total_processed")
 	delete(existingWant.State, "current_time")
 
-	InfoLog("[RECONCILE] Want %s (ID: %s) updated and reset to idle status for re-execution\n", wantName, wantConfig.Metadata.ID)
-
 	// If this is a Target want with children, use Target's parameter update mechanism
 	// which automatically pushes updates to children
 	if changedParams != nil {
@@ -1522,7 +1520,6 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 				for paramName, paramValue := range changedParams {
 					target.UpdateParameter(paramName, paramValue)
 				}
-				InfoLog("[RECONCILE] Pushed %d parameter updates to Target %s children\n", len(changedParams), wantName)
 			}
 		}
 	}
@@ -1540,8 +1537,6 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 // deleteWant removes a want from runtime
 func (cb *ChainBuilder) deleteWant(wantName string) {
-	InfoLog("[RECONCILE] Deleting want: %s\n", wantName)
-
 	delete(cb.wants, wantName)
 }
 
@@ -1640,9 +1635,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				runtimeWant, exists := cb.wants[wantName]
 				cb.reconcileMutex.RUnlock()
 				if exists {
-					// Set the resolved paths with actual channels before execution
-					runtimeWant.want.paths.In = activeInputPaths
-					runtimeWant.want.paths.Out = activeOutputPaths
+					// Set the resolved paths with actual channels before execution using proper setter
+					runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
 					runtimeWant.want.BeginExecCycle()
 				}
 
@@ -1751,9 +1745,7 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Initialize memory file if configured
 	if cb.memoryPath != "" {
-		if err := cb.copyConfigToMemory(); err != nil {
-			InfoLog("Warning: Failed to copy config to memory: %v\n", err)
-		} else {
+		if err := cb.copyConfigToMemory(); err == nil {
 			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 		}
 	}
@@ -1774,7 +1766,6 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Server mode: run indefinitely, never stop reconcile loop
 	if serverMode {
-		InfoLog("[RECONCILE] Server mode: reconcile loop running indefinitely")
 		// Keep running forever - reconcile loop handles all want lifecycle
 		select {} // Block forever
 	}
@@ -1820,16 +1811,8 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.running = false
 	cb.reconcileMutex.Unlock()
 
-	// Final memory dump - ensure it completes before returning
-	InfoLog("[RECONCILE] Writing final memory dump...")
-	err := cb.dumpWantMemoryToYAML()
-	if err != nil {
-		InfoLog("Warning: Failed to dump want memory to YAML: %v\n", err)
-	} else {
-		InfoLog("[RECONCILE] Memory dump completed successfully")
-	}
-
-	InfoLog("[RECONCILE] Execution completed")
+	// Final memory dump - ensure it completes before returning (silent - routine operation)
+	cb.dumpWantMemoryToYAML()
 }
 
 // GetAllWantStates returns the states of all wants
@@ -1947,9 +1930,8 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 // addDynamicWantUnsafe adds a want without acquiring the mutex (internal use only)
 // Must be called while holding reconcileMutex or within addWantsChan handler
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
-	// Check for duplicate name and skip if exists (don't error, just log)
+	// Check for duplicate name and skip if exists
 	if _, exists := cb.wants[want.Metadata.Name]; exists {
-		InfoLog("[RECONCILE] Want %s already exists, skipping\n", want.Metadata.Name)
 		return nil
 	}
 
@@ -2133,7 +2115,6 @@ func validateConfigWithSpec(yamlData []byte) error {
 		}
 	}
 
-	InfoLog("[VALIDATION] Config validated successfully against OpenAPI spec\n")
 	return nil
 }
 
@@ -2295,10 +2276,6 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 		}
 	}
 
-	InfoLog("📝 Want memory dumped to: %s\n", filename)
-	if err == nil {
-		InfoLog("📝 Latest memory also saved to: %s\n", latestFilename)
-	}
 	return nil
 }
 
@@ -2320,11 +2297,9 @@ func (cb *ChainBuilder) Suspend() error {
 	// Signal suspension to control loop
 	select {
 	case cb.suspendChan <- true:
-		InfoLog("[SUSPEND] Chain execution suspended")
 		return nil
 	default:
 		// Control loop not running, just mark as suspended
-		InfoLog("[SUSPEND] Chain marked as suspended (control loop not active)")
 		return nil
 	}
 }
@@ -2343,11 +2318,9 @@ func (cb *ChainBuilder) Resume() error {
 	// Signal resume to control loop
 	select {
 	case cb.resumeChan <- true:
-		InfoLog("[RESUME] Chain execution resumed")
 		return nil
 	default:
 		// Control loop not running, just mark as resumed
-		InfoLog("[RESUME] Chain marked as resumed (control loop not active)")
 		return nil
 	}
 }
@@ -2361,20 +2334,15 @@ func (cb *ChainBuilder) IsSuspended() bool {
 
 // Stop stops execution by clearing all wants from the configuration
 func (cb *ChainBuilder) Stop() error {
-	InfoLog("[STOP] Stopping chain execution by clearing all wants...")
-
 	// Clear the config wants which will trigger reconciliation to clean up
 	cb.reconcileMutex.Lock()
-	wantCount := len(cb.config.Wants)
 	cb.config.Wants = []*Want{}
 	cb.reconcileMutex.Unlock()
 
 	// Trigger reconciliation to process the empty config
 	select {
 	case cb.reconcileTrigger <- true:
-		InfoLog("[STOP] Cleared %d wants, reconcile loop will clean up execution\n", wantCount)
 	default:
-		InfoLog("[STOP] Warning: Failed to trigger reconciliation")
 	}
 
 	return nil
@@ -2382,8 +2350,6 @@ func (cb *ChainBuilder) Stop() error {
 
 // Start restarts execution by triggering reconciliation of existing configuration
 func (cb *ChainBuilder) Start() error {
-	InfoLog("[START] Starting/restarting chain execution by triggering reconciliation...")
-
 	// Trigger reconciliation - this will reload from memory and restart wants
 	select {
 	case cb.reconcileTrigger <- true:
@@ -2413,11 +2379,8 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 // DeleteWantByID removes a want from runtime by its ID
 // If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
-	InfoLog("[DELETE_BY_ID] Starting deletion for want ID: %s\n", wantID)
-
 	// Phase 1: Find the want name by ID (with lock held briefly)
 	cb.reconcileMutex.Lock()
-	InfoLog("[DELETE_BY_ID] Current runtime has %d wants\n", len(cb.wants))
 
 	var wantName string
 	wantsCopy := make([]string, 0, len(cb.wants))
@@ -2432,10 +2395,8 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.RLock()
 	for _, name := range wantsCopy {
 		if runtimeWant, exists := cb.wants[name]; exists {
-			InfoLog("[DELETE_BY_ID] Checking want %s (ID: %s)\n", name, runtimeWant.want.Metadata.ID)
 			if runtimeWant.want.Metadata.ID == wantID {
 				wantName = name
-				InfoLog("[DELETE_BY_ID] Found target want: %s\n", wantName)
 				break
 			}
 		}
@@ -2443,22 +2404,18 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.RUnlock()
 
 	if wantName == "" {
-		InfoLog("[DELETE_BY_ID] ERROR: Want with ID %s not found in runtime\n", wantID)
 		return fmt.Errorf("want with ID %s not found in runtime", wantID)
 	}
 
 	// Phase 2: Find all children first (cascade deletion) with read lock
 	var childrenToDelete []string
-	InfoLog("[DELETE_BY_ID] Searching for children of want ID: %s\n", wantID)
 
 	cb.reconcileMutex.RLock()
 	for name, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.OwnerReferences != nil {
 			for _, ownerRef := range runtimeWant.want.Metadata.OwnerReferences {
-				InfoLog("[DELETE_BY_ID] Checking want %s - ownerRef.ID: %s\n", name, ownerRef.ID)
 				if ownerRef.ID == wantID {
 					childrenToDelete = append(childrenToDelete, name)
-					InfoLog("[DELETE_BY_ID] Found child to delete: %s\n", name)
 					break
 				}
 			}
@@ -2466,14 +2423,11 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	}
 	cb.reconcileMutex.RUnlock()
 
-	InfoLog("[DELETE_BY_ID] Found %d children to delete\n", len(childrenToDelete))
-
 	// Phase 3: Delete children first (with write lock for each deletion)
 	for _, childName := range childrenToDelete {
 		cb.reconcileMutex.Lock()
 		cb.deleteWant(childName)
 		cb.reconcileMutex.Unlock()
-		InfoLog("[DELETE] Cascade: Removed child want %s\n", childName)
 	}
 
 	// Phase 4: Delete the parent want (with write lock)
@@ -2481,26 +2435,20 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.deleteWant(wantName)
 	cb.reconcileMutex.Unlock()
 
-	InfoLog("[DELETE] Removed want %s (ID: %s) from runtime (with %d children)\n", wantName, wantID, len(childrenToDelete))
 	return nil
 }
 
 // controlLoop handles suspend/resume signals in a separate goroutine
 func (cb *ChainBuilder) controlLoop() {
-	InfoLog("[CONTROL] Starting suspension control loop")
-
 	for {
 		select {
 		case <-cb.suspendChan:
-			InfoLog("[CONTROL] Processing suspend signal")
 			// Suspend signal processed by Suspend() method
 
 		case <-cb.resumeChan:
-			InfoLog("[CONTROL] Processing resume signal")
 			// Resume signal processed by Resume() method
 
 		case <-cb.controlStop:
-			InfoLog("[CONTROL] Stopping suspension control loop")
 			return
 		}
 	}
