@@ -1558,11 +1558,14 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	}
 
 	// Check if connectivity requirements are satisfied before executing
-	// If not satisfied, skip execution but DO NOT return - let Reconcile loop try again
+	// If not satisfied, trigger reconciliation to re-attempt path generation
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		DebugLog("[EXEC] Want %s connectivity requirements not satisfied, waiting for paths",
+		DebugLog("[EXEC] Want %s connectivity requirements not satisfied, triggering reconciliation",
 			wantName)
-		// Don't execute - will be retried in next Reconcile loop iteration
+		// Trigger reconciliation to retry path generation and connection
+		if err := cb.TriggerReconcile(); err != nil {
+			DebugLog("[EXEC] Failed to trigger reconcile for %s: %v", wantName, err)
+		}
 		return
 	}
 
