@@ -113,6 +113,10 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
+	// Log all completion events for debugging
+	InfoLog("[TARGET:COMPLETION] Received completion event for child '%s' targeting target '%s' (my target: '%s')\n",
+		completionEvent.ChildName, completionEvent.TargetName, tcs.target.Metadata.Name)
+
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
 		return EventResponse{Handled: false}
@@ -121,17 +125,21 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	// Track child completion
 	tcs.target.childCompletionMutex.Lock()
 	tcs.target.completedChildren[completionEvent.ChildName] = true
+	InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Child '%s' marked complete (%d/%d completed)\n",
+		tcs.target.Metadata.Name, completionEvent.ChildName, len(tcs.target.completedChildren), len(tcs.target.childWants))
 	allComplete := tcs.target.checkAllChildrenComplete()
 	tcs.target.childCompletionMutex.Unlock()
 
-	// If all children are complete, signal the target via channel (only for old-style blocking)
-	// Note: New implementation uses polling in Exec(), not channel-based signaling
+	// If all children are complete, signal the target via channel
 	if allComplete {
+		InfoLog("[TARGET:COMPLETION] 🎉 Target '%s': ALL children complete! Signaling completion...\n", tcs.target.Metadata.Name)
 		select {
 		case tcs.target.childrenDone <- true:
-			// Signal sent (legacy support)
+			// Signal sent successfully
+			InfoLog("[TARGET:COMPLETION] ✅ Target '%s': Completion signal sent successfully\n", tcs.target.Metadata.Name)
 		default:
 			// Channel already has signal, ignore
+			InfoLog("[TARGET:COMPLETION] ⚠️  Target '%s': Completion signal already sent or buffered\n", tcs.target.Metadata.Name)
 		}
 	}
 
@@ -146,11 +154,14 @@ func (t *Target) checkAllChildrenComplete() bool {
 	// If we have no children yet AND no completions have arrived, we can't be complete
 	// (children are still being added asynchronously)
 	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
+		InfoLog("[TARGET:CHECK] ⏳ No children added yet for target '%s' - waiting for children...\n", t.Metadata.Name)
 		return false
 	}
 
 	// If we have completed children but no childWants yet, they're still being added asynchronously
 	if len(t.childWants) == 0 && len(t.completedChildren) > 0 {
+		InfoLog("[TARGET:CHECK] ⏳ Children still being added for target '%s' (%d completions received, waiting for wants list)\n",
+			t.Metadata.Name, len(t.completedChildren))
 		return false
 	}
 
@@ -183,6 +194,7 @@ func (t *Target) resolveRecipeParameters() {
 	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
+		InfoLog("[TARGET] ⚠️  Could not resolve recipe parameters for %s: %v\n", t.RecipePath, err)
 		return
 	}
 
@@ -217,14 +229,19 @@ func (t *Target) resolveRecipeParameters() {
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
+		InfoLog("[TARGET] ❌ Target %s: No recipe loader available - target wants require recipes\n", t.Metadata.Name)
 		return []*Want{}
 	}
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
+		InfoLog("[TARGET] ❌ Target %s: Failed to load recipe %s: %v\n", t.Metadata.Name, t.RecipePath, err)
 		return []*Want{}
 	}
+
+	InfoLog("[TARGET] ✅ Target %s: Successfully loaded recipe %s with %d child wants\n",
+		t.Metadata.Name, t.RecipePath, len(config.Wants))
 
 	// Add owner references to all child wants
 	for i := range config.Wants {
@@ -251,45 +268,40 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Exec implements the ChainWant interface for Target with direct execution
 func (t *Target) Exec() bool {
-	// Check if we've already created child wants
-	childrenCreatedVal, _ := t.GetState("children_created")
-	childrenCreated, _ := childrenCreatedVal.(bool)
+	InfoLog("[TARGET] 🎯 Target %s: Managing child nodes with owner references\n", t.Metadata.Name)
 
-	// Phase 1: Create child wants (only once)
-	if !childrenCreated && t.builder != nil {
+	// Dynamically create child wants
+	if t.builder != nil {
+		InfoLog("[TARGET] 🎯 Target %s: Creating child wants dynamically...\n", t.Metadata.Name)
 		childWants := t.CreateChildWants()
 
+		// Add child wants to the builder's configuration
+		for _, childWant := range childWants {
+			InfoLog("[TARGET] 🔧 Adding child want: %s (type: %s)\n", childWant.Metadata.Name, childWant.Metadata.Type)
+		}
+
 		// Send child wants to reconcile loop asynchronously
+		// This avoids deadlock by not trying to acquire locks already held by parent execution
+		InfoLog("[TARGET] 🔧 Sending child wants to reconcile loop for async addition...\n")
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			InfoLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
-			return false
+		} else {
+			InfoLog("[TARGET] 🔧 Child wants sent to reconcile loop\n")
 		}
-
-		// Mark that we've created children and return false to let system continue
-		t.StoreState("children_created", true)
-		return false // Not complete yet, waiting for children
 	}
 
-	// Phase 2: Check if all children have completed
-	if childrenCreated {
-		t.childCompletionMutex.Lock()
-		allComplete := t.checkAllChildrenComplete()
-		t.childCompletionMutex.Unlock()
+	// Target waits for signal that all children have finished
+	InfoLog("[TARGET] 🎯 Target %s: Waiting for all child wants to complete...\n", t.Metadata.Name)
+	<-t.childrenDone
+	InfoLog("[TARGET] 🎯 Target %s: All child wants completed, computing result...\n", t.Metadata.Name)
 
-		if allComplete {
-			// Compute and store recipe result
-			t.computeTemplateResult()
+	// Compute and store recipe result
+	t.computeTemplateResult()
 
-			// Mark the target as completed
-			t.SetStatus(WantStatusCompleted)
-			return true
-		}
-
-		// Children not all complete yet
-		return false
-	}
-
-	// No builder, mark as complete
+	// Mark the target as completed
+	t.SetStatus(WantStatusCompleted)
+	InfoLog("[TARGET] ✅ Target %s: SetStatus(Completed) called, current status: %s\n", t.Metadata.Name, t.GetStatus())
+	InfoLog("[TARGET] 🎯 Target %s: Result computed, target finishing\n", t.Metadata.Name)
 	return true
 }
 
@@ -306,10 +318,15 @@ func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 
 	// Push parameter change to child wants
 	t.PushParameterToChildren(paramName, paramValue)
+
+	InfoLog("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+		t.Metadata.Name, paramName, paramValue)
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
+	InfoLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
+		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
 
@@ -328,13 +345,16 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue interface{
 	}
 
 	// Get all child wants that have owner references pointing to this target
-	for _, runtimeWant := range t.builder.wants {
+	for wantName, runtimeWant := range t.builder.wants {
 		if t.isChildWant(runtimeWant.want) {
 			// Map target parameters to child parameters based on naming patterns
 			childParamName := t.mapParameterNameForChild(paramName, runtimeWant.want.Metadata.Type)
 			if childParamName != "" {
 				// Update the child's parameter
 				runtimeWant.want.UpdateParameter(childParamName, paramValue)
+
+				InfoLog("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
 			}
 		}
 	}
@@ -584,19 +604,27 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec() bool {
+	// Log execution start
+	InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s' executing (target: '%s')\n", oaw.WantName, oaw.TargetName)
+
 	// Call the original Exec method directly
 	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
 		result := chainWant.Exec()
+		InfoLog("[TARGET:WRAPPER] OwnerAwareWant '%s': BaseWant.Exec() returned %v\n", oaw.WantName, result)
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
 			// Emit OwnerCompletionEvent through unified subscription system
+			InfoLog("[TARGET:WRAPPER] ✅ OwnerAwareWant '%s': Will emit completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
 			oaw.emitOwnerCompletionEvent()
+		} else {
+			InfoLog("[TARGET:WRAPPER] ⚠️  OwnerAwareWant '%s': result=%v, TargetName='%s' - skipping completion event\n", oaw.WantName, result, oaw.TargetName)
 		}
 
 		return result
 	} else {
 		// Fallback for non-ChainWant types
+		InfoLog("[TARGET:WRAPPER] ⚠️  Want '%s': No ChainWant implementation found (type: %T)\n", oaw.WantName, oaw.BaseWant)
 		return true
 	}
 }
@@ -656,6 +684,10 @@ func (oaw *OwnerAwareWant) GetInputAndOutputChannelsAt(inIndex, outIndex int) (c
 func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 	// Use the Want pointer stored at creation time
 	if oaw.Want == nil {
+		// Only log warnings if we actually have a target (not a standalone want)
+		if oaw.TargetName != "" {
+			InfoLog("[TARGET] ⚠️  OwnerAwareWant %s: Want pointer is nil, cannot emit completion event\n", oaw.WantName)
+		}
 		return
 	}
 
@@ -671,6 +703,10 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 		ChildName: oaw.WantName,
 	}
 
+	// Log the emission for debugging
+	if oaw.TargetName != "" {
+		InfoLog("[TARGET:COMPLETION] 📤 Want '%s': Emitting completion event to target '%s'\n", oaw.WantName, oaw.TargetName)
+	}
 
 	// Emit through subscription system (blocking mode)
 	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)

@@ -923,14 +923,15 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	// Ensure all input channels are available
 	inCount := t.paths.GetInCount()
 
-	// If no channels are connected, this might be for independent child wants
-	// that don't feed back through channels. Mark as completed.
-	if inCount == 0 {
-		return true
-	}
-
 	if inCount < 3 {
 		// If not all inputs are connected yet, return false to retry later
+		// Only log if connection count has changed
+		prevCountVal, _ := t.GetState("prev_in_count")
+		prevCount, _ := prevCountVal.(int)
+		if prevCount != inCount {
+			InfoLog("[TRAVEL_COORDINATOR] Waiting for 3 input channels, currently have %d.\n", inCount)
+			t.StoreState("prev_in_count", inCount)
+		}
 		return false
 	}
 
