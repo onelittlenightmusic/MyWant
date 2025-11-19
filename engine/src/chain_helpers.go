@@ -62,43 +62,6 @@ func (n *Want) GetFirstOutputChannel() (chain.Chan, bool) {
 	return n.GetOutputChannel(0)
 }
 
-// GetInputAndOutputChannels returns both input and output channels from paths
-// Returns (nil, nil, true) if input is not available (skip execution)
-// Returns (in, nil, false) if output is not available (check if needed)
-//
-// Usage:
-//   in, out, skipExec := w.GetInputAndOutputChannels()
-//   if skipExec {
-//       return true
-//   }
-//   if out == nil {
-//       return true  // if output is required
-//   }
-//   data := (<-in).(DataType)
-//   out <- ProcessedData{Value: process(data)}
-func (n *Want) GetInputAndOutputChannels() (chain.Chan, chain.Chan, bool) {
-	return n.GetInputAndOutputChannelsAt(0, 0)
-}
-
-// GetInputAndOutputChannelsAt returns both input and output channels at specified indices
-// Returns (nil, nil, true) if input is not available (skip execution)
-// Returns (in, nil, false) if output is not available (check if needed)
-//
-// Usage:
-//   in, out, skipExec := w.GetInputAndOutputChannelsAt(0, 1)
-//   if skipExec {
-//       return true
-//   }
-func (n *Want) GetInputAndOutputChannelsAt(inIndex, outIndex int) (chain.Chan, chain.Chan, bool) {
-	in, skipExec := n.GetInputChannel(inIndex)
-	if skipExec {
-		return nil, nil, true
-	}
-
-	out, _ := n.GetOutputChannel(outIndex)
-	return in, out, false
-}
-
 // SetPaths sets both input and output paths for this want
 // This is the proper way to synchronize paths instead of direct field access
 //

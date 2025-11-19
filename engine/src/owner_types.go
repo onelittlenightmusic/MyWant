@@ -643,22 +643,6 @@ func (oaw *OwnerAwareWant) GetFirstOutputChannel() (chain.Chan, bool) {
 	return nil, true
 }
 
-// GetInputAndOutputChannels delegates to the stored Want
-func (oaw *OwnerAwareWant) GetInputAndOutputChannels() (chain.Chan, chain.Chan, bool) {
-	if oaw.Want != nil {
-		return oaw.Want.GetInputAndOutputChannels()
-	}
-	return nil, nil, true
-}
-
-// GetInputAndOutputChannelsAt delegates to the stored Want
-func (oaw *OwnerAwareWant) GetInputAndOutputChannelsAt(inIndex, outIndex int) (chain.Chan, chain.Chan, bool) {
-	if oaw.Want != nil {
-		return oaw.Want.GetInputAndOutputChannelsAt(inIndex, outIndex)
-	}
-	return nil, nil, true
-}
-
 // emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
 func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 	// Use the Want pointer stored at creation time

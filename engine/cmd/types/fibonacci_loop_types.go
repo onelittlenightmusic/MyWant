@@ -111,9 +111,15 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the fibonacci computer
 func (c *FibonacciComputer) Exec() bool {
-	// Get input and output channels safely
-	in, out, skipExec := c.GetInputAndOutputChannels()
-	if skipExec || out == nil {
+	// Get input channel
+	in, inputUnavailable := c.GetInputChannel(0)
+	if inputUnavailable {
+		return true
+	}
+
+	// Get output channel
+	out, outputUnavailable := c.GetOutputChannel(0)
+	if outputUnavailable {
 		return true
 	}
 

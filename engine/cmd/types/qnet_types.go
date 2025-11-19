@@ -217,9 +217,15 @@ func (q *Queue) Exec() bool {
 	// Local persistent state variables are used instead of State map
 	// This ensures they persist across cycles without batching interference
 
-	// Get input and output channels safely
-	in, out, skipExec := q.GetInputAndOutputChannels()
-	if skipExec || out == nil {
+	// Get input channel
+	in, inputUnavailable := q.GetInputChannel(0)
+	if inputUnavailable {
+		return true
+	}
+
+	// Get output channel
+	out, outputUnavailable := q.GetOutputChannel(0)
+	if outputUnavailable {
 		return true
 	}
 
