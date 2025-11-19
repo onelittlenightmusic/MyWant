@@ -676,8 +676,7 @@ func (cb *ChainBuilder) connectPhase() error {
 		if runtimeWant, exists := cb.wants[wantName]; exists {
 			// Update the want's paths field with the generated paths
 			// This makes output/input channels available to the want during execution
-			runtimeWant.want.paths.In = paths.In
-			runtimeWant.want.paths.Out = paths.Out
+			runtimeWant.want.SetPaths(paths.In, paths.Out)
 			DebugLog("[RECONCILE:CONNECT] Synchronized paths for '%s': Set In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
 		} else {
 			DebugLog("[RECONCILE:CONNECT] Want '%s' NOT FOUND in cb.wants (unable to sync paths)\n", wantName)
@@ -1617,6 +1616,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	if chainWant, ok := want.function.(ChainWant); ok {
 		want.want.SetStatus(WantStatusRunning)
 
+		// Set the resolved paths with actual channels before execution using proper setter
+		want.want.SetPaths(activeInputPaths, activeOutputPaths)
+
 		cb.waitGroup.Add(1)
 		go func() {
 			defer cb.waitGroup.Done()
@@ -1635,11 +1637,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				runtimeWant, exists := cb.wants[wantName]
 				cb.reconcileMutex.RUnlock()
 				if exists {
-					// Set the resolved paths with actual channels before execution using proper setter
-					runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
 					runtimeWant.want.BeginExecCycle()
 				}
 
+				DebugLog("[EXEC] Calling Exec() for want %s\n", wantName)
 				// Direct call - no parameters needed, channels are in want.paths
 				finished := chainWant.Exec()
 

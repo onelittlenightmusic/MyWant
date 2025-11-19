@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	. "mywant/engine/src"
+	"sort"
+	"sync"
 	"time"
 )
 
@@ -79,8 +81,8 @@ func (r *RestaurantWant) Exec() bool {
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel, but don't skip execution if not available yet
-	out, outChannelAvailable := r.GetFirstOutputChannel()
+	// Get output channel
+	out, skipExec := r.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -94,8 +96,8 @@ func (r *RestaurantWant) Exec() bool {
 		// Use the agent's schedule result
 		r.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available
-		if outChannelAvailable {
+		// Send the schedule to output channel only if available (skipExec=false means channel is available)
+		if !skipExec {
 			restaurantEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
 				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
@@ -182,8 +184,8 @@ func (r *RestaurantWant) Exec() bool {
 		"schedule_date":              baseDate.Format("2006-01-02"),
 	})
 
-	// Send to output channel only if available
-	if outChannelAvailable {
+	// Send to output channel only if available (skipExec=false means channel is available)
+	if !skipExec {
 		out <- newSchedule
 	}
 
@@ -350,8 +352,8 @@ func (h *HotelWant) Exec() bool {
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel, but don't skip execution if not available yet
-	out, outChannelAvailable := h.GetFirstOutputChannel()
+	// Get output channel
+	out, skipExec := h.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -365,8 +367,8 @@ func (h *HotelWant) Exec() bool {
 		// Use the agent's schedule result
 		h.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available
-		if outChannelAvailable {
+		// Send the schedule to output channel only if available (skipExec=false means channel is available)
+		if !skipExec {
 			hotelEvent := TimeSlot{
 				Start: agentSchedule.CheckInTime,
 				End:   agentSchedule.CheckOutTime,
@@ -455,8 +457,8 @@ func (h *HotelWant) Exec() bool {
 		"reservation_name":    newEvent.Name,
 	})
 
-	// Send to output channel only if available
-	if outChannelAvailable {
+	// Send to output channel only if available (skipExec=false means channel is available)
+	if !skipExec {
 		out <- newSchedule
 	}
 
@@ -550,8 +552,8 @@ func (b *BuffetWant) Exec() bool {
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel, but don't skip execution if not available yet
-	out, outChannelAvailable := b.GetFirstOutputChannel()
+	// Get output channel
+	out, skipExec := b.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -563,10 +565,10 @@ func (b *BuffetWant) Exec() bool {
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
 		// Use the agent's schedule result
-	b.SetSchedule(*agentSchedule)
+		b.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available
-		if outChannelAvailable {
+		// Send the schedule to output channel only if available (skipExec=false means channel is available)
+		if !skipExec {
 			buffetEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
 				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
@@ -649,8 +651,8 @@ func (b *BuffetWant) Exec() bool {
 		"reservation_name":      newEvent.Name,
 	})
 
-	// Send to output channel only if available
-	if outChannelAvailable {
+	// Send to output channel only if available (skipExec=false means channel is available)
+	if !skipExec {
 		out <- newSchedule
 	}
 
@@ -777,7 +779,9 @@ func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 // TravelCoordinatorWant orchestrates the entire travel itinerary
 type TravelCoordinatorWant struct {
 	Want
-	Template string
+	Template  string
+	mu        sync.Mutex
+	schedules map[int]*TravelSchedule
 }
 
 func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
@@ -810,87 +814,86 @@ func (t *TravelCoordinatorWant) GetWant() *Want {
 }
 
 func (t *TravelCoordinatorWant) Exec() bool {
-	// Ensure all input channels are available
-	inCount := t.GetInCount()
+	// This function is called repeatedly, so it needs to be non-blocking and stateful.
 
-	// If no channels are connected, this might be for independent child wants
-	// that don't feed back through channels. Mark as completed.
-	if inCount == 0 {
-		return true
-	}
-
-	if inCount < 3 {
-		// If not all inputs are connected yet, return false to retry later
-		return false
-	}
-
-	// All inputs are now connected
-
-	// Use persistent state to track schedules
-	schedulesVal, _ := t.GetState("schedules")
-	schedules, _ := schedulesVal.([]*TravelSchedule)
-	if schedules == nil {
-		schedules = make([]*TravelSchedule, 0)
-	}
-
-	// Collect all available schedules from child wants in this cycle
-	// Use a non-blocking read to avoid deadlocks if a channel is empty
-	for i := 0; i < t.GetInCount(); i++ {
-		in, inChannelAvailable := t.GetInputChannel(i)
-		if !inChannelAvailable {
-			continue
-		}
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				schedules = append(schedules, schedule)
-				InfoLog("[TRAVEL_COORDINATOR] Received schedule from child (want #%d): %d events\n", i+1, len(schedule.Events))
-			}
-		default:
-			// No data on this channel in this cycle, continue to next channel
-		}
-	}
-
-	// Update persistent state with collected schedules
-	// Use StoreStateMulti for batching
-	t.StoreStateMulti(map[string]interface{}{
-		"schedules": schedules,
-		"total_processed": len(schedules), // Track how many schedules have been collected
-	})
-
-	// When we have all schedules, create final itinerary
-	if len(schedules) >= t.GetInCount() { // Check if all expected schedules are collected
-		InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, combining events...\n", len(schedules))
-
-		// Combine and sort all events
-		allEvents := make([]TimeSlot, 0)
-		for _, schedule := range schedules {
-			allEvents = append(allEvents, schedule.Events...)
-		}
-
-		// Sort events by start time
-		// (Sorting logic remains the same)
-		for i := 0; i < len(allEvents)-1; i++ {
-			for j := i + 1; j < len(allEvents); j++ {
-				if allEvents[i].Start.After(allEvents[j].Start) {
-					allEvents[i], allEvents[j] = allEvents[j], allEvents[i]
-				}
-			}
-		}
-
-		// Batch final coordinator state update
-		t.StoreStateMulti(map[string]interface{}{
-			"schedules":       schedules, // Store final schedules
-			"total_processed": len(allEvents),
-			"final_itinerary": allEvents, // Store the combined and sorted itinerary
-		})
-		InfoLog("[TRAVEL_COORDINATOR] Final itinerary created with %d events. Coordinator completed.\n", len(allEvents))
-		return true // All schedules collected and processed, coordinator is complete
-	}
-
-	// Continue waiting for more schedules (no logging needed - would spam on every cycle)
-	return false
-}
+	       // Lock for safe concurrent access to the schedules map
+	       t.mu.Lock()
+	       defer t.mu.Unlock()
+	
+	       // Initialize the map on the first run
+	       if t.schedules == nil {
+	               t.schedules = make(map[int]*TravelSchedule)
+	               InfoLog("[TRAVEL_COORDINATOR] Initializing schedules map. GetInCount: %d\n", t.GetInCount())
+	       }
+	
+	       // If we have already collected all schedules, we're done.
+	       if len(t.schedules) >= t.GetInCount() {
+	               InfoLog("[TRAVEL_COORDINATOR] All schedules already collected (%d/%d). Returning true.\n", len(t.schedules), t.GetInCount())
+	               return true
+	       }
+	
+	       // Try to read from all input channels without blocking
+	       for i := 0; i < t.GetInCount(); i++ {
+	               // Skip if we already have a schedule from this input
+	               if _, exists := t.schedules[i]; exists {
+	                       continue
+	               }
+	
+	               in, inChannelAvailable := t.GetInputChannel(i)
+	               if !inChannelAvailable {
+	                       DebugLog("[TRAVEL_COORDINATOR] Input channel %d not available yet.\n", i)
+	                       continue // Channel not ready yet
+	               }
+	
+	               select {
+	               case schedData, ok := <-in:
+	                       if !ok {
+	                               InfoLog("[TRAVEL_COORDINATOR] Input channel %d was closed. Marking as processed.\n", i)
+	                               t.schedules[i] = nil // Use nil to mark as processed
+	                               continue
+	                       }
+	
+	                       if schedule, isTravelSchedule := schedData.(*TravelSchedule); isTravelSchedule {
+	                               // Store the received schedule in our map
+	                               t.schedules[i] = schedule
+	                               InfoLog("[TRAVEL_COORDINATOR] Received schedule from input #%d. Total collected: %d/%d. Schedule: %+v\n", i, len(t.schedules), t.GetInCount(), schedule)
+	                       } else {
+	                               InfoLog("[TRAVEL_COORDINATOR] Received data from input #%d but it's not a *TravelSchedule. Type: %T, Value: %+v\n", i, schedData, schedData)
+	                       }
+	               default:
+	                       // No data on this channel right now, just continue
+	                       DebugLog("[TRAVEL_COORDINATOR] No data on input channel %d in this cycle.\n", i)
+	               }
+	       }
+	
+	       // Check if we have collected all schedules
+	       if len(t.schedules) >= t.GetInCount() {
+	               InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, creating final itinerary.\n", t.GetInCount())
+	
+	               var allEvents []TimeSlot
+	               for _, schedule := range t.schedules {
+	                       if schedule != nil {
+	                               allEvents = append(allEvents, schedule.Events...)
+	                       }
+	               }
+	
+	               // Sort events by start time
+	               sort.Slice(allEvents, func(i, j int) bool {
+	                       return allEvents[i].Start.Before(allEvents[j].Start)
+	               })
+	
+	               // Store the final combined itinerary in the want's state for API retrieval
+	               t.StoreState("final_itinerary", allEvents)
+	               t.StoreState("total_events", len(allEvents))
+	               InfoLog("[TRAVEL_COORDINATOR] Final itinerary with %d events created. Coordinator finished.\n", len(allEvents))
+	
+	               return true // Returning true signals completion
+	       }
+	
+	       // Not all schedules are in yet, so we are not done.
+	       // Return false to be called again.
+	       InfoLog("[TRAVEL_COORDINATOR] Still waiting for %d more schedules. Current collected: %d/%d. Returning false.\n", t.GetInCount()-len(t.schedules), len(t.schedules), t.GetInCount())
+	       return false}
 
 // RegisterTravelWantTypes registers all travel-related want types
 func RegisterTravelWantTypes(builder *ChainBuilder) {
