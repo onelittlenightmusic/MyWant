@@ -15,9 +15,9 @@ import (
 //   data := (<-in).(DataType)
 func (n *Want) GetInputChannel(index int) (chain.Chan, bool) {
 	if index < 0 || index >= n.paths.GetInCount() {
-		return nil, false // Channel not available (out of bounds)
+		return nil, true
 	}
-	return n.paths.In[index].Channel, n.paths.In[index].Active
+	return n.paths.In[index].Channel, false
 }
 
 // GetOutputChannel returns output channel by index
@@ -107,15 +107,4 @@ func (n *Want) GetInputAndOutputChannelsAt(inIndex, outIndex int) (chain.Chan, c
 func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 	n.paths.In = inPaths
 	n.paths.Out = outPaths
-	// Add debug logging to confirm the active status of the channels being set
-	firstInActive := false
-	if len(n.paths.In) > 0 {
-		firstInActive = n.paths.In[0].Active
-	}
-	firstOutActive := false
-	if len(n.paths.Out) > 0 {
-		firstOutActive = n.paths.Out[0].Active
-	}
-	DebugLog("[WANT:SET_PATHS] Want %s: Set In=%d, Out=%d. First In channel active: %v, First Out channel active: %v\n",
-		n.Metadata.Name, len(n.paths.In), len(n.paths.Out), firstInActive, firstOutActive)
 }
