@@ -110,8 +110,8 @@ func (g *Numbers) Exec() bool {
 		g.State = make(map[string]interface{})
 	}
 
-	out, skipExec := g.GetFirstOutputChannel()
-	if skipExec {
+	out, connectionAvailable := g.GetFirstOutputChannel()
+	if !connectionAvailable {
 		return true
 	}
 
@@ -218,14 +218,14 @@ func (q *Queue) Exec() bool {
 	// This ensures they persist across cycles without batching interference
 
 	// Get input channel
-	in, inputUnavailable := q.GetInputChannel(0)
-	if inputUnavailable {
+	in, connectionAvailable := q.GetInputChannel(0)
+	if !connectionAvailable {
 		return true
 	}
 
 	// Get output channel
-	out, outputUnavailable := q.GetOutputChannel(0)
-	if outputUnavailable {
+	out, connectionAvailable := q.GetOutputChannel(0)
+	if !connectionAvailable {
 		return true
 	}
 
@@ -365,7 +365,10 @@ func (c *Combiner) Exec() bool {
 	if c.paths.GetInCount() == 0 || c.paths.GetOutCount() == 0 {
 		return true
 	}
-	out, _ := c.GetOutputChannel(0)
+	out, connectionAvailable := c.GetOutputChannel(0)
+	if !connectionAvailable {
+		return true
+	}
 
 	// Simple combiner: just forward all packets from all inputs
 	for i := 0; i < c.paths.GetInCount(); i++ {
@@ -453,8 +456,8 @@ func (s *Sink) GetWant() *mywant.Want {
 // Exec executes the sink directly
 func (s *Sink) Exec() bool {
 	// Validate input channel is available
-	in, skipExec := s.GetFirstInputChannel()
-	if skipExec {
+	in, connectionAvailable := s.GetFirstInputChannel()
+	if !connectionAvailable {
 		return true
 	}
 

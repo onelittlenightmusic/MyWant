@@ -5,43 +5,43 @@ import (
 )
 
 // GetInputChannel returns input channel by index
-// Returns (nil, true) if not available
+// Returns (nil, false) if not available, (channel, true) if available
 //
 // Usage:
-//   in, skipExec := w.GetInputChannel(0)
-//   if skipExec {
+//   in, connectionAvailable := w.GetInputChannel(0)
+//   if !connectionAvailable {
 //       return true
 //   }
 //   data := (<-in).(DataType)
 func (n *Want) GetInputChannel(index int) (chain.Chan, bool) {
 	if index < 0 || index >= n.paths.GetInCount() {
-		return nil, true
+		return nil, false
 	}
-	return n.paths.In[index].Channel, false
+	return n.paths.In[index].Channel, true
 }
 
 // GetOutputChannel returns output channel by index
-// Returns (nil, true) if not available
+// Returns (nil, false) if not available, (channel, true) if available
 //
 // Usage:
-//   out, skipExec := w.GetOutputChannel(0)
-//   if skipExec {
+//   out, connectionAvailable := w.GetOutputChannel(0)
+//   if !connectionAvailable {
 //       return true
 //   }
 //   out <- Data{Value: 42}
 func (n *Want) GetOutputChannel(index int) (chain.Chan, bool) {
 	if index < 0 || index >= n.paths.GetOutCount() {
-		return nil, true
+		return nil, false
 	}
-	return n.paths.Out[index].Channel, false
+	return n.paths.Out[index].Channel, true
 }
 
 // GetFirstInputChannel returns the first input channel from paths
-// Returns (nil, true) if no input channels available (skip execution)
+// Returns (nil, false) if no input channels available, (channel, true) if available
 //
 // Usage:
-//   in, skipExec := w.GetFirstInputChannel()
-//   if skipExec {
+//   in, connectionAvailable := w.GetFirstInputChannel()
+//   if !connectionAvailable {
 //       return true
 //   }
 //   data := (<-in).(DataType)
@@ -50,11 +50,11 @@ func (n *Want) GetFirstInputChannel() (chain.Chan, bool) {
 }
 
 // GetFirstOutputChannel returns the first output channel from paths
-// Returns (nil, true) if no output channels available (skip execution)
+// Returns (nil, false) if no output channels available, (channel, true) if available
 //
 // Usage:
-//   out, skipExec := w.GetFirstOutputChannel()
-//   if skipExec {
+//   out, connectionAvailable := w.GetFirstOutputChannel()
+//   if !connectionAvailable {
 //       return true
 //   }
 //   out <- Data{Value: 42}
