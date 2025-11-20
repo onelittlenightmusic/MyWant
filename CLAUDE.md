@@ -751,6 +751,36 @@ python3 tools/codebase_rag.py index  # Rebuild with embeddings
 
 The RAG database should be kept in sync with code changes for accurate search results.
 
+#### Automatic RAG Updates (Post-commit Hook)
+
+A **post-commit hook** is installed that automatically:
+1. Rebuilds the RAG database after each commit
+2. Detects if the database changed
+3. Creates a follow-up commit if updates are needed
+4. Prevents infinite loops (skips if last commit was a RAG update)
+
+**How it works:**
+```
+$ git commit -m "feat: Add new function"
+[master abc1234] feat: Add new function
+ 1 file changed, 25 insertions(+)
+
+🔄 Updating RAG database...
+✅ RAG database updated, committing...
+[master def5678] chore: Update RAG database
+ 1 file changed, 100 insertions(+)
+
+✅ RAG database committed
+```
+
+**You don't need to do anything** - the hook handles RAG updates automatically!
+
+**If you want to disable the hook temporarily:**
+```bash
+git commit --no-verify          # Bypass hook
+git config core.hooksPath ""    # Disable all hooks temporarily
+```
+
 #### When to Rebuild RAG Index
 
 **After Adding/Modifying Code:**
