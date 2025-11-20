@@ -744,3 +744,187 @@ The RAG system can be used to:
 pip install sentence-transformers
 python3 tools/codebase_rag.py index  # Rebuild with embeddings
 ```
+
+### RAG Database Maintenance Workflow
+
+**IMPORTANT: Sync RAG database with git commits**
+
+The RAG database should be kept in sync with code changes for accurate search results.
+
+#### When to Rebuild RAG Index
+
+**After Adding/Modifying Code:**
+When you add new functions, types, or modify significant code structure:
+
+```bash
+# 1. Make your code changes
+# 2. Stage files for commit
+git add engine/src/...
+
+# 3. Rebuild RAG database (before committing)
+python3 tools/codebase_rag.py index
+
+# 4. Stage the updated database
+git add codebase_rag.db
+
+# 5. Commit everything together
+git commit -m "feat: Add new feature
+
+Add detailed description here
+
+🧠 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+**After Pulling Changes:**
+When pulling code from remote:
+
+```bash
+# 1. Pull latest changes
+git pull origin main
+
+# 2. Rebuild RAG index with new code
+python3 tools/codebase_rag.py index
+
+# 3. Database is now in sync locally
+```
+
+#### RAG Database Commit Strategy
+
+**Include database in commits when:**
+- Adding new public functions or types
+- Modifying function signatures
+- Creating new files with significant code
+- Refactoring module structure
+
+**Quick rebuild command:**
+```bash
+python3 tools/codebase_rag.py index  # ~2 seconds
+```
+
+**Verify database was updated:**
+```bash
+# Check file modification time
+ls -lh codebase_rag.db
+
+# Verify indexed content
+python3 tools/codebase_rag.py  # Start interactive search
+```
+
+#### Git Workflow Example
+
+**Typical workflow for new feature:**
+
+```bash
+# 1. Create feature branch
+git checkout -b feature/new-feature
+
+# 2. Write code
+# ... edit engine/src/my_feature.go ...
+
+# 3. Test locally
+make test
+make run-travel-recipe
+
+# 4. Rebuild RAG index
+python3 tools/codebase_rag.py index
+
+# 5. Verify search works
+python3 tools/codebase_rag.py  # type: "my_feature" to verify
+
+# 6. Stage and commit
+git add engine/src/my_feature.go
+git add codebase_rag.db
+git commit -m "feat: Add new feature XYZ
+
+Detailed description of the feature...
+
+🧠 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 7. Push
+git push origin feature/new-feature
+```
+
+#### RAG Index Status Checklist
+
+Before committing, verify:
+
+```bash
+# Database was rebuilt recently
+ls -lh codebase_rag.db
+
+# Search works
+python3 tools/codebase_rag.py  # then type "arch"
+
+# Database is included in staging
+git status | grep codebase_rag.db
+```
+
+#### Handling Large Refactors
+
+For major refactoring that affects many files:
+
+```bash
+# Rebuild with extra validation
+python3 tools/codebase_rag.py index
+
+# Verify entity counts match expectations
+python3 << 'EOF'
+from tools.codebase_rag import CodebaseRAG
+rag = CodebaseRAG("codebase_rag.db")
+overview = rag.get_architecture_overview()
+print(f"Total: {overview['total_entities']}")
+print(f"Functions: {overview['by_type'].get('function', 0)}")
+print(f"Structs: {overview['by_type'].get('struct', 0)}")
+rag.close()
+EOF
+
+# If counts match previous (or show expected growth), commit
+git add codebase_rag.db
+git commit -m "refactor: Update XYZ with RAG index sync
+
+Updated codebase_rag.db to reflect structural changes...
+
+🧠 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+#### When RAG Index Gets Out of Sync
+
+If you notice stale search results or missing entities:
+
+```bash
+# Force rebuild
+python3 tools/codebase_rag.py index
+
+# Verify freshness
+git diff codebase_rag.db  # Should show changes
+
+# If it should be updated, commit it
+git add codebase_rag.db
+git commit -m "chore: Rebuild RAG index for latest code
+
+Updates codebase search database to match current code structure.
+
+🧠 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
+#### Ignoring RAG Changes (Optional)
+
+If you want to skip RAG updates in some cases:
+
+```bash
+# Ignore RAG database changes temporarily
+git update-index --assume-unchanged codebase_rag.db
+
+# Resume tracking
+git update-index --no-assume-unchanged codebase_rag.db
+```
+
+**Note:** Not recommended. Keep RAG in sync for best search results.
