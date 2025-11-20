@@ -80,7 +80,7 @@ func (r *RestaurantWant) Exec() bool {
 	attempted, _ := attemptedVal.(bool)
 
 	// Get output channel
-	out, skipExec := r.GetFirstOutputChannel()
+	out, connectionAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -94,8 +94,8 @@ func (r *RestaurantWant) Exec() bool {
 		// Use the agent's schedule result
 		r.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available (skipExec=false means available)
-		if !skipExec {
+		// Send the schedule to output channel only if available
+		if connectionAvailable {
 			restaurantEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
 				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
@@ -117,8 +117,8 @@ func (r *RestaurantWant) Exec() bool {
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
 	if r.GetInCount() > 0 {
-		in, skipExec := r.GetInputChannel(0)
-		if !skipExec {
+		in, connectionAvailable := r.GetInputChannel(0)
+		if connectionAvailable {
 			select {
 			case schedData := <-in:
 				if schedule, ok := schedData.(*TravelSchedule); ok {
@@ -182,8 +182,8 @@ func (r *RestaurantWant) Exec() bool {
 		"schedule_date":              baseDate.Format("2006-01-02"),
 	})
 
-	// Send to output channel only if available (skipExec=false means available)
-	if !skipExec {
+	// Send to output channel only if available
+	if connectionAvailable {
 		out <- newSchedule
 	}
 
@@ -351,7 +351,7 @@ func (h *HotelWant) Exec() bool {
 	attempted, _ := attemptedVal.(bool)
 
 	// Get output channel
-	out, skipExec := h.GetFirstOutputChannel()
+	out, connectionAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -365,8 +365,8 @@ func (h *HotelWant) Exec() bool {
 		// Use the agent's schedule result
 		h.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available (skipExec=false means available)
-		if !skipExec {
+		// Send the schedule to output channel only if available
+		if connectionAvailable {
 			hotelEvent := TimeSlot{
 				Start: agentSchedule.CheckInTime,
 				End:   agentSchedule.CheckOutTime,
@@ -390,8 +390,8 @@ func (h *HotelWant) Exec() bool {
 	// Check for existing schedule
 	var existingSchedule *TravelSchedule
 	if h.GetInCount() > 0 {
-		in, skipExec := h.GetInputChannel(0)
-		if !skipExec {
+		in, connectionAvailable := h.GetInputChannel(0)
+		if connectionAvailable {
 			select {
 			case schedData := <-in:
 				if schedule, ok := schedData.(*TravelSchedule); ok {
@@ -455,8 +455,8 @@ func (h *HotelWant) Exec() bool {
 		"reservation_name":    newEvent.Name,
 	})
 
-	// Send to output channel only if available (skipExec=false means available)
-	if !skipExec {
+	// Send to output channel only if available
+	if connectionAvailable {
 		out <- newSchedule
 	}
 
@@ -551,7 +551,7 @@ func (b *BuffetWant) Exec() bool {
 	attempted, _ := attemptedVal.(bool)
 
 	// Get output channel
-	out, skipExec := b.GetFirstOutputChannel()
+	out, connectionAvailable := b.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -565,8 +565,8 @@ func (b *BuffetWant) Exec() bool {
 		// Use the agent's schedule result
 		b.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel only if available (skipExec=false means available)
-		if !skipExec {
+		// Send the schedule to output channel only if available
+		if connectionAvailable {
 			buffetEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
 				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
@@ -589,8 +589,8 @@ func (b *BuffetWant) Exec() bool {
 
 	var existingSchedule *TravelSchedule
 	if b.GetInCount() > 0 {
-		in, skipExec := b.GetInputChannel(0)
-		if !skipExec {
+		in, connectionAvailable := b.GetInputChannel(0)
+		if connectionAvailable {
 			select {
 			case schedData := <-in:
 				if schedule, ok := schedData.(*TravelSchedule); ok {
@@ -649,8 +649,8 @@ func (b *BuffetWant) Exec() bool {
 		"reservation_name":      newEvent.Name,
 	})
 
-	// Send to output channel only if available (skipExec=false means available)
-	if !skipExec {
+	// Send to output channel only if available
+	if connectionAvailable {
 		out <- newSchedule
 	}
 
@@ -836,8 +836,8 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	// Collect all available schedules from child wants in this cycle
 	// Use a non-blocking read to avoid deadlocks if a channel is empty
 	for i := 0; i < t.GetInCount(); i++ {
-		in, skipExec := t.GetInputChannel(i)
-		if skipExec {
+		in, connectionAvailable := t.GetInputChannel(i)
+		if !connectionAvailable {
 			continue
 		}
 		select {
