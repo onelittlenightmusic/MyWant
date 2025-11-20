@@ -586,3 +586,161 @@ When all steps are completed correctly:
 - `engine/cmd/types/travel_types.go` - RestaurantWant, HotelWant, BuffetWant implementations
 - `recipes/travel-itinerary.yaml` - Travel recipe definition with execution ordering
 - `logs/mywant-backend.log` - Output logs for analysis
+
+## Codebase RAG Database System
+
+A **Retrieval Augmented Generation (RAG)** database is available for semantic code search and architecture understanding across the entire MyWant repository.
+
+### Database Status
+
+- **Location**: `codebase_rag.db` (632KB SQLite database)
+- **Indexed Entities**: 760 total
+  - Functions: 409
+  - Structs/Types: 198
+  - Interfaces: 15
+  - Files: 138
+- **Top Components**:
+  - `engine/cmd/server/main.go` (56 entities)
+  - `engine/src/chain_builder.go` (38 entities)
+  - `engine/src/want.go` (30 entities)
+
+### Quick Usage
+
+#### Python API (Recommended for Claude Code)
+
+```python
+from tools.codebase_rag import CodebaseRAG
+
+# Initialize
+rag = CodebaseRAG("codebase_rag.db")
+
+# Search for code
+results = rag.search("Want execution", limit=10)
+results = rag.search("GetOutputChannel", entity_types=['function'])
+results = rag.search("ChainBuilder", entity_types=['struct'])
+
+# Get architecture overview
+overview = rag.get_architecture_overview()
+print(f"Total entities: {overview['total_entities']}")
+print(f"By type: {overview['by_type']}")
+print(f"Top files: {overview['top_files']}")
+
+# Close when done
+rag.close()
+```
+
+#### Interactive CLI
+
+```bash
+python3 tools/codebase_rag.py
+
+# Inside interactive mode:
+# "Want execution" - keyword search
+# "func:GetOutputChannel" - search functions
+# "struct:ChainBuilder" - search structs
+# "file:chain_builder.go" - search files
+# "arch" - show architecture overview
+# "help" - show all options
+```
+
+### Common Search Patterns
+
+#### Understanding Want Execution
+```python
+results = rag.search("Exec", entity_types=['function'])  # Find Exec implementations
+results = rag.search("BeginExecCycle", entity_types=['function'])  # State management
+results = rag.search("GetState", entity_types=['function'])  # State access methods
+```
+
+#### Channel Communication
+```python
+results = rag.search("GetInputChannel", entity_types=['function'])
+results = rag.search("GetOutputChannel", entity_types=['function'])
+results = rag.search("Paths", entity_types=['struct'])  # Path information
+```
+
+#### Chain Building
+```python
+results = rag.search("ChainBuilder", entity_types=['struct'])
+results = rag.search("AddDynamicNode", entity_types=['function'])
+results = rag.search("generatePathsFromConnections", entity_types=['function'])
+```
+
+#### Recipe System
+```python
+results = rag.search("GenericRecipe", entity_types=['struct'])
+results = rag.search("LoadRecipe", entity_types=['function'])
+results = rag.search("RegisterWantType", entity_types=['function'])
+```
+
+#### Travel Planning
+```python
+results = rag.search("RestaurantWant", entity_types=['struct'])
+results = rag.search("TravelCoordinator", entity_types=['struct'])
+results = rag.search("GetSchedule", entity_types=['function'])
+```
+
+#### Queue System
+```python
+results = rag.search("Numbers", entity_types=['struct'])  # Generator
+results = rag.search("Queue", entity_types=['struct'])  # Processor
+results = rag.search("Sink", entity_types=['struct'])  # Collector
+```
+
+### Rebuilding the Database
+
+When codebase changes significantly:
+
+```bash
+# Option 1: Direct rebuild
+python3 tools/codebase_rag.py index
+
+# Option 2: Using bash wrapper
+bash tools/rag index        # Rebuild index
+bash tools/rag reset        # Delete and rebuild
+bash tools/rag arch         # Show architecture
+```
+
+### Files and Resources
+
+- **Main RAG System**: `tools/codebase_rag.py` (760 lines, fully documented)
+- **Documentation**: `tools/README_RAG.md` (comprehensive guide)
+- **Quick Start**: `QUICKSTART_RAG.md` (quick reference)
+- **Bash Wrapper**: `tools/rag` (convenient command-line interface)
+- **Database**: `codebase_rag.db` (SQLite, 632KB)
+- **Requirements**: `tools/requirements-rag.txt` (`pip install` compatible)
+
+### Integration with Claude Code
+
+The RAG system can be used to:
+
+1. **Find Code Patterns**: Search for similar implementations
+2. **Understand Architecture**: View codebase structure and relationships
+3. **Locate Functionality**: Quickly find where features are implemented
+4. **Code Analysis**: Gather context for bug fixes and refactoring
+5. **Documentation**: Extract code organization and component descriptions
+
+### Performance
+
+- **Indexing**: ~2 seconds for full codebase
+- **Search**: <100ms typical queries
+- **Database Size**: ~632KB (small, fits in memory)
+- **Memory Usage**: Minimal (only loads on search)
+
+### Limitations
+
+- **Keyword-based search** by default (text matching)
+- **Semantic search** requires: `pip install sentence-transformers`
+- **Updates**: Requires manual rebuild when code changes significantly
+
+### Troubleshooting
+
+**Database not found**: Run `python3 tools/codebase_rag.py index`
+
+**No results**: Try simpler search terms or check spelling
+
+**Want better results**: Install embeddings model:
+```bash
+pip install sentence-transformers
+python3 tools/codebase_rag.py index  # Rebuild with embeddings
+```

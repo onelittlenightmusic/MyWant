@@ -1,0 +1,11 @@
+# RAG System Requirements
+# Install with: pip install -r tools/requirements-rag.txt
+
+# Optional: For semantic search with embeddings (recommended)
+sentence-transformers>=2.2.0
+
+# Optional: For better performance with large datasets
+numpy>=1.21.0
+
+# Core dependencies (usually pre-installed)
+# sqlite3 (built-in)
