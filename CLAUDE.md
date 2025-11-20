@@ -687,6 +687,193 @@ results = rag.search("Queue", entity_types=['struct'])  # Processor
 results = rag.search("Sink", entity_types=['struct'])  # Collector
 ```
 
+### Practical Code Search Examples
+
+Real-world examples of using RAG to find and understand code in the MyWant codebase.
+
+#### Example 1: Find All Channel Communication Functions
+
+**Goal**: Understand how channels are used throughout the system
+
+```python
+import sys
+sys.path.insert(0, 'tools')
+from codebase_rag import CodebaseRAG
+
+rag = CodebaseRAG('codebase_rag.db')
+
+# Find GetInputChannel usages
+results = rag.search("GetInputChannel", limit=15)
+print(f"Found {len(results)} GetInputChannel references:")
+for result in results:
+    print(f"  • {result['name']} in {result['file_path']}:{result['line_number']}")
+
+rag.close()
+```
+
+**Expected Output**:
+```
+Found 2 GetInputChannel definitions:
+  • GetInputChannel (function) in engine/src/chain_helpers.go:16
+  • GetInputChannel (function) in engine/src/owner_types.go:615
+
+Plus 11 usages across:
+  • Queue implementation (qnet_types.go)
+  • Travel system (travel_types.go - Restaurant, Hotel, Buffet, Coordinator)
+  • Fibonacci feedback loops (fibonacci_loop_types.go)
+  • Approval/workflow system (approval_types.go)
+  • Flight integration (flight_types.go)
+```
+
+#### Example 2: Locate All State Management Methods
+
+**Goal**: Find all functions that manage want state
+
+```python
+rag = CodebaseRAG('codebase_rag.db')
+
+# Search for state-related functions
+state_funcs = rag.search("State", entity_types=['function'], limit=20)
+
+# Group by functionality
+store_state = [r for r in state_funcs if 'Store' in r['name']]
+get_state = [r for r in state_funcs if 'Get' in r['name']]
+
+print(f"State storage functions: {len(store_state)}")
+print(f"State retrieval functions: {len(get_state)}")
+
+for func in store_state[:3]:
+    print(f"  • {func['name']} - {func['file_path']}:{func['line_number']}")
+
+rag.close()
+```
+
+#### Example 3: Find Want Type Implementations
+
+**Goal**: Understand the Want type hierarchy
+
+```python
+rag = CodebaseRAG('codebase_rag.db')
+
+# Find all Want types
+want_structs = rag.search("Want", entity_types=['struct'], limit=30)
+
+# Organize by category
+types_dict = {}
+for result in want_structs:
+    if result['name'] != 'Want':  # Skip base type
+        types_dict[result['name']] = result['file_path']
+
+print("Want type implementations:")
+for name in sorted(types_dict.keys()):
+    print(f"  • {name}")
+
+rag.close()
+```
+
+#### Example 4: Trace Execution Flow
+
+**Goal**: Follow how a specific operation flows through the system
+
+```python
+rag = CodebaseRAG('codebase_rag.db')
+
+# Trace execution cycle
+cycle_funcs = rag.search("ExecCycle", entity_types=['function'])
+exec_funcs = rag.search("Exec", entity_types=['function'], limit=15)
+
+print("Execution cycle management:")
+for func in cycle_funcs:
+    print(f"  • {func['name']} in {func['file_path']}:{func['line_number']}")
+
+print("\nExecution implementations (first 5):")
+for func in exec_funcs[:5]:
+    print(f"  • {func['name']} in {func['file_path']}:{func['line_number']}")
+
+rag.close()
+```
+
+#### Example 5: Analyze Architecture
+
+**Goal**: Understand codebase structure and complexity
+
+```python
+rag = CodebaseRAG('codebase_rag.db')
+
+# Get full architecture overview
+overview = rag.get_architecture_overview()
+
+print("Codebase Statistics:")
+print(f"  Total entities: {overview['total_entities']}")
+print(f"  Functions: {overview['by_type'].get('function', 0)}")
+print(f"  Structs: {overview['by_type'].get('struct', 0)}")
+print(f"  Interfaces: {overview['by_type'].get('interface', 0)}")
+
+print("\nTop 5 most complex files:")
+for i, file_info in enumerate(overview['top_files'][:5], 1):
+    print(f"  {i}. {file_info['file']}: {file_info['count']} entities")
+
+print("\nBy package:")
+for pkg, count in sorted(overview['by_package'].items())[:10]:
+    print(f"  • {pkg}: {count} entities")
+
+rag.close()
+```
+
+#### Example 6: Find Usage Patterns
+
+**Goal**: Locate all usages of a specific function pattern
+
+```python
+rag = CodebaseRAG('codebase_rag.db')
+
+# Find all output channel operations
+output_funcs = rag.search("GetOutputChannel", limit=20)
+
+print(f"GetOutputChannel usages across {len(set(r['file_path'] for r in output_funcs))} files:")
+
+# Group by file
+by_file = {}
+for result in output_funcs:
+    file = result['file_path']
+    if file not in by_file:
+        by_file[file] = []
+    by_file[file].append(result)
+
+for file in sorted(by_file.keys()):
+    print(f"\n📁 {file}")
+    for item in by_file[file]:
+        print(f"   Line {item['line_number']}: {item['name']}")
+
+rag.close()
+```
+
+### Using RAG in Code Review
+
+When reviewing code changes, use RAG to:
+
+1. **Find Similar Implementations**: Search for existing code that does similar work
+   ```python
+   results = rag.search("AddDynamicNode")  # Find pattern for dynamic additions
+   ```
+
+2. **Check Naming Conventions**: Ensure new code follows project patterns
+   ```python
+   existing = rag.search("NewQueue", entity_types=['function'])
+   # Check if "NewMyType" follows the same pattern
+   ```
+
+3. **Understand Dependencies**: See what functions call or are called by your code
+   ```python
+   results = rag.search("ChainBuilder")  # Find all builder usage
+   ```
+
+4. **Validate Architecture**: Confirm changes don't break architectural patterns
+   ```python
+   arch = rag.get_architecture_overview()
+   # Verify new code fits within expected structure
+   ```
+
 ### Rebuilding the Database
 
 When codebase changes significantly:
