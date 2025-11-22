@@ -823,14 +823,17 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
+	log.Printf("[API:UPDATE] Looking for want ID: %s across %d executions\n", wantID, len(s.wants))
+
 	// Search for the want by metadata.id across all executions using universal search
 	var targetExecution *WantExecution
 	var targetWantIndex int = -1
 	var foundWant *mywant.Want
 
-	for _, execution := range s.wants {
+	for i, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
+				log.Printf("[API:UPDATE] Found want in execution %d\n", i)
 				targetExecution = execution
 				foundWant = want
 				// Find the index in the original config for updating
@@ -842,6 +845,8 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 				}
 				break
 			}
+		} else {
+			log.Printf("[API:UPDATE] Execution %d has nil builder\n", i)
 		}
 	}
 

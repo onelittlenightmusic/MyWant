@@ -199,11 +199,5 @@ type ConnectivityMetadata struct {
 	Description     string
 }
 
-// EnhancedBaseWant interface for path-aware wants with connectivity validation
-type EnhancedBaseWant interface {
-	InitializePaths(inCount, outCount int)
-	GetConnectivityMetadata() ConnectivityMetadata
-	GetType() string
-}
 
 // ChangeEventType represents the type of change detected

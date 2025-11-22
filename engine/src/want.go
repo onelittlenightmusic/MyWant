@@ -896,13 +896,6 @@ func (n *Want) SendPacketMulti(packet interface{}, outputs []Chan) error {
 	return nil
 }
 
-// InitializePaths initializes the paths for this want
-// This method eliminates the need for duplicate implementations in all want types
-func (n *Want) InitializePaths(inCount, outCount int) {
-	n.paths.In = make([]PathInfo, inCount)
-	n.paths.Out = make([]PathInfo, outCount)
-}
-
 // GetType returns the want type
 // This method eliminates the need for duplicate implementations in all want types
 func (n *Want) GetType() string {
@@ -1035,5 +1028,25 @@ func (n *Want) IncrementIntState(key string) int {
 	n.pendingStateChanges[key] = newValue
 
 	return newValue
+}
+
+// GetSpec returns a pointer to the Want's Spec field
+// This provides controlled access to the Spec, following the encapsulation principle
+// Returns nil if the Want is nil
+func (w *Want) GetSpec() *WantSpec {
+	if w == nil {
+		return nil
+	}
+	return &w.Spec
+}
+
+// GetMetadata returns a pointer to the Want's Metadata field
+// This provides controlled access to the Metadata, following the encapsulation principle
+// Returns nil if the Want is nil
+func (w *Want) GetMetadata() *Metadata {
+	if w == nil {
+		return nil
+	}
+	return &w.Metadata
 }
 

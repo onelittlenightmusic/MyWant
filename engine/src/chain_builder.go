@@ -72,11 +72,27 @@ type ChainBuilder struct {
 
 // runtimeWant holds the runtime state of a want
 type runtimeWant struct {
-	metadata Metadata
-	spec     WantSpec
 	chain    chain.C_chain
 	function interface{}
 	want     *Want
+}
+
+// GetSpec returns a pointer to the runtimeWant's Spec field
+// by delegating to the underlying want's GetSpec() method
+func (rw *runtimeWant) GetSpec() *WantSpec {
+	if rw == nil || rw.want == nil {
+		return nil
+	}
+	return rw.want.GetSpec()
+}
+
+// GetMetadata returns a pointer to the runtimeWant's Metadata field
+// by delegating to the underlying want's GetMetadata() method
+func (rw *runtimeWant) GetMetadata() *Metadata {
+	if rw == nil || rw.want == nil {
+		return nil
+	}
+	return rw.want.GetMetadata()
 }
 
 // NewChainBuilder creates a new builder from configuration
@@ -154,9 +170,10 @@ func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector m
 
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
+	DebugLog("[PATH_GEN:START] Starting path generation, %d wants in runtime\n", len(cb.wants))
 	pathMap := make(map[string]*Paths)
 
-	// Initialize empty paths for all wants
+	// Initialize empty paths for all runtime wants
 	for wantName := range cb.wants {
 		pathMap[wantName] = &Paths{
 			In:  []PathInfo{},
@@ -168,23 +185,26 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
 
-		// Debug logging for this want's using selectors
-		if len(want.spec.Using) > 0 {
-			DebugLog("[PATH_GEN] Want %s has %d using selectors. Current labels: %v\n",
-				wantName, len(want.spec.Using), want.metadata.Labels)
-		}
-
 		// Process using connections for this want
-		for selectorIdx, usingSelector := range want.spec.Using {
-			DebugLog("[PATH_GEN] Processing using selector %d: %v for want %s\n", selectorIdx, usingSelector, wantName)
-
+		DebugLog("[PATH_GEN:CHECKING] Want %s has Using specs: %v (len=%d)\n", wantName, want.GetSpec().Using, len(want.GetSpec().Using))
+		if len(want.GetSpec().Using) > 0 {
+			DebugLog("[PATH_GEN:MATCH] Want %s has %d using selectors\n", wantName, len(want.GetSpec().Using))
+		}
+		for selectorIdx, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-			// Find wants that match this using selector
+			DebugLog("[PATH_GEN:SELECTOR] Want %s selector[%d]: %v\n", wantName, selectorIdx, usingSelector)
+			DebugLog("[PATH_GEN:SEARCH] Searching %d available wants for matches\n", len(cb.wants))
+
+			// Find wants that match this using selector (from runtime only - all wants should be here by connectPhase)
 			for otherName, otherWant := range cb.wants {
-				if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
+				if wantName == otherName {
+					continue // Skip self-matching
+				}
+				DebugLog("[PATH_GEN:CHECK] Checking %s (labels: %v) against selector %v\n",
+					otherName, otherWant.GetMetadata().Labels, usingSelector)
+				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 					matchCount++
-					DebugLog("[PATH_GEN] Match found! Want %s matches selector %v (labels: %v)\n",
-						otherName, usingSelector, otherWant.metadata.Labels)
+					DebugLog("[PATH_GEN:MATCH_FOUND] %s matches selector for %s\n", otherName, wantName)
 
 					// Create using path for current want
 					// Create a channel directly typed as chain.Chan
@@ -204,11 +224,10 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						Active:  true,
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
-					DebugLog("[PATH_GEN] Created output path for %s: %s\n", otherName, outPath.Name)
 				}
 			}
 			if matchCount == 0 {
-				DebugLog("[PATH_GEN] NO MATCHES for selector %v on want %s\n", usingSelector, wantName)
+				DebugLog("[PATH_GEN:NO_MATCH] Selector %v for %s matched 0 wants\n", usingSelector, wantName)
 			}
 		}
 	}
@@ -231,8 +250,8 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 		paths := pathMap[wantName]
 
 		// Check if this is an enhanced want that has connectivity requirements
-		if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
-			meta := enhancedWant.GetConnectivityMetadata()
+		if w, ok := want.function.(*Want); ok {
+			meta := w.GetConnectivityMetadata()
 
 			inCount := len(paths.In)
 			outCount := len(paths.Out)
@@ -266,8 +285,8 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 	paths := pathMap[wantName]
 
 	// Check if this is an enhanced want that has connectivity requirements
-	if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
-		meta := enhancedWant.GetConnectivityMetadata()
+	if w, ok := want.function.(*Want); ok {
+		meta := w.GetConnectivityMetadata()
 
 		inCount := len(paths.In)
 		outCount := len(paths.Out)
@@ -608,7 +627,10 @@ func (cb *ChainBuilder) compilePhase() error {
 	}
 
 	// Update last config and hash
-	cb.lastConfig = newConfig
+	// IMPORTANT: Make a deep copy to avoid reference aliasing issues
+	// When both lastConfig and config point to the same Want objects,
+	// updates to one appear to update both, breaking change detection
+	cb.lastConfig = cb.deepCopyConfig(newConfig)
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 
 	DebugLog("[RECONCILE:COMPILE] Configuration compilation completed")
@@ -618,6 +640,12 @@ func (cb *ChainBuilder) compilePhase() error {
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
 	DebugLog("[RECONCILE:CONNECT] Establishing want topology")
+
+	// DEBUG: Log all wants in cb.wants at connectPhase start
+	DebugLog("[RECONCILE:CONNECT] Wants in cb.wants at connectPhase start: %d\n", len(cb.wants))
+	for wantName, runtimeWant := range cb.wants {
+		DebugLog("[RECONCILE:CONNECT]   - Want: %s (Type: %s, Using: %v)\n", wantName, runtimeWant.want.Metadata.Type, runtimeWant.want.Spec.Using)
+	}
 
 	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
@@ -811,8 +839,7 @@ func (cb *ChainBuilder) processAutoConnections() {
 	for _, runtimeWant := range autoConnectWants {
 		want := runtimeWant.want
 		cb.autoConnectWant(want, allWants)
-		// Update the runtime spec to reflect auto-connection changes
-		runtimeWant.spec.Using = want.Spec.Using
+		// Note: want object itself has been updated, no need to sync to separate spec copy
 	}
 
 	DebugLog("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
@@ -1022,8 +1049,8 @@ func (cb *ChainBuilder) startPhase() {
 			if want.want.GetStatus() == WantStatusIdle {
 				// Check if connectivity requirements are met
 				paths := cb.pathMap[wantName]
-				if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
-					meta := enhancedWant.GetConnectivityMetadata()
+				if w, ok := want.function.(*Want); ok {
+					meta := w.GetConnectivityMetadata()
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
 
@@ -1069,8 +1096,8 @@ func (cb *ChainBuilder) startPhase() {
 			if want.want.GetStatus() == WantStatusIdle {
 				// Check if connectivity requirements are now met
 				paths := cb.pathMap[wantName]
-				if enhancedWant, ok := want.function.(EnhancedBaseWant); ok {
-					meta := enhancedWant.GetConnectivityMetadata()
+				if w, ok := want.function.(*Want); ok {
+					meta := w.GetConnectivityMetadata()
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
 
@@ -1094,13 +1121,13 @@ func (cb *ChainBuilder) startPhase() {
 // because its upstream wants are running or idle (have new data)
 func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtimeWant) bool {
 	// Check if any upstream wants (using) are running or idle
-	for _, usingSelector := range want.spec.Using {
+	for _, usingSelector := range want.GetSpec().Using {
 		for otherName, otherWant := range cb.wants {
 			if otherName == wantName {
 				continue
 			}
 			// Check if upstream matches selector and is running/idle
-			if cb.matchesSelector(otherWant.metadata.Labels, usingSelector) {
+			if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 				status := otherWant.want.GetStatus()
 				if status == WantStatusRunning || status == WantStatusIdle {
 					return true
@@ -1133,11 +1160,14 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 		if oldWant, exists := oldWants[name]; exists {
 			// Check if want changed
 			if !cb.wantsEqual(oldWant, newWant) {
+				DebugLog("[RECONCILE:DETECT] Want changed: %s (old Using: %v, new Using: %v)\n", name, oldWant.Spec.Using, newWant.Spec.Using)
 				changes = append(changes, ChangeEvent{
 					Type:     ChangeEventUpdate,
 					WantName: name,
 					Want:     newWant,
 				})
+			} else {
+				DebugLog("[RECONCILE:DETECT] Want NOT changed: %s (oldWant ptr=%p, newWant ptr=%p, same=%v)\n", name, oldWant, newWant, oldWant == newWant)
 			}
 		} else {
 			// New want
@@ -1172,6 +1202,111 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		fmt.Sprintf("%v", a.Spec.Using) == fmt.Sprintf("%v", b.Spec.Using)
 }
 
+// deepCopyConfig creates a deep copy of a Config to prevent reference aliasing
+// This is critical for change detection to work correctly
+func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
+	// Copy the wants slice with new Want objects
+	copiedWants := make([]*Want, 0, len(src.Wants))
+	for _, want := range src.Wants {
+		// Deep copy the want
+		copiedWant := &Want{
+			Metadata: Metadata{
+				ID:     want.Metadata.ID,
+				Name:   want.Metadata.Name,
+				Type:   want.Metadata.Type,
+				Labels: copyStringMap(want.Metadata.Labels),
+			},
+			Spec: WantSpec{
+				Params:              copyInterfaceMap(want.Spec.Params),
+				Using:               copyUsing(want.Spec.Using),
+				StateSubscriptions:  copyStateSubscriptions(want.Spec.StateSubscriptions),
+				NotificationFilters: copyNotificationFilters(want.Spec.NotificationFilters),
+				Requires:            copyStringSlice(want.Spec.Requires),
+			},
+		}
+		copiedWants = append(copiedWants, copiedWant)
+	}
+
+	return Config{Wants: copiedWants}
+}
+
+// Helper functions for deep copying
+func copyStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func copyInterfaceMap(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]interface{}, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func copyUsing(src []map[string]string) []map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make([]map[string]string, 0, len(src))
+	for _, selector := range src {
+		copiedSelector := copyStringMap(selector)
+		dst = append(dst, copiedSelector)
+	}
+	return dst
+}
+
+func copyStringSlice(src []string) []string {
+	if src == nil {
+		return nil
+	}
+	dst := make([]string, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func copyStateSubscriptions(src []StateSubscription) []StateSubscription {
+	if src == nil {
+		return nil
+	}
+	dst := make([]StateSubscription, 0, len(src))
+	for _, sub := range src {
+		copiedSub := StateSubscription{
+			WantName:   sub.WantName,
+			StateKeys:  copyStringSlice(sub.StateKeys),
+			Conditions: copyStringSlice(sub.Conditions),
+			BufferSize: sub.BufferSize,
+		}
+		dst = append(dst, copiedSub)
+	}
+	return dst
+}
+
+func copyNotificationFilters(src []NotificationFilter) []NotificationFilter {
+	if src == nil {
+		return nil
+	}
+	dst := make([]NotificationFilter, 0, len(src))
+	for _, filter := range src {
+		copiedFilter := NotificationFilter{
+			SourcePattern: filter.SourcePattern,
+			StateKeys:     copyStringSlice(filter.StateKeys),
+			ValuePattern:  filter.ValuePattern,
+		}
+		dst = append(dst, copiedFilter)
+	}
+	return dst
+}
+
 // applyWantChanges applies want changes in sink-to-generator order
 // Note: Connections are rebuilt in separate connectPhase()
 func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
@@ -1185,7 +1320,51 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 			cb.addDynamicWantUnsafe(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
+			// Update config first
 			cb.UpdateWant(change.Want)
+
+			// Sync ALL fields from config want to runtime want
+			// This is the single synchronization point for config→runtime
+			if runtimeWant, exists := cb.wants[change.WantName]; exists {
+				// Find the updated want in config (UpdateWant replaces it in the array)
+				var updatedConfigWant *Want
+				for _, cfgWant := range cb.config.Wants {
+					if cfgWant.Metadata.ID == change.Want.Metadata.ID {
+						updatedConfigWant = cfgWant
+						break
+					}
+				}
+
+				if updatedConfigWant != nil {
+					DebugLog("[APPLY_CHANGES] Syncing config to runtime for %s: Using %v -> %v\n",
+						change.WantName, runtimeWant.want.GetSpec().Using, updatedConfigWant.Spec.Using)
+
+					// Update the spec reference to point to the new config want's spec
+					// This ensures generatePathsFromConnections sees the updated spec
+					// spec is now part of want object, removed redundant copy
+
+					// Sync the want's spec from the updated config want
+					runtimeWant.want.Spec.Using = copyUsing(updatedConfigWant.Spec.Using)
+					runtimeWant.want.Spec.Requires = copyStringSlice(updatedConfigWant.Spec.Requires)
+					runtimeWant.want.Spec.Params = copyInterfaceMap(updatedConfigWant.Spec.Params)
+					runtimeWant.want.Spec.StateSubscriptions = copyStateSubscriptions(updatedConfigWant.Spec.StateSubscriptions)
+					runtimeWant.want.Spec.NotificationFilters = copyNotificationFilters(updatedConfigWant.Spec.NotificationFilters)
+
+					// Sync metadata
+					// metadata is now part of want object, removed redundant copy
+					runtimeWant.want.Metadata.Labels = copyStringMap(updatedConfigWant.Metadata.Labels)
+					runtimeWant.want.Metadata.Name = updatedConfigWant.Metadata.Name
+					runtimeWant.want.Metadata.Type = updatedConfigWant.Metadata.Type
+					runtimeWant.want.Metadata.ID = updatedConfigWant.Metadata.ID
+
+					// Reset status to Idle so want can be re-executed with new configuration
+					runtimeWant.want.SetStatus(WantStatusIdle)
+
+					DebugLog("[APPLY_CHANGES] Runtime want %s synced successfully (spec updated to config version)\n", change.WantName)
+				} else {
+					DebugLog("[APPLY_CHANGES] WARNING: Could not find updated config want for %s\n", change.WantName)
+				}
+			}
 			hasWantChanges = true
 		case ChangeEventDelete:
 			cb.deleteWant(change.WantName)
@@ -1321,9 +1500,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		wantPtr.InitializeSubscriptionSystem()
 
 		runtimeWant := &runtimeWant{
-			metadata: wantConfig.Metadata,
-			spec:     wantConfig.Spec,
-			function: nil, // No function since creation failed
+									function: nil, // No function since creation failed
 			want:     wantPtr,
 		}
 		cb.wants[wantConfig.Metadata.Name] = runtimeWant
@@ -1414,9 +1591,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	wantPtr.InitializeSubscriptionSystem()
 
 	runtimeWant := &runtimeWant{
-		metadata: wantConfig.Metadata,
-		spec:     wantConfig.Spec,
-		function: wantFunction,
+						function: wantFunction,
 		want:     wantPtr,
 	}
 	cb.wants[wantConfig.Metadata.Name] = runtimeWant
@@ -1427,11 +1602,21 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 // FindWantByID searches for a want by its metadata.id across all runtime wants
 func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
+	// First search in runtime wants
 	for wantName, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.ID == wantID {
 			return runtimeWant.want, wantName, true
 		}
 	}
+
+	// If not found in runtime, search in config wants
+	// This handles newly created wants that haven't been promoted to runtime yet
+	for _, configWant := range cb.config.Wants {
+		if configWant.Metadata.ID == wantID {
+			return configWant, configWant.Metadata.Name, true
+		}
+	}
+
 	return nil, "", false
 }
 
@@ -1439,91 +1624,28 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 // Automatically triggers reconciliation to process topology changes
 // Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
+	DebugLog("[UPDATE_WANT] UpdateWant called for: %s (ID: %s), Using: %v\n", wantConfig.Metadata.Name, wantConfig.Metadata.ID, wantConfig.Spec.Using)
+
 	// Find the existing want by metadata.id using universal search
-	existingWant, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
+	_, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
 		// Want not found, add as new
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
 
-	// Detect parameter changes and create a single consolidated history entry
-	var changedParams map[string]interface{}
-	if wantConfig.Spec.Params != nil {
-		for paramName, newValue := range wantConfig.Spec.Params {
-			// Check if parameter changed
-			var oldValue interface{}
-			var hasOldValue bool
-			if existingWant.Spec.Params != nil {
-				oldValue, hasOldValue = existingWant.Spec.Params[paramName]
-			}
-
-			// Update if value changed or is new
-			if !hasOldValue || oldValue != newValue {
-				// Initialize params map if needed
-				if existingWant.Spec.Params == nil {
-					existingWant.Spec.Params = make(map[string]interface{})
-				}
-
-				// Update the parameter directly (bypass UpdateParameter to avoid individual history entries)
-				existingWant.Spec.Params[paramName] = newValue
-
-				// Track changed parameters for consolidated history entry
-				if changedParams == nil {
-					changedParams = make(map[string]interface{})
-				}
-				changedParams[paramName] = newValue
-			}
+	// Only update config - runtime want will be synchronized in applyWantChanges() via compilePhase
+	configUpdated := false
+	for i, cfgWant := range cb.config.Wants {
+		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
+			DebugLog("[UPDATE_WANT] Updating config want %s: Using %v -> %v\n", wantName, cfgWant.Spec.Using, wantConfig.Spec.Using)
+			cb.config.Wants[i] = wantConfig
+			configUpdated = true
+			break
 		}
 	}
-
-	// Create a single consolidated parameter history entry for all changes
-	if changedParams != nil {
-		entry := StateHistoryEntry{
-			WantName:   existingWant.Metadata.Name,
-			StateValue: changedParams,
-			Timestamp:  time.Now(),
-		}
-		existingWant.History.ParameterHistory = append(existingWant.History.ParameterHistory, entry)
-
-		// Limit history size (keep last 50 entries for parameters)
-		maxHistorySize := 50
-		if len(existingWant.History.ParameterHistory) > maxHistorySize {
-			existingWant.History.ParameterHistory = existingWant.History.ParameterHistory[len(existingWant.History.ParameterHistory)-maxHistorySize:]
-		}
-	}
-
-	// Update other spec fields (using, requires, etc.)
-	existingWant.Spec.Using = wantConfig.Spec.Using
-	existingWant.Spec.Requires = wantConfig.Spec.Requires
-
-	// Update metadata
-	existingWant.Metadata = wantConfig.Metadata
-
-	// Reset status from completed to idle to allow re-execution
-	existingWant.SetStatus(WantStatusIdle)
-
-	// Clear previous state if needed (preserve some runtime state)
-	if existingWant.State == nil {
-		existingWant.State = make(map[string]interface{})
-	}
-	// Reset execution-related state but preserve structural state
-	delete(existingWant.State, "current_count")
-	delete(existingWant.State, "total_processed")
-	delete(existingWant.State, "current_time")
-
-	// If this is a Target want with children, use Target's parameter update mechanism
-	// which automatically pushes updates to children
-	if changedParams != nil {
-		parentRuntime, exists := cb.wants[wantName]
-		if exists {
-			if target, ok := parentRuntime.function.(*Target); ok {
-				// Use Target's UpdateParameter which automatically pushes to children
-				for paramName, paramValue := range changedParams {
-					target.UpdateParameter(paramName, paramValue)
-				}
-			}
-		}
+	if !configUpdated {
+		DebugLog("[UPDATE_WANT] WARNING: Could not find config want by ID %s for %s\n", wantConfig.Metadata.ID, wantName)
 	}
 
 	// Trigger immediate reconciliation via channel (unless already in reconciliation)
@@ -1696,7 +1818,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		configWantMap[want.Metadata.Name] = true
 		if runtimeWant, exists := cb.wants[want.Metadata.Name]; exists {
 			// Update with runtime data including spec using
-			want.Spec = runtimeWant.spec // Preserve using from runtime spec
+			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
 			want.State = runtimeWant.want.State
@@ -1710,8 +1832,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
 			wantConfig := &Want{
-				Metadata: runtimeWant.metadata,
-				Spec:     runtimeWant.spec,
+				Metadata: *runtimeWant.GetMetadata(),
+				Spec:     *runtimeWant.GetSpec(),
 				// Stats field removed - data now in State
 				Status:  runtimeWant.want.Status,
 				State:   runtimeWant.want.State,
@@ -1942,6 +2064,17 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 
 	// Create runtime want
 	cb.addWant(want)
+
+	// Trigger reconciliation to process the new want
+	if !cb.inReconciliation {
+		select {
+		case cb.reconcileTrigger <- true:
+			DebugLog("[RECONCILE:TRIGGER] Reconciliation triggered by addDynamicWantUnsafe for: %s\n", want.Metadata.Name)
+		default:
+			// Channel already has a pending trigger, skip
+		}
+	}
+
 	return nil
 }
 
@@ -2216,8 +2349,8 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 
 		// Use runtime spec to preserve using, but want state for stats/status
 		want := &Want{
-			Metadata: runtimeWant.metadata,
-			Spec:     runtimeWant.spec, // This preserves using
+			Metadata: *runtimeWant.GetMetadata(),
+			Spec:     *runtimeWant.GetSpec(), // This preserves using
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
 			State:   stateCopy,                // Use copy to avoid concurrent modification

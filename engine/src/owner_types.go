@@ -643,6 +643,22 @@ func (oaw *OwnerAwareWant) GetFirstOutputChannel() (chain.Chan, bool) {
 	return nil, true
 }
 
+// GetMetadata delegates to the stored Want
+func (oaw *OwnerAwareWant) GetMetadata() *Metadata {
+	if oaw.Want != nil {
+		return oaw.Want.GetMetadata()
+	}
+	return nil
+}
+
+// GetSpec delegates to the stored Want
+func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
+	if oaw.Want != nil {
+		return oaw.Want.GetSpec()
+	}
+	return nil
+}
+
 // emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
 func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 	// Use the Want pointer stored at creation time
