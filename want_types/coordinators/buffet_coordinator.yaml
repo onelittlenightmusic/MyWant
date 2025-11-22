@@ -1,0 +1,101 @@
+wantType:
+  metadata:
+    name: "buffet_coordinator"
+    title: "Buffet Schedule Coordinator"
+    description: "Orchestrates standalone buffet reservation wants and collects their schedule data"
+    version: "1.0"
+    category: "travel"
+    pattern: "coordinator"
+
+  parameters:
+    - name: "display_name"
+      description: "Name/title of the buffet experience"
+      type: "string"
+      default: "Buffet Experience"
+      required: false
+      example: "Weekend Brunch Buffet"
+
+    - name: "include_summary"
+      description: "Whether to include summary information in state"
+      type: "bool"
+      default: true
+      required: false
+
+  state:
+    - name: "buffet_schedule"
+      description: "Buffet reservation schedule with timing and event details"
+      type: "map[string]interface{}"
+      persistent: true
+      example: |
+        {
+          "restaurant_name": "Montmartre Brasserie",
+          "date": "2024-11-22",
+          "time": "12:00",
+          "duration_hours": 2.5,
+          "party_size": 4,
+          "events": [...]
+        }
+
+    - name: "coordination_status"
+      description: "Status of buffet coordination (pending, confirmed, completed, failed)"
+      type: "string"
+      persistent: true
+      example: "completed"
+
+    - name: "completion_time"
+      description: "ISO8601 timestamp when buffet schedule was finalized"
+      type: "string"
+      persistent: true
+
+    - name: "last_updated"
+      description: "ISO8601 timestamp of last coordination update"
+      type: "string"
+      persistent: true
+
+  connectivity:
+    inputs:
+      - name: "buffet_schedule"
+        type: "want"
+        description: "Buffet want providing schedule data"
+        required: true
+        multiple: false
+    outputs: []
+
+  agents: []
+
+  constraints:
+    - description: "Exactly one input want must be connected"
+      validation: "len(using) == 1"
+
+  examples:
+    - name: "Standalone buffet coordinator"
+      description: "Buffet coordinator managing a single buffet reservation"
+      params:
+        display_name: "Weekend Brunch"
+        include_summary: true
+      expectedBehavior: |
+        1. Waits for buffet want to send schedule data
+        2. Receives and stores buffet schedule in state
+        3. Sets completion_time when schedule received
+        4. Marks coordination status as completed
+      connectedTo: ["buffet"]
+
+    - name: "Buffet with custom display name"
+      description: "Coordinator with specific event naming"
+      params:
+        display_name: "Corporate Team Lunch"
+        include_summary: true
+      expectedBehavior: |
+        1. Receives buffet schedule from connected buffet want
+        2. Stores with custom display context
+        3. Completes execution immediately after receiving schedule
+      connectedTo: ["buffet"]
+
+  relatedTypes:
+    - "buffet"
+    - "travel_coordinator"
+
+  seeAlso:
+    - "buffet want type"
+    - "standalone coordinator pattern"
+    - "Independent wants execution"
