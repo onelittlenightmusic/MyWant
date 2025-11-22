@@ -1,0 +1,1750 @@
+🔄 Packet Wake-up Test Server
+==============================
+This demo tests automatic wake-up of completed wants when receiving packets.
+
+[VALIDATION] Config validated successfully against OpenAPI spec
+📝 Loaded 3 wants from configuration
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+[TRIGGER] Registered handler for trigger type: manual
+[TRIGGER] Registered handler for trigger type: monitor_alert
+[TRIGGER] Registered handler for trigger type: state_changed
+[TRIGGER] Registered handler for trigger type: config_change
+[TRIGGER] Registered handler for trigger type: scheduled
+[TRIGGER] Registered handler for trigger type: want_ready
+[TRIGGER] Registered handler for trigger type: packet_received
+[TRIGGER] Registered all default trigger handlers
+
+🚀 Executing simple 3-want pipeline (gen → queue → sink)
+   Wants will complete, then monitor for packets
+   Server will keep running - use API to update parameters
+   API: http://localhost:8080/api/v1/wants
+
+[RECONCILE] Starting reconcile loop execution
+[TRIGGER] Trigger manager started
+[TRIGGER] Started periodic reconciliation trigger
+[TRIGGER] Sent trigger trigger-1759237165006938000: system -> system
+[RECONCILE] Using event-driven execution system
+[CONTROL] Starting suspension control loop
+[TRIGGER] Processing trigger trigger-1759237165006938000: type=config_change, source=system, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: initial_load
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Initial load: processing 3 wants
+[RECONCILE] Adding want: gen primary
+[RECONCILE] Recording initial parameter history for want gen primary: map[count:100 rate:10]
+[RECONCILE] Adding want: queue main
+[RECONCILE] Recording initial parameter history for want queue main: map[service_time:0.05]
+[RECONCILE] Adding want: sink main
+[RECONCILE] Recording initial parameter history for want sink main: map[]
+[RECONCILE:MEMORY] Dumping memory after initial load...
+📝 Want memory dumped to: memory/memory-20250930-215925.yaml
+📝 Latest memory also saved to: memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237165018156000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237165006938000
+[RECONCILE] Initial wants loaded, execution will be triggered by event system
+[RECONCILE] 3 idle wants detected, ensuring they start before waiting
+[TRIGGER] Processing trigger trigger-1759237165018156000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[RECONCILE:START] Started 3 wants directly
+[RECONCILE] Server mode: keeping reconcile loop running for API updates
+[RECONCILE] Memory dump completed successfully
+[RECONCILE] Execution completed
+[EXEC] Starting want queue main with 1 using, 1 outputs
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237165018156000
+[EXEC] Starting want sink main with 1 using, 0 outputs
+
+✅ Server running! Watch for [MONITOR] and [TRIGGER:PACKET] messages
+[EXEC] Starting want gen primary with 0 using, 1 outputs
+[GENERATOR] Generated 100 packets
+[EXEC] Want gen primary finished
+[QUEUE] Processed 100 packets, avg wait time: 0.001734
+[EXEC] Want queue main finished
+[MONITOR] Starting packet monitoring for completed want: queue main
+[SINK] Received 100 packets
+[EXEC] Want sink main finished
+[MONITOR] Starting packet monitoring for completed want: sink main
+[TRIGGER] Sent trigger trigger-1759237170009111000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237170009111000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237170009278000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237170009111000
+[TRIGGER] Processing trigger trigger-1759237170009278000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237170009278000
+[TRIGGER] Sent trigger trigger-1759237175008790000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237175008790000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237175009231000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237175008790000
+[TRIGGER] Processing trigger trigger-1759237175009231000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237175009231000
+[TRIGGER] Sent trigger trigger-1759237180009295000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237180009295000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237180009848000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237180009295000
+[TRIGGER] Processing trigger trigger-1759237180009848000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237180009848000
+[TRIGGER] Sent trigger trigger-1759237185009282000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237185009282000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237185009788000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237185009282000
+[TRIGGER] Processing trigger trigger-1759237185009788000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237185009788000
+[TRIGGER] Sent trigger trigger-1759237190009341000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237190009341000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237190009788000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237190009341000
+[TRIGGER] Processing trigger trigger-1759237190009788000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237190009788000
+[TRIGGER] Sent trigger trigger-1759237195008906000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237195008906000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237195009499000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237195008906000
+[TRIGGER] Processing trigger trigger-1759237195009499000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237195009499000
+[TRIGGER] Sent trigger trigger-1759237200010106000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237200010106000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237200010597000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237200010106000
+[TRIGGER] Processing trigger trigger-1759237200010597000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237200010597000
+[TRIGGER] Sent trigger trigger-1759237205009519000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237205009519000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237205009946000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237205009519000
+[TRIGGER] Processing trigger trigger-1759237205009946000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237205009946000
+[TRIGGER] Sent trigger trigger-1759237210009583000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237210009583000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237210009954000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237210009583000
+[TRIGGER] Processing trigger trigger-1759237210009954000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237210009954000
+[TRIGGER] Sent trigger trigger-1759237215009636000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237215009636000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237215010074000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237215009636000
+[TRIGGER] Processing trigger trigger-1759237215010074000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237215010074000
+[TRIGGER] Sent trigger trigger-1759237220008437000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237220008437000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237220008895000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237220008437000
+[TRIGGER] Processing trigger trigger-1759237220008895000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237220008895000
+[TRIGGER] Sent trigger trigger-1759237225008678000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237225008678000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237225009091000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237225008678000
+[TRIGGER] Processing trigger trigger-1759237225009091000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237225009091000
+[TRIGGER] Sent trigger trigger-1759237230007960000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237230007960000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237230008367000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237230007960000
+[TRIGGER] Processing trigger trigger-1759237230008367000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237230008367000
+[TRIGGER] Sent trigger trigger-1759237235009867000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237235009867000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237235010298000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237235009867000
+[TRIGGER] Processing trigger trigger-1759237235010298000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237235010298000
+[TRIGGER] Sent trigger trigger-1759237240009931000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237240009931000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237240010314000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237240009931000
+[TRIGGER] Processing trigger trigger-1759237240010314000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237240010314000
+[TRIGGER] Sent trigger trigger-1759237245009983000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237245009983000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237245010423000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237245009983000
+[TRIGGER] Processing trigger trigger-1759237245010423000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237245010423000
+[TRIGGER] Sent trigger trigger-1759237250010054000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237250010054000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237250010453000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237250010054000
+[TRIGGER] Processing trigger trigger-1759237250010453000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237250010453000
+[TRIGGER] Sent trigger trigger-1759237255008639000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237255008639000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237255009071000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237255008639000
+[TRIGGER] Processing trigger trigger-1759237255009071000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237255009071000
+[TRIGGER] Sent trigger trigger-1759237260010161000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237260010161000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237260010546000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237260010161000
+[TRIGGER] Processing trigger trigger-1759237260010546000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237260010546000
+[TRIGGER] Sent trigger trigger-1759237265010218000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237265010218000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237265010598000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237265010218000
+[TRIGGER] Processing trigger trigger-1759237265010598000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237265010598000
+[TRIGGER] Sent trigger trigger-1759237270009373000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237270009373000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237270009781000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237270009373000
+[TRIGGER] Processing trigger trigger-1759237270009781000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237270009781000
+[TRIGGER] Sent trigger trigger-1759237275010339000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237275010339000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237275010784000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237275010339000
+[TRIGGER] Processing trigger trigger-1759237275010784000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237275010784000
+[TRIGGER] Sent trigger trigger-1759237280008665000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237280008665000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237280009203000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237280008665000
+[TRIGGER] Processing trigger trigger-1759237280009203000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237280009203000
+[TRIGGER] Sent trigger trigger-1759237285010452000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237285010452000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237285010847000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237285010452000
+[TRIGGER] Processing trigger trigger-1759237285010847000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237285010847000
+[TRIGGER] Sent trigger trigger-1759237290010554000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237290010554000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237290010930000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237290010554000
+[TRIGGER] Processing trigger trigger-1759237290010930000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237290010930000
+[TRIGGER] Sent trigger trigger-1759237295009860000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237295009860000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237295010287000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237295009860000
+[TRIGGER] Processing trigger trigger-1759237295010287000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237295010287000
+[TRIGGER] Sent trigger trigger-1759237300010668000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237300010668000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237300011023000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237300010668000
+[TRIGGER] Processing trigger trigger-1759237300011023000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237300011023000
+[TRIGGER] Sent trigger trigger-1759237305009962000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237305009962000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237305010438000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237305010438000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237305010438000
+[TRIGGER] Successfully processed trigger trigger-1759237305009962000
+[TRIGGER] Sent trigger trigger-1759237310010746000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237310010746000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237310011122000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237310010746000
+[TRIGGER] Processing trigger trigger-1759237310011122000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237310011122000
+[TRIGGER] Sent trigger trigger-1759237315010804000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237315010804000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237315011213000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237315010804000
+[TRIGGER] Processing trigger trigger-1759237315011213000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237315011213000
+[TRIGGER] Sent trigger trigger-1759237320010872000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237320010872000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237320011235000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237320010872000
+[TRIGGER] Processing trigger trigger-1759237320011235000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237320011235000
+[TRIGGER] Sent trigger trigger-1759237325010393000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237325010393000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237325010901000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237325010393000
+[TRIGGER] Processing trigger trigger-1759237325010901000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237325010901000
+[TRIGGER] Sent trigger trigger-1759237330010987000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237330010987000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237330011150000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237330010987000
+[TRIGGER] Processing trigger trigger-1759237330011150000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237330011150000
+[TRIGGER] Sent trigger trigger-1759237335009726000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237335009726000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237335010176000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237335009726000
+[TRIGGER] Processing trigger trigger-1759237335010176000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237335010176000
+[TRIGGER] Sent trigger trigger-1759237340011139000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237340011139000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237340011572000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237340011139000
+[TRIGGER] Processing trigger trigger-1759237340011572000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237340011572000
+[TRIGGER] Sent trigger trigger-1759237345011155000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237345011155000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237345011499000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237345011155000
+[TRIGGER] Processing trigger trigger-1759237345011499000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237345011499000
+[TRIGGER] Sent trigger trigger-1759237350011217000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237350011217000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237350011610000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237350011217000
+[TRIGGER] Processing trigger trigger-1759237350011610000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237350011610000
+[TRIGGER] Sent trigger trigger-1759237355011120000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237355011120000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237355011533000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237355011120000
+[TRIGGER] Processing trigger trigger-1759237355011533000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237355011533000
+[TRIGGER] Sent trigger trigger-1759237360011333000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237360011333000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237360011769000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237360011333000
+[TRIGGER] Processing trigger trigger-1759237360011769000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237360011769000
+[TRIGGER] Sent trigger trigger-1759237365011390000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237365011390000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237365011851000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237365011390000
+[TRIGGER] Processing trigger trigger-1759237365011851000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237365011851000
+[TRIGGER] Sent trigger trigger-1759237370011451000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237370011451000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237370011905000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237370011905000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237370011905000
+[TRIGGER] Successfully processed trigger trigger-1759237370011451000
+[TRIGGER] Sent trigger trigger-1759237375011080000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237375011080000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237375011491000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237375011080000
+[TRIGGER] Processing trigger trigger-1759237375011491000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237375011491000
+[TRIGGER] Sent trigger trigger-1759237380010755000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237380010755000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237380011230000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237380010755000
+[TRIGGER] Processing trigger trigger-1759237380011230000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237380011230000
+[TRIGGER] Sent trigger trigger-1759237385011642000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237385011642000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237385011975000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237385011642000
+[TRIGGER] Processing trigger trigger-1759237385011975000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237385011975000
+[TRIGGER] Sent trigger trigger-1759237390010595000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237390010595000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237390010992000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237390010595000
+[TRIGGER] Processing trigger trigger-1759237390010992000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237390010992000
+[TRIGGER] Sent trigger trigger-1759237395011741000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237395011741000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237395012167000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237395012167000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237395012167000
+[TRIGGER] Successfully processed trigger trigger-1759237395011741000
+[TRIGGER] Sent trigger trigger-1759237400011808000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237400011808000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237400012244000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237400011808000
+[TRIGGER] Processing trigger trigger-1759237400012244000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237400012244000
+[TRIGGER] Sent trigger trigger-1759237405011856000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237405011856000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237405012298000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237405011856000
+[TRIGGER] Processing trigger trigger-1759237405012298000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237405012298000
+[TRIGGER] Sent trigger trigger-1759237410010324000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237410010324000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237410010715000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237410010324000
+[TRIGGER] Processing trigger trigger-1759237410010715000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237410010715000
+[TRIGGER] Sent trigger trigger-1759237415011977000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237415011977000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237415012387000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237415011977000
+[TRIGGER] Processing trigger trigger-1759237415012387000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237415012387000
+[TRIGGER] Sent trigger trigger-1759237420012036000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237420012036000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237420012386000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237420012036000
+[TRIGGER] Processing trigger trigger-1759237420012386000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237420012386000
+[TRIGGER] Sent trigger trigger-1759237425012093000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237425012093000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237425012526000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237425012093000
+[TRIGGER] Processing trigger trigger-1759237425012526000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237425012526000
+[TRIGGER] Sent trigger trigger-1759237430012159000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237430012159000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237430012569000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237430012159000
+[TRIGGER] Processing trigger trigger-1759237430012569000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237430012569000
+[TRIGGER] Sent trigger trigger-1759237435011525000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237435011525000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237435011648000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237435011525000
+[TRIGGER] Processing trigger trigger-1759237435011648000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237435011648000
+[TRIGGER] Sent trigger trigger-1759237440012308000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237440012308000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237440012739000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237440012308000
+[TRIGGER] Processing trigger trigger-1759237440012739000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237440012739000
+[TRIGGER] Sent trigger trigger-1759237445012343000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237445012343000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237445012826000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237445012343000
+[TRIGGER] Processing trigger trigger-1759237445012826000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237445012826000
+[TRIGGER] Sent trigger trigger-1759237450012359000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237450012359000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237450012495000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237450012359000
+[TRIGGER] Processing trigger trigger-1759237450012495000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237450012495000
+[TRIGGER] Sent trigger trigger-1759237455012463000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237455012463000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237455012896000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237455012463000
+[TRIGGER] Processing trigger trigger-1759237455012896000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237455012896000
+[TRIGGER] Sent trigger trigger-1759237460012568000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237460012568000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237460012988000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237460012568000
+[TRIGGER] Processing trigger trigger-1759237460012988000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237460012988000
+[TRIGGER] Sent trigger trigger-1759237465012593000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237465012593000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237465012995000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237465012995000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237465012995000
+[TRIGGER] Successfully processed trigger trigger-1759237465012593000
+[TRIGGER] Sent trigger trigger-1759237470012641000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237470012641000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237470013083000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237470012641000
+[TRIGGER] Processing trigger trigger-1759237470013083000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237470013083000
+[TRIGGER] Sent trigger trigger-1759237475011378000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237475011378000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237475011879000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237475011378000
+[TRIGGER] Processing trigger trigger-1759237475011879000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237475011879000
+[TRIGGER] Sent trigger trigger-1759237480012796000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237480012796000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237480013260000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237480012796000
+[TRIGGER] Processing trigger trigger-1759237480013260000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237480013260000
+[TRIGGER] Sent trigger trigger-1759237485010991000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237485010991000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237485011432000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237485011432000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237485011432000
+[TRIGGER] Successfully processed trigger trigger-1759237485010991000
+[TRIGGER] Sent trigger trigger-1759237490012871000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237490012871000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237490013302000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237490012871000
+[TRIGGER] Processing trigger trigger-1759237490013302000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237490013302000
+[TRIGGER] Sent trigger trigger-1759237495012984000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237495012984000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237495013444000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237495012984000
+[TRIGGER] Processing trigger trigger-1759237495013444000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237495013444000
+[TRIGGER] Sent trigger trigger-1759237500012994000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237500012994000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237500013373000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237500012994000
+[TRIGGER] Processing trigger trigger-1759237500013373000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237500013373000
+[TRIGGER] Sent trigger trigger-1759237505013097000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237505013097000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237505013514000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237505013097000
+[TRIGGER] Processing trigger trigger-1759237505013514000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237505013514000
+[TRIGGER] Sent trigger trigger-1759237510013149000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237510013149000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237510013549000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237510013149000
+[TRIGGER] Processing trigger trigger-1759237510013549000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237510013549000
+[TRIGGER] Sent trigger trigger-1759237519280792000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237519280792000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237519281134000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237519280792000
+[TRIGGER] Processing trigger trigger-1759237519281134000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237519281134000
+[TRIGGER] Sent trigger trigger-1759237524281271000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237524281271000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237524281714000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237524281271000
+[TRIGGER] Processing trigger trigger-1759237524281714000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237524281714000
+[TRIGGER] Sent trigger trigger-1759237529281488000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237529281488000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237529281890000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237529281890000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237529281890000
+[TRIGGER] Successfully processed trigger trigger-1759237529281488000
+[TRIGGER] Sent trigger trigger-1759237534280314000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237534280314000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237534280790000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237534280314000
+[TRIGGER] Processing trigger trigger-1759237534280790000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237534280790000
+[TRIGGER] Sent trigger trigger-1759237539281861000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237539281861000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237539282266000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237539281861000
+[TRIGGER] Processing trigger trigger-1759237539282266000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237539282266000
+[TRIGGER] Sent trigger trigger-1759237544281969000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237544281969000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237544282419000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237544281969000
+[TRIGGER] Processing trigger trigger-1759237544282419000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237544282419000
+[TRIGGER] Sent trigger trigger-1759237549282062000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237549282062000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237549282495000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237549282062000
+[TRIGGER] Processing trigger trigger-1759237549282495000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237549282495000
+[TRIGGER] Sent trigger trigger-1759237554282167000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237554282167000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237554282570000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237554282570000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237554282570000
+[TRIGGER] Successfully processed trigger trigger-1759237554282167000
+[TRIGGER] Sent trigger trigger-1759237559282211000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237559282211000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237559282623000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Processing trigger trigger-1759237559282623000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER] Successfully processed trigger trigger-1759237559282211000
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237559282623000
+[TRIGGER] Sent trigger trigger-1759237564282255000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237564282255000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237564282651000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237564282255000
+[TRIGGER] Processing trigger trigger-1759237564282651000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237564282651000
+[TRIGGER] Sent trigger trigger-1759237569282278000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237569282278000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237569282688000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237569282278000
+[TRIGGER] Processing trigger trigger-1759237569282688000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237569282688000
+[TRIGGER] Sent trigger trigger-1759237574282292000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237574282292000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237574282742000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237574282292000
+[TRIGGER] Processing trigger trigger-1759237574282742000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237574282742000
+[TRIGGER] Sent trigger trigger-1759237579282324000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237579282324000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237579282749000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237579282324000
+[TRIGGER] Processing trigger trigger-1759237579282749000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237579282749000
+[TRIGGER] Sent trigger trigger-1759237584282338000: scheduler -> system
+[TRIGGER] Processing trigger trigger-1759237584282338000: type=config_change, source=scheduler, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: periodic_check
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] No configuration changes detected
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759237584282716000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759237584282338000
+[TRIGGER] Processing trigger trigger-1759237584282716000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 0 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759237584282716000

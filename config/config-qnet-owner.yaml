@@ -1,0 +1,16 @@
+wants:
+  - metadata:
+      name: qnet-target
+      type: target
+      labels:
+        role: parent
+    spec:
+      params:
+        max_display: 1000
+        primary_count: 100
+        secondary_count: 100
+        primary_rate: 5.0
+        secondary_rate: 5.0
+        primary_service_time: 0.1
+        secondary_service_time: 0.1
+        final_service_time: 0.05

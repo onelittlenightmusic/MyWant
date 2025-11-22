@@ -1,0 +1,31 @@
+wants:
+  - metadata:
+      name: gen primary
+      type: qnet numbers
+      labels:
+        role: source
+    spec:
+      params:
+        count: 200
+        rate: 10
+
+  - metadata:
+      name: queue main
+      type: qnet queue
+      labels:
+        role: processor
+    spec:
+      params:
+        service_time: 0.05
+      using:
+        - role: source
+
+  - metadata:
+      name: sink main
+      type: qnet sink
+      labels:
+        role: collector
+    spec:
+      params: {}
+      using:
+        - role: processor

@@ -826,15 +826,13 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	// Search for the want by metadata.id across all executions using universal search
 	var targetExecution *WantExecution
 	var targetWantIndex int = -1
-	var executionID string
 	var foundWant *mywant.Want
 
-	for execID, execution := range s.wants {
+	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				targetExecution = execution
 				foundWant = want
-				executionID = execID
 				// Find the index in the original config for updating
 				for j, configWant := range execution.Config.Wants {
 					if configWant.Metadata.ID == wantID {
@@ -909,15 +907,9 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 	targetExecution.Status = "updated"
 
-	// Return the updated want, not the entire execution
-	response := &WantExecution{
-		ID:      executionID,
-		Config:  mywant.Config{Wants: []*mywant.Want{updatedWant}},
-		Status:  "updated",
-		Results: nil,
-	}
-
-	json.NewEncoder(w).Encode(response)
+	// Return the updated want directly (matching createWant response format)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updatedWant)
 }
 
 // deleteWant handles DELETE /api/v1/wants/{id} - deletes an individual want by its ID

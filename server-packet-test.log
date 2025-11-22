@@ -1,0 +1,134 @@
+🎯 QNet Target Want Demo with Dynamic Recipe Loading
+====================================================
+This demo shows a target want that dynamically generates
+other wants from the qnet-pipeline recipe at runtime.
+
+[VALIDATION] Config validated successfully against OpenAPI spec
+📝 Loaded 3 wants from configuration
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+[TRIGGER] Registered handler for trigger type: manual
+[TRIGGER] Registered handler for trigger type: monitor_alert
+[TRIGGER] Registered handler for trigger type: state_changed
+[TRIGGER] Registered handler for trigger type: config_change
+[TRIGGER] Registered handler for trigger type: scheduled
+[TRIGGER] Registered handler for trigger type: want_ready
+[TRIGGER] Registered handler for trigger type: packet_received
+[TRIGGER] Registered all default trigger handlers
+
+🚀 Executing target-based chain with dynamic recipe loading...
+The target want will:
+1. Load the qnet-pipeline recipe
+2. Dynamically create child wants (generators, queues, combiner, sink)
+3. Add owner references to all child wants
+4. Wait for all children to complete
+5. Compute aggregate results
+
+[RECONCILE] Starting reconcile loop execution
+[TRIGGER] Trigger manager started
+[TRIGGER] Started periodic reconciliation trigger
+[TRIGGER] Sent trigger trigger-1759183117021478000: system -> system
+[RECONCILE] Using event-driven execution system
+[CONTROL] Starting suspension control loop
+[TRIGGER] Processing trigger trigger-1759183117021478000: type=config_change, source=system, target=system
+[TRIGGER:CONFIG] Processing config change trigger
+[TRIGGER:CONFIG] Reconciling: initial_load
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Initial load: processing 3 wants
+[RECONCILE] Adding want: gen primary
+[RECONCILE] Recording initial parameter history for want gen primary: map[count:1000 rate:2]
+[RECONCILE] Adding want: queue main
+[RECONCILE] Recording initial parameter history for want queue main: map[service_time:0.05]
+[RECONCILE] Adding want: sink main
+[RECONCILE] Recording initial parameter history for want sink main: map[]
+[RECONCILE:MEMORY] Dumping memory after initial load...
+📝 Want memory dumped to: memory/memory-20250930-065837.yaml
+📝 Latest memory also saved to: memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Triggering execution of ready wants
+[TRIGGER] Sent trigger trigger-1759183117031375000: system -> all
+[RECONCILE:START] Triggered want execution via event system
+[RECONCILE] All phases completed successfully
+[TRIGGER] Successfully processed trigger trigger-1759183117021478000
+[TRIGGER] Processing trigger trigger-1759183117031375000: type=topology_ready, source=system, target=all
+[TRIGGER:EXEC] Processing execution trigger: type=topology_ready, target=all
+[TRIGGER:EXEC] Started 3 ready wants
+[TRIGGER] Successfully processed trigger trigger-1759183117031375000
+[EXEC] Starting want gen primary with 0 using, 1 outputs
+[EXEC] Starting want queue main with 1 using, 1 outputs
+[EXEC] Starting want sink main with 1 using, 0 outputs
+[RECONCILE] Initial wants loaded, execution will be triggered by event system
+[RECONCILE] Server mode: keeping reconcile loop running for API updates
+[RECONCILE] Memory dump completed successfully
+[RECONCILE] Execution completed
+
+📊 Final Want States:
+  gen primary: running (processed: 0)
+fatal error: concurrent map read and map write
+
+goroutine 1 [running]:
+internal/runtime/maps.fatal({0x10286ca06?, 0x1025548ac?})
+	/opt/homebrew/opt/go/libexec/src/runtime/panic.go:1058 +0x20
+main.main()
+	/Users/hiroyukiosaki/work/MyWant/engine/cmd/demos/demo_qnet_owner.go:66 +0x7f4
+
+goroutine 7 [select]:
+mywant/engine/src.(*ChainBuilder).controlLoop(0x14000137a40)
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:3597 +0x9c
+created by mywant/engine/src.(*ChainBuilder).startControlLoop in goroutine 1
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:3615 +0x5c
+
+goroutine 8 [select]:
+mywant/engine/src.(*TriggerManager).processTriggers(0x14000380440)
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:3401 +0x90
+created by mywant/engine/src.(*TriggerManager).Start in goroutine 1
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:3353 +0xac
+
+goroutine 9 [select]:
+mywant/engine/src.(*ChainBuilder).TriggerPeriodicReconcile.func1()
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:4106 +0xc0
+created by mywant/engine/src.(*ChainBuilder).TriggerPeriodicReconcile in goroutine 1
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:4101 +0x64
+
+goroutine 19 [runnable]:
+mywant/engine/cmd/types.(*Queue).Exec(0x140000b0000, {0x14000420028, 0x1, 0x32?}, {0x14000420030, 0x1, 0x3?})
+	/Users/hiroyukiosaki/work/MyWant/engine/cmd/types/qnet_types.go:326 +0x3f4
+mywant/engine/src.(*ChainBuilder).startWant.func1()
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2183 +0x248
+created by mywant/engine/src.(*ChainBuilder).startWant in goroutine 18
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2165 +0x5a8
+
+goroutine 20 [chan receive]:
+mywant/engine/cmd/types.(*Sink).Exec(0x140000b01e0, {0x14000420038?, 0x140002be7f4?, 0x32?}, {0x14000092f68?, 0x3?, 0x3?})
+	/Users/hiroyukiosaki/work/MyWant/engine/cmd/types/qnet_types.go:556 +0x38
+mywant/engine/src.(*ChainBuilder).startWant.func1()
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2183 +0x248
+created by mywant/engine/src.(*ChainBuilder).startWant in goroutine 18
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2165 +0x5a8
+
+goroutine 21 [chan send]:
+mywant/engine/cmd/types.(*Numbers).Exec(0x140000a8000, {0x1400005a030?, 0x140002be664?, 0x32?}, {0x14000420040, 0x1, 0x3?})
+	/Users/hiroyukiosaki/work/MyWant/engine/cmd/types/qnet_types.go:195 +0x390
+mywant/engine/src.(*ChainBuilder).startWant.func1()
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2183 +0x248
+created by mywant/engine/src.(*ChainBuilder).startWant in goroutine 18
+	/Users/hiroyukiosaki/work/MyWant/engine/src/declarative.go:2165 +0x5a8

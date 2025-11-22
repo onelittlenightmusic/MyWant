@@ -1,0 +1,479 @@
+[VALIDATION] Capability validated successfully against OpenAPI spec
+[VALIDATION] Capability validated successfully against OpenAPI spec
+[VALIDATION] Capability validated successfully against OpenAPI spec
+[VALIDATION] Agent validated successfully against OpenAPI spec
+[VALIDATION] Agent validated successfully against OpenAPI spec
+[VALIDATION] Agent validated successfully against OpenAPI spec
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+[SERVER] Loading 10 recipe files into registry...
+📝 Created recipe: 'Level 1 Approval'
+[SERVER] ✅ Loaded recipe: Level 1 Approval
+📝 Created recipe: 'Level 2 Approval'
+[SERVER] ✅ Loaded recipe: Level 2 Approval
+[SERVER] Warning: Failed to register recipe fibonacci-pipeline: recipe validation failed: recipe name is required
+📝 Created recipe: 'Fibonacci Sequence'
+[SERVER] ✅ Loaded recipe: Fibonacci Sequence
+[SERVER] Warning: Failed to register recipe prime-sieve: recipe validation failed: recipe name is required
+[SERVER] Warning: Failed to register recipe qnet-pipeline: recipe validation failed: recipe name is required
+📝 Created recipe: 'Queue System'
+[SERVER] ✅ Loaded recipe: Queue System
+📝 Created recipe: 'Travel Agent System'
+[SERVER] ✅ Loaded recipe: Travel Agent System
+📝 Created recipe: 'Travel Itinerary with Agents'
+[SERVER] ✅ Loaded recipe: Travel Itinerary with Agents
+📝 Created recipe: 'Travel Itinerary'
+[SERVER] ✅ Loaded recipe: Travel Itinerary
+[SERVER] Successfully loaded 7/10 recipe files
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+📊 Monitor want types registered
+[SERVER] Starting global reconcile loop for server mode...
+🚀 MyWant server starting on localhost:8080
+📋 Available endpoints:
+  GET  /health                        - Health check
+  POST /api/v1/configs               - Create config (YAML config with recipe reference)
+  POST /api/v1/wants                 - Create want (JSON/YAML want object)
+  GET  /api/v1/wants                 - List wants
+  GET  /api/v1/wants/{id}            - Get want
+  PUT  /api/v1/wants/{id}            - Update want (JSON/YAML want object)
+  DELETE /api/v1/wants/{id}          - Delete want
+  GET  /api/v1/wants/{id}/status     - Get execution status
+  GET  /api/v1/wants/{id}/results    - Get execution results
+  POST /api/v1/wants/{id}/suspend    - Suspend want execution
+  POST /api/v1/wants/{id}/resume     - Resume want execution
+  POST /api/v1/agents                - Create agent
+  GET  /api/v1/agents                - List agents
+  GET  /api/v1/agents/{name}         - Get agent
+  DELETE /api/v1/agents/{name}       - Delete agent
+  POST /api/v1/capabilities          - Create capability
+  GET  /api/v1/capabilities          - List capabilities
+  GET  /api/v1/capabilities/{name}   - Get capability
+  DELETE /api/v1/capabilities/{name} - Delete capability
+  GET  /api/v1/capabilities/{name}/agents - Find agents by capability
+  GET  /api/v1/errors              - List error history
+  GET  /api/v1/errors/{id}         - Get error details
+  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)
+  DELETE /api/v1/errors/{id}       - Delete error entry
+
+[RECONCILE] Starting reconcile loop execution (server mode: true)
+[RECONCILE] Server mode: reconcile loop running indefinitely
+[RECONCILE] Loading initial configuration
+[RECONCILE] Starting reconciliation with separated phases
+[CONTROL] Starting suspension control loop
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Initial load: processing 0 wants
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 0)
+[RECONCILE:CONNECT] Processed 0 Target wants for subscription building
+[RECONCILE:CONNECT] Topology established: 0 channels created
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Started 0 wants
+[RECONCILE] All phases completed successfully
+[LIST_WANTS] Processing 0 executions
+[LIST_WANTS] After deduplication: 0 unique wants
+[LIST_WANTS] Processing 0 executions
+[LIST_WANTS] After deduplication: 0 unique wants
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+📊 Monitor want types registered
+🎯 Creating custom target type: 'wait time in queue system' - Queue system simulation with wait time analysis
+[RECONCILE] Adding want: qnet-test1
+🎯 Creating custom target type: 'wait time in queue system' - Queue system simulation with wait time analysis
+[RECONCILE] Recording initial parameter history for want qnet-test1: map[count:1000 deterministic:false prefix:qnet primary_count:100 rate:10 service_time:0.05]
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Initial load: processing 1 wants
+[RECONCILE:MEMORY] Dumping memory after initial load...
+📝 Want memory dumped to: engine/memory/memory-20251003-001616.yaml
+📝 Latest memory also saved to: engine/memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 1)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 0)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[]
+[RECONCILE:CONNECT] Processed 1 Target wants for subscription building
+[RECONCILE:CONNECT] Topology established: 0 channels created
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Started 1 wants
+[RECONCILE] All phases completed successfully
+[SERVER] Added want want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 to global builder, reconcile loop will process it
+[EXEC] Starting want qnet-test1 with 0 using, 0 outputs
+🎯 Target qnet-test1: Managing child nodes with owner references
+🎯 Target qnet-test1: Creating child wants dynamically...
+[VALIDATION] Recipe validated successfully against OpenAPI spec
+✅ Target qnet-test1: Successfully loaded recipe recipes/queue-system.yaml with 3 child wants
+🔧 Adding child want: qnet-test1-qnet numbers-1 (type: qnet numbers)
+🔧 Adding child want: qnet-test1-qnet queue-2 (type: qnet queue)
+🔧 Adding child want: qnet-test1-qnet sink-3 (type: qnet sink)
+[RECONCILE] Adding want: qnet-test1-qnet numbers-1
+[RECONCILE] Recording initial parameter history for want qnet-test1-qnet numbers-1: map[count:1000 deterministic:false rate:10]
+[RECONCILE] Adding want: qnet-test1-qnet queue-2
+[RECONCILE] Recording initial parameter history for want qnet-test1-qnet queue-2: map[deterministic:false service_time:0.05]
+[RECONCILE] Adding want: qnet-test1-qnet sink-3
+[RECONCILE] Recording initial parameter history for want qnet-test1-qnet sink-3: map[display_format:Number: %d]
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Processing 3 configuration changes
+[RECONCILE:COMPILE] Adding want: qnet-test1-qnet sink-3
+[RECONCILE:COMPILE] Adding want: qnet-test1-qnet queue-2
+[RECONCILE:COMPILE] Adding want: qnet-test1-qnet numbers-1
+[RECONCILE:MEMORY] Dumping memory after want changes...
+📝 Want memory dumped to: engine/memory/memory-20251003-001616.yaml
+📝 Latest memory also saved to: engine/memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 4)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[count:[qnet-test1-qnet numbers-1] deterministic:[qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2] rate:[qnet-test1-qnet numbers-1] service_time:[qnet-test1-qnet queue-2]]
+[RECONCILE:CONNECT] Processed 1 Target wants for subscription building
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Started 3 wants
+[RECONCILE] All phases completed successfully
+🔧 Rebuilding connections with dynamic wants...
+[RECONCILE] rebuildConnections() is deprecated, use connectPhase()
+[EXEC] Starting want qnet-test1-qnet queue-2 with 1 using, 1 outputs
+[EXEC] Starting want qnet-test1-qnet sink-3 with 1 using, 0 outputs
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 4)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[EXEC] Starting want qnet-test1-qnet numbers-1 with 0 using, 1 outputs
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[count:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] deterministic:[qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2] rate:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] service_time:[qnet-test1-qnet queue-2 qnet-test1-qnet queue-2]]
+[RECONCILE:CONNECT] Processed 1 Target wants for subscription building
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Started 0 wants
+🎯 Target qnet-test1: Waiting for all child wants to complete...
+[GENERATOR] Generated 1000 packets
+[EXEC] Want qnet-test1-qnet numbers-1 finished
+[QUEUE] Processed 1000 packets, avg wait time: 0.022853
+[EXEC] Want qnet-test1-qnet queue-2 finished
+[SINK] Received 1000 packets
+[EXEC] Want qnet-test1-qnet sink-3 finished
+🎯 All children of target qnet-test1 have completed, notifying...
+🎯 Target qnet-test1: All child wants completed, computing result...
+🧮 Target qnet-test1: Found 6 child wants for recipe-defined result computation
+⚠️  Target qnet-test1: Want 'queue' not found for result computation
+✅ Target qnet-test1: Primary result (.average_wait_time from queue): 0
+⚠️  Target qnet-test1: Want 'numbers' not found for result computation
+📊 Target qnet-test1: Metric Items generated (.total_processed from numbers): 0
+⚠️  Target qnet-test1: Want 'queue' not found for result computation
+📊 Target qnet-test1: Metric All metrics from queue system (. from queue): 0
+✅ Target qnet-test1: Recipe-defined result computation completed
+🎯 Target qnet-test1: Result computed, target finishing
+[EXEC] Want qnet-test1 finished
+[LIST_WANTS] Processing 1 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 4 wants
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] After deduplication: 4 unique wants
+[LIST_WANTS] Processing 1 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 4 wants
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] After deduplication: 4 unique wants
+🔍 Scanning 10 recipes for custom types...
+🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+🎯 Registered custom target type: 'level 1 approval'
+🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+🎯 Registered custom target type: 'level 2 approval'
+🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+🎯 Registered custom target type: 'fibonacci sequence'
+🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+🎯 Registered custom target type: 'wait time in queue system'
+🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+🎯 Registered custom target type: 'agent travel system'
+🎯 Found custom type 'agent travel itinerary planner' in recipe travel-itinerary-agent.yaml
+🎯 Registered custom target type: 'agent travel itinerary planner'
+🎯 Found custom type 'travel itinerary planner' in recipe travel-itinerary.yaml
+🎯 Registered custom target type: 'travel itinerary planner'
+✅ Registered 7 custom types from recipes
+📊 Monitor want types registered
+🎯 Creating custom target type: 'wait time in queue system' - Queue system simulation with wait time analysis
+[RECONCILE] Adding want: qnet-test2
+🎯 Creating custom target type: 'wait time in queue system' - Queue system simulation with wait time analysis
+[RECONCILE] Recording initial parameter history for want qnet-test2: map[count:1000 deterministic:false prefix:qnet primary_count:50 rate:10 service_time:0.05]
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Processing 1 configuration changes
+[RECONCILE:COMPILE] Adding want: qnet-test2
+[RECONCILE:MEMORY] Dumping memory after want changes...
+📝 Want memory dumped to: engine/memory/memory-20251003-001626.yaml
+📝 Latest memory also saved to: engine/memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 5)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[count:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] deterministic:[qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2] rate:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] service_time:[qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2]]
+[RECONCILE:CONNECT] Found Target want: qnet-test2 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 0)
+[RECONCILE:CONNECT] Target qnet-test2: Built parameter subscriptions: map[]
+[RECONCILE:CONNECT] Processed 2 Target wants for subscription building
+[RECONCILE:CONNECT] Topology established: 2 channels created
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Started 1 wants
+[RECONCILE] All phases completed successfully
+[SERVER] Added want want-5b393004-7271-410f-95a0-9751ee5d3dd9 to global builder, reconcile loop will process it
+[EXEC] Starting want qnet-test2 with 0 using, 0 outputs
+🎯 Target qnet-test2: Managing child nodes with owner references
+🎯 Target qnet-test2: Creating child wants dynamically...
+[VALIDATION] Recipe validated successfully against OpenAPI spec
+✅ Target qnet-test2: Successfully loaded recipe recipes/queue-system.yaml with 3 child wants
+🔧 Adding child want: qnet-test2-qnet numbers-1 (type: qnet numbers)
+🔧 Adding child want: qnet-test2-qnet queue-2 (type: qnet queue)
+🔧 Adding child want: qnet-test2-qnet sink-3 (type: qnet sink)
+[RECONCILE] Adding want: qnet-test2-qnet numbers-1
+[RECONCILE] Recording initial parameter history for want qnet-test2-qnet numbers-1: map[count:1000 deterministic:false rate:10]
+[RECONCILE] Adding want: qnet-test2-qnet queue-2
+[RECONCILE] Recording initial parameter history for want qnet-test2-qnet queue-2: map[deterministic:false service_time:0.05]
+[RECONCILE] Adding want: qnet-test2-qnet sink-3
+[RECONCILE] Recording initial parameter history for want qnet-test2-qnet sink-3: map[display_format:Number: %d]
+[RECONCILE] Starting reconciliation with separated phases
+[RECONCILE:COMPILE] Loading and validating configuration
+[RECONCILE:COMPILE] Processing 3 configuration changes
+[RECONCILE:COMPILE] Adding want: qnet-test2-qnet sink-3
+[RECONCILE:COMPILE] Adding want: qnet-test2-qnet queue-2
+[RECONCILE:COMPILE] Adding want: qnet-test2-qnet numbers-1
+[RECONCILE:MEMORY] Dumping memory after want changes...
+📝 Want memory dumped to: engine/memory/memory-20251003-001626.yaml
+📝 Latest memory also saved to: engine/memory/memory-0000-latest.yaml
+[RECONCILE:COMPILE] Configuration compilation completed
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 8)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[count:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] deterministic:[qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2] rate:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] service_time:[qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2]]
+[RECONCILE:CONNECT] Found Target want: qnet-test2 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test2: Built parameter subscriptions: map[count:[qnet-test2-qnet numbers-1] deterministic:[qnet-test2-qnet numbers-1 qnet-test2-qnet queue-2] rate:[qnet-test2-qnet numbers-1] service_time:[qnet-test2-qnet queue-2]]
+[RECONCILE:CONNECT] Processed 2 Target wants for subscription building
+[RECONCILE] Connect phase failed: connectivity validation failed: validation failed for want qnet-test1-qnet queue-2: want queue allows max 1 using, got 2
+🔧 Rebuilding connections with dynamic wants...
+[RECONCILE] rebuildConnections() is deprecated, use connectPhase()
+[RECONCILE:CONNECT] Establishing want topology
+[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants
+[RECONCILE:AUTOCONNECT] Processed auto-connections for 0 RecipeAgent wants
+[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: 8)
+[RECONCILE:CONNECT] Found Target want: qnet-test1 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test1: Child qnet-test1-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test1: Built parameter subscriptions: map[count:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] deterministic:[qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2 qnet-test1-qnet numbers-1 qnet-test1-qnet queue-2] rate:[qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1 qnet-test1-qnet numbers-1] service_time:[qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2 qnet-test1-qnet queue-2]]
+[RECONCILE:CONNECT] Found Target want: qnet-test2 (RecipePath: recipes/queue-system.yaml, has loader: true, children: 3)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter count (as count)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter rate (as rate)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet numbers-1 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet queue-2 subscribes to parameter service_time (as service_time)
+[RECONCILE:CONNECT] Target qnet-test2: Child qnet-test2-qnet queue-2 subscribes to parameter deterministic (as deterministic)
+[RECONCILE:CONNECT] Target qnet-test2: Built parameter subscriptions: map[count:[qnet-test2-qnet numbers-1 qnet-test2-qnet numbers-1] deterministic:[qnet-test2-qnet numbers-1 qnet-test2-qnet queue-2 qnet-test2-qnet numbers-1 qnet-test2-qnet queue-2] rate:[qnet-test2-qnet numbers-1 qnet-test2-qnet numbers-1] service_time:[qnet-test2-qnet queue-2 qnet-test2-qnet queue-2]]
+[RECONCILE:CONNECT] Processed 2 Target wants for subscription building
+[RECONCILE] Connection rebuild failed: connectivity validation failed: validation failed for want qnet-test1-qnet queue-2: want queue allows max 1 using, got 2
+[RECONCILE:START] Launching new and updated wants
+[RECONCILE:START] Restarting completed want qnet-test1-qnet queue-2 (upstream has new data)
+[RECONCILE:START] Restarting completed want qnet-test1-qnet sink-3 (upstream has new data)
+[RECONCILE:START] Started 5 wants
+🎯 Target qnet-test2: Waiting for all child wants to complete...
+[EXEC] Starting want qnet-test1-qnet sink-3 with 1 using, 0 outputs
+[EXEC] Starting want qnet-test2-qnet numbers-1 with 0 using, 0 outputs
+[EXEC] Starting want qnet-test2-qnet queue-2 with 0 using, 0 outputs
+[EXEC] Want qnet-test2-qnet queue-2 finished
+[EXEC] Starting want qnet-test1-qnet queue-2 with 1 using, 1 outputs
+[EXEC] Starting want qnet-test2-qnet sink-3 with 0 using, 0 outputs
+[EXEC] Want qnet-test2-qnet sink-3 finished
+[EXEC] Want qnet-test2-qnet numbers-1 finished
+🎯 All children of target qnet-test2 have completed, notifying...
+🎯 Target qnet-test2: All child wants completed, computing result...
+🧮 Target qnet-test2: Found 6 child wants for recipe-defined result computation
+⚠️  Target qnet-test2: Want 'queue' not found for result computation
+✅ Target qnet-test2: Primary result (.average_wait_time from queue): 0
+⚠️  Target qnet-test2: Want 'numbers' not found for result computation
+📊 Target qnet-test2: Metric Items generated (.total_processed from numbers): 0
+⚠️  Target qnet-test2: Want 'queue' not found for result computation
+📊 Target qnet-test2: Metric All metrics from queue system (. from queue): 0
+✅ Target qnet-test2: Recipe-defined result computation completed
+🎯 Target qnet-test2: Result computed, target finishing
+[EXEC] Want qnet-test2 finished
+[LIST_WANTS] Processing 2 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 8 wants
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Execution want-5b393004-7271-410f-95a0-9751ee5d3dd9 has 8 wants
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] After deduplication: 8 unique wants
+[LIST_WANTS] Processing 2 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 8 wants
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Execution want-5b393004-7271-410f-95a0-9751ee5d3dd9 has 8 wants
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] After deduplication: 8 unique wants
+[LIST_WANTS] Processing 2 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 8 wants
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Execution want-5b393004-7271-410f-95a0-9751ee5d3dd9 has 8 wants
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] After deduplication: 8 unique wants
+[LIST_WANTS] Processing 2 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 8 wants
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Execution want-5b393004-7271-410f-95a0-9751ee5d3dd9 has 8 wants
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] After deduplication: 8 unique wants
+[LIST_WANTS] Processing 2 executions
+[LIST_WANTS] Execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4 has 8 wants
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-c5a5ea3e-e933-4c52-b060-188f3b0bd6f4
+[LIST_WANTS] Execution want-5b393004-7271-410f-95a0-9751ee5d3dd9 has 8 wants
+[LIST_WANTS] Adding want qnet-test1-qnet numbers-1 (ID: want-5efc4be4-4f34-43f4-8e11-bc11537dae48) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet queue-2 (ID: want-8a7c73b2-7618-4ff2-aaa0-e073308fe8e3) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1-qnet sink-3 (ID: want-dc581087-9f84-468b-9f9e-288c8d92653a) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2 (ID: want-9bd4fa01-820f-490f-9b75-2f9452e0818e) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet numbers-1 (ID: want-94c861a9-7eed-4d61-9e4b-4f4f1abb4712) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet queue-2 (ID: want-925a86ef-28b4-42bd-955b-7112444a8fcd) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test2-qnet sink-3 (ID: want-a6aacebc-d19f-4627-905a-f46a24162c90) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] Adding want qnet-test1 (ID: want-ccb8bddd-4463-4a04-ab8b-2f98dd01c50c) from execution want-5b393004-7271-410f-95a0-9751ee5d3dd9
+[LIST_WANTS] After deduplication: 8 unique wants
