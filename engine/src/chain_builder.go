@@ -1435,7 +1435,9 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	return nil, "", false
 }
 
-// UpdateWant updates an existing want in place and restarts execution
+// UpdateWant updates an existing want's configuration (params, labels, using fields, etc.)
+// Automatically triggers reconciliation to process topology changes
+// Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	// Find the existing want by metadata.id using universal search
 	existingWant, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
