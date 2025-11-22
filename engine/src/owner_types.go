@@ -608,6 +608,27 @@ func (oaw *OwnerAwareWant) Exec() bool {
 	}
 }
 
+// BeginExecCycle delegates to the stored Want to start batching state changes
+func (oaw *OwnerAwareWant) BeginExecCycle() {
+	if oaw.Want != nil {
+		oaw.Want.BeginExecCycle()
+	}
+}
+
+// EndExecCycle delegates to the stored Want to commit batched state changes
+func (oaw *OwnerAwareWant) EndExecCycle() {
+	if oaw.Want != nil {
+		oaw.Want.EndExecCycle()
+	}
+}
+
+// SetPaths delegates to the stored Want to set input/output paths
+func (oaw *OwnerAwareWant) SetPaths(inPaths []PathInfo, outPaths []PathInfo) {
+	if oaw.Want != nil {
+		oaw.Want.SetPaths(inPaths, outPaths)
+	}
+}
+
 // Channel delegation methods for OwnerAwareWant
 // These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
 

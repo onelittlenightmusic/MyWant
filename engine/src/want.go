@@ -236,6 +236,14 @@ func (n *Want) EndExecCycle() {
 	}
 
 	// Handle state changes
+	n.stateMutex.Lock()
+	changeCount := len(n.pendingStateChanges)
+	n.stateMutex.Unlock()
+
+	if changeCount > 0 {
+		DebugLog("[STATE:HISTORY] %s: EndExecCycle processing %d pending state changes\n", n.Metadata.Name, changeCount)
+	}
+
 	n.AggregateChanges()
 
 	n.inExecCycle = false
