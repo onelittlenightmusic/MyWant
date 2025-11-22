@@ -112,15 +112,6 @@ func (f *PrimeSequence) Exec() bool {
 		return true
 	}
 
-	// Check if already completed using persistent state
-	completed, _ := f.GetStateBool("completed", false)
-	if completed {
-		return true
-	}
-
-	// Mark as completed in persistent state
-	f.StoreState("completed", true)
-
 	var out Chan
 	if f.paths.GetOutCount() > 0 {
 		out, _ = f.GetOutputChannel(0)
@@ -241,15 +232,6 @@ func (s *PrimeSink) Exec() bool {
 	if !connectionAvailable {
 		return true
 	}
-
-	// Check if already completed using persistent state
-	completed, _ := s.GetStateBool("completed", false)
-	if completed {
-		return true
-	}
-
-	// Mark as completed in persistent state
-	s.StoreState("completed", true)
 
 	// Use persistent state for received count
 	received, _ := s.State["received"].(int)
