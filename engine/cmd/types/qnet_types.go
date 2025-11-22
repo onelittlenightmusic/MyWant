@@ -461,11 +461,19 @@ func (s *Sink) Exec() bool {
 		return true
 	}
 
+	// Check if already completed using persistent state
+	completed, _ := s.GetStateBool("completed", false)
+	if completed {
+		return true
+	}
+
 	// Block waiting for data from using channel
 	packet := (<-in).(QueuePacket)
 
 	// Check for termination packet
 	if packet.IsEnded() {
+		// Mark as completed in persistent state
+		s.StoreState("completed", true)
 		// Trigger OnEnded callback
 		if err := s.OnEnded(&packet); err != nil {
 			fmt.Printf("[SINK] OnEnded callback error: %v\n", err)
