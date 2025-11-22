@@ -117,6 +117,15 @@ func (f *FibonacciSequence) Exec() bool {
 		return true
 	}
 
+	// Check if already completed using persistent state
+	completed, _ := f.GetStateBool("completed", false)
+	if completed {
+		return true
+	}
+
+	// Mark as completed in persistent state
+	f.StoreState("completed", true)
+
 	// Get persistent filtered slice or create new one
 	filtered, _ := f.State["filtered"].([]int)
 	if filtered == nil {
