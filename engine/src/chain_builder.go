@@ -285,22 +285,20 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 	paths := pathMap[wantName]
 
 	// Check if this is an enhanced want that has connectivity requirements
-	if w, ok := want.function.(*Want); ok {
-		meta := w.GetConnectivityMetadata()
+	meta := want.want.GetConnectivityMetadata()
 
-		inCount := len(paths.In)
-		outCount := len(paths.Out)
+	inCount := len(paths.In)
+	outCount := len(paths.Out)
 
-		// For all wants, enforce normal connectivity requirements
-		// If want has required inputs, check if they're satisfied
-		if meta.RequiredInputs > 0 && inCount < meta.RequiredInputs {
-			return false
-		}
+	// For all wants, enforce normal connectivity requirements
+	// If want has required inputs, check if they're satisfied
+	if meta.RequiredInputs > 0 && inCount < meta.RequiredInputs {
+		return false
+	}
 
-		// If want has required outputs, check if they're satisfied
-		if meta.RequiredOutputs > 0 && outCount < meta.RequiredOutputs {
-			return false
-		}
+	// If want has required outputs, check if they're satisfied
+	if meta.RequiredOutputs > 0 && outCount < meta.RequiredOutputs {
+		return false
 	}
 
 	return true
@@ -1068,6 +1066,7 @@ func (cb *ChainBuilder) startPhase() {
 						wantName, meta.WantType, inCount, outCount)
 				} else {
 					DebugLog("[RECONCILE:START] Starting idle want %s (non-enhanced, no connectivity check)\n", wantName)
+				continue
 				}
 
 				cb.startWant(wantName, want)
