@@ -7,7 +7,7 @@ import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
-import { stringifyYaml, validateYaml } from '@/utils/yaml';
+import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import {
   DetailsSidebar,
   TabContent,
@@ -117,7 +117,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   };
 
   const handleSaveConfig = async () => {
-    if (!want || !editedConfig) return;
+    if (!want || !editedConfig || !selectedWantDetails) return;
 
     const wantId = want.metadata?.id || want.id;
     if (!wantId) return;
@@ -126,10 +126,29 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     setUpdateError(null);
 
     try {
-      // Parse YAML to want object
-      const yamlValidation = validateYaml(editedConfig);
+      // Get the want type
+      const wantType = selectedWantDetails.metadata?.type;
+      if (!wantType) {
+        setUpdateError('Cannot determine want type');
+        setUpdateLoading(false);
+        return;
+      }
+
+      // Fetch want type specification from backend
+      const specResponse = await fetch(`http://localhost:8080/api/v1/want-types/${wantType}`);
+      let spec: WantTypeDefinition | undefined;
+
+      if (specResponse.ok) {
+        spec = await specResponse.json();
+      }
+
+      // Validate YAML against spec (or just basic validation if spec not available)
+      const yamlValidation = spec
+        ? validateYamlWithSpec(editedConfig, wantType, spec)
+        : validateYaml(editedConfig);
+
       if (!yamlValidation.isValid) {
-        setUpdateError(`Invalid YAML: ${yamlValidation.error}`);
+        setUpdateError(yamlValidation.error || 'Invalid YAML');
         setUpdateLoading(false);
         return;
       }
