@@ -40,8 +40,8 @@ func (g *PrimeNumbers) Exec() bool {
 	completed, _ := g.GetStateBool("completed", false)
 
 	// Validate output channel is available
-	out, skipExec := g.GetFirstOutputChannel()
-	if skipExec {
+	out, connectionAvailable := g.GetFirstOutputChannel()
+	if !connectionAvailable {
 		return true
 	}
 
@@ -107,8 +107,8 @@ func (f *PrimeSequence) GetWant() interface{} {
 func (f *PrimeSequence) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	// Note: prime parameter available but not used in current implementation
-	in, skipExec := f.GetFirstInputChannel()
-	if skipExec {
+	in, connectionAvailable := f.GetFirstInputChannel()
+	if !connectionAvailable {
 		return true
 	}
 
@@ -228,8 +228,8 @@ func (s *PrimeSink) GetWant() interface{} {
 // Exec returns the generalized chain function for the sink
 func (s *PrimeSink) Exec() bool {
 	// Validate input channel is available
-	in, skipExec := s.GetFirstInputChannel()
-	if skipExec {
+	in, connectionAvailable := s.GetFirstInputChannel()
+	if !connectionAvailable {
 		return true
 	}
 

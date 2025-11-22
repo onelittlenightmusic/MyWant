@@ -55,8 +55,8 @@ func (g *SeedNumbers) Exec() bool {
 	completed, _ := g.GetStateBool("completed", false)
 
 	// Validate output channel is available
-	out, skipExec := g.GetFirstOutputChannel()
-	if skipExec {
+	out, connectionAvailable := g.GetFirstOutputChannel()
+	if !connectionAvailable {
 		return true
 	}
 

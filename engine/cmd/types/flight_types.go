@@ -156,8 +156,8 @@ func (f *FlightWant) Exec() bool {
 
 	duration := time.Duration(f.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
 
-	out, skipExec := f.GetFirstOutputChannel()
-	if skipExec {
+	out, connectionAvailable := f.GetFirstOutputChannel()
+	if !connectionAvailable {
 		return true
 	}
 

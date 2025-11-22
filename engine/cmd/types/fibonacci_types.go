@@ -35,8 +35,8 @@ func (g *FibonacciNumbers) Exec() bool {
 	completed, _ := g.GetStateBool("completed", false)
 
 	// Validate output channel is available
-	out, skipExec := g.GetFirstOutputChannel()
-	if skipExec {
+	out, connectionAvailable := g.GetFirstOutputChannel()
+	if !connectionAvailable {
 		return true
 	}
 
@@ -112,8 +112,8 @@ func (f *FibonacciSequence) Exec() bool {
 	maxValue := f.GetIntParam("max_value", 1000000)
 
 	// Validate input channel is available
-	in, skipExec := f.GetFirstInputChannel()
-	if skipExec {
+	in, connectionAvailable := f.GetFirstInputChannel()
+	if !connectionAvailable {
 		return true
 	}
 
