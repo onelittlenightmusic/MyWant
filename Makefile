@@ -403,7 +403,7 @@ restart-all:
 	@echo "🏗️  Building mock server..."
 	@$(MAKE) build-mock
 	@echo "🚀 Starting backend in background..."
-	@nohup ./bin/mywant 8080 localhost > ./logs/mywant-backend.log 2>&1 &
+	@nohup ./bin/mywant 8080 localhost debug > ./logs/mywant-backend.log 2>&1 &
 	@sleep 1
 	@echo "✅ Backend started (PID: $$(pgrep -f './bin/mywant'))"
 	@echo "✈️  Starting mock flight server in background..."
