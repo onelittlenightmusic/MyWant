@@ -250,32 +250,30 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 		paths := pathMap[wantName]
 
 		// Check if this is an enhanced want that has connectivity requirements
-		if w, ok := want.function.(*Want); ok {
-			meta := w.GetConnectivityMetadata()
+		meta := want.want.GetConnectivityMetadata()
 
-			inCount := len(paths.In)
-			outCount := len(paths.Out)
+		inCount := len(paths.In)
+		outCount := len(paths.Out)
 
-			// Store connectivity status for reconcile loop decision
-			// If required inputs not met, mark want as waiting for connections
-			if inCount < meta.RequiredInputs {
-				DebugLog("[RECONCILE:CONNECT] Want %s needs %d inputs but has %d (waiting for connections)",
-					wantName, meta.RequiredInputs, inCount)
-			}
-			if outCount < meta.RequiredOutputs {
-				DebugLog("[RECONCILE:CONNECT] Want %s needs %d outputs but has %d (waiting for connections)",
-					wantName, meta.RequiredOutputs, outCount)
-			}
+		// Store connectivity status for reconcile loop decision
+		// If required inputs not met, mark want as waiting for connections
+		if inCount < meta.RequiredInputs {
+			DebugLog("[RECONCILE:CONNECT] Want %s needs %d inputs but has %d (waiting for connections)",
+				wantName, meta.RequiredInputs, inCount)
+		}
+		if outCount < meta.RequiredOutputs {
+			DebugLog("[RECONCILE:CONNECT] Want %s needs %d outputs but has %d (waiting for connections)",
+				wantName, meta.RequiredOutputs, outCount)
+		}
 
-			// Validate constraints
-			if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-				DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d inputs but max is %d",
-					wantName, inCount, meta.MaxInputs)
-			}
-			if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-				DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d outputs but max is %d",
-					wantName, outCount, meta.MaxOutputs)
-			}
+		// Validate constraints
+		if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
+			DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d inputs but max is %d",
+				wantName, inCount, meta.MaxInputs)
+		}
+		if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
+			DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d outputs but max is %d",
+				wantName, outCount, meta.MaxOutputs)
 		}
 	}
 }
@@ -1095,17 +1093,15 @@ func (cb *ChainBuilder) startPhase() {
 			if want.want.GetStatus() == WantStatusIdle {
 				// Check if connectivity requirements are now met
 				paths := cb.pathMap[wantName]
-				if w, ok := want.function.(*Want); ok {
-					meta := w.GetConnectivityMetadata()
-					inCount := len(paths.In)
-					outCount := len(paths.Out)
+				meta := want.want.GetConnectivityMetadata()
+				inCount := len(paths.In)
+				outCount := len(paths.Out)
 
-					// Start if required connections are now available
-					if inCount >= meta.RequiredInputs && outCount >= meta.RequiredOutputs {
-						DebugLog("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
-						cb.startWant(wantName, want)
-						additionalStarted++
-					}
+				// Start if required connections are now available
+				if inCount >= meta.RequiredInputs && outCount >= meta.RequiredOutputs {
+					DebugLog("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
+					cb.startWant(wantName, want)
+					additionalStarted++
 				}
 			}
 		}
