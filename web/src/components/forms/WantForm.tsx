@@ -7,6 +7,7 @@ import { CreateSidebar } from '@/components/layout/CreateSidebar';
 import { YamlEditor } from './YamlEditor';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { useWantStore } from '@/stores/wantStore';
+import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { ApiError } from '@/types/api';
 
 interface WantFormProps {
@@ -142,16 +143,6 @@ const SAMPLE_CONFIGS = [
   }
 ];
 
-// Common want types and their default parameters
-const WANT_TYPES = [
-  { value: 'qnet numbers', label: 'Number Generator', defaultParams: { rate: 2.0, count: 100 } },
-  { value: 'qnet queue', label: 'Processing Queue', defaultParams: { service_time: 0.1 } },
-  { value: 'qnet sink', label: 'Result Collector', defaultParams: {} },
-  { value: 'sequence', label: 'Sequence Generator', defaultParams: { count: 10, rate: 1.0 } },
-  { value: 'travel_hotel', label: 'Hotel Booking', defaultParams: { hotel_type: 'luxury' } },
-  { value: 'travel_restaurant', label: 'Restaurant Booking', defaultParams: { restaurant_type: 'fine dining' } },
-  { value: 'dynamic travel change', label: 'Dynamic Travel Change', defaultParams: { prefix: 'dynamic-travel', display_name: 'Dynamic Travel Itinerary with Flight', flight_type: 'business class', departure_date: '2026-12-20', flight_duration: 12.0, restaurant_type: 'fine dining', hotel_type: 'luxury', buffet_type: 'international', dinner_duration: 2.0 } }
-];
 
 export const WantForm: React.FC<WantFormProps> = ({
   isOpen,
@@ -159,17 +150,18 @@ export const WantForm: React.FC<WantFormProps> = ({
   editingWant
 }) => {
   const { createWant, updateWant, loading, error } = useWantStore();
+  const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
 
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
-  const [showSamples, setShowSamples] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<ApiError | null>(null);
+  const [wantTypeLoading, setWantTypeLoading] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
-  const [type, setType] = useState('sequence');
+  const [type, setType] = useState('');
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
@@ -177,6 +169,13 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
+
+  // Fetch want types on component mount
+  useEffect(() => {
+    if (isOpen && wantTypes.length === 0) {
+      fetchWantTypes();
+    }
+  }, [isOpen, wantTypes.length, fetchWantTypes]);
 
   // Convert form data to want object
   const formToWantObject = () => ({
@@ -210,6 +209,13 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   }, [name, type, labels, params, using, recipe, editMode]);
 
+  // Initialize form when sidebar opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
   // Initialize form when editing
   useEffect(() => {
     if (editingWant) {
@@ -219,24 +225,21 @@ export const WantForm: React.FC<WantFormProps> = ({
         metadata: editingWant.metadata,
         spec: editingWant.spec
       }));
-    } else {
-      resetForm();
     }
   }, [editingWant]);
 
   const resetForm = () => {
     setIsEditing(false);
     setEditMode('form');
-    setShowSamples(false);
     setName('');
-    setType('sequence');
+    setType('');
     setLabels({});
-    setParams(WANT_TYPES[0].defaultParams);
+    setParams({});
     setUsing([]);
     setRecipe('');
     setYamlContent(stringifyYaml({
-      metadata: { name: '', type: 'sequence' },
-      spec: { params: WANT_TYPES[0].defaultParams }
+      metadata: { name: '', type: '' },
+      spec: {}
     }));
     setValidationError(null);
     setApiError(null);
@@ -250,31 +253,59 @@ export const WantForm: React.FC<WantFormProps> = ({
       // For multi-want configs, just load the YAML representation
       // This handles samples like "Hierarchical Approval" that deploy multiple wants at once
       setYamlContent(stringifyYaml(config));
-      setShowSamples(false);
       return;
     }
 
     // Single-want configuration handling
-    setName(config.metadata.name);
-    setType(config.metadata.type);
-    const labels = config.metadata.labels || {};
-    setLabels(Object.fromEntries(
-      Object.entries(labels).filter(([_, value]) => value !== undefined)
-    ));
-    setParams(config.spec.params ? {...config.spec.params} : {});
-    setUsing((config.spec as any).using || []);
-    setRecipe(config.spec.recipe || '');
+    if (config.metadata) {
+      setName(config.metadata.name);
+      setType(config.metadata.type);
+      const labels = config.metadata.labels || {};
+      setLabels(Object.fromEntries(
+        Object.entries(labels).filter(([_, value]) => value !== undefined)
+      ));
+    }
+    if (config.spec) {
+      setParams(config.spec.params ? {...config.spec.params} : {});
+      setUsing((config.spec as any).using || []);
+      setRecipe(config.spec.recipe || '');
+    }
     setYamlContent(stringifyYaml(config));
-    setShowSamples(false);
   };
 
-  // Update default params when type changes
+  // Update form when want type is selected
   useEffect(() => {
-    const selectedType = WANT_TYPES.find(t => t.value === type);
-    if (selectedType && !isEditing) {
-      setParams(selectedType.defaultParams);
+    if (type && !isEditing) {
+      setWantTypeLoading(true);
+      getWantType(type).finally(() => {
+        setWantTypeLoading(false);
+      });
     }
-  }, [type, isEditing]);
+  }, [type, isEditing, getWantType]);
+
+  // Populate parameters from want type examples when selectedWantType changes
+  useEffect(() => {
+    if (selectedWantType && !isEditing && type === selectedWantType.metadata.name) {
+      // Get the first example if available, use parameter examples otherwise
+      if (selectedWantType.examples && selectedWantType.examples.length > 0) {
+        const firstExample = selectedWantType.examples[0];
+        setParams(firstExample.params || {});
+      } else if (selectedWantType.parameters && selectedWantType.parameters.length > 0) {
+        // Fallback: use parameter examples
+        const paramsFromExamples: Record<string, unknown> = {};
+        selectedWantType.parameters.forEach(param => {
+          if (param.example !== undefined) {
+            paramsFromExamples[param.name] = param.example;
+          } else if (param.default !== undefined) {
+            paramsFromExamples[param.name] = param.default;
+          }
+        });
+        setParams(paramsFromExamples);
+      } else {
+        setParams({});
+      }
+    }
+  }, [selectedWantType, isEditing, type]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
@@ -506,15 +537,23 @@ export const WantForm: React.FC<WantFormProps> = ({
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             required
+            disabled={wantTypes.length === 0 || wantTypeLoading}
           >
-            {WANT_TYPES.map(wantType => (
-              <option key={wantType.value} value={wantType.value}>
-                {wantType.label}
+            <option value="">Select a want type...</option>
+            {wantTypes.map(wantType => (
+              <option key={wantType.name} value={wantType.name}>
+                {wantType.title} ({wantType.category})
               </option>
             ))}
           </select>
+          {wantTypeLoading && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+              Loading want type details...
+            </div>
+          )}
         </div>
 
         {/* Labels */}
@@ -571,45 +610,75 @@ export const WantForm: React.FC<WantFormProps> = ({
               type="button"
               onClick={addParam}
               className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+              disabled={!type}
             >
               <Plus className="w-4 h-4" />
               Add Parameter
             </button>
           </div>
+
+          {/* Parameter definitions hint from want type */}
+          {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm font-medium text-blue-900 mb-2">Available Parameters:</p>
+              <div className="space-y-1">
+                {selectedWantType.parameters.map((param) => (
+                  <div key={param.name} className="text-xs text-blue-800">
+                    <span className="font-medium">{param.name}</span>
+                    {param.required && <span className="text-red-600 ml-1">*</span>}
+                    <span className="text-blue-700 ml-1">({param.type})</span>
+                    {param.description && <span className="text-blue-600 ml-1">- {param.description}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             {Object.entries(params).map(([key, value], index) => (
-              <div key={index} className="flex gap-2">
-                <input
-                  type="text"
-                  value={key}
-                  onChange={(e) => {
-                    const newKey = e.target.value;
-                    const newParams = { ...params };
-                    if (key !== newKey) {
-                      delete newParams[key];
-                      if (newKey.trim()) {
-                        newParams[newKey] = value;
+              <div key={index} className="space-y-1">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={key}
+                    onChange={(e) => {
+                      const newKey = e.target.value;
+                      const newParams = { ...params };
+                      if (key !== newKey) {
+                        delete newParams[key];
+                        if (newKey.trim()) {
+                          newParams[newKey] = value;
+                        }
+                        setParams(newParams);
                       }
-                      setParams(newParams);
-                    }
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Parameter name"
-                />
-                <input
-                  type="text"
-                  value={String(value)}
-                  onChange={(e) => updateParam(key, e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Parameter value"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeParam(key)}
-                  className="text-red-600 hover:text-red-800 p-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Parameter name"
+                  />
+                  <input
+                    type="text"
+                    value={String(value)}
+                    onChange={(e) => updateParam(key, e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Parameter value"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeParam(key)}
+                    className="text-red-600 hover:text-red-800 p-2"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {/* Show parameter help text from want type definition */}
+                {selectedWantType && selectedWantType.parameters && (
+                  (() => {
+                    const paramDef = selectedWantType.parameters.find(p => p.name === key);
+                    return paramDef ? (
+                      <p className="text-xs text-gray-600 ml-3">{paramDef.description}</p>
+                    ) : null;
+                  })()
+                )}
               </div>
             ))}
           </div>
