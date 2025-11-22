@@ -900,9 +900,14 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
 	}
 
-	// Use ChainBuilder's UpdateWant API - let reconcile loop handle the rest
+	// Use ChainBuilder's UpdateWant API to update the want
 	if targetExecution.Builder != nil {
 		targetExecution.Builder.UpdateWant(updatedWant)
+
+		// Trigger reconciliation loop to process spec changes (labels, using fields, etc.)
+		if err := targetExecution.Builder.TriggerReconcile(); err != nil {
+			log.Printf("Warning: Failed to trigger reconciliation after want update: %v", err)
+		}
 	}
 
 	targetExecution.Status = "updated"
