@@ -892,6 +892,75 @@ func (t *TravelCoordinatorWant) Exec() bool {
 	return false
 }
 
+// BuffetCoordinatorWant is a minimal coordinator for standalone buffet deployment
+// It simply collects the buffet schedule from the BuffetWant and marks completion
+type BuffetCoordinatorWant struct {
+	Want
+	Description string
+}
+
+func NewBuffetCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
+	coordinator := &BuffetCoordinatorWant{
+		Want:        Want{},
+		Description: "Buffet coordinator",
+	}
+
+	// Initialize base Want fields
+	coordinator.Init(metadata, spec)
+
+	coordinator.Description = coordinator.GetStringParam("description", "Buffet coordinator")
+
+	// Set fields for base Want methods
+	coordinator.WantType = "buffet_coordinator"
+	coordinator.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  1,              // Expect buffet schedule input
+		RequiredOutputs: 0,              // No output, just collects data
+		MaxInputs:       1,
+		MaxOutputs:      0,
+		WantType:        "buffet_coordinator",
+		Description:     "Buffet schedule coordinator want",
+	}
+
+	return coordinator
+}
+
+func (b *BuffetCoordinatorWant) GetWant() *Want {
+	return &b.Want
+}
+
+func (b *BuffetCoordinatorWant) Exec() bool {
+	// Check if input channel is available
+	if b.GetInCount() < 1 {
+		// Input not connected yet, wait
+		return false
+	}
+
+	// Try to read buffet schedule from input
+	in, connectionAvailable := b.GetInputChannel(0)
+	if !connectionAvailable {
+		return false
+	}
+
+	// Use non-blocking read to collect schedule if available
+	select {
+	case schedData := <-in:
+		if schedule, ok := schedData.(*TravelSchedule); ok {
+			InfoLog("[BUFFET_COORDINATOR] Received buffet schedule with %d events\n", len(schedule.Events))
+
+			// Store the buffet schedule in state
+			b.StoreState("buffet_schedule", schedule)
+
+			// Mark completion
+			return true
+		}
+	default:
+		// No schedule available yet, try again later
+		return false
+	}
+
+	return false
+}
+
 // RegisterTravelWantTypes registers all travel-related want types
 func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("flight", NewFlightWant)
@@ -899,6 +968,7 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
 	builder.RegisterWantType("travel_coordinator", NewTravelCoordinatorWant)
+	builder.RegisterWantType("buffet_coordinator", NewBuffetCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
@@ -929,5 +999,9 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 
 	builder.RegisterWantType("travel_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewTravelCoordinatorWant(metadata, spec)
+	})
+
+	builder.RegisterWantType("buffet_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
+		return NewBuffetCoordinatorWant(metadata, spec)
 	})
 }
