@@ -38,7 +38,61 @@ MyWant is a Go library implementing functional chain programming patterns with c
 #### Want Types
 - **Independent Wants**: Execute in parallel without dependencies (travel planning)
 - **Dependent Wants**: Connected in pipelines using `using` selectors (queue systems)
-- **Coordinator Wants**: Orchestrate independent wants (travel_coordinator)
+- **Coordinator Wants**: Orchestrate independent wants
+  - `travel_coordinator`: Coordinates Restaurant, Hotel, Buffet wants
+  - `buffet_coordinator`: Minimal coordinator for standalone buffet deployment
+
+### Standalone Buffet Deployment with BuffetCoordinatorWant
+
+The `BuffetCoordinatorWant` enables deployment of buffet wants without requiring the full travel planning system:
+
+```json
+{
+  "wants": [
+    {
+      "metadata": {
+        "name": "buffet_standalone",
+        "type": "buffet",
+        "labels": {"role": "producer"}
+      },
+      "spec": {
+        "params": {
+          "buffet_type": "continental"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "buffet_coordinator",
+        "type": "buffet_coordinator",
+        "labels": {"role": "coordinator"}
+      },
+      "spec": {
+        "using": [{"role": "producer"}]
+      }
+    }
+  ]
+}
+```
+
+**How it works:**
+1. `buffet_coordinator` expects 1 input channel from the buffet want (matched by label selector `role: producer`)
+2. BuffetWant executes, generates a buffet schedule, and sends it through the output channel
+3. BuffetCoordinatorWant receives the schedule on its input channel
+4. When schedule is received, BuffetCoordinatorWant marks completion
+5. Schedule is stored in state for querying via `/api/v1/wants/{want_id}`
+
+**Why this matters:**
+- Previously, standalone buffet wants would stay in "idle" status with no driver
+- BuffetCoordinatorWant provides the minimal orchestration needed to trigger execution
+- Follows the same coordinator pattern as TravelCoordinatorWant for consistency
+- Reduces resource overhead compared to full travel system
+
+**Implementation details** (engine/cmd/types/travel_types.go:895-962):
+- Requires exactly 1 input connection
+- Non-blocking read from input channel (uses `select` with `default`)
+- Stores received schedule in want state
+- Returns `true` on completion, enabling status transition from "running" to "completed"
 
 ## Development Commands
 
