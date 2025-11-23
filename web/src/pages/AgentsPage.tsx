@@ -134,6 +134,13 @@ export const AgentsPage: React.FC = () => {
         onCreateWant={handleCreateAgent}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        title="Agents"
+        createButtonLabel="Create Agent"
+        itemCount={agents.length}
+        itemLabel="agent"
+        searchPlaceholder="Search agents by name, type, capabilities, or dependencies..."
+        onRefresh={() => fetchAgents()}
+        loading={loading}
       />
 
       {/* Main content area with sidebar-aware layout */}
