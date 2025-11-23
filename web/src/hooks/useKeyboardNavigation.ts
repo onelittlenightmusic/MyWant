@@ -90,16 +90,16 @@ export const useKeyboardNavigation = ({
       if (shouldNavigate) {
         onNavigate(newIndex);
 
-        // Use multiple animation frames to ensure React has fully updated the DOM
-        // and the browser has reflow/repaint cycle
+        // Use requestAnimationFrame and a small timeout to ensure React has fully updated the DOM
+        // before attempting to scroll. This prevents animation artifacts.
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
             if (selectedElement && selectedElement instanceof HTMLElement) {
-              // Use the native scrollIntoView method which handles both window and container scrolling
+              // Use 'center' to ensure the selected element is clearly visible in the center of the viewport
               selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-          });
+          }, 0);
         });
       }
     };
