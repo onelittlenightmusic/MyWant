@@ -331,9 +331,9 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
         )}
       </div>
 
-      {/* Control Panel Buttons */}
+      {/* Control Panel Buttons - Always Bottom Aligned */}
       {want && (
-        <div className="border-t border-gray-200 bg-blue-50 p-4 space-y-2">
+        <div className="flex-shrink-0 border-t border-gray-200 bg-blue-50 p-4 space-y-2">
           <div className="flex flex-col gap-2">
             <div className="flex gap-2">
               {/* Start */}
