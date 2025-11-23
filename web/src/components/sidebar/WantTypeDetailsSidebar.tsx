@@ -340,3 +340,4 @@ const ConstraintsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }
     )}
   </TabContent>
 );
+

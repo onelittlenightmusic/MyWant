@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X } from 'lucide-react';
-import { Want } from '@/types/want';
+import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -24,7 +24,7 @@ interface WantDetailsSidebarProps {
   want: Want | null;
   initialTab?: 'overview' | 'config' | 'logs' | 'agents';
   onWantUpdate?: () => void;
-  onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: string }) => void;
+  onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
 }
 
 type TabType = 'overview' | 'config' | 'logs' | 'agents';
@@ -185,13 +185,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       onHeaderStateChange?.({
         autoRefresh,
         loading,
-        status: selectedWantDetails.status
+        status: (selectedWantDetails.status as WantExecutionStatus) || 'created'
       });
     } else if (want) {
       onHeaderStateChange?.({
         autoRefresh,
         loading,
-        status: want.status
+        status: (want.status as WantExecutionStatus) || 'created'
       });
     }
   }, [autoRefresh, loading, want, selectedWantDetails, onHeaderStateChange]);

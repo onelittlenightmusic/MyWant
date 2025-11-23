@@ -194,19 +194,23 @@ export const WantGrid: React.FC<WantGridProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
       {filteredWants.map((want, index) => (
-        <WantCard
+        <div
           key={want.metadata?.id || `want-${index}`}
-          want={want}
-          children={want.children}
-          selected={selectedWant?.metadata?.id === want.metadata?.id}
-          selectedWant={selectedWant}
-          onView={onViewWant}
-          onViewAgents={onViewAgentsWant}
-          onEdit={onEditWant}
-          onDelete={onDeleteWant}
-          onSuspend={onSuspendWant}
-          onResume={onResumeWant}
-        />
+          data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
+        >
+          <WantCard
+            want={want}
+            children={want.children}
+            selected={selectedWant?.metadata?.id === want.metadata?.id}
+            selectedWant={selectedWant}
+            onView={onViewWant}
+            onViewAgents={onViewAgentsWant}
+            onEdit={onEditWant}
+            onDelete={onDeleteWant}
+            onSuspend={onSuspendWant}
+            onResume={onResumeWant}
+          />
+        </div>
       ))}
     </div>
   );

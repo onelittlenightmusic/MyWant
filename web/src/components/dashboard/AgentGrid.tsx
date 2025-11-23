@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { AgentResponse } from '@/types/agent';
 import { AgentCard } from './AgentCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -12,6 +12,7 @@ interface AgentGridProps {
   onViewAgent: (agent: AgentResponse) => void;
   onEditAgent: (agent: AgentResponse) => void;
   onDeleteAgent: (agent: AgentResponse) => void;
+  onGetFilteredAgents?: (agents: AgentResponse[]) => void;
 }
 
 export const AgentGrid: React.FC<AgentGridProps> = ({
@@ -22,7 +23,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   selectedAgent,
   onViewAgent,
   onEditAgent,
-  onDeleteAgent
+  onDeleteAgent,
+  onGetFilteredAgents
 }) => {
   const filteredAgents = useMemo(() => {
     return agents.filter(agent => {
@@ -56,6 +58,11 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
       return nameA.localeCompare(nameB);
     });
   }, [agents, searchQuery, typeFilters]);
+
+  // Notify parent of filtered agents for keyboard navigation
+  useEffect(() => {
+    onGetFilteredAgents?.(filteredAgents);
+  }, [filteredAgents, onGetFilteredAgents]);
 
   if (loading && agents.length === 0) {
     return (
@@ -121,14 +128,18 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
       {filteredAgents.map((agent, index) => (
-        <AgentCard
+        <div
           key={agent.name || `agent-${index}`}
-          agent={agent}
-          selected={selectedAgent?.name === agent.name}
-          onView={onViewAgent}
-          onEdit={onEditAgent}
-          onDelete={onDeleteAgent}
-        />
+          data-keyboard-nav-selected={selectedAgent?.name === agent.name}
+        >
+          <AgentCard
+            agent={agent}
+            selected={selectedAgent?.name === agent.name}
+            onView={onViewAgent}
+            onEdit={onEditAgent}
+            onDelete={onDeleteAgent}
+          />
+        </div>
       ))}
     </div>
   );

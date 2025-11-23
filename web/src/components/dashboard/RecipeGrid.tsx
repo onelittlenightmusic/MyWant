@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { GenericRecipe } from '@/types/recipe';
 import { RecipeCard } from './RecipeCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -12,6 +12,7 @@ interface RecipeGridProps {
   onEditRecipe: (recipe: GenericRecipe) => void;
   onDeleteRecipe: (recipe: GenericRecipe) => void;
   onSelectRecipe?: (recipe: GenericRecipe) => void;
+  onGetFilteredRecipes?: (recipes: GenericRecipe[]) => void;
 }
 
 export const RecipeGrid: React.FC<RecipeGridProps> = ({
@@ -22,7 +23,8 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
   onViewRecipe,
   onEditRecipe,
   onDeleteRecipe,
-  onSelectRecipe
+  onSelectRecipe,
+  onGetFilteredRecipes
 }) => {
   const filteredRecipes = useMemo(() => {
     return recipes.filter(recipe => {
@@ -49,6 +51,11 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
       return nameA.localeCompare(nameB);
     });
   }, [recipes, searchQuery]);
+
+  // Notify parent of filtered recipes for keyboard navigation
+  useEffect(() => {
+    onGetFilteredRecipes?.(filteredRecipes);
+  }, [filteredRecipes, onGetFilteredRecipes]);
 
   if (loading && recipes.length === 0) {
     return (
@@ -114,15 +121,19 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
       {filteredRecipes.map((recipe, index) => (
-        <RecipeCard
+        <div
           key={recipe.recipe.metadata.name || `recipe-${index}`}
-          recipe={recipe}
-          selected={selectedRecipe?.recipe.metadata.name === recipe.recipe.metadata.name}
-          onView={onViewRecipe}
-          onEdit={onEditRecipe}
-          onDelete={onDeleteRecipe}
-          onSelect={onSelectRecipe}
-        />
+          data-keyboard-nav-selected={selectedRecipe?.recipe.metadata.name === recipe.recipe.metadata.name}
+        >
+          <RecipeCard
+            recipe={recipe}
+            selected={selectedRecipe?.recipe.metadata.name === recipe.recipe.metadata.name}
+            onView={onViewRecipe}
+            onEdit={onEditRecipe}
+            onDelete={onDeleteRecipe}
+            onSelect={onSelectRecipe}
+          />
+        </div>
       ))}
     </div>
   );
