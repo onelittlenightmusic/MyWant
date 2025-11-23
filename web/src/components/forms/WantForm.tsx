@@ -438,26 +438,32 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   if (!isOpen) return null;
 
+  const headerAction = (
+    <button
+      type="submit"
+      disabled={loading}
+      form="want-form"
+      className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+    >
+      {loading ? (
+        <LoadingSpinner size="sm" />
+      ) : (
+        <>
+          <Save className="w-3.5 h-3.5" />
+          {isEditing ? 'Update' : 'Create'}
+        </>
+      )}
+    </button>
+  );
+
   return (
-    <CreateSidebar isOpen={isOpen} onClose={onClose} title={isEditing ? 'Edit Want' : 'Create New Want'}>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Form Actions - At the very top */}
-        <div className="flex justify-end gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <LoadingSpinner size="sm" />
-            ) : (
-              <>
-                <Save className="w-3.5 h-3.5" />
-                {isEditing ? 'Update' : 'Create'}
-              </>
-            )}
-          </button>
-        </div>
+    <CreateSidebar
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? 'Edit Want' : 'Create New Want'}
+      headerAction={headerAction}
+    >
+      <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
 
         {/* Sample Selector */}
         {!isEditing && (
