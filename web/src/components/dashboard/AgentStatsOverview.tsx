@@ -29,7 +29,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
   </div>
 );
 
-export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, loading, layout = 'grid' }) => {
+export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, loading, layout = 'vertical' }) => {
   const gridClass = layout === 'vertical'
     ? 'flex flex-col gap-3'
     : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6';
