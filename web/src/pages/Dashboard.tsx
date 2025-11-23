@@ -382,8 +382,8 @@ export const Dashboard: React.FC = () => {
           <div className="p-6 space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
-              <div className="space-y-4">
-                <StatsOverview wants={wants} loading={loading} />
+              <div>
+                <StatsOverview wants={wants} loading={loading} layout="vertical" />
               </div>
             </div>
 

@@ -5,6 +5,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 interface StatsOverviewProps {
   wants: Want[];
   loading: boolean;
+  layout?: 'grid' | 'vertical';
 }
 
 interface StatCardProps {
@@ -28,10 +29,14 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
   </div>
 );
 
-export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading }) => {
+export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, layout = 'grid' }) => {
+  const gridClass = layout === 'vertical'
+    ? 'flex flex-col gap-3'
+    : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6';
+
   if (loading && wants.length === 0) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={gridClass}>
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-center h-16">
@@ -78,7 +83,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading }) 
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className={gridClass}>
       {statCards.map((stat, index) => (
         <StatCard
           key={index}
