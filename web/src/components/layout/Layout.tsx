@@ -15,7 +15,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onSidebarMinimizedChange
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
+  const [internalMinimized, setInternalMinimized] = useState(false); // Start expanded
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout>();
 

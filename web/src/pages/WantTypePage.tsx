@@ -32,7 +32,7 @@ export default function WantTypePage() {
   } = useWantTypeStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');

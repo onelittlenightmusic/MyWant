@@ -28,7 +28,7 @@ export const AgentsPage: React.FC = () => {
   } = useAgentStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentResponse | null>(null);
