@@ -68,6 +68,9 @@ type ChainBuilder struct {
 
 	// Connectivity warning tracking (to prevent duplicate logs in reconciliation loop)
 	warnedConnectionIssues map[string]bool // Track which wants have already logged connectivity warnings
+
+	// Execution timing
+	executionInterval time.Duration // Sleep interval between execution cycles (prevents CPU spinning)
 }
 
 // runtimeWant holds the runtime state of a want
@@ -124,6 +127,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		suspendChan: make(chan bool),
 		resumeChan:  make(chan bool),
 		controlStop: make(chan bool),
+		// Initialize execution interval to 100ms (0.1s) to reduce CPU spinning
+		executionInterval: 100 * time.Millisecond,
 	}
 
 	// Auto-register custom target types from recipes
@@ -156,6 +161,12 @@ func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 // SetConfigInternal sets the config for the builder (for server mode)
 func (cb *ChainBuilder) SetConfigInternal(config Config) {
 	cb.config = config
+}
+
+// SetExecutionInterval sets the sleep interval between want execution cycles
+// This controls CPU usage during want execution loops
+func (cb *ChainBuilder) SetExecutionInterval(interval time.Duration) {
+	cb.executionInterval = interval
 }
 
 // matchesSelector checks if want labels match the selector criteria
@@ -1682,6 +1693,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 					break
 				}
+
+				// Sleep to prevent CPU spinning in tight execution loops
+				time.Sleep(cb.executionInterval)
 			}
 		}()
 	}
