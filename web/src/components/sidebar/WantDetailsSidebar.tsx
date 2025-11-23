@@ -261,6 +261,78 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col">
+      {/* Control Panel Buttons - Icon Only, Minimal Height */}
+      {want && (
+        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
+          {/* Start */}
+          <button
+            onClick={handleStartClick}
+            disabled={!canStart || loading}
+            title={canStart ? 'Start execution' : 'Cannot start in current state'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canStart && !loading
+                ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Play className="h-4 w-4" />
+          </button>
+
+          {/* Suspend/Resume */}
+          {canSuspend && (
+            <button
+              onClick={handleSuspendClick}
+              disabled={!canSuspend || loading}
+              title="Suspend execution"
+              className="p-2 rounded-md transition-colors bg-orange-100 text-orange-600 hover:bg-orange-200"
+            >
+              <Pause className="h-4 w-4" />
+            </button>
+          )}
+          {canResume && (
+            <button
+              onClick={handleResumeClick}
+              disabled={!canResume || loading}
+              title="Resume execution"
+              className="p-2 rounded-md transition-colors bg-blue-100 text-blue-600 hover:bg-blue-200"
+            >
+              <RotateCw className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Stop */}
+          <button
+            onClick={handleStopClick}
+            disabled={!canStop || loading}
+            title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canStop && !loading
+                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Square className="h-4 w-4" />
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={handleDeleteClick}
+            disabled={!canDelete || loading}
+            title={canDelete ? 'Delete want' : 'No want selected'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canDelete && !loading
+                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Tab navigation */}
       <div className="border-b border-gray-200 px-8 py-4">
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
@@ -330,87 +402,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
           </>
         )}
       </div>
-
-      {/* Control Panel Buttons - Always Bottom Aligned */}
-      {want && (
-        <div className="flex-shrink-0 border-t border-gray-200 bg-blue-50 p-4 space-y-2">
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              {/* Start */}
-              <button
-                onClick={handleStartClick}
-                disabled={!canStart || loading}
-                title={canStart ? 'Start execution' : 'Cannot start in current state'}
-                className={classNames(
-                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors',
-                  canStart && !loading
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                )}
-              >
-                <Play className="h-4 w-4" />
-                <span>Start</span>
-              </button>
-
-              {/* Suspend/Resume */}
-              {canSuspend && (
-                <button
-                  onClick={handleSuspendClick}
-                  disabled={!canSuspend || loading}
-                  title="Suspend execution"
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-orange-600 text-white hover:bg-orange-700"
-                >
-                  <Pause className="h-4 w-4" />
-                  <span>Suspend</span>
-                </button>
-              )}
-              {canResume && (
-                <button
-                  onClick={handleResumeClick}
-                  disabled={!canResume || loading}
-                  title="Resume execution"
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  <RotateCw className="h-4 w-4" />
-                  <span>Resume</span>
-                </button>
-              )}
-
-              {/* Stop */}
-              <button
-                onClick={handleStopClick}
-                disabled={!canStop || loading}
-                title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
-                className={classNames(
-                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors',
-                  canStop && !loading
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                )}
-              >
-                <Square className="h-4 w-4" />
-                <span>Stop</span>
-              </button>
-            </div>
-
-            {/* Delete */}
-            <button
-              onClick={handleDeleteClick}
-              disabled={!canDelete || loading}
-              title={canDelete ? 'Delete want' : 'No want selected'}
-              className={classNames(
-                'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors border',
-                canDelete && !loading
-                  ? 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-                  : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-              )}
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Delete</span>
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
