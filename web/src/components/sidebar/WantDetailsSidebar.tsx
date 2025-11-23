@@ -437,7 +437,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                   disabled={updateLoading}
                   className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
                 >
-                  + Add Label
+                  +
                 </button>
               )}
             </div>
@@ -570,7 +570,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                 disabled={updateLoading}
                 className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
               >
-                + Add Dependency
+                +
               </button>
             )}
           </div>
