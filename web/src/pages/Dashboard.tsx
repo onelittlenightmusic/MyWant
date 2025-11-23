@@ -307,13 +307,20 @@ export const Dashboard: React.FC = () => {
       onSidebarMinimizedChange={setSidebarMinimized}
     >
       {/* Header */}
-      <Header onCreateWant={handleCreateWant} />
+      <Header
+        onCreateWant={handleCreateWant}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
-      {/* Main content area with padding for fixed control panel */}
-      <main className="flex-1 p-6 pb-24">
-          {/* Error message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+      {/* Main content area with sidebar-aware layout */}
+      <main className="flex-1 flex overflow-hidden bg-gray-50">
+        {/* Left content area - main dashboard */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6 pb-24">
+            {/* Error message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <svg
@@ -349,37 +356,49 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Stats Overview */}
-          <div className="mb-8">
-            <StatsOverview wants={wants} loading={loading} />
+            {/* Want Grid */}
+            <div>
+              <WantGrid
+                wants={wants}
+                loading={loading}
+                searchQuery={searchQuery}
+                statusFilters={statusFilters}
+                selectedWant={selectedWant}
+                onViewWant={handleViewWant}
+                onViewAgentsWant={handleViewAgents}
+                onEditWant={handleEditWant}
+                onDeleteWant={setDeleteWantState}
+                onSuspendWant={handleSuspendWant}
+                onResumeWant={handleResumeWant}
+                onGetFilteredWants={setFilteredWants}
+                expandedParents={expandedParents}
+              />
+            </div>
           </div>
+        </div>
 
-          {/* Filters */}
-          <WantFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            selectedStatuses={statusFilters}
-            onStatusFilter={setStatusFilters}
-          />
+        {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
+        <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedWant ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <div className="p-6 space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+              <div className="space-y-4">
+                <StatsOverview wants={wants} loading={loading} />
+              </div>
+            </div>
 
-          {/* Want Grid */}
-          <div>
-            <WantGrid
-              wants={wants}
-              loading={loading}
-              searchQuery={searchQuery}
-              statusFilters={statusFilters}
-              selectedWant={selectedWant}
-              onViewWant={handleViewWant}
-              onViewAgentsWant={handleViewAgents}
-              onEditWant={handleEditWant}
-              onDeleteWant={setDeleteWantState}
-              onSuspendWant={handleSuspendWant}
-              onResumeWant={handleResumeWant}
-              onGetFilteredWants={setFilteredWants}
-              expandedParents={expandedParents}
-            />
+            {/* Filters section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+              <WantFilters
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedStatuses={statusFilters}
+                onStatusFilter={setStatusFilters}
+              />
+            </div>
           </div>
+        </div>
       </main>
 
       {/* Right Sidebar for Want Details */}
