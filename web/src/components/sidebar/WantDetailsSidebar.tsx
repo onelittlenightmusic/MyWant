@@ -24,6 +24,7 @@ interface WantDetailsSidebarProps {
   want: Want | null;
   initialTab?: 'overview' | 'config' | 'logs' | 'agents';
   onWantUpdate?: () => void;
+  onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: string }) => void;
 }
 
 type TabType = 'overview' | 'config' | 'logs' | 'agents';
@@ -31,7 +32,8 @@ type TabType = 'overview' | 'config' | 'logs' | 'agents';
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'overview',
-  onWantUpdate
+  onWantUpdate,
+  onHeaderStateChange
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -177,6 +179,23 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     setUpdateError(null);
   };
 
+  // Notify parent of header state changes - must be before early return to keep hook order consistent
+  useEffect(() => {
+    if (want && selectedWantDetails) {
+      onHeaderStateChange?.({
+        autoRefresh,
+        loading,
+        status: selectedWantDetails.status
+      });
+    } else if (want) {
+      onHeaderStateChange?.({
+        autoRefresh,
+        loading,
+        status: want.status
+      });
+    }
+  }, [autoRefresh, loading, want, selectedWantDetails, onHeaderStateChange]);
+
   if (!want) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -199,57 +218,27 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with tabs */}
-      <div className="border-b border-gray-200 px-8 py-6">
-        <div className="space-y-4">
-          {/* Top row: Status and controls */}
-          <div className="flex items-center justify-between">
-            <StatusBadge status={wantDetails.status} size="sm" />
-            <div className="flex items-center space-x-3">
-              {/* Auto refresh toggle */}
+      {/* Tab navigation */}
+      <div className="border-b border-gray-200 px-8 py-4">
+        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
               <button
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`p-2 rounded-md transition-colors ${
-                  autoRefresh
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                }`}
-                title={autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={classNames(
+                  'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                  activeTab === tab.id
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                )}
               >
-                <RefreshCw className="h-4 w-4" />
+                <Icon className="h-4 w-4" />
+                <span className="inline">{tab.label}</span>
               </button>
-              <button
-                onClick={handleRefresh}
-                disabled={loading}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                title="Refresh"
-              >
-                <RefreshCw className={classNames('h-4 w-4', loading && 'animate-spin')} />
-              </button>
-            </div>
-          </div>
-
-          {/* Bottom row: Tab navigation */}
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={classNames(
-                    'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-                    activeTab === tab.id
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="inline">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
       </div>
 

@@ -9,6 +9,7 @@ interface RightSidebarProps {
   children: React.ReactNode;
   className?: string;
   backgroundStyle?: React.CSSProperties;
+  headerActions?: React.ReactNode;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -17,7 +18,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   title,
   children,
   className,
-  backgroundStyle
+  backgroundStyle,
+  headerActions
 }) => {
   return (
     <>
@@ -39,13 +41,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         style={backgroundStyle}
       >
         {/* Header */}
-        <div className="flex-shrink-0 bg-white px-6 py-4 flex items-center justify-between z-10 border-b border-gray-200">
-          {title && (
-            <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
-          )}
+        <div className="flex-shrink-0 bg-white px-6 py-4 flex items-center justify-between z-10 border-b border-gray-200 gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {title && (
+              <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
+            )}
+            {headerActions && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {headerActions}
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
             title="Close sidebar"
           >
             <X className="h-5 w-5" />

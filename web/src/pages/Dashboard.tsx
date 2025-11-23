@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { classNames } from '@/utils/helpers';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -55,6 +58,9 @@ export const Dashboard: React.FC = () => {
   const currentWantIndex = selectedWant
     ? filteredWants.findIndex(w => w.metadata?.id === selectedWant.metadata?.id)
     : -1;
+
+  // Header state for sidebar
+  const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: string } | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -224,6 +230,31 @@ export const Dashboard: React.FC = () => {
     backgroundAttachment: 'fixed'
   } : undefined;
 
+  // Create header actions from header state
+  const headerActions = headerState ? (
+    <div className="flex items-center gap-2">
+      <StatusBadge status={headerState.status} size="sm" />
+      <button
+        onClick={() => {/* auto refresh toggle will be handled in sidebar */}}
+        className={`p-2 rounded-md transition-colors ${
+          headerState.autoRefresh
+            ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+        }`}
+        title={headerState.autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}
+      >
+        <RefreshCw className="h-4 w-4" />
+      </button>
+      <button
+        disabled={headerState.loading}
+        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw className={classNames('h-4 w-4', headerState.loading && 'animate-spin')} />
+      </button>
+    </div>
+  ) : null;
+
   return (
     <Layout
       sidebarMinimized={sidebarMinimized}
@@ -310,6 +341,7 @@ export const Dashboard: React.FC = () => {
         onClose={() => setSelectedWant(null)}
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
         backgroundStyle={sidebarBackgroundStyle}
+        headerActions={headerActions}
       >
         <WantDetailsSidebar
           want={selectedWant}
@@ -321,6 +353,7 @@ export const Dashboard: React.FC = () => {
               fetchWantDetails(wantId);
             }
           }}
+          onHeaderStateChange={setHeaderState}
         />
       </RightSidebar>
 
