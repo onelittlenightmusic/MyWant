@@ -25,8 +25,12 @@ const (
 	ChangeEventDelete ChangeEventType = "DELETE"
 
 	// GlobalExecutionInterval defines the sleep interval between goroutine execution cycles
-	// This prevents CPU spinning in tight execution loops for both reconcile and want execution
+	// This prevents CPU spinning in tight execution loops for want execution goroutines
 	GlobalExecutionInterval = 20 * time.Millisecond
+
+	// GlobalReconcileInterval defines the frequency of reconcile loop operations
+	// This controls how often the system checks for memory file changes and writes statistics
+	GlobalReconcileInterval = 100 * time.Millisecond
 )
 
 // ChangeEvent represents a configuration change
@@ -476,9 +480,10 @@ func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
 	cb.reconcileWants()
 
-	// Use GlobalExecutionInterval (20ms) to prevent CPU spinning
-	ticker := time.NewTicker(GlobalExecutionInterval)
-	statsTicker := time.NewTicker(1 * time.Second)
+	// Use GlobalReconcileInterval (100ms) for memory file checks and statistics
+	// This is separate from GlobalExecutionInterval (20ms) which is used for want execution
+	ticker := time.NewTicker(GlobalReconcileInterval)
+	statsTicker := time.NewTicker(GlobalReconcileInterval)
 	defer ticker.Stop()
 	defer statsTicker.Stop()
 
