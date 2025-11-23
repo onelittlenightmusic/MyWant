@@ -21,6 +21,7 @@ export default function WantTypePage() {
     filters,
     fetchWantTypes,
     getWantType,
+    setSelectedWantType,
     setFilters,
     clearFilters,
     clearError,
@@ -102,14 +103,13 @@ export default function WantTypePage() {
 
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
-    if (detailsSidebarOpen) {
-      setDetailsSidebarOpen(false);
-    }
+    setDetailsSidebarOpen(false);
+    setSelectedWantType(null);
   };
 
   useEscapeKey({
     onEscape: handleEscapeKey,
-    enabled: detailsSidebarOpen
+    enabled: detailsSidebarOpen || !!selectedWantType
   });
 
   return (
