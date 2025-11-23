@@ -57,8 +57,18 @@ export const Dashboard: React.FC = () => {
   // Keyboard navigation
   const [filteredWants, setFilteredWants] = useState<Want[]>([]);
 
+  // Flatten hierarchical wants to a single array while preserving parent-child relationships
+  // This allows proper sibling navigation within child wants
+  const flattenedWants = filteredWants.flatMap((parentWant: any) => {
+    const items = [parentWant];
+    if (parentWant.children && Array.isArray(parentWant.children)) {
+      items.push(...parentWant.children);
+    }
+    return items;
+  });
+
   // Convert wants to hierarchical format for keyboard navigation
-  const hierarchicalWants = filteredWants.map(want => ({
+  const hierarchicalWants = flattenedWants.map(want => ({
     id: want.metadata?.id || want.id || '',
     parentId: want.metadata?.ownerReferences?.[0]?.id
   }));
@@ -210,8 +220,8 @@ export const Dashboard: React.FC = () => {
   const handleHierarchicalNavigate = (hierarchicalItem: { id: string; parentId?: string } | null) => {
     if (!hierarchicalItem) return;
 
-    // Find the corresponding want in filteredWants
-    const targetWant = filteredWants.find(w =>
+    // Find the corresponding want in flattenedWants
+    const targetWant = flattenedWants.find(w =>
       (w.metadata?.id === hierarchicalItem.id) || (w.id === hierarchicalItem.id)
     );
 
