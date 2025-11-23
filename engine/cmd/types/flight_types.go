@@ -40,13 +40,6 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	flight.Duration = time.Duration(flight.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
 	flight.DepartureDate = flight.GetStringParam("departure_date", "2024-01-01")
 
-	// Allow monitoring_duration to be overridden via parameters (in seconds)
-	if monitoringDurationSecs, ok := flight.Spec.Params["monitoring_duration_seconds"]; ok {
-		if duration, ok := monitoringDurationSecs.(float64); ok {
-			flight.monitoringDuration = time.Duration(duration) * time.Second
-		}
-	}
-
 	// Set fields for base Want methods
 	flight.WantType = "flight"
 	flight.ConnectivityMetadata = ConnectivityMetadata{

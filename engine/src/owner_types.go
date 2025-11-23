@@ -260,6 +260,7 @@ func (t *Target) Exec() bool {
 
 		// Send child wants to reconcile loop asynchronously
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
+			InfoLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
 			return false
 		}
 
