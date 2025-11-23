@@ -1556,8 +1556,20 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	}
 }
 
-// deleteWant removes a want from runtime
+// deleteWant removes a want from runtime and signals its goroutines to stop
 func (cb *ChainBuilder) deleteWant(wantName string) {
+	// Send stop signal to the want's goroutine
+	if runtimeWant, exists := cb.wants[wantName]; exists {
+		if runtimeWant.want.stopChannel == nil {
+			runtimeWant.want.stopChannel = make(chan struct{})
+		}
+
+		// Close the stop channel to signal all goroutines listening on it
+		// This is safe to call multiple times and will wake up all select statements
+		close(runtimeWant.want.stopChannel)
+	}
+
+	// Remove want from registry
 	delete(cb.wants, wantName)
 }
 
@@ -1631,6 +1643,11 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	if chainWant, ok := want.function.(ChainWant); ok {
 		want.want.SetStatus(WantStatusRunning)
 
+		// Initialize stop channel if not already initialized
+		if want.want.stopChannel == nil {
+			want.want.stopChannel = make(chan struct{})
+		}
+
 		cb.waitGroup.Add(1)
 		go func() {
 			defer cb.waitGroup.Done()
@@ -1640,16 +1657,40 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 			}()
 
-
 			for {
+				// Check if stop signal was sent (non-blocking check)
+				select {
+				case <-want.want.stopChannel:
+					// Stop signal received - exit gracefully
+					want.want.SetStatus(WantStatusTerminated)
+					return
+				default:
+					// Continue execution
+				}
+
 				// Begin execution cycle for batching state changes
 				cb.reconcileMutex.RLock()
 				runtimeWant, exists := cb.wants[wantName]
 				cb.reconcileMutex.RUnlock()
-				if exists {
-					// Set the resolved paths with actual channels before execution using proper setter
-					runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
-					runtimeWant.want.BeginExecCycle()
+				if !exists {
+					// Want was deleted from registry - exit gracefully
+					want.want.SetStatus(WantStatusTerminated)
+					return
+				}
+
+				// Set the resolved paths with actual channels before execution using proper setter
+				runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
+				runtimeWant.want.BeginExecCycle()
+
+				// Check again before executing (want might have been deleted while we were setting up)
+				select {
+				case <-want.want.stopChannel:
+					// Stop signal received before execution - abort
+					runtimeWant.want.EndExecCycle()
+					want.want.SetStatus(WantStatusTerminated)
+					return
+				default:
+					// Continue with execution
 				}
 
 				// Direct call - no parameters needed, channels are in want.paths
@@ -1680,7 +1721,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 						InfoLog("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
 
-					break
+					// Exit the execution loop - execution is complete
+					return
 				}
 			}
 		}()
