@@ -17,6 +17,7 @@ interface WantCardProps {
   onResume?: (want: Want) => void;
   className?: string;
   expandedParents?: Set<string>;
+  onToggleExpand?: (wantId: string) => void;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -31,7 +32,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   onSuspend,
   onResume,
   className,
-  expandedParents
+  expandedParents,
+  onToggleExpand
 }) => {
   const wantId = want.metadata?.id || want.id;
   // Use expandedParents from keyboard navigation if provided, otherwise use local state
@@ -151,11 +153,11 @@ export const WantCard: React.FC<WantCardProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (expandedParents) {
-                // This should be handled by keyboard navigation, but allow manual click too
-                // In this case, we'd need a callback from Dashboard - for now just use local state
-                setLocalIsExpanded(true);
+              if (expandedParents && onToggleExpand && wantId) {
+                // Use parent callback to update expandedParents
+                onToggleExpand(wantId);
               } else {
+                // Fallback to local state if no callback provided
                 setLocalIsExpanded(true);
               }
             }}
@@ -178,10 +180,11 @@ export const WantCard: React.FC<WantCardProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (expandedParents) {
-                  // Would need callback to update expandedParents in parent
-                  setLocalIsExpanded(false);
+                if (expandedParents && onToggleExpand && wantId) {
+                  // Use parent callback to update expandedParents
+                  onToggleExpand(wantId);
                 } else {
+                  // Fallback to local state if no callback provided
                   setLocalIsExpanded(false);
                 }
               }}

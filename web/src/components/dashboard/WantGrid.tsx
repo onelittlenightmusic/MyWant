@@ -21,6 +21,7 @@ interface WantGridProps {
   onResumeWant?: (want: Want) => void;
   onGetFilteredWants?: (wants: Want[]) => void;
   expandedParents?: Set<string>;
+  onToggleExpand?: (wantId: string) => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -36,7 +37,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onSuspendWant,
   onResumeWant,
   onGetFilteredWants,
-  expandedParents
+  expandedParents,
+  onToggleExpand
 }) => {
   const hierarchicalWants = useMemo(() => {
     // First, build a map of all wants by name for efficient lookup
@@ -212,6 +214,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
             onSuspend={onSuspendWant}
             onResume={onResumeWant}
             expandedParents={expandedParents}
+            onToggleExpand={onToggleExpand}
           />
         </div>
       ))}

@@ -236,6 +236,19 @@ export const Dashboard: React.FC = () => {
     setExpandedParents(prev => new Set(prev).add(wantId));
   };
 
+  // Handler to toggle expand/collapse of a parent want
+  const handleToggleExpand = (wantId: string) => {
+    setExpandedParents(prev => {
+      const updated = new Set(prev);
+      if (updated.has(wantId)) {
+        updated.delete(wantId);
+      } else {
+        updated.add(wantId);
+      }
+      return updated;
+    });
+  };
+
   // Use hierarchical keyboard navigation hook
   useHierarchicalKeyboardNavigation({
     items: hierarchicalWants,
@@ -372,6 +385,7 @@ export const Dashboard: React.FC = () => {
                 onResumeWant={handleResumeWant}
                 onGetFilteredWants={setFilteredWants}
                 expandedParents={expandedParents}
+                onToggleExpand={handleToggleExpand}
               />
             </div>
           </div>
