@@ -19,6 +19,7 @@ interface WantGridProps {
   onDeleteWant: (want: Want) => void;
   onSuspendWant?: (want: Want) => void;
   onResumeWant?: (want: Want) => void;
+  onGetFilteredWants?: (wants: Want[]) => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -32,7 +33,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onEditWant,
   onDeleteWant,
   onSuspendWant,
-  onResumeWant
+  onResumeWant,
+  onGetFilteredWants
 }) => {
   const hierarchicalWants = useMemo(() => {
     // First, build a map of all wants by name for efficient lookup
@@ -122,6 +124,11 @@ export const WantGrid: React.FC<WantGridProps> = ({
       return idA.localeCompare(idB);
     });
   }, [hierarchicalWants, searchQuery, statusFilters]);
+
+  // Notify parent component of filtered wants for keyboard navigation
+  React.useEffect(() => {
+    onGetFilteredWants?.(filteredWants);
+  }, [filteredWants, onGetFilteredWants]);
 
   if (loading && wants.length === 0) {
     return (

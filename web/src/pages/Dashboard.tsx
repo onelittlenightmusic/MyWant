@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -48,6 +49,12 @@ export const Dashboard: React.FC = () => {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<WantExecutionStatus[]>([]);
+
+  // Keyboard navigation
+  const [filteredWants, setFilteredWants] = useState<Want[]>([]);
+  const currentWantIndex = selectedWant
+    ? filteredWants.findIndex(w => w.metadata?.id === selectedWant.metadata?.id)
+    : -1;
 
   // Load initial data
   useEffect(() => {
@@ -184,6 +191,22 @@ export const Dashboard: React.FC = () => {
     setDeleteWantState(null);
   };
 
+  // Keyboard navigation handler
+  const handleKeyboardNavigate = (index: number) => {
+    if (index >= 0 && index < filteredWants.length) {
+      const want = filteredWants[index];
+      handleViewWant(want);
+    }
+  };
+
+  // Use keyboard navigation hook
+  useKeyboardNavigation({
+    itemCount: filteredWants.length,
+    currentIndex: currentWantIndex,
+    onNavigate: handleKeyboardNavigate,
+    enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
+  });
+
   // Determine background style for flight, hotel, restaurant, and buffet wants
   const getWantBackgroundImage = (type?: string) => {
     if (type === 'flight') return '/resources/flight.png';
@@ -276,6 +299,7 @@ export const Dashboard: React.FC = () => {
               onDeleteWant={setDeleteWantState}
               onSuspendWant={handleSuspendWant}
               onResumeWant={handleResumeWant}
+              onGetFilteredWants={setFilteredWants}
             />
           </div>
       </main>
