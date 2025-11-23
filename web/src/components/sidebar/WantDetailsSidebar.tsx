@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -256,7 +256,16 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
         ) : (
           <>
             {activeTab === 'overview' && (
-              <OverviewTab want={wantDetails} />
+              <OverviewTab
+                want={wantDetails}
+                onWantUpdate={() => {
+                  const wantId = want.metadata?.id || want.id;
+                  if (wantId) {
+                    fetchWantDetails(wantId);
+                    fetchWants();
+                  }
+                }}
+              />
             )}
 
             {activeTab === 'config' && (
@@ -288,61 +297,215 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 };
 
 // Tab Components
-const OverviewTab: React.FC<{ want: Want }> = ({ want }) => (
-  <div className="p-8">
-    <div className="space-y-8">
-      {/* Status Section */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h4 className="text-base font-medium text-gray-900 mb-4">Status Information</h4>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">Current Status:</span>
-            <StatusBadge status={want.status} size="sm" />
-          </div>
-          {want.suspended && (
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Suspended:</span>
-              <span className="text-orange-600 font-medium text-sm">Yes</span>
-            </div>
-          )}
-        </div>
-      </div>
+const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want, onWantUpdate }) => {
+  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
+  const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
+  const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
+  const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
-      {/* Metadata Section */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">Name:</span>
-            <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">Type:</span>
-            <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-gray-600 text-sm">ID:</span>
-            <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
-          </div>
-        </div>
-      </div>
+  const handleSaveLabel = async (oldKey: string) => {
+    if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
 
-      {/* Labels */}
-      {want.metadata?.labels && Object.keys(want.metadata.labels).length > 0 && (
+    setUpdateLoading(true);
+    setUpdateError(null);
+
+    try {
+      const newLabels = { ...want.metadata.labels };
+      if (oldKey !== editingLabelDraft.key) {
+        delete newLabels[oldKey];
+      }
+      newLabels[editingLabelDraft.key] = editingLabelDraft.value;
+
+      const updatePayload = {
+        metadata: {
+          ...want.metadata,
+          labels: newLabels
+        },
+        spec: want.spec
+      };
+
+      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update label');
+      }
+
+      setEditingLabelKey(null);
+      setEditingLabelDraft({ key: '', value: '' });
+      onWantUpdate?.();
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to update label');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleRemoveLabel = async (key: string) => {
+    if (!want.metadata?.id) return;
+
+    setUpdateLoading(true);
+    setUpdateError(null);
+
+    try {
+      const newLabels = { ...want.metadata.labels };
+      delete newLabels[key];
+
+      const updatePayload = {
+        metadata: {
+          ...want.metadata,
+          labels: newLabels
+        },
+        spec: want.spec
+      };
+
+      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove label');
+      }
+
+      onWantUpdate?.();
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : 'Failed to remove label');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-8">
+      <div className="space-y-8">
+        {/* Status Section */}
         <div className="bg-gray-50 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Labels</h4>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(want.metadata.labels).map(([key, value]) => (
-              <span
-                key={key}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-              >
-                {key}: {value}
-              </span>
-            ))}
+          <h4 className="text-base font-medium text-gray-900 mb-4">Status Information</h4>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 text-sm">Current Status:</span>
+              <StatusBadge status={want.status} size="sm" />
+            </div>
+            {want.suspended && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-sm">Suspended:</span>
+                <span className="text-orange-600 font-medium text-sm">Yes</span>
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Metadata Section */}
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 text-sm">Name:</span>
+              <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 text-sm">Type:</span>
+              <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 text-sm">ID:</span>
+              <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Labels */}
+        {want.metadata?.labels && (Object.keys(want.metadata.labels).length > 0 || editingLabelKey !== null) && (
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h4 className="text-base font-medium text-gray-900 mb-4">Labels</h4>
+
+            {/* Display existing labels as styled chips */}
+            {Object.keys(want.metadata.labels).length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {Object.entries(want.metadata.labels).map(([key, value]) => {
+                  if (editingLabelKey === key) return null;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        setEditingLabelKey(key);
+                        setEditingLabelDraft({ key, value });
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                      disabled={updateLoading}
+                    >
+                      {key}: {value}
+                      <X
+                        className="w-3 h-3 ml-2 hover:text-blue-900"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveLabel(key);
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Edit form */}
+            {editingLabelKey !== null && (
+              <div className="space-y-3 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={editingLabelDraft.key}
+                    onChange={(e) => setEditingLabelDraft(prev => ({ ...prev, key: e.target.value }))}
+                    placeholder="Key"
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={updateLoading}
+                  />
+                  <input
+                    type="text"
+                    value={editingLabelDraft.value}
+                    onChange={(e) => setEditingLabelDraft(prev => ({ ...prev, value: e.target.value }))}
+                    placeholder="Value"
+                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={updateLoading}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      handleSaveLabel(editingLabelKey);
+                    }}
+                    disabled={updateLoading || !editingLabelDraft.key.trim()}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {updateLoading ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingLabelKey(null);
+                      setEditingLabelDraft({ key: '', value: '' });
+                      setUpdateError(null);
+                    }}
+                    disabled={updateLoading}
+                    className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {updateError && (
+                  <div className="text-red-600 text-xs">{updateError}</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Timeline */}
       {want.stats && (
@@ -377,6 +540,52 @@ const OverviewTab: React.FC<{ want: Want }> = ({ want }) => (
         </div>
       )}
 
+      {/* Dependencies (Using) */}
+      {want.spec?.using && want.spec.using.length > 0 && (
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Dependencies (using)</h4>
+
+          {/* Display existing dependencies as styled chips */}
+          {want.spec.using.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {want.spec.using.map((usingItem, index) => {
+                return Object.entries(usingItem).map(([key, value], keyIndex) => (
+                  <button
+                    key={`${index}-${keyIndex}`}
+                    type="button"
+                    onClick={() => {
+                      setEditingUsingIndex(index);
+                      setEditingUsingDraft({ key, value });
+                    }}
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                    disabled={updateLoading}
+                  >
+                    {key}: {value}
+                    <X
+                      className="w-3 h-3 ml-2 hover:text-blue-900"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Remove this dependency
+                        const newUsing = want.spec.using.filter((_, i) => i !== index);
+                        const updatePayload = {
+                          metadata: want.metadata,
+                          spec: { ...want.spec, using: newUsing }
+                        };
+                        fetch(`http://localhost:8080/api/v1/wants/${want.metadata?.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(updatePayload)
+                        }).then(() => onWantUpdate?.());
+                      }}
+                    />
+                  </button>
+                ));
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Error Information */}
       {want.status === 'failed' && want.state?.error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
@@ -393,7 +602,8 @@ const OverviewTab: React.FC<{ want: Want }> = ({ want }) => (
       )}
     </div>
   </div>
-);
+  );
+};
 
 const ConfigTab: React.FC<{
   want: Want;
