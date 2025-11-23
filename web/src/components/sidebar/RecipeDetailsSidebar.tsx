@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
-import { BookOpen, Settings, List, FileText, Copy } from 'lucide-react';
+import { BookOpen, Settings, List, FileText } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { classNames } from '@/utils/helpers';
 import {
-  DetailsSidebar,
   TabContent,
   TabSection,
   TabGrid,
-  EmptyState,
   InfoRow,
-  TabConfig
 } from './DetailsSidebar';
 
 interface RecipeDetailsSidebarProps {
@@ -24,37 +21,55 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   if (!recipe) {
-    return <EmptyState icon={BookOpen} message="Select a recipe to view details" />;
+    return (
+      <div className="text-center py-12">
+        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">Select a recipe to view details</p>
+      </div>
+    );
   }
 
-  const tabs: TabConfig[] = [
-    { id: 'overview', label: 'Overview', icon: FileText },
-    { id: 'parameters', label: 'Parameters', icon: Settings },
-    { id: 'wants', label: 'Wants', icon: List },
-    { id: 'results', label: 'Results', icon: BookOpen }
+  const tabs = [
+    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
+    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
+    { id: 'wants' as TabType, label: 'Wants', icon: List },
+    { id: 'results' as TabType, label: 'Results', icon: BookOpen }
   ];
 
-  const badge = (
-    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-blue-100 text-blue-800 border-blue-200">
-      <BookOpen className="h-4 w-4 mr-2" />
-      Recipe
-    </div>
-  );
-
   return (
-    <DetailsSidebar
-      title={recipe.recipe.metadata.name}
-      subtitle={recipe.recipe.metadata.description}
-      badge={badge}
-      tabs={tabs}
-      defaultTab="overview"
-      onTabChange={(tabId) => setActiveTab(tabId as TabType)}
-    >
-      {activeTab === 'overview' && <OverviewTab recipe={recipe} />}
-      {activeTab === 'parameters' && <ParametersTab recipe={recipe} />}
-      {activeTab === 'wants' && <WantsTab recipe={recipe} />}
-      {activeTab === 'results' && <ResultsTab recipe={recipe} />}
-    </DetailsSidebar>
+    <div className="h-full flex flex-col">
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={classNames(
+                  'flex-1 flex items-center justify-center space-x-1 px-2 py-2 text-sm font-medium rounded-md transition-colors min-w-0',
+                  activeTab === tab.id
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                )}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate text-xs">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'overview' && <OverviewTab recipe={recipe} />}
+        {activeTab === 'parameters' && <ParametersTab recipe={recipe} />}
+        {activeTab === 'wants' && <WantsTab recipe={recipe} />}
+        {activeTab === 'results' && <ResultsTab recipe={recipe} />}
+      </div>
+    </div>
   );
 };
 

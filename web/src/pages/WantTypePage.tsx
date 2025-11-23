@@ -30,7 +30,6 @@ export default function WantTypePage() {
   // UI State
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Auto-dismiss notifications after 5 seconds
@@ -56,7 +55,6 @@ export default function WantTypePage() {
   // Handle view details - open right sidebar
   const handleViewDetails = async (wantType: WantTypeListItem) => {
     await getWantType(wantType.name);
-    setShowDetailsModal(true);
   };
 
   // Handle search
@@ -192,9 +190,10 @@ export default function WantTypePage() {
 
         {/* Right Sidebar for Want Type Details */}
         <RightSidebar
-          isOpen={showDetailsModal}
+          isOpen={!!selectedWantType}
           onClose={() => {
-            setShowDetailsModal(false);
+            // Store will maintain the selection, but sidebar will close
+            // Next selection will open it again
           }}
           title={selectedWantType ? selectedWantType.metadata.name : undefined}
         >

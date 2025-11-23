@@ -3,12 +3,9 @@ import { Zap, Settings, Database, Share2, BookOpen, FileText, List } from 'lucid
 import { WantTypeDefinition } from '@/types/wantType';
 import { classNames } from '@/utils/helpers';
 import {
-  DetailsSidebar,
   TabContent,
   TabSection,
-  EmptyState,
   InfoRow,
-  TabConfig
 } from './DetailsSidebar';
 
 interface WantTypeDetailsSidebarProps {
@@ -17,65 +14,67 @@ interface WantTypeDetailsSidebarProps {
 
 type TabType = 'overview' | 'parameters' | 'state' | 'connectivity' | 'agents' | 'examples' | 'constraints';
 
-const patternIcons: Record<string, React.ReactNode> = {
-  generator: <Zap className="h-4 w-4" />,
-  processor: <Settings className="h-4 w-4" />,
-  sink: <Database className="h-4 w-4" />,
-  coordinator: <Share2 className="h-4 w-4" />,
-  independent: <Zap className="h-4 w-4" />,
-};
-
 export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
   wantType
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   if (!wantType) {
-    return <EmptyState icon={BookOpen} message="Select a want type to view details" />;
+    return (
+      <div className="text-center py-12">
+        <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-500">Select a want type to view details</p>
+      </div>
+    );
   }
 
-  const tabs: TabConfig[] = [
-    { id: 'overview', label: 'Overview', icon: FileText },
-    { id: 'parameters', label: 'Parameters', icon: Settings },
-    { id: 'state', label: 'State', icon: Database },
-    { id: 'connectivity', label: 'Connectivity', icon: Share2 },
-    { id: 'agents', label: 'Agents', icon: Zap },
-    { id: 'examples', label: 'Examples', icon: BookOpen },
-    { id: 'constraints', label: 'Constraints', icon: List }
+  const tabs = [
+    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
+    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
+    { id: 'state' as TabType, label: 'State', icon: Database },
+    { id: 'connectivity' as TabType, label: 'Connectivity', icon: Share2 },
+    { id: 'agents' as TabType, label: 'Agents', icon: Zap },
+    { id: 'examples' as TabType, label: 'Examples', icon: BookOpen },
+    { id: 'constraints' as TabType, label: 'Constraints', icon: List }
   ];
 
-  const patternColor = {
-    generator: 'bg-blue-100 text-blue-800',
-    processor: 'bg-purple-100 text-purple-800',
-    sink: 'bg-red-100 text-red-800',
-    coordinator: 'bg-green-100 text-green-800',
-    independent: 'bg-amber-100 text-amber-800',
-  }[wantType.metadata.pattern] || 'bg-gray-100 text-gray-800';
-
-  const badge = (
-    <div className={classNames('inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border', patternColor)}>
-      {patternIcons[wantType.metadata.pattern]}
-      <span className="ml-2 capitalize">{wantType.metadata.pattern}</span>
-    </div>
-  );
-
   return (
-    <DetailsSidebar
-      title={wantType.metadata.name}
-      subtitle={wantType.metadata.title}
-      badge={badge}
-      tabs={tabs}
-      defaultTab="overview"
-      onTabChange={(tabId) => setActiveTab(tabId as TabType)}
-    >
-      {activeTab === 'overview' && <OverviewTab wantType={wantType} />}
-      {activeTab === 'parameters' && <ParametersTab wantType={wantType} />}
-      {activeTab === 'state' && <StateTab wantType={wantType} />}
-      {activeTab === 'connectivity' && <ConnectivityTab wantType={wantType} />}
-      {activeTab === 'agents' && <AgentsTab wantType={wantType} />}
-      {activeTab === 'examples' && <ExamplesTab wantType={wantType} />}
-      {activeTab === 'constraints' && <ConstraintsTab wantType={wantType} />}
-    </DetailsSidebar>
+    <div className="h-full flex flex-col">
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={classNames(
+                  'flex items-center justify-center space-x-1 px-2 py-2 text-sm font-medium rounded-md transition-colors flex-shrink-0',
+                  activeTab === tab.id
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                )}
+              >
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate text-xs whitespace-nowrap">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'overview' && <OverviewTab wantType={wantType} />}
+        {activeTab === 'parameters' && <ParametersTab wantType={wantType} />}
+        {activeTab === 'state' && <StateTab wantType={wantType} />}
+        {activeTab === 'connectivity' && <ConnectivityTab wantType={wantType} />}
+        {activeTab === 'agents' && <AgentsTab wantType={wantType} />}
+        {activeTab === 'examples' && <ExamplesTab wantType={wantType} />}
+        {activeTab === 'constraints' && <ConstraintsTab wantType={wantType} />}
+      </div>
+    </div>
   );
 };
 

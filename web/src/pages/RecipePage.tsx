@@ -25,7 +25,6 @@ export default function RecipePage() {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<GenericRecipe | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -56,7 +55,6 @@ export default function RecipePage() {
 
   const handleViewRecipe = (recipe: GenericRecipe) => {
     setSelectedRecipe(recipe);
-    setShowDetailsModal(true);
   };
 
   const handleDeleteRecipe = (recipe: GenericRecipe) => {
@@ -268,8 +266,8 @@ export default function RecipePage() {
 
         {/* Right Sidebar for Recipe Details */}
         <RightSidebar
-          isOpen={showDetailsModal}
-          onClose={() => setShowDetailsModal(false)}
+          isOpen={!!selectedRecipe}
+          onClose={() => setSelectedRecipe(null)}
           title={selectedRecipe ? selectedRecipe.recipe.metadata.name : undefined}
         >
           <RecipeDetailsSidebar recipe={selectedRecipe} />
