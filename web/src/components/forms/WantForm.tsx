@@ -567,19 +567,16 @@ export const WantForm: React.FC<WantFormProps> = ({
         </div>
 
         {/* Labels */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Labels
-            </label>
-            {editingLabelKey === null && Object.entries(labels).length < 5 && (
+        <div className="bg-gray-50 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-base font-medium text-gray-900">Labels</h4>
+            {editingLabelKey === null && (
               <button
                 type="button"
                 onClick={() => addLabel()}
-                className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
               >
-                <Plus className="w-4 h-4" />
-                Add Label
+                +
               </button>
             )}
           </div>
@@ -616,44 +613,47 @@ export const WantForm: React.FC<WantFormProps> = ({
           )}
 
           {/* Label input form - shown when editing or adding new label */}
-          <div className="space-y-2">
-            {Object.entries(labels).map(([key, value], index) => {
-              // Only show input form for the label being edited
-              if (editingLabelKey !== key) return null;
-
-              return (
-                <div key={key} className="flex gap-2 pb-3 border-b border-gray-200">
-                  <div className="flex-1">
-                    <LabelAutocomplete
-                      keyValue={editingLabelDraft.key}
-                      valueValue={editingLabelDraft.value}
-                      onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
-                      onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
-                      onRemove={() => {
-                        removeLabel(key);
-                        setEditingLabelKey(null);
-                        setEditingLabelDraft({ key: '', value: '' });
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Only update if draft has a key value
-                      if (editingLabelDraft.key.trim()) {
-                        updateLabel(key, editingLabelDraft.key, editingLabelDraft.value);
-                      }
-                      setEditingLabelKey(null);
-                      setEditingLabelDraft({ key: '', value: '' });
-                    }}
-                    className="text-gray-500 hover:text-gray-700 font-medium text-sm px-3 py-2"
-                  >
-                    Done
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          {editingLabelKey !== null && (
+            <div className="space-y-3 pt-4 border-t border-gray-200">
+              <LabelAutocomplete
+                keyValue={editingLabelDraft.key}
+                valueValue={editingLabelDraft.value}
+                onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
+                onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
+                onRemove={() => {
+                  removeLabel(editingLabelKey);
+                  setEditingLabelKey(null);
+                  setEditingLabelDraft({ key: '', value: '' });
+                }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Only update if draft has a key value
+                    if (editingLabelDraft.key.trim()) {
+                      updateLabel(editingLabelKey === '__new__' ? '' : editingLabelKey, editingLabelDraft.key, editingLabelDraft.value);
+                    }
+                    setEditingLabelKey(null);
+                    setEditingLabelDraft({ key: '', value: '' });
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingLabelKey(null);
+                    setEditingLabelDraft({ key: '', value: '' });
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Parameters */}
@@ -741,19 +741,18 @@ export const WantForm: React.FC<WantFormProps> = ({
         </div>
 
         {/* Using (Dependencies) */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Dependencies (using)
-            </label>
-            <button
-              type="button"
-              onClick={addUsing}
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-            >
-              <Plus className="w-4 h-4" />
-              Add Dependency
-            </button>
+        <div className="bg-gray-50 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
+            {editingUsingIndex === null && (
+              <button
+                type="button"
+                onClick={addUsing}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                +
+              </button>
+            )}
           </div>
 
           {/* Display existing dependencies as styled chips */}
@@ -788,53 +787,67 @@ export const WantForm: React.FC<WantFormProps> = ({
           )}
 
           {/* Dependency input form - shown when editing or adding new dependency */}
-          <div className="space-y-2">
-            {using.map((usingItem, index) => {
-              // Only show input form for the dependency being edited
-              if (editingUsingIndex !== index) return null;
-
-              return Object.entries(usingItem).map(([key, value], keyIndex) => (
-                <div key={`${index}-${keyIndex}`} className="flex gap-2 pb-3 border-b border-gray-200">
-                  <div className="flex-1">
-                    <LabelSelectorAutocomplete
-                      keyValue={editingUsingDraft.key}
-                      valuValue={editingUsingDraft.value}
-                      onKeyChange={(newKey) => {
-                        setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
-                      }}
-                      onValueChange={(newValue) => {
-                        setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
-                      }}
-                      onRemove={() => {
-                        removeUsing(index);
-                        setEditingUsingIndex(null);
-                        setEditingUsingDraft({ key: '', value: '' });
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Confirm the changes
-                      if (editingUsingDraft.key.trim()) {
-                        const newUsing = [...using];
-                        const newItem = { ...newUsing[index] };
-                        delete newItem[key];
+          {editingUsingIndex !== null && (
+            <div className="space-y-3 pt-4 border-t border-gray-200">
+              <LabelSelectorAutocomplete
+                keyValue={editingUsingDraft.key}
+                valuValue={editingUsingDraft.value}
+                onKeyChange={(newKey) => {
+                  setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
+                }}
+                onValueChange={(newValue) => {
+                  setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
+                }}
+                onRemove={() => {
+                  if (editingUsingIndex >= 0) {
+                    removeUsing(editingUsingIndex);
+                  }
+                  setEditingUsingIndex(null);
+                  setEditingUsingDraft({ key: '', value: '' });
+                }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Confirm the changes
+                    if (editingUsingDraft.key.trim()) {
+                      const newUsing = [...using];
+                      if (editingUsingIndex < newUsing.length) {
+                        const newItem = { ...newUsing[editingUsingIndex] };
+                        // Get the original key from the current item
+                        const originalKey = Object.keys(newItem)[0];
+                        if (originalKey) {
+                          delete newItem[originalKey];
+                        }
                         newItem[editingUsingDraft.key] = editingUsingDraft.value;
-                        newUsing[index] = newItem;
-                        setUsing(newUsing);
+                        newUsing[editingUsingIndex] = newItem;
+                      } else {
+                        // Adding new dependency
+                        newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
                       }
-                      setEditingUsingIndex(null);
-                      setEditingUsingDraft({ key: '', value: '' });
-                    }}
-                    className="text-gray-500 hover:text-gray-700 font-medium text-sm px-3 py-2"
-                  >
-                    Done
-                  </button>
-                </div>
-              ));
-            })}
-          </div>
+                      setUsing(newUsing);
+                    }
+                    setEditingUsingIndex(null);
+                    setEditingUsingDraft({ key: '', value: '' });
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingUsingIndex(null);
+                    setEditingUsingDraft({ key: '', value: '' });
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Recipe */}
