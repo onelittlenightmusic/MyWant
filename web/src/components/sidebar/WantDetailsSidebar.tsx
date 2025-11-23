@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, RotateCw, Trash2 } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -25,6 +25,11 @@ interface WantDetailsSidebarProps {
   initialTab?: 'overview' | 'config' | 'logs' | 'agents';
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
+  onStart?: (want: Want) => void;
+  onStop?: (want: Want) => void;
+  onSuspend?: (want: Want) => void;
+  onResume?: (want: Want) => void;
+  onDelete?: (want: Want) => void;
 }
 
 type TabType = 'overview' | 'config' | 'logs' | 'agents';
@@ -33,7 +38,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'overview',
   onWantUpdate,
-  onHeaderStateChange
+  onHeaderStateChange,
+  onStart,
+  onStop,
+  onSuspend,
+  onResume,
+  onDelete
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -53,6 +63,39 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [editedConfig, setEditedConfig] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+
+  // Control panel logic
+  const isRunning = selectedWantDetails?.status === 'running';
+  const isSuspended = selectedWantDetails?.suspended === true;
+  const isCompleted = selectedWantDetails?.status === 'completed';
+  const isStopped = selectedWantDetails?.status === 'stopped' || selectedWantDetails?.status === 'created';
+  const isFailed = selectedWantDetails?.status === 'failed';
+
+  const canStart = want && (isStopped || isCompleted || isFailed);
+  const canStop = want && isRunning && !isSuspended;
+  const canSuspend = want && isRunning && !isSuspended;
+  const canResume = want && isSuspended;
+  const canDelete = want !== null;
+
+  const handleStartClick = () => {
+    if (want && canStart && onStart) onStart(want);
+  };
+
+  const handleStopClick = () => {
+    if (want && canStop && onStop) onStop(want);
+  };
+
+  const handleSuspendClick = () => {
+    if (want && canSuspend && onSuspend) onSuspend(want);
+  };
+
+  const handleResumeClick = () => {
+    if (want && canResume && onResume) onResume(want);
+  };
+
+  const handleDeleteClick = () => {
+    if (want && canDelete && onDelete) onDelete(want);
+  };
 
   // Fetch details when want changes
   useEffect(() => {
@@ -287,6 +330,87 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
           </>
         )}
       </div>
+
+      {/* Control Panel Buttons */}
+      {want && (
+        <div className="border-t border-gray-200 bg-blue-50 p-4 space-y-2">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              {/* Start */}
+              <button
+                onClick={handleStartClick}
+                disabled={!canStart || loading}
+                title={canStart ? 'Start execution' : 'Cannot start in current state'}
+                className={classNames(
+                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors',
+                  canStart && !loading
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                )}
+              >
+                <Play className="h-4 w-4" />
+                <span>Start</span>
+              </button>
+
+              {/* Suspend/Resume */}
+              {canSuspend && (
+                <button
+                  onClick={handleSuspendClick}
+                  disabled={!canSuspend || loading}
+                  title="Suspend execution"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-orange-600 text-white hover:bg-orange-700"
+                >
+                  <Pause className="h-4 w-4" />
+                  <span>Suspend</span>
+                </button>
+              )}
+              {canResume && (
+                <button
+                  onClick={handleResumeClick}
+                  disabled={!canResume || loading}
+                  title="Resume execution"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  <RotateCw className="h-4 w-4" />
+                  <span>Resume</span>
+                </button>
+              )}
+
+              {/* Stop */}
+              <button
+                onClick={handleStopClick}
+                disabled={!canStop || loading}
+                title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
+                className={classNames(
+                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors',
+                  canStop && !loading
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                )}
+              >
+                <Square className="h-4 w-4" />
+                <span>Stop</span>
+              </button>
+            </div>
+
+            {/* Delete */}
+            <button
+              onClick={handleDeleteClick}
+              disabled={!canDelete || loading}
+              title={canDelete ? 'Delete want' : 'No want selected'}
+              className={classNames(
+                'w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors border',
+                canDelete && !loading
+                  ? 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                  : 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+              )}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

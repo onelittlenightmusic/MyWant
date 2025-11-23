@@ -18,7 +18,6 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
-import { WantControlPanel } from '@/components/dashboard/WantControlPanel';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -434,6 +433,11 @@ export const Dashboard: React.FC = () => {
             }
           }}
           onHeaderStateChange={setHeaderState}
+          onStart={handleStartWant}
+          onStop={handleStopWant}
+          onSuspend={handleSuspendWant}
+          onResume={handleResumeWant}
+          onDelete={setDeleteWantState}
         />
       </RightSidebar>
 
@@ -459,18 +463,6 @@ export const Dashboard: React.FC = () => {
               ).length
             : 0
         }
-      />
-
-      {/* Control Panel */}
-      <WantControlPanel
-        selectedWant={selectedWant}
-        onStart={handleStartWant}
-        onStop={handleStopWant}
-        onSuspend={handleSuspendWant}
-        onResume={handleResumeWant}
-        onDelete={setDeleteWantState}
-        loading={loading}
-        sidebarMinimized={sidebarMinimized}
       />
     </Layout>
   );
