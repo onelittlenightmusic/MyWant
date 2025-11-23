@@ -119,7 +119,7 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+    <div className="grid grid-cols-3 gap-6 items-start">
       {filteredRecipes.map((recipe, index) => (
         <div
           key={recipe.recipe.metadata.name || `recipe-${index}`}
