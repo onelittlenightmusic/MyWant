@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, Play, Square, Pause, MoreHorizontal, AlertTriangle, Bot } from 'lucide-react';
+import { AlertTriangle, Bot } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -109,90 +109,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             )}
 
             <StatusBadge status={want.status} size={sizes.statusSize} />
-
-            {/* Actions - only show for parent cards */}
-            {!isChild && (
-              <div className="relative group/menu">
-                <button className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100">
-                  <MoreHorizontal className={sizes.iconSize} />
-                </button>
-
-                <div className="absolute right-0 top-8 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200">
-                  <div className="py-1">
-                    <button
-                      onClick={() => onView(want)}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <Eye className={`${sizes.iconSize} mr-2`} />
-                      View Details
-                    </button>
-
-                    {!isRunning && onEdit && (
-                      <button
-                        onClick={() => onEdit(want)}
-                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Edit className={`${sizes.iconSize} mr-2`} />
-                        Edit
-                      </button>
-                    )}
-
-                    {canSuspendResume && !isSuspended && onSuspend && (
-                      <button
-                        onClick={() => onSuspend(want)}
-                        className="flex items-center w-full px-4 py-2 text-sm text-orange-600 hover:bg-orange-50"
-                        title="Suspend execution"
-                      >
-                        <Pause className={`${sizes.iconSize} mr-2`} />
-                        Suspend
-                      </button>
-                    )}
-
-                    {canSuspendResume && isSuspended && onResume && (
-                      <button
-                        onClick={() => onResume(want)}
-                        className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50"
-                        title="Resume execution"
-                      >
-                        <Play className={`${sizes.iconSize} mr-2`} />
-                        Resume
-                      </button>
-                    )}
-
-                    {canControl && (
-                      <button
-                        onClick={() => {/* TODO: Implement stop/start */}}
-                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        {isRunning ? (
-                          <>
-                            <Square className={`${sizes.iconSize} mr-2`} />
-                            Stop
-                          </>
-                        ) : (
-                          <>
-                            <Play className={`${sizes.iconSize} mr-2`} />
-                            Start
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    <hr className="my-1" />
-
-                    {onDelete && (
-                      <button
-                        onClick={() => onDelete(want)}
-                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className={`${sizes.iconSize} mr-2`} />
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
 
           </div>
         </div>
