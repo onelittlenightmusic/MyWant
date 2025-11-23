@@ -287,7 +287,17 @@ export const Dashboard: React.FC = () => {
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
         backgroundStyle={sidebarBackgroundStyle}
       >
-        <WantDetailsSidebar want={selectedWant} initialTab={sidebarInitialTab} />
+        <WantDetailsSidebar
+          want={selectedWant}
+          initialTab={sidebarInitialTab}
+          onWantUpdate={() => {
+            if (selectedWant?.metadata?.id || selectedWant?.id) {
+              const wantId = selectedWant.metadata?.id || selectedWant.id;
+              const { fetchWantDetails } = useWantStore.getState();
+              fetchWantDetails(wantId);
+            }
+          }}
+        />
       </RightSidebar>
 
       {/* Modals */}

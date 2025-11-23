@@ -108,6 +108,13 @@ export interface WantTypeExamplesResponse {
   examples: ExampleDef[];
 }
 
+// Labels API Response Type
+export interface LabelsResponse {
+  labelKeys: string[];
+  labelValues: Record<string, string[]>; // Map of key -> array of values
+  count: number;
+}
+
 // Store state type
 export interface WantTypeState {
   wantTypes: WantTypeListItem[];

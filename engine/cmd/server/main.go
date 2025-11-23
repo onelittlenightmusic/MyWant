@@ -277,6 +277,11 @@ func (s *Server) setupRoutes() {
 	wantTypes.HandleFunc("/{name}/examples", s.getWantTypeExamples).Methods("GET")
 	wantTypes.HandleFunc("/{name}/examples", s.handleOptions).Methods("OPTIONS")
 
+	// Labels endpoints - for autocomplete in want creation form
+	labels := api.PathPrefix("/labels").Subrouter()
+	labels.HandleFunc("", s.getLabels).Methods("GET")
+	labels.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
 	// Error history endpoints
 	errors := api.PathPrefix("/errors").Subrouter()
 	errors.HandleFunc("", s.listErrorHistory).Methods("GET")
@@ -1984,6 +1989,70 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"wantTypes": items,
 		"count":     len(items),
+	})
+}
+
+// getLabels handles GET /api/v1/labels - returns all label keys and values used across wants
+func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Collect all unique label keys and their values from all wants
+	labelKeys := make(map[string]bool)
+	labelValues := make(map[string]map[string]bool) // key -> (value -> true)
+
+	// Collect from wants in executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			currentStates := execution.Builder.GetAllWantStates()
+			for _, want := range currentStates {
+				for key, value := range want.Metadata.Labels {
+					labelKeys[key] = true
+					if labelValues[key] == nil {
+						labelValues[key] = make(map[string]bool)
+					}
+					labelValues[key][value] = true
+				}
+			}
+		}
+	}
+
+	// Also check global builder
+	if s.globalBuilder != nil {
+		currentStates := s.globalBuilder.GetAllWantStates()
+		for _, want := range currentStates {
+			for key, value := range want.Metadata.Labels {
+				labelKeys[key] = true
+				if labelValues[key] == nil {
+					labelValues[key] = make(map[string]bool)
+				}
+				labelValues[key][value] = true
+			}
+		}
+	}
+
+	// Convert keys to sorted slice
+	keys := make([]string, 0, len(labelKeys))
+	for key := range labelKeys {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Convert values maps to sorted slices
+	values := make(map[string][]string)
+	for key, valueMap := range labelValues {
+		valueSlice := make([]string, 0, len(valueMap))
+		for value := range valueMap {
+			valueSlice = append(valueSlice, value)
+		}
+		sort.Strings(valueSlice)
+		values[key] = valueSlice
+	}
+
+	// Return response
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"labelKeys":   keys,
+		"labelValues": values,
+		"count":       len(keys),
 	})
 }
 

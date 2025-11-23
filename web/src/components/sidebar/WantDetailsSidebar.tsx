@@ -21,13 +21,15 @@ import {
 interface WantDetailsSidebarProps {
   want: Want | null;
   initialTab?: 'overview' | 'config' | 'logs' | 'agents';
+  onWantUpdate?: () => void;
 }
 
 type TabType = 'overview' | 'config' | 'logs' | 'agents';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
-  initialTab = 'overview'
+  initialTab = 'overview',
+  onWantUpdate
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -312,7 +314,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
     setUpdateError(null);
 
     try {
-      const newLabels = { ...want.metadata.labels };
+      const newLabels = { ...(want.metadata.labels || {}) };
       if (oldKey !== editingLabelDraft.key) {
         delete newLabels[oldKey];
       }
@@ -353,7 +355,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
     setUpdateError(null);
 
     try {
-      const newLabels = { ...want.metadata.labels };
+      const newLabels = { ...(want.metadata.labels || {}) };
       delete newLabels[key];
 
       const updatePayload = {
@@ -422,12 +424,26 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
         </div>
 
         {/* Labels */}
-        {want.metadata?.labels && (Object.keys(want.metadata.labels).length > 0 || editingLabelKey !== null) && (
+        {want.metadata ? (
           <div className="bg-gray-50 rounded-lg p-6">
-            <h4 className="text-base font-medium text-gray-900 mb-4">Labels</h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-base font-medium text-gray-900">Labels</h4>
+              {editingLabelKey === null && (
+                <button
+                  onClick={() => {
+                    setEditingLabelKey('__new__');
+                    setEditingLabelDraft({ key: '', value: '' });
+                  }}
+                  disabled={updateLoading}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
+                >
+                  + Add Label
+                </button>
+              )}
+            </div>
 
             {/* Display existing labels as styled chips */}
-            {Object.keys(want.metadata.labels).length > 0 && (
+            {want.metadata?.labels && Object.keys(want.metadata.labels).length > 0 && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {Object.entries(want.metadata.labels).map(([key, value]) => {
                   if (editingLabelKey === key) return null;
@@ -480,7 +496,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
-                      handleSaveLabel(editingLabelKey);
+                      handleSaveLabel(editingLabelKey === '__new__' ? '' : editingLabelKey);
                     }}
                     disabled={updateLoading || !editingLabelDraft.key.trim()}
                     className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
@@ -505,7 +521,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
       {/* Timeline */}
       {want.stats && (
@@ -541,14 +557,29 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
       )}
 
       {/* Dependencies (Using) */}
-      {want.spec?.using && want.spec.using.length > 0 && (
+      {want.spec?.using && (want.spec.using.length > 0 || editingUsingIndex !== null) && (
         <div className="bg-gray-50 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Dependencies (using)</h4>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
+            {editingUsingIndex === null && (
+              <button
+                onClick={() => {
+                  setEditingUsingIndex(-1);
+                  setEditingUsingDraft({ key: '', value: '' });
+                }}
+                disabled={updateLoading}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
+              >
+                + Add Dependency
+              </button>
+            )}
+          </div>
 
           {/* Display existing dependencies as styled chips */}
           {want.spec.using.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-4">
               {want.spec.using.map((usingItem, index) => {
+                if (editingUsingIndex === index) return null;
                 return Object.entries(usingItem).map(([key, value], keyIndex) => (
                   <button
                     key={`${index}-${keyIndex}`}
@@ -581,6 +612,82 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                   </button>
                 ));
               })}
+            </div>
+          )}
+
+          {/* Edit form for dependencies */}
+          {editingUsingIndex !== null && (
+            <div className="space-y-3 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={editingUsingDraft.key}
+                  onChange={(e) => setEditingUsingDraft(prev => ({ ...prev, key: e.target.value }))}
+                  placeholder="Key"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={updateLoading}
+                />
+                <input
+                  type="text"
+                  value={editingUsingDraft.value}
+                  onChange={(e) => setEditingUsingDraft(prev => ({ ...prev, value: e.target.value }))}
+                  placeholder="Value"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={updateLoading}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (!editingUsingDraft.key.trim() || !want.metadata?.id) return;
+
+                    setUpdateLoading(true);
+                    try {
+                      let newUsing = [...want.spec.using];
+                      if (editingUsingIndex === -1) {
+                        // Adding new dependency
+                        newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
+                      } else {
+                        // Editing existing dependency
+                        const oldItem = newUsing[editingUsingIndex];
+                        const oldKey = Object.keys(oldItem)[0];
+                        newUsing[editingUsingIndex] = { [editingUsingDraft.key]: editingUsingDraft.value };
+                      }
+
+                      const updatePayload = {
+                        metadata: want.metadata,
+                        spec: { ...want.spec, using: newUsing }
+                      };
+
+                      fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatePayload)
+                      }).then(() => {
+                        setEditingUsingIndex(null);
+                        setEditingUsingDraft({ key: '', value: '' });
+                        onWantUpdate?.();
+                      });
+                    } finally {
+                      setUpdateLoading(false);
+                    }
+                  }}
+                  disabled={updateLoading || !editingUsingDraft.key.trim()}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {updateLoading ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingUsingIndex(null);
+                    setEditingUsingDraft({ key: '', value: '' });
+                  }}
+                  disabled={updateLoading}
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
         </div>

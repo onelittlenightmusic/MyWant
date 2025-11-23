@@ -30,6 +30,7 @@ import {
   WantTypeListResponse,
   WantTypeDetailResponse,
   WantTypeExamplesResponse,
+  LabelsResponse,
 } from '@/types/wantType';
 
 class MyWantApiClient {
@@ -258,6 +259,11 @@ class MyWantApiClient {
 
   async getWantTypeExamples(name: string): Promise<WantTypeExamplesResponse> {
     const response = await this.client.get<WantTypeExamplesResponse>(`/api/v1/want-types/${name}/examples`);
+    return response.data;
+  }
+
+  async getLabels(): Promise<LabelsResponse> {
+    const response = await this.client.get<LabelsResponse>('/api/v1/labels');
     return response.data;
   }
 }

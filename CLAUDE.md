@@ -1199,3 +1199,4 @@ git update-index --no-assume-unchanged codebase_rag.db
 ```
 
 **Note:** Not recommended. Keep RAG in sync for best search results.
+- Dependencies (using) label key also supports autocompletion but tab selection and entering is not working.
