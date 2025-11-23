@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { Sidebar } from './Sidebar';
@@ -15,7 +15,9 @@ export const Layout: React.FC<LayoutProps> = ({
   onSidebarMinimizedChange
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [internalMinimized, setInternalMinimized] = useState(false);
+  const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
 
   const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : internalMinimized;
 
@@ -27,6 +29,37 @@ export const Layout: React.FC<LayoutProps> = ({
       setInternalMinimized(newValue);
     }
   };
+
+  // Handle mouse enter - expand sidebar
+  const handleSidebarMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    if (onSidebarMinimizedChange) {
+      onSidebarMinimizedChange(false);
+    } else {
+      setInternalMinimized(false);
+    }
+  };
+
+  // Handle mouse leave - collapse sidebar after a delay
+  const handleSidebarMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (onSidebarMinimizedChange) {
+        onSidebarMinimizedChange(true);
+      } else {
+        setInternalMinimized(true);
+      }
+    }, 300); // 300ms delay before auto-collapse
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -40,13 +73,19 @@ export const Layout: React.FC<LayoutProps> = ({
         </button>
       </div>
 
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        isMinimized={sidebarMinimized}
-        onClose={() => setSidebarOpen(false)}
-        onMinimizeToggle={handleMinimizeToggle}
-      />
+      {/* Sidebar wrapper with hover handlers */}
+      <div
+        ref={sidebarRef}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+      >
+        <Sidebar
+          isOpen={sidebarOpen}
+          isMinimized={sidebarMinimized}
+          onClose={() => setSidebarOpen(false)}
+          onMinimizeToggle={handleMinimizeToggle}
+        />
+      </div>
 
       {/* Main content */}
       <div className={classNames(

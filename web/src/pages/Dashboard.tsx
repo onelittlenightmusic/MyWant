@@ -40,7 +40,7 @@ export const Dashboard: React.FC = () => {
   const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
   const [selectedWant, setSelectedWant] = useState<Want | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Auto-collapse on mouse leave
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 

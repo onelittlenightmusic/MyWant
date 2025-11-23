@@ -26,7 +26,7 @@ export default function RecipePage() {
   } = useRecipeStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(false);
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Auto-collapse on mouse leave
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
