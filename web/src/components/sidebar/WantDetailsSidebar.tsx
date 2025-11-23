@@ -389,23 +389,6 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
   return (
     <div className="p-8">
       <div className="space-y-8">
-        {/* Status Section */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Status Information</h4>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Current Status:</span>
-              <StatusBadge status={want.status} size="sm" />
-            </div>
-            {want.suspended && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Suspended:</span>
-                <span className="text-orange-600 font-medium text-sm">Yes</span>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Metadata Section */}
         <div className="bg-gray-50 rounded-lg p-6">
           <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
