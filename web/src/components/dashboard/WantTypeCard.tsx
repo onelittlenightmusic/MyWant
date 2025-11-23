@@ -52,6 +52,17 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
     }
 
     onSelect?.(wantType);
+    onView(wantType);
+
+    // Smooth scroll the card into view after selection
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+        if (selectedElement && selectedElement instanceof HTMLElement) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+    });
   };
 
   return (

@@ -222,8 +222,7 @@ export default function WantTypePage() {
         <RightSidebar
           isOpen={!!selectedWantType}
           onClose={() => {
-            // Store will maintain the selection, but sidebar will close
-            // Next selection will open it again
+            // Keep sidebar open - just re-render content when selection changes
           }}
           title={selectedWantType ? selectedWantType.metadata.name : undefined}
         >
