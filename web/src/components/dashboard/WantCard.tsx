@@ -58,6 +58,16 @@ export const WantCard: React.FC<WantCardProps> = ({
     }
 
     onView(want);
+
+    // Smooth scroll the card into view after selection
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+        if (selectedElement && selectedElement instanceof HTMLElement) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+    });
   };
 
   // Handler for child card clicks - passes child directly without closure
@@ -67,6 +77,16 @@ export const WantCard: React.FC<WantCardProps> = ({
     e.stopPropagation();
 
     onView(child);
+
+    // Smooth scroll the card into view after selection
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+        if (selectedElement && selectedElement instanceof HTMLElement) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+    });
   };
 
   // Check if this is a flight or hotel want

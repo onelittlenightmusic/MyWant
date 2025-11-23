@@ -25,6 +25,20 @@ export const AgentCard: React.FC<AgentCardProps> = ({
   const capabilities = agent.capabilities || [];
   const uses = agent.uses || [];
 
+  const handleCardClick = () => {
+    onView(agent);
+
+    // Smooth scroll the card into view after selection
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+        if (selectedElement && selectedElement instanceof HTMLElement) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+    });
+  };
+
   const getTypeIcon = () => {
     switch (agentType) {
       case 'do':
@@ -48,11 +62,13 @@ export const AgentCard: React.FC<AgentCardProps> = ({
   };
 
   return (
-    <div className={classNames(
-      'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
-      selected ? 'border-blue-500 border-2' : 'border-gray-200',
-      className
-    )}>
+    <div
+      onClick={handleCardClick}
+      className={classNames(
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
+        selected ? 'border-blue-500 border-2' : 'border-gray-200',
+        className
+      )}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">

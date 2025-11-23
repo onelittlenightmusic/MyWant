@@ -33,9 +33,23 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     return Object.keys(params).length;
   };
 
+  const handleCardClick = () => {
+    onSelect?.(recipe);
+
+    // Smooth scroll the card into view after selection
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+        if (selectedElement && selectedElement instanceof HTMLElement) {
+          selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 0);
+    });
+  };
+
   return (
     <div
-      onClick={() => onSelect?.(recipe)}
+      onClick={handleCardClick}
       className={classNames(
         'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
