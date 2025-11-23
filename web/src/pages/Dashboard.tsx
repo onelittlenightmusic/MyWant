@@ -42,6 +42,7 @@ export const Dashboard: React.FC = () => {
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   // TODO: Re-enable auto-refresh selection later (currently disabled for testing)
   // // Derive selectedWant from wants array using selectedWantId
@@ -230,11 +231,18 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Handler to expand a parent want when Down arrow is pressed on it
+  const handleExpandParent = (wantId: string) => {
+    setExpandedParents(prev => new Set(prev).add(wantId));
+  };
+
   // Use hierarchical keyboard navigation hook
   useHierarchicalKeyboardNavigation({
     items: hierarchicalWants,
     currentItem: currentHierarchicalWant,
     onNavigate: handleHierarchicalNavigate,
+    onExpandParent: handleExpandParent,
+    expandedItems: expandedParents,
     enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
   });
 
@@ -369,6 +377,7 @@ export const Dashboard: React.FC = () => {
               onSuspendWant={handleSuspendWant}
               onResumeWant={handleResumeWant}
               onGetFilteredWants={setFilteredWants}
+              expandedParents={expandedParents}
             />
           </div>
       </main>
@@ -386,7 +395,7 @@ export const Dashboard: React.FC = () => {
           initialTab={sidebarInitialTab}
           onWantUpdate={() => {
             if (selectedWant?.metadata?.id || selectedWant?.id) {
-              const wantId = selectedWant.metadata?.id || selectedWant.id;
+              const wantId = (selectedWant.metadata?.id || selectedWant.id) as string;
               const { fetchWantDetails } = useWantStore.getState();
               fetchWantDetails(wantId);
             }

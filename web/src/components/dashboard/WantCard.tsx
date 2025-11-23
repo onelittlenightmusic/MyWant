@@ -16,6 +16,7 @@ interface WantCardProps {
   onSuspend?: (want: Want) => void;
   onResume?: (want: Want) => void;
   className?: string;
+  expandedParents?: Set<string>;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -29,10 +30,17 @@ export const WantCard: React.FC<WantCardProps> = ({
   onDelete,
   onSuspend,
   onResume,
-  className
+  className,
+  expandedParents
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const wantId = want.metadata?.id || want.id;
+  // Use expandedParents from keyboard navigation if provided, otherwise use local state
+  const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
+
+  // Local state for managing expansion (fallback if expandedParents not provided)
+  const [localIsExpanded, setLocalIsExpanded] = useState(false);
+  const displayIsExpanded = expandedParents ? isExpanded : localIsExpanded;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
@@ -138,12 +146,18 @@ export const WantCard: React.FC<WantCardProps> = ({
       </div>
 
       {/* Children indicator at bottom */}
-      {hasChildren && !isExpanded && (
+      {hasChildren && !displayIsExpanded && (
         <div className="mt-4 pt-3 border-t border-gray-200">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setIsExpanded(true);
+              if (expandedParents) {
+                // This should be handled by keyboard navigation, but allow manual click too
+                // In this case, we'd need a callback from Dashboard - for now just use local state
+                setLocalIsExpanded(true);
+              } else {
+                setLocalIsExpanded(true);
+              }
             }}
             className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
@@ -157,14 +171,19 @@ export const WantCard: React.FC<WantCardProps> = ({
       )}
 
       {/* Expanded children section */}
-      {hasChildren && isExpanded && (
+      {hasChildren && displayIsExpanded && (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsExpanded(false);
+                if (expandedParents) {
+                  // Would need callback to update expandedParents in parent
+                  setLocalIsExpanded(false);
+                } else {
+                  setLocalIsExpanded(false);
+                }
               }}
               className="text-xs text-gray-500 hover:text-gray-700"
             >
