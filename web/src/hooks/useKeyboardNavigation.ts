@@ -89,6 +89,18 @@ export const useKeyboardNavigation = ({
 
       if (shouldNavigate) {
         onNavigate(newIndex);
+
+        // Use multiple animation frames to ensure React has fully updated the DOM
+        // and the browser has reflow/repaint cycle
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+            if (selectedElement && selectedElement instanceof HTMLElement) {
+              // Use the native scrollIntoView method which handles both window and container scrolling
+              selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          });
+        });
       }
     };
 

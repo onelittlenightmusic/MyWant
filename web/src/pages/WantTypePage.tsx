@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Menu, Zap, AlertCircle } from 'lucide-react';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { WantTypeListItem } from '@/types/wantType';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { WantTypeGrid } from '@/components/dashboard/WantTypeGrid';
 import { WantTypeMenu } from '@/components/dashboard/WantTypeMenu';
 import { WantTypeDetailsSidebar } from '@/components/sidebar/WantTypeDetailsSidebar';
@@ -31,6 +32,7 @@ export default function WantTypePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
 
   // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
@@ -72,9 +74,33 @@ export default function WantTypePage() {
     setFilters({ pattern });
   };
 
-  const filteredWantTypes = getFilteredWantTypes();
+  const allFilteredWantTypes = getFilteredWantTypes();
   const categories = getCategories();
   const patterns = getPatterns();
+
+  // Sync local state with all filtered want types
+  useEffect(() => {
+    setFilteredWantTypes(allFilteredWantTypes);
+  }, [allFilteredWantTypes]);
+
+  // Keyboard navigation
+  const currentWantTypeIndex = selectedWantType
+    ? allFilteredWantTypes.findIndex(wt => wt.name === selectedWantType.metadata.name)
+    : -1;
+
+  const handleKeyboardNavigate = (index: number) => {
+    if (index >= 0 && index < allFilteredWantTypes.length) {
+      const wantType = allFilteredWantTypes[index];
+      handleSelectWantType(wantType);
+    }
+  };
+
+  useKeyboardNavigation({
+    itemCount: allFilteredWantTypes.length,
+    currentIndex: currentWantTypeIndex,
+    onNavigate: handleKeyboardNavigate,
+    enabled: allFilteredWantTypes.length > 0
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -132,7 +158,7 @@ export default function WantTypePage() {
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-6">
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -170,18 +196,22 @@ export default function WantTypePage() {
 
           {/* Want Types Grid */}
           <WantTypeGrid
-            wantTypes={filteredWantTypes}
-            selectedWantType={filteredWantTypes.find(wt => wt.name === selectedWantType?.metadata.name) || null}
+            wantTypes={allFilteredWantTypes}
+            selectedWantType={allFilteredWantTypes.find(wt => wt.name === selectedWantType?.metadata.name) || null}
             onSelectWantType={handleSelectWantType}
             onViewDetails={handleViewDetails}
             loading={loading}
+            onGetFilteredWantTypes={setFilteredWantTypes}
           />
         </main>
 
         {/* Want Type Control Panel */}
         <WantTypeControlPanel
           selectedWantType={selectedWantType}
-          onViewDetails={handleViewDetails}
+          onViewDetails={(wantType) => {
+            const listItem = allFilteredWantTypes.find(wt => wt.name === wantType.metadata.name);
+            if (listItem) handleViewDetails(listItem);
+          }}
           onDeploySuccess={(message) => setNotification({ message, type: 'success' })}
           onDeployError={(error) => setNotification({ message: error, type: 'error' })}
           loading={loading}
