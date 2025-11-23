@@ -109,6 +109,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
+      data-keyboard-nav-selected={selected}
       className={classNames(
         'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
@@ -186,6 +187,7 @@ export const WantCard: React.FC<WantCardProps> = ({
               return (
                 <div
                   key={childId || `child-${index}`}
+                  data-keyboard-nav-selected={isChildSelected}
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'

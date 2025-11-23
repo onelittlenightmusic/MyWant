@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
-import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames } from '@/utils/helpers';
@@ -56,9 +56,17 @@ export const Dashboard: React.FC = () => {
 
   // Keyboard navigation
   const [filteredWants, setFilteredWants] = useState<Want[]>([]);
-  const currentWantIndex = selectedWant
-    ? filteredWants.findIndex(w => w.metadata?.id === selectedWant.metadata?.id)
-    : -1;
+
+  // Convert wants to hierarchical format for keyboard navigation
+  const hierarchicalWants = filteredWants.map(want => ({
+    id: want.metadata?.id || want.id || '',
+    parentId: want.metadata?.ownerReferences?.[0]?.id
+  }));
+
+  const currentHierarchicalWant = selectedWant ? {
+    id: selectedWant.metadata?.id || selectedWant.id || '',
+    parentId: selectedWant.metadata?.ownerReferences?.[0]?.id
+  } : null;
 
   // Header state for sidebar
   const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: WantExecutionStatus } | null>(null);
@@ -199,18 +207,24 @@ export const Dashboard: React.FC = () => {
   };
 
   // Keyboard navigation handler
-  const handleKeyboardNavigate = (index: number) => {
-    if (index >= 0 && index < filteredWants.length) {
-      const want = filteredWants[index];
-      handleViewWant(want);
+  const handleHierarchicalNavigate = (hierarchicalItem: { id: string; parentId?: string } | null) => {
+    if (!hierarchicalItem) return;
+
+    // Find the corresponding want in filteredWants
+    const targetWant = filteredWants.find(w =>
+      (w.metadata?.id === hierarchicalItem.id) || (w.id === hierarchicalItem.id)
+    );
+
+    if (targetWant) {
+      handleViewWant(targetWant);
     }
   };
 
-  // Use keyboard navigation hook
-  useKeyboardNavigation({
-    itemCount: filteredWants.length,
-    currentIndex: currentWantIndex,
-    onNavigate: handleKeyboardNavigate,
+  // Use hierarchical keyboard navigation hook
+  useHierarchicalKeyboardNavigation({
+    items: hierarchicalWants,
+    currentItem: currentHierarchicalWant,
+    onNavigate: handleHierarchicalNavigate,
     enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
   });
 
