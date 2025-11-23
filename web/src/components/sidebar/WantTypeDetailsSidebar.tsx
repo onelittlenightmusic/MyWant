@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { Zap, Settings, Database, Share2, BookOpen, FileText, List } from 'lucide-react';
+import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download } from 'lucide-react';
 import { WantTypeDefinition } from '@/types/wantType';
 import { classNames } from '@/utils/helpers';
 import {
   TabContent,
   TabSection,
   InfoRow,
+  EmptyState,
 } from './DetailsSidebar';
 
 interface WantTypeDetailsSidebarProps {
   wantType: WantTypeDefinition | null;
+  onDownload?: (wantType: WantTypeDefinition) => void;
 }
 
 type TabType = 'overview' | 'parameters' | 'state' | 'connectivity' | 'agents' | 'examples' | 'constraints';
 
 export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
-  wantType
+  wantType,
+  onDownload
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
@@ -27,6 +30,12 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
       </div>
     );
   }
+
+  const handleDownloadClick = () => {
+    if (wantType && onDownload) {
+      onDownload(wantType);
+    }
+  };
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: FileText },
@@ -40,6 +49,26 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col">
+      {/* Control Panel Buttons - Icon Only, Minimal Height */}
+      {wantType && (
+        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
+          {/* Download */}
+          <button
+            onClick={handleDownloadClick}
+            disabled={!wantType}
+            title={wantType ? 'Download want type as JSON' : 'No want type selected'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              wantType
+                ? 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 px-6 py-4">
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
@@ -340,4 +369,22 @@ const ConstraintsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }
     )}
   </TabContent>
 );
+
+// Helper function for want type download
+function downloadWantTypeJSON(wantType: WantTypeDefinition): void {
+  const filename = `${wantType.metadata.name}.json`;
+  const jsonContent = JSON.stringify(wantType, null, 2);
+
+  const element = document.createElement('a');
+  element.setAttribute(
+    'href',
+    `data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}`
+  );
+  element.setAttribute('download', filename);
+  element.style.display = 'none';
+
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
 

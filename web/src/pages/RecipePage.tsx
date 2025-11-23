@@ -325,7 +325,24 @@ export default function RecipePage() {
         onClose={() => setSelectedRecipe(null)}
         title={selectedRecipe ? selectedRecipe.recipe.metadata.name : undefined}
       >
-        <RecipeDetailsSidebar recipe={selectedRecipe} />
+        <RecipeDetailsSidebar
+          recipe={selectedRecipe}
+          onDeploy={async (recipe) => {
+            try {
+              // Implementation handled by RecipeDetailsSidebar
+            } catch (error) {
+              setNotification({
+                message: error instanceof Error ? error.message : 'Deployment failed',
+                type: 'error'
+              });
+            }
+          }}
+          onEdit={handleEditRecipe}
+          onDelete={handleDeleteRecipe}
+          onDeploySuccess={(message) => setNotification({ message, type: 'success' })}
+          onDeployError={(error) => setNotification({ message: error, type: 'error' })}
+          loading={loading}
+        />
       </RightSidebar>
     </Layout>
   );

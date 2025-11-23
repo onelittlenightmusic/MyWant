@@ -1,24 +1,93 @@
 import React, { useState } from 'react';
-import { BookOpen, Settings, List, FileText } from 'lucide-react';
+import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2 } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { classNames } from '@/utils/helpers';
+import { apiClient } from '@/api/client';
+import { validateYaml } from '@/utils/yaml';
 import {
   TabContent,
   TabSection,
   TabGrid,
   InfoRow,
+  EmptyState,
 } from './DetailsSidebar';
 
 interface RecipeDetailsSidebarProps {
   recipe: GenericRecipe | null;
+  onDeploy?: (recipe: GenericRecipe) => Promise<void>;
+  onEdit?: (recipe: GenericRecipe) => void;
+  onDelete?: (recipe: GenericRecipe) => void;
+  onDeploySuccess?: (message: string) => void;
+  onDeployError?: (error: string) => void;
+  loading?: boolean;
 }
 
 type TabType = 'overview' | 'parameters' | 'wants' | 'results';
 
 export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
-  recipe
+  recipe,
+  onDeploy,
+  onEdit,
+  onDelete,
+  onDeploySuccess,
+  onDeployError,
+  loading = false
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [deploying, setDeploying] = useState(false);
+
+  // Check if recipe has example deployment
+  const hasExample = recipe?.recipe.example?.wants &&
+                     recipe.recipe.example.wants.length > 0;
+
+  // Button enable/disable logic
+  const canDeploy = recipe && hasExample && !loading && !deploying;
+  const canEdit = recipe && !loading && !deploying;
+  const canDelete = recipe && !loading && !deploying;
+
+  const handleDeployClick = async () => {
+    if (!recipe || !hasExample) return;
+
+    setDeploying(true);
+    try {
+      if (onDeploy) {
+        await onDeploy(recipe);
+      } else {
+        // Default deployment logic
+        const yamlContent = convertWantsToYAML(recipe.recipe.example!.wants);
+        const yamlValidation = validateYaml(yamlContent);
+        if (!yamlValidation.isValid) {
+          throw new Error(`Invalid YAML: ${yamlValidation.error}`);
+        }
+        const wantData = yamlValidation.data;
+        const wants = Array.isArray(wantData.wants) ? wantData.wants : [wantData];
+        for (const want of wants) {
+          await apiClient.createWant(want);
+        }
+      }
+      onDeploySuccess?.(`Recipe "${recipe.recipe.metadata.name}" deployed successfully!`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to deploy recipe';
+      onDeployError?.(errorMessage);
+      console.error('Deploy error:', error);
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleEditClick = () => {
+    if (recipe && canEdit && onEdit) onEdit(recipe);
+  };
+
+  const handleDeleteClick = () => {
+    if (recipe && canDelete && onDelete) onDelete(recipe);
+  };
+
+  const handleDownloadClick = () => {
+    if (recipe) {
+      downloadRecipeYAML(recipe);
+    }
+  };
 
   if (!recipe) {
     return (
@@ -38,6 +107,77 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col">
+      {/* Control Panel Buttons - Icon Only, Minimal Height */}
+      {recipe && (
+        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
+          {/* Deploy */}
+          <button
+            onClick={handleDeployClick}
+            disabled={!canDeploy}
+            title={
+              !recipe
+                ? 'No recipe selected'
+                : !hasExample
+                ? 'Recipe has no example deployment'
+                : 'Deploy recipe'
+            }
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canDeploy && !deploying
+                ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Play className="h-4 w-4" />
+          </button>
+
+          {/* Edit */}
+          <button
+            onClick={handleEditClick}
+            disabled={!canEdit}
+            title={canEdit ? 'Edit recipe' : 'Cannot edit'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canEdit
+                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
+
+          {/* Download */}
+          <button
+            onClick={handleDownloadClick}
+            disabled={!recipe}
+            title={recipe ? 'Download recipe as YAML' : 'No recipe selected'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              recipe
+                ? 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Download className="h-4 w-4" />
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={handleDeleteClick}
+            disabled={!canDelete}
+            title={canDelete ? 'Delete recipe' : 'Cannot delete'}
+            className={classNames(
+              'p-2 rounded-md transition-colors',
+              canDelete
+                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            )}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 px-6 py-4">
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
@@ -287,3 +427,73 @@ const ResultsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
     )}
   </TabContent>
 );
+
+// Helper functions for recipe deployment and download
+function convertWantsToYAML(wants: any[]): string {
+  const config = { wants };
+  return convertToYAML(config);
+}
+
+/**
+ * Convert object to YAML string
+ */
+function convertToYAML(obj: any, indent = 0): string {
+  const spaces = ' '.repeat(indent);
+  let result = '';
+
+  if (Array.isArray(obj)) {
+    obj.forEach((item) => {
+      if (typeof item === 'object' && item !== null) {
+        // For array items that are objects, format as YAML list items
+        const itemYaml = convertToYAML(item, indent + 2);
+        result += `${spaces}- ${itemYaml.substring(indent + 2)}`;
+      } else {
+        result += `${spaces}- ${item}\n`;
+      }
+    });
+  } else if (typeof obj === 'object' && obj !== null) {
+    // Filter out null, undefined, and empty values
+    const entries = Object.entries(obj).filter(([, value]) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'object' && Object.keys(value).length === 0 && !Array.isArray(value)) return false;
+      return true;
+    });
+
+    entries.forEach(([key, value]) => {
+      result += `${spaces}${key}`;
+      if (Array.isArray(value)) {
+        result += `:\n${convertToYAML(value, indent + 2)}`;
+      } else if (typeof value === 'object' && value !== null) {
+        result += `:\n${convertToYAML(value, indent + 2)}`;
+      } else if (typeof value === 'string') {
+        result += `: "${value}"\n`;
+      } else if (typeof value === 'boolean' || typeof value === 'number') {
+        result += `: ${value}\n`;
+      } else {
+        result += `: ${JSON.stringify(value)}\n`;
+      }
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Download recipe as YAML file
+ */
+function downloadRecipeYAML(recipe: GenericRecipe): void {
+  const recipeName = recipe.recipe.metadata.name || 'recipe';
+  const yamlContent = `recipe:\n${convertToYAML(recipe.recipe, 2)}`;
+
+  const element = document.createElement('a');
+  element.setAttribute(
+    'href',
+    `data:text/yaml;charset=utf-8,${encodeURIComponent(yamlContent)}`
+  );
+  element.setAttribute('download', `${recipeName}.yaml`);
+  element.style.display = 'none';
+
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}

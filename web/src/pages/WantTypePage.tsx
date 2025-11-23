@@ -212,7 +212,25 @@ export default function WantTypePage() {
         onClose={() => setSelectedWantType(null)}
         title={selectedWantType ? selectedWantType.metadata.name : undefined}
       >
-        <WantTypeDetailsSidebar wantType={selectedWantType} />
+        <WantTypeDetailsSidebar
+          wantType={selectedWantType}
+          onDownload={(wantType) => {
+            const filename = `${wantType.metadata.name}.json`;
+            const jsonContent = JSON.stringify(wantType, null, 2);
+
+            const element = document.createElement('a');
+            element.setAttribute(
+              'href',
+              `data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}`
+            );
+            element.setAttribute('download', filename);
+            element.style.display = 'none';
+
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+          }}
+        />
       </RightSidebar>
 
       {/* Notification Toast */}
