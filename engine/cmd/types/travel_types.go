@@ -844,7 +844,6 @@ func (t *TravelCoordinatorWant) Exec() bool {
 		case schedData := <-in:
 			if schedule, ok := schedData.(*TravelSchedule); ok {
 				schedules = append(schedules, schedule)
-				InfoLog("[TRAVEL_COORDINATOR] Received schedule from child (want #%d): %d events\n", i+1, len(schedule.Events))
 			}
 		default:
 			// No data on this channel in this cycle, continue to next channel
@@ -860,7 +859,6 @@ func (t *TravelCoordinatorWant) Exec() bool {
 
 	// When we have all schedules, create final itinerary
 	if len(schedules) >= t.GetInCount() { // Check if all expected schedules are collected
-		InfoLog("[TRAVEL_COORDINATOR] All %d schedules collected, combining events...\n", len(schedules))
 
 		// Combine and sort all events
 		allEvents := make([]TimeSlot, 0)
@@ -884,7 +882,6 @@ func (t *TravelCoordinatorWant) Exec() bool {
 			"total_processed": len(allEvents),
 			"final_itinerary": allEvents, // Store the combined and sorted itinerary
 		})
-		InfoLog("[TRAVEL_COORDINATOR] Final itinerary created with %d events. Coordinator completed.\n", len(allEvents))
 		return true // All schedules collected and processed, coordinator is complete
 	}
 
@@ -945,8 +942,6 @@ func (b *BuffetCoordinatorWant) Exec() bool {
 	select {
 	case schedData := <-in:
 		if schedule, ok := schedData.(*TravelSchedule); ok {
-			InfoLog("[BUFFET_COORDINATOR] Received buffet schedule with %d events\n", len(schedule.Events))
-
 			// Store the buffet schedule in state
 			b.StoreState("buffet_schedule", schedule)
 
