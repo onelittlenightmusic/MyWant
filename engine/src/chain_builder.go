@@ -170,7 +170,6 @@ func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector m
 
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
-	DebugLog("[PATH_GEN:START] Starting path generation, %d wants in runtime\n", len(cb.wants))
 	pathMap := make(map[string]*Paths)
 
 	// Initialize empty paths for all runtime wants
@@ -186,25 +185,18 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		paths := pathMap[wantName]
 
 		// Process using connections for this want
-		DebugLog("[PATH_GEN:CHECKING] Want %s has Using specs: %v (len=%d)\n", wantName, want.GetSpec().Using, len(want.GetSpec().Using))
 		if len(want.GetSpec().Using) > 0 {
-			DebugLog("[PATH_GEN:MATCH] Want %s has %d using selectors\n", wantName, len(want.GetSpec().Using))
 		}
-		for selectorIdx, usingSelector := range want.GetSpec().Using {
+		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-			DebugLog("[PATH_GEN:SELECTOR] Want %s selector[%d]: %v\n", wantName, selectorIdx, usingSelector)
-			DebugLog("[PATH_GEN:SEARCH] Searching %d available wants for matches\n", len(cb.wants))
 
 			// Find wants that match this using selector (from runtime only - all wants should be here by connectPhase)
 			for otherName, otherWant := range cb.wants {
 				if wantName == otherName {
 					continue // Skip self-matching
 				}
-				DebugLog("[PATH_GEN:CHECK] Checking %s (labels: %v) against selector %v\n",
-					otherName, otherWant.GetMetadata().Labels, usingSelector)
 				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 					matchCount++
-					DebugLog("[PATH_GEN:MATCH_FOUND] %s matches selector for %s\n", otherName, wantName)
 
 					// Create using path for current want
 					// Create a channel directly typed as chain.Chan
@@ -227,7 +219,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 				}
 			}
 			if matchCount == 0 {
-				DebugLog("[PATH_GEN:NO_MATCH] Selector %v for %s matched 0 wants\n", usingSelector, wantName)
 			}
 		}
 	}
@@ -235,8 +226,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	// Convert pointers back to values for the return type
 	result := make(map[string]Paths)
 	for wantName, pathsPtr := range pathMap {
-		DebugLog("[PATH_GEN_RESULT] Want %s: %d input paths, %d output paths\n",
-			wantName, len(pathsPtr.In), len(pathsPtr.Out))
 		result[wantName] = *pathsPtr
 	}
 	return result
@@ -258,22 +247,14 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 		// Store connectivity status for reconcile loop decision
 		// If required inputs not met, mark want as waiting for connections
 		if inCount < meta.RequiredInputs {
-			DebugLog("[RECONCILE:CONNECT] Want %s needs %d inputs but has %d (waiting for connections)",
-				wantName, meta.RequiredInputs, inCount)
 		}
 		if outCount < meta.RequiredOutputs {
-			DebugLog("[RECONCILE:CONNECT] Want %s needs %d outputs but has %d (waiting for connections)",
-				wantName, meta.RequiredOutputs, outCount)
 		}
 
 		// Validate constraints
 		if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
-			DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d inputs but max is %d",
-				wantName, inCount, meta.MaxInputs)
 		}
 		if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
-			DebugLog("[RECONCILE:CONNECT] Warning: Want %s has %d outputs but max is %d",
-				wantName, outCount, meta.MaxOutputs)
 		}
 	}
 }
@@ -489,7 +470,6 @@ func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
 // reconcileLoop main reconcile loop that handles both initial config load and dynamic changes
 func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
-	DebugLog("[RECONCILE] Loading initial configuration")
 	cb.reconcileWants()
 
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -503,7 +483,6 @@ func (cb *ChainBuilder) reconcileLoop() {
 			InfoLog("[RECONCILE] Stopping reconcile loop")
 			return
 		case <-cb.reconcileTrigger:
-			DebugLog("[RECONCILE] Triggered reconciliation")
 			cb.reconcileWants()
 		case newWants := <-cb.addWantsChan:
 			// Add wants to config and runtime
@@ -537,11 +516,9 @@ func (cb *ChainBuilder) reconcileLoop() {
 			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
-				DebugLog("[RECONCILE] Detected config change")
 				// Load memory file into config before reconciling
 				if newConfig, err := cb.loadMemoryConfig(); err == nil {
 					cb.config = newConfig
-					DebugLog("[RECONCILE] Loaded %d wants from memory file\n", len(newConfig.Wants))
 				} else {
 					InfoLog("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
 				}
@@ -563,7 +540,6 @@ func (cb *ChainBuilder) reconcileWants() {
 	cb.inReconciliation = true
 	defer func() { cb.inReconciliation = false }()
 
-	DebugLog("[RECONCILE] Starting reconciliation with separated phases")
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
@@ -580,12 +556,10 @@ func (cb *ChainBuilder) reconcileWants() {
 	// Phase 3: START - Launch new/updated wants
 	cb.startPhase()
 
-	DebugLog("[RECONCILE] All phases completed successfully")
 }
 
 // compilePhase handles configuration loading and want creation/updates
 func (cb *ChainBuilder) compilePhase() error {
-	DebugLog("[RECONCILE:COMPILE] Loading and validating configuration")
 
 	// Use current config as source of truth during runtime
 	// Memory file is only loaded on initial startup
@@ -595,7 +569,6 @@ func (cb *ChainBuilder) compilePhase() error {
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
 
 	if isInitialLoad {
-		DebugLog("[RECONCILE:COMPILE] Initial load: processing %d wants\n", len(newConfig.Wants))
 		// For initial load, treat all wants as new additions
 		for _, wantConfig := range newConfig.Wants {
 			cb.addDynamicWantUnsafe(wantConfig)
@@ -612,11 +585,9 @@ func (cb *ChainBuilder) compilePhase() error {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
 		if len(changes) == 0 {
-			DebugLog("[RECONCILE:COMPILE] No configuration changes detected")
 			return nil
 		}
 
-		DebugLog("[RECONCILE:COMPILE] Processing %d configuration changes\n", len(changes))
 
 		// Apply changes in reverse dependency order (sink to generator)
 		cb.applyWantChanges(changes)
@@ -629,28 +600,20 @@ func (cb *ChainBuilder) compilePhase() error {
 	cb.lastConfig = cb.deepCopyConfig(newConfig)
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 
-	DebugLog("[RECONCILE:COMPILE] Configuration compilation completed")
 	return nil
 }
 
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
-	DebugLog("[RECONCILE:CONNECT] Establishing want topology")
 
-	// DEBUG: Log all wants in cb.wants at connectPhase start
-	DebugLog("[RECONCILE:CONNECT] Wants in cb.wants at connectPhase start: %d\n", len(cb.wants))
-	for wantName, runtimeWant := range cb.wants {
-		DebugLog("[RECONCILE:CONNECT]   - Want: %s (Type: %s, Using: %v)\n", wantName, runtimeWant.want.Metadata.Type, runtimeWant.want.Spec.Using)
-	}
 
 	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
 
 	// Build parameter subscription connectivity for Target wants
 	// This references the owner-children relationships already established in OwnerReferences metadata
-	DebugLog("[RECONCILE:CONNECT] Building parameter subscriptions for Target wants (total wants: %d)", len(cb.wants))
 	targetCount := 0
-	for wantName, runtimeWant := range cb.wants {
+	for _, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
 			targetCount++
 
@@ -667,31 +630,18 @@ func (cb *ChainBuilder) connectPhase() error {
 				}
 			}
 
-			DebugLog("[RECONCILE:CONNECT] Found Target want: %s (RecipePath: %s, has loader: %v, children: %d)",
-				wantName, target.RecipePath, target.recipeLoader != nil, childCount)
 
 			if target.RecipePath != "" && target.recipeLoader != nil {
 				// Parse recipe to build parameter subscription map based on ownership
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
-					DebugLog("[RECONCILE:CONNECT] Warning: Failed to build parameter subscriptions for %s: %v",
-						target.Metadata.Name, err)
 				}
 			}
 		}
 	}
-	DebugLog("[RECONCILE:CONNECT] Processed %d Target wants for subscription building", targetCount)
 
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
-	// DEBUG: Log what paths were generated
-	DebugLog("[RECONCILE:CONNECT] Generated pathMap: %d entries\n", len(cb.pathMap))
-	for wantName, paths := range cb.pathMap {
-		DebugLog("[RECONCILE:CONNECT] Want '%s': In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
-		for i, outPath := range paths.Out {
-			DebugLog("[RECONCILE:CONNECT]   Out[%d]: Name=%s, Active=%v\n", i, outPath.Name, outPath.Active)
-		}
-	}
 
 	// CRITICAL FIX: Synchronize generated paths to individual Want structs
 	// This ensures child wants can access their output channels when they execute
@@ -702,9 +652,7 @@ func (cb *ChainBuilder) connectPhase() error {
 			// This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
-			DebugLog("[RECONCILE:CONNECT] Synchronized paths for '%s': Set In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
 		} else {
-			DebugLog("[RECONCILE:CONNECT] Want '%s' NOT FOUND in cb.wants (unable to sync paths)\n", wantName)
 		}
 	}
 
@@ -728,7 +676,6 @@ func (cb *ChainBuilder) connectPhase() error {
 	}
 	cb.channelMutex.Unlock()
 
-	DebugLog("[RECONCILE:CONNECT] Topology established: %d channels created\n", channelCount)
 	return nil
 }
 
@@ -790,7 +737,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 		actualChildName := runtimeChild.Metadata.Name
 
 		// Iterate through child's params to find which parent params it uses
-		for childParamName, childParamValue := range recipeWant.Spec.Params {
+		for _, childParamValue := range recipeWant.Spec.Params {
 			// Check if this param value references a parent parameter (simple string match)
 			if paramRefStr, ok := childParamValue.(string); ok {
 				// If the value matches a parent parameter name, it's a subscription
@@ -799,22 +746,17 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 						target.parameterSubscriptions[paramRefStr],
 						actualChildName,
 					)
-					DebugLog("[RECONCILE:CONNECT] Target %s: Child %s subscribes to parameter %s (as %s)",
-						target.Metadata.Name, actualChildName, paramRefStr, childParamName)
 				}
 			}
 		}
 	}
 
-	DebugLog("[RECONCILE:CONNECT] Target %s: Built parameter subscriptions: %v",
-		target.Metadata.Name, target.parameterSubscriptions)
 
 	return nil
 }
 
 // processAutoConnections handles system-wide auto-connection for RecipeAgent wants
 func (cb *ChainBuilder) processAutoConnections() {
-	DebugLog("[RECONCILE:AUTOCONNECT] Processing auto-connections for RecipeAgent wants")
 
 	// Collect all wants with RecipeAgent enabled
 	autoConnectWants := make([]*runtimeWant, 0)
@@ -827,7 +769,6 @@ func (cb *ChainBuilder) processAutoConnections() {
 		want := runtimeWant.want
 		if cb.hasRecipeAgent(want) {
 			autoConnectWants = append(autoConnectWants, runtimeWant)
-			DebugLog("[RECONCILE:AUTOCONNECT] Found RecipeAgent want: %s\n", want.Metadata.Name)
 		}
 	}
 
@@ -838,7 +779,6 @@ func (cb *ChainBuilder) processAutoConnections() {
 		// Note: want object itself has been updated, no need to sync to separate spec copy
 	}
 
-	DebugLog("[RECONCILE:AUTOCONNECT] Processed auto-connections for %d RecipeAgent wants\n", len(autoConnectWants))
 }
 
 // hasRecipeAgent checks if a want has RecipeAgent functionality enabled
@@ -860,7 +800,6 @@ func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
 
 // autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
 func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
-	DebugLog("[RECONCILE:AUTOCONNECT] Processing auto-connection for want %s\n", want.Metadata.Name)
 
 	// Look for approval_id in want's params or labels
 	approvalID := ""
@@ -882,11 +821,9 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	}
 
 	if approvalID == "" {
-		DebugLog("[RECONCILE:AUTOCONNECT] No approval_id found for want %s, skipping\n", want.Metadata.Name)
 		return
 	}
 
-	DebugLog("[RECONCILE:AUTOCONNECT] Found approval_id: %s for want %s\n", approvalID, want.Metadata.Name)
 
 	// Initialize using selectors if nil
 	if want.Spec.Using == nil {
@@ -962,24 +899,16 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 					if !duplicate {
 						want.Spec.Using = append(want.Spec.Using, selector)
 						connectionsAdded++
-						DebugLog("[RECONCILE:AUTOCONNECT] Added connection: %s -> %v (from %s)\n",
-							want.Metadata.Name, selector, otherWant.Metadata.Name)
 
 					} else {
-						DebugLog("[RECONCILE:AUTOCONNECT] Skipping duplicate connection: %s -> %v\n",
-							want.Metadata.Name, selector)
 
 					}
 				} else {
-					DebugLog("[RECONCILE:AUTOCONNECT] Skipping connection to %s (role: %s) - not a data provider\n",
-						otherWant.Metadata.Name, role)
 				}
 			}
 		}
 	}
 
-	DebugLog("[RECONCILE:AUTOCONNECT] Completed auto-connection for %s with %d connections\n",
-		want.Metadata.Name, connectionsAdded)
 }
 
 // addConnectionLabel adds a unique label to source want indicating which coordinator is using it
@@ -995,8 +924,6 @@ func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want)
 	if connectionKey != "" {
 		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
 		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
-		DebugLog("[RECONCILE:AUTOCONNECT] Added connection label to %s: %s=%s\n",
-			sourceWant.Metadata.Name, labelKey, consumerWant.Metadata.Name)
 	}
 }
 
@@ -1034,7 +961,6 @@ func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
 
 // startPhase handles launching new/updated wants
 func (cb *ChainBuilder) startPhase() {
-	DebugLog("[RECONCILE:START] Launching new and updated wants")
 
 	// Start new wants if system is running
 	if cb.running {
@@ -1051,19 +977,12 @@ func (cb *ChainBuilder) startPhase() {
 					outCount := len(paths.Out)
 
 					// Log detailed info for debugging
-					DebugLog("[RECONCILE:START:DEBUG] Want %s (%s): inCount=%d (required=%d), outCount=%d (required=%d)\n",
-						wantName, meta.WantType, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
 
 					// Skip if required connections are not met
 					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-						DebugLog("[RECONCILE:START] Skipping idle want %s (%s) - %s requires %d inputs (%d avail), %d outputs (%d avail) - REMAIN IDLE\n",
-							wantName, meta.WantType, meta.Description, meta.RequiredInputs, inCount, meta.RequiredOutputs, outCount)
 						continue
 					}
-					DebugLog("[RECONCILE:START] Starting idle want %s (%s) - has required connections: %d inputs, %d outputs\n",
-						wantName, meta.WantType, inCount, outCount)
 				} else {
-					DebugLog("[RECONCILE:START] Starting idle want %s (non-enhanced, no connectivity check)\n", wantName)
 				continue
 				}
 
@@ -1076,7 +995,6 @@ func (cb *ChainBuilder) startPhase() {
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusCompleted {
 				if cb.shouldRestartCompletedWant(wantName, want) {
-					DebugLog("[RECONCILE:START] Restarting completed want %s (upstream has new data)\n", wantName)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
@@ -1084,7 +1002,6 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		DebugLog("[RECONCILE:START] Started %d wants in first pass\n", startedCount)
 
 		// Third pass: start any idle wants that now have required connections available
 		// This allows wants with inputs from just-completed upstream wants to execute
@@ -1099,16 +1016,12 @@ func (cb *ChainBuilder) startPhase() {
 
 				// Start if required connections are now available
 				if inCount >= meta.RequiredInputs && outCount >= meta.RequiredOutputs {
-					DebugLog("[RECONCILE:START] Starting idle want %s (inputs/outputs now available)\n", wantName)
 					cb.startWant(wantName, want)
 					additionalStarted++
 				}
 			}
 		}
-		DebugLog("[RECONCILE:START] Started %d additional wants in third pass\n", additionalStarted)
-		DebugLog("[RECONCILE:START] Total started: %d wants\n", startedCount+additionalStarted)
 	} else {
-		DebugLog("[RECONCILE:START] System not running, wants will be started later")
 	}
 }
 
@@ -1137,7 +1050,6 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
 
-	DebugLog("[RECONCILE:DETECT] Comparing configs: old=%d wants, new=%d wants\n", len(oldConfig.Wants), len(newConfig.Wants))
 
 	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
@@ -1155,14 +1067,12 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 		if oldWant, exists := oldWants[name]; exists {
 			// Check if want changed
 			if !cb.wantsEqual(oldWant, newWant) {
-				DebugLog("[RECONCILE:DETECT] Want changed: %s (old Using: %v, new Using: %v)\n", name, oldWant.Spec.Using, newWant.Spec.Using)
 				changes = append(changes, ChangeEvent{
 					Type:     ChangeEventUpdate,
 					WantName: name,
 					Want:     newWant,
 				})
 			} else {
-				DebugLog("[RECONCILE:DETECT] Want NOT changed: %s (oldWant ptr=%p, newWant ptr=%p, same=%v)\n", name, oldWant, newWant, oldWant == newWant)
 			}
 		} else {
 			// New want
@@ -1177,7 +1087,6 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	// Find deletions
 	for name := range oldWants {
 		if _, exists := newWants[name]; !exists {
-			DebugLog("[RECONCILE:DETECT] Detected deletion of want: %s\n", name)
 			changes = append(changes, ChangeEvent{
 				Type:     ChangeEventDelete,
 				WantName: name,
@@ -1331,8 +1240,6 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 				}
 
 				if updatedConfigWant != nil {
-					DebugLog("[APPLY_CHANGES] Syncing config to runtime for %s: Using %v -> %v\n",
-						change.WantName, runtimeWant.want.GetSpec().Using, updatedConfigWant.Spec.Using)
 
 					// Update the spec reference to point to the new config want's spec
 					// This ensures generatePathsFromConnections sees the updated spec
@@ -1355,9 +1262,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					// Reset status to Idle so want can be re-executed with new configuration
 					runtimeWant.want.SetStatus(WantStatusIdle)
 
-					DebugLog("[APPLY_CHANGES] Runtime want %s synced successfully (spec updated to config version)\n", change.WantName)
 				} else {
-					DebugLog("[APPLY_CHANGES] WARNING: Could not find updated config want for %s\n", change.WantName)
 				}
 			}
 			hasWantChanges = true
@@ -1619,10 +1524,9 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 // Automatically triggers reconciliation to process topology changes
 // Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-	DebugLog("[UPDATE_WANT] UpdateWant called for: %s (ID: %s), Using: %v\n", wantConfig.Metadata.Name, wantConfig.Metadata.ID, wantConfig.Spec.Using)
 
 	// Find the existing want by metadata.id using universal search
-	_, wantName, exists := cb.FindWantByID(wantConfig.Metadata.ID)
+	_, _, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
 		// Want not found, add as new
 		cb.addDynamicWantUnsafe(wantConfig)
@@ -1633,14 +1537,12 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	configUpdated := false
 	for i, cfgWant := range cb.config.Wants {
 		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
-			DebugLog("[UPDATE_WANT] Updating config want %s: Using %v -> %v\n", wantName, cfgWant.Spec.Using, wantConfig.Spec.Using)
 			cb.config.Wants[i] = wantConfig
 			configUpdated = true
 			break
 		}
 	}
 	if !configUpdated {
-		DebugLog("[UPDATE_WANT] WARNING: Could not find config want by ID %s for %s\n", wantConfig.Metadata.ID, wantName)
 	}
 
 	// Trigger immediate reconciliation via channel (unless already in reconciliation)
@@ -1675,8 +1577,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Check if this want's connectivity requirements are satisfied
 	// If not, skip execution - the reconcile loop will retry once connections are available
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		DebugLog("[EXEC] Skipping want %s - connectivity requirements not yet satisfied",
-			wantName)
 		// Set to Idle state so the Third pass in reconcile can retry this want
 		want.want.SetStatus(WantStatusIdle)
 		return
@@ -1692,21 +1592,16 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Only require paths if the want has 'using' selectors
 	// Entry point wants (like Target) don't need paths
 	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
-		DebugLog("[EXEC] ERROR: Want %s has using selectors but no input paths in pathMap",
-			wantName)
 		return
 	}
 
 	// Check if connectivity requirements are satisfied before executing
 	// If not satisfied, trigger reconciliation to re-attempt path generation
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		DebugLog("[EXEC] Want %s connectivity requirements not satisfied, triggering reconciliation",
-			wantName)
 		// Set to Idle state so the Third pass in reconcile can retry this want
 		want.want.SetStatus(WantStatusIdle)
 		// Trigger reconciliation to retry path generation and connection
 		if err := cb.TriggerReconcile(); err != nil {
-			DebugLog("[EXEC] Failed to trigger reconcile for %s: %v", wantName, err)
 		}
 		return
 	}
@@ -1745,8 +1640,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 			}()
 
-			DebugLog("[EXEC] Starting want %s with %d using, %d outputs\n",
-				wantName, len(activeInputPaths), len(activeOutputPaths))
 
 			for {
 				// Begin execution cycle for batching state changes
@@ -1771,7 +1664,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 
 				if finished {
-					DebugLog("[EXEC] Want %s finished\n", wantName)
 
 					// Update want status to completed
 					cb.reconcileMutex.RLock()
@@ -1784,7 +1676,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					// Trigger reconciliation after want completes
 					// This allows Target wants that created children to be properly connected
 					// and allows idle children to be started
-					DebugLog("[EXEC] Triggering reconciliation after want %s completion\n", wantName)
 					if err := cb.TriggerReconcile(); err != nil {
 						InfoLog("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
@@ -2064,7 +1955,6 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	if !cb.inReconciliation {
 		select {
 		case cb.reconcileTrigger <- true:
-			DebugLog("[RECONCILE:TRIGGER] Reconciliation triggered by addDynamicWantUnsafe for: %s\n", want.Metadata.Name)
 		default:
 			// Channel already has a pending trigger, skip
 		}

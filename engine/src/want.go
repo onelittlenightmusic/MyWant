@@ -227,7 +227,6 @@ func (n *Want) BeginExecCycle() {
 	for k := range n.pendingParameterChanges {
 		delete(n.pendingParameterChanges, k)
 	}
-	DebugLog("[EXEC:CYCLE] %s: BeginExecCycle (cycle #%d)\n", n.Metadata.Name, n.execCycleCount)
 }
 
 // EndExecCycle completes the execution cycle and commits all batched state and parameter changes
@@ -242,7 +241,6 @@ func (n *Want) EndExecCycle() {
 	n.stateMutex.Unlock()
 
 	if changeCount > 0 {
-		DebugLog("[STATE:HISTORY] %s: EndExecCycle processing %d pending state changes\n", n.Metadata.Name, changeCount)
 	}
 
 	n.AggregateChanges()
@@ -277,11 +275,9 @@ func (n *Want) AggregateChanges() {
 	}
 	n.stateMutex.Unlock()
 
-	DebugLog("[AGGREGATE] %s: AggregateChanges with %d changes\n", n.Metadata.Name, len(changesCopy))
 
 	// Create history entries (each will acquire lock internally)
 	if len(changesCopy) > 0 {
-		DebugLog("[AGGREGATE] %s: Calling addAggregatedStateHistory\n", n.Metadata.Name)
 		n.addAggregatedStateHistory()
 	}
 
@@ -441,11 +437,8 @@ func (n *Want) StoreState(key string, value interface{}) {
 		n.pendingStateChanges = make(map[string]interface{})
 	}
 	n.pendingStateChanges[key] = value
-
-	inCycle := n.inExecCycle
 	n.stateMutex.Unlock()
 
-	DebugLog("[STATE:STORE] %s: StoreState(%s=%v, inCycle=%v)\n", n.Metadata.Name, key, value, inCycle)
 
 	// Create and send notifications AFTER releasing the lock
 	// The notification data is already captured, so no need to hold the lock
