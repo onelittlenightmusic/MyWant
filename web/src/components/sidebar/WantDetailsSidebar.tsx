@@ -236,7 +236,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={classNames(
-                    'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-md transition-colors',
+                    'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
                     activeTab === tab.id
                       ? 'bg-white text-blue-600 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
