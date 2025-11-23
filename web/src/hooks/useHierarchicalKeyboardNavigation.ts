@@ -48,18 +48,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          nextItem = getNextSibling(items, currentItem);
-          shouldNavigate = !!nextItem;
-          break;
-
-        case 'ArrowUp':
-          e.preventDefault();
-          nextItem = getPreviousSibling(items, currentItem);
-          shouldNavigate = !!nextItem;
-          break;
-
-        case 'ArrowRight':
-          e.preventDefault();
+          // Down arrow: navigate within hierarchy
           if (currentItem) {
             // Try to move to first child
             nextItem = getFirstChild(items, currentItem);
@@ -74,16 +63,31 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           shouldNavigate = !!nextItem;
           break;
 
-        case 'ArrowLeft':
+        case 'ArrowUp':
           e.preventDefault();
+          // Up arrow: navigate up within hierarchy
           if (currentItem) {
-            // Try to move to parent
-            nextItem = getParent(items, currentItem);
-            if (!nextItem) {
-              // If no parent, move to previous sibling at same level
-              nextItem = getPreviousSibling(items, currentItem);
+            // Try to move to previous sibling
+            nextItem = getPreviousSibling(items, currentItem);
+            if (!nextItem && currentItem.parentId) {
+              // If no siblings and has parent, move to parent
+              nextItem = getParent(items, currentItem);
             }
           }
+          shouldNavigate = !!nextItem;
+          break;
+
+        case 'ArrowRight':
+          e.preventDefault();
+          // Right arrow: navigate to next top-level want
+          nextItem = getNextTopLevel(items, currentItem);
+          shouldNavigate = !!nextItem;
+          break;
+
+        case 'ArrowLeft':
+          e.preventDefault();
+          // Left arrow: navigate to previous top-level want
+          nextItem = getPreviousTopLevel(items, currentItem);
           shouldNavigate = !!nextItem;
           break;
 
@@ -184,4 +188,53 @@ function getFirstChild<T extends HierarchicalItem>(items: T[], item: T): T | nul
 function getParent<T extends HierarchicalItem>(items: T[], item: T): T | null {
   if (!item.parentId) return null;
   return items.find(i => i.id === item.parentId) || null;
+}
+
+/**
+ * Get all top-level items (items without a parent)
+ */
+function getTopLevelItems<T extends HierarchicalItem>(items: T[]): T[] {
+  return items.filter(i => !i.parentId);
+}
+
+/**
+ * Get the next top-level item
+ */
+function getNextTopLevel<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
+  if (!item) return null;
+
+  // If current item is not top-level, find its parent
+  let topLevelItem = item;
+  if (item.parentId) {
+    topLevelItem = getParent(items, item) || item;
+  }
+
+  const topLevelItems = getTopLevelItems(items);
+  const currentIndex = topLevelItems.findIndex(i => i.id === topLevelItem.id);
+
+  if (currentIndex < topLevelItems.length - 1) {
+    return topLevelItems[currentIndex + 1];
+  }
+  return null;
+}
+
+/**
+ * Get the previous top-level item
+ */
+function getPreviousTopLevel<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
+  if (!item) return null;
+
+  // If current item is not top-level, find its parent
+  let topLevelItem = item;
+  if (item.parentId) {
+    topLevelItem = getParent(items, item) || item;
+  }
+
+  const topLevelItems = getTopLevelItems(items);
+  const currentIndex = topLevelItems.findIndex(i => i.id === topLevelItem.id);
+
+  if (currentIndex > 0) {
+    return topLevelItems[currentIndex - 1];
+  }
+  return null;
 }
