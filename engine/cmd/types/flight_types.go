@@ -30,7 +30,13 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 		Duration:           12 * time.Hour, // Default 12 hour flight
 		DepartureDate:      "2024-01-01",   // Default departure date
 		monitoringActive:   false,
-		monitoringDuration: 60 * time.Second, // Monitor for 60 seconds after flight creation
+		// monitoringDuration: 60-second window to monitor flight status for stability
+		// After initial booking or rebooking, the system monitors the flight schedule for 60 seconds
+		// to ensure it has stabilized before marking completion. This allows detection of immediate
+		// status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
+		// window expires, if no issues are detected, the FlightWant completes and notifies the
+		// parent Target want, allowing the entire travel plan to complete.
+		monitoringDuration: 60 * time.Second,
 	}
 
 	// Initialize base Want fields
@@ -101,8 +107,15 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 }
 
 // Exec creates a flight booking reservation
+// The execution flow includes three main phases:
+// 1. Agent execution: Book or rebook flights using the agent system
+// 2. Monitoring phase: Wait for the 60-second stability window to detect any issues
+// 3. Completion: After monitoring expires, return true to complete and notify parent
 func (f *FlightWant) Exec() bool {
 	// Handle continuous monitoring phase
+	// During this phase, the flight status is monitored for 60 seconds after booking/rebooking.
+	// If no issues are detected, the want completes and notifies the parent Target want that
+	// the flight reservation has stabilized. The parent can then complete once all children finish.
 	if f.monitoringActive {
 		// Continue running monitoring during the monitoring duration
 		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
@@ -207,6 +220,10 @@ func (f *FlightWant) Exec() bool {
 				agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
 
 			// Start continuous monitoring to capture all status changes
+			// Begin the 60-second stability window - the flight schedule will be monitored to detect
+			// any immediate changes (delays, cancellations, etc.) that would require rebooking.
+			// The parent Target want cannot complete until this monitoring period expires and the
+			// flight returns true (completion), signaling that the flight has stabilized.
 			if !f.monitoringActive {
 				f.monitoringActive = true
 				f.monitoringStartTime = time.Now()
