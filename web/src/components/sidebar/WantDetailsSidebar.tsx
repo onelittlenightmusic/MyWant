@@ -5,6 +5,8 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
+import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
+import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
@@ -475,24 +477,16 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
             {/* Edit form */}
             {editingLabelKey !== null && (
               <div className="space-y-3 pt-4 border-t border-gray-200">
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="text"
-                    value={editingLabelDraft.key}
-                    onChange={(e) => setEditingLabelDraft(prev => ({ ...prev, key: e.target.value }))}
-                    placeholder="Key"
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={updateLoading}
-                  />
-                  <input
-                    type="text"
-                    value={editingLabelDraft.value}
-                    onChange={(e) => setEditingLabelDraft(prev => ({ ...prev, value: e.target.value }))}
-                    placeholder="Value"
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={updateLoading}
-                  />
-                </div>
+                <LabelAutocomplete
+                  keyValue={editingLabelDraft.key}
+                  valueValue={editingLabelDraft.value}
+                  onKeyChange={(key) => setEditingLabelDraft(prev => ({ ...prev, key }))}
+                  onValueChange={(value) => setEditingLabelDraft(prev => ({ ...prev, value }))}
+                  onRemove={() => {
+                    setEditingLabelKey(null);
+                    setEditingLabelDraft({ key: '', value: '' });
+                  }}
+                />
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
@@ -618,24 +612,16 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
           {/* Edit form for dependencies */}
           {editingUsingIndex !== null && (
             <div className="space-y-3 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={editingUsingDraft.key}
-                  onChange={(e) => setEditingUsingDraft(prev => ({ ...prev, key: e.target.value }))}
-                  placeholder="Key"
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={updateLoading}
-                />
-                <input
-                  type="text"
-                  value={editingUsingDraft.value}
-                  onChange={(e) => setEditingUsingDraft(prev => ({ ...prev, value: e.target.value }))}
-                  placeholder="Value"
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={updateLoading}
-                />
-              </div>
+              <LabelSelectorAutocomplete
+                keyValue={editingUsingDraft.key}
+                valuValue={editingUsingDraft.value}
+                onKeyChange={(key) => setEditingUsingDraft(prev => ({ ...prev, key }))}
+                onValueChange={(value) => setEditingUsingDraft(prev => ({ ...prev, value }))}
+                onRemove={() => {
+                  setEditingUsingIndex(null);
+                  setEditingUsingDraft({ key: '', value: '' });
+                }}
+              />
               <div className="flex gap-2">
                 <button
                   onClick={() => {
