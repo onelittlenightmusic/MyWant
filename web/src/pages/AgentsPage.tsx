@@ -4,6 +4,8 @@ import { AgentResponse } from '@/types/agent';
 import { useAgentStore } from '@/stores/agentStore';
 
 import { classNames } from '@/utils/helpers';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 // Components
 import { Header } from '@/components/layout/Header';
@@ -32,6 +34,8 @@ export const AgentsPage: React.FC = () => {
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentResponse | null>(null);
   const [deleteAgentState, setDeleteAgentState] = useState<AgentResponse | null>(null);
+  const [currentAgentIndex, setCurrentAgentIndex] = useState(-1);
+  const [filteredAgents, setFilteredAgents] = useState<AgentResponse[]>([]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +87,35 @@ export const AgentsPage: React.FC = () => {
     setEditingAgent(null);
     setDeleteAgentState(null);
   };
+
+  // Keyboard navigation handler
+  const handleKeyboardNavigate = (index: number) => {
+    if (filteredAgents[index]) {
+      setCurrentAgentIndex(index);
+      setSelectedAgent(filteredAgents[index]);
+    }
+  };
+
+  // Keyboard navigation hook
+  useKeyboardNavigation({
+    itemCount: filteredAgents.length,
+    currentIndex: currentAgentIndex,
+    onNavigate: handleKeyboardNavigate,
+    enabled: !showCreateForm && !editingAgent && filteredAgents.length > 0
+  });
+
+  // Handle ESC key to close details sidebar and deselect
+  const handleEscapeKey = () => {
+    if (selectedAgent) {
+      setSelectedAgent(null);
+      setCurrentAgentIndex(-1);
+    }
+  };
+
+  useEscapeKey({
+    onEscape: handleEscapeKey,
+    enabled: !!selectedAgent
+  });
 
   // Stats calculation
   const stats = {
@@ -289,6 +322,7 @@ export const AgentsPage: React.FC = () => {
               onViewAgent={handleViewAgent}
               onEditAgent={handleEditAgent}
               onDeleteAgent={setDeleteAgentState}
+              onGetFilteredAgents={setFilteredAgents}
             />
           </div>
         </main>

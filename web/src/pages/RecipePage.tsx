@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Plus, BookOpen, Menu, Check, AlertCircle } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { GenericRecipe } from '@/types/recipe';
+import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 import RecipeModal from '@/components/modals/RecipeModal';
 import { RecipeDetailsSidebar } from '@/components/sidebar/RecipeDetailsSidebar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
@@ -28,6 +30,7 @@ export default function RecipePage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<GenericRecipe | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [filteredRecipes, setFilteredRecipes] = useState<GenericRecipe[]>([]);
 
   useEffect(() => {
     fetchRecipes();
@@ -70,6 +73,36 @@ export default function RecipePage() {
     }
   };
 
+  // Keyboard navigation
+  const currentRecipeIndex = selectedRecipe
+    ? filteredRecipes.findIndex(r => r.recipe.metadata.name === selectedRecipe.recipe.metadata.name)
+    : -1;
+
+  const handleKeyboardNavigate = (index: number) => {
+    if (index >= 0 && index < filteredRecipes.length) {
+      const recipe = filteredRecipes[index];
+      handleViewRecipe(recipe);
+    }
+  };
+
+  useKeyboardNavigation({
+    itemCount: filteredRecipes.length,
+    currentIndex: currentRecipeIndex,
+    onNavigate: handleKeyboardNavigate,
+    enabled: !showCreateModal && !showEditModal && filteredRecipes.length > 0
+  });
+
+  // Handle ESC key to close details sidebar and deselect
+  const handleEscapeKey = () => {
+    if (selectedRecipe) {
+      setSelectedRecipe(null);
+    }
+  };
+
+  useEscapeKey({
+    onEscape: handleEscapeKey,
+    enabled: !!selectedRecipe
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -192,6 +225,7 @@ export default function RecipePage() {
             onEditRecipe={handleEditRecipe}
             onDeleteRecipe={handleDeleteRecipe}
             onSelectRecipe={setSelectedRecipe}
+            onGetFilteredRecipes={setFilteredRecipes}
           />
 
           {/* Modals */}

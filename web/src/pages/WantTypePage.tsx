@@ -3,6 +3,7 @@ import { Menu, Zap, AlertCircle } from 'lucide-react';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { WantTypeListItem } from '@/types/wantType';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { WantTypeGrid } from '@/components/dashboard/WantTypeGrid';
 import { WantTypeMenu } from '@/components/dashboard/WantTypeMenu';
 import { WantTypeDetailsSidebar } from '@/components/sidebar/WantTypeDetailsSidebar';
@@ -97,6 +98,18 @@ export default function WantTypePage() {
     currentIndex: currentWantTypeIndex,
     onNavigate: handleKeyboardNavigate,
     enabled: allFilteredWantTypes.length > 0
+  });
+
+  // Handle ESC key to close details sidebar and deselect
+  const handleEscapeKey = () => {
+    if (detailsSidebarOpen) {
+      setDetailsSidebarOpen(false);
+    }
+  };
+
+  useEscapeKey({
+    onEscape: handleEscapeKey,
+    enabled: detailsSidebarOpen
   });
 
   return (

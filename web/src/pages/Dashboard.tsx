@@ -4,6 +4,7 @@ import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames } from '@/utils/helpers';
 
@@ -60,7 +61,7 @@ export const Dashboard: React.FC = () => {
     : -1;
 
   // Header state for sidebar
-  const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: string } | null>(null);
+  const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: WantExecutionStatus } | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -211,6 +212,19 @@ export const Dashboard: React.FC = () => {
     currentIndex: currentWantIndex,
     onNavigate: handleKeyboardNavigate,
     enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
+  });
+
+  // Handle ESC key to close details sidebar and deselect
+  const handleEscapeKey = () => {
+    if (selectedWant) {
+      setSelectedWant(null);
+      setSelectedWantId(null);
+    }
+  };
+
+  useEscapeKey({
+    onEscape: handleEscapeKey,
+    enabled: !!selectedWant
   });
 
   // Determine background style for flight, hotel, restaurant, and buffet wants
