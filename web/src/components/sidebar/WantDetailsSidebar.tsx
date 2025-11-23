@@ -207,15 +207,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             <StatusBadge status={wantDetails.status} size="sm" />
             <div className="flex items-center space-x-3">
               {/* Auto refresh toggle */}
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-600 whitespace-nowrap">Auto refresh</span>
-              </label>
+              <button
+                onClick={() => setAutoRefresh(!autoRefresh)}
+                className={`p-2 rounded-md transition-colors ${
+                  autoRefresh
+                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                }`}
+                title={autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
