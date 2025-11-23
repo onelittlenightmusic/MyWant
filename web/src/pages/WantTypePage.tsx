@@ -179,21 +179,6 @@ export default function WantTypePage() {
             </div>
           )}
 
-          {/* Filter Menu */}
-          <div className="mb-6 bg-white p-4 rounded-lg border border-gray-200">
-            <WantTypeMenu
-              categories={categories}
-              patterns={patterns}
-              selectedCategory={filters.category}
-              selectedPattern={filters.pattern}
-              searchTerm={filters.searchTerm}
-              onSearchChange={handleSearch}
-              onCategoryChange={handleCategoryChange}
-              onPatternChange={handlePatternChange}
-              onClearFilters={clearFilters}
-            />
-          </div>
-
           {/* Want Types Grid */}
           <WantTypeGrid
             wantTypes={allFilteredWantTypes}
