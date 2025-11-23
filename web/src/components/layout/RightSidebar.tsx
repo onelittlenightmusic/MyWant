@@ -46,19 +46,21 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             {title && (
               <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
             )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {headerActions && (
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2">
                 {headerActions}
               </div>
             )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+              title="Close sidebar"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
-            title="Close sidebar"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Content */}
