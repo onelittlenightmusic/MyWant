@@ -5,7 +5,6 @@ import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { WantTypeGrid } from '@/components/dashboard/WantTypeGrid';
 import { WantTypeDetailsSidebar } from '@/components/sidebar/WantTypeDetailsSidebar';
-import { WantTypeControlPanel } from '@/components/dashboard/WantTypeControlPanel';
 import { WantTypeStatsOverview } from '@/components/dashboard/WantTypeStatsOverview';
 import { WantTypeFilters } from '@/components/dashboard/WantTypeFilters';
 import { RightSidebar } from '@/components/layout/RightSidebar';
@@ -192,19 +191,6 @@ export default function WantTypePage() {
           </div>
         </div>
       </main>
-
-      {/* Want Type Control Panel */}
-      <WantTypeControlPanel
-        selectedWantType={selectedWantType}
-        onViewDetails={(wantType) => {
-          const listItem = filteredWantTypes.find(wt => wt.name === wantType.metadata.name);
-          if (listItem) handleViewDetails(listItem);
-        }}
-        onDeploySuccess={(message) => setNotification({ message, type: 'success' })}
-        onDeployError={(error) => setNotification({ message: error, type: 'error' })}
-        loading={loading}
-        sidebarMinimized={sidebarMinimized}
-      />
 
       {/* Right Sidebar for Want Type Details */}
       <RightSidebar

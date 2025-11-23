@@ -10,7 +10,6 @@ import { RightSidebar } from '@/components/layout/RightSidebar';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RecipeGrid } from '@/components/dashboard/RecipeGrid';
-import { RecipeControlPanel } from '@/components/dashboard/RecipeControlPanel';
 import { RecipeStatsOverview } from '@/components/dashboard/RecipeStatsOverview';
 import { RecipeFilters } from '@/components/dashboard/RecipeFilters';
 import { classNames } from '@/utils/helpers';
@@ -307,17 +306,6 @@ export default function RecipePage() {
           <span className="text-sm font-medium">{notification.message}</span>
         </div>
       )}
-
-      {/* Recipe Control Panel */}
-      <RecipeControlPanel
-        selectedRecipe={selectedRecipe}
-        onEdit={handleEditRecipe}
-        onDelete={handleDeleteRecipe}
-        onDeploySuccess={(message) => setNotification({ message, type: 'success' })}
-        onDeployError={(error) => setNotification({ message: error, type: 'error' })}
-        loading={loading}
-        sidebarMinimized={sidebarMinimized}
-      />
 
       {/* Right Sidebar for Recipe Details */}
       <RightSidebar
