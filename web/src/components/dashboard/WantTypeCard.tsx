@@ -7,7 +7,6 @@ interface WantTypeCardProps {
   wantType: WantTypeListItem;
   selected?: boolean;
   onView: (wantType: WantTypeListItem) => void;
-  onSelect?: (wantType: WantTypeListItem) => void;
   className?: string;
 }
 
@@ -40,7 +39,6 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
   wantType,
   selected = false,
   onView,
-  onSelect,
   className
 }) => {
   const handleCardClick = (e: React.MouseEvent) => {
@@ -51,7 +49,6 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       return;
     }
 
-    onSelect?.(wantType);
     onView(wantType);
 
     // Smooth scroll the card into view after selection

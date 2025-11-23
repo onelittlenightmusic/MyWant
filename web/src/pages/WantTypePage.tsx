@@ -33,6 +33,7 @@ export default function WantTypePage() {
   const [sidebarMinimized, setSidebarMinimized] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
+  const [detailsSidebarOpen, setDetailsSidebarOpen] = useState(false);
 
   // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
@@ -49,14 +50,10 @@ export default function WantTypePage() {
     fetchWantTypes();
   }, [fetchWantTypes]);
 
-  // Handle want type selection to fetch details
-  const handleSelectWantType = (wantType: WantTypeListItem) => {
-    getWantType(wantType.name);
-  };
-
   // Handle view details - open right sidebar
   const handleViewDetails = async (wantType: WantTypeListItem) => {
     await getWantType(wantType.name);
+    setDetailsSidebarOpen(true);
   };
 
   // Handle search
@@ -91,7 +88,7 @@ export default function WantTypePage() {
   const handleKeyboardNavigate = (index: number) => {
     if (index >= 0 && index < allFilteredWantTypes.length) {
       const wantType = allFilteredWantTypes[index];
-      handleSelectWantType(wantType);
+      getWantType(wantType.name);
     }
   };
 
@@ -183,7 +180,6 @@ export default function WantTypePage() {
           <WantTypeGrid
             wantTypes={allFilteredWantTypes}
             selectedWantType={allFilteredWantTypes.find(wt => wt.name === selectedWantType?.metadata.name) || null}
-            onSelectWantType={handleSelectWantType}
             onViewDetails={handleViewDetails}
             loading={loading}
             onGetFilteredWantTypes={setFilteredWantTypes}
@@ -205,9 +201,9 @@ export default function WantTypePage() {
 
         {/* Right Sidebar for Want Type Details */}
         <RightSidebar
-          isOpen={!!selectedWantType}
+          isOpen={detailsSidebarOpen && !!selectedWantType}
           onClose={() => {
-            // Keep sidebar open - just re-render content when selection changes
+            setDetailsSidebarOpen(false);
           }}
           title={selectedWantType ? selectedWantType.metadata.name : undefined}
         >

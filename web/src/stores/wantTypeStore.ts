@@ -15,6 +15,7 @@ interface WantTypeStore {
   loading: boolean;
   error: string | null;
   filters: WantTypeFilters;
+  pendingRequest?: string; // Track pending want type request
 
   // Actions
   fetchWantTypes: () => Promise<void>;
@@ -39,6 +40,7 @@ export const useWantTypeStore = create<WantTypeStore>((set, get) => ({
   loading: false,
   error: null,
   filters: {},
+  pendingRequest: undefined,
 
   // Fetch all want types with optional filters
   fetchWantTypes: async () => {
@@ -75,21 +77,28 @@ export const useWantTypeStore = create<WantTypeStore>((set, get) => ({
     }
   },
 
-  // Fetch detailed want type
+  // Fetch detailed want type - prevent duplicate concurrent requests
   getWantType: async (name: string) => {
-    set({ loading: true, error: null });
+    const current = get();
+
+    // Skip if there's already a pending request for this want type
+    if (current.pendingRequest === name) {
+      return;
+    }
+
+    set({ pendingRequest: name, error: null });
     try {
       const response = await apiClient.getWantType(name);
       set({
         selectedWantType: response,
-        loading: false,
+        pendingRequest: undefined,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch want type details';
       set({
         error: message,
-        loading: false,
         selectedWantType: null,
+        pendingRequest: undefined,
       });
     }
   },

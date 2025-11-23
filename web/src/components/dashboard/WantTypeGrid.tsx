@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { WantTypeCard } from './WantTypeCard';
 import { WantTypeListItem } from '@/types/wantType';
 
 interface WantTypeGridProps {
   wantTypes: WantTypeListItem[];
   selectedWantType: WantTypeListItem | null;
-  onSelectWantType: (wantType: WantTypeListItem) => void;
   onViewDetails: (wantType: WantTypeListItem) => void;
   loading?: boolean;
+  onGetFilteredWantTypes?: (wantTypes: WantTypeListItem[]) => void;
+  onSelectWantType?: (wantType: WantTypeListItem) => void; // For keyboard navigation
 }
 
 export const WantTypeGrid: React.FC<WantTypeGridProps> = ({
@@ -16,7 +17,12 @@ export const WantTypeGrid: React.FC<WantTypeGridProps> = ({
   onSelectWantType,
   onViewDetails,
   loading = false,
+  onGetFilteredWantTypes,
 }) => {
+  // Notify parent of filtered want types for keyboard navigation
+  useEffect(() => {
+    onGetFilteredWantTypes?.(wantTypes);
+  }, [wantTypes, onGetFilteredWantTypes]);
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -42,13 +48,16 @@ export const WantTypeGrid: React.FC<WantTypeGridProps> = ({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {wantTypes.map((wantType) => (
-        <WantTypeCard
+        <div
           key={wantType.name}
-          wantType={wantType}
-          selected={selectedWantType?.name === wantType.name}
-          onSelect={onSelectWantType}
-          onView={onViewDetails}
-        />
+          data-keyboard-nav-selected={selectedWantType?.name === wantType.name}
+        >
+          <WantTypeCard
+            wantType={wantType}
+            selected={selectedWantType?.name === wantType.name}
+            onView={onViewDetails}
+          />
+        </div>
       ))}
     </div>
   );
