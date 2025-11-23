@@ -45,7 +45,7 @@ func NewMonitorFlightAPI(name string, capabilities []string, uses []string, serv
 			},
 		},
 		ServerURL:           serverURL,
-		PollInterval:        10 * time.Second,
+		PollInterval:        5 * time.Second, // Poll flight status every 5 seconds to reduce API calls
 		LastKnownStatus:     "unknown",
 		StatusChangeHistory: make([]StatusChange, 0),
 	}
@@ -72,6 +72,17 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		fmt.Printf("[MonitorFlightAPI] Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)\n")
 		return nil
 	}
+
+	// Check if enough time has passed since last poll (5-second polling interval)
+	// This prevents excessive polling even when Exec() is called frequently (every 100ms)
+	now := time.Now()
+	if !m.LastPollTime.IsZero() && now.Sub(m.LastPollTime) < m.PollInterval {
+		// Skip this polling cycle - wait for PollInterval to elapse
+		return nil
+	}
+
+	// Record this poll time for next interval check
+	m.LastPollTime = now
 
 	fmt.Printf("[MonitorFlightAPI] Polling flight status for ID: %s\n", flightIDStr)
 
