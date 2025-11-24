@@ -47,6 +47,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
+
+  // Memoize wantId to avoid dependency array issues
+  const wantId = want?.metadata?.id || want?.id;
+
   const {
     selectedWantDetails,
     selectedWantResults,
@@ -64,21 +68,27 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
-  // Control panel logic
-  const isRunning = selectedWantDetails?.status === 'running';
-  const isSuspended = selectedWantDetails?.suspended === true;
-  const isCompleted = selectedWantDetails?.status === 'completed';
-  const isStopped = selectedWantDetails?.status === 'stopped' || selectedWantDetails?.status === 'created';
-  const isFailed = selectedWantDetails?.status === 'failed';
+  // Control panel logic (use want for status since it comes from the live dashboard state)
+  const isRunning = want?.status === 'running';
+  const isSuspended = want?.status === 'suspended';
+  const isCompleted = want?.status === 'completed';
+  const isStopped = want?.status === 'stopped' || want?.status === 'created';
+  const isFailed = want?.status === 'failed';
 
-  const canStart = want && (isStopped || isCompleted || isFailed);
-  const canStop = want && isRunning && !isSuspended;
-  const canSuspend = want && isRunning && !isSuspended;
-  const canResume = want && isSuspended;
-  const canDelete = want !== null;
+  // Ensure want exists before checking control states
+  const canStart = !!want && (isStopped || isCompleted || isFailed || isSuspended);
+  const canStop = !!want && isRunning && !isSuspended;
+  const canSuspend = !!want && isRunning && !isSuspended;
+  const canDelete = !!want;
 
   const handleStartClick = () => {
-    if (want && canStart && onStart) onStart(want);
+    if (want) {
+      if (isSuspended && onResume) {
+        onResume(want);
+      } else if (canStart && onStart) {
+        onStart(want);
+      }
+    }
   };
 
   const handleStopClick = () => {
@@ -89,25 +99,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     if (want && canSuspend && onSuspend) onSuspend(want);
   };
 
-  const handleResumeClick = () => {
-    if (want && canResume && onResume) onResume(want);
-  };
-
   const handleDeleteClick = () => {
     if (want && canDelete && onDelete) onDelete(want);
   };
 
-  // Fetch details when want changes
+  // Fetch details when want ID changes (not on every want object change)
   useEffect(() => {
-    if (want) {
-      const wantId = want.metadata?.id || want.id;
-      if (wantId) {
-        fetchWantDetails(wantId);
-        fetchWantResults(wantId);
-        fetchWants(); // Also refresh main wants list
-      }
+    if (wantId) {
+      fetchWantDetails(wantId);
+      fetchWantResults(wantId);
     }
-  }, [want, fetchWantDetails, fetchWantResults, fetchWants]);
+  }, [wantId, fetchWantDetails, fetchWantResults]);
 
   // Reset state when want changes and set initial tab
   useEffect(() => {
@@ -128,20 +130,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [want, selectedWantDetails?.status]);
 
-  // Auto refresh setup
+  // Auto refresh setup (only refresh specific want details, not the whole list)
   useEffect(() => {
-    if (autoRefresh && want) {
+    if (autoRefresh && wantId) {
       const interval = setInterval(() => {
-        const wantId = want.metadata?.id || want.id;
-        if (wantId) {
-          fetchWantDetails(wantId);
-          fetchWantResults(wantId);
-        }
+        fetchWantDetails(wantId);
+        fetchWantResults(wantId);
       }, 5000);
 
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, want, fetchWantDetails, fetchWantResults]);
+  }, [autoRefresh, wantId, fetchWantDetails, fetchWantResults]);
 
   const handleRefresh = () => {
     if (want) {
@@ -264,11 +263,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {want && (
         <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
-          {/* Start */}
+          {/* Start / Resume */}
           <button
             onClick={handleStartClick}
             disabled={!canStart || loading}
-            title={canStart ? 'Start execution' : 'Cannot start in current state'}
+            title={canStart ? (isSuspended ? 'Resume execution' : 'Start execution') : 'Cannot start in current state'}
             className={classNames(
               'p-2 rounded-md transition-colors',
               canStart && !loading
@@ -276,10 +275,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             )}
           >
-            <Play className="h-4 w-4" />
+            {isSuspended ? <RotateCw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </button>
 
-          {/* Suspend/Resume */}
+          {/* Suspend */}
           {canSuspend && (
             <button
               onClick={handleSuspendClick}
@@ -288,16 +287,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
               className="p-2 rounded-md transition-colors bg-orange-100 text-orange-600 hover:bg-orange-200"
             >
               <Pause className="h-4 w-4" />
-            </button>
-          )}
-          {canResume && (
-            <button
-              onClick={handleResumeClick}
-              disabled={!canResume || loading}
-              title="Resume execution"
-              className="p-2 rounded-md transition-colors bg-blue-100 text-blue-600 hover:bg-blue-200"
-            >
-              <RotateCw className="h-4 w-4" />
             </button>
           )}
 
@@ -841,7 +830,7 @@ const ConfigTab: React.FC<{
               className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {updateLoading ? (
-                <LoadingSpinner size="xs" className="mr-1" />
+                <LoadingSpinner size="sm" className="mr-1" />
               ) : (
                 <Save className="h-3 w-3 mr-1" />
               )}

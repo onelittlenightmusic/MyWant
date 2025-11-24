@@ -38,6 +38,8 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
     case 'initializing':
     case 'running':
       return 'blue';
+    case 'suspended':
+      return 'yellow';
     case 'completed':
       return 'green';
     case 'failed':
@@ -58,6 +60,8 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '🔄';
     case 'running':
       return '▶️';
+    case 'suspended':
+      return '⏸️';
     case 'completed':
       return '✅';
     case 'failed':

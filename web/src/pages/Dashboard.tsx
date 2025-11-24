@@ -37,18 +37,16 @@ export const Dashboard: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
-  const [selectedWant, setSelectedWant] = useState<Want | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
-  // TODO: Re-enable auto-refresh selection later (currently disabled for testing)
-  // // Derive selectedWant from wants array using selectedWantId
-  // // This ensures selectedWant always reflects the current data from polling
-  // const selectedWant = selectedWantId
-  //   ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
-  //   : null;
+  // Derive selectedWant from wants array using selectedWantId
+  // This ensures selectedWant always reflects the current data from polling
+  const selectedWant = selectedWantId
+    ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
+    : null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,14 +136,12 @@ export const Dashboard: React.FC = () => {
   const handleViewWant = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
-    setSelectedWant(want);
     setSidebarInitialTab('overview');
   };
 
   const handleViewAgents = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
-    setSelectedWant(want);
     setSidebarInitialTab('agents');
   };
 
@@ -162,7 +158,7 @@ export const Dashboard: React.FC = () => {
 
         // Close the details sidebar if the deleted want is currently selected
         if (selectedWant && (selectedWant.metadata?.id === wantId || selectedWant.id === wantId)) {
-          setSelectedWant(null);
+          setSelectedWantId(null);
         }
       } catch (error) {
         console.error('Failed to delete want:', error);
@@ -261,7 +257,6 @@ export const Dashboard: React.FC = () => {
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
     if (selectedWant) {
-      setSelectedWant(null);
       setSelectedWantId(null);
     }
   };
@@ -417,7 +412,7 @@ export const Dashboard: React.FC = () => {
       {/* Right Sidebar for Want Details */}
       <RightSidebar
         isOpen={!!selectedWant}
-        onClose={() => setSelectedWant(null)}
+        onClose={() => setSelectedWantId(null)}
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
         backgroundStyle={sidebarBackgroundStyle}
         headerActions={headerActions}

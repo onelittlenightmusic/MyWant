@@ -25,20 +25,26 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
   sidebarMinimized = false
 }) => {
   const isRunning = selectedWant?.status === 'running';
-  const isSuspended = selectedWant?.suspended === true;
+  const isSuspended = selectedWant?.status === 'suspended';
   const isCompleted = selectedWant?.status === 'completed';
   const isStopped = selectedWant?.status === 'stopped' || selectedWant?.status === 'created';
   const isFailed = selectedWant?.status === 'failed';
 
   // Button enable/disable logic
-  const canStart = selectedWant && (isStopped || isCompleted || isFailed);
+  const canStart = selectedWant && (isStopped || isCompleted || isFailed || isSuspended);
   const canStop = selectedWant && isRunning && !isSuspended;
   const canSuspend = selectedWant && isRunning && !isSuspended;
-  const canResume = selectedWant && isSuspended;
   const canDelete = selectedWant !== null;
 
   const handleStart = () => {
-    if (selectedWant && canStart) onStart(selectedWant);
+    if (selectedWant) {
+      // If suspended, resume; otherwise start
+      if (isSuspended) {
+        onResume(selectedWant);
+      } else {
+        onStart(selectedWant);
+      }
+    }
   };
 
   const handleStop = () => {
@@ -47,10 +53,6 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
 
   const handleSuspend = () => {
     if (selectedWant && canSuspend) onSuspend(selectedWant);
-  };
-
-  const handleResume = () => {
-    if (selectedWant && canResume) onResume(selectedWant);
   };
 
   const handleDelete = () => {
@@ -67,7 +69,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
         <div className="flex items-center">
           {/* Control Buttons */}
           <div className="flex items-center space-x-2 flex-wrap gap-y-2">
-            {/* Start */}
+            {/* Start / Resume */}
             <button
               onClick={handleStart}
               disabled={!canStart || loading}
@@ -77,10 +79,10 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
                   ? 'bg-green-600 text-white hover:bg-green-700'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               )}
-              title={canStart ? 'Start execution' : 'Cannot start in current state'}
+              title={canStart ? (isSuspended ? 'Resume execution' : 'Start execution') : 'Cannot start in current state'}
             >
               <Play className="h-4 w-4" />
-              <span>Start</span>
+              <span>{isSuspended ? 'Resume' : 'Start'}</span>
             </button>
 
             {/* Suspend */}
@@ -97,22 +99,6 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
             >
               <Pause className="h-4 w-4" />
               <span>Suspend</span>
-            </button>
-
-            {/* Resume */}
-            <button
-              onClick={handleResume}
-              disabled={!canResume || loading}
-              className={classNames(
-                'flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                canResume && !loading
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              )}
-              title={canResume ? 'Resume execution' : 'Cannot resume in current state'}
-            >
-              <RotateCw className="h-4 w-4" />
-              <span>Resume</span>
             </button>
 
             {/* Stop */}

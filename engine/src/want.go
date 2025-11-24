@@ -49,6 +49,7 @@ type WantStatus string
 const (
 	WantStatusIdle       WantStatus = "idle"
 	WantStatusRunning    WantStatus = "running"
+	WantStatusSuspended  WantStatus = "suspended"
 	WantStatusCompleted  WantStatus = "completed"
 	WantStatusFailed     WantStatus = "failed"
 	WantStatusTerminated WantStatus = "terminated"

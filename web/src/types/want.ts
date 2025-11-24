@@ -8,7 +8,6 @@ export interface Want {
   history?: WantHistory;
   results?: Record<string, unknown>;
   builder?: unknown; // ChainBuilder reference (not serialized)
-  suspended?: boolean; // Suspension state
   current_agent?: string; // Name of the agent currently executing for this want
   running_agents?: string[]; // Array of all currently running agent names
 }
@@ -68,7 +67,7 @@ export interface ConfigMetadata {
   labels?: Record<string, string>;
 }
 
-export type WantExecutionStatus = 'created' | 'running' | 'completed' | 'failed' | 'stopped';
+export type WantExecutionStatus = 'created' | 'running' | 'suspended' | 'completed' | 'failed' | 'stopped';
 
 export type WantPhase = 'pending' | 'initializing' | 'running' | 'completed' | 'failed' | 'stopped';
 

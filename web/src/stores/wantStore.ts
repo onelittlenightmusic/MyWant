@@ -175,14 +175,14 @@ export const useWantStore = create<WantStore>()(
       try {
         await apiClient.suspendWant(id);
 
-        // Refresh the want status to get updated suspended state
+        // Refresh the want status to get updated status
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status, suspended: status.suspended } : w),
-          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status, suspended: status.suspended } : state.selectedWant,
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status } : state.selectedWant,
           selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
-            { ...state.selectedWantDetails, suspended: status.suspended } :
+            { ...state.selectedWantDetails, status: status.status } :
             state.selectedWantDetails,
           loading: false
         }));
@@ -200,14 +200,14 @@ export const useWantStore = create<WantStore>()(
       try {
         await apiClient.resumeWant(id);
 
-        // Refresh the want status to get updated suspended state
+        // Refresh the want status to get updated status
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status, suspended: status.suspended } : w),
-          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status, suspended: status.suspended } : state.selectedWant,
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status } : state.selectedWant,
           selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
-            { ...state.selectedWantDetails, suspended: status.suspended } :
+            { ...state.selectedWantDetails, status: status.status } :
             state.selectedWantDetails,
           loading: false
         }));

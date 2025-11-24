@@ -1698,15 +1698,16 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					InfoLog("[CONTROL:EXEC] Want %s received control signal: %s\n", wantName, cmd.Trigger)
 					switch cmd.Trigger {
 					case ControlTriggerSuspend:
-						// Mark as suspended and wait for resume
+						// Mark as suspended and change status to suspended
 						want.want.SetSuspended(true)
-						want.want.SetStatus(WantStatusRunning) // Stay in running but suspended
+						want.want.SetStatus(WantStatusSuspended)
 						InfoLog("[CONTROL:EXEC] Want %s suspended\n", wantName)
 						// Continue to next iteration (execution will be skipped while suspended)
 
 					case ControlTriggerResume:
-						// Resume execution
+						// Resume execution and restore running status
 						want.want.SetSuspended(false)
+						want.want.SetStatus(WantStatusRunning)
 						InfoLog("[CONTROL:EXEC] Want %s resumed\n", wantName)
 
 					case ControlTriggerStop:
@@ -2522,9 +2523,17 @@ func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	cb.reconcileMutex.RLock()
 	defer cb.reconcileMutex.RUnlock()
 
-	// Find the target want
-	targetRuntime, exists := cb.wants[cmd.WantID]
-	if !exists {
+	// Find the target want by metadata.id (WantID is the metadata ID)
+	// We need to search through all wants since cb.wants uses wantName as key
+	var targetRuntime *runtimeWant
+	for _, runtime := range cb.wants {
+		if runtime.want.Metadata.ID == cmd.WantID {
+			targetRuntime = runtime
+			break
+		}
+	}
+
+	if targetRuntime == nil {
 		InfoLog("[CONTROL] Warning: Target want %s not found\n", cmd.WantID)
 		return
 	}
