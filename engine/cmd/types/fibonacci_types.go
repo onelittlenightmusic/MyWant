@@ -166,18 +166,6 @@ func (f *FibonacciSequence) Exec() bool {
 		"count":    len(filtered),
 	})
 
-	// Display collected results
-	println("🔢 Filtered fibonacci numbers:", len(filtered), "numbers between", minValue, "and", maxValue)
-	for i, num := range filtered {
-		if i < 10 { // Show first 10 numbers
-			print(num, " ")
-		}
-	}
-	if len(filtered) > 10 {
-		println("... (", len(filtered)-10, "more)")
-	} else {
-		println()
-	}
 
 	return true
 }

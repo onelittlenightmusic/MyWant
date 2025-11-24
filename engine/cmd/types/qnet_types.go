@@ -126,7 +126,6 @@ func (g *Numbers) Exec() bool {
 		})
 
 		out <- QueuePacket{Num: -1, Time: 0}
-		fmt.Printf("[GENERATOR] Generated %d packets\n", g.currentCount)
 		return true
 	}
 	g.currentCount++
@@ -310,7 +309,6 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 		"current_server_free_time": q.serverFreeTime,
 	})
 
-	fmt.Printf("[QUEUE] Processed %d packets, avg wait time: %.6f\n", q.processedCount, avgWaitTime)
 	return nil
 }
 
@@ -413,7 +411,6 @@ func (c *Combiner) OnEnded(packet mywant.Packet) error {
 		"total_wait_time":   0.0,
 	})
 
-	fmt.Printf("[COMBINER] Processed %d packets\n", processed)
 	return nil
 }
 
@@ -494,7 +491,6 @@ func (s *Sink) OnEnded(packet mywant.Packet) error {
 		"total_wait_time":   0.0,
 	})
 
-	fmt.Printf("[SINK] Received %d packets\n", s.Received)
 	return nil
 }
 
