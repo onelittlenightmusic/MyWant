@@ -54,6 +54,28 @@ const (
 	WantStatusTerminated WantStatus = "terminated"
 )
 
+// ControlTrigger represents a control command sent to a Want
+type ControlTrigger string
+
+const (
+	// Suspend temporarily pauses want execution
+	ControlTriggerSuspend ControlTrigger = "suspend"
+	// Resume resumes suspended want execution
+	ControlTriggerResume ControlTrigger = "resume"
+	// Stop terminates want execution
+	ControlTriggerStop ControlTrigger = "stop"
+	// Restart restarts want execution from initial state
+	ControlTriggerRestart ControlTrigger = "restart"
+)
+
+// ControlCommand represents a control command with metadata
+type ControlCommand struct {
+	Trigger   ControlTrigger `json:"trigger"`
+	WantID    string         `json:"wantId"`
+	Timestamp time.Time      `json:"timestamp"`
+	Reason    string         `json:"reason,omitempty"`
+}
+
 // WantStats is deprecated - use State field instead
 // Keeping type alias for backward compatibility during transition
 type WantStats = map[string]interface{}
