@@ -72,7 +72,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 		if ok {
 			switch action {
 			case "cancel_flight":
-				log.Printf("[AgentFlightAPI] Executing cancel_flight action")
+				want.StoreLog("Executing cancel_flight action")
 				if err := a.CancelFlight(ctx, want); err != nil {
 					return err
 				}
@@ -80,7 +80,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 				want.StoreState("flight_action", "")
 				return nil
 			case "create_flight":
-				log.Printf("[AgentFlightAPI] Executing create_flight action")
+				want.StoreLog("Executing create_flight action")
 				if err := a.CreateFlight(ctx, want); err != nil {
 					return err
 				}
