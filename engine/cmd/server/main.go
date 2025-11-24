@@ -1646,6 +1646,7 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 	// Create a temporary builder to check available types
 	builder := mywant.NewChainBuilder(mywant.Config{})
 	builder.SetAgentRegistry(s.agentRegistry)
+	builder.SetCustomTargetRegistry(s.recipeRegistry) // Include custom types in validation
 
 	// Register all want types (same as in executeWantAsync)
 	types.RegisterQNetWantTypes(builder)

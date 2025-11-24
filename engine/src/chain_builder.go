@@ -155,6 +155,11 @@ func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
 
+// SetCustomTargetRegistry sets the custom target type registry for the chain builder
+func (cb *ChainBuilder) SetCustomTargetRegistry(registry *CustomTargetTypeRegistry) {
+	cb.customRegistry = registry
+}
+
 // SetConfigInternal sets the config for the builder (for server mode)
 func (cb *ChainBuilder) SetConfigInternal(config Config) {
 	cb.config = config
