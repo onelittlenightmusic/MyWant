@@ -83,16 +83,28 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case 'ArrowLeft':
           e.preventDefault();
-          // Left arrow: navigate up within hierarchy (previously Up)
+          // Left arrow: minimize expanded parent or navigate to previous parent
           if (currentItem) {
-            // Try to move to previous sibling
-            nextItem = getPreviousSibling(items, currentItem);
-            if (!nextItem && currentItem.parentId) {
-              // If no siblings and has parent, move to parent
+            // Check if current item is an expanded parent (has children and is expanded)
+            const hasChildren = items.some(item => item.parentId === currentItem.id);
+            const isExpanded = expandedItems?.has(currentItem.id);
+
+            if (hasChildren && isExpanded) {
+              // Current item is an expanded parent, minimize it
+              if (onExpandParent) {
+                onExpandParent(currentItem.id);
+              }
+              shouldNavigate = false;
+            } else if (currentItem.parentId) {
+              // Current item is a child, move to parent
               nextItem = getParent(items, currentItem);
+              shouldNavigate = !!nextItem;
+            } else {
+              // Current item is a top-level want, move to previous top-level
+              nextItem = getPreviousTopLevel(items, currentItem);
+              shouldNavigate = !!nextItem;
             }
           }
-          shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowDown':
