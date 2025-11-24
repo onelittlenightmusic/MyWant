@@ -48,32 +48,32 @@ func NewMonitorFlight(name string, capabilities []string, uses []string) *Monito
 
 // Exec executes flight monitoring by reading state from YAML files
 func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
-	fmt.Printf("[MONITOR_FLIGHT] Starting monitoring for %s (execution #%d)\n", want.Metadata.Name, m.ExecutionCount)
+	want.StoreLog(fmt.Sprintf("Starting monitoring for %s (execution #%d)", want.Metadata.Name, m.ExecutionCount))
 
 	// Determine which YAML file to read based on execution count
 	filename := fmt.Sprintf("flight%d.yaml", m.ExecutionCount)
 	filepath := filepath.Join(m.TestDataPath, filename)
 
-	fmt.Printf("[MONITOR_FLIGHT] Reading state from %s\n", filepath)
+	want.StoreLog(fmt.Sprintf("Reading state from %s", filepath))
 
 	// Read the YAML file
 	data, err := os.ReadFile(filepath)
 	if err != nil {
-		fmt.Printf("[MONITOR_FLIGHT] Error reading %s: %v\n", filepath, err)
+		want.StoreLog(fmt.Sprintf("Error reading %s: %v", filepath, err))
 		return err
 	}
 
 	// Parse the YAML content
 	var flightState FlightState
 	if err := yaml.Unmarshal(data, &flightState); err != nil {
-		fmt.Printf("[MONITOR_FLIGHT] Error parsing YAML: %v\n", err)
+		want.StoreLog(fmt.Sprintf("Error parsing YAML: %v", err))
 		return err
 	}
 
 	// Debug: Print parsed state
-	fmt.Printf("[MONITOR_FLIGHT] DEBUG: Parsed state: %+v\n", flightState)
-	fmt.Printf("[MONITOR_FLIGHT] DEBUG: Departure time: %v, IsZero: %v\n",
-		flightState.State.DepartureTime, flightState.State.DepartureTime.IsZero())
+	want.StoreLog(fmt.Sprintf("DEBUG: Parsed state: %+v", flightState))
+	want.StoreLog(fmt.Sprintf("DEBUG: Departure time: %v, IsZero: %v",
+		flightState.State.DepartureTime, flightState.State.DepartureTime.IsZero()))
 
 	// Store the state information using StoreState
 	if !flightState.State.DepartureTime.IsZero() {
@@ -89,18 +89,18 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 			PremiumAmenities: []string{"monitoring_data"},
 		}
 
-		fmt.Printf("[MONITOR_FLIGHT] DEBUG: About to store agent_result: %+v\n", schedule)
+		want.StoreLog(fmt.Sprintf("DEBUG: About to store agent_result: %+v", schedule))
 		want.StoreStateMulti(map[string]interface{}{
 			"agent_result":            schedule,
 			"monitor_execution_count": m.ExecutionCount,
 			"monitor_source_file":     filename,
 		})
-		fmt.Printf("[MONITOR_FLIGHT] DEBUG: Stored agent_result successfully\n")
+		want.StoreLog("DEBUG: Stored agent_result successfully")
 
-		fmt.Printf("[MONITOR_FLIGHT] Loaded existing schedule: %s from %s to %s\n",
+		want.StoreLog(fmt.Sprintf("Loaded existing schedule: %s from %s to %s",
 			flightState.State.Name,
 			flightState.State.DepartureTime.Format("15:04 Jan 2"),
-			flightState.State.ArrivalTime.Format("15:04 Jan 2"))
+			flightState.State.ArrivalTime.Format("15:04 Jan 2")))
 	} else {
 		// No existing schedule found - store explicit first record
 		want.StoreStateMulti(map[string]interface{}{
@@ -108,7 +108,7 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 			"monitor_execution_count": m.ExecutionCount,
 			"monitor_source_file":     filename,
 		})
-		fmt.Printf("[MONITOR_FLIGHT] No existing schedule found in %s - stored first record\n", filename)
+		want.StoreLog(fmt.Sprintf("No existing schedule found in %s - stored first record", filename))
 	}
 
 	// Increment execution count for next call
