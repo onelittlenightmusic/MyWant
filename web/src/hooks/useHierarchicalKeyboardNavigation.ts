@@ -16,16 +16,17 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
 
 /**
  * Hook for hierarchical keyboard navigation with arrow keys and space
- * - Arrow Right: Move to next sibling or next top-level item
- * - Arrow Left: Move to previous sibling or previous top-level item
+ * - Arrow Right: If parent expanded, move to first child; else move to next sibling or next top-level
+ * - Arrow Left: Move to previous sibling; if first child, move to parent; if top-level, move to previous top-level
  * - Arrow Up: Move to previous top-level item
  * - Arrow Down: Move to next top-level item
- * - Space: Toggle expand/collapse on current parent item
+ * - Space: Toggle expand/collapse on current parent item (only works on parents with children)
  *
  * @param items - All items in flat list
  * @param currentItem - Currently selected item
  * @param onNavigate - Callback when navigation occurs with new item
  * @param onToggleExpand - Callback to toggle expand/collapse
+ * @param expandedItems - Set of expanded parent IDs for checking expansion state
  * @param enabled - Whether keyboard navigation is enabled (default: true)
  */
 export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
@@ -55,21 +56,34 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       switch (e.key) {
         case 'ArrowRight':
           e.preventDefault();
-          // Right arrow: Move to next sibling at same level, or next top-level if at top level
+          // Right arrow behavior:
+          // - If parent is expanded, move to first child
+          // - If at a child, move to next sibling
+          // - If at last child, move to next parent's sibling
+          // - If at top-level non-expanded parent, move to next top-level item
           if (currentItem) {
-            if (currentItem.parentId) {
+            if (!currentItem.parentId) {
+              // Current item is top-level (parent)
+              const hasChildren = items.some(item => item.parentId === currentItem.id);
+              const isExpanded = expandedItems?.has(currentItem.id);
+
+              if (hasChildren && isExpanded) {
+                // Parent is expanded, move to first child
+                nextItem = getFirstChild(items, currentItem);
+              } else {
+                // Parent is not expanded or has no children, move to next top-level
+                nextItem = getNextTopLevel(items, currentItem);
+              }
+            } else {
               // Current item is a child, move to next sibling
               nextItem = getNextSibling(items, currentItem);
               if (!nextItem) {
-                // No next sibling, move to next parent's sibling (move up to parent level)
+                // No next sibling, move to next parent's sibling
                 const parent = getParent(items, currentItem);
                 if (parent) {
                   nextItem = getNextSibling(items, parent);
                 }
               }
-            } else {
-              // Current item is top-level, move to next top-level item
-              nextItem = getNextTopLevel(items, currentItem);
             }
             shouldNavigate = !!nextItem;
           } else if (items.length > 0) {
@@ -81,17 +95,17 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case 'ArrowLeft':
           e.preventDefault();
-          // Left arrow: Move to previous sibling at same level, or previous top-level if at top level
+          // Left arrow behavior:
+          // - If at a child with previous sibling, move to previous sibling
+          // - If at first child or no previous sibling, move to parent
+          // - If at top-level, move to previous top-level item
           if (currentItem) {
             if (currentItem.parentId) {
-              // Current item is a child, move to previous sibling
+              // Current item is a child
               nextItem = getPreviousSibling(items, currentItem);
               if (!nextItem) {
-                // No previous sibling, move to previous parent's sibling
-                const parent = getParent(items, currentItem);
-                if (parent) {
-                  nextItem = getPreviousSibling(items, parent);
-                }
+                // No previous sibling, move to parent
+                nextItem = getParent(items, currentItem);
               }
             } else {
               // Current item is top-level, move to previous top-level item
