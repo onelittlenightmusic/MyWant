@@ -124,15 +124,14 @@ func (f *FlightWant) Exec() bool {
 			elapsed := time.Since(f.monitoringStartTime)
 			now := time.Now()
 			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
-				log.Printf("[FLIGHT] Monitoring cycle (elapsed: %v/%v)\n",
-					elapsed, f.monitoringDuration)
+				f.StoreLog(fmt.Sprintf("Monitoring cycle (elapsed: %v/%v)", elapsed, f.monitoringDuration))
 				f.lastLogTime = now
 			}
 
 			// Check for delayed flights that need cancellation and rebooking
 			// This is checked during monitoring phase so rebooking can happen immediately
 			if f.shouldCancelAndRebook() {
-				log.Printf("[FLIGHT] Flight status is delayed during monitoring, initiating cancellation and rebooking\n")
+				f.StoreLog("Flight status is delayed during monitoring, initiating cancellation and rebooking")
 
 				// Set flight_action to cancel_flight so the agent executor will handle it
 				// Note: Keep flight_id so agent can cancel it
@@ -144,7 +143,7 @@ func (f *FlightWant) Exec() bool {
 				// Reset attempted flag so agent can execute the cancellation action
 				f.StoreState("attempted", false)
 
-				log.Printf("[FLIGHT] Set flight_action to cancel_flight during monitoring, waiting for agent cancellation\n")
+				f.StoreLog("Set flight_action to cancel_flight during monitoring, waiting for agent cancellation")
 
 				// Return false to trigger the rebooking flow in next cycle
 				return false
@@ -158,7 +157,7 @@ func (f *FlightWant) Exec() bool {
 			return false
 		} else {
 			// Monitoring duration exceeded, complete the monitoring phase
-			log.Printf("[FLIGHT] Monitoring completed (total duration: %v)\n", time.Since(f.monitoringStartTime))
+			f.StoreLog(fmt.Sprintf("Monitoring completed (total duration: %v)", time.Since(f.monitoringStartTime)))
 			f.monitoringActive = false
 			return true
 		}
@@ -192,7 +191,7 @@ func (f *FlightWant) Exec() bool {
 	// Check if agent created a flight result (read from state, not return value)
 	agentResult, hasResult := f.GetState("agent_result")
 	if hasResult && agentResult != nil {
-		log.Printf("[FLIGHT] Agent execution completed, processing agent result\n")
+		f.StoreLog("Agent execution completed, processing agent result")
 
 		// Convert agent_result to FlightSchedule
 	agentSchedule := f.extractFlightSchedule(agentResult)
@@ -214,10 +213,10 @@ func (f *FlightWant) Exec() bool {
 			}
 
 			out <- travelSchedule
-			log.Printf("[FLIGHT] Sent agent-generated schedule: %s from %s to %s\n",
+			f.StoreLog(fmt.Sprintf("Sent agent-generated schedule: %s from %s to %s",
 				agentSchedule.ReservationName,
 				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-				agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
+				agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
 
 			// Start continuous monitoring to capture all status changes
 			// Begin the 60-second stability window - the flight schedule will be monitored to detect
@@ -227,7 +226,7 @@ func (f *FlightWant) Exec() bool {
 			if !f.monitoringActive {
 				f.monitoringActive = true
 				f.monitoringStartTime = time.Now()
-				log.Printf("[FLIGHT] Starting continuous monitoring for status changes (duration: %v)\n", f.monitoringDuration)
+				f.StoreLog(fmt.Sprintf("Starting continuous monitoring for status changes (duration: %v)", f.monitoringDuration))
 			}
 
 			// Continue running to collect more status updates
@@ -240,7 +239,7 @@ func (f *FlightWant) Exec() bool {
 	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
 	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
 		// Flight was just cancelled, prepare for rebooking
-		log.Printf("[FLIGHT] Flight cancellation completed, preparing for rebooking\n")
+		f.StoreLog("Flight cancellation completed, preparing for rebooking")
 
 		// Reset attempted flag to allow agent to execute rebooking in this cycle
 		// This is critical - without resetting, the "attempted" check above will return true
@@ -255,7 +254,7 @@ func (f *FlightWant) Exec() bool {
 		// Check if rebooking created a new flight result (read from state, not return value)
 	agentResult, hasResult := f.GetState("agent_result")
 	if hasResult && agentResult != nil {
-			log.Printf("[FLIGHT] Rebooking agent execution completed, processing new flight result\n")
+			f.StoreLog("Rebooking agent execution completed, processing new flight result")
 
 			// Convert agent_result to FlightSchedule
 	agentSchedule := f.extractFlightSchedule(agentResult)
@@ -277,16 +276,16 @@ func (f *FlightWant) Exec() bool {
 				}
 
 				out <- travelSchedule
-				log.Printf("[FLIGHT] Sent rebooked flight schedule: %s from %s to %s\n",
+				f.StoreLog(fmt.Sprintf("Sent rebooked flight schedule: %s from %s to %s",
 					agentSchedule.ReservationName,
 					agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-					agentSchedule.ArrivalTime.Format("15:04 Jan 2"))
+					agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
 
 				// Start continuous monitoring for new flight
 				if !f.monitoringActive {
 					f.monitoringActive = true
 					f.monitoringStartTime = time.Now()
-					log.Printf("[FLIGHT] Starting continuous monitoring for new booked flight (duration: %v)\n", f.monitoringDuration)
+					f.StoreLog(fmt.Sprintf("Starting continuous monitoring for new booked flight (duration: %v)", f.monitoringDuration))
 				}
 
 				// Continue monitoring the new flight
@@ -296,7 +295,7 @@ func (f *FlightWant) Exec() bool {
 	}
 
 	// Normal flight execution (only runs if agent execution didn't return a result)
-	log.Printf("[FLIGHT] Agent execution did not return result, using standard flight logic\n")
+	f.StoreLog("Agent execution did not return result, using standard flight logic")
 
 	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
@@ -335,7 +334,7 @@ func (f *FlightWant) Exec() bool {
 					departureTime = departureTime.Add(2 * time.Hour)
 					newEvent.Start = departureTime
 					newEvent.End = departureTime.Add(duration)
-					log.Printf("[FLIGHT] Conflict detected, retrying at %s\n", departureTime.Format("15:04"))
+					f.StoreLog(fmt.Sprintf("Conflict detected, retrying at %s", departureTime.Format("15:04")))
 					break
 				}
 			}
@@ -365,8 +364,8 @@ func (f *FlightWant) Exec() bool {
 		"schedule_date":         baseDate.Format("2006-01-02"),
 	})
 
-	log.Printf("[FLIGHT] Scheduled %s from %s to %s\n",
-		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2"))
+	f.StoreLog(fmt.Sprintf("Scheduled %s from %s to %s",
+		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2")))
 
 	out <- newSchedule
 	return true

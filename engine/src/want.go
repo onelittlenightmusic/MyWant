@@ -811,6 +811,7 @@ func (n *Want) addAggregatedParameterHistory() {
 
 // addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle
 // Concatenates multiple log lines separated by newlines
+// Also writes the logs to the actual log file via InfoLog
 func (n *Want) addAggregatedLogHistory() {
 	if len(n.pendingLogs) == 0 {
 		return
@@ -834,7 +835,6 @@ func (n *Want) addAggregatedLogHistory() {
 
 	// CRITICAL: Protect History.LogHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
 
 	// Initialize LogHistory if nil
 	if n.History.LogHistory == nil {
@@ -852,6 +852,10 @@ func (n *Want) addAggregatedLogHistory() {
 
 	// Clear pending logs after adding to history
 	n.pendingLogs = make([]string, 0)
+	n.stateMutex.Unlock()
+
+	// Write logs to the actual log file (after releasing lock to avoid holding it during I/O)
+	fmt.Printf("[%s] %s\n", n.Metadata.Name, logsText)
 }
 
 // copyCurrentState creates a copy of the current state
