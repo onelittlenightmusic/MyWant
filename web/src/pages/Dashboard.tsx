@@ -226,11 +226,6 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  // Handler to expand a parent want when Down arrow is pressed on it
-  const handleExpandParent = (wantId: string) => {
-    setExpandedParents(prev => new Set(prev).add(wantId));
-  };
-
   // Handler to toggle expand/collapse of a parent want
   const handleToggleExpand = (wantId: string) => {
     setExpandedParents(prev => {
@@ -249,7 +244,6 @@ export const Dashboard: React.FC = () => {
     items: hierarchicalWants,
     currentItem: currentHierarchicalWant,
     onNavigate: handleHierarchicalNavigate,
-    onExpandParent: handleExpandParent,
     onToggleExpand: handleToggleExpand,
     expandedItems: expandedParents,
     enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
