@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, RotateCw, Trash2 } from 'lucide-react';
+import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2 } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -276,7 +276,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             )}
           >
-            {isSuspended ? <RotateCw className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            <Play className="h-4 w-4" />
           </button>
 
           {/* Suspend */}
