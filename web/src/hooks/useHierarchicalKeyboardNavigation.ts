@@ -16,9 +16,9 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
 
 /**
  * Hook for hierarchical keyboard navigation with arrow keys
- * - Arrow Up/Down: Navigate between items at same hierarchy level
- * - Arrow Left: Move to parent item (if current item has parent)
- * - Arrow Right: Move to first child item (if current item has children)
+ * - Arrow Left/Right: Navigate between items at same hierarchy level
+ * - Arrow Up: Move to parent item (if current item has parent)
+ * - Arrow Down: Move to first child item (if current item has children)
  *
  * @param items - All items in flat list
  * @param currentItem - Currently selected item
@@ -50,9 +50,9 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       let shouldNavigate = false;
 
       switch (e.key) {
-        case 'ArrowDown':
+        case 'ArrowRight':
           e.preventDefault();
-          // Down arrow: navigate within hierarchy
+          // Right arrow: navigate within hierarchy (previously Down)
           if (currentItem) {
             // Check if current item is a parent with children
             const hasChildren = items.some(item => item.parentId === currentItem.id);
@@ -81,9 +81,9 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           }
           break;
 
-        case 'ArrowUp':
+        case 'ArrowLeft':
           e.preventDefault();
-          // Up arrow: navigate up within hierarchy
+          // Left arrow: navigate up within hierarchy (previously Up)
           if (currentItem) {
             // Try to move to previous sibling
             nextItem = getPreviousSibling(items, currentItem);
@@ -95,16 +95,16 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           shouldNavigate = !!nextItem;
           break;
 
-        case 'ArrowRight':
+        case 'ArrowDown':
           e.preventDefault();
-          // Right arrow: navigate to next top-level want
+          // Down arrow: navigate to next top-level want (previously Right)
           nextItem = getNextTopLevel(items, currentItem);
           shouldNavigate = !!nextItem;
           break;
 
-        case 'ArrowLeft':
+        case 'ArrowUp':
           e.preventDefault();
-          // Left arrow: navigate to previous top-level want
+          // Up arrow: navigate to previous top-level want (previously Left)
           nextItem = getPreviousTopLevel(items, currentItem);
           shouldNavigate = !!nextItem;
           break;
