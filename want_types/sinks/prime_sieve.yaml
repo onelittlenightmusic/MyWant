@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "prime_sieve"
+    name: "prime sieve"
     title: "Prime Number Sieve Sink"
     description: |
       Terminal sink that collects prime numbers identified by upstream sieve
@@ -82,7 +82,7 @@ wantType:
         3. prime_sieve collects all 25 primes in this range
         4. Stores in primes array: [2, 3, 5, 7, 11, ...]
         5. Reports: 25 primes, largest=97, smallest=2
-      connectedTo: ["prime_sequence"]
+      connectedTo: ["prime sequence"]
 
     - name: "Collect Primes 2-1000"
       description: "Sieve and collect primes from larger range"
@@ -93,7 +93,7 @@ wantType:
         3. Filters down to 168 primes
         4. prime_sieve collects all 168 values
         5. Statistics: largest_prime=997, count=168
-      connectedTo: ["prime_sequence"]
+      connectedTo: ["prime sequence"]
 
     - name: "Large Range Primes 2-10000"
       description: "Collect 1229 primes from range 2-10000"
@@ -104,11 +104,11 @@ wantType:
         3. Collects 1229 prime numbers
         4. Demonstrates sieve performance on larger sets
         5. Final statistics for analysis
-      connectedTo: ["prime_sequence"]
+      connectedTo: ["prime sequence"]
 
   relatedTypes:
-    - "prime_sequence"
-    - "prime_numbers"
+    - "prime sequence"
+    - "prime numbers"
     - "sink"
     - "prime_sink"
 

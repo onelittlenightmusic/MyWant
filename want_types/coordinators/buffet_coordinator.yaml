@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "buffet_coordinator"
+    name: "buffet coordinator"
     title: "Buffet Schedule Coordinator"
     description: "Orchestrates standalone buffet reservation wants and collects their schedule data"
     version: "1.0"
@@ -93,7 +93,7 @@ wantType:
 
   relatedTypes:
     - "buffet"
-    - "travel_coordinator"
+    - "travel coordinator"
 
   seeAlso:
     - "buffet want type"

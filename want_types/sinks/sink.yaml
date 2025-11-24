@@ -207,13 +207,13 @@ wantType:
         1. Discards all received items
         2. Tracks total count until max_items
         3. Useful for pipeline performance testing
-      connectedTo: ["fibonacci_sequence"]
+      connectedTo: ["fibonacci sequence"]
 
   relatedTypes:
     - "queue"
     - "combiner"
-    - "fibonacci_sequence"
-    - "prime_sequence"
+    - "fibonacci sequence"
+    - "prime sequence"
     - "numbers"
 
   seeAlso:

@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "fibonacci_adder_loop"
+    name: "fibonacci adder loop"
     title: "Fibonacci Loop Adder / Merger"
     description: |
       Terminal sink that receives computed Fibonacci numbers and optionally
@@ -79,7 +79,7 @@ wantType:
         4. Accumulates all: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377
         5. Computes sum=986, largest=377
         6. Stores complete sequence for analysis
-      connectedTo: ["fibonacci_loop"]
+      connectedTo: ["fibonacci loop"]
 
     - name: "Aggregate Statistics"
       description: "Compute statistics on Fibonacci sequence"
@@ -89,11 +89,11 @@ wantType:
         2. Computes: count, sum, min, max
         3. Useful for analyzing growth pattern
         4. Can verify correctness of computation
-      connectedTo: ["fibonacci_loop"]
+      connectedTo: ["fibonacci loop"]
 
   relatedTypes:
-    - "fibonacci_loop"
-    - "fibonacci_source_loop"
+    - "fibonacci loop"
+    - "fibonacci source loop"
 
   seeAlso:
     - "Fibonacci loop aggregation"

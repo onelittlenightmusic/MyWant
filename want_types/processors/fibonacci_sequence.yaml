@@ -3,7 +3,7 @@ wantType:
   # METADATA LAYER - Identity and Classification
   # =====================================================================
   metadata:
-    name: "fibonacci_sequence"
+    name: "fibonacci sequence"
     title: "Fibonacci Number Sequence Filter"
     description: |
       Processor that filters Fibonacci numbers based on value range constraints.
@@ -121,7 +121,7 @@ wantType:
         3. Accumulates: 55, 89, 144, 233, 377
         4. Stores 5 filtered values in state
         5. Reports total_processed = 20 (from generator)
-      connectedTo: ["fibonacci_numbers"]
+      connectedTo: ["fibonacci numbers"]
 
     - name: "Large Fibonacci Range"
       description: "Filter Fibonacci numbers over 1000"
@@ -134,7 +134,7 @@ wantType:
         3. Accumulates larger numbers: 1597, 2584, 4181, ...
         4. Useful for testing with 100+ Fibonacci numbers
         5. Demonstrates filtering effectiveness on large sequences
-      connectedTo: ["fibonacci_numbers"]
+      connectedTo: ["fibonacci numbers"]
 
     - name: "Exact Value Match"
       description: "Filter single Fibonacci value (Fibonacci golden ratio)"
@@ -147,14 +147,14 @@ wantType:
         3. Filters out all other numbers
         4. Accumulates single value: [89]
         5. Demonstrates precision filtering
-      connectedTo: ["fibonacci_numbers"]
+      connectedTo: ["fibonacci numbers"]
 
   # =====================================================================
   # RELATED TYPES - What other want types work with this one?
   # =====================================================================
   relatedTypes:
-    - "fibonacci_numbers"
-    - "prime_sequence"
+    - "fibonacci numbers"
+    - "prime sequence"
     - "numbers"
     - "queue"
     - "sink"

@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "fibonacci_source_loop"
+    name: "fibonacci source loop"
     title: "Fibonacci Loop Source"
     description: |
       Generator that produces initial Fibonacci seed values (0, 1) and maximum
@@ -77,7 +77,7 @@ wantType:
   relatedTypes:
     - "fibonacci_computer"
     - "fibonacci_merger"
-    - "fibonacci_numbers"
+    - "fibonacci numbers"
 
   seeAlso:
     - "Fibonacci loop pattern"

@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "fibonacci_loop"
+    name: "fibonacci loop"
     title: "Fibonacci Loop Processor"
     description: |
       Processor for feedback-loop based Fibonacci number generation. Receives
@@ -91,10 +91,10 @@ wantType:
         4. Computes positions 2-14: 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377
         5. Sends each computed value
         6. Sends end signal
-      connectedTo: ["fibonacci_source_loop", "fibonacci_merger"]
+      connectedTo: ["fibonacci source loop", "fibonacci_merger"]
 
   relatedTypes:
-    - "fibonacci_source_loop"
+    - "fibonacci source loop"
     - "fibonacci_merger"
     - "fibonacci_computer"
 

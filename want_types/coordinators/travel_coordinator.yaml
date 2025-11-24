@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "travel_coordinator"
+    name: "travel coordinator"
     title: "Travel Itinerary Coordinator"
     description: "Orchestrates multiple independent travel wants (restaurant, hotel, buffet, flight) into a unified itinerary"
     version: "1.0"

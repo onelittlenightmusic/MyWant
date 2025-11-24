@@ -103,7 +103,7 @@ wantType:
         service_time: 0.5
         max_queue_size: 500
       expectedBehavior: "Items queue up and wait for processing with longer delays"
-      connectedTo: ["fibonacci_sequence"]
+      connectedTo: ["fibonacci sequence"]
 
     - name: "High-throughput queue"
       description: "Fast queue for quick item processing"
@@ -119,14 +119,14 @@ wantType:
         service_time: 0.2
         max_queue_size: 100
       expectedBehavior: "Items beyond 100 are rejected/discarded"
-      connectedTo: ["prime_sequence"]
+      connectedTo: ["prime sequence"]
 
   relatedTypes:
     - "numbers"
     - "combiner"
     - "sink"
-    - "fibonacci_sequence"
-    - "prime_sequence"
+    - "fibonacci sequence"
+    - "prime sequence"
 
   seeAlso:
     - "queue-system recipe"

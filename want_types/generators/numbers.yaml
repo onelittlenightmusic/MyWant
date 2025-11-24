@@ -85,8 +85,8 @@ wantType:
       connectedTo: []
 
   relatedTypes:
-    - "fibonacci_numbers"
-    - "prime_numbers"
+    - "fibonacci numbers"
+    - "prime numbers"
     - "queue"
     - "combiner"
 

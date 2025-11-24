@@ -3,7 +3,7 @@ wantType:
   # METADATA LAYER - Identity and Classification
   # =====================================================================
   metadata:
-    name: "prime_numbers"
+    name: "prime numbers"
     title: "Prime Number Range Generator"
     description: |
       Generator that produces all numbers within a specified range. Output values
@@ -114,7 +114,7 @@ wantType:
         3. Closes output channel
         4. Sets completed flag
         5. Downstream prime_sequence filters to find: 2, 3, 5, 7, 11, ...
-      connectedTo: ["prime_sequence", "prime_sink"]
+      connectedTo: ["prime sequence", "prime_sink"]
 
     - name: "Medium Prime Range"
       description: "Generate numbers 2-1000 for larger sieve"
@@ -127,7 +127,7 @@ wantType:
         3. prime_sequence uses Eratosthenes algorithm to filter
         4. Result: 168 primes between 2 and 1000
         5. Demonstrates sieve efficiency on larger range
-      connectedTo: ["prime_sequence", "prime_sink"]
+      connectedTo: ["prime sequence", "prime_sink"]
 
     - name: "Custom Range (Skip to 500)"
       description: "Generate numbers from 500-600 to find primes in that range"
@@ -140,15 +140,15 @@ wantType:
         3. prime_sequence identifies primes: 503, 509, 521, 523, 541, ...
         4. Result: 16 primes in this range
         5. Demonstrates sieve on arbitrary number ranges
-      connectedTo: ["prime_sequence", "prime_sink"]
+      connectedTo: ["prime sequence", "prime_sink"]
 
   # =====================================================================
   # RELATED TYPES - What other want types work with this one?
   # =====================================================================
   relatedTypes:
-    - "prime_sequence"
-    - "prime_sieve"
-    - "fibonacci_numbers"
+    - "prime sequence"
+    - "prime sieve"
+    - "fibonacci numbers"
     - "numbers"
     - "sink"
 

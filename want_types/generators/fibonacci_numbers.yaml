@@ -3,7 +3,7 @@ wantType:
   # METADATA LAYER - Identity and Classification
   # =====================================================================
   metadata:
-    name: "fibonacci_numbers"
+    name: "fibonacci numbers"
     title: "Fibonacci Number Generator"
     description: |
       Generator that produces Fibonacci sequence numbers. Generates a configurable
@@ -96,7 +96,7 @@ wantType:
         3. Closes output channel
         4. Sets completed flag in state
         5. Ready to process results
-      connectedTo: ["fibonacci_sequence", "queue", "sink"]
+      connectedTo: ["fibonacci sequence", "queue", "sink"]
 
     - name: "Large Fibonacci Sequence"
       description: "Generate 100 Fibonacci numbers for testing throughput"
@@ -107,7 +107,7 @@ wantType:
         2. Values grow exponentially (up to ~3.5 billion)
         3. Useful for testing processor capacity
         4. Sink can count/aggregate the stream
-      connectedTo: ["fibonacci_sequence", "sink"]
+      connectedTo: ["fibonacci sequence", "sink"]
 
     - name: "Single Number"
       description: "Generate just the first Fibonacci number (0)"
@@ -123,8 +123,8 @@ wantType:
   # RELATED TYPES - What other want types work with this one?
   # =====================================================================
   relatedTypes:
-    - "fibonacci_sequence"
-    - "prime_numbers"
+    - "fibonacci sequence"
+    - "prime numbers"
     - "numbers"
     - "queue"
     - "sink"

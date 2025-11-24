@@ -1,6 +1,6 @@
 wantType:
   metadata:
-    name: "prime_sequence"
+    name: "prime sequence"
     title: "Prime Sequence Sieve"
     description: |
       Processor that filters numbers to identify primes using the Sieve of
@@ -89,7 +89,7 @@ wantType:
         4. Identifies 3, uses it as sieve
         5. Continues until all tested
         6. Outputs: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, ..., 97 (25 total)
-      connectedTo: ["prime_numbers", "prime_sieve"]
+      connectedTo: ["prime numbers", "prime sieve"]
 
     - name: "Large Range Sieve"
       description: "Sieve 1000 numbers to find primes"
@@ -101,7 +101,7 @@ wantType:
         3. Uses memoized primes for efficiency
         4. Outputs filtered prime stream
         5. Demonstrates sieve algorithm correctness
-      connectedTo: ["prime_numbers", "prime_sieve"]
+      connectedTo: ["prime numbers", "prime sieve"]
 
     - name: "Custom Prime Range"
       description: "Sieve numbers from 100-200"
@@ -113,11 +113,11 @@ wantType:
         3. Identifies 21 primes in this range
         4. Outputs: 101, 103, 107, 109, 113, ...
         5. Useful for analyzing prime distribution
-      connectedTo: ["prime_numbers", "prime_sink"]
+      connectedTo: ["prime numbers", "prime_sink"]
 
   relatedTypes:
-    - "prime_numbers"
-    - "prime_sieve"
+    - "prime numbers"
+    - "prime sieve"
     - "prime_sink"
 
   seeAlso:
