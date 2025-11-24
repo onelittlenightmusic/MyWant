@@ -1,4 +1,5 @@
 import React from 'react';
+import { Zap } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -11,14 +12,16 @@ interface StatCardProps {
   title: string;
   value: number;
   color: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-6">
     <div className="flex items-center">
       <div className={`flex-shrink-0 p-3 rounded-full ${color}`}>
-        <span className="text-2xl">{icon}</span>
+        <div className="text-xl">
+          {icon}
+        </div>
       </div>
       <div className="ml-4">
         <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -52,7 +55,7 @@ export const WantTypeStatsOverview: React.FC<WantTypeStatsOverviewProps> = ({ wa
       title: 'Total Types',
       value: stats.total,
       color: 'bg-purple-100',
-      icon: '⚡'
+      icon: <Zap className="h-6 w-6 text-purple-600" />
     }
   ];
 
