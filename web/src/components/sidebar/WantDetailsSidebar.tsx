@@ -630,7 +630,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
       )}
 
       {/* Dependencies (Using) */}
-      {want.spec?.using && (want.spec.using.length > 0 || editingUsingIndex !== null) && (
+      {want.spec && (
         <div className="bg-gray-50 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
@@ -649,7 +649,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
           </div>
 
           {/* Display existing dependencies as styled chips */}
-          {want.spec.using.length > 0 && (
+          {want.spec.using && want.spec.using.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {want.spec.using.map((usingItem, index) => {
                 if (editingUsingIndex === index) return null;
@@ -670,7 +670,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                       onClick={(e) => {
                         e.stopPropagation();
                         // Remove this dependency
-                        const newUsing = want.spec.using.filter((_, i) => i !== index);
+                        const newUsing = want.spec.using ? want.spec.using.filter((_, i) => i !== index) : [];
                         const updatePayload = {
                           metadata: want.metadata,
                           spec: { ...want.spec, using: newUsing }
@@ -708,7 +708,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
 
                     setUpdateLoading(true);
                     try {
-                      let newUsing = [...want.spec.using];
+                      let newUsing = want.spec.using ? [...want.spec.using] : [];
                       if (editingUsingIndex === -1) {
                         // Adding new dependency
                         newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
