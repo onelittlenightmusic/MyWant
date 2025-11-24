@@ -41,6 +41,13 @@ type WantHistory struct {
 	StateHistory        []StateHistoryEntry         `json:"stateHistory" yaml:"stateHistory"`
 	AgentHistory        []AgentExecution            `json:"agentHistory,omitempty" yaml:"agentHistory,omitempty"`
 	GroupedAgentHistory map[string][]AgentExecution `json:"groupedAgentHistory,omitempty" yaml:"groupedAgentHistory,omitempty"`
+	LogHistory          []LogHistoryEntry           `json:"logHistory,omitempty" yaml:"logHistory,omitempty"`
+}
+
+// LogHistoryEntry represents a collection of log messages from a single Exec cycle
+type LogHistoryEntry struct {
+	Timestamp int64  `json:"timestamp" yaml:"timestamp"`
+	Logs      string `json:"logs" yaml:"logs"` // Multiple log lines concatenated
 }
 
 // WantStatus represents the current state of a want
@@ -114,6 +121,7 @@ type Want struct {
 	pendingParameterChanges map[string]interface{} `json:"-" yaml:"-"`
 	execCycleCount          int                    `json:"-" yaml:"-"`
 	inExecCycle             bool                   `json:"-" yaml:"-"`
+	pendingLogs             []string               `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
@@ -256,6 +264,8 @@ func (n *Want) BeginExecCycle() {
 	// This is safer than iterating and deleting from existing maps
 	n.pendingStateChanges = make(map[string]interface{})
 	n.pendingParameterChanges = make(map[string]interface{})
+	// Initialize log buffer for this exec cycle
+	n.pendingLogs = make([]string, 0)
 }
 
 // EndExecCycle completes the execution cycle and commits all batched state and parameter changes
@@ -273,6 +283,11 @@ func (n *Want) EndExecCycle() {
 	}
 
 	n.AggregateChanges()
+
+	// Handle log aggregation
+	if len(n.pendingLogs) > 0 {
+		n.addAggregatedLogHistory()
+	}
 
 	n.inExecCycle = false
 }
@@ -590,6 +605,22 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 	}
 }
 
+// StoreLog appends a log message to the want's log buffer during an Exec cycle
+// Logs are aggregated and written to LogHistory at the end of each Exec cycle
+// Usage within Exec():
+//   want.StoreLog("Processing packet #1")
+//   want.StoreLog("Calculation complete: result = 42")
+func (n *Want) StoreLog(message string) {
+	// Only buffer logs if we're in an Exec cycle
+	if !n.inExecCycle {
+		return
+	}
+
+	// Append the log message to the pending logs buffer
+	// No lock needed here since pendingLogs is only accessed during the current Exec cycle
+	n.pendingLogs = append(n.pendingLogs, message)
+}
+
 // GetState retrieves a state value atomically with mutex protection
 // This method encapsulates all stateMutex access for state reads, ensuring thread safety
 // Returns (value, exists) to indicate whether the key exists in state
@@ -776,6 +807,51 @@ func (n *Want) addAggregatedParameterHistory() {
 	for k := range n.pendingParameterChanges {
 		delete(n.pendingParameterChanges, k)
 	}
+}
+
+// addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle
+// Concatenates multiple log lines separated by newlines
+func (n *Want) addAggregatedLogHistory() {
+	if len(n.pendingLogs) == 0 {
+		return
+	}
+
+	// Concatenate all log messages with newlines
+	// This preserves the order and allows reading individual lines
+	logsText := ""
+	for i, log := range n.pendingLogs {
+		if i > 0 {
+			logsText += "\n"
+		}
+		logsText += log
+	}
+
+	// Create a single log history entry with all logs from this cycle
+	entry := LogHistoryEntry{
+		Timestamp: time.Now().Unix(),
+		Logs:      logsText,
+	}
+
+	// CRITICAL: Protect History.LogHistory access with stateMutex to prevent concurrent slice mutations
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	// Initialize LogHistory if nil
+	if n.History.LogHistory == nil {
+		n.History.LogHistory = make([]LogHistoryEntry, 0)
+	}
+
+	// Append the new log entry to log history
+	n.History.LogHistory = append(n.History.LogHistory, entry)
+
+	// Limit history size (keep last 100 entries for logs)
+	maxHistorySize := 100
+	if len(n.History.LogHistory) > maxHistorySize {
+		n.History.LogHistory = n.History.LogHistory[len(n.History.LogHistory)-maxHistorySize:]
+	}
+
+	// Clear pending logs after adding to history
+	n.pendingLogs = make([]string, 0)
 }
 
 // copyCurrentState creates a copy of the current state
