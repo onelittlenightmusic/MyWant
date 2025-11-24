@@ -2172,7 +2172,7 @@ func main() {
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Ltime)
 
 	// Parse command line arguments: [port] [host] [debug]
 	// Examples:
