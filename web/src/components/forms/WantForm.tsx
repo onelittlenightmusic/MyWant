@@ -259,9 +259,10 @@ export const WantForm: React.FC<WantFormProps> = ({
 
     // Check if this is a multi-want configuration (has 'wants' array)
     if ((config as any).wants && Array.isArray((config as any).wants)) {
-      // For multi-want configs, just load the YAML representation
-      // This handles samples like "Hierarchical Approval" that deploy multiple wants at once
+      // For multi-want configs, load the YAML representation and switch to YAML editor
+      // This handles samples like "Dynamic Travel Change" that deploy multiple wants at once
       setYamlContent(stringifyYaml(config));
+      setEditMode('yaml');
       return;
     }
 
