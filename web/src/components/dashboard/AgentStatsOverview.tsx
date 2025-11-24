@@ -1,4 +1,5 @@
 import React from 'react';
+import { Bot, Zap, Eye, Target } from 'lucide-react';
 import { AgentResponse } from '@/types/agent';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -12,14 +13,16 @@ interface StatCardProps {
   title: string;
   value: number;
   color: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-6">
     <div className="flex items-center">
       <div className={`flex-shrink-0 p-3 rounded-full ${color}`}>
-        <span className="text-2xl">{icon}</span>
+        <div className="text-xl">
+          {icon}
+        </div>
       </div>
       <div className="ml-4">
         <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -60,25 +63,25 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
       title: 'Total Agents',
       value: stats.total,
       color: 'bg-blue-100',
-      icon: '🤖'
+      icon: <Bot className="h-6 w-6 text-blue-600" />
     },
     {
       title: 'Do Agents',
       value: stats.doAgents,
       color: 'bg-green-100',
-      icon: '⚡'
+      icon: <Zap className="h-6 w-6 text-green-600" />
     },
     {
       title: 'Monitor Agents',
       value: stats.monitorAgents,
       color: 'bg-purple-100',
-      icon: '👁️'
+      icon: <Eye className="h-6 w-6 text-purple-600" />
     },
     {
       title: 'Total Capabilities',
       value: stats.totalCapabilities,
       color: 'bg-orange-100',
-      icon: '🎯'
+      icon: <Target className="h-6 w-6 text-orange-600" />
     }
   ];
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ClipboardList, Play, CheckCircle, AlertCircle } from 'lucide-react';
 import { Want } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -12,14 +13,16 @@ interface StatCardProps {
   title: string;
   value: number;
   color: string;
-  icon: string;
+  icon: React.ReactNode;
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-6">
     <div className="flex items-center">
       <div className={`flex-shrink-0 p-3 rounded-full ${color}`}>
-        <span className="text-2xl">{icon}</span>
+        <div className="text-xl">
+          {icon}
+        </div>
       </div>
       <div className="ml-4">
         <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -60,25 +63,25 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
       title: 'Total Wants',
       value: stats.total,
       color: 'bg-blue-100',
-      icon: '📋'
+      icon: <ClipboardList className="h-6 w-6 text-blue-600" />
     },
     {
       title: 'Running',
       value: stats.running,
       color: 'bg-green-100',
-      icon: '▶️'
+      icon: <Play className="h-6 w-6 text-green-600" />
     },
     {
       title: 'Completed',
       value: stats.completed,
       color: 'bg-green-100',
-      icon: '✅'
+      icon: <CheckCircle className="h-6 w-6 text-green-600" />
     },
     {
       title: 'Failed',
       value: stats.failed,
       color: 'bg-red-100',
-      icon: '❌'
+      icon: <AlertCircle className="h-6 w-6 text-red-600" />
     }
   ];
 
