@@ -252,19 +252,10 @@ func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 func (n *Want) BeginExecCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
-	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]interface{})
-	}
-	if n.pendingParameterChanges == nil {
-		n.pendingParameterChanges = make(map[string]interface{})
-	}
-	// Clear pending changes for new cycle
-	for k := range n.pendingStateChanges {
-		delete(n.pendingStateChanges, k)
-	}
-	for k := range n.pendingParameterChanges {
-		delete(n.pendingParameterChanges, k)
-	}
+	// Always create fresh maps to avoid concurrent map access issues
+	// This is safer than iterating and deleting from existing maps
+	n.pendingStateChanges = make(map[string]interface{})
+	n.pendingParameterChanges = make(map[string]interface{})
 }
 
 // EndExecCycle completes the execution cycle and commits all batched state and parameter changes
