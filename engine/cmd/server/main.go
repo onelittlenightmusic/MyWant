@@ -1357,8 +1357,8 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Suspend the execution
-	if err := execution.Builder.Suspend(); err != nil {
+	// Suspend the specific want execution
+	if err := execution.Builder.SuspendWant(wantID); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
@@ -1403,8 +1403,8 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resume the execution
-	if err := execution.Builder.Resume(); err != nil {
+	// Resume the specific want execution
+	if err := execution.Builder.ResumeWant(wantID); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{
 			"error": fmt.Sprintf("Failed to resume want execution: %v", err),

@@ -76,6 +76,14 @@ type ControlCommand struct {
 	Reason    string         `json:"reason,omitempty"`
 }
 
+// TriggerCommand is a union type that wraps either a reconciliation trigger or a control command
+// This allows reconcileTrigger channel to handle both types of signals in a unified way
+type TriggerCommand struct {
+	Type             string           // "reconcile" or "control"
+	ControlCommand   *ControlCommand  // Non-nil for control triggers
+	ReconcileTrigger bool             // Non-zero for reconciliation triggers
+}
+
 // WantStats is deprecated - use State field instead
 // Keeping type alias for backward compatibility during transition
 type WantStats = map[string]interface{}

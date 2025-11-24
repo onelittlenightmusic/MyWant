@@ -53,15 +53,15 @@ type ChainBuilder struct {
 	config         Config                    // Current configuration
 
 	// Reconcile loop fields
-	reconcileStop    chan bool           // Stop signal for reconcile loop
-	reconcileTrigger chan bool           // Buffered channel for reconciliation trigger signals
-	addWantsChan     chan []*Want        // Buffered channel for asynchronous want addition requests
-	deleteWantsChan  chan []string       // Buffered channel for asynchronous want deletion requests (want IDs)
-	reconcileMutex   sync.RWMutex        // Protect concurrent access
-	inReconciliation bool                // Flag to prevent recursive reconciliation
-	running          bool                // Execution state
-	lastConfig       Config              // Last known config state
-	lastConfigHash   string              // Hash of last config for change detection
+	reconcileStop    chan bool              // Stop signal for reconcile loop
+	reconcileTrigger chan *TriggerCommand   // Unified channel for reconciliation and control triggers
+	addWantsChan     chan []*Want           // Buffered channel for asynchronous want addition requests
+	deleteWantsChan  chan []string          // Buffered channel for asynchronous want deletion requests (want IDs)
+	reconcileMutex   sync.RWMutex           // Protect concurrent access
+	inReconciliation bool                   // Flag to prevent recursive reconciliation
+	running          bool                   // Execution state
+	lastConfig       Config                 // Last known config state
+	lastConfigHash   string                 // Hash of last config for change detection
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -120,7 +120,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		registry:         make(map[string]WantFactory),
 		customRegistry:   NewCustomTargetTypeRegistry(),
 		reconcileStop:    make(chan bool),
-		reconcileTrigger: make(chan bool, 10), // Buffered to avoid blocking on concurrent triggers
+		reconcileTrigger: make(chan *TriggerCommand, 20), // Unified channel for reconciliation and control triggers
 		addWantsChan:     make(chan []*Want, 10), // Buffered to allow concurrent submissions
 		deleteWantsChan:  make(chan []string, 10), // Buffered to allow concurrent deletion requests
 		pathMap:          make(map[string]Paths),
@@ -493,8 +493,20 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-cb.reconcileStop:
 			InfoLog("[RECONCILE] Stopping reconcile loop")
 			return
-		case <-cb.reconcileTrigger:
-			cb.reconcileWants()
+		case trigger := <-cb.reconcileTrigger:
+			// Handle both reconciliation and control triggers from unified channel
+			if trigger == nil {
+				continue
+			}
+			if trigger.Type == "control" && trigger.ControlCommand != nil {
+				// Handle control trigger for a specific want
+				cmd := trigger.ControlCommand
+				InfoLog("[RECONCILE] Received control trigger: %s for want %s\n", cmd.Trigger, cmd.WantID)
+				cb.distributeControlCommand(cmd)
+			} else {
+				// Handle standard reconciliation trigger
+				cb.reconcileWants()
+			}
 		case newWants := <-cb.addWantsChan:
 			// Add wants to config and runtime
 			cb.reconcileMutex.Lock()
@@ -1559,7 +1571,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	// Trigger immediate reconciliation via channel (unless already in reconciliation)
 	if !cb.inReconciliation {
 		select {
-		case cb.reconcileTrigger <- true:
+		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 			// Trigger sent successfully
 		default:
 			// Channel already has a pending trigger, skip
@@ -2010,7 +2022,7 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	// Trigger reconciliation to process the new want
 	if !cb.inReconciliation {
 		select {
-		case cb.reconcileTrigger <- true:
+		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 		default:
 			// Channel already has a pending trigger, skip
 		}
@@ -2359,7 +2371,64 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 // Suspend/Resume Control Methods
 // ==============================
 
-// Suspend pauses the execution of all wants
+// SuspendWant suspends execution of a specific want and propagates to children
+func (cb *ChainBuilder) SuspendWant(wantID string) error {
+	cmd := &ControlCommand{
+		Trigger:   ControlTriggerSuspend,
+		WantID:    wantID,
+		Timestamp: time.Now(),
+		Reason:    "Suspended via API",
+	}
+	return cb.SendControlCommand(cmd)
+}
+
+// ResumeWant resumes execution of a specific want and propagates to children
+func (cb *ChainBuilder) ResumeWant(wantID string) error {
+	cmd := &ControlCommand{
+		Trigger:   ControlTriggerResume,
+		WantID:    wantID,
+		Timestamp: time.Now(),
+		Reason:    "Resumed via API",
+	}
+	return cb.SendControlCommand(cmd)
+}
+
+// StopWant stops execution of a specific want
+func (cb *ChainBuilder) StopWant(wantID string) error {
+	cmd := &ControlCommand{
+		Trigger:   ControlTriggerStop,
+		WantID:    wantID,
+		Timestamp: time.Now(),
+		Reason:    "Stopped via API",
+	}
+	return cb.SendControlCommand(cmd)
+}
+
+// RestartWant restarts execution of a specific want
+func (cb *ChainBuilder) RestartWant(wantID string) error {
+	cmd := &ControlCommand{
+		Trigger:   ControlTriggerRestart,
+		WantID:    wantID,
+		Timestamp: time.Now(),
+		Reason:    "Restarted via API",
+	}
+	return cb.SendControlCommand(cmd)
+}
+
+// SendControlCommand sends a control command to the reconcile loop for distribution
+func (cb *ChainBuilder) SendControlCommand(cmd *ControlCommand) error {
+	select {
+	case cb.reconcileTrigger <- &TriggerCommand{
+		Type:           "control",
+		ControlCommand: cmd,
+	}:
+		return nil
+	default:
+		return fmt.Errorf("failed to send control command - trigger channel full")
+	}
+}
+
+// Suspend pauses the execution of all wants (deprecated - use SuspendWant instead)
 func (cb *ChainBuilder) Suspend() error {
 	cb.controlMutex.Lock()
 	defer cb.controlMutex.Unlock()
@@ -2380,7 +2449,7 @@ func (cb *ChainBuilder) Suspend() error {
 	}
 }
 
-// Resume resumes the execution of all wants
+// Resume resumes the execution of all wants (deprecated - use ResumeWant instead)
 func (cb *ChainBuilder) Resume() error {
 	cb.controlMutex.Lock()
 	defer cb.controlMutex.Unlock()
@@ -2408,6 +2477,42 @@ func (cb *ChainBuilder) IsSuspended() bool {
 	return cb.suspended
 }
 
+// distributeControlCommand distributes a control command to target want(s)
+// and propagates to child wants if the target is a parent want
+func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
+	// Find the target want
+	_, exists := cb.wants[cmd.WantID]
+	if !exists {
+		InfoLog("[CONTROL] Warning: Target want %s not found\n", cmd.WantID)
+		return
+	}
+
+	// Handle the control command for the target want
+	switch cmd.Trigger {
+	case ControlTriggerSuspend:
+		InfoLog("[CONTROL] Suspending want %s\n", cmd.WantID)
+		// TODO: Implement goroutine pause mechanism
+
+	case ControlTriggerResume:
+		InfoLog("[CONTROL] Resuming want %s\n", cmd.WantID)
+		// TODO: Implement goroutine resume mechanism
+
+	case ControlTriggerStop:
+		InfoLog("[CONTROL] Stopping want %s\n", cmd.WantID)
+		// TODO: Implement goroutine termination
+
+	case ControlTriggerRestart:
+		InfoLog("[CONTROL] Restarting want %s\n", cmd.WantID)
+		// TODO: Implement goroutine restart
+	}
+
+	// TODO: Propagate control to child wants if this is a parent want
+	// This will require finding parent-child relationships in the Target want implementation
+}
+
 // Stop stops execution by clearing all wants from the configuration
 func (cb *ChainBuilder) Stop() error {
 	// Clear the config wants which will trigger reconciliation to clean up
@@ -2417,7 +2522,7 @@ func (cb *ChainBuilder) Stop() error {
 
 	// Trigger reconciliation to process the empty config
 	select {
-	case cb.reconcileTrigger <- true:
+	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 	default:
 	}
 
@@ -2428,7 +2533,7 @@ func (cb *ChainBuilder) Stop() error {
 func (cb *ChainBuilder) Start() error {
 	// Trigger reconciliation - this will reload from memory and restart wants
 	select {
-	case cb.reconcileTrigger <- true:
+	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 		return nil
 	default:
 		return fmt.Errorf("failed to trigger reconciliation - channel full")
@@ -2445,7 +2550,7 @@ func (cb *ChainBuilder) IsRunning() bool {
 // TriggerReconcile triggers the reconciliation loop to process current config
 func (cb *ChainBuilder) TriggerReconcile() error {
 	select {
-	case cb.reconcileTrigger <- true:
+	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 		return nil
 	default:
 		return fmt.Errorf("failed to trigger reconciliation - channel full")
