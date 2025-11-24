@@ -83,20 +83,19 @@ export default function RecipePage() {
   const handleDeployRecipe = async (recipe: GenericRecipe) => {
     try {
       const customType = recipe.recipe.metadata.custom_type || 'unknown';
+      const recipeFileName = customType.toLowerCase().replace(/\s+/g, '-');
+
       // Create a want that references the recipe
       await createWant({
-        wants: [
-          {
-            metadata: {
-              name: customType.toLowerCase().replace(/\s+/g, '-'),
-              type: customType,
-            },
-            spec: {
-              recipe: `recipes/${customType.toLowerCase().replace(/\s+/g, '-')}.yaml`,
-              params: recipe.recipe.parameters || {},
-            },
-          }
-        ]
+        metadata: {
+          name: recipeFileName,
+          type: customType,
+          labels: {},
+        },
+        spec: {
+          recipe: `recipes/${recipeFileName}.yaml`,
+          params: recipe.recipe.parameters || {},
+        },
       });
       setNotification({
         message: `Recipe "${recipe.recipe.metadata.name}" deployed successfully!`,
@@ -112,14 +111,28 @@ export default function RecipePage() {
 
   const handleDeployRecipeExample = async (recipe: GenericRecipe) => {
     try {
-      if (!recipe.recipe.example || !recipe.recipe.example.wants) {
+      if (!recipe.recipe.example || !recipe.recipe.example.wants || recipe.recipe.example.wants.length === 0) {
         throw new Error('No example configuration available for this recipe');
       }
 
-      // Use the example wants directly
-      await createWant({
-        wants: recipe.recipe.example.wants,
-      });
+      // Deploy each want from the example
+      for (const exampleWant of recipe.recipe.example.wants) {
+        const metadata = exampleWant.metadata || {};
+        // Ensure required fields
+        if (!metadata.name || !metadata.type) {
+          throw new Error('Example want must have name and type');
+        }
+
+        await createWant({
+          metadata: {
+            name: metadata.name,
+            type: metadata.type,
+            labels: metadata.labels || {},
+          },
+          spec: exampleWant.spec || {},
+        });
+      }
+
       setNotification({
         message: `Recipe example "${recipe.recipe.metadata.name}" deployed successfully!`,
         type: 'success',
