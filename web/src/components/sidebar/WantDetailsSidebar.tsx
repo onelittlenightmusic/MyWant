@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2 } from 'lucide-react';
+import { RefreshCw, Settings, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2, Database } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -23,7 +23,7 @@ import {
 
 interface WantDetailsSidebarProps {
   want: Want | null;
-  initialTab?: 'overview' | 'config' | 'logs' | 'agents';
+  initialTab?: 'settings' | 'results' | 'logs' | 'agents';
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
   onStart?: (want: Want) => void;
@@ -33,11 +33,11 @@ interface WantDetailsSidebarProps {
   onDelete?: (want: Want) => void;
 }
 
-type TabType = 'overview' | 'config' | 'logs' | 'agents';
+type TabType = 'settings' | 'results' | 'logs' | 'agents';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
-  initialTab = 'overview',
+  initialTab = 'settings',
   onWantUpdate,
   onHeaderStateChange,
   onStart,
@@ -62,12 +62,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     loading
   } = useWantStore();
 
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [showConfigEditor, setShowConfigEditor] = useState<boolean>(false);
 
   // Control panel logic (use want for status since it comes from the live dashboard state)
   const isRunning = want?.status === 'reaching';
@@ -257,8 +258,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const sidebarBackgroundStyle = getBackgroundStyle(wantDetails.metadata?.type, true);
 
   const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', icon: Eye },
-    { id: 'config' as TabType, label: 'Config', icon: Edit },
+    { id: 'settings' as TabType, label: 'Settings', icon: Settings },
+    { id: 'results' as TabType, label: 'Results', icon: Database },
     { id: 'logs' as TabType, label: 'Logs', icon: FileText },
     { id: 'agents' as TabType, label: 'Agents', icon: Bot },
   ];
@@ -365,9 +366,19 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
           </div>
         ) : (
           <>
-            {activeTab === 'overview' && (
-              <OverviewTab
+            {activeTab === 'settings' && (
+              <SettingsTab
                 want={wantDetails}
+                isEditing={isEditing}
+                editedConfig={editedConfig}
+                updateLoading={updateLoading}
+                updateError={updateError}
+                showConfigEditor={showConfigEditor}
+                onEdit={handleEditConfig}
+                onSave={handleSaveConfig}
+                onCancel={handleCancelEdit}
+                onConfigChange={setEditedConfig}
+                onToggleConfigEditor={setShowConfigEditor}
                 onWantUpdate={() => {
                   const wantId = want.metadata?.id || want.id;
                   if (wantId) {
@@ -378,18 +389,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
               />
             )}
 
-            {activeTab === 'config' && (
-              <ConfigTab
-                want={wantDetails}
-                isEditing={isEditing}
-                editedConfig={editedConfig}
-                updateLoading={updateLoading}
-                updateError={updateError}
-                onEdit={handleEditConfig}
-                onSave={handleSaveConfig}
-                onCancel={handleCancelEdit}
-                onConfigChange={setEditedConfig}
-              />
+            {activeTab === 'results' && (
+              <ResultsTab want={wantDetails} />
             )}
 
             {activeTab === 'logs' && (
@@ -408,19 +409,45 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 };
 
 // Tab Components
-const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want, onWantUpdate }) => {
+const SettingsTab: React.FC<{
+  want: Want;
+  isEditing: boolean;
+  editedConfig: string;
+  updateLoading: boolean;
+  updateError: string | null;
+  showConfigEditor: boolean;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onConfigChange: (value: string) => void;
+  onToggleConfigEditor: (show: boolean) => void;
+  onWantUpdate?: () => void;
+}> = ({
+  want,
+  isEditing,
+  editedConfig,
+  updateLoading,
+  updateError,
+  showConfigEditor,
+  onEdit,
+  onSave,
+  onCancel,
+  onConfigChange,
+  onToggleConfigEditor,
+  onWantUpdate
+}) => {
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
   const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
-  const [updateLoading, setUpdateLoading] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
+  const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
 
   const handleSaveLabel = async (oldKey: string) => {
     if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
 
-    setUpdateLoading(true);
-    setUpdateError(null);
+    setLocalUpdateLoading(true);
+    setLocalUpdateError(null);
 
     try {
       const newLabels = { ...(want.metadata.labels || {}) };
@@ -451,17 +478,17 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
       setEditingLabelDraft({ key: '', value: '' });
       onWantUpdate?.();
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to update label');
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update label');
     } finally {
-      setUpdateLoading(false);
+      setLocalUpdateLoading(false);
     }
   };
 
   const handleRemoveLabel = async (key: string) => {
     if (!want.metadata?.id) return;
 
-    setUpdateLoading(true);
-    setUpdateError(null);
+    setLocalUpdateLoading(true);
+    setLocalUpdateError(null);
 
     try {
       const newLabels = { ...(want.metadata.labels || {}) };
@@ -487,16 +514,29 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
 
       onWantUpdate?.();
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : 'Failed to remove label');
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to remove label');
     } finally {
-      setUpdateLoading(false);
+      setLocalUpdateLoading(false);
     }
   };
 
   return (
-    <div className="p-8">
-      <div className="space-y-8">
-        {/* Metadata Section */}
+    <div className="h-full flex flex-col">
+      {/* Config/Overview Toggle Button */}
+      <div className="flex-shrink-0 border-b border-gray-200 px-8 py-4">
+        <button
+          onClick={() => onToggleConfigEditor(!showConfigEditor)}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          {showConfigEditor ? 'Overview' : 'Config'}
+        </button>
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto p-8">
+        {!showConfigEditor ? (
+          <div className="space-y-8">
+            {/* Metadata Section */}
         <div className="bg-gray-50 rounded-lg p-6">
           <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
           <div className="space-y-3">
@@ -591,16 +631,16 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                     onClick={() => {
                       setEditingLabelKey(null);
                       setEditingLabelDraft({ key: '', value: '' });
-                      setUpdateError(null);
+                      setLocalUpdateError(null);
                     }}
-                    disabled={updateLoading}
+                    disabled={localUpdateLoading}
                     className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                 </div>
-                {updateError && (
-                  <div className="text-red-600 text-xs">{updateError}</div>
+                {localUpdateError && (
+                  <div className="text-red-600 text-xs">{localUpdateError}</div>
                 )}
               </div>
             )}
@@ -717,7 +757,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                   onClick={() => {
                     if (!editingUsingDraft.key.trim() || !want.metadata?.id) return;
 
-                    setUpdateLoading(true);
+                    setLocalUpdateLoading(true);
                     try {
                       let newUsing = want.spec.using ? [...want.spec.using] : [];
                       if (editingUsingIndex === -1) {
@@ -745,20 +785,20 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
                         onWantUpdate?.();
                       });
                     } finally {
-                      setUpdateLoading(false);
+                      setLocalUpdateLoading(false);
                     }
                   }}
-                  disabled={updateLoading || !editingUsingDraft.key.trim()}
+                  disabled={localUpdateLoading || !editingUsingDraft.key.trim()}
                   className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {updateLoading ? 'Saving...' : 'Save'}
+                  {localUpdateLoading ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={() => {
                     setEditingUsingIndex(null);
                     setEditingUsingDraft({ key: '', value: '' });
                   }}
-                  disabled={updateLoading}
+                  disabled={localUpdateLoading}
                   className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
                 >
                   Cancel
@@ -783,92 +823,191 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
           </div>
         </div>
       )}
+          </div>
+        ) : (
+          /* Config Editor View */
+          <div className="flex flex-col h-full">
+            {!isEditing ? (
+              <div className="flex flex-col flex-1">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-medium text-gray-900">Configuration</h4>
+                  <button
+                    onClick={onEdit}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
+                  </button>
+                </div>
+                <div className="flex-1">
+                  <YamlEditor
+                    value={stringifyYaml({
+                      metadata: want.metadata,
+                      spec: want.spec
+                    })}
+                    onChange={() => {}}
+                    readOnly={true}
+                    height="100%"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col flex-1">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-medium text-gray-900">Edit Configuration</h4>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={onCancel}
+                      disabled={updateLoading}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={onSave}
+                      disabled={updateLoading}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      {updateLoading ? (
+                        <LoadingSpinner size="sm" className="mr-1" />
+                      ) : (
+                        <Save className="h-3 w-3 mr-1" />
+                      )}
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                {updateError && (
+                  <div className="mb-4">
+                    <ErrorDisplay error={updateError} />
+                  </div>
+                )}
+
+                <div className="flex-1">
+                  <YamlEditor
+                    value={editedConfig}
+                    onChange={onConfigChange}
+                    readOnly={updateLoading}
+                    height="100%"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
   );
 };
 
-const ConfigTab: React.FC<{
-  want: Want;
-  isEditing: boolean;
-  editedConfig: string;
-  updateLoading: boolean;
-  updateError: string | null;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onConfigChange: (value: string) => void;
-}> = ({ want, isEditing, editedConfig, updateLoading, updateError, onEdit, onSave, onCancel, onConfigChange }) => (
-  <div className="p-8 h-full flex flex-col">
-    {!isEditing ? (
-      <div className="flex flex-col flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-medium text-gray-900">Configuration</h4>
-          <button
-            onClick={onEdit}
-            className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <Edit className="h-3 w-3 mr-1" />
-            Edit
-          </button>
-        </div>
-        <div className="flex-1">
-          <YamlEditor
-            value={stringifyYaml({
-              metadata: want.metadata,
-              spec: want.spec
-            })}
-            onChange={() => {}}
-            readOnly={true}
-            height="100%"
-          />
-        </div>
-      </div>
-    ) : (
-      <div className="flex flex-col flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-medium text-gray-900">Edit Configuration</h4>
-          <div className="flex space-x-2">
-            <button
-              onClick={onCancel}
-              disabled={updateLoading}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              disabled={updateLoading}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {updateLoading ? (
-                <LoadingSpinner size="sm" className="mr-1" />
-              ) : (
-                <Save className="h-3 w-3 mr-1" />
-              )}
-              Save
-            </button>
-          </div>
-        </div>
+// Component for expandable array items
+const ArrayItemRenderer: React.FC<{ item: any; index: number; depth: number }> = ({ item, index, depth }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isNested = item !== null && typeof item === 'object';
 
-        {updateError && (
-          <div className="mb-4">
-            <ErrorDisplay error={updateError} />
-          </div>
+  if (!isNested) {
+    return (
+      <div className="text-sm text-gray-700 font-mono ml-4">
+        [{index}]: {String(item)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-l border-gray-300 pl-3 ml-2">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 py-1"
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-500" />
         )}
+        <span className="text-xs text-gray-500">[{index}]</span>
+        {!isExpanded && (
+          <span className="text-xs text-gray-400">
+            {Array.isArray(item) ? `Array(${item.length})` : 'Object'}
+          </span>
+        )}
+      </button>
+      {isExpanded && (
+        <div className="mt-2 ml-2 space-y-2">
+          {renderKeyValuePairs(item, depth + 1)}
+        </div>
+      )}
+    </div>
+  );
+};
 
-        <div className="flex-1">
-          <YamlEditor
-            value={editedConfig}
-            onChange={onConfigChange}
-            readOnly={updateLoading}
-            height="100%"
-          />
+// Helper to render key-value pairs recursively
+const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => {
+  const items: React.ReactNode[] = [];
+
+  if (obj === null || obj === undefined) {
+    return [<span key="null" className="text-gray-500 italic">null</span>];
+  }
+
+  if (typeof obj !== 'object') {
+    return [
+      <span key="value" className="text-gray-700 font-mono break-all">
+        {String(obj)}
+      </span>
+    ];
+  }
+
+  if (Array.isArray(obj)) {
+    return [
+      <div key="array" className="space-y-2">
+        {obj.map((item, index) => (
+          <ArrayItemRenderer key={index} item={item} index={index} depth={depth} />
+        ))}
+      </div>
+    ];
+  }
+
+  Object.entries(obj).forEach(([key, value]) => {
+    const isNested = value !== null && typeof value === 'object';
+    const isArray = Array.isArray(value);
+
+    items.push(
+      <div key={key} className="space-y-1">
+        <div className="font-medium text-gray-800 text-sm">{key}:</div>
+        <div className={`${isNested ? 'ml-4 border-l border-gray-200 pl-3' : 'ml-4 text-gray-700'}`}>
+          {renderKeyValuePairs(value, depth + 1)}
         </div>
       </div>
-    )}
-  </div>
-);
+    );
+  });
+
+  return items;
+};
+
+const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
+  const hasState = want.state && Object.keys(want.state).length > 0;
+
+  return (
+    <div className="p-8 h-full overflow-y-auto">
+      {hasState ? (
+        <div className="space-y-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <div className="space-y-4">
+              {renderKeyValuePairs(want.state)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">No state data available</p>
+          <p className="text-xs text-gray-400 mt-2">State will appear here once the want executes</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface AgentExecution {
   agent_name: string;

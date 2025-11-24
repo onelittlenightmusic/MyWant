@@ -40,7 +40,7 @@ export const Dashboard: React.FC = () => {
   const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
-  const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   // Derive selectedWant from wants array using selectedWantId
@@ -137,7 +137,7 @@ export const Dashboard: React.FC = () => {
   const handleViewWant = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
-    setSidebarInitialTab('overview');
+    setSidebarInitialTab('settings');
   };
 
   const handleViewAgents = (want: Want) => {

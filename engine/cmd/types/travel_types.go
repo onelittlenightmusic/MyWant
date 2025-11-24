@@ -774,6 +774,38 @@ func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
 }
 
+// generateTravelTimeline creates a human-readable timeline from all events
+func generateTravelTimeline(events []TimeSlot) string {
+	if len(events) == 0 {
+		return "No events scheduled"
+	}
+
+	timeline := ""
+	for _, event := range events {
+		startTime := event.Start.Format("15:04")
+		endTime := event.End.Format("15:04")
+
+		// Map event type to readable names
+		eventName := event.Name
+		if event.Type != "" {
+			switch event.Type {
+			case "restaurant":
+				eventName = "Restaurant: " + eventName
+			case "hotel":
+				eventName = "Hotel: " + eventName
+			case "buffet":
+				eventName = "Buffet: " + eventName
+			case "flight":
+				eventName = "Flight: " + eventName
+			}
+		}
+
+		timeline += fmt.Sprintf("%s, %s to %s\n", eventName, startTime, endTime)
+	}
+
+	return timeline
+}
+
 // TravelCoordinatorWant orchestrates the entire travel itinerary
 type TravelCoordinatorWant struct {
 	Want
@@ -876,11 +908,15 @@ func (t *TravelCoordinatorWant) Exec() bool {
 			}
 		}
 
+		// Generate readable timeline format
+		timeline := generateTravelTimeline(allEvents)
+
 		// Batch final coordinator state update
 		t.StoreStateMulti(map[string]interface{}{
 			"schedules":       schedules, // Store final schedules
 			"total_processed": len(allEvents),
 			"final_itinerary": allEvents, // Store the combined and sorted itinerary
+			"finalResult":     timeline,   // Store readable timeline
 		})
 		return true // All schedules collected and processed, coordinator is complete
 	}
