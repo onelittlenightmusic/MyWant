@@ -148,11 +148,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         </div>
       )}
 
-      {/* Progress indicator for running wants */}
+      {/* Progress indicator for reaching wants */}
       {isRunning && (
         <div className="mt-4">
           <div className={`flex items-center justify-between ${sizes.errorTextSize} text-gray-600 mb-1`}>
-            <span>{isSuspended ? 'Suspended' : 'Running...'}</span>
+            <span>{isSuspended ? 'Suspended' : 'Reaching...'}</span>
             <div className={classNames(
               `${sizes.agentDotSize} rounded-full`,
               isSuspended ? 'bg-orange-500' : 'bg-blue-500 animate-pulse'

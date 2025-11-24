@@ -925,7 +925,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
               <p className="text-sm text-blue-700">{want.current_agent}</p>
             </div>
             <div className="ml-auto">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Running" />
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Reaching" />
             </div>
           </div>
         </div>
