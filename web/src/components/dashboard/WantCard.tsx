@@ -174,7 +174,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       {/* Expanded children section */}
       {hasChildren && displayIsExpanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200 animate-in fade-in duration-300">
+        <div className="mt-4 pt-4 border-t border-gray-200 animate-fade-in">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
             <button
@@ -194,7 +194,7 @@ export const WantCard: React.FC<WantCardProps> = ({
             </button>
           </div>
           {/* Grid layout for child wants - 3 columns, wraps to new rows */}
-          <div className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2 duration-300 delay-100">
+          <div className="grid grid-cols-3 gap-3 animate-slide-in">
             {children!.sort((a, b) => {
               const idA = a.metadata?.id || a.id || '';
               const idB = b.metadata?.id || b.id || '';
