@@ -1122,10 +1122,41 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 
 // wantsEqual compares two wants for equality
 func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
-	// Simple comparison - could be enhanced
-	return a.Metadata.Type == b.Metadata.Type &&
-		fmt.Sprintf("%v", a.Spec.Params) == fmt.Sprintf("%v", b.Spec.Params) &&
-		fmt.Sprintf("%v", a.Spec.Using) == fmt.Sprintf("%v", b.Spec.Using)
+	// Compare metadata
+	if a.Metadata.Type != b.Metadata.Type {
+		return false
+	}
+
+	// Compare labels
+	if !mapsEqual(a.Metadata.Labels, b.Metadata.Labels) {
+		return false
+	}
+
+	// Compare spec
+	if fmt.Sprintf("%v", a.Spec.Params) != fmt.Sprintf("%v", b.Spec.Params) {
+		return false
+	}
+
+	if fmt.Sprintf("%v", a.Spec.Using) != fmt.Sprintf("%v", b.Spec.Using) {
+		return false
+	}
+
+	return true
+}
+
+// mapsEqual compares two string maps for equality
+func mapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+
+	return true
 }
 
 // deepCopyConfig creates a deep copy of a Config to prevent reference aliasing
