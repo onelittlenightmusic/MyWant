@@ -177,18 +177,17 @@ export const WantCard: React.FC<WantCardProps> = ({
         <div
           className="mt-4 pt-4 border-t border-gray-200"
           style={{
-            opacity: 0,
-            animation: 'fadeIn 0.3s ease-out 0s forwards'
+            animation: 'fadeIn 0.3s ease-out forwards'
           } as React.CSSProperties}
         >
           <style>{`
             @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
+              0% { opacity: 0; }
+              100% { opacity: 1; }
             }
             @keyframes slideIn {
-              from { opacity: 0; transform: translateY(-8px); }
-              to { opacity: 1; transform: translateY(0); }
+              0% { opacity: 0; transform: translateY(-8px); }
+              100% { opacity: 1; transform: translateY(0); }
             }
           `}</style>
           <div className="flex items-center justify-between mb-3">
@@ -213,8 +212,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           <div
             className="grid grid-cols-3 gap-3"
             style={{
-              opacity: 0,
-              animation: 'slideIn 0.3s ease-out 0.1s forwards'
+              animation: 'slideIn 0.3s ease-out 0.1s both'
             } as React.CSSProperties}
           >
             {children!.sort((a, b) => {
