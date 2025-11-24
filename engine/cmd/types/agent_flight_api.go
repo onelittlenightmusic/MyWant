@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -128,7 +127,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		// e.g., AA100 -> AA101, AA102, etc.
 		flightSuffixes := []string{"A", "B", "C", "D", "E"}
 		flightNumber = baseFlight + flightSuffixes[rand.Intn(len(flightSuffixes))]
-		log.Printf("[AgentFlightAPI] Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber)
+		want.StoreLog(fmt.Sprintf("Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber))
 	}
 
 	from, _ := params["from"].(string)
@@ -161,8 +160,8 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 				delayHours := 2 + time.Duration(rand.Intn(3))
 				departureTime = departureTime.Add(delayHours * time.Hour)
 				arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-				log.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)",
-					departureTime.Format(time.RFC3339))
+				want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
+					departureTime.Format(time.RFC3339)))
 			}
 		} else {
 			// Fall back to default if parsing fails
@@ -191,8 +190,8 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 			delayHours := 2 + time.Duration(rand.Intn(3))
 			departureTime = departureTime.Add(delayHours * time.Hour)
 			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-			log.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)",
-				departureTime.Format(time.RFC3339))
+			want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
+				departureTime.Format(time.RFC3339)))
 		}
 	}
 
@@ -259,8 +258,8 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		reservation.FlightNumber, reservation.FlightNumber, reservation.From, reservation.To)
 	want.SetAgentActivity(a.Name, activity)
 
-	log.Printf("[AgentFlightAPI] Created flight reservation: %s (ID: %s, Status: %s)",
-		reservation.FlightNumber, reservation.ID, reservation.Status)
+	want.StoreLog(fmt.Sprintf("Created flight reservation: %s (ID: %s, Status: %s)",
+		reservation.FlightNumber, reservation.ID, reservation.Status))
 
 	return nil
 }
@@ -317,7 +316,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)
 	want.SetAgentActivity(a.Name, activity)
 
-	log.Printf("[AgentFlightAPI] Cancelled flight: %s", flightIDStr)
+	want.StoreLog(fmt.Sprintf("Cancelled flight: %s", flightIDStr))
 
 	return nil
 }

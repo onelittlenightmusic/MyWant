@@ -47,15 +47,15 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 		a.PremiumLevel)
 	want.SetAgentActivity(a.Name, activity)
 
-	fmt.Printf("[AGENT_PREMIUM] Premium hotel booking completed: %s from %s to %s\n",
-		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2"))
+	want.StoreLog(fmt.Sprintf("Premium hotel booking completed: %s from %s to %s",
+		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2")))
 
 	return nil
 }
 
 // generateHotelSchedule creates a premium hotel schedule
 func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
-	fmt.Printf("[AGENT_PREMIUM] Processing hotel reservation for %s with premium service\n", want.Metadata.Name)
+	want.StoreLog(fmt.Sprintf("Processing hotel reservation for %s with premium service", want.Metadata.Name))
 
 	// Generate premium hotel booking with better times and luxury amenities
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow

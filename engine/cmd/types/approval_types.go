@@ -90,7 +90,7 @@ func (e *EvidenceWant) Exec() bool {
 		"total_processed":      1,
 	})
 
-	InfoLog("[EVIDENCE] ✅ Evidence %s provided for approval %s to %d coordinator(s)\n", e.EvidenceType, e.ApprovalID, e.paths.GetOutCount())
+	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.paths.GetOutCount()))
 
 	// Broadcast evidence to all output channels using SendPacketMulti
 	outputs := make([]Chan, e.paths.GetOutCount())
@@ -169,7 +169,7 @@ func (d *DescriptionWant) Exec() bool {
 		"total_processed":         1,
 	})
 
-	InfoLog("[DESCRIPTION] 📝 Description provided: %s to %d coordinator(s)\n", description, d.paths.GetOutCount())
+	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.paths.GetOutCount()))
 
 	// Broadcast description to all output channels using SendPacketMulti
 	outputs := make([]Chan, d.paths.GetOutCount())
@@ -311,9 +311,9 @@ func (l *Level1CoordinatorWant) Exec() bool {
 		}
 		l.StoreStateMulti(stateUpdates)
 
-		InfoLog("[LEVEL1] ✅ Approval %s: %s by %s at %s\n",
+		l.StoreLog(fmt.Sprintf("Approval %s: %s by %s at %s",
 			result.ApprovalID, result.Status, result.ApproverID,
-			result.ApprovalTime.Format("15:04:05"))
+			result.ApprovalTime.Format("15:04:05")))
 
 		return true
 	}
@@ -457,9 +457,9 @@ func (l *Level2CoordinatorWant) Exec() bool {
 		}
 		l.StoreStateMulti(stateUpdates)
 
-		InfoLog("[LEVEL2] ✅ Final approval %s: %s by %s at %s\n",
+		l.StoreLog(fmt.Sprintf("Final approval %s: %s by %s at %s",
 			result.ApprovalID, result.Status, result.ApproverID,
-			result.ApprovalTime.Format("15:04:05"))
+			result.ApprovalTime.Format("15:04:05")))
 
 		return true
 	}

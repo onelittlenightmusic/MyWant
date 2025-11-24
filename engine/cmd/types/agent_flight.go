@@ -47,16 +47,16 @@ func (a *AgentFlight) Exec(ctx context.Context, want *Want) error {
 		schedule.FlightType, schedule.FlightNumber, schedule.DepartureTime.Format("15:04 Jan 2"))
 	want.SetAgentActivity(a.Name, activity)
 
-	fmt.Printf("[AGENT_FLIGHT] Flight booking completed: %s departing at %s for %.1f hours\n",
+	want.StoreLog(fmt.Sprintf("Flight booking completed: %s departing at %s for %.1f hours",
 		schedule.FlightType, schedule.DepartureTime.Format("15:04 Jan 2"),
-		schedule.ArrivalTime.Sub(schedule.DepartureTime).Hours())
+		schedule.ArrivalTime.Sub(schedule.DepartureTime).Hours()))
 
 	return nil
 }
 
 // generateFlightSchedule creates a flight booking schedule
 func (a *AgentFlight) generateFlightSchedule(want *Want) FlightSchedule {
-	fmt.Printf("[AGENT_FLIGHT] Processing flight booking for %s with premium service\n", want.Metadata.Name)
+	want.StoreLog(fmt.Sprintf("Processing flight booking for %s with premium service", want.Metadata.Name))
 
 	// Generate flight booking with appropriate timing
 	baseDate := time.Now()

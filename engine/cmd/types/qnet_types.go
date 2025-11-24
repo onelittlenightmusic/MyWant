@@ -237,7 +237,7 @@ func (q *Queue) Exec() bool {
 
 		// Trigger OnEnded callback
 		if err := q.OnEnded(&packet); err != nil {
-			fmt.Printf("[QUEUE] OnEnded callback error: %v\n", err)
+			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
 		out <- packet
@@ -381,7 +381,7 @@ func (c *Combiner) Exec() bool {
 			if qp.IsEnded() {
 				// Trigger OnEnded callback
 				if err := c.OnEnded(&qp); err != nil {
-					fmt.Printf("[COMBINER] OnEnded callback error: %v\n", err)
+					c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 				}
 				// Forward end signal to next want
 				out <- qp
@@ -473,7 +473,7 @@ func (s *Sink) Exec() bool {
 		s.StoreState("completed", true)
 		// Trigger OnEnded callback
 		if err := s.OnEnded(&packet); err != nil {
-			fmt.Printf("[SINK] OnEnded callback error: %v\n", err)
+			s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		return true
 	}

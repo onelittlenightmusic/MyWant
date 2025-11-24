@@ -44,15 +44,15 @@ func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
 		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours)
 	want.SetAgentActivity(a.Name, activity)
 
-	fmt.Printf("[AGENT_BUFFET] Buffet reservation completed: %s at %s for %.1f hours\n",
-		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours)
+	want.StoreLog(fmt.Sprintf("Buffet reservation completed: %s at %s for %.1f hours",
+		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours))
 
 	return nil
 }
 
 // generateBuffetSchedule creates a buffet reservation schedule
 func (a *AgentBuffet) generateBuffetSchedule(want *Want) BuffetSchedule {
-	fmt.Printf("[AGENT_BUFFET] Processing buffet reservation for %s with premium service\n", want.Metadata.Name)
+	want.StoreLog(fmt.Sprintf("Processing buffet reservation for %s with premium service", want.Metadata.Name))
 
 	// Generate buffet reservation with appropriate timing
 	baseDate := time.Now()

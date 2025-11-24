@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -69,7 +68,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
 	if flightIDStr == "" {
-		log.Printf("[MonitorFlightAPI] Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
+		want.StoreLog("Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
 		return nil
 	}
 
@@ -97,7 +96,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
 		if historyStrs, ok := historyI.([]interface{}); ok {
-			log.Printf("[MonitorFlightAPI] Restoring %d status history entries from state (interface{})", len(historyStrs))
+			want.StoreLog(fmt.Sprintf("Restoring %d status history entries from state (interface{})", len(historyStrs)))
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
 					// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
@@ -114,12 +113,12 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 							m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 						}
 					} else {
-						log.Printf("[MonitorFlightAPI] Failed to parse history entry (interface{}): %s\n", entry)
+						want.StoreLog(fmt.Sprintf("Failed to parse history entry (interface{}): %s", entry))
 					}
 				}
 			}
 		} else if historyStrs, ok := historyI.([]string); ok {
-			log.Printf("[MonitorFlightAPI] Restoring %d status history entries from state ([]string)", len(historyStrs))
+			want.StoreLog(fmt.Sprintf("Restoring %d status history entries from state ([]string)", len(historyStrs)))
 			for _, entry := range historyStrs {
 				// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
 				if parsed, ok := parseStatusHistoryEntry(entry); ok {
@@ -135,7 +134,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 						m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 					}
 				} else {
-					log.Printf("[MonitorFlightAPI] Failed to parse history entry ([]string): %s\n", entry)
+					want.StoreLog(fmt.Sprintf("Failed to parse history entry ([]string): %s", entry))
 				}
 			}
 		}
@@ -186,7 +185,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		}
 
 		if hasStateChange {
-			log.Printf("[MonitorFlightAPI] Status changed: %s -> %s", oldStatus, newStatus)
+			want.StoreLog(fmt.Sprintf("Status changed: %s -> %s", oldStatus, newStatus))
 
 			// Record status change
 			statusChange := StatusChange{
@@ -231,15 +230,15 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			m.LastKnownStatus = newStatus
 
 			// Print status progression
-			log.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)",
-				reservation.ID, newStatus, time.Now().Format("15:04:05"))
+			want.StoreLog(fmt.Sprintf("FLIGHT %s STATUS PROGRESSION: %s (at %s)",
+				reservation.ID, newStatus, time.Now().Format("15:04:05")))
 
 			// Update hash after successful commit
 			m.LastRecordedStateHash = currentStateHash
-			log.Printf("[MonitorFlightAPI] State recorded (hash: %s)", currentStateHash[:8])
+			want.StoreLog(fmt.Sprintf("State recorded (hash: %s)", currentStateHash[:8]))
 		} else {
 			// No status change - don't create history entry, but still update other flight details
-			log.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s", newStatus)
+			want.StoreLog(fmt.Sprintf("Flight details changed but status is still: %s", newStatus))
 			m.LastRecordedStateHash = currentStateHash
 		}
 		want.StoreStateMulti(updates)

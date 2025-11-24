@@ -76,7 +76,7 @@ func (g *SeedNumbers) Exec() bool {
 
 	// Store final statistics
 	g.StoreState("total_processed", 2)
-	fmt.Printf("[SEED] Generated initial seeds: 0, 1 (max_count: %d)\n", maxCount)
+	g.StoreLog(fmt.Sprintf("Generated initial seeds: 0, 1 (max_count: %d)", maxCount))
 	return true
 }
 
@@ -145,7 +145,7 @@ func (c *FibonacciComputer) Exec() bool {
 	if seed.IsEnd {
 		maxCount = seed.Value
 		c.StoreState("maxCount", maxCount)
-		fmt.Printf("[COMPUTER] Received max count: %d\n", maxCount)
+		c.StoreLog(fmt.Sprintf("Received max count: %d", maxCount))
 
 		// After getting max count, start computing all remaining fibonacci numbers
 		for position < maxCount {
@@ -169,7 +169,7 @@ func (c *FibonacciComputer) Exec() bool {
 			"total_processed": processed,
 		})
 
-		fmt.Printf("[COMPUTER] Computed %d fibonacci numbers\n", processed)
+		c.StoreLog(fmt.Sprintf("Computed %d fibonacci numbers", processed))
 		return true
 	}
 
@@ -252,8 +252,8 @@ func (m *FibonacciMerger) Exec() bool {
 				m.StoreState("maxCountReceived", maxCountReceived)
 			}
 		} else {
-			computerOut <- fibSeed                                      // Send to computer for processing
-			fmt.Printf("F(%d) = %d\n", fibSeed.Position, fibSeed.Value) // Display directly
+			computerOut <- fibSeed                                                        // Send to computer for processing
+			m.StoreLog(fmt.Sprintf("F(%d) = %d", fibSeed.Position, fibSeed.Value)) // Display directly
 			processed++
 			m.StoreState("processed", processed)
 		}
@@ -265,7 +265,7 @@ func (m *FibonacciMerger) Exec() bool {
 			m.StoreState("computedUsingClosed", computedUsingClosed)
 		} else {
 			// Display computed values directly
-			fmt.Printf("F(%d) = %d\n", fibSeed.Position, fibSeed.Value)
+			m.StoreLog(fmt.Sprintf("F(%d) = %d", fibSeed.Position, fibSeed.Value))
 			processed++
 			m.StoreState("processed", processed)
 		}
@@ -274,7 +274,7 @@ func (m *FibonacciMerger) Exec() bool {
 	// End when both using are closed
 	if seedUsingClosed && computedUsingClosed {
 		m.StoreState("total_processed", processed)
-		fmt.Printf("[MERGER] Merged %d fibonacci values\n", processed)
+		m.StoreLog(fmt.Sprintf("Merged %d fibonacci values", processed))
 		return true
 	}
 

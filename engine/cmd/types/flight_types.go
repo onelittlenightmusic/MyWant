@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	. "mywant/engine/src"
 	"time"
@@ -101,7 +100,7 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 		}
 		return &schedule
 	default:
-		log.Printf("[FLIGHT] agent_result is unexpected type: %T\n", result)
+		f.StoreLog(fmt.Sprintf("agent_result is unexpected type: %T", result))
 		return nil
 	}
 }
@@ -376,26 +375,26 @@ func (f *FlightWant) Exec() bool {
 func (f *FlightWant) tryAgentExecution() {
 	// Check if this want has agent requirements
 	if len(f.Spec.Requires) > 0 {
-		log.Printf("[FLIGHT] Want has agent requirements: %v\n", f.Spec.Requires)
+		f.StoreLog(fmt.Sprintf("Want has agent requirements: %v", f.Spec.Requires))
 
 		// Store the requirements in want state for tracking
 		f.StoreState("agent_requirements", f.Spec.Requires)
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
-		log.Printf("[FLIGHT] Executing agents via ExecuteAgents() for proper tracking\n")
+		f.StoreLog("Executing agents via ExecuteAgents() for proper tracking")
 		if err := f.ExecuteAgents(); err != nil {
-			log.Printf("[FLIGHT] Dynamic agent execution failed: %v\n", err)
+			f.StoreLog(fmt.Sprintf("Dynamic agent execution failed: %v", err))
 			f.StoreState("agent_execution_status", "failed")
 			f.StoreState("agent_execution_error", err.Error())
 			return
 		}
 
-		log.Printf("[FLIGHT] Dynamic agent execution completed successfully\n")
+		f.StoreLog("Dynamic agent execution completed successfully")
 		f.StoreState("agent_execution_status", "completed")
 
 		// Check for agent_result in state
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
-			log.Printf("[FLIGHT] Found agent_result in state: %+v\n", result)
+			f.StoreLog(fmt.Sprintf("Found agent_result in state: %+v", result))
 			f.StoreState("execution_source", "agent")
 
 			// Start continuous monitoring for this flight
@@ -404,11 +403,11 @@ func (f *FlightWant) tryAgentExecution() {
 			return
 		}
 
-		log.Printf("[FLIGHT] Warning: Agent completed but no result found in state\n")
+		f.StoreLog("Warning: Agent completed but no result found in state")
 		return
 	}
 
-	log.Printf("[FLIGHT] No agent requirements specified\n")
+	f.StoreLog("No agent requirements specified")
 }
 
 // FlightSchedule represents a complete flight booking schedule
@@ -475,7 +474,7 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 
 	// Cancel and rebook if delayed
 	if status == "delayed_one_day" {
-		log.Printf("[FLIGHT] Detected delayed_one_day status, will cancel and rebook\n")
+		f.StoreLog("Detected delayed_one_day status, will cancel and rebook")
 		return true
 	}
 
@@ -499,13 +498,13 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			// Check if flight has been booked
 			flightIDVal, exists := f.GetState("flight_id")
 			if !exists {
-				log.Printf("[FLIGHT-MONITOR] No flight_id found, stopping monitoring\n")
+				f.StoreLog("No flight_id found, stopping monitoring")
 				return
 			}
 
 			flightID, ok := flightIDVal.(string)
 			if !ok || flightID == "" {
-				log.Printf("[FLIGHT-MONITOR] Invalid flight_id, stopping monitoring\n")
+				f.StoreLog("Invalid flight_id, stopping monitoring")
 				return
 			}
 
@@ -526,16 +525,16 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			f.EndExecCycle()
 
 			if err != nil {
-				log.Printf("[FLIGHT-MONITOR] Polling error: %v\n", err)
+				f.StoreLog(fmt.Sprintf("Polling error: %v", err))
 			} else {
 				// Log the current status
 				if status, exists := f.GetState("flight_status"); exists {
-					log.Printf("[FLIGHT-MONITOR] Flight %s status: %v (polled at %s)\n",
-						flightID, status, time.Now().Format("15:04:05"))
+					f.StoreLog(fmt.Sprintf("Flight %s status: %v (polled at %s)",
+						flightID, status, time.Now().Format("15:04:05")))
 				}
 			}
 		}
 	}()
 
-	log.Printf("[FLIGHT] Started continuous monitoring for flight %s\n", f.Metadata.Name)
+	f.StoreLog(fmt.Sprintf("Started continuous monitoring for flight %s", f.Metadata.Name))
 }
