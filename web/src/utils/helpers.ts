@@ -1,3 +1,5 @@
+import React from 'react';
+import { Play, Pause, Square, CheckCircle, AlertCircle, Clock, RotateCw } from 'lucide-react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
 
 export const formatDate = (dateString?: string): string => {
@@ -70,6 +72,30 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '⏹️';
     default:
       return '❓';
+  }
+};
+
+export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase): React.ReactNode => {
+  const iconProps = { className: 'h-4 w-4' };
+
+  switch (status) {
+    case 'created':
+    case 'pending':
+      return React.createElement(Clock, iconProps);
+    case 'initializing':
+      return React.createElement(RotateCw, iconProps);
+    case 'running':
+      return React.createElement(Play, iconProps);
+    case 'suspended':
+      return React.createElement(Pause, iconProps);
+    case 'completed':
+      return React.createElement(CheckCircle, iconProps);
+    case 'failed':
+      return React.createElement(AlertCircle, iconProps);
+    case 'stopped':
+      return React.createElement(Square, iconProps);
+    default:
+      return React.createElement(AlertCircle, iconProps);
   }
 };
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, RotateCw, Trash2 } from 'lucide-react';
+import { Play, Pause, Square, Trash2 } from 'lucide-react';
 import { Want } from '@/types/want';
 import { classNames } from '@/utils/helpers';
 

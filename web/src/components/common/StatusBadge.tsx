@@ -1,6 +1,6 @@
 import React from 'react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
-import { getStatusColor, getStatusIcon, classNames } from '@/utils/helpers';
+import { getStatusColor, getStatusIconComponent, classNames } from '@/utils/helpers';
 
 interface StatusBadgeProps {
   status: WantExecutionStatus | WantPhase;
@@ -16,7 +16,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   className
 }) => {
   const color = getStatusColor(status);
-  const icon = getStatusIcon(status);
+  const icon = getStatusIconComponent(status);
 
   const sizeClasses = {
     xs: 'px-1.5 py-0.5 text-xs',
