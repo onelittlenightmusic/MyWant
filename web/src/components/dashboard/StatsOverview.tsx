@@ -66,7 +66,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
       icon: <ClipboardList className="h-6 w-6 text-blue-600" />
     },
     {
-      title: 'Running',
+      title: 'Reaching',
       value: stats.running,
       color: 'bg-green-100',
       icon: <Play className="h-6 w-6 text-green-600" />
