@@ -824,13 +824,13 @@ func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator.Template = coordinator.GetStringParam("template", "travel itinerary")
 
 	// Set fields for base Want methods
-	coordinator.WantType = "travel_coordinator"
+	coordinator.WantType = "travel coordinator"
 	coordinator.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  3,
 		RequiredOutputs: 0,
 		MaxInputs:       3,
 		MaxOutputs:      0,
-		WantType:        "travel_coordinator",
+		WantType:        "travel coordinator",
 		Description:     "Travel itinerary coordinator want",
 	}
 
@@ -944,13 +944,13 @@ func NewBuffetCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator.Description = coordinator.GetStringParam("description", "Buffet coordinator")
 
 	// Set fields for base Want methods
-	coordinator.WantType = "buffet_coordinator"
+	coordinator.WantType = "buffet coordinator"
 	coordinator.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,              // Expect buffet schedule input
 		RequiredOutputs: 0,              // No output, just collects data
 		MaxInputs:       1,
 		MaxOutputs:      0,
-		WantType:        "buffet_coordinator",
+		WantType:        "buffet coordinator",
 		Description:     "Buffet schedule coordinator want",
 	}
 
@@ -998,8 +998,8 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-	builder.RegisterWantType("travel_coordinator", NewTravelCoordinatorWant)
-	builder.RegisterWantType("buffet_coordinator", NewBuffetCoordinatorWant)
+	builder.RegisterWantType("travel coordinator", NewTravelCoordinatorWant)
+	builder.RegisterWantType("buffet coordinator", NewBuffetCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
@@ -1032,7 +1032,7 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 		return NewTravelCoordinatorWant(metadata, spec)
 	})
 
-	builder.RegisterWantType("buffet_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("buffet coordinator", func(metadata Metadata, spec WantSpec) interface{} {
 		return NewBuffetCoordinatorWant(metadata, spec)
 	})
 }

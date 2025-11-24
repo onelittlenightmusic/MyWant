@@ -33,13 +33,13 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 	gen.MaxCount = gen.GetIntParam("max_count", 15)
 
 	// Set fields for base Want methods
-	gen.WantType = "seed_numbers"
+	gen.WantType = "seed numbers"
 	gen.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       0,
 		MaxOutputs:      -1,
-		WantType:        "seed_numbers",
+		WantType:        "seed numbers",
 		Description:     "Fibonacci seed generator",
 	}
 
@@ -96,13 +96,13 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 	computer.Init(metadata, spec)
 
 	// Set fields for base Want methods
-	computer.WantType = "fibonacci_computer"
+	computer.WantType = "fibonacci computer"
 	computer.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
 		MaxOutputs:      -1,
-		WantType:        "fibonacci_computer",
+		WantType:        "fibonacci computer",
 		Description:     "Fibonacci number computer",
 	}
 
@@ -209,13 +209,13 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 	merger.Init(metadata, spec)
 
 	// Set fields for base Want methods
-	merger.WantType = "fibonacci_merger"
+	merger.WantType = "fibonacci merger"
 	merger.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  2,
 		RequiredOutputs: 1,
 		MaxInputs:       2,
 		MaxOutputs:      1,
-		WantType:        "fibonacci_merger",
+		WantType:        "fibonacci merger",
 		Description:     "Fibonacci merger",
 	}
 
@@ -283,7 +283,7 @@ func (m *FibonacciMerger) Exec() bool {
 
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
 func RegisterFibonacciLoopWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("seed_numbers", NewSeedNumbers)
-	builder.RegisterWantType("fibonacci_computer", NewFibonacciComputer)
-	builder.RegisterWantType("fibonacci_merger", NewFibonacciMerger)
+	builder.RegisterWantType("seed numbers", NewSeedNumbers)
+	builder.RegisterWantType("fibonacci computer", NewFibonacciComputer)
+	builder.RegisterWantType("fibonacci merger", NewFibonacciMerger)
 }

@@ -65,11 +65,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-scroll min-h-0 relative">
-          {/* Background overlay for flight wants */}
+          {/* Background overlay for flight wants - fixed at top */}
           {backgroundStyle && (
             <div
-              className="absolute inset-0 pointer-events-none"
-              style={backgroundStyle}
+              className="fixed top-0 right-0 w-[480px] h-48 pointer-events-none z-0"
+              style={{
+                ...backgroundStyle,
+                backgroundAttachment: 'scroll'
+              }}
             />
           )}
           <div className="relative z-10 bg-white bg-opacity-70">
