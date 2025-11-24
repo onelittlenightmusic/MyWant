@@ -1208,8 +1208,57 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
   );
 };
 
+const LogHistoryItem: React.FC<{ logEntry: any; index: number }> = ({ logEntry, index }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const logTimestamp = logEntry.timestamp;
+  const logsText = logEntry.logs || '';
+  // Split logs by newline for display
+  const logLines = logsText.split('\n').filter((line: string) => line.trim().length > 0);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+      {/* Collapsed/Header View */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center space-x-3 flex-1 text-left">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900">
+              #{index + 1} - {logLines.length} line{logLines.length !== 1 ? 's' : ''}
+            </div>
+            {logTimestamp && (
+              <div className="text-xs text-gray-500 mt-1">
+                {formatDate(logTimestamp)}
+              </div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded View - Display Logs */}
+      {isExpanded && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border">
+            <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words font-mono">
+              {logsText}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasParameterHistory = want.history?.parameterHistory && want.history.parameterHistory.length > 0;
+  const hasLogHistory = want.history?.logHistory && want.history.logHistory.length > 0;
   const hasLogs = results?.logs && results.logs.length > 0;
 
   return (
@@ -1242,6 +1291,18 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
         </div>
       )}
 
+      {/* Log History Section */}
+      {hasLogHistory && (
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
+          <div className="space-y-3">
+            {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
+              <LogHistoryItem key={index} logEntry={logEntry} index={want.history!.logHistory!.length - index - 1} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* State History Section */}
       {want.history?.stateHistory && want.history.stateHistory.length > 0 && (
         <div className="bg-gray-50 rounded-lg p-6">
@@ -1255,7 +1316,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       )}
 
       {/* Empty State */}
-      {!hasParameterHistory && !hasLogs && (!want.history?.stateHistory || want.history.stateHistory.length === 0) && (
+      {!hasParameterHistory && !hasLogs && !hasLogHistory && (!want.history?.stateHistory || want.history.stateHistory.length === 0) && (
         <div className="text-center py-8">
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500">No logs or parameter history available</p>

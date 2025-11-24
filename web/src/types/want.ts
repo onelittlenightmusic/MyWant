@@ -93,6 +93,10 @@ export interface WantHistory {
     timestamp: string;
   }>;
   stateHistory?: Array<unknown>;
+  logHistory?: Array<{
+    timestamp: number;
+    logs: string;
+  }>;
   agentHistory?: AgentExecution[]; // Complete history of agent executions for this want
 }
 
