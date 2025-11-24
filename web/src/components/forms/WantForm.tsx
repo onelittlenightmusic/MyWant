@@ -254,6 +254,9 @@ export const WantForm: React.FC<WantFormProps> = ({
   const loadSampleConfig = (sample: typeof SAMPLE_CONFIGS[0]) => {
     const config = sample.config;
 
+    // Reset form state first to clear any previous values
+    resetForm();
+
     // Check if this is a multi-want configuration (has 'wants' array)
     if ((config as any).wants && Array.isArray((config as any).wants)) {
       // For multi-want configs, just load the YAML representation
