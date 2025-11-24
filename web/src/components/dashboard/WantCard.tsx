@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Users } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
@@ -43,6 +43,24 @@ export const WantCard: React.FC<WantCardProps> = ({
   // Local state for managing expansion (fallback if expandedParents not provided)
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
   const displayIsExpanded = expandedParents ? isExpanded : localIsExpanded;
+
+  // Ref for animation container
+  const expandedContainerRef = useRef<HTMLDivElement>(null);
+  const [showAnimation, setShowAnimation] = useState(false);
+
+  // Trigger animation when expanded children section mounts
+  useEffect(() => {
+    if (displayIsExpanded && expandedContainerRef.current) {
+      // Force reflow to ensure animation triggers
+      setShowAnimation(false);
+      const timer = requestAnimationFrame(() => {
+        setShowAnimation(true);
+      });
+      return () => cancelAnimationFrame(timer);
+    } else {
+      setShowAnimation(false);
+    }
+  }, [displayIsExpanded]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
@@ -175,21 +193,12 @@ export const WantCard: React.FC<WantCardProps> = ({
       {/* Expanded children section */}
       {hasChildren && displayIsExpanded && (
         <div
-          className="mt-4 pt-4 border-t border-gray-200"
+          ref={expandedContainerRef}
+          className="mt-4 pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out"
           style={{
-            animation: 'fadeIn 0.3s ease-out forwards'
+            opacity: showAnimation ? 1 : 0
           } as React.CSSProperties}
         >
-          <style>{`
-            @keyframes fadeIn {
-              0% { opacity: 0; }
-              100% { opacity: 1; }
-            }
-            @keyframes slideIn {
-              0% { opacity: 0; transform: translateY(-8px); }
-              100% { opacity: 1; transform: translateY(0); }
-            }
-          `}</style>
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
             <button
@@ -210,9 +219,10 @@ export const WantCard: React.FC<WantCardProps> = ({
           </div>
           {/* Grid layout for child wants - 3 columns, wraps to new rows */}
           <div
-            className="grid grid-cols-3 gap-3"
+            className="grid grid-cols-3 gap-3 transition-all duration-300 ease-out"
             style={{
-              animation: 'slideIn 0.3s ease-out 0.1s both'
+              opacity: showAnimation ? 1 : 0,
+              transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)'
             } as React.CSSProperties}
           >
             {children!.sort((a, b) => {
