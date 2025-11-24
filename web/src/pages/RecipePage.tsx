@@ -388,16 +388,8 @@ export default function RecipePage() {
       >
         <RecipeDetailsSidebar
           recipe={selectedRecipe}
-          onDeploy={async (recipe) => {
-            try {
-              // Implementation handled by RecipeDetailsSidebar
-            } catch (error) {
-              setNotification({
-                message: error instanceof Error ? error.message : 'Deployment failed',
-                type: 'error'
-              });
-            }
-          }}
+          onDeploy={handleDeployRecipe}
+          onDeployExample={handleDeployRecipeExample}
           onEdit={handleEditRecipe}
           onDelete={handleDeleteRecipe}
           onDeploySuccess={(message) => setNotification({ message, type: 'success' })}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2 } from 'lucide-react';
+import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2, Zap } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { classNames } from '@/utils/helpers';
 import { apiClient } from '@/api/client';
@@ -15,6 +15,7 @@ import {
 interface RecipeDetailsSidebarProps {
   recipe: GenericRecipe | null;
   onDeploy?: (recipe: GenericRecipe) => Promise<void>;
+  onDeployExample?: (recipe: GenericRecipe) => Promise<void>;
   onEdit?: (recipe: GenericRecipe) => void;
   onDelete?: (recipe: GenericRecipe) => void;
   onDeploySuccess?: (message: string) => void;
@@ -27,6 +28,7 @@ type TabType = 'overview' | 'parameters' | 'wants' | 'results';
 export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
   recipe,
   onDeploy,
+  onDeployExample,
   onEdit,
   onDelete,
   onDeploySuccess,
@@ -41,19 +43,41 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
                      recipe.recipe.example.wants.length > 0;
 
   // Button enable/disable logic
-  const canDeploy = recipe && hasExample && !loading && !deploying;
+  const canDeploy = recipe && !loading && !deploying;
+  const canDeployExample = recipe && hasExample && !loading && !deploying;
   const canEdit = recipe && !loading && !deploying;
   const canDelete = recipe && !loading && !deploying;
 
   const handleDeployClick = async () => {
-    if (!recipe || !hasExample) return;
+    if (!recipe) return;
 
     setDeploying(true);
     try {
       if (onDeploy) {
         await onDeploy(recipe);
       } else {
-        // Default deployment logic
+        // Default: deploy recipe with its parameters
+        throw new Error('Deploy handler not provided');
+      }
+      onDeploySuccess?.(`Recipe "${recipe.recipe.metadata.name}" deployed successfully!`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to deploy recipe';
+      onDeployError?.(errorMessage);
+      console.error('Deploy error:', error);
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  const handleDeployExampleClick = async () => {
+    if (!recipe || !hasExample) return;
+
+    setDeploying(true);
+    try {
+      if (onDeployExample) {
+        await onDeployExample(recipe);
+      } else {
+        // Default deployment logic for example
         const yamlContent = convertWantsToYAML(recipe.recipe.example!.wants);
         const yamlValidation = validateYaml(yamlContent);
         if (!yamlValidation.isValid) {
@@ -65,11 +89,11 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
           await apiClient.createWant(want);
         }
       }
-      onDeploySuccess?.(`Recipe "${recipe.recipe.metadata.name}" deployed successfully!`);
+      onDeploySuccess?.(`Recipe example "${recipe.recipe.metadata.name}" deployed successfully!`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to deploy recipe';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to deploy recipe example';
       onDeployError?.(errorMessage);
-      console.error('Deploy error:', error);
+      console.error('Deploy example error:', error);
     } finally {
       setDeploying(false);
     }
@@ -117,9 +141,7 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
             title={
               !recipe
                 ? 'No recipe selected'
-                : !hasExample
-                ? 'Recipe has no example deployment'
-                : 'Deploy recipe'
+                : 'Deploy recipe with parameters'
             }
             className={classNames(
               'p-2 rounded-md transition-colors',
@@ -130,6 +152,23 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
           >
             <Play className="h-4 w-4" />
           </button>
+
+          {/* Deploy Example (only if example exists) */}
+          {hasExample && (
+            <button
+              onClick={handleDeployExampleClick}
+              disabled={!canDeployExample}
+              title={canDeployExample ? 'Deploy recipe example' : 'Recipe has no example'}
+              className={classNames(
+                'p-2 rounded-md transition-colors',
+                canDeployExample && !deploying
+                  ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              )}
+            >
+              <Zap className="h-4 w-4" />
+            </button>
+          )}
 
           {/* Edit */}
           <button
