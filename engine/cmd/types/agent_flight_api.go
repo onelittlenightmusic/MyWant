@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"time"
@@ -71,7 +72,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 		if ok {
 			switch action {
 			case "cancel_flight":
-				fmt.Printf("[AgentFlightAPI] Executing cancel_flight action\n")
+				log.Printf("[AgentFlightAPI] Executing cancel_flight action")
 				if err := a.CancelFlight(ctx, want); err != nil {
 					return err
 				}
@@ -79,7 +80,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 				want.StoreState("flight_action", "")
 				return nil
 			case "create_flight":
-				fmt.Printf("[AgentFlightAPI] Executing create_flight action\n")
+				log.Printf("[AgentFlightAPI] Executing create_flight action")
 				if err := a.CreateFlight(ctx, want); err != nil {
 					return err
 				}
@@ -127,7 +128,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		// e.g., AA100 -> AA101, AA102, etc.
 		flightSuffixes := []string{"A", "B", "C", "D", "E"}
 		flightNumber = baseFlight + flightSuffixes[rand.Intn(len(flightSuffixes))]
-		fmt.Printf("[AgentFlightAPI] Rebooking: Original flight %s -> New flight %s\n", baseFlight, flightNumber)
+		log.Printf("[AgentFlightAPI] Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber)
 	}
 
 	from, _ := params["from"].(string)
@@ -160,7 +161,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 				delayHours := 2 + time.Duration(rand.Intn(3))
 				departureTime = departureTime.Add(delayHours * time.Hour)
 				arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-				fmt.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)\n",
+				log.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)",
 					departureTime.Format(time.RFC3339))
 			}
 		} else {
@@ -190,7 +191,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 			delayHours := 2 + time.Duration(rand.Intn(3))
 			departureTime = departureTime.Add(delayHours * time.Hour)
 			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-			fmt.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)\n",
+			log.Printf("[AgentFlightAPI] Rebooking: Adjusted departure time to %s (next available flight)",
 				departureTime.Format(time.RFC3339))
 		}
 	}
@@ -258,7 +259,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		reservation.FlightNumber, reservation.FlightNumber, reservation.From, reservation.To)
 	want.SetAgentActivity(a.Name, activity)
 
-	fmt.Printf("[AgentFlightAPI] Created flight reservation: %s (ID: %s, Status: %s)\n",
+	log.Printf("[AgentFlightAPI] Created flight reservation: %s (ID: %s, Status: %s)",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
 
 	return nil
@@ -316,7 +317,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)
 	want.SetAgentActivity(a.Name, activity)
 
-	fmt.Printf("[AgentFlightAPI] Cancelled flight: %s\n", flightIDStr)
+	log.Printf("[AgentFlightAPI] Cancelled flight: %s", flightIDStr)
 
 	return nil
 }

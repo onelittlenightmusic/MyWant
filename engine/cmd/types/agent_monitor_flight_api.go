@@ -69,7 +69,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
 	if flightIDStr == "" {
-		fmt.Printf("[MonitorFlightAPI] Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)\n")
+		log.Printf("[MonitorFlightAPI] Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
 		return nil
 	}
 
@@ -84,8 +84,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Record this poll time for next interval check
 	m.LastPollTime = now
 
-	fmt.Printf("[MonitorFlightAPI] Polling flight status for ID: %s\n", flightIDStr)
-
 	// Restore last known status from want state for persistence across execution cycles
 	if lastStatus, exists := want.GetState("flight_status"); exists {
 		if lastStatusStr, ok := lastStatus.(string); ok {
@@ -94,7 +92,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	} else {
 		m.LastKnownStatus = "unknown" // Default if not found in state
 	}
-	fmt.Printf("[MonitorFlightAPI] Current m.LastKnownStatus: %s\n", m.LastKnownStatus)
 
 	// Restore status history from want state for persistence
 	// Do NOT clear history - it accumulates across multiple monitoring executions
@@ -189,7 +186,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		}
 
 		if hasStateChange {
-			fmt.Printf("[MonitorFlightAPI] Status changed: %s -> %s\n", oldStatus, newStatus)
+			log.Printf("[MonitorFlightAPI] Status changed: %s -> %s", oldStatus, newStatus)
 
 			// Record status change
 			statusChange := StatusChange{
@@ -234,24 +231,19 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			m.LastKnownStatus = newStatus
 
 			// Print status progression
-			fmt.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)\n",
+			log.Printf("[MonitorFlightAPI] FLIGHT %s STATUS PROGRESSION: %s (at %s)",
 				reservation.ID, newStatus, time.Now().Format("15:04:05"))
 
 			// Update hash after successful commit
 			m.LastRecordedStateHash = currentStateHash
-			fmt.Printf("[MonitorFlightAPI] State recorded (hash: %s)\n", currentStateHash[:8])
+			log.Printf("[MonitorFlightAPI] State recorded (hash: %s)", currentStateHash[:8])
 		} else {
 			// No status change - don't create history entry, but still update other flight details
-			fmt.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s\n", newStatus)
+			log.Printf("[MonitorFlightAPI] Flight details changed but status is still: %s", newStatus)
 			m.LastRecordedStateHash = currentStateHash
 		}
 		want.StoreStateMulti(updates)
-	} else {
-		// No state change - skip history entry
-		fmt.Printf("[MonitorFlightAPI] No state change detected, skipping history entry\n")
 	}
-
-	fmt.Printf("[MonitorFlightAPI] Polling complete - Current status: %s\n", newStatus)
 
 	return nil
 }
