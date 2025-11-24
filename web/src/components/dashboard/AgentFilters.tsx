@@ -69,10 +69,7 @@ export const AgentFilters: React.FC<AgentFiltersProps> = ({
                   onClick={() => handleTypeToggle(typeOption.value)}
                   className={classNames(
                     'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border transition-colors',
-                    {
-                      'bg-primary-100 border-primary-300 text-primary-800': isSelected,
-                      'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200': !isSelected
-                    }
+                    isSelected ? 'bg-primary-100 border-primary-300 text-primary-800' : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
                   )}
                 >
                   <Icon className="w-3 h-3 mr-2" />

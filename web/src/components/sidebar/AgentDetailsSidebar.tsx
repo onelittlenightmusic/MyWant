@@ -88,7 +88,7 @@ export const AgentDetailsSidebar: React.FC<AgentDetailsSidebarProps> = ({
         <>
           {error && (
             <div className="p-6">
-              <ErrorDisplay message={error} />
+              <ErrorDisplay error={error} />
             </div>
           )}
 

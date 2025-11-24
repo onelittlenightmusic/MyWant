@@ -9,6 +9,15 @@ interface SidebarProps {
   onMinimizeToggle: () => void;
 }
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<any>;
+  href: string;
+  active: boolean;
+  disabled?: boolean;
+}
+
 // Get current path for active state
 const getCurrentPath = () => {
   if (typeof window !== 'undefined') {
@@ -17,7 +26,7 @@ const getCurrentPath = () => {
   return '/dashboard';
 };
 
-const getMenuItems = () => {
+const getMenuItems = (): MenuItem[] => {
   const currentPath = getCurrentPath();
   return [
     {
@@ -25,19 +34,21 @@ const getMenuItems = () => {
       label: 'Wants',
       icon: Heart,
       href: '/dashboard',
-      active: currentPath === '/dashboard'
+      active: currentPath === '/dashboard',
+      disabled: false
     },
     {
       id: 'agents',
       label: 'Agents',
       icon: Bot,
       href: '/agents',
-      active: currentPath === '/agents'
+      active: currentPath === '/agents',
+      disabled: false
     }
   ];
 };
 
-const getAdvancedItems = () => {
+const getAdvancedItems = (): MenuItem[] => {
   const currentPath = getCurrentPath();
   return [
     {
@@ -128,11 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     href={item.href}
                     className={classNames(
                       'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                      {
-                        'bg-primary-100 text-primary-900': item.active,
-                        'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
-                        'text-gray-400 cursor-not-allowed': item.disabled
-                      },
+                      item.active ? 'bg-primary-100 text-primary-900' : (!item.disabled ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'),
                       isMinimized && "justify-center"
                     )}
                     onClick={(e) => item.disabled && e.preventDefault()}
@@ -165,11 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       href={item.href}
                       className={classNames(
                         'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                        {
-                          'bg-primary-100 text-primary-900': item.active,
-                          'text-gray-600 hover:bg-gray-100 hover:text-gray-900': !item.active && !item.disabled,
-                          'text-gray-400 cursor-not-allowed': item.disabled
-                        },
+                        item.active ? 'bg-primary-100 text-primary-900' : (!item.disabled ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' : 'text-gray-400 cursor-not-allowed'),
                         isMinimized && "justify-center"
                       )}
                       onClick={(e) => item.disabled && e.preventDefault()}

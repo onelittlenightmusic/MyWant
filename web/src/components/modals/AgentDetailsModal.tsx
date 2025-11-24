@@ -131,7 +131,7 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
 
             {error && (
               <ErrorDisplay
-                message={error}
+                error={error}
                 className="mb-4"
               />
             )}

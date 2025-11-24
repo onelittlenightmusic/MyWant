@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Bot } from 'lucide-react';
+import { AlertTriangle, Bot, Pause } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -35,7 +35,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const isRunning = want.status === 'running';
   const isFailed = want.status === 'failed';
   const hasError = Boolean(isFailed && want.state?.error);
-  const isSuspended = want.suspended === true;
+  const isSuspended = want.status === 'suspended';
   const canControl = want.status === 'running' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
 

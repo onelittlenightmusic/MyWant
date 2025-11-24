@@ -10,6 +10,8 @@ interface ConfirmDeleteModalProps {
   want: Want | null;
   loading?: boolean;
   childrenCount?: number;
+  title?: string;
+  message?: string;
 }
 
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({

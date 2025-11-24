@@ -71,21 +71,16 @@ export const WantFilters: React.FC<WantFiltersProps> = ({
                   onClick={() => handleStatusToggle(status)}
                   className={classNames(
                     'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border transition-colors',
-                    {
-                      'bg-primary-100 border-primary-300 text-primary-800': isSelected,
-                      'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200': !isSelected
-                    }
+                    isSelected ? 'bg-primary-100 border-primary-300 text-primary-800' : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'
                   )}
                 >
                   <div className={classNames(
                     'w-2 h-2 rounded-full mr-2',
-                    {
-                      'bg-gray-400': color === 'gray',
-                      'bg-blue-400': color === 'blue',
-                      'bg-green-400': color === 'green',
-                      'bg-red-400': color === 'red',
-                      'bg-yellow-400': color === 'yellow'
-                    }
+                    color === 'gray' ? 'bg-gray-400' :
+                    color === 'blue' ? 'bg-blue-400' :
+                    color === 'green' ? 'bg-green-400' :
+                    color === 'red' ? 'bg-red-400' :
+                    color === 'yellow' ? 'bg-yellow-400' : ''
                   )} />
                   <span className="capitalize">{status}</span>
                 </button>
