@@ -14,19 +14,19 @@ recipe:
 
   wants:
     # Fibonacci Generator
-    - type: fibonacci_generator
+    - type: fibonacci generator
       params:
         max_number: max_number
         delay: delay
 
     # Fibonacci Sink
-    - type: fibonacci_sink
+    - type: fibonacci sink
       params:
         display_format: "Fibonacci: %d"
       using:
         - category: fibonacci-producer
   result:
-    - want_name: "fibonacci_generator"
+    - want_name: "fibonacci generator"
       stat_name: ".total_processed"
       description: "Total fibonacci numbers generated"
 
