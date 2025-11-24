@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download } from 'lucide-react';
 import { WantTypeDefinition } from '@/types/wantType';
 import { classNames } from '@/utils/helpers';
+import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 import {
   TabContent,
   TabSection,
@@ -37,6 +38,9 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
     }
   };
 
+  // Get background style for want type detail sidebar
+  const sidebarBackgroundStyle = getBackgroundStyle(wantType.metadata.name, true);
+
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: FileText },
     { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
@@ -48,7 +52,14 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
   ];
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" style={sidebarBackgroundStyle.style}>
+      {/* Overlay - semi-transparent background */}
+      {sidebarBackgroundStyle.hasBackgroundImage && (
+        <div className={getBackgroundOverlayClass()}></div>
+      )}
+
+      {/* Sidebar content */}
+      <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {wantType && (
         <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
@@ -102,6 +113,7 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
         {activeTab === 'agents' && <AgentsTab wantType={wantType} />}
         {activeTab === 'examples' && <ExamplesTab wantType={wantType} />}
         {activeTab === 'constraints' && <ConstraintsTab wantType={wantType} />}
+      </div>
       </div>
     </div>
   );
