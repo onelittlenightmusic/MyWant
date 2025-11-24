@@ -2,7 +2,7 @@ wants:
   # Prime number generator
   - metadata:
       name: generator
-      type: prime_numbers
+      type: prime numbers
       labels:
         role: source
     spec:
@@ -13,7 +13,7 @@ wants:
   # Prime sequence that filters out non-prime numbers
   - metadata:
       name: prime sequence
-      type: prime_sequence
+      type: prime sequence
       labels:
         role: filter
     spec:
@@ -24,7 +24,7 @@ wants:
   # Sink that collects and displays prime numbers
   - metadata:
       name: sink
-      type: prime_sink
+      type: prime sink
       labels:
         role: collector
     spec:

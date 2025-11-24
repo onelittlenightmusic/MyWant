@@ -2,7 +2,7 @@ wants:
   # Seed generator provides initial fibonacci values (0, 1)
   - metadata:
       name: seed generator
-      type: seed_numbers
+      type: seed numbers
       labels:
         role: source
         stage: initial
@@ -14,7 +14,7 @@ wants:
   # Fibonacci computer calculates next fibonacci numbers
   - metadata:
       name: fibonacci computer
-      type: fibonacci_computer
+      type: fibonacci computer
       labels:
         role: processor
         stage: computation
@@ -27,7 +27,7 @@ wants:
   # Merger combines seed values with computed values creating feedback loop
   - metadata:
       name: fibonacci merger
-      type: fibonacci_merger
+      type: fibonacci merger
       labels:
         role: merger
         stage: combine

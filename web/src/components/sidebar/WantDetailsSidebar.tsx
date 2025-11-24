@@ -901,6 +901,35 @@ const SettingsTab: React.FC<{
   );
 };
 
+// Component for collapsible array fields
+const CollapsibleArray: React.FC<{ label: string; items: any[]; depth: number }> = ({ label, items, depth }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 font-medium text-gray-800 text-sm hover:text-gray-900 py-1"
+      >
+        {isExpanded ? (
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-gray-500" />
+        )}
+        {label}:
+        {!isExpanded && <span className="text-xs text-gray-400 ml-1">Array({items.length})</span>}
+      </button>
+      {isExpanded && (
+        <div className="ml-4 border-l border-gray-200 pl-3 space-y-2">
+          {items.map((item, index) => (
+            <ArrayItemRenderer key={index} item={item} index={index} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Component for expandable array items
 const ArrayItemRenderer: React.FC<{ item: any; index: number; depth: number }> = ({ item, index, depth }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -971,14 +1000,21 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
     const isNested = value !== null && typeof value === 'object';
     const isArray = Array.isArray(value);
 
-    items.push(
-      <div key={key} className="space-y-1">
-        <div className="font-medium text-gray-800 text-sm">{key}:</div>
-        <div className={`${isNested ? 'ml-4 border-l border-gray-200 pl-3' : 'ml-4 text-gray-700'}`}>
-          {renderKeyValuePairs(value, depth + 1)}
+    if (isArray) {
+      // For array values, wrap in a collapsible container
+      items.push(
+        <CollapsibleArray key={key} label={key} items={value} depth={depth} />
+      );
+    } else {
+      items.push(
+        <div key={key} className="space-y-1">
+          <div className="font-medium text-gray-800 text-sm">{key}:</div>
+          <div className={`${isNested ? 'ml-4 border-l border-gray-200 pl-3' : 'ml-4 text-gray-700'}`}>
+            {renderKeyValuePairs(value, depth + 1)}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   });
 
   return items;

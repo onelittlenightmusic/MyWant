@@ -18,7 +18,7 @@ recipe:
   wants:
     # Fibonacci number generator - generates fibonacci sequence
     - metadata:
-        type: fibonacci_numbers
+        type: fibonacci numbers
         labels:
           role: generator
           component: source
@@ -28,7 +28,7 @@ recipe:
 
     # Fibonacci sequence - filters fibonacci numbers by range
     - metadata:
-        type: fibonacci_sequence
+        type: fibonacci sequence
         labels:
           role: filter
           component: processor
@@ -41,13 +41,13 @@ recipe:
 
   # Recipe result definition - specifies how to compute fibonacci results
   result:
-    - want_name: "fibonacci_sequence"
+    - want_name: "fibonacci sequence"
       stat_name: ".total_processed"
       description: "Total numbers processed by fibonacci filter"
-    - want_name: "fibonacci_numbers"
+    - want_name: "fibonacci numbers"
       stat_name: ".total_processed"
       description: "Total fibonacci numbers generated"
-    - want_name: "fibonacci_sequence"
+    - want_name: "fibonacci sequence"
       stat_name: "."
       description: "All metrics from fibonacci sequence filter"
   # Example deployment - one-click deployment configuration
