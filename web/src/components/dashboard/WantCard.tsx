@@ -151,8 +151,11 @@ export const WantCard: React.FC<WantCardProps> = ({
         backgroundAttachment: 'scroll'
       } : undefined}
     >
+      {/* Overlay - always apply semi-transparent background to entire card */}
+      <div className="absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none"></div>
+
       {/* Parent want content using reusable component */}
-      <div className={backgroundImage ? 'relative z-10 bg-white bg-opacity-70' : ''}>
+      <div className="relative z-10">
         <WantCardContent
           want={want}
           isChild={false}
@@ -167,7 +170,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       {/* Children indicator at bottom */}
       {hasChildren && !displayIsExpanded && (
-        <div className="mt-4 pt-3 border-t border-gray-200">
+        <div className="relative z-10 mt-4 pt-3 border-t border-gray-200">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -194,7 +197,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       {hasChildren && displayIsExpanded && (
         <div
           ref={expandedContainerRef}
-          className="mt-4 pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out"
+          className="relative z-10 mt-4 pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out"
           style={{
             opacity: showAnimation ? 1 : 0
           } as React.CSSProperties}

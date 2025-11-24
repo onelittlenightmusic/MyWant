@@ -115,8 +115,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       </div>
 
 
-      {/* Timeline - only for parent cards */}
-      {!isChild && (
+      {/* Timeline - only for parent cards - DISABLED to keep consistent height */}
+      {false && !isChild && (
         <div className="space-y-2 text-sm text-gray-600">
           {createdAt && (
             <div className="flex justify-between">
