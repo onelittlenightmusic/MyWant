@@ -854,8 +854,8 @@ func (n *Want) addAggregatedLogHistory() {
 	n.pendingLogs = make([]string, 0)
 	n.stateMutex.Unlock()
 
-	// Write logs to the actual log file (after releasing lock to avoid holding it during I/O)
-	fmt.Printf("[%s] %s\n", n.Metadata.Name, logsText)
+	// Write logs to the actual log file via InfoLog (after releasing lock to avoid holding it during I/O)
+	InfoLog("[%s] %s\n", n.Metadata.Name, logsText)
 }
 
 // copyCurrentState creates a copy of the current state
