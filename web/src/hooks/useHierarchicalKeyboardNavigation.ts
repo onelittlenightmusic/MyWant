@@ -10,6 +10,7 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
   currentItem: T | null;
   onNavigate: (item: T) => void;
   onExpandParent?: (itemId: string) => void;
+  onToggleExpand?: (itemId: string) => void;
   expandedItems?: Set<string>;
   enabled?: boolean;
 }
@@ -30,6 +31,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   currentItem,
   onNavigate,
   onExpandParent,
+  onToggleExpand,
   expandedItems,
   enabled = true
 }: UseHierarchicalKeyboardNavigationProps<T>) => {
@@ -83,21 +85,25 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case 'ArrowLeft':
           e.preventDefault();
-          // Left arrow: minimize expanded parent or navigate to previous parent
+          // Left arrow: minimize expanded parent, navigate to previous sibling, or navigate up
           if (currentItem) {
             // Check if current item is an expanded parent (has children and is expanded)
             const hasChildren = items.some(item => item.parentId === currentItem.id);
             const isExpanded = expandedItems?.has(currentItem.id);
 
             if (hasChildren && isExpanded) {
-              // Current item is an expanded parent, minimize it
-              if (onExpandParent) {
-                onExpandParent(currentItem.id);
+              // Current item is an expanded parent, toggle/collapse it
+              if (onToggleExpand) {
+                onToggleExpand(currentItem.id);
               }
               shouldNavigate = false;
             } else if (currentItem.parentId) {
-              // Current item is a child, move to parent
-              nextItem = getParent(items, currentItem);
+              // Current item is a child, try to navigate to previous sibling first
+              nextItem = getPreviousSibling(items, currentItem);
+              if (!nextItem) {
+                // No previous sibling, move to parent
+                nextItem = getParent(items, currentItem);
+              }
               shouldNavigate = !!nextItem;
             } else {
               // Current item is a top-level want, move to previous top-level
@@ -159,7 +165,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, currentItem, onNavigate, onExpandParent, expandedItems, enabled]);
+  }, [items, currentItem, onNavigate, onExpandParent, onToggleExpand, expandedItems, enabled]);
 };
 
 // Helper functions for hierarchical navigation
