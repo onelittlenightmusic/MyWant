@@ -37,6 +37,7 @@ export const Dashboard: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
+  const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'overview' | 'config' | 'logs' | 'agents'>('overview');
@@ -246,12 +247,18 @@ export const Dashboard: React.FC = () => {
     onNavigate: handleHierarchicalNavigate,
     onToggleExpand: handleToggleExpand,
     expandedItems: expandedParents,
+    lastSelectedItemId: lastSelectedWantId,
     enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
   });
 
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
     if (selectedWant) {
+      // Remember the last selected want before deselecting
+      const wantId = selectedWant.metadata?.id || selectedWant.id;
+      if (wantId) {
+        setLastSelectedWantId(wantId);
+      }
       setSelectedWantId(null);
     }
   };

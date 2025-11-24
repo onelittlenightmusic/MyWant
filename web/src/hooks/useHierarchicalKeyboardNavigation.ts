@@ -11,6 +11,7 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
   onNavigate: (item: T) => void;
   onToggleExpand?: (itemId: string) => void;
   expandedItems?: Set<string>;
+  lastSelectedItemId?: string | null;
   enabled?: boolean;
 }
 
@@ -35,6 +36,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   onNavigate,
   onToggleExpand,
   expandedItems,
+  lastSelectedItemId,
   enabled = true
 }: UseHierarchicalKeyboardNavigationProps<T>) => {
   useEffect(() => {
@@ -61,25 +63,32 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           // - If at a child, move to next sibling
           // - If at last child, move to next parent's sibling
           // - If at top-level non-expanded parent, move to next top-level item
-          if (currentItem) {
-            if (!currentItem.parentId) {
+          // - If no current item, restore last selected item or start with first item
+          let itemForRight = currentItem;
+          if (!itemForRight && lastSelectedItemId && items.length > 0) {
+            // No current item but we have a last selected ID, restore it
+            itemForRight = items.find(item => item.id === lastSelectedItemId) || null;
+          }
+
+          if (itemForRight) {
+            if (!itemForRight.parentId) {
               // Current item is top-level (parent)
-              const hasChildren = items.some(item => item.parentId === currentItem.id);
-              const isExpanded = expandedItems?.has(currentItem.id);
+              const hasChildren = items.some(item => item.parentId === itemForRight.id);
+              const isExpanded = expandedItems?.has(itemForRight.id);
 
               if (hasChildren && isExpanded) {
                 // Parent is expanded, move to first child
-                nextItem = getFirstChild(items, currentItem);
+                nextItem = getFirstChild(items, itemForRight);
               } else {
                 // Parent is not expanded or has no children, move to next top-level
-                nextItem = getNextTopLevel(items, currentItem);
+                nextItem = getNextTopLevel(items, itemForRight);
               }
             } else {
               // Current item is a child, move to next sibling
-              nextItem = getNextSibling(items, currentItem);
+              nextItem = getNextSibling(items, itemForRight);
               if (!nextItem) {
                 // No next sibling, move to next parent's sibling
-                const parent = getParent(items, currentItem);
+                const parent = getParent(items, itemForRight);
                 if (parent) {
                   nextItem = getNextSibling(items, parent);
                 }
@@ -87,7 +96,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
             }
             shouldNavigate = !!nextItem;
           } else if (items.length > 0) {
-            // No current item, start with first item
+            // No current item or last selected item, start with first item
             nextItem = items[0];
             shouldNavigate = true;
           }
@@ -99,17 +108,24 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           // - If at a child with previous sibling, move to previous sibling
           // - If at first child or no previous sibling, move to parent
           // - If at top-level, move to previous top-level item
-          if (currentItem) {
-            if (currentItem.parentId) {
+          // - If no current item, restore last selected item
+          let itemForLeft = currentItem;
+          if (!itemForLeft && lastSelectedItemId && items.length > 0) {
+            // No current item but we have a last selected ID, restore it
+            itemForLeft = items.find(item => item.id === lastSelectedItemId) || null;
+          }
+
+          if (itemForLeft) {
+            if (itemForLeft.parentId) {
               // Current item is a child
-              nextItem = getPreviousSibling(items, currentItem);
+              nextItem = getPreviousSibling(items, itemForLeft);
               if (!nextItem) {
                 // No previous sibling, move to parent
-                nextItem = getParent(items, currentItem);
+                nextItem = getParent(items, itemForLeft);
               }
             } else {
               // Current item is top-level, move to previous top-level item
-              nextItem = getPreviousTopLevel(items, currentItem);
+              nextItem = getPreviousTopLevel(items, itemForLeft);
             }
             shouldNavigate = !!nextItem;
           }
@@ -179,7 +195,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, currentItem, onNavigate, onToggleExpand, expandedItems, enabled]);
+  }, [items, currentItem, onNavigate, onToggleExpand, expandedItems, lastSelectedItemId, enabled]);
 };
 
 // Helper functions for hierarchical navigation
