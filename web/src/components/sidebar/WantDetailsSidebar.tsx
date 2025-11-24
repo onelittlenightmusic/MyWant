@@ -111,14 +111,15 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [wantId, fetchWantDetails, fetchWantResults]);
 
-  // Reset state when want changes and set initial tab
+  // Reset state when want ID changes (not on every want object change from polling)
   useEffect(() => {
     if (want) {
-      setActiveTab(initialTab);
       setIsEditing(false);
       setUpdateError(null);
+      // Only reset tab if initialTab has changed from outside
+      setActiveTab(initialTab);
     }
-  }, [want, initialTab]);
+  }, [initialTab]);
 
   // Auto-enable refresh for running wants
   useEffect(() => {
