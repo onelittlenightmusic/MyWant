@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, MoreHorizontal, Zap, Settings, Database, Share2 } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { truncateText, classNames } from '@/utils/helpers';
+import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 
 interface WantTypeCardProps {
   wantType: WantTypeListItem;
@@ -62,15 +63,24 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
     });
   };
 
+  // Get background style for want type card (using wantType.name for image lookup)
+  const backgroundStyle = getBackgroundStyle(wantType.name, true);
+
   return (
     <div
       onClick={handleCardClick}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
+      style={backgroundStyle.style}
     >
+      {/* Overlay - semi-transparent background */}
+      <div className={getBackgroundOverlayClass()}></div>
+
+      {/* Card content */}
+      <div className="relative z-10">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
@@ -134,6 +144,7 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
         <p className="text-xs text-gray-600">
           {wantType.pattern} pattern in {wantType.category} category
         </p>
+      </div>
       </div>
     </div>
   );
