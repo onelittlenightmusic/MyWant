@@ -45,7 +45,7 @@ wants:
   # Travel coordinator to combine all schedules
   - metadata:
       name: agent travel coordinator
-      type: travel coordinator
+      type: travel_coordinator
       labels:
         role: coordinator
         category: travel

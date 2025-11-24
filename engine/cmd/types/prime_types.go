@@ -86,13 +86,13 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 	filter.Prime = filter.GetIntParam("prime", 2)
 
 	// Set fields for base Want methods
-	filter.WantType = "prime sequence"
+	filter.WantType = "prime_sequence"
 	filter.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 0,
 		MaxInputs:       1,
 		MaxOutputs:      -1,
-		WantType:        "prime sequence",
+		WantType:        "prime_sequence",
 		Description:     "Prime number sequence",
 	}
 
@@ -217,13 +217,13 @@ func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} {
 	sink.Init(metadata, spec)
 
 	// Set fields for base Want methods
-	sink.WantType = "prime sink"
+	sink.WantType = "prime_sink"
 	sink.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 0,
 		MaxInputs:       -1,
 		MaxOutputs:      0,
-		WantType:        "prime sink",
+		WantType:        "prime_sink",
 		Description:     "Prime sink/collector",
 	}
 
@@ -281,7 +281,7 @@ func (s *PrimeSink) Exec() bool {
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("prime numbers", NewPrimeNumbers)
-	builder.RegisterWantType("prime sequence", NewPrimeSequence)
-	builder.RegisterWantType("prime sink", NewPrimeSink)
+	builder.RegisterWantType("prime_numbers", NewPrimeNumbers)
+	builder.RegisterWantType("prime_sequence", NewPrimeSequence)
+	builder.RegisterWantType("prime_sink", NewPrimeSink)
 }

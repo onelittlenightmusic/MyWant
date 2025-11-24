@@ -42,7 +42,7 @@ wants:
   # Travel coordinator (parent want) - "get one day travel"
   - metadata:
       name: get one day travel
-      type: travel coordinator
+      type: travel_coordinator
       labels:
         role: coordinator
         category: travel

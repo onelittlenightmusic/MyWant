@@ -87,13 +87,13 @@ func NewFibonacciSequence(metadata Metadata, spec WantSpec) interface{} {
 	filter.MaxValue = filter.GetIntParam("max_value", 1000000)
 
 	// Set fields for base Want methods
-	filter.WantType = "fibonacci sequence"
+	filter.WantType = "fibonacci_sequence"
 	filter.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 0,
 		MaxInputs:       1,
 		MaxOutputs:      0,
-		WantType:        "fibonacci sequence",
+		WantType:        "fibonacci_sequence",
 		Description:     "Fibonacci number sequence filter (terminal)",
 	}
 
@@ -172,6 +172,6 @@ func (f *FibonacciSequence) Exec() bool {
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("fibonacci numbers", NewFibonacciNumbers)
-	builder.RegisterWantType("fibonacci sequence", NewFibonacciSequence)
+	builder.RegisterWantType("fibonacci_numbers", NewFibonacciNumbers)
+	builder.RegisterWantType("fibonacci_sequence", NewFibonacciSequence)
 }

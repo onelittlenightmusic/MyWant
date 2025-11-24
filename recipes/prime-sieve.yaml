@@ -16,7 +16,7 @@ recipe:
 
   wants:
     # Prime number generator - generates consecutive numbers
-    - type: prime numbers
+    - type: prime_numbers
       labels:
         role: generator
         component: source
@@ -25,7 +25,7 @@ recipe:
         end: end_number
 
     # Prime sequence - filters out non-prime numbers using sieve algorithm  
-    - type: prime sequence
+    - type: prime_sequence
       labels:
         role: filter
         component: processor
@@ -35,13 +35,13 @@ recipe:
 
   # Recipe result definition - specifies how to compute prime sieve results
   result:
-    - want_name: "prime sequence"
+    - want_name: "prime_sequence"
       stat_name: ".total_processed"
       description: "Total numbers processed by prime filter"
-    - want_name: "prime numbers"
+    - want_name: "prime_numbers"
       stat_name: ".total_processed"
       description: "Total numbers generated"
-    - want_name: "prime sequence"
+    - want_name: "prime_sequence"
       stat_name: "."
       description: "All metrics from prime sequence filter"
   # Example deployment - one-click deployment configuration
