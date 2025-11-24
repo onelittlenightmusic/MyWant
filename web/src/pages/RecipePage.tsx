@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Check, AlertCircle } from 'lucide-react';
 import { useRecipeStore } from '@/stores/recipeStore';
+import { useWantStore } from '@/stores/wantStore';
 import { GenericRecipe } from '@/types/recipe';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -23,6 +24,10 @@ export default function RecipePage() {
     deleteRecipe,
     clearError,
   } = useRecipeStore();
+
+  const {
+    createWant,
+  } = useWantStore();
 
   // UI State
   const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
@@ -72,6 +77,58 @@ export default function RecipePage() {
       await deleteRecipe(selectedRecipe.recipe.metadata.name);
       setShowDeleteModal(false);
       setSelectedRecipe(null);
+    }
+  };
+
+  const handleDeployRecipe = async (recipe: GenericRecipe) => {
+    try {
+      const customType = recipe.recipe.metadata.custom_type || 'unknown';
+      // Create a want that references the recipe
+      await createWant({
+        wants: [
+          {
+            metadata: {
+              name: customType.toLowerCase().replace(/\s+/g, '-'),
+              type: customType,
+            },
+            spec: {
+              recipe: `recipes/${customType.toLowerCase().replace(/\s+/g, '-')}.yaml`,
+              params: recipe.recipe.parameters || {},
+            },
+          }
+        ]
+      });
+      setNotification({
+        message: `Recipe "${recipe.recipe.metadata.name}" deployed successfully!`,
+        type: 'success',
+      });
+    } catch (err) {
+      setNotification({
+        message: `Failed to deploy recipe: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        type: 'error',
+      });
+    }
+  };
+
+  const handleDeployRecipeExample = async (recipe: GenericRecipe) => {
+    try {
+      if (!recipe.recipe.example || !recipe.recipe.example.wants) {
+        throw new Error('No example configuration available for this recipe');
+      }
+
+      // Use the example wants directly
+      await createWant({
+        wants: recipe.recipe.example.wants,
+      });
+      setNotification({
+        message: `Recipe example "${recipe.recipe.metadata.name}" deployed successfully!`,
+        type: 'success',
+      });
+    } catch (err) {
+      setNotification({
+        message: `Failed to deploy recipe example: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        type: 'error',
+      });
     }
   };
 
@@ -221,8 +278,11 @@ export default function RecipePage() {
               onViewRecipe={handleViewRecipe}
               onEditRecipe={handleEditRecipe}
               onDeleteRecipe={handleDeleteRecipe}
+              onDeployRecipe={handleDeployRecipe}
+              onDeployRecipeExample={handleDeployRecipeExample}
               onSelectRecipe={setSelectedRecipe}
               onGetFilteredRecipes={setFilteredRecipes}
+              searchQuery={searchQuery}
             />
           </div>
         </div>

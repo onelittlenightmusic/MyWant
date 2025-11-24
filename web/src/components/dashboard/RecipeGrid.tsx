@@ -11,6 +11,8 @@ interface RecipeGridProps {
   onViewRecipe: (recipe: GenericRecipe) => void;
   onEditRecipe: (recipe: GenericRecipe) => void;
   onDeleteRecipe: (recipe: GenericRecipe) => void;
+  onDeployRecipe?: (recipe: GenericRecipe) => Promise<void>;
+  onDeployRecipeExample?: (recipe: GenericRecipe) => Promise<void>;
   onSelectRecipe?: (recipe: GenericRecipe) => void;
   onGetFilteredRecipes?: (recipes: GenericRecipe[]) => void;
 }
@@ -23,6 +25,8 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
   onViewRecipe,
   onEditRecipe,
   onDeleteRecipe,
+  onDeployRecipe,
+  onDeployRecipeExample,
   onSelectRecipe,
   onGetFilteredRecipes
 }) => {
@@ -131,6 +135,8 @@ export const RecipeGrid: React.FC<RecipeGridProps> = ({
             onView={onViewRecipe}
             onEdit={onEditRecipe}
             onDelete={onDeleteRecipe}
+            onDeploy={onDeployRecipe}
+            onDeployExample={onDeployRecipeExample}
             onSelect={onSelectRecipe}
           />
         </div>

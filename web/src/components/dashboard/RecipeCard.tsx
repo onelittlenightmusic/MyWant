@@ -1,5 +1,5 @@
-import React from 'react';
-import { Eye, Edit2, Trash2, MoreHorizontal, BookOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, Edit2, Trash2, MoreHorizontal, BookOpen, Play, Zap } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { truncateText, classNames } from '@/utils/helpers';
 
@@ -9,6 +9,8 @@ interface RecipeCardProps {
   onView: (recipe: GenericRecipe) => void;
   onEdit: (recipe: GenericRecipe) => void;
   onDelete: (recipe: GenericRecipe) => void;
+  onDeploy?: (recipe: GenericRecipe) => void;
+  onDeployExample?: (recipe: GenericRecipe) => void;
   onSelect?: (recipe: GenericRecipe) => void;
   className?: string;
 }
@@ -19,9 +21,12 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   onView,
   onEdit,
   onDelete,
+  onDeploy,
+  onDeployExample,
   onSelect,
   className
 }) => {
+  const [isDeploying, setIsDeploying] = useState(false);
   const recipeName = recipe.recipe.metadata.name || 'Unnamed Recipe';
   const description = recipe.recipe.metadata.description || '';
   const version = recipe.recipe.metadata.version || '';
@@ -46,6 +51,32 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       }, 0);
     });
   };
+
+  const handleDeploy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDeploy) return;
+
+    setIsDeploying(true);
+    try {
+      await onDeploy(recipe);
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
+  const handleDeployExample = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDeployExample) return;
+
+    setIsDeploying(true);
+    try {
+      await onDeployExample(recipe);
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
+  const hasExample = recipe.recipe.example && recipe.recipe.example.wants && recipe.recipe.example.wants.length > 0;
 
   return (
     <div
@@ -96,6 +127,32 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   View Details
                 </button>
 
+                <hr className="my-1" />
+
+                {onDeploy && (
+                  <button
+                    onClick={handleDeploy}
+                    disabled={isDeploying}
+                    className="flex items-center w-full px-4 py-2 text-sm text-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    {isDeploying ? 'Deploying...' : 'Deploy'}
+                  </button>
+                )}
+
+                {hasExample && onDeployExample && (
+                  <button
+                    onClick={handleDeployExample}
+                    disabled={isDeploying}
+                    className="flex items-center w-full px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    {isDeploying ? 'Deploying...' : 'Deploy Example'}
+                  </button>
+                )}
+
+                <hr className="my-1" />
+
                 <button
                   onClick={() => onEdit(recipe)}
                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -103,8 +160,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
                   <Edit2 className="h-4 w-4 mr-2" />
                   Edit
                 </button>
-
-                <hr className="my-1" />
 
                 <button
                   onClick={() => onDelete(recipe)}
