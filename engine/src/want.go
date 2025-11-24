@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -855,7 +856,13 @@ func (n *Want) addAggregatedLogHistory() {
 	n.stateMutex.Unlock()
 
 	// Write logs to the actual log file via InfoLog (after releasing lock to avoid holding it during I/O)
-	InfoLog("[%s] %s\n", n.Metadata.Name, logsText)
+	// Split by newlines and output each line separately so each gets a timestamp
+	lines := strings.Split(logsText, "\n")
+	for _, line := range lines {
+		if line != "" { // Skip empty lines
+			InfoLog("[%s] %s", n.Metadata.Name, line)
+		}
+	}
 }
 
 // copyCurrentState creates a copy of the current state
