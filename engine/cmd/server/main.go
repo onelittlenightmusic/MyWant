@@ -1643,21 +1643,11 @@ func (s *Server) Start() error {
 }
 
 // validateWantTypes validates that all want types are known before execution
+// Uses the global builder which has all registries already configured
 func (s *Server) validateWantTypes(config mywant.Config) error {
-	// Create a temporary builder to check available types
-	builder := mywant.NewChainBuilder(mywant.Config{})
-	builder.SetAgentRegistry(s.agentRegistry)
-	builder.SetCustomTargetRegistry(s.recipeRegistry) // Include custom types in validation
-
-	// Register all want types (same as in executeWantAsync)
-	types.RegisterQNetWantTypes(builder)
-	types.RegisterFibonacciWantTypes(builder)
-	types.RegisterPrimeWantTypes(builder)
-	types.RegisterTravelWantTypes(builder)
-	types.RegisterApprovalWantTypes(builder)
-	mywant.RegisterMonitorWantTypes(builder)
-
 	// Check each want type by trying to create a minimal want
+	// Using globalBuilder ensures we validate against the exact same registries
+	// that will be used during actual execution
 	for _, want := range config.Wants {
 		wantType := want.Metadata.Type
 
@@ -1673,7 +1663,8 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 		}
 
 		// Try to create the want function to check if type is valid
-		_, err := builder.TestCreateWantFunction(testWant)
+		// This uses the globalBuilder which has all registries synchronized
+		_, err := s.globalBuilder.TestCreateWantFunction(testWant)
 		if err != nil {
 			return fmt.Errorf("invalid want type '%s' in want '%s': %v", wantType, want.Metadata.Name, err)
 		}
