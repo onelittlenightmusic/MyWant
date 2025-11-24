@@ -3,6 +3,7 @@ import { ChevronDown, Users } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
+import { getBackgroundStyle, getBackgroundOverlayClass, getBackgroundContentContainerClass } from '@/utils/backgroundStyles';
 
 interface WantCardProps {
   want: Want;
@@ -121,18 +122,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   const isFlightWant = want.metadata?.type === 'flight';
   const isHotelWant = want.metadata?.type === 'hotel';
 
-  // Determine background image based on want type
-  const getBackgroundImage = (type?: string) => {
-    if (type === 'flight') return '/resources/flight.png';
-    if (type === 'hotel') return '/resources/hotel.png';
-    if (type === 'restaurant') return '/resources/restaurant.png';
-    if (type === 'buffet') return '/resources/buffet.png';
-    if (type === 'evidence') return '/resources/evidence.png';
-    if (type?.endsWith('coordinator')) return '/resources/agent.png';
-    return undefined;
-  };
-
-  const backgroundImage = getBackgroundImage(want.metadata?.type);
+  // Get background style for parent want (isParentWant = true)
+  const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, true);
 
   return (
     <div
@@ -143,16 +134,10 @@ export const WantCard: React.FC<WantCardProps> = ({
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
-      style={backgroundImage ? {
-        backgroundImage: `url(${backgroundImage})`,
-        backgroundSize: '100% auto',
-        backgroundPosition: 'center center',
-        backgroundRepeat: 'no-repeat',
-        backgroundAttachment: 'scroll'
-      } : undefined}
+      style={parentBackgroundStyle.style}
     >
       {/* Overlay - always apply semi-transparent background to entire card */}
-      <div className="absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none"></div>
+      <div className={getBackgroundOverlayClass()}></div>
 
       {/* Parent want content using reusable component */}
       <div className="relative z-10">
@@ -238,8 +223,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                 (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
                 (selectedWant.id && selectedWant.id === child.id)
               );
-              const childBackgroundImage = getBackgroundImage(child.metadata?.type);
-              const hasBackgroundImage = backgroundImage || childBackgroundImage;
+              // Get background style for child want (isParentWant = false)
+              const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
               return (
                 <div
                   key={childId || `child-${index}`}
@@ -248,17 +233,11 @@ export const WantCard: React.FC<WantCardProps> = ({
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
                   )}
-                  style={childBackgroundImage ? {
-                    backgroundImage: `url(${childBackgroundImage})`,
-                    backgroundSize: '100% auto',
-                    backgroundPosition: 'center center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundAttachment: 'scroll'
-                  } : undefined}
+                  style={childBackgroundStyle.style}
                   onClick={handleChildCardClick(child)}
                 >
                   {/* Child want content using reusable component */}
-                  <div className={classNames('p-4 w-full h-full', hasBackgroundImage ? 'bg-white bg-opacity-70 relative z-10' : 'bg-white')}>
+                  <div className={classNames('p-4 w-full h-full', childBackgroundStyle.className, getBackgroundContentContainerClass(childBackgroundStyle.hasBackgroundImage))}>
                     <WantCardContent
                       want={child}
                       isChild={true}

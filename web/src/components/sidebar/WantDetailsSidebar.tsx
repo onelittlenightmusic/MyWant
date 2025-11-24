@@ -10,6 +10,7 @@ import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutoc
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, classNames } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
+import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import {
   DetailsSidebar,
   TabContent,
