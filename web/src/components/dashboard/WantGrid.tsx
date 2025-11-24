@@ -208,12 +208,9 @@ export const WantGrid: React.FC<WantGridProps> = ({
             key={wantId || `want-${index}`}
             data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
             className={classNames(
-              'transition-all duration-300 ease-out origin-top-left',
-              isExpanded ? 'col-span-3 scale-100' : 'scale-100'
+              'transition-all duration-300 ease-out',
+              isExpanded ? 'col-span-3' : ''
             )}
-            style={{
-              transformOrigin: 'top left'
-            }}
           >
             <WantCard
               want={want}
