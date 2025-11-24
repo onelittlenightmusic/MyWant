@@ -54,9 +54,9 @@ func TestWantStatus(t *testing.T) {
 	}
 
 	// Test setting status
-	want.SetStatus(WantStatusRunning)
-	if want.GetStatus() != WantStatusRunning {
-		t.Errorf("Expected %v, got %v", WantStatusRunning, want.GetStatus())
+	want.SetStatus(WantStatusReaching)
+	if want.GetStatus() != WantStatusReaching {
+		t.Errorf("Expected %v, got %v", WantStatusReaching, want.GetStatus())
 	}
 }
 

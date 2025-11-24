@@ -53,9 +53,9 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
   // Auto-enable refresh when modal opens with running want
   useEffect(() => {
-    if (isOpen && selectedWantDetails && selectedWantDetails.status === 'running') {
+    if (isOpen && selectedWantDetails && selectedWantDetails.status === 'reaching') {
       setAutoRefresh(true);
-    } else if (isOpen && selectedWantDetails && selectedWantDetails.status !== 'running' && autoRefresh) {
+    } else if (isOpen && selectedWantDetails && selectedWantDetails.status !== 'reaching' && autoRefresh) {
       // Auto-disable when want stops running
       setAutoRefresh(false);
     }
@@ -66,7 +66,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     if (!isOpen || !want || !autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (selectedWantDetails && selectedWantDetails.status === 'running') {
+      if (selectedWantDetails && selectedWantDetails.status === 'reaching') {
         const wantId = want.metadata?.id || want.id;
         if (wantId) {
           fetchWantDetails(wantId);
@@ -198,7 +198,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
               {wantDetails?.metadata?.name || want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want'}
             </h3>
             <StatusBadge status={want.status} />
-            {want.status === 'running' && (
+            {want.status === 'reaching' && (
               <div className="flex items-center space-x-2">
                 <label className="flex items-center text-sm text-gray-600">
                   <input
@@ -294,7 +294,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                     <div className="flex items-center space-x-3">
                       <StatusBadge status={want.status} />
                       <span className="text-sm text-gray-600">
-                        {want.status === 'running' && 'Execution in progress...'}
+                        {want.status === 'reaching' && 'Execution in progress...'}
                         {want.status === 'completed' && 'Execution completed successfully'}
                         {want.status === 'failed' && 'Execution failed'}
                         {want.status === 'created' && 'Want created, ready to execute'}
@@ -534,7 +534,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       <div>[{new Date().toLocaleString()}] Initializing chain builder...</div>
                       <div>[{new Date().toLocaleString()}] Registering want types...</div>
                       <div>[{new Date().toLocaleString()}] Starting execution...</div>
-                      {want.status === 'running' && (
+                      {want.status === 'reaching' && (
                         <div className="text-blue-400">[{new Date().toLocaleString()}] Processing... <span className="animate-pulse">●</span></div>
                       )}
                       {want.status === 'completed' && (
@@ -722,7 +722,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                                 return <CheckCircle className="h-4 w-4 text-green-600" />;
                               case 'failed':
                                 return <XCircle className="h-4 w-4 text-red-600" />;
-                              case 'running':
+                              case 'reaching':
                                 return <Clock className="h-4 w-4 text-blue-600 animate-pulse" />;
                               default:
                                 return <Minus className="h-4 w-4 text-gray-600" />;
@@ -735,7 +735,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                                 return 'bg-green-50 border-green-200';
                               case 'failed':
                                 return 'bg-red-50 border-red-200';
-                              case 'running':
+                              case 'reaching':
                                 return 'bg-blue-50 border-blue-200';
                               default:
                                 return 'bg-gray-50 border-gray-200';
@@ -773,7 +773,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                                 </div>
                                 <span className={classNames(
                                   'px-2 py-1 rounded-full text-xs font-medium',
-                                  execution.status === 'running' && 'bg-blue-100 text-blue-800',
+                                  execution.status === 'reaching' && 'bg-blue-100 text-blue-800',
                                   execution.status === 'completed' && 'bg-green-100 text-green-800',
                                   execution.status === 'failed' && 'bg-red-100 text-red-800',
                                   execution.status === 'terminated' && 'bg-gray-100 text-gray-800'

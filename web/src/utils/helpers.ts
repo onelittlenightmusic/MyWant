@@ -38,7 +38,7 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
     case 'pending':
       return 'gray';
     case 'initializing':
-    case 'running':
+    case 'reaching':
       return 'blue';
     case 'suspended':
       return 'yellow';
@@ -60,7 +60,7 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '⏳';
     case 'initializing':
       return '🔄';
-    case 'running':
+    case 'reaching':
       return '▶️';
     case 'suspended':
       return '⏸️';
@@ -84,7 +84,7 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase):
       return React.createElement(Clock, iconProps);
     case 'initializing':
       return React.createElement(RotateCw, iconProps);
-    case 'running':
+    case 'reaching':
       return React.createElement(Play, iconProps);
     case 'suspended':
       return React.createElement(Pause, iconProps);

@@ -1059,7 +1059,7 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 			// Check if upstream matches selector and is running/idle
 			if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 				status := otherWant.want.GetStatus()
-				if status == WantStatusRunning || status == WantStatusIdle {
+				if status == WantStatusReaching || status == WantStatusIdle {
 					return true
 				}
 			}
@@ -1604,7 +1604,7 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Check if want is already running or completed to prevent duplicate starts
-	if want.want.GetStatus() == WantStatusRunning || want.want.GetStatus() == WantStatusCompleted {
+	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusCompleted {
 		return
 	}
 
@@ -1663,7 +1663,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Start want execution with direct Exec() calls
 	if chainWant, ok := want.function.(ChainWant); ok {
-		want.want.SetStatus(WantStatusRunning)
+		want.want.SetStatus(WantStatusReaching)
 
 		// Initialize stop channel if not already initialized
 		if want.want.stopChannel == nil {
@@ -1677,7 +1677,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		go func() {
 			defer cb.waitGroup.Done()
 			defer func() {
-				if want.want.GetStatus() == WantStatusRunning {
+				if want.want.GetStatus() == WantStatusReaching {
 					want.want.SetStatus(WantStatusCompleted)
 				}
 			}()
@@ -1707,7 +1707,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					case ControlTriggerResume:
 						// Resume execution and restore running status
 						want.want.SetSuspended(false)
-						want.want.SetStatus(WantStatusRunning)
+						want.want.SetStatus(WantStatusReaching)
 						InfoLog("[CONTROL:EXEC] Want %s resumed\n", wantName)
 
 					case ControlTriggerStop:

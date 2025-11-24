@@ -70,7 +70,7 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 // Exec implements the ChainWant interface
 func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
-	mw.Want.SetStatus(WantStatusRunning)
+	mw.Want.SetStatus(WantStatusReaching)
 
 	// Store initial state (if not already set)
 	if _, exists := mw.Want.GetState("start_time"); !exists {

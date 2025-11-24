@@ -66,7 +66,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
             </p>
           </div>
 
-          {want.status === 'running' && (
+          {want.status === 'reaching' && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
               <p className="text-sm text-yellow-800">
                 <strong>Warning:</strong> This want is currently running. Deleting it will stop the execution.

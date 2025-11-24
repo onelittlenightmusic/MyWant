@@ -32,11 +32,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const startedAt = want.stats?.started_at;
   const completedAt = want.stats?.completed_at;
 
-  const isRunning = want.status === 'running';
+  const isRunning = want.status === 'reaching';
   const isFailed = want.status === 'failed';
   const hasError = Boolean(isFailed && want.state?.error);
   const isSuspended = want.status === 'suspended';
-  const canControl = want.status === 'running' || want.status === 'stopped';
+  const canControl = want.status === 'reaching' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
 
   // Responsive sizing based on whether it's a child card
@@ -102,7 +102,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                     `${sizes.agentDotSize} rounded-full`,
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'completed' && 'bg-green-500',
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
-                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && 'bg-blue-500 animate-pulse'
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'reaching' && 'bg-blue-500 animate-pulse'
                   )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
                 )}
               </button>

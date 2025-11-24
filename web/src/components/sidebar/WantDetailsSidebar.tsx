@@ -69,7 +69,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Control panel logic (use want for status since it comes from the live dashboard state)
-  const isRunning = want?.status === 'running';
+  const isRunning = want?.status === 'reaching';
   const isSuspended = want?.status === 'suspended';
   const isCompleted = want?.status === 'completed';
   const isStopped = want?.status === 'stopped' || want?.status === 'created';
@@ -123,9 +123,9 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   // Auto-enable refresh for running wants
   useEffect(() => {
-    if (want && selectedWantDetails && selectedWantDetails.status === 'running') {
+    if (want && selectedWantDetails && selectedWantDetails.status === 'reaching') {
       setAutoRefresh(true);
-    } else if (want && selectedWantDetails && selectedWantDetails.status !== 'running' && autoRefresh) {
+    } else if (want && selectedWantDetails && selectedWantDetails.status !== 'reaching' && autoRefresh) {
       // Auto-disable when want stops running
       setAutoRefresh(false);
     }
@@ -1019,7 +1019,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                                 'w-2 h-2 rounded-full',
                                 execution.status === 'completed' && 'bg-green-500',
                                 execution.status === 'failed' && 'bg-red-500',
-                                execution.status === 'running' && 'bg-blue-500 animate-pulse',
+                                execution.status === 'reaching' && 'bg-blue-500 animate-pulse',
                                 execution.status === 'terminated' && 'bg-gray-500'
                               )} />
                             </div>
