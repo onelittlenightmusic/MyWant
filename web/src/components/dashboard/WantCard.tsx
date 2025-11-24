@@ -213,8 +213,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   data-keyboard-nav-selected={isChildSelected}
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
-                    isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
-                    hasBackgroundImage ? 'bg-white bg-opacity-70' : 'bg-white'
+                    isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
                   )}
                   style={childBackgroundImage ? {
                     backgroundImage: `url(${childBackgroundImage})`,
@@ -226,7 +225,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   onClick={handleChildCardClick(child)}
                 >
                   {/* Child want content using reusable component */}
-                  <div className="p-3 relative z-10">
+                  <div className={classNames('p-4 w-full h-full', hasBackgroundImage ? 'bg-white bg-opacity-70 relative z-10' : 'bg-white')}>
                     <WantCardContent
                       want={child}
                       isChild={true}
