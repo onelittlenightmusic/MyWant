@@ -24,7 +24,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
 }) => {
   if (!isOpen || !want) return null;
 
-  const wantName = want.config?.wants?.[0]?.metadata?.name || want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want';
+  const wantName = want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want';
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">

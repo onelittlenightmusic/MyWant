@@ -373,9 +373,9 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
           <div>
             <h5 className="text-xs font-medium text-gray-700 mb-1">Labels</h5>
             <div className="flex flex-wrap gap-1">
-              {Object.entries(labels).map(([key, value]) => (
+              {Object.entries(labels as Record<string, any>).map(([key, value]) => (
                 <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded border border-green-300">
-                  {key}={value}
+                  {key}={value as any}
                 </span>
               ))}
             </div>

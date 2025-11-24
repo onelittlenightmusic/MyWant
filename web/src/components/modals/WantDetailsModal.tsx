@@ -93,16 +93,17 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
   const handleEditStart = () => {
     // Initialize the editor with current want configuration as single want object
+    const details = wantDetails as any || {};
     const currentConfig = stringifyYaml({
       metadata: {
-        name: wantDetails?.metadata?.name || want.metadata?.name,
-        type: wantDetails?.metadata?.type || want.metadata?.type,
-        labels: wantDetails?.metadata?.labels || want.metadata?.labels || {}
+        name: details?.metadata?.name || want.metadata?.name,
+        type: details?.metadata?.type || want.metadata?.type,
+        labels: details?.metadata?.labels || want.metadata?.labels || {}
       },
       spec: {
-        params: wantDetails?.spec?.params || want.spec?.params || {},
-        ...(wantDetails?.spec?.using || want.spec?.using) && { using: wantDetails?.spec?.using || want.spec?.using },
-        ...(wantDetails?.spec?.recipe || want.spec?.recipe) && { recipe: wantDetails?.spec?.recipe || want.spec?.recipe }
+        params: details?.spec?.params || want.spec?.params || {},
+        ...(details?.spec?.using || want.spec?.using) && { using: details?.spec?.using || want.spec?.using },
+        ...(details?.spec?.recipe || want.spec?.recipe) && { recipe: details?.spec?.recipe || want.spec?.recipe }
       }
     });
     setEditedConfig(currentConfig);
@@ -654,7 +655,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                         <div className="flex items-center">
                           <div className="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse" />
                           <div>
-                            <div className="text-sm font-medium text-blue-900">{wantDetails.current_agent || wantDetails.state?.current_agent}</div>
+                            <div className="text-sm font-medium text-blue-900">{(wantDetails as any)?.current_agent || (wantDetails as any)?.state?.current_agent}</div>
                             <div className="text-xs text-blue-700">Currently executing</div>
                           </div>
                         </div>
@@ -666,22 +667,22 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   )}
 
                   {/* Running Agents Summary */}
-                  {((wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
-                    (wantDetails?.state?.running_agents && Array.isArray(wantDetails.state.running_agents) && wantDetails.state.running_agents.length > 0)) && (
+                  {(((wantDetails as any)?.running_agents && (wantDetails as any)?.running_agents?.length > 0) ||
+                    ((wantDetails as any)?.state?.running_agents && Array.isArray((wantDetails as any)?.state?.running_agents) && (wantDetails as any)?.state?.running_agents?.length > 0)) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-blue-900 mb-3 flex items-center">
                         <Users className="h-4 w-4 mr-2" />
                         Running Agents
                       </h4>
                       {(() => {
-                        const runningAgents = wantDetails.running_agents || wantDetails.state?.running_agents || [];
+                        const runningAgents = ((wantDetails as any)?.running_agents || (wantDetails as any)?.state?.running_agents || []) as any[];
                         return (
                           <>
                             <div className="text-sm text-gray-700">
                               <span className="font-medium">{runningAgents.length}</span> agent{runningAgents.length !== 1 ? 's' : ''} currently running:
                             </div>
                             <div className="mt-2 space-y-1">
-                              {runningAgents.map((agentName, index) => (
+                              {runningAgents.map((agentName: any, index: number) => (
                                 <div key={index} className="flex items-center text-sm text-blue-700">
                                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse" />
                                   {agentName}
@@ -695,14 +696,14 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   )}
 
                   {/* Agent Execution History */}
-                  {((wantDetails?.history?.agentHistory && wantDetails.history.agentHistory.length > 0) ||
-                    (wantDetails?.state?.agent_history && Array.isArray(wantDetails.state.agent_history) && wantDetails.state.agent_history.length > 0)) && (
+                  {(((wantDetails as any)?.history?.agentHistory && (wantDetails as any)?.history?.agentHistory?.length > 0) ||
+                    ((wantDetails as any)?.state?.agent_history && Array.isArray((wantDetails as any)?.state?.agent_history) && (wantDetails as any)?.state?.agent_history?.length > 0)) && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
                         <Clock className="h-4 w-4 mr-2" />
                         Execution History
                         {(() => {
-                          const agentHistory = wantDetails.history?.agentHistory || wantDetails.state?.agent_history || [];
+                          const agentHistory = ((wantDetails as any)?.history?.agentHistory || (wantDetails as any)?.state?.agent_history || []) as any[];
                           return (
                             <span className="ml-2 text-xs text-gray-500">
                               ({agentHistory.length} execution{agentHistory.length !== 1 ? 's' : ''})
@@ -713,8 +714,8 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
                       <div className="space-y-3 max-h-96 overflow-y-auto">
                         {(() => {
-                          const agentHistory = wantDetails.history?.agentHistory || wantDetails.state?.agent_history || [];
-                          return agentHistory.map((execution, index) => {
+                          const agentHistory = ((wantDetails as any)?.history?.agentHistory || (wantDetails as any)?.state?.agent_history || []) as any[];
+                          return agentHistory.map((execution: any, index: number) => {
                           const getStatusIcon = (status: string) => {
                             switch (status) {
                               case 'completed':

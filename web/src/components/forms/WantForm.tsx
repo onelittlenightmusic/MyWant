@@ -269,7 +269,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       const labels = config.metadata.labels || {};
       setLabels(Object.fromEntries(
         Object.entries(labels).filter(([_, value]) => value !== undefined)
-      ));
+      ) as Record<string, string>);
     }
     if (config.spec) {
       setParams(config.spec.params ? {...config.spec.params} : {});
