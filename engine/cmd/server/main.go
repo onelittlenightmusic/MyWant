@@ -172,6 +172,7 @@ func NewServer(config ServerConfig) *Server {
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetAgentRegistry(agentRegistry)
+	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes
 
 	// Create temporary server instance to call registerDynamicAgents
 	tempServer := &Server{}
