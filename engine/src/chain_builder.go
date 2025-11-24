@@ -512,11 +512,10 @@ func (cb *ChainBuilder) reconcileLoop() {
 			cb.reconcileMutex.Lock()
 			addedCount := 0
 			for _, want := range newWants {
-				if _, exists := cb.wants[want.Metadata.Name]; !exists {
-					cb.config.Wants = append(cb.config.Wants, want)
-					cb.addWant(want)
-					addedCount++
-				}
+				// Allow multiple wants with the same name (they may be different instances)
+				cb.config.Wants = append(cb.config.Wants, want)
+				cb.addWant(want)
+				addedCount++
 			}
 			cb.reconcileMutex.Unlock()
 			if addedCount > 0 {

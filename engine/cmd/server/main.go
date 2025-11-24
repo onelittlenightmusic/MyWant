@@ -1338,42 +1338,61 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Find the want execution
-	execution, exists := s.wants[wantID]
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
-		})
-		return
+	// Search for the want by metadata.id across all executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if _, _, found := execution.Builder.FindWantByID(wantID); found {
+				// Suspend the specific want execution
+				if err := execution.Builder.SuspendWant(wantID); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{
+						"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
+					})
+					return
+				}
+
+				// Return success response
+				response := map[string]interface{}{
+					"message":   "Want execution suspended successfully",
+					"wantId":    wantID,
+					"suspended": true,
+					"timestamp": time.Now().Format(time.RFC3339),
+				}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
 	}
 
-	// Check if builder exists
-	if execution.Builder == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Want execution has no active builder to suspend",
-		})
-		return
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Suspend the specific want execution
+			if err := s.globalBuilder.SuspendWant(wantID); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
+				})
+				return
+			}
+
+			// Return success response
+			response := map[string]interface{}{
+				"message":   "Want execution suspended successfully",
+				"wantId":    wantID,
+				"suspended": true,
+				"timestamp": time.Now().Format(time.RFC3339),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 	}
 
-	// Suspend the specific want execution
-	if err := execution.Builder.SuspendWant(wantID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
-		})
-		return
-	}
-
-	// Return success response
-	response := map[string]interface{}{
-		"message":   "Want execution suspended successfully",
-		"wantId":    wantID,
-		"suspended": true,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-	json.NewEncoder(w).Encode(response)
+	// Want not found
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+	})
 }
 
 // resumeWant handles POST /api/v1/wants/{id}/resume - resumes want execution
@@ -1384,42 +1403,61 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Find the want execution
-	execution, exists := s.wants[wantID]
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
-		})
-		return
+	// Search for the want by metadata.id across all executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if _, _, found := execution.Builder.FindWantByID(wantID); found {
+				// Resume the specific want execution
+				if err := execution.Builder.ResumeWant(wantID); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{
+						"error": fmt.Sprintf("Failed to resume want execution: %v", err),
+					})
+					return
+				}
+
+				// Return success response
+				response := map[string]interface{}{
+					"message":   "Want execution resumed successfully",
+					"wantId":    wantID,
+					"suspended": false,
+					"timestamp": time.Now().Format(time.RFC3339),
+				}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
 	}
 
-	// Check if builder exists
-	if execution.Builder == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Want execution has no active builder to resume",
-		})
-		return
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Resume the specific want execution
+			if err := s.globalBuilder.ResumeWant(wantID); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": fmt.Sprintf("Failed to resume want execution: %v", err),
+				})
+				return
+			}
+
+			// Return success response
+			response := map[string]interface{}{
+				"message":   "Want execution resumed successfully",
+				"wantId":    wantID,
+				"suspended": false,
+				"timestamp": time.Now().Format(time.RFC3339),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 	}
 
-	// Resume the specific want execution
-	if err := execution.Builder.ResumeWant(wantID); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Failed to resume want execution: %v", err),
-		})
-		return
-	}
-
-	// Return success response
-	response := map[string]interface{}{
-		"message":   "Want execution resumed successfully",
-		"wantId":    wantID,
-		"suspended": false,
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-	json.NewEncoder(w).Encode(response)
+	// Want not found
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+	})
 }
 
 // stopWant handles POST /api/v1/wants/{id}/stop - stops want execution
@@ -1430,45 +1468,61 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Find the want execution
-	execution, exists := s.wants[wantID]
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
-		})
-		return
+	// Search for the want by metadata.id across all executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if _, _, found := execution.Builder.FindWantByID(wantID); found {
+				// Stop the specific want execution
+				if err := execution.Builder.StopWant(wantID); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{
+						"error": fmt.Sprintf("Failed to stop want execution: %v", err),
+					})
+					return
+				}
+
+				// Return success response
+				response := map[string]interface{}{
+					"message":   "Want execution stopped successfully",
+					"wantId":    wantID,
+					"status":    "stopped",
+					"timestamp": time.Now().Format(time.RFC3339),
+				}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
 	}
 
-	// Check if builder exists
-	if execution.Builder == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Want execution has no active builder to stop",
-		})
-		return
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Stop the specific want execution
+			if err := s.globalBuilder.StopWant(wantID); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": fmt.Sprintf("Failed to stop want execution: %v", err),
+				})
+				return
+			}
+
+			// Return success response
+			response := map[string]interface{}{
+				"message":   "Want execution stopped successfully",
+				"wantId":    wantID,
+				"status":    "stopped",
+				"timestamp": time.Now().Format(time.RFC3339),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 	}
 
-	// Stop the execution
-	if err := execution.Builder.Stop(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Failed to stop want execution: %v", err),
-		})
-		return
-	}
-
-	// Update execution status
-	execution.Status = "stopped"
-
-	// Return success response
-	response := map[string]interface{}{
-		"message":   "Want execution stopped successfully",
-		"wantId":    wantID,
-		"status":    "stopped",
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-	json.NewEncoder(w).Encode(response)
+	// Want not found
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+	})
 }
 
 // startWant handles POST /api/v1/wants/{id}/start - starts/restarts want execution
@@ -1479,45 +1533,61 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Find the want execution
-	execution, exists := s.wants[wantID]
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Want execution with ID %s not found", wantID),
-		})
-		return
+	// Search for the want by metadata.id across all executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if _, _, found := execution.Builder.FindWantByID(wantID); found {
+				// Restart the specific want execution
+				if err := execution.Builder.RestartWant(wantID); err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					json.NewEncoder(w).Encode(map[string]string{
+						"error": fmt.Sprintf("Failed to restart want execution: %v", err),
+					})
+					return
+				}
+
+				// Return success response
+				response := map[string]interface{}{
+					"message":   "Want execution restarted successfully",
+					"wantId":    wantID,
+					"status":    "running",
+					"timestamp": time.Now().Format(time.RFC3339),
+				}
+				json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
 	}
 
-	// Check if builder exists
-	if execution.Builder == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Want execution has no active builder to start",
-		})
-		return
+	// If not found in executions, also search in global builder (for wants loaded from memory file)
+	if s.globalBuilder != nil {
+		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Restart the specific want execution
+			if err := s.globalBuilder.RestartWant(wantID); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{
+					"error": fmt.Sprintf("Failed to restart want execution: %v", err),
+				})
+				return
+			}
+
+			// Return success response
+			response := map[string]interface{}{
+				"message":   "Want execution restarted successfully",
+				"wantId":    wantID,
+				"status":    "running",
+				"timestamp": time.Now().Format(time.RFC3339),
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
 	}
 
-	// Start the execution
-	if err := execution.Builder.Start(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("Failed to start want execution: %v", err),
-		})
-		return
-	}
-
-	// Update execution status
-	execution.Status = "running"
-
-	// Return success response
-	response := map[string]interface{}{
-		"message":   "Want execution started successfully",
-		"wantId":    wantID,
-		"status":    "running",
-		"timestamp": time.Now().Format(time.RFC3339),
-	}
-	json.NewEncoder(w).Encode(response)
+	// Want not found
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+	})
 }
 
 // Start starts the HTTP server

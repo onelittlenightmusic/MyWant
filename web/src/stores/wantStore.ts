@@ -179,9 +179,9 @@ export const useWantStore = create<WantStore>()(
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
-          selectedWantDetails: state.selectedWantDetails?.id === id ?
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status, suspended: status.suspended } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status, suspended: status.suspended } : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
             { ...state.selectedWantDetails, suspended: status.suspended } :
             state.selectedWantDetails,
           loading: false
@@ -204,9 +204,9 @@ export const useWantStore = create<WantStore>()(
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
-          selectedWantDetails: state.selectedWantDetails?.id === id ?
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status, suspended: status.suspended } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status, suspended: status.suspended } : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
             { ...state.selectedWantDetails, suspended: status.suspended } :
             state.selectedWantDetails,
           loading: false
@@ -229,9 +229,9 @@ export const useWantStore = create<WantStore>()(
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
-          selectedWantDetails: state.selectedWantDetails?.id === id ?
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
             { ...state.selectedWantDetails, status: status.status } :
             state.selectedWantDetails,
           loading: false
@@ -254,9 +254,9 @@ export const useWantStore = create<WantStore>()(
         const status = await apiClient.getWantStatus(id);
 
         set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
-          selectedWantDetails: state.selectedWantDetails?.id === id ?
+          wants: state.wants.map(w => (w.metadata?.id === id || w.id === id) ? { ...w, status: status.status } : w),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ?
             { ...state.selectedWantDetails, status: status.status } :
             state.selectedWantDetails,
           loading: false
