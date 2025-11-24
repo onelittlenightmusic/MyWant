@@ -57,7 +57,7 @@ func loadAgentSpec() (*openapi3.T, error) {
 }
 
 // validateCapabilityWithSpec validates capability YAML data against the OpenAPI spec
-func validateCapabilityWithSpec(yamlData []byte) error {
+func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
@@ -88,7 +88,7 @@ func validateCapabilityWithSpec(yamlData []byte) error {
 		return fmt.Errorf("capability structure validation failed: %w", err)
 	}
 
-	InfoLog("[VALIDATION] Capability validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Capability '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (r *AgentRegistry) loadCapabilityFile(filename string) error {
 	}
 
 	// Validate against OpenAPI spec
-	err = validateCapabilityWithSpec(data)
+	err = validateCapabilityWithSpec(data, filename)
 	if err != nil {
 		return fmt.Errorf("capability validation failed for %s: %w", filename, err)
 	}
@@ -191,7 +191,7 @@ func (r *AgentRegistry) LoadAgents(path string) error {
 }
 
 // validateAgentWithSpec validates agent YAML data against the OpenAPI spec
-func validateAgentWithSpec(yamlData []byte) error {
+func validateAgentWithSpec(yamlData []byte, filename string) error {
 	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
@@ -222,7 +222,7 @@ func validateAgentWithSpec(yamlData []byte) error {
 		return fmt.Errorf("agent structure validation failed: %w", err)
 	}
 
-	InfoLog("[VALIDATION] Agent validated successfully against OpenAPI spec\n")
+	InfoLog("[VALIDATION] Agent '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
 
@@ -317,7 +317,7 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 	}
 
 	// Validate against OpenAPI spec
-	err = validateAgentWithSpec(data)
+	err = validateAgentWithSpec(data, filename)
 	if err != nil {
 		return fmt.Errorf("agent validation failed for %s: %w", filename, err)
 	}

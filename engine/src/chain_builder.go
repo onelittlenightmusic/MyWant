@@ -135,16 +135,9 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		controlStop: make(chan bool),
 	}
 
-	// Auto-register custom target types from recipes
-	// Try to find the recipes directory - check both "recipes" and "../recipes"
-	recipeDir := "recipes"
-	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
-		recipeDir = "../recipes"
-	}
-	err := ScanAndRegisterCustomTypes(recipeDir, builder.customRegistry)
-	if err != nil {
-		InfoLog("⚠️  Warning: failed to scan recipes for custom types: %v\n", err)
-	}
+	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes()
+	// This avoids duplicate scanning logs when multiple ChainBuilder instances are created
+	// Recipe registry is passed via the environment during server initialization
 
 	// Auto-register owner want types for target system support
 	RegisterOwnerWantTypes(builder)
