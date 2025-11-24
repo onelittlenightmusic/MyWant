@@ -174,7 +174,23 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       {/* Expanded children section */}
       {hasChildren && displayIsExpanded && (
-        <div className="mt-4 pt-4 border-t border-gray-200 animate-fade-in">
+        <div
+          className="mt-4 pt-4 border-t border-gray-200"
+          style={{
+            opacity: 0,
+            animation: 'fadeIn 0.3s ease-out 0s forwards'
+          } as React.CSSProperties}
+        >
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes slideIn {
+              from { opacity: 0; transform: translateY(-8px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+          `}</style>
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
             <button
@@ -194,7 +210,13 @@ export const WantCard: React.FC<WantCardProps> = ({
             </button>
           </div>
           {/* Grid layout for child wants - 3 columns, wraps to new rows */}
-          <div className="grid grid-cols-3 gap-3 animate-slide-in">
+          <div
+            className="grid grid-cols-3 gap-3"
+            style={{
+              opacity: 0,
+              animation: 'slideIn 0.3s ease-out 0.1s forwards'
+            } as React.CSSProperties}
+          >
             {children!.sort((a, b) => {
               const idA = a.metadata?.id || a.id || '';
               const idB = b.metadata?.id || b.id || '';
