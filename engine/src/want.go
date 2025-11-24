@@ -129,6 +129,13 @@ type Want struct {
 	// Stop channel for graceful shutdown of want's goroutines
 	stopChannel chan struct{} `json:"-" yaml:"-"`
 
+	// Control channel for suspend/resume/stop/restart operations
+	controlChannel chan *ControlCommand `json:"-" yaml:"-"`
+
+	// Control state tracking
+	suspended bool       `json:"-" yaml:"-"` // Current suspension state
+	controlMu sync.Mutex `json:"-" yaml:"-"` // Protect control state access
+
 	// Fields for eliminating duplicate methods in want types
 	WantType             string               `json:"-" yaml:"-"`
 	paths                Paths                `json:"-" yaml:"-"`
@@ -435,6 +442,54 @@ func (n *Want) getSignificantStateChanges(oldState, newState map[string]interfac
 // GetStatus returns the current want status
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
+}
+
+// InitializeControlChannel initializes the control channel if not already done
+func (n *Want) InitializeControlChannel() {
+	if n.controlChannel == nil {
+		n.controlChannel = make(chan *ControlCommand, 10) // Buffered for non-blocking receives
+	}
+}
+
+// SendControlCommand sends a control command to this want's control channel (non-blocking)
+func (n *Want) SendControlCommand(cmd *ControlCommand) error {
+	if n.controlChannel == nil {
+		return fmt.Errorf("control channel not initialized for want %s", n.Metadata.Name)
+	}
+	select {
+	case n.controlChannel <- cmd:
+		return nil
+	default:
+		return fmt.Errorf("control channel full for want %s", n.Metadata.Name)
+	}
+}
+
+// CheckControlSignal checks for control commands without blocking
+// Returns (command, received, error)
+func (n *Want) CheckControlSignal() (*ControlCommand, bool) {
+	if n.controlChannel == nil {
+		return nil, false
+	}
+	select {
+	case cmd := <-n.controlChannel:
+		return cmd, true
+	default:
+		return nil, false
+	}
+}
+
+// IsSuspended returns whether the want is currently suspended
+func (n *Want) IsSuspended() bool {
+	n.controlMu.Lock()
+	defer n.controlMu.Unlock()
+	return n.suspended
+}
+
+// SetSuspended sets the want's suspension state
+func (n *Want) SetSuspended(suspended bool) {
+	n.controlMu.Lock()
+	defer n.controlMu.Unlock()
+	n.suspended = suspended
 }
 
 // StoreState stores a key-value pair in the want's state

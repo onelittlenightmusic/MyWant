@@ -1671,6 +1671,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			want.want.stopChannel = make(chan struct{})
 		}
 
+		// Initialize control channel for suspend/resume/stop/restart operations
+		want.want.InitializeControlChannel()
+
 		cb.waitGroup.Add(1)
 		go func() {
 			defer cb.waitGroup.Done()
@@ -1689,6 +1692,43 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					return
 				default:
 					// Continue execution
+				}
+
+				// Check for control signals (suspend/resume/stop/restart)
+				if cmd, received := want.want.CheckControlSignal(); received {
+					InfoLog("[CONTROL:EXEC] Want %s received control signal: %s\n", wantName, cmd.Trigger)
+					switch cmd.Trigger {
+					case ControlTriggerSuspend:
+						// Mark as suspended and wait for resume
+						want.want.SetSuspended(true)
+						want.want.SetStatus(WantStatusRunning) // Stay in running but suspended
+						InfoLog("[CONTROL:EXEC] Want %s suspended\n", wantName)
+						// Continue to next iteration (execution will be skipped while suspended)
+
+					case ControlTriggerResume:
+						// Resume execution
+						want.want.SetSuspended(false)
+						InfoLog("[CONTROL:EXEC] Want %s resumed\n", wantName)
+
+					case ControlTriggerStop:
+						// Stop execution immediately
+						want.want.SetStatus(WantStatusTerminated)
+						InfoLog("[CONTROL:EXEC] Want %s stopped\n", wantName)
+						return
+
+					case ControlTriggerRestart:
+						// Restart execution from beginning
+						// Reset any execution state if needed
+						want.want.SetSuspended(false)
+						InfoLog("[CONTROL:EXEC] Want %s restarted\n", wantName)
+					}
+				}
+
+				// Skip execution if want is suspended
+				if want.want.IsSuspended() {
+					// Sleep but don't execute - just check for control signals
+					time.Sleep(GlobalExecutionInterval)
+					continue
 				}
 
 				// Begin execution cycle for batching state changes
@@ -2484,29 +2524,17 @@ func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	defer cb.reconcileMutex.RUnlock()
 
 	// Find the target want
-	_, exists := cb.wants[cmd.WantID]
+	targetRuntime, exists := cb.wants[cmd.WantID]
 	if !exists {
 		InfoLog("[CONTROL] Warning: Target want %s not found\n", cmd.WantID)
 		return
 	}
 
-	// Handle the control command for the target want
-	switch cmd.Trigger {
-	case ControlTriggerSuspend:
-		InfoLog("[CONTROL] Suspending want %s\n", cmd.WantID)
-		// TODO: Implement goroutine pause mechanism
-
-	case ControlTriggerResume:
-		InfoLog("[CONTROL] Resuming want %s\n", cmd.WantID)
-		// TODO: Implement goroutine resume mechanism
-
-	case ControlTriggerStop:
-		InfoLog("[CONTROL] Stopping want %s\n", cmd.WantID)
-		// TODO: Implement goroutine termination
-
-	case ControlTriggerRestart:
-		InfoLog("[CONTROL] Restarting want %s\n", cmd.WantID)
-		// TODO: Implement goroutine restart
+	// Send control command to the target want's control channel
+	if err := targetRuntime.want.SendControlCommand(cmd); err != nil {
+		InfoLog("[CONTROL] Warning: Failed to send control command to want %s: %v\n", cmd.WantID, err)
+	} else {
+		InfoLog("[CONTROL] Sent %s command to want %s\n", cmd.Trigger, cmd.WantID)
 	}
 
 	// TODO: Propagate control to child wants if this is a parent want
