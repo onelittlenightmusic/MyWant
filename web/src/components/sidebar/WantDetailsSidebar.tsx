@@ -71,7 +71,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Control panel logic (use want for status since it comes from the live dashboard state)
   const isRunning = want?.status === 'reaching';
   const isSuspended = want?.status === 'suspended';
-  const isCompleted = want?.status === 'completed';
+  const isCompleted = want?.status === 'achieved';
   const isStopped = want?.status === 'stopped' || want?.status === 'created';
   const isFailed = want?.status === 'failed';
 
@@ -615,7 +615,7 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
             )}
             {want.stats.completed_at && (
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Completed:</span>
+                <span className="text-gray-600 text-sm">Achieved:</span>
                 <span className="text-sm">{formatDate(want.stats.completed_at)}</span>
               </div>
             )}
@@ -1017,7 +1017,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                               <span className="text-gray-500 text-xs">{execution.agent_type}</span>
                               <div className={classNames(
                                 'w-2 h-2 rounded-full',
-                                execution.status === 'completed' && 'bg-green-500',
+                                execution.status === 'achieved' && 'bg-green-500',
                                 execution.status === 'failed' && 'bg-red-500',
                                 execution.status === 'reaching' && 'bg-blue-500 animate-pulse',
                                 execution.status === 'terminated' && 'bg-gray-500'

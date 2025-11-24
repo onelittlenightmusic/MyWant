@@ -100,7 +100,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
                   <span className={classNames(
                     `${sizes.agentDotSize} rounded-full`,
-                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'completed' && 'bg-green-500',
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'achieved' && 'bg-green-500',
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'reaching' && 'bg-blue-500 animate-pulse'
                   )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
@@ -134,7 +134,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
           {completedAt && (
             <div className="flex justify-between">
-              <span>Completed:</span>
+              <span>Achieved:</span>
               <span>{formatDate(completedAt)}</span>
             </div>
           )}

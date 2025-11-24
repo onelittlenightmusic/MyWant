@@ -76,7 +76,7 @@ type AgentExecution struct {
 	AgentType string     `json:"agent_type" yaml:"agent_type"`
 	StartTime time.Time  `json:"start_time" yaml:"start_time"`
 	EndTime   *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
-	Status    string     `json:"status" yaml:"status"` // "running", "completed", "failed"
+	Status    string     `json:"status" yaml:"status"` // "running", "achieved", "failed"
 	Error     string     `json:"error,omitempty" yaml:"error,omitempty"`
 	Activity  string     `json:"activity,omitempty" yaml:"activity,omitempty"` // Description of agent action like "flight reservation has been created"
 }

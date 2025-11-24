@@ -185,7 +185,7 @@ func (n *Want) executeAgent(agent Agent) error {
 			// Mark as completed
 			for i := range n.History.AgentHistory {
 				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
-					n.History.AgentHistory[i].Status = "completed"
+					n.History.AgentHistory[i].Status = "achieved"
 					break
 				}
 			}

@@ -280,7 +280,7 @@ func (t *Target) Exec() bool {
 			t.computeTemplateResult()
 
 			// Mark the target as completed
-			t.SetStatus(WantStatusCompleted)
+			t.SetStatus(WantStatusAchieved)
 			return true
 		}
 

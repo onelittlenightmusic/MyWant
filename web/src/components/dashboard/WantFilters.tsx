@@ -13,7 +13,7 @@ interface WantFiltersProps {
 const STATUS_OPTIONS: WantExecutionStatus[] = [
   'created',
   'reaching',
-  'completed',
+  'achieved',
   'failed',
   'stopped'
 ];

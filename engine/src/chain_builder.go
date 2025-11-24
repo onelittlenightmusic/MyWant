@@ -1015,7 +1015,7 @@ func (cb *ChainBuilder) startPhase() {
 
 		// Second pass: restart completed wants if their upstream is running/idle
 		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusCompleted {
+			if want.want.GetStatus() == WantStatusAchieved {
 				if cb.shouldRestartCompletedWant(wantName, want) {
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
@@ -1604,7 +1604,7 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Check if want is already running or completed to prevent duplicate starts
-	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusCompleted {
+	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusAchieved {
 		return
 	}
 
@@ -1678,7 +1678,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			defer cb.waitGroup.Done()
 			defer func() {
 				if want.want.GetStatus() == WantStatusReaching {
-					want.want.SetStatus(WantStatusCompleted)
+					want.want.SetStatus(WantStatusAchieved)
 				}
 			}()
 
@@ -1774,7 +1774,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					runtimeWant, exists := cb.wants[wantName]
 					cb.reconcileMutex.RUnlock()
 					if exists {
-						runtimeWant.want.SetStatus(WantStatusCompleted)
+						runtimeWant.want.SetStatus(WantStatusAchieved)
 					}
 
 					// Trigger reconciliation after want completes

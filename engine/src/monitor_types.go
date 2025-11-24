@@ -116,7 +116,7 @@ func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 			select {
 			case <-mw.Want.GetStopChannel(): // Stop monitoring if want is stopped
 				log.Printf("🛑 Monitor %s stopping continuous monitoring\n", mw.Want.Metadata.Name)
-				mw.Want.SetStatus(WantStatusCompleted) // Mark as completed when stopped
+				mw.Want.SetStatus(WantStatusAchieved) // Mark as completed when stopped
 				return
 			case <-ticker.C:
 				err := monitorAgent.Monitor(context.Background(), mw.Want)

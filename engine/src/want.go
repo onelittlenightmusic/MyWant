@@ -50,7 +50,7 @@ const (
 	WantStatusIdle       WantStatus = "idle"
 	WantStatusReaching   WantStatus = "reaching"
 	WantStatusSuspended  WantStatus = "suspended"
-	WantStatusCompleted  WantStatus = "completed"
+	WantStatusAchieved   WantStatus = "achieved"
 	WantStatusFailed     WantStatus = "failed"
 	WantStatusTerminated WantStatus = "terminated"
 )
@@ -900,7 +900,7 @@ func (n *Want) GetStopChannel() chan struct{} {
 
 // OnProcessEnd handles state storage when the want process ends
 func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
-	n.SetStatus(WantStatusCompleted)
+	n.SetStatus(WantStatusAchieved)
 
 	// Store final state
 	for key, value := range finalState {

@@ -54,7 +54,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
   const stats = {
     total: wants.length,
     running: wants.filter(w => w.status === 'reaching').length,
-    completed: wants.filter(w => w.status === 'completed').length,
+    completed: wants.filter(w => w.status === 'achieved').length,
     failed: wants.filter(w => w.status === 'failed').length,
   };
 
@@ -72,7 +72,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
       icon: <Play className="h-6 w-6 text-green-600" />
     },
     {
-      title: 'Completed',
+      title: 'Achieved',
       value: stats.completed,
       color: 'bg-green-100',
       icon: <CheckCircle className="h-6 w-6 text-green-600" />

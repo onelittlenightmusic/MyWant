@@ -295,7 +295,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       <StatusBadge status={want.status} />
                       <span className="text-sm text-gray-600">
                         {want.status === 'reaching' && 'Execution in progress...'}
-                        {want.status === 'completed' && 'Execution completed successfully'}
+                        {want.status === 'achieved' && 'Execution completed successfully'}
                         {want.status === 'failed' && 'Execution failed'}
                         {want.status === 'created' && 'Want created, ready to execute'}
                         {want.status === 'stopped' && 'Execution stopped'}
@@ -341,7 +341,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                         <dd className="text-gray-900">{formatDate(startedAt)}</dd>
                       </div>
                       <div>
-                        <dt className="text-gray-500">Completed:</dt>
+                        <dt className="text-gray-500">Achieved:</dt>
                         <dd className="text-gray-900">{formatDate(completedAt)}</dd>
                       </div>
                       {startedAt && (
@@ -537,7 +537,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       {want.status === 'reaching' && (
                         <div className="text-blue-400">[{new Date().toLocaleString()}] Processing... <span className="animate-pulse">●</span></div>
                       )}
-                      {want.status === 'completed' && (
+                      {want.status === 'achieved' && (
                         <div className="text-green-400">[{new Date().toLocaleString()}] Execution completed successfully</div>
                       )}
                       {want.status === 'failed' && (
@@ -718,7 +718,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                           return agentHistory.map((execution: any, index: number) => {
                           const getStatusIcon = (status: string) => {
                             switch (status) {
-                              case 'completed':
+                              case 'achieved':
                                 return <CheckCircle className="h-4 w-4 text-green-600" />;
                               case 'failed':
                                 return <XCircle className="h-4 w-4 text-red-600" />;
@@ -731,7 +731,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
                           const getStatusColor = (status: string) => {
                             switch (status) {
-                              case 'completed':
+                              case 'achieved':
                                 return 'bg-green-50 border-green-200';
                               case 'failed':
                                 return 'bg-red-50 border-red-200';
@@ -774,7 +774,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                                 <span className={classNames(
                                   'px-2 py-1 rounded-full text-xs font-medium',
                                   execution.status === 'reaching' && 'bg-blue-100 text-blue-800',
-                                  execution.status === 'completed' && 'bg-green-100 text-green-800',
+                                  execution.status === 'achieved' && 'bg-green-100 text-green-800',
                                   execution.status === 'failed' && 'bg-red-100 text-red-800',
                                   execution.status === 'terminated' && 'bg-gray-100 text-gray-800'
                                 )}>

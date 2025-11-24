@@ -42,7 +42,7 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
       return 'blue';
     case 'suspended':
       return 'yellow';
-    case 'completed':
+    case 'achieved':
       return 'green';
     case 'failed':
       return 'red';
@@ -64,7 +64,7 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '▶️';
     case 'suspended':
       return '⏸️';
-    case 'completed':
+    case 'achieved':
       return '✅';
     case 'failed':
       return '❌';
@@ -88,7 +88,7 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase):
       return React.createElement(Play, iconProps);
     case 'suspended':
       return React.createElement(Pause, iconProps);
-    case 'completed':
+    case 'achieved':
       return React.createElement(CheckCircle, iconProps);
     case 'failed':
       return React.createElement(AlertCircle, iconProps);

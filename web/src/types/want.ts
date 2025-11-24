@@ -67,9 +67,9 @@ export interface ConfigMetadata {
   labels?: Record<string, string>;
 }
 
-export type WantExecutionStatus = 'created' | 'reaching' | 'suspended' | 'completed' | 'failed' | 'stopped';
+export type WantExecutionStatus = 'created' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped';
 
-export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'completed' | 'failed' | 'stopped';
+export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'achieved' | 'failed' | 'stopped';
 
 export interface WantDetails extends Want {
   execution_status?: WantExecutionStatus;
@@ -131,6 +131,6 @@ export interface AgentExecution {
   agent_type: 'do' | 'monitor';
   start_time: string;
   end_time?: string;
-  status: 'reaching' | 'completed' | 'failed' | 'terminated';
+  status: 'reaching' | 'achieved' | 'failed' | 'terminated';
   error?: string;
 }

@@ -26,7 +26,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
 }) => {
   const isRunning = selectedWant?.status === 'reaching';
   const isSuspended = selectedWant?.status === 'suspended';
-  const isCompleted = selectedWant?.status === 'completed';
+  const isCompleted = selectedWant?.status === 'achieved';
   const isStopped = selectedWant?.status === 'stopped' || selectedWant?.status === 'created';
   const isFailed = selectedWant?.status === 'failed';
 
