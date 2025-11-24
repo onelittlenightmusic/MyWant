@@ -406,6 +406,9 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  // Get background style for want detail (using isParentWant = true since this is the main detail view)
+  const backgroundStyle = getBackgroundStyle(want.metadata?.type, true);
+
   const handleSaveLabel = async (oldKey: string) => {
     if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
 
@@ -486,6 +489,25 @@ const OverviewTab: React.FC<{ want: Want; onWantUpdate?: () => void }> = ({ want
   return (
     <div className="p-8">
       <div className="space-y-8">
+        {/* Header Section with Background Image */}
+        <div
+          className="relative overflow-hidden rounded-lg p-6"
+          style={backgroundStyle.style}
+        >
+          {/* Semi-transparent overlay */}
+          {backgroundStyle.hasBackgroundImage && (
+            <div className="absolute inset-0 bg-white bg-opacity-70 z-0"></div>
+          )}
+          {/* Header content */}
+          <div className={classNames('relative z-10', backgroundStyle.className)}>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{want.metadata?.name || 'N/A'}</h3>
+            <p className="text-sm text-gray-600">Type: {want.metadata?.type || 'N/A'}</p>
+            {want.metadata?.id && (
+              <p className="text-xs text-gray-500 font-mono mt-2 break-all">ID: {want.metadata.id}</p>
+            )}
+          </div>
+        </div>
+
         {/* Metadata Section */}
         <div className="bg-gray-50 rounded-lg p-6">
           <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
