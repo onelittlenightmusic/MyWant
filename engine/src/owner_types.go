@@ -278,6 +278,8 @@ func (t *Target) Exec() bool {
 			return false
 		}
 
+		// Mark that we've created children
+		t.StoreState("children_created", true)
 		return false // Not complete yet, waiting for children
 	}
 
@@ -500,6 +502,9 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
+	// Store additional metadata through encapsulated method
+	t.StoreState("recipePath", t.RecipePath)
+	t.StoreState("childCount", len(childWantsByName))
 
 	// Store result in a standardized format for memory dumps
 	if len(*recipeResult) > 0 {
@@ -905,6 +910,8 @@ func (t *Target) computeFallbackResultUnsafe() {
 
 	// Store result in target's state
 	t.StoreState("recipeResult", totalProcessed)
+	t.StoreState("recipePath", t.RecipePath)
+	t.StoreState("childCount", len(childWants))
 	InfoLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 
 	// Store result in a standardized format for memory dumps
