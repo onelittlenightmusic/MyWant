@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCard } from './WantCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { classNames } from '@/utils/helpers';
 
 interface WantWithChildren extends Want {
   children?: Want[];
@@ -197,27 +198,36 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   return (
     <div className="grid grid-cols-3 gap-6 items-start">
-      {filteredWants.map((want, index) => (
-        <div
-          key={want.metadata?.id || `want-${index}`}
-          data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-        >
-          <WantCard
-            want={want}
-            children={want.children}
-            selected={selectedWant?.metadata?.id === want.metadata?.id}
-            selectedWant={selectedWant}
-            onView={onViewWant}
-            onViewAgents={onViewAgentsWant}
-            onEdit={onEditWant}
-            onDelete={onDeleteWant}
-            onSuspend={onSuspendWant}
-            onResume={onResumeWant}
-            expandedParents={expandedParents}
-            onToggleExpand={onToggleExpand}
-          />
-        </div>
-      ))}
+      {filteredWants.map((want, index) => {
+        const wantId = want.metadata?.id || want.id;
+        const isExpanded = expandedParents?.has(wantId || '') ?? false;
+        const childCount = want.children?.length || 0;
+
+        return (
+          <div
+            key={wantId || `want-${index}`}
+            data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
+            className={classNames(
+              isExpanded ? 'col-span-3' : ''
+            )}
+          >
+            <WantCard
+              want={want}
+              children={want.children}
+              selected={selectedWant?.metadata?.id === want.metadata?.id}
+              selectedWant={selectedWant}
+              onView={onViewWant}
+              onViewAgents={onViewAgentsWant}
+              onEdit={onEditWant}
+              onDelete={onDeleteWant}
+              onSuspend={onSuspendWant}
+              onResume={onResumeWant}
+              expandedParents={expandedParents}
+              onToggleExpand={onToggleExpand}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 };

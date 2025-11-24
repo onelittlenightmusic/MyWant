@@ -193,7 +193,8 @@ export const WantCard: React.FC<WantCardProps> = ({
               Collapse
             </button>
           </div>
-          <div className="space-y-2">
+          {/* Grid layout for child wants - 3 columns, wraps to new rows */}
+          <div className="grid grid-cols-3 gap-3">
             {children!.sort((a, b) => {
               const idA = a.metadata?.id || a.id || '';
               const idB = b.metadata?.id || b.id || '';
