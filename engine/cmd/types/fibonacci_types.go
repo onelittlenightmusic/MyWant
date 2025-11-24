@@ -170,8 +170,39 @@ func (f *FibonacciSequence) Exec() bool {
 	return true
 }
 
+// FibonacciFilter is an alias for FibonacciSequence when used in recipes
+func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
+	// Reuse FibonacciSequence implementation but with "fibonacci filter" type
+	filter := &FibonacciSequence{
+		Want:     Want{},
+		MinValue: 0,
+		MaxValue: 1000000,
+		filtered: make([]int, 0),
+	}
+
+	// Initialize base Want fields
+	filter.Init(metadata, spec)
+
+	filter.MinValue = filter.GetIntParam("min_value", 0)
+	filter.MaxValue = filter.GetIntParam("max_value", 1000000)
+
+	// Set fields for base Want methods
+	filter.WantType = "fibonacci filter"
+	filter.ConnectivityMetadata = ConnectivityMetadata{
+		RequiredInputs:  1,
+		RequiredOutputs: 0,
+		MaxInputs:       1,
+		MaxOutputs:      0,
+		WantType:        "fibonacci filter",
+		Description:     "Fibonacci number filter (terminal)",
+	}
+
+	return filter
+}
+
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("fibonacci numbers", NewFibonacciNumbers)
 	builder.RegisterWantType("fibonacci sequence", NewFibonacciSequence)
+	builder.RegisterWantType("fibonacci filter", NewFibonacciFilter)
 }

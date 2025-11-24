@@ -26,9 +26,9 @@ recipe:
         params:
           count: count
 
-    # Fibonacci sequence - filters fibonacci numbers by range
+    # Fibonacci filter - filters fibonacci numbers by range
     - metadata:
-        type: fibonacci sequence
+        type: fibonacci filter
         labels:
           role: filter
           component: processor
@@ -41,13 +41,13 @@ recipe:
 
   # Recipe result definition - specifies how to compute fibonacci results
   result:
-    - want_name: "fibonacci sequence"
+    - want_name: "fibonacci filter"
       stat_name: ".total_processed"
       description: "Total numbers processed by fibonacci filter"
     - want_name: "fibonacci numbers"
       stat_name: ".total_processed"
       description: "Total fibonacci numbers generated"
-    - want_name: "fibonacci sequence"
+    - want_name: "fibonacci filter"
       stat_name: "."
       description: "All metrics from fibonacci sequence filter"
   # Example deployment - one-click deployment configuration

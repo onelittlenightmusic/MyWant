@@ -225,6 +225,20 @@ func (t *Target) CreateChildWants() []*Want {
 		return []*Want{}
 	}
 
+	// VALIDATION: Prevent want type name conflicts between parent and children
+	// This prevents infinite loops where a want type references a recipe that contains
+	// a want of the same type, which would cause recursive instantiation
+	parentType := t.Metadata.Type
+	for _, childWant := range config.Wants {
+		if childWant.Metadata.Type == parentType {
+			InfoLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
+				t.Metadata.Name, parentType, t.RecipePath)
+			InfoLog("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
+				childWant.Metadata.Type, parentType)
+			return []*Want{}
+		}
+	}
+
 	// Add owner references to all child wants
 	for i := range config.Wants {
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
