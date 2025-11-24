@@ -1291,18 +1291,6 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
         </div>
       )}
 
-      {/* Log History Section */}
-      {hasLogHistory && (
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
-          <div className="space-y-3">
-            {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
-              <LogHistoryItem key={index} logEntry={logEntry} index={want.history!.logHistory!.length - index - 1} />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* State History Section */}
       {want.history?.stateHistory && want.history.stateHistory.length > 0 && (
         <div className="bg-gray-50 rounded-lg p-6">
@@ -1310,6 +1298,18 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
           <div className="space-y-3">
             {want.history.stateHistory.slice().reverse().map((state, index) => (
               <StateHistoryItem key={index} state={state} index={want.history.stateHistory.length - index - 1} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Log History Section */}
+      {hasLogHistory && (
+        <div className="bg-gray-50 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
+          <div className="space-y-3">
+            {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
+              <LogHistoryItem key={index} logEntry={logEntry} index={want.history!.logHistory!.length - index - 1} />
             ))}
           </div>
         </div>
