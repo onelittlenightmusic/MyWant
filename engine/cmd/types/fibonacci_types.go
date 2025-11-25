@@ -126,8 +126,15 @@ func (f *FibonacciSequence) Exec() bool {
 	// Mark as completed in persistent state
 	f.StoreState("completed", true)
 
-	// Use local field to track filtered numbers
+	// Get persistent filtered slice or create new one using GetState only
+	filteredVal, exists := f.GetState("filtered")
 	f.filtered = make([]int, 0)
+	if exists {
+		if filt, ok := filteredVal.([]int); ok {
+			f.filtered = filt
+		}
+	}
+
 	totalProcessed := 0
 
 	// Process all input numbers and filter them
