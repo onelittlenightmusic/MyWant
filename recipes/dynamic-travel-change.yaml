@@ -77,19 +77,20 @@ recipe:
 
     # Travel coordinator that combines all schedules
     - metadata:
-        type: travel coordinator
+        type: coordinator
       spec:
         params:
           display_name: display_name
+          required_inputs: 4
         using:
           - role: scheduler
 
   # Recipe result definition - specifies how to compute travel planning results
   result:
-    - want_name: "travel coordinator"
+    - want_name: "coordinator"
       stat_name: ".finalResult"
       description: "Travel itinerary summary timeline"
-    - want_name: "travel coordinator"
+    - want_name: "coordinator"
       stat_name: ".total_processed"
       description: "Total travel bookings coordinated"
     - want_name: "flight"
