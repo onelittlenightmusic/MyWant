@@ -288,11 +288,14 @@ func (t *Target) Exec() bool {
 		t.childCompletionMutex.Unlock()
 
 		if allComplete {
-			// Compute and store recipe result
-			t.computeTemplateResult()
+			// Only compute result once - check if already completed
+			if t.Status != WantStatusAchieved {
+				// Compute and store recipe result
+				t.computeTemplateResult()
 
-			// Mark the target as completed
-			t.SetStatus(WantStatusAchieved)
+				// Mark the target as completed
+				t.SetStatus(WantStatusAchieved)
+			}
 			return true
 		}
 
