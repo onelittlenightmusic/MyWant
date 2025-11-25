@@ -808,36 +808,12 @@ func generateTravelTimeline(events []TimeSlot) string {
 
 // TravelCoordinatorWant orchestrates the entire travel itinerary
 // TravelCoordinatorWant now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
-
-// NewTravelCoordinatorWant creates a new Travel coordinator using generic pattern
-func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := NewCoordinatorWant(
-		metadata,
-		spec,
-		3, // Requires 3 inputs (restaurant, hotel, buffet schedules)
-		&TravelDataHandler{IsBuffet: false},
-		&TravelCompletionChecker{IsBuffet: false},
-		"travel coordinator",
-	)
-	return coordinator
-}
+// The type field in metadata determines the configuration automatically
 
 // BuffetCoordinatorWant is a minimal coordinator for standalone buffet deployment
 // It simply collects the buffet schedule from the BuffetWant and marks completion
 // Now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
-
-// NewBuffetCoordinatorWant creates a new Buffet coordinator using generic pattern
-func NewBuffetCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := NewCoordinatorWant(
-		metadata,
-		spec,
-		1, // Requires 1 input (buffet schedule)
-		&TravelDataHandler{IsBuffet: true},
-		&TravelCompletionChecker{IsBuffet: true},
-		"buffet coordinator",
-	)
-	return coordinator
-}
+// The type field in metadata determines the configuration automatically
 
 // RegisterTravelWantTypes registers all travel-related want types
 func RegisterTravelWantTypes(builder *ChainBuilder) {
@@ -845,8 +821,12 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-	builder.RegisterWantType("travel coordinator", NewTravelCoordinatorWant)
-	builder.RegisterWantType("buffet coordinator", NewBuffetCoordinatorWant)
+	// All coordinator types now use the unified "coordinator" type
+	// Configuration is determined by required_inputs parameter
+	builder.RegisterWantType("coordinator", NewCoordinatorWant)
+	// Backward compatibility aliases for legacy coordinator types
+	builder.RegisterWantType("travel coordinator", NewCoordinatorWant)
+	builder.RegisterWantType("buffet coordinator", NewCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
@@ -875,11 +855,6 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 		return buffet
 	})
 
-	builder.RegisterWantType("travel_coordinator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewTravelCoordinatorWant(metadata, spec)
-	})
-
-	builder.RegisterWantType("buffet coordinator", func(metadata Metadata, spec WantSpec) interface{} {
-		return NewBuffetCoordinatorWant(metadata, spec)
-	})
+	builder.RegisterWantType("travel_coordinator", NewCoordinatorWant)
+	builder.RegisterWantType("buffet coordinator", NewCoordinatorWant)
 }

@@ -323,37 +323,16 @@ func (l *Level1CoordinatorWant) Exec() bool {
 
 // Level1CoordinatorWant and Level2CoordinatorWant now use the generic CoordinatorWant
 // with ApprovalDataHandler and ApprovalCompletionChecker
-
-// NewLevel1CoordinatorWant creates a new Level 1 approval coordinator using generic pattern
-func NewLevel1CoordinatorWantRefactored(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := NewCoordinatorWant(
-		metadata,
-		spec,
-		2, // Requires 2 inputs (evidence + description)
-		&ApprovalDataHandler{Level: 1},
-		&ApprovalCompletionChecker{Level: 1},
-		"level1_coordinator",
-	)
-	return coordinator
-}
-
-// NewLevel2CoordinatorWant creates a new Level 2 approval coordinator using generic pattern
-func NewLevel2CoordinatorWantRefactored(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := NewCoordinatorWant(
-		metadata,
-		spec,
-		2, // Requires 2 inputs (evidence + description)
-		&ApprovalDataHandler{Level: 2},
-		&ApprovalCompletionChecker{Level: 2},
-		"level2_coordinator",
-	)
-	return coordinator
-}
+// The type field in metadata determines the configuration automatically
 
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("evidence", NewEvidenceWant)
 	builder.RegisterWantType("description", NewDescriptionWant)
-	builder.RegisterWantType("level1_coordinator", NewLevel1CoordinatorWantRefactored)
-	builder.RegisterWantType("level2_coordinator", NewLevel2CoordinatorWantRefactored)
+	// All coordinator types now use the unified "coordinator" type
+	// Configuration is determined by required_inputs parameter and coordinator_level in params
+	builder.RegisterWantType("coordinator", NewCoordinatorWant)
+	// Backward compatibility aliases for legacy coordinator types
+	builder.RegisterWantType("level1_coordinator", NewCoordinatorWant)
+	builder.RegisterWantType("level2_coordinator", NewCoordinatorWant)
 }

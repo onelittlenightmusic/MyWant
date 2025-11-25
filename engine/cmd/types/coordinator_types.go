@@ -36,24 +36,26 @@ type CoordinatorWant struct {
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
+// It automatically determines the required inputs and handlers based on the want type
 func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
-	requiredInputs int,
-	dataHandler DataHandler,
-	completionChecker CompletionChecker,
-	coordinatorType string,
 ) interface{} {
 	coordinator := &CoordinatorWant{
-		Want:               Want{},
-		RequiredInputCount: requiredInputs,
-		DataHandler:        dataHandler,
-		CompletionChecker:  completionChecker,
-		CoordinatorType:    coordinatorType,
+		Want: Want{},
 	}
 
 	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
+
+	// Determine coordinator configuration based on want type
+	coordinatorType := metadata.Type
+	requiredInputs, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, &coordinator.Want)
+
+	coordinator.RequiredInputCount = requiredInputs
+	coordinator.DataHandler = dataHandler
+	coordinator.CompletionChecker = completionChecker
+	coordinator.CoordinatorType = coordinatorType
 
 	// Set fields for base Want methods
 	coordinator.WantType = coordinatorType
@@ -67,6 +69,96 @@ func NewCoordinatorWant(
 	}
 
 	return coordinator
+}
+
+// getCoordinatorConfig returns the configuration for a coordinator based on its type and parameters
+// It determines the data handler and completion checker based on:
+// 1. The want type from metadata
+// 2. Coordinator-specific parameters (coordinator_level, coordinator_type, is_buffet, required_inputs)
+// This enables full customization of coordinator behavior through parameters
+func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {
+	// Get parameters from want specs
+	requiredInputsParam := want.GetIntParam("required_inputs", -1)
+	coordinatorLevel := want.GetIntParam("coordinator_level", -1)
+	isBuffetParam := want.GetBoolParam("is_buffet", false)
+	coordinatorTypeParam := want.GetStringParam("coordinator_type", "")
+
+	// Determine handler based on coordinator type and parameters
+	// Priority: explicit params > type-specific defaults > generic fallback
+
+	switch coordinatorType {
+	case "coordinator":
+		// Universal coordinator: behavior determined by parameters
+
+		// Check if this is an approval coordinator (by explicit type param or level)
+		if coordinatorTypeParam == "approval" || coordinatorLevel > 0 {
+			level := 1
+			if coordinatorLevel > 0 {
+				level = coordinatorLevel
+			}
+			return 2,
+				&ApprovalDataHandler{Level: level},
+				&ApprovalCompletionChecker{Level: level}
+		}
+
+		// Check if this is a travel/buffet coordinator
+		requiredInputs := requiredInputsParam
+		if requiredInputs <= 0 {
+			// Default based on is_buffet parameter
+			if isBuffetParam {
+				requiredInputs = 1
+			} else {
+				requiredInputs = 3
+			}
+		}
+		return requiredInputs,
+			&TravelDataHandler{IsBuffet: isBuffetParam},
+			&TravelCompletionChecker{IsBuffet: isBuffetParam}
+
+	// Backward compatibility with specific coordinator type names
+	case "level1_coordinator", "level2_coordinator":
+		// Approval coordinators: 2 inputs (evidence + description)
+		level := 1
+		if coordinatorType == "level2_coordinator" {
+			level = 2
+		}
+		if coordinatorLevel > 0 {
+			level = coordinatorLevel
+		}
+		return 2,
+			&ApprovalDataHandler{Level: level},
+			&ApprovalCompletionChecker{Level: level}
+
+	case "travel coordinator":
+		// Travel coordinator: 3 inputs (restaurant, hotel, buffet)
+		requiredInputs := 3
+		if requiredInputsParam > 0 {
+			requiredInputs = requiredInputsParam
+		}
+		return requiredInputs,
+			&TravelDataHandler{IsBuffet: false},
+			&TravelCompletionChecker{IsBuffet: false}
+
+	case "buffet coordinator":
+		// Buffet coordinator: 1 input (buffet schedule)
+		requiredInputs := 1
+		if requiredInputsParam > 0 {
+			requiredInputs = requiredInputsParam
+		}
+		return requiredInputs,
+			&TravelDataHandler{IsBuffet: true},
+			&TravelCompletionChecker{IsBuffet: true}
+
+	default:
+		// Generic fallback: determine based on parameters
+		requiredInputs := 1
+		if requiredInputsParam > 0 {
+			requiredInputs = requiredInputsParam
+		}
+		return requiredInputs,
+			&TravelDataHandler{IsBuffet: isBuffetParam},
+			&TravelCompletionChecker{IsBuffet: isBuffetParam}
+	}
 }
 
 // GetWant returns the base Want struct
