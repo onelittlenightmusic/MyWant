@@ -146,10 +146,12 @@ func (f *FibonacciSequence) Exec() bool {
 		close(f.paths.Out[i].Channel)
 	}
 
-	// Store final state - count and total_processed
+	// Store final state - persist filtered slice and counts
+	f.State["filtered"] = f.filtered
 	f.StoreStateMulti(map[string]interface{}{
-		"count":            len(f.filtered),
-		"total_processed":  totalProcessed,
+		"filtered":        f.filtered,
+		"count":           len(f.filtered),
+		"total_processed": totalProcessed,
 	})
 
 
