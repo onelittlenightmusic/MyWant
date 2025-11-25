@@ -39,6 +39,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for label being edited
   const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for dependency being edited
+  const [sampleConfigLoaded, setSampleConfigLoaded] = useState(false); // Track if a sample config was loaded
 
   // Form state
   const [name, setName] = useState('');
@@ -55,23 +56,29 @@ export const WantForm: React.FC<WantFormProps> = ({
   const generateSampleConfigs = () => {
     return recipes
       .filter(r => r.recipe?.example?.wants && r.recipe.example.wants.length > 0)
-      .map(r => ({
-        name: r.recipe.metadata.name || 'Unnamed Recipe',
-        description: r.recipe.metadata.description || '',
-        config: {
-          metadata: {
-            name: `${r.recipe.metadata.custom_type}-example` || 'recipe-example',
-            type: r.recipe.metadata.custom_type || 'recipe',
-            labels: {
-              recipe: r.recipe.metadata.name || 'recipe'
+      .map(r => {
+        // Use example parameters if available, otherwise use recipe parameters
+        const exampleWant = r.recipe.example.wants[0];
+        const exampleParams = exampleWant?.spec?.params || r.recipe.parameters || {};
+
+        return {
+          name: r.recipe.metadata.name || 'Unnamed Recipe',
+          description: r.recipe.metadata.description || '',
+          config: {
+            metadata: {
+              name: `${r.recipe.metadata.custom_type}-example` || 'recipe-example',
+              type: r.recipe.metadata.custom_type || 'recipe',
+              labels: {
+                recipe: r.recipe.metadata.name || 'recipe'
+              }
+            },
+            spec: {
+              recipe: `recipes/${r.recipe.metadata.custom_type?.replace(/\s+/g, '-')}.yaml`,
+              params: exampleParams
             }
-          },
-          spec: {
-            recipe: `recipes/${r.recipe.metadata.custom_type?.replace(/\s+/g, '-')}.yaml`,
-            params: r.recipe.parameters || {}
           }
-        }
-      }));
+        };
+      });
   };
 
   const sampleConfigs = generateSampleConfigs();
@@ -148,6 +155,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams({});
     setUsing([]);
     setRecipe('');
+    setSampleConfigLoaded(false); // Clear sample config flag on reset
     setYamlContent(stringifyYaml({
       metadata: { name: '', type: '' },
       spec: {}
@@ -185,6 +193,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       setUsing((config.spec as any).using || []);
       setRecipe(config.spec.recipe || '');
     }
+    setSampleConfigLoaded(true); // Mark that sample config was loaded
     setYamlContent(stringifyYaml(config));
   };
 
@@ -200,6 +209,11 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // Populate parameters from want type examples when selectedWantType changes
   useEffect(() => {
+    // Skip if a sample config was loaded (it has its own parameters)
+    if (sampleConfigLoaded) {
+      return;
+    }
+
     if (selectedWantType && !isEditing && type === selectedWantType.metadata.name) {
       // Get the first example if available, use parameter examples otherwise
       if (selectedWantType.examples && selectedWantType.examples.length > 0) {
@@ -220,7 +234,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         setParams({});
       }
     }
-  }, [selectedWantType, isEditing, type]);
+  }, [selectedWantType, isEditing, type, sampleConfigLoaded]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
