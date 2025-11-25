@@ -42,12 +42,6 @@ recipe:
   # Recipe result definition - specifies how to compute fibonacci results
   result:
     - want_name: "fibonacci filter"
-      stat_name: ".total_processed"
-      description: "Total numbers processed by fibonacci filter"
-    - want_name: "fibonacci numbers"
-      stat_name: ".total_processed"
-      description: "Total fibonacci numbers generated"
-    - want_name: "fibonacci filter"
       stat_name: ".filtered"
       description: "Filtered fibonacci numbers in range"
     - want_name: "fibonacci filter"

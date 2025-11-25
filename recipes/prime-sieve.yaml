@@ -36,12 +36,6 @@ recipe:
   # Recipe result definition - specifies how to compute prime sieve results
   result:
     - want_name: "prime sequence"
-      stat_name: ".total_processed"
-      description: "Total numbers processed by prime filter"
-    - want_name: "prime numbers"
-      stat_name: ".total_processed"
-      description: "Total numbers generated"
-    - want_name: "prime sequence"
       stat_name: ".foundPrimes"
       description: "List of prime numbers found"
     - want_name: "prime sequence"
