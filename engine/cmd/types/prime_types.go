@@ -126,14 +126,27 @@ func (f *PrimeSequence) Exec() bool {
 		out, _ = f.GetOutputChannel(0)
 	}
 
-	// Get persistent foundPrimes slice or create new one
-	foundPrimes, _ := f.State["foundPrimes"].([]int)
-	if foundPrimes == nil {
-		foundPrimes = make([]int, 0)
+	// Get persistent foundPrimes slice or create new one using GetState only
+	foundPrimesVal, exists := f.GetState("foundPrimes")
+	foundPrimes := make([]int, 0)
+	if exists {
+		if fp, ok := foundPrimesVal.([]int); ok {
+			foundPrimes = fp
+		}
+	}
+
+	// Get current total_processed count
+	totalProcessedVal, _ := f.GetState("total_processed")
+	totalProcessed := 0
+	if totalProcessedVal != nil {
+		if tp, ok := totalProcessedVal.(int); ok {
+			totalProcessed = tp
+		}
 	}
 
 	for i := range in {
 		if val, ok := i.(int); ok {
+			totalProcessed++
 			isPrime := true
 
 			// Special cases: 1 is not prime, 2 is prime
@@ -157,7 +170,6 @@ func (f *PrimeSequence) Exec() bool {
 			// If it's prime, add to memoized primes and pass through
 			if isPrime {
 				foundPrimes = append(foundPrimes, val)
-				f.State["foundPrimes"] = foundPrimes
 				if out != nil {
 					out <- val
 				}
@@ -169,18 +181,9 @@ func (f *PrimeSequence) Exec() bool {
 				})
 			}
 
-			if f.State == nil {
-				f.State = make(map[string]interface{})
-			}
-			if val, exists := f.State["total_processed"]; exists {
-				f.State["total_processed"] = val.(int) + 1
-			} else {
-				f.State["total_processed"] = 1
-			}
-
 			// Update live state for each processed number
 			f.StoreStateMulti(map[string]interface{}{
-				"total_processed":       f.State["total_processed"],
+				"total_processed":       totalProcessed,
 				"last_number_processed": val,
 			})
 		}
@@ -189,11 +192,11 @@ func (f *PrimeSequence) Exec() bool {
 		close(out)
 	}
 
-	// Store found primes in state for collection
-	f.State["foundPrimes"] = foundPrimes
+	// Store found primes in state for collection using StoreState only
 	f.StoreStateMulti(map[string]interface{}{
-		"foundPrimes": foundPrimes,
-		"primeCount":  len(foundPrimes),
+		"foundPrimes":    foundPrimes,
+		"primeCount":     len(foundPrimes),
+		"total_processed": totalProcessed,
 	})
 
 	return true
