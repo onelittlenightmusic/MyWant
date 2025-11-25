@@ -10,6 +10,7 @@ import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
+import { useRecipeStore } from '@/stores/recipeStore';
 import { ApiError } from '@/types/api';
 
 interface WantFormProps {
@@ -17,133 +18,6 @@ interface WantFormProps {
   onClose: () => void;
   editingWant?: Want | null;
 }
-
-// Sample configurations based on existing config files
-const SAMPLE_CONFIGS = [
-  {
-    name: 'Queue System',
-    description: 'Queue-based processing pipeline with generators, queues, and sinks',
-    config: {
-      metadata: {
-        name: 'qnet-pipeline',
-        type: 'wait time in queue system',
-        labels: {
-          role: 'qnet-target'
-        }
-      },
-      spec: {
-        recipe: 'recipes/qnet-pipeline.yaml',
-        params: {
-          prefix: 'qnet',
-          primary_count: 1000,
-          secondary_count: 800,
-          primary_rate: 2.5,
-          secondary_rate: 3.5,
-          primary_service_time: 0.08,
-          secondary_service_time: 0.10,
-          final_service_time: 0.04
-        }
-      }
-    }
-  },
-  {
-    name: 'Fibonacci Sequence',
-    description: 'Mathematical sequence generator with configurable parameters',
-    config: {
-      metadata: {
-        name: 'fibonacci-sequence',
-        type: 'fibonacci sequence',
-        labels: {
-          category: 'fibonacci'
-        }
-      },
-      spec: {
-        recipe: 'recipes/fibonacci-sequence.yaml',
-        params: {
-          count: 15,
-          min_value: 1,
-          max_value: 100
-        }
-      }
-    }
-  },
-  {
-    name: 'Travel Planner',
-    description: 'Travel itinerary planning with hotels, restaurants, and coordination using agents',
-    config: {
-      metadata: {
-        name: 'travel-planner',
-        type: 'agent travel system',
-        labels: {
-          role: 'travel-planner'
-        }
-      },
-      spec: {
-        recipe: 'Travel Agent System',
-        params: {
-          prefix: 'vacation',
-          display_name: 'One Day Travel Itinerary',
-          restaurant_type: 'fine dining',
-          hotel_type: 'luxury',
-          buffet_type: 'international',
-          dinner_duration: 2.0
-        }
-      }
-    }
-  },
-  {
-    name: 'Hierarchical Approval',
-    description: 'Level 1 approval workflow',
-    config: {
-      metadata: {
-        name: 'level1_approval',
-        type: 'level 1 approval',
-        labels: {
-          role: 'approval-target',
-          approval_level: '1'
-        }
-      },
-      spec: {
-        params: {
-          approval_id: 'approval-001',
-          coordinator_type: 'level1',
-          level2_authority: 'senior_manager'
-        }
-      }
-    }
-  },
-  {
-    name: 'Dynamic Travel Change',
-    description: 'Dynamic travel itinerary with flight booking and schedule changes',
-    config: {
-      wants: [
-        {
-          metadata: {
-            name: 'dynamic-travel-planner',
-            type: 'dynamic travel change',
-            labels: {
-              role: 'dynamic-travel-planner'
-            }
-          },
-          spec: {
-            recipe: 'recipes/dynamic-travel-change.yaml',
-            params: {
-              prefix: 'dynamic-travel',
-              display_name: 'Dynamic Travel Itinerary with Flight',
-              flight_type: 'business class',
-              departure_date: '2026-12-20',
-              flight_duration: 12.0,
-              restaurant_type: 'fine dining',
-              hotel_type: 'luxury',
-              buffet_type: 'international',
-              dinner_duration: 2.0
-            }
-          }
-        }
-      ]
-    }
-  }
-];
 
 
 export const WantForm: React.FC<WantFormProps> = ({
@@ -153,6 +27,7 @@ export const WantForm: React.FC<WantFormProps> = ({
 }) => {
   const { createWant, updateWant, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
+  const { recipes, fetchRecipes } = useRecipeStore();
 
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
@@ -176,12 +51,42 @@ export const WantForm: React.FC<WantFormProps> = ({
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
 
-  // Fetch want types on component mount
+  // Generate sample configs from recipes that have examples
+  const generateSampleConfigs = () => {
+    return recipes
+      .filter(r => r.recipe?.example?.wants && r.recipe.example.wants.length > 0)
+      .map(r => ({
+        name: r.recipe.metadata.name || 'Unnamed Recipe',
+        description: r.recipe.metadata.description || '',
+        config: {
+          metadata: {
+            name: `${r.recipe.metadata.custom_type}-example` || 'recipe-example',
+            type: r.recipe.metadata.custom_type || 'recipe',
+            labels: {
+              recipe: r.recipe.metadata.name || 'recipe'
+            }
+          },
+          spec: {
+            recipe: `recipes/${r.recipe.metadata.custom_type?.replace(/\s+/g, '-')}.yaml`,
+            params: r.recipe.parameters || {}
+          }
+        }
+      }));
+  };
+
+  const sampleConfigs = generateSampleConfigs();
+
+  // Fetch want types and recipes on component mount
   useEffect(() => {
-    if (isOpen && wantTypes.length === 0) {
-      fetchWantTypes();
+    if (isOpen) {
+      if (wantTypes.length === 0) {
+        fetchWantTypes();
+      }
+      if (recipes.length === 0) {
+        fetchRecipes();
+      }
     }
-  }, [isOpen, wantTypes.length, fetchWantTypes]);
+  }, [isOpen, wantTypes.length, recipes.length, fetchWantTypes, fetchRecipes]);
 
   // Convert form data to want object
   const formToWantObject = () => ({
@@ -251,7 +156,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setApiError(null);
   };
 
-  const loadSampleConfig = (sample: typeof SAMPLE_CONFIGS[0]) => {
+  const loadSampleConfig = (sample: typeof sampleConfigs[0]) => {
     const config = sample.config;
 
     // Reset form state first to clear any previous values
@@ -479,14 +384,14 @@ export const WantForm: React.FC<WantFormProps> = ({
               onChange={(e) => {
                 const index = parseInt(e.target.value);
                 if (!isNaN(index)) {
-                  loadSampleConfig(SAMPLE_CONFIGS[index]);
+                  loadSampleConfig(sampleConfigs[index]);
                 }
               }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               defaultValue=""
             >
               <option value="" disabled>Select a sample configuration...</option>
-              {SAMPLE_CONFIGS.map((sample, index) => (
+              {sampleConfigs.map((sample, index) => (
                 <option key={index} value={index}>
                   {sample.name} - {sample.description}
                 </option>
