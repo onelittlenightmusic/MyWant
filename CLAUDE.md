@@ -1200,3 +1200,4 @@ git update-index --no-assume-unchanged codebase_rag.db
 
 **Note:** Not recommended. Keep RAG in sync for best search results.
 - Dependencies (using) label key also supports autocompletion but tab selection and entering is not working.
+- level1_coordinator やtravel coordinatorはほぼ同じ処理をしているはずなので、共通的なCoordinatorというWantに集約したいです。
