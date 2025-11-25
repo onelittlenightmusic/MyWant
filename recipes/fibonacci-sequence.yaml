@@ -48,8 +48,11 @@ recipe:
       stat_name: ".total_processed"
       description: "Total fibonacci numbers generated"
     - want_name: "fibonacci filter"
-      stat_name: "."
-      description: "All metrics from fibonacci sequence filter"
+      stat_name: ".filtered"
+      description: "Filtered fibonacci numbers in range"
+    - want_name: "fibonacci filter"
+      stat_name: ".count"
+      description: "Count of filtered fibonacci numbers"
   # Example deployment - one-click deployment configuration
   example:
     wants:

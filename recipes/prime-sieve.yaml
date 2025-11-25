@@ -42,8 +42,11 @@ recipe:
       stat_name: ".total_processed"
       description: "Total numbers generated"
     - want_name: "prime sequence"
-      stat_name: "."
-      description: "All metrics from prime sequence filter"
+      stat_name: ".foundPrimes"
+      description: "List of prime numbers found"
+    - want_name: "prime sequence"
+      stat_name: ".primeCount"
+      description: "Count of prime numbers found"
   # Example deployment - one-click deployment configuration
   example:
     wants:
