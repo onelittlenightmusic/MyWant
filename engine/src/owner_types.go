@@ -37,6 +37,8 @@ type Target struct {
 	recipeLoader           *GenericRecipeLoader // Reference to generic recipe loader
 	stateMutex             sync.RWMutex         // Mutex to protect concurrent state updates
 	childrenDone           chan bool            // Signal when all children complete
+	childrenCreated        bool                 // Track if child wants have been created
+	childCount             int                  // Count of child wants
 }
 
 // NewTarget creates a new target want
@@ -264,12 +266,8 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Exec implements the ChainWant interface for Target with direct execution
 func (t *Target) Exec() bool {
-	// Check if children have already been created
-	childrenCreatedVal, _ := t.GetState("children_created")
-	childrenCreated, _ := childrenCreatedVal.(bool)
-
 	// Phase 1: Create child wants (only once)
-	if !childrenCreated && t.builder != nil {
+	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 
 		// Send child wants to reconcile loop asynchronously
@@ -279,12 +277,12 @@ func (t *Target) Exec() bool {
 		}
 
 		// Mark that we've created children
-		t.StoreState("children_created", true)
+		t.childrenCreated = true
 		return false // Not complete yet, waiting for children
 	}
 
 	// Phase 2: Check if all children have completed
-	if childrenCreated {
+	if t.childrenCreated {
 		t.childCompletionMutex.Lock()
 		allComplete := t.checkAllChildrenComplete()
 		t.childCompletionMutex.Unlock()
@@ -502,9 +500,8 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	// Store additional metadata through encapsulated method
-	t.StoreState("recipePath", t.RecipePath)
-	t.StoreState("childCount", len(childWantsByName))
+	// Store child count in local field
+	t.childCount = len(childWantsByName)
 
 	// Store result in a standardized format for memory dumps
 	if len(*recipeResult) > 0 {
@@ -910,8 +907,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 
 	// Store result in target's state
 	t.StoreState("recipeResult", totalProcessed)
-	t.StoreState("recipePath", t.RecipePath)
-	t.StoreState("childCount", len(childWants))
+	t.childCount = len(childWants)
 	InfoLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 
 	// Store result in a standardized format for memory dumps
