@@ -807,189 +807,36 @@ func generateTravelTimeline(events []TimeSlot) string {
 }
 
 // TravelCoordinatorWant orchestrates the entire travel itinerary
-type TravelCoordinatorWant struct {
-	Want
-	Template string
-}
+// TravelCoordinatorWant now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
 
+// NewTravelCoordinatorWant creates a new Travel coordinator using generic pattern
 func NewTravelCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := &TravelCoordinatorWant{
-		Want:     Want{},
-		Template: "travel itinerary",
-	}
-
-	// Initialize base Want fields
-	coordinator.Init(metadata, spec)
-
-	coordinator.Template = coordinator.GetStringParam("template", "travel itinerary")
-
-	// Set fields for base Want methods
-	coordinator.WantType = "travel coordinator"
-	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  3,
-		RequiredOutputs: 0,
-		MaxInputs:       3,
-		MaxOutputs:      0,
-		WantType:        "travel coordinator",
-		Description:     "Travel itinerary coordinator want",
-	}
-
+	coordinator := NewCoordinatorWant(
+		metadata,
+		spec,
+		3, // Requires 3 inputs (restaurant, hotel, buffet schedules)
+		&TravelDataHandler{IsBuffet: false},
+		&TravelCompletionChecker{IsBuffet: false},
+		"travel coordinator",
+	)
 	return coordinator
-}
-
-func (t *TravelCoordinatorWant) GetWant() *Want {
-	return &t.Want
-}
-
-func (t *TravelCoordinatorWant) Exec() bool {
-	// Ensure all input channels are available
-	inCount := t.GetInCount()
-
-	// If no channels are connected, this might be for independent child wants
-	// that don't feed back through channels. Mark as completed.
-	if inCount == 0 {
-		return true
-	}
-
-	if inCount < 3 {
-		// If not all inputs are connected yet, return false to retry later
-		return false
-	}
-
-	// All inputs are now connected
-
-	// Use persistent state to track schedules
-	schedulesVal, _ := t.GetState("schedules")
-	schedules, _ := schedulesVal.([]*TravelSchedule)
-	if schedules == nil {
-		schedules = make([]*TravelSchedule, 0)
-	}
-
-	// Collect all available schedules from child wants in this cycle
-	// Use a non-blocking read to avoid deadlocks if a channel is empty
-	for i := 0; i < t.GetInCount(); i++ {
-		in, connectionAvailable := t.GetInputChannel(i)
-		if !connectionAvailable {
-			continue
-		}
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				schedules = append(schedules, schedule)
-			}
-		default:
-			// No data on this channel in this cycle, continue to next channel
-		}
-	}
-
-	// Update persistent state with collected schedules
-	// Use StoreStateMulti for batching
-	t.StoreStateMulti(map[string]interface{}{
-		"schedules": schedules,
-		"total_processed": len(schedules), // Track how many schedules have been collected
-	})
-
-	// When we have all schedules, create final itinerary
-	if len(schedules) >= t.GetInCount() { // Check if all expected schedules are collected
-
-		// Combine and sort all events
-		allEvents := make([]TimeSlot, 0)
-		for _, schedule := range schedules {
-			allEvents = append(allEvents, schedule.Events...)
-		}
-
-		// Sort events by start time
-		// (Sorting logic remains the same)
-		for i := 0; i < len(allEvents)-1; i++ {
-			for j := i + 1; j < len(allEvents); j++ {
-				if allEvents[i].Start.After(allEvents[j].Start) {
-					allEvents[i], allEvents[j] = allEvents[j], allEvents[i]
-				}
-			}
-		}
-
-		// Generate readable timeline format
-		timeline := generateTravelTimeline(allEvents)
-
-		// Batch final coordinator state update
-		t.StoreStateMulti(map[string]interface{}{
-			"schedules":       schedules, // Store final schedules
-			"total_processed": len(allEvents),
-			"final_itinerary": allEvents, // Store the combined and sorted itinerary
-			"finalResult":     timeline,   // Store readable timeline
-		})
-		return true // All schedules collected and processed, coordinator is complete
-	}
-
-	// Continue waiting for more schedules (no logging needed - would spam on every cycle)
-	return false
 }
 
 // BuffetCoordinatorWant is a minimal coordinator for standalone buffet deployment
 // It simply collects the buffet schedule from the BuffetWant and marks completion
-type BuffetCoordinatorWant struct {
-	Want
-	Description string
-}
+// Now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
 
+// NewBuffetCoordinatorWant creates a new Buffet coordinator using generic pattern
 func NewBuffetCoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := &BuffetCoordinatorWant{
-		Want:        Want{},
-		Description: "Buffet coordinator",
-	}
-
-	// Initialize base Want fields
-	coordinator.Init(metadata, spec)
-
-	coordinator.Description = coordinator.GetStringParam("description", "Buffet coordinator")
-
-	// Set fields for base Want methods
-	coordinator.WantType = "buffet coordinator"
-	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  1,              // Expect buffet schedule input
-		RequiredOutputs: 0,              // No output, just collects data
-		MaxInputs:       1,
-		MaxOutputs:      0,
-		WantType:        "buffet coordinator",
-		Description:     "Buffet schedule coordinator want",
-	}
-
+	coordinator := NewCoordinatorWant(
+		metadata,
+		spec,
+		1, // Requires 1 input (buffet schedule)
+		&TravelDataHandler{IsBuffet: true},
+		&TravelCompletionChecker{IsBuffet: true},
+		"buffet coordinator",
+	)
 	return coordinator
-}
-
-func (b *BuffetCoordinatorWant) GetWant() *Want {
-	return &b.Want
-}
-
-func (b *BuffetCoordinatorWant) Exec() bool {
-	// Check if input channel is available
-	if b.GetInCount() < 1 {
-		// Input not connected yet, wait
-		return false
-	}
-
-	// Try to read buffet schedule from input
-	in, connectionAvailable := b.GetInputChannel(0)
-	if !connectionAvailable {
-		return false
-	}
-
-	// Use non-blocking read to collect schedule if available
-	select {
-	case schedData := <-in:
-		if schedule, ok := schedData.(*TravelSchedule); ok {
-			// Store the buffet schedule in state
-			b.StoreState("buffet_schedule", schedule)
-
-			// Mark completion
-			return true
-		}
-	default:
-		// No schedule available yet, try again later
-		return false
-	}
-
-	return false
 }
 
 // RegisterTravelWantTypes registers all travel-related want types

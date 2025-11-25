@@ -321,156 +321,39 @@ func (l *Level1CoordinatorWant) Exec() bool {
 	return false // Continue waiting for inputs
 }
 
-// Level2CoordinatorWant handles Level 2 approval coordination
-type Level2CoordinatorWant struct {
-	Want
-	ApprovalID      string
-	CoordinatorType string
-	Level2Authority string
-	paths           Paths
-}
+// Level1CoordinatorWant and Level2CoordinatorWant now use the generic CoordinatorWant
+// with ApprovalDataHandler and ApprovalCompletionChecker
 
-func NewLevel2CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
-	coordinator := &Level2CoordinatorWant{
-		Want:            Want{},
-		CoordinatorType: "level2",
-		Level2Authority: "senior_manager",
-	}
-
-	// Initialize base Want fields
-	coordinator.Init(metadata, spec)
-
-	coordinator.ApprovalID = coordinator.GetStringParam("approval_id", "")
-
-	coordinator.CoordinatorType = coordinator.GetStringParam("coordinator_type", "level2")
-
-	coordinator.Level2Authority = coordinator.GetStringParam("level2_authority", "senior_manager")
-
-	// Set fields for base Want methods
-	coordinator.WantType = "level2_coordinator"
-	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  2,
-		RequiredOutputs: 0,
-		MaxInputs:       2,
-		MaxOutputs:      1,
-		WantType:        "level2_coordinator",
-		Description:     "Level 2 approval coordinator",
-	}
-
+// NewLevel1CoordinatorWant creates a new Level 1 approval coordinator using generic pattern
+func NewLevel1CoordinatorWantRefactored(metadata Metadata, spec WantSpec) interface{} {
+	coordinator := NewCoordinatorWant(
+		metadata,
+		spec,
+		2, // Requires 2 inputs (evidence + description)
+		&ApprovalDataHandler{Level: 1},
+		&ApprovalCompletionChecker{Level: 1},
+		"level1_coordinator",
+	)
 	return coordinator
 }
 
-func (l *Level2CoordinatorWant) GetWant() interface{} {
-	return &l.Want
-}
-
-func (l *Level2CoordinatorWant) Exec() bool {
-	// Check if final approval already processed
-	processed, _ := l.GetStateBool("final_approval_processed", false)
-
-	if processed {
-		return true
-	}
-
-	inCount := l.paths.GetInCount()
-
-	// If no channels are connected, mark as completed
-	if inCount == 0 {
-		return true
-	}
-
-	if inCount < 2 {
-		return false // Wait for evidence and description
-	}
-
-	// Collect evidence and description
-	evidenceReceived := false
-	descriptionReceived := false
-	var evidenceTimestamp time.Time
-	var descriptionTimestamp time.Time
-
-	for i := 0; i < l.GetInCount(); i++ {
-		in, inChannelAvailable := l.GetInputChannel(i)
-		if !inChannelAvailable {
-			continue
-		}
-		select {
-		case data := <-in:
-			if approvalData, ok := data.(*ApprovalData); ok {
-				if approvalData.Evidence != nil {
-					evidenceReceived = true
-					evidenceTimestamp = approvalData.Timestamp
-					l.StoreStateMulti(map[string]interface{}{
-						"evidence_received":    true,
-						"evidence_type":        approvalData.Evidence,
-						"evidence_provided":    true,
-						"evidence_provided_at": approvalData.Timestamp.Format(time.RFC3339),
-					})
-				}
-				if approvalData.Description != "" {
-					descriptionReceived = true
-					descriptionTimestamp = approvalData.Timestamp
-					l.StoreStateMulti(map[string]interface{}{
-						"description_received":    true,
-						"description_text":        approvalData.Description,
-						"description_provided":    true,
-						"description_provided_at": approvalData.Timestamp.Format(time.RFC3339),
-					})
-				}
-			}
-		default:
-			// No more data
-		}
-	}
-
-	// Process final approval when both evidence and description are received
-	if evidenceReceived && descriptionReceived {
-		l.StoreState("final_approval_processed", true)
-
-		// Simulate Level 2 final approval decision
-		result := &ApprovalResult{
-			ApprovalID:   l.ApprovalID,
-			Level:        2,
-			Status:       "approved",
-			ApprovalTime: time.Now(),
-			ApproverID:   l.Level2Authority,
-			Comments:     "Level 2 final approval granted",
-		}
-
-		// Store final state including evidence and description completion info
-		stateUpdates := map[string]interface{}{
-			"final_approval_status":       result.Status,
-			"approval_level":              result.Level,
-			"approver_id":                 result.ApproverID,
-			"approval_time":               result.ApprovalTime.Format(time.RFC3339),
-			"level2_authority":            l.Level2Authority,
-			"comments":                    result.Comments,
-			"total_processed":             1,
-			"evidence_provider_complete":  true,
-			"description_provider_complete": true,
-		}
-		if !evidenceTimestamp.IsZero() {
-			stateUpdates["evidence_received_at"] = evidenceTimestamp.Format(time.RFC3339)
-		}
-		if !descriptionTimestamp.IsZero() {
-			stateUpdates["description_received_at"] = descriptionTimestamp.Format(time.RFC3339)
-		}
-		l.StoreStateMulti(stateUpdates)
-
-		l.StoreLog(fmt.Sprintf("Final approval %s: %s by %s at %s",
-			result.ApprovalID, result.Status, result.ApproverID,
-			result.ApprovalTime.Format("15:04:05")))
-
-		return true
-	}
-
-	return false // Continue waiting for inputs
+// NewLevel2CoordinatorWant creates a new Level 2 approval coordinator using generic pattern
+func NewLevel2CoordinatorWantRefactored(metadata Metadata, spec WantSpec) interface{} {
+	coordinator := NewCoordinatorWant(
+		metadata,
+		spec,
+		2, // Requires 2 inputs (evidence + description)
+		&ApprovalDataHandler{Level: 2},
+		&ApprovalCompletionChecker{Level: 2},
+		"level2_coordinator",
+	)
+	return coordinator
 }
 
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("evidence", NewEvidenceWant)
 	builder.RegisterWantType("description", NewDescriptionWant)
-	builder.RegisterWantType("level1_coordinator", NewLevel1CoordinatorWant)
-	builder.RegisterWantType("level2_coordinator", NewLevel2CoordinatorWant)
+	builder.RegisterWantType("level1_coordinator", NewLevel1CoordinatorWantRefactored)
+	builder.RegisterWantType("level2_coordinator", NewLevel2CoordinatorWantRefactored)
 }
