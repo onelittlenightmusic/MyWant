@@ -233,10 +233,10 @@ func (t *Target) CreateChildWants() []*Want {
 	parentType := t.Metadata.Type
 	for _, childWant := range config.Wants {
 		if childWant.Metadata.Type == parentType {
-			InfoLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
-				t.Metadata.Name, parentType, t.RecipePath)
-			InfoLog("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
-				childWant.Metadata.Type, parentType)
+			t.StoreLog(fmt.Sprintf("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
+				t.Metadata.Name, parentType, t.RecipePath))
+			t.StoreLog(fmt.Sprintf("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
+				childWant.Metadata.Type, parentType))
 			return []*Want{}
 		}
 	}
@@ -272,7 +272,7 @@ func (t *Target) Exec() bool {
 
 		// Send child wants to reconcile loop asynchronously
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			InfoLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
+			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
 			return false
 		}
 
@@ -321,14 +321,14 @@ func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 	// Push parameter change to child wants
 	t.PushParameterToChildren(paramName, paramValue)
 
-	InfoLog("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
-		t.Metadata.Name, paramName, paramValue)
+	t.StoreLog(fmt.Sprintf("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+		t.Metadata.Name, paramName, paramValue))
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
-	InfoLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
-		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
+	t.StoreLog(fmt.Sprintf("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
+		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue))
 	t.UpdateParameter(paramName, paramValue)
 }
 
@@ -355,8 +355,8 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue interface{
 				// Update the child's parameter
 				runtimeWant.want.UpdateParameter(childParamName, paramValue)
 
-				InfoLog("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
-					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
+				t.StoreLog(fmt.Sprintf("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+					t.Metadata.Name, wantName, paramName, paramValue, childParamName))
 			}
 		}
 	}
@@ -413,7 +413,7 @@ func (t *Target) computeTemplateResult() {
 	defer t.stateMutex.Unlock()
 
 	if t.recipeLoader == nil {
-		InfoLog("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
+		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name))
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -421,13 +421,13 @@ func (t *Target) computeTemplateResult() {
 	// Get recipe result definition
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		InfoLog("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
+		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err))
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
-		InfoLog("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
+		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name))
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -459,7 +459,7 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	InfoLog("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName))
+	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName)))
 
 	// Stats are now stored in State - no separate initialization needed
 
@@ -481,9 +481,9 @@ func (t *Target) computeTemplateResult() {
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			InfoLog("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
+			t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult))
 		} else {
-			InfoLog("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
+			t.StoreLog(fmt.Sprintf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue))
 		}
 	}
 
@@ -512,7 +512,7 @@ func (t *Target) computeTemplateResult() {
 		t.StoreState("result", fmt.Sprintf("%s: %v", firstResult.Description, primaryResult))
 	}
 
-	InfoLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
+	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name))
 }
 
 // addChildWantsToMemory adds child wants to the memory configuration
@@ -520,7 +520,7 @@ func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would
 	// interact with the ChainBuilder to add wants to the memory file
 	// For now, we'll assume the reconcile loop will pick up the wants
-	InfoLog("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
+	t.StoreLog(fmt.Sprintf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants)))
 	return nil
 }
 
@@ -756,7 +756,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
 	want, exists := childWants[spec.WantName]
 	if !exists {
-		InfoLog("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName)
+		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName))
 		return 0
 	}
 
@@ -797,7 +797,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return value
 	}
 
-	InfoLog("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
+	t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State))
 	return 0
 }
 
@@ -885,7 +885,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 		}
 	}
 
-	InfoLog("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
+	t.StoreLog(fmt.Sprintf("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants)))
 
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
@@ -911,8 +911,8 @@ func (t *Target) computeFallbackResultUnsafe() {
 	// Store result in target's state
 	t.StoreState("recipeResult", totalProcessed)
 	t.childCount = len(childWants)
-	InfoLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants)))
 
 	// Store result in a standardized format for memory dumps
-	t.State["result"] = fmt.Sprintf("processed: %d", totalProcessed)
+	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 }
