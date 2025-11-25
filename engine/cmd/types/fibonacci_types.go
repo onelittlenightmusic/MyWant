@@ -126,31 +126,17 @@ func (f *FibonacciSequence) Exec() bool {
 	// Mark as completed in persistent state
 	f.StoreState("completed", true)
 
-	// Get persistent filtered slice or create new one
-	filtered, _ := f.State["filtered"].([]int)
-	if filtered == nil {
-		filtered = make([]int, 0)
-	}
+	// Use local field to track filtered numbers
+	f.filtered = make([]int, 0)
+	totalProcessed := 0
 
 	// Process all input numbers and filter them
 	for i := range in {
 		if val, ok := i.(int); ok {
+			totalProcessed++
 			// Filter based on min/max values
 			if val >= minValue && val <= maxValue {
-				filtered = append(filtered, val)
-				// Update state immediately when number is filtered
-				f.StoreStateMulti(map[string]interface{}{
-					"filtered": filtered,
-					"count":    len(filtered),
-				})
-			}
-			if f.State == nil {
-				f.State = make(map[string]interface{})
-			}
-			if val, exists := f.State["total_processed"]; exists {
-				f.State["total_processed"] = val.(int) + 1
-			} else {
-				f.State["total_processed"] = 1
+				f.filtered = append(f.filtered, val)
 			}
 		}
 	}
@@ -160,10 +146,10 @@ func (f *FibonacciSequence) Exec() bool {
 		close(f.paths.Out[i].Channel)
 	}
 
-	// Final state update to ensure consistency (in case no numbers were filtered)
+	// Store final state - count and total_processed
 	f.StoreStateMulti(map[string]interface{}{
-		"filtered": filtered,
-		"count":    len(filtered),
+		"count":            len(f.filtered),
+		"total_processed":  totalProcessed,
 	})
 
 
