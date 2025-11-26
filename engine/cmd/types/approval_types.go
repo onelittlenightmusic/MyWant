@@ -29,7 +29,6 @@ type EvidenceWant struct {
 	Want
 	EvidenceType string
 	ApprovalID   string
-	paths        Paths
 }
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
@@ -90,12 +89,15 @@ func (e *EvidenceWant) Exec() bool {
 		"total_processed":      1,
 	})
 
-	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.paths.GetOutCount()))
+	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.GetOutCount()))
 
 	// Broadcast evidence to all output channels using SendPacketMulti
-	outputs := make([]Chan, e.paths.GetOutCount())
-	for i := 0; i < e.paths.GetOutCount(); i++ {
-		outputs[i] = e.paths.Out[i].Channel
+	outputs := make([]Chan, e.GetOutCount())
+	for i := 0; i < e.GetOutCount(); i++ {
+		outChannel, available := e.GetOutputChannel(i)
+		if available {
+			outputs[i] = outChannel
+		}
 	}
 	e.SendPacketMulti(evidenceData, outputs)
 	return true
@@ -106,7 +108,6 @@ type DescriptionWant struct {
 	Want
 	DescriptionFormat string
 	ApprovalID        string
-	paths             Paths
 }
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
@@ -169,23 +170,26 @@ func (d *DescriptionWant) Exec() bool {
 		"total_processed":         1,
 	})
 
-	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.paths.GetOutCount()))
+	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.GetOutCount()))
 
 	// Broadcast description to all output channels using SendPacketMulti
-	outputs := make([]Chan, d.paths.GetOutCount())
-	for i := 0; i < d.paths.GetOutCount(); i++ {
-		outputs[i] = d.paths.Out[i].Channel
+	outputs := make([]Chan, d.GetOutCount())
+	for i := 0; i < d.GetOutCount(); i++ {
+		outChannel, available := d.GetOutputChannel(i)
+		if available {
+			outputs[i] = outChannel
+		}
 	}
 	d.SendPacketMulti(descriptionData, outputs)
 	return true
 }
 
 // Level1CoordinatorWant handles Level 1 approval coordination
+// Note: This type is kept for backward compatibility but NewCoordinatorWant is preferred
 type Level1CoordinatorWant struct {
 	Want
 	ApprovalID      string
 	CoordinatorType string
-	paths           Paths
 }
 
 func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
@@ -227,7 +231,7 @@ func (l *Level1CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	inCount := l.paths.GetInCount()
+	inCount := l.GetInCount()
 
 	// If no channels are connected, mark as completed
 	if inCount == 0 {
