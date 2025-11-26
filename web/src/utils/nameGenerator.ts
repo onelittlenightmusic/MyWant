@@ -73,6 +73,63 @@ export function suggestAlternativeName(
 }
 
 /**
+ * Generate a unique want name that doesn't conflict with existing wants
+ * Tries different descriptive suffixes before falling back to numbers
+ *
+ * @param selectedId - The ID of the selected want type or recipe
+ * @param itemType - Whether it's a 'want-type' or 'recipe'
+ * @param existingNames - Set of already used names
+ * @param userInput - Optional user input to append as suffix
+ * @returns A unique want name
+ */
+export function generateUniqueWantName(
+  selectedId: string,
+  itemType: 'want-type' | 'recipe',
+  existingNames: Set<string>,
+  userInput?: string
+): string {
+  if (!selectedId) {
+    return '';
+  }
+
+  // If user provided custom input, use suggestAlternativeName on that
+  if (userInput && userInput.trim()) {
+    const customName = generateWantName(selectedId, itemType, userInput);
+    return suggestAlternativeName(customName, existingNames);
+  }
+
+  // Convert type name to kebab-case
+  const baseName = selectedId
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/_/g, '-')
+    .replace(/--+/g, '-');
+
+  // Try default suffix first
+  const defaultSuffix = itemType === 'recipe' ? 'example' : 'instance';
+  const defaultName = `${baseName}-${defaultSuffix}`;
+
+  if (!existingNames.has(defaultName)) {
+    return defaultName;
+  }
+
+  // Try alternative descriptive suffixes
+  const alternatives = itemType === 'recipe'
+    ? ['example', 'demo', 'template', 'sample']
+    : ['instance', 'copy', 'test', 'new'];
+
+  for (const suffix of alternatives) {
+    const candidate = `${baseName}-${suffix}`;
+    if (!existingNames.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Fallback to numbered suffix
+  return suggestAlternativeName(defaultName, existingNames);
+}
+
+/**
  * Validate a want name
  * @param name - The name to validate
  * @returns True if valid, false otherwise

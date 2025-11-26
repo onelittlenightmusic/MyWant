@@ -9,7 +9,7 @@ import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { TypeRecipeSelector } from './TypeRecipeSelector';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
-import { generateWantName, isValidWantName } from '@/utils/nameGenerator';
+import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
@@ -27,7 +27,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   onClose,
   editingWant
 }) => {
-  const { createWant, updateWant, loading, error } = useWantStore();
+  const { wants, createWant, updateWant, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
   const { recipes, fetchRecipes } = useRecipeStore();
 
@@ -378,12 +378,14 @@ export const WantForm: React.FC<WantFormProps> = ({
                     setRecipe(id);
                     setType(''); // Clear type as we're using a recipe
                   }
-                  // Auto-generate name
-                  const generatedName = generateWantName(id, itemType, userNameSuffix);
+                  // Auto-generate unique name that doesn't conflict with existing wants
+                  const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                  const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
                   setName(generatedName);
                 }}
                 onGenerateName={(id, itemType, suffix) => {
-                  return generateWantName(id, itemType, suffix);
+                  const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                  return generateUniqueWantName(id, itemType, existingNames, suffix);
                 }}
               />
             </div>
