@@ -31,6 +31,7 @@ type Metadata struct {
 type WantSpec struct {
 	Params              map[string]interface{} `json:"params" yaml:"params"`
 	Using               []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
+	Recipe              string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
 	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
 	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
 	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`

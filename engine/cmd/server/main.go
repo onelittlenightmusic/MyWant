@@ -1644,12 +1644,24 @@ func (s *Server) Start() error {
 
 // validateWantTypes validates that all want types are known before execution
 // Uses the global builder which has all registries already configured
+// Allows either want.Type or want.Spec.Recipe to be specified
 func (s *Server) validateWantTypes(config mywant.Config) error {
 	// Check each want type by trying to create a minimal want
 	// Using globalBuilder ensures we validate against the exact same registries
 	// that will be used during actual execution
 	for _, want := range config.Wants {
 		wantType := want.Metadata.Type
+		hasRecipe := want.Spec.Recipe != ""
+
+		// Want must have either a type or a recipe
+		if wantType == "" && !hasRecipe {
+			return fmt.Errorf("want '%s' must have either a type or a recipe specified", want.Metadata.Name)
+		}
+
+		// If recipe is specified without a type, skip type validation
+		if hasRecipe && wantType == "" {
+			continue
+		}
 
 		// Create a minimal test want to validate the type
 		testWant := &mywant.Want{

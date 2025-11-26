@@ -180,8 +180,8 @@ export const WantForm: React.FC<WantFormProps> = ({
       setValidationError('Want name is required');
       return false;
     }
-    if (!type.trim()) {
-      setValidationError('Want type is required');
+    if (!type.trim() && !recipe.trim()) {
+      setValidationError('Either want type or recipe is required');
       return false;
     }
     setValidationError(null);
