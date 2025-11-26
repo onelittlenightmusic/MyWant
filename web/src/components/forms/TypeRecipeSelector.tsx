@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown, Search } from 'lucide-react';
 import { WantType } from '@/types/wantType';
 import { Recipe } from '@/types/recipe';
 
@@ -31,6 +31,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [userNameInput, setUserNameInput] = useState('');
   const [showSuffixOptions, setShowSuffixOptions] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -99,17 +100,28 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Search */}
-      <div>
+    <div className="space-y-3">
+      {/* Search Button - Optional */}
+      <button
+        type="button"
+        onClick={() => setShowSearch(!showSearch)}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors border border-gray-200"
+      >
+        <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : ''}`} />
+        Filter (optional)
+      </button>
+
+      {/* Search Input - Collapsible */}
+      {showSearch && (
         <input
           type="text"
           placeholder="Search want types or recipes..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          autoFocus
         />
-      </div>
+      )}
 
       {/* Scrollable Card List */}
       <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
@@ -195,54 +207,37 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
         )}
       </div>
 
-      {/* Selected Item Summary & Name Generation */}
+      {/* Selected Item Summary */}
       {selectedItem && (
         <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900">
-                {selectedItem.type === 'want-type' ? 'Selected Want Type' : 'Selected Recipe'}
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">{selectedItem.title}</p>
-            </div>
-          </div>
-
-          {/* Generated Name Display */}
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-xs text-gray-600 mb-1">Generated name:</p>
-            <p className="text-sm font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded border border-gray-300">
-              {generateNameForSelected()}
-            </p>
+          <div>
+            <h4 className="font-medium text-gray-900">
+              {selectedItem.type === 'want-type' ? 'Selected Want Type' : 'Selected Recipe'}
+            </h4>
+            <p className="text-sm text-gray-600 mt-1">{selectedItem.title}</p>
           </div>
 
           {/* Optional Suffix Button */}
           <button
             type="button"
             onClick={() => setShowSuffixOptions(!showSuffixOptions)}
-            className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-white hover:border hover:border-gray-300 rounded transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-white rounded border border-gray-300 transition-colors"
           >
-            <span className="flex items-center gap-2">
-              <ChevronDown
-                className={`w-4 h-4 transition-transform ${showSuffixOptions ? 'rotate-180' : ''}`}
-              />
-              Customize name (optional)
-            </span>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform flex-shrink-0 ${showSuffixOptions ? 'rotate-180' : ''}`}
+            />
+            Add custom suffix (optional)
           </button>
 
           {/* Suffix Input - Collapsible */}
           {showSuffixOptions && (
-            <div className="pt-2 space-y-2 border-t border-gray-200">
-              <input
-                type="text"
-                placeholder="e.g., 'demo', 'test', or leave empty"
-                value={userNameInput}
-                onChange={(e) => setUserNameInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              />
-              <p className="text-xs text-gray-500">
-                Add a custom suffix to the auto-generated name
-              </p>
-            </div>
+            <input
+              type="text"
+              placeholder="e.g., 'demo', 'test'"
+              value={userNameInput}
+              onChange={(e) => setUserNameInput(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
           )}
         </div>
       )}
