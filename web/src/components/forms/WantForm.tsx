@@ -41,7 +41,6 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for label being edited
   const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for dependency being edited
-  const [sampleConfigLoaded, setSampleConfigLoaded] = useState(false); // Track if a sample config was loaded
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
@@ -56,37 +55,6 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
-
-  // Generate sample configs from recipes that have examples
-  const generateSampleConfigs = () => {
-    return recipes
-      .filter(r => r.recipe?.example?.wants && r.recipe.example.wants.length > 0)
-      .map(r => {
-        // Use example parameters if available, otherwise use recipe parameters
-        const exampleWant = r.recipe.example.wants[0];
-        const exampleParams = exampleWant?.spec?.params || r.recipe.parameters || {};
-
-        return {
-          name: r.recipe.metadata.name || 'Unnamed Recipe',
-          description: r.recipe.metadata.description || '',
-          config: {
-            metadata: {
-              name: `${r.recipe.metadata.custom_type}-example` || 'recipe-example',
-              type: r.recipe.metadata.custom_type || 'recipe',
-              labels: {
-                recipe: r.recipe.metadata.name || 'recipe'
-              }
-            },
-            spec: {
-              recipe: `recipes/${r.recipe.metadata.custom_type?.replace(/\s+/g, '-')}.yaml`,
-              params: exampleParams
-            }
-          }
-        };
-      });
-  };
-
-  const sampleConfigs = generateSampleConfigs();
 
   // Fetch want types and recipes on component mount
   useEffect(() => {
@@ -163,46 +131,12 @@ export const WantForm: React.FC<WantFormProps> = ({
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
     setUserNameSuffix('');
-    setSampleConfigLoaded(false); // Clear sample config flag on reset
     setYamlContent(stringifyYaml({
       metadata: { name: '', type: '' },
       spec: {}
     }));
     setValidationError(null);
     setApiError(null);
-  };
-
-  const loadSampleConfig = (sample: typeof sampleConfigs[0]) => {
-    const config = sample.config;
-
-    // Reset form state first to clear any previous values
-    resetForm();
-
-    // Check if this is a multi-want configuration (has 'wants' array)
-    if ((config as any).wants && Array.isArray((config as any).wants)) {
-      // For multi-want configs, load the YAML representation and switch to YAML editor
-      // This handles samples like "Dynamic Travel Change" that deploy multiple wants at once
-      setYamlContent(stringifyYaml(config));
-      setEditMode('yaml');
-      return;
-    }
-
-    // Single-want configuration handling
-    if (config.metadata) {
-      setName(config.metadata.name);
-      setType(config.metadata.type);
-      const labels = config.metadata.labels || {};
-      setLabels(Object.fromEntries(
-        Object.entries(labels).filter(([_, value]) => value !== undefined)
-      ) as Record<string, string>);
-    }
-    if (config.spec) {
-      setParams(config.spec.params ? {...config.spec.params} : {});
-      setUsing((config.spec as any).using || []);
-      setRecipe(config.spec.recipe || '');
-    }
-    setSampleConfigLoaded(true); // Mark that sample config was loaded
-    setYamlContent(stringifyYaml(config));
   };
 
   // Update form when want type is selected
@@ -217,11 +151,6 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // Populate parameters from want type examples when selectedWantType changes
   useEffect(() => {
-    // Skip if a sample config was loaded (it has its own parameters)
-    if (sampleConfigLoaded) {
-      return;
-    }
-
     if (selectedWantType && !isEditing && type === selectedWantType.metadata.name) {
       // Get the first example if available, use parameter examples otherwise
       if (selectedWantType.examples && selectedWantType.examples.length > 0) {
@@ -242,7 +171,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         setParams({});
       }
     }
-  }, [selectedWantType, isEditing, type, sampleConfigLoaded]);
+  }, [selectedWantType, isEditing, type]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
@@ -395,32 +324,6 @@ export const WantForm: React.FC<WantFormProps> = ({
       headerAction={headerAction}
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
-
-        {/* Sample Selector */}
-        {!isEditing && (
-          <div className="border-b border-gray-200 pb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sample Configurations
-            </label>
-            <select
-              onChange={(e) => {
-                const index = parseInt(e.target.value);
-                if (!isNaN(index)) {
-                  loadSampleConfig(sampleConfigs[index]);
-                }
-              }}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-              defaultValue=""
-            >
-              <option value="" disabled>Select a sample configuration...</option>
-              {sampleConfigs.map((sample, index) => (
-                <option key={index} value={index}>
-                  {sample.name} - {sample.description}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Mode Toggle */}
         <div className="border-b border-gray-200 pb-4">
