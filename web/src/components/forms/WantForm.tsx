@@ -387,9 +387,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                     setType(id);
                     setRecipe('');
                   } else {
-                    // For recipes, set recipe field
-                    setRecipe(id);
-                    setType(''); // Clear type as we're using a recipe
+                    // For recipes, set both type (custom_type) and recipe field
+                    setType(id); // Set type to recipe's custom_type
+                    setRecipe(id); // Set recipe to the recipe custom_type/name
                   }
                   // Auto-generate unique name that doesn't conflict with existing wants
                   const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
