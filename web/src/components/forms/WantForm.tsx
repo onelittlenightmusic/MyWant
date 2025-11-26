@@ -7,7 +7,9 @@ import { CreateSidebar } from '@/components/layout/CreateSidebar';
 import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
+import { TypeRecipeSelector } from './TypeRecipeSelector';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
+import { generateWantName, isValidWantName } from '@/utils/nameGenerator';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
@@ -40,6 +42,9 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for dependency being edited
   const [sampleConfigLoaded, setSampleConfigLoaded] = useState(false); // Track if a sample config was loaded
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
+  const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
+  const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
 
   // Form state
   const [name, setName] = useState('');
@@ -155,6 +160,9 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams({});
     setUsing([]);
     setRecipe('');
+    setSelectedTypeId(null); // Reset selector state
+    setSelectedItemType('want-type');
+    setUserNameSuffix('');
     setSampleConfigLoaded(false); // Clear sample config flag on reset
     setYamlContent(stringifyYaml({
       metadata: { name: '', type: '' },
@@ -446,47 +454,61 @@ export const WantForm: React.FC<WantFormProps> = ({
 
         {editMode === 'form' ? (
           <>
-            {/* Want Name */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Want Name *
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter want name"
-            required
-          />
-        </div>
-
-        {/* Want Type */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Want Type *
-          </label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-            required
-            disabled={wantTypes.length === 0 || wantTypeLoading}
-          >
-            <option value="">Select a want type...</option>
-            {wantTypes.map(wantType => (
-              <option key={wantType.name} value={wantType.name}>
-                {wantType.title} ({wantType.category})
-              </option>
-            ))}
-          </select>
-          {wantTypeLoading && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-              Loading want type details...
+            {/* Type/Recipe Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Want Type or Recipe *
+              </label>
+              <TypeRecipeSelector
+                wantTypes={wantTypes}
+                recipes={recipes}
+                selectedId={selectedTypeId}
+                onSelect={(id, itemType) => {
+                  setSelectedTypeId(id);
+                  setSelectedItemType(itemType);
+                  // Update type and recipe fields based on selection
+                  if (itemType === 'want-type') {
+                    setType(id);
+                    setRecipe('');
+                  } else {
+                    // For recipes, set recipe field
+                    setRecipe(id);
+                    setType(''); // Clear type as we're using a recipe
+                  }
+                  // Auto-generate name
+                  const generatedName = generateWantName(id, itemType, userNameSuffix);
+                  setName(generatedName);
+                }}
+                onGenerateName={(id, itemType, suffix) => {
+                  return generateWantName(id, itemType, suffix);
+                }}
+              />
             </div>
-          )}
-        </div>
+
+            {/* Want Name with Auto-generation */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Want Name *
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Auto-generated or enter custom name"
+                  required
+                />
+                {selectedTypeId && (
+                  <div className="text-xs text-gray-600">
+                    <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
+                    {!isValidWantName(name) && name.trim() && (
+                      <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
 
         {/* Labels */}
         <div className="bg-gray-50 rounded-lg p-6">
