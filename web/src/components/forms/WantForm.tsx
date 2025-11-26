@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, X, Code, Edit3 } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, Search } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -44,6 +44,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
+  const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
 
   // Form state
   const [name, setName] = useState('');
@@ -131,6 +132,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
     setUserNameSuffix('');
+    setShowSearch(false);
     setYamlContent(stringifyYaml({
       metadata: { name: '', type: '' },
       spec: {}
@@ -359,13 +361,24 @@ export const WantForm: React.FC<WantFormProps> = ({
           <>
             {/* Type/Recipe Selector */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Want Type or Recipe *
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Want Type or Recipe *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                  title="Filter want types and recipes"
+                >
+                  <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : 'text-gray-500'}`} />
+                </button>
+              </div>
               <TypeRecipeSelector
                 wantTypes={wantTypes}
                 recipes={recipes}
                 selectedId={selectedTypeId}
+                showSearch={showSearch}
                 onSelect={(id, itemType) => {
                   setSelectedTypeId(id);
                   setSelectedItemType(itemType);

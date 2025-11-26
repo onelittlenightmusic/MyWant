@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown, Search } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
 import { WantType } from '@/types/wantType';
 import { Recipe } from '@/types/recipe';
 
@@ -17,6 +17,7 @@ interface TypeRecipeSelectorProps {
   wantTypes: WantType[];
   recipes: Recipe[];
   selectedId: string | null;
+  showSearch: boolean;
   onSelect: (id: string, itemType: 'want-type' | 'recipe') => void;
   onGenerateName: (selectedId: string, itemType: 'want-type' | 'recipe', userInput?: string) => string;
 }
@@ -25,13 +26,13 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
   wantTypes,
   recipes,
   selectedId,
+  showSearch,
   onSelect,
   onGenerateName
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userNameInput, setUserNameInput] = useState('');
   const [showSuffixOptions, setShowSuffixOptions] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -101,16 +102,6 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Search Button - Optional */}
-      <button
-        type="button"
-        onClick={() => setShowSearch(!showSearch)}
-        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors border border-gray-200"
-      >
-        <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : ''}`} />
-        Filter (optional)
-      </button>
-
       {/* Search Input - Collapsible */}
       {showSearch && (
         <input
