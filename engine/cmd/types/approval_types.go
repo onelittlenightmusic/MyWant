@@ -329,10 +329,7 @@ func (l *Level1CoordinatorWant) Exec() bool {
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("evidence", NewEvidenceWant)
 	builder.RegisterWantType("description", NewDescriptionWant)
-	// All coordinator types now use the unified "coordinator" type
-	// Configuration is determined by required_inputs parameter and coordinator_level in params
+	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
+	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)
-	// Backward compatibility aliases for legacy coordinator types
-	builder.RegisterWantType("level1_coordinator", NewCoordinatorWant)
-	builder.RegisterWantType("level2_coordinator", NewCoordinatorWant)
 }

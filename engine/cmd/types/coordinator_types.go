@@ -86,24 +86,32 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 	// Determine handler based on coordinator type and parameters
 	// Priority: explicit params > type-specific defaults > generic fallback
 
-	switch coordinatorType {
-	case "coordinator":
-		// Universal coordinator: behavior determined by parameters
+	// Determine approval level from coordinator type name (backward compat) or parameter
+	approvalLevel := coordinatorLevel
+	if approvalLevel <= 0 && (coordinatorType == "level2_coordinator") {
+		approvalLevel = 2
+	}
 
-		// Check if this is an approval coordinator (by explicit type param or level)
-		if coordinatorTypeParam == "approval" || coordinatorLevel > 0 {
-			level := 1
-			if coordinatorLevel > 0 {
-				level = coordinatorLevel
-			}
-			return 2,
-				&ApprovalDataHandler{Level: level},
-				&ApprovalCompletionChecker{Level: level}
+	// Check if this is an approval coordinator
+	if coordinatorTypeParam == "approval" || approvalLevel > 0 || coordinatorType == "level1_coordinator" || coordinatorType == "level2_coordinator" {
+		if approvalLevel <= 0 {
+			approvalLevel = 1
 		}
+		return 2,
+			&ApprovalDataHandler{Level: approvalLevel},
+			&ApprovalCompletionChecker{Level: approvalLevel}
+	}
 
-		// Check if this is a travel/buffet coordinator
-		requiredInputs := requiredInputsParam
-		if requiredInputs <= 0 {
+	// Check if this is a travel/buffet coordinator
+	requiredInputs := requiredInputsParam
+	if requiredInputs <= 0 {
+		// Handle legacy coordinator type names
+		switch coordinatorType {
+		case "travel coordinator":
+			requiredInputs = 3
+		case "buffet coordinator":
+			requiredInputs = 1
+		default:
 			// Default based on is_buffet parameter
 			if isBuffetParam {
 				requiredInputs = 1
@@ -111,54 +119,10 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 				requiredInputs = 3
 			}
 		}
-		return requiredInputs,
-			&TravelDataHandler{IsBuffet: isBuffetParam},
-			&TravelCompletionChecker{IsBuffet: isBuffetParam}
-
-	// Backward compatibility with specific coordinator type names
-	case "level1_coordinator", "level2_coordinator":
-		// Approval coordinators: 2 inputs (evidence + description)
-		level := 1
-		if coordinatorType == "level2_coordinator" {
-			level = 2
-		}
-		if coordinatorLevel > 0 {
-			level = coordinatorLevel
-		}
-		return 2,
-			&ApprovalDataHandler{Level: level},
-			&ApprovalCompletionChecker{Level: level}
-
-	case "travel coordinator":
-		// Travel coordinator: 3 inputs (restaurant, hotel, buffet)
-		requiredInputs := 3
-		if requiredInputsParam > 0 {
-			requiredInputs = requiredInputsParam
-		}
-		return requiredInputs,
-			&TravelDataHandler{IsBuffet: false},
-			&TravelCompletionChecker{IsBuffet: false}
-
-	case "buffet coordinator":
-		// Buffet coordinator: 1 input (buffet schedule)
-		requiredInputs := 1
-		if requiredInputsParam > 0 {
-			requiredInputs = requiredInputsParam
-		}
-		return requiredInputs,
-			&TravelDataHandler{IsBuffet: true},
-			&TravelCompletionChecker{IsBuffet: true}
-
-	default:
-		// Generic fallback: determine based on parameters
-		requiredInputs := 1
-		if requiredInputsParam > 0 {
-			requiredInputs = requiredInputsParam
-		}
-		return requiredInputs,
-			&TravelDataHandler{IsBuffet: isBuffetParam},
-			&TravelCompletionChecker{IsBuffet: isBuffetParam}
 	}
+	return requiredInputs,
+		&TravelDataHandler{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"},
+		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
 // GetWant returns the base Want struct

@@ -821,12 +821,9 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-	// All coordinator types now use the unified "coordinator" type
-	// Configuration is determined by required_inputs parameter
+	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
+	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)
-	// Backward compatibility aliases for legacy coordinator types
-	builder.RegisterWantType("travel coordinator", NewCoordinatorWant)
-	builder.RegisterWantType("buffet coordinator", NewCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support

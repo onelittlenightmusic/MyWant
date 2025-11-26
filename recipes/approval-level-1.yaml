@@ -37,7 +37,7 @@ recipe:
 
     # Level 1 Coordinator - connects to evidence and description
     - metadata:
-        type: level1_coordinator
+        type: coordinator
         labels:
           role: coordinator
           category: approval-coordinator
@@ -46,7 +46,8 @@ recipe:
       spec:
         params:
           approval_id: approval_id
-          coordinator_type: coordinator_type
+          coordinator_type: "approval"
+          coordinator_level: 1
         using:
           - role: evidence-provider
           - role: description-provider
@@ -62,12 +63,13 @@ recipe:
       spec:
         params:
           approval_id: approval_id
-          coordinator_type: "level2"
+          coordinator_type: "approval"
+          coordinator_level: 2
           level2_authority: level2_authority
 
   # Recipe result definition
   result:
-    - want_name: "level1_coordinator"
+    - want_name: "coordinator"
       stat_name: ".approval_status"
       description: "Level 1 approval status"
     - want_name: "level2_approval"

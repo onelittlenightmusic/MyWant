@@ -36,23 +36,26 @@ recipe:
           approval_id: approval_id
 
     # Level 2 Coordinator
-    - type: level2_coordinator
-      labels:
-        role: coordinator
-        category: approval-coordinator
-        component: level2-coordinator
-        approval_level: "2"
-      params:
-        approval_id: approval_id
-        coordinator_type: coordinator_type
-        level2_authority: level2_authority
-      using:
-        - role: evidence-provider
-        - role: description-provider
+    - metadata:
+        type: coordinator
+        labels:
+          role: coordinator
+          category: approval-coordinator
+          component: level2-coordinator
+          approval_level: "2"
+      spec:
+        params:
+          approval_id: approval_id
+          coordinator_type: "approval"
+          coordinator_level: 2
+          level2_authority: level2_authority
+        using:
+          - role: evidence-provider
+          - role: description-provider
 
   # Recipe result definition
   result:
-    - want_name: "level2_coordinator"
+    - want_name: "coordinator"
       stat_name: ".final_approval_status"
       description: "Level 2 final approval status"
   # Example deployment - one-click deployment configuration
