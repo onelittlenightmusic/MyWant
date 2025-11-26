@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Package, Zap } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
 import { WantType } from '@/types/wantType';
 import { Recipe } from '@/types/recipe';
 
@@ -30,6 +30,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userNameInput, setUserNameInput] = useState('');
+  const [showSuffixOptions, setShowSuffixOptions] = useState(false);
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -196,28 +197,53 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 
       {/* Selected Item Summary & Name Generation */}
       {selectedItem && (
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">
-            {selectedItem.type === 'want-type' ? 'Selected Want Type' : 'Selected Recipe'}
-          </h4>
-          <p className="text-sm text-gray-600 mb-4">{selectedItem.title}</p>
+        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h4 className="font-medium text-gray-900">
+                {selectedItem.type === 'want-type' ? 'Selected Want Type' : 'Selected Recipe'}
+              </h4>
+              <p className="text-sm text-gray-600 mt-1">{selectedItem.title}</p>
+            </div>
+          </div>
 
-          {/* Auto Name Generation */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Add suffix to auto-generated name (optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., 'example', 'demo' or leave empty"
-              value={userNameInput}
-              onChange={(e) => setUserNameInput(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              Generated name: <span className="font-mono font-medium">{generateNameForSelected()}</span>
+          {/* Generated Name Display */}
+          <div className="pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-600 mb-1">Generated name:</p>
+            <p className="text-sm font-mono font-medium text-gray-900 bg-white px-3 py-2 rounded border border-gray-300">
+              {generateNameForSelected()}
             </p>
           </div>
+
+          {/* Optional Suffix Button */}
+          <button
+            type="button"
+            onClick={() => setShowSuffixOptions(!showSuffixOptions)}
+            className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-white hover:border hover:border-gray-300 rounded transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <ChevronDown
+                className={`w-4 h-4 transition-transform ${showSuffixOptions ? 'rotate-180' : ''}`}
+              />
+              Customize name (optional)
+            </span>
+          </button>
+
+          {/* Suffix Input - Collapsible */}
+          {showSuffixOptions && (
+            <div className="pt-2 space-y-2 border-t border-gray-200">
+              <input
+                type="text"
+                placeholder="e.g., 'demo', 'test', or leave empty"
+                value={userNameInput}
+                onChange={(e) => setUserNameInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+              <p className="text-xs text-gray-500">
+                Add a custom suffix to the auto-generated name
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
