@@ -807,22 +807,14 @@ func generateTravelTimeline(events []TimeSlot) string {
 }
 
 // TravelCoordinatorWant orchestrates the entire travel itinerary
-// TravelCoordinatorWant now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
-// The type field in metadata determines the configuration automatically
-
-// BuffetCoordinatorWant is a minimal coordinator for standalone buffet deployment
-// It simply collects the buffet schedule from the BuffetWant and marks completion
-// Now uses the generic CoordinatorWant with TravelDataHandler and TravelCompletionChecker
-// The type field in metadata determines the configuration automatically
-
 // RegisterTravelWantTypes registers all travel-related want types
+// Note: All coordinators now use the unified "coordinator" type
+// Configuration is determined by parameters (is_buffet, required_inputs, etc.)
 func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("flight", NewFlightWant)
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
-	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }
 
@@ -852,6 +844,5 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 		return buffet
 	})
 
-	builder.RegisterWantType("travel_coordinator", NewCoordinatorWant)
-	builder.RegisterWantType("buffet coordinator", NewCoordinatorWant)
+	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }
