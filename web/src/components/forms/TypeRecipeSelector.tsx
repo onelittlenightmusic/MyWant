@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
 import { WantType } from '@/types/wantType';
 import { Recipe } from '@/types/recipe';
+import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 
 export interface TypeRecipeSelectorItem {
   id: string;
@@ -124,33 +125,40 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
               Want Types ({groupedItems.wantTypes.length})
             </h3>
             <div className="space-y-2">
-              {groupedItems.wantTypes.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleSelect(item)}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
-                    selectedId === item.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.title}</h4>
-                      {item.category && (
-                        <p className="text-xs text-gray-500">{item.category}</p>
-                      )}
-                      {item.description && (
-                        <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+              {groupedItems.wantTypes.map(item => {
+                const backgroundStyle = getBackgroundStyle(item.name);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelect(item)}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-colors relative overflow-hidden ${
+                      selectedId === item.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    } ${backgroundStyle.className}`}
+                    style={backgroundStyle.style}
+                  >
+                    {backgroundStyle.hasBackgroundImage && (
+                      <div className={getBackgroundOverlayClass()}></div>
+                    )}
+                    <div className="flex items-start justify-between relative z-10">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">{item.title}</h4>
+                        {item.category && (
+                          <p className="text-xs text-gray-500">{item.category}</p>
+                        )}
+                        {item.description && (
+                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                        )}
+                      </div>
+                      {selectedId === item.id && (
+                        <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2" />
                       )}
                     </div>
-                    {selectedId === item.id && (
-                      <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2" />
-                    )}
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
