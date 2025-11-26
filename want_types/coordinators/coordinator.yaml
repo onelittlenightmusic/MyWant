@@ -1,0 +1,217 @@
+wantType:
+  metadata:
+    name: "coordinator"
+    title: "Unified Coordinator"
+    description: "Generic coordinator that orchestrates multiple wants (travel, approval, buffet) with pluggable configuration"
+    version: "1.0"
+    category: "system"
+    pattern: "coordinator"
+
+  parameters:
+    - name: "display_name"
+      description: "Display name/title for the coordination result"
+      type: "string"
+      default: "Coordination Result"
+      required: false
+      example: "Travel Itinerary 2024"
+
+    - name: "coordinator_type"
+      description: "Type of coordinator (travel, approval, buffet)"
+      type: "string"
+      default: "travel"
+      required: false
+      validation:
+        enum: ["travel", "approval", "buffet"]
+      example: "travel"
+
+    - name: "coordinator_level"
+      description: "For approval coordinators: level 1 or 2 in approval hierarchy"
+      type: "int"
+      default: 1
+      required: false
+      validation:
+        min: 1
+        max: 2
+      example: 1
+
+    - name: "required_inputs"
+      description: "Number of inputs required before completion (0 = all inputs optional)"
+      type: "int"
+      default: 0
+      required: false
+      example: 3
+
+    - name: "include_summary"
+      description: "Whether to include summary information in state"
+      type: "bool"
+      default: true
+      required: false
+
+    - name: "output_format"
+      description: "Format for output (detailed, summary, json, text)"
+      type: "string"
+      default: "detailed"
+      required: false
+      validation:
+        enum: ["summary", "detailed", "json", "text"]
+      example: "detailed"
+
+    - name: "timezone"
+      description: "Timezone for timestamps in output"
+      type: "string"
+      default: "UTC"
+      required: false
+      validation:
+        enum: ["UTC", "EST", "CST", "MST", "PST", "GMT", "CET", "JST", "AEST"]
+
+  state:
+    - name: "finalResult"
+      description: "Final coordinated result (itinerary, approval summary, buffet schedule, etc)"
+      type: "map[string]interface{}"
+      persistent: true
+      example: |
+        {
+          "type": "travel_itinerary",
+          "items": [...],
+          "summary": "..."
+        }
+
+    - name: "coordination_status"
+      description: "Overall status of coordination (pending, running, completed, failed, approved, rejected)"
+      type: "string"
+      persistent: true
+      example: "completed"
+
+    - name: "inputs_received"
+      description: "Number of input packets received from connected wants"
+      type: "int"
+      persistent: true
+      example: 3
+
+    - name: "completion_time"
+      description: "ISO8601 timestamp when coordination completed"
+      type: "string"
+      persistent: true
+
+    - name: "last_updated"
+      description: "ISO8601 timestamp of last coordination update"
+      type: "string"
+      persistent: true
+
+    - name: "error_message"
+      description: "Error message if coordination failed"
+      type: "string"
+      persistent: true
+
+  connectivity:
+    inputs:
+      - name: "data_packets"
+        type: "want"
+        description: "Independent wants providing data for coordination (travel: restaurant/hotel/buffet/flight, approval: evidence/description)"
+        required: false
+        multiple: true
+    outputs:
+      - name: "coordinated_result"
+        type: "state"
+        description: "Final coordinated data stored in state"
+
+  agents: []
+
+  constraints:
+    - description: "For travel coordinator: at least 1 input want should be connected"
+      validation: "coordinator_type='travel' AND len(using) > 0 OR coordinator_type != 'travel'"
+
+    - description: "For approval coordinators: must specify coordinator_level (1 or 2)"
+      validation: "coordinator_type='approval' THEN coordinator_level in [1, 2]"
+
+    - description: "Output format must be valid enumerated option"
+      validation: "output_format in [summary, detailed, json, text]"
+
+    - description: "Timezone must be valid"
+      validation: "timezone is valid"
+
+  examples:
+    - name: "Travel coordinator - full itinerary"
+      description: "Complete trip coordinating flight, hotel, restaurant, and buffet"
+      params:
+        coordinator_type: "travel"
+        display_name: "Paris & Lyon 2024"
+        required_inputs: 4
+        output_format: "detailed"
+        timezone: "CET"
+      expectedBehavior: |
+        1. Collects reservation data from all connected wants (flight, hotel, restaurant, buffet)
+        2. Merges into unified itinerary with common format
+        3. Calculates total costs
+        4. Generates comprehensive summary
+        5. Outputs in specified format with all details and pricing
+      connectedTo: ["flight", "hotel", "restaurant", "buffet"]
+
+    - name: "Level 1 approval coordinator"
+      description: "First level approval collecting evidence and description"
+      params:
+        coordinator_type: "approval"
+        coordinator_level: 1
+        display_name: "Approval Request #001"
+        required_inputs: 2
+      expectedBehavior: |
+        1. Receives evidence documents from EvidenceWant
+        2. Receives description from DescriptionWant
+        3. Merges evidence and description
+        4. Returns approval decision
+      connectedTo: ["evidence", "description"]
+
+    - name: "Level 2 approval coordinator"
+      description: "Second level approval collecting results from Level 1 coordinators"
+      params:
+        coordinator_type: "approval"
+        coordinator_level: 2
+        display_name: "Level 2 Approval"
+        required_inputs: 3
+      expectedBehavior: |
+        1. Receives approval decisions from Level 1 coordinators
+        2. Aggregates decisions
+        3. Makes final approval/rejection decision
+        4. Stores in state
+      connectedTo: ["level1_coordinator", "level1_coordinator", "level1_coordinator"]
+
+    - name: "Buffet coordinator - standalone"
+      description: "Minimal coordinator for standalone buffet deployment"
+      params:
+        coordinator_type: "buffet"
+        display_name: "Weekend Brunch"
+        required_inputs: 1
+      expectedBehavior: |
+        1. Receives buffet schedule from BuffetWant
+        2. Stores schedule in state
+        3. Sets completion status
+      connectedTo: ["buffet"]
+
+    - name: "Travel coordinator - weekend getaway"
+      description: "Short trip with hotel and restaurant"
+      params:
+        coordinator_type: "travel"
+        display_name: "NYC Weekend Getaway"
+        required_inputs: 2
+        output_format: "summary"
+        timezone: "EST"
+      expectedBehavior: |
+        1. Coordinates hotel and restaurant reservations
+        2. Creates compact summary itinerary
+        3. Calculates weekend trip budget
+      connectedTo: ["hotel", "restaurant"]
+
+  relatedTypes:
+    - "restaurant"
+    - "hotel"
+    - "buffet"
+    - "flight"
+    - "evidence"
+    - "description"
+
+  seeAlso:
+    - "travel-itinerary recipe"
+    - "approval-level-1 recipe"
+    - "approval-level-2 recipe"
+    - "Coordinator pattern documentation"
+    - "Independent wants execution"
