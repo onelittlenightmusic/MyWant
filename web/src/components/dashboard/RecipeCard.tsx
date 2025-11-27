@@ -186,6 +186,23 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         </div>
       </div>
 
+      {/* Recipe Parameters Description */}
+      {recipe.recipe.parameters && Object.keys(recipe.recipe.parameters).length > 0 && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <p className="text-xs font-semibold text-gray-700 mb-2">Parameters:</p>
+          <div className="space-y-1">
+            {Object.entries(recipe.recipe.parameters).map(([key, value]) => (
+              <div key={key} className="text-xs">
+                <span className="font-medium text-gray-800">{key}:</span>
+                <span className="text-gray-600 ml-1">
+                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Custom Type Badge (if available) */}
       {recipe.recipe.metadata.custom_type && (
         <div className="mb-4">
