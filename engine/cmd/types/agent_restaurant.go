@@ -69,16 +69,28 @@ func (a *AgentRestaurant) generateRestaurantSchedule(want *Want) RestaurantSched
 	// Generate realistic restaurant names
 	restaurantName := a.generateRealisticRestaurantName(restaurantType)
 
+	// Generate realistic reservation name with party size reference
+	partySize := want.GetIntParam("party_size", 2)
+	reservationReference := a.generateReservationReference()
+	formattedReservationName := fmt.Sprintf("%s - Party of %d (%s)", restaurantName, partySize, reservationReference)
+
 	// Create and return structured restaurant schedule
 	return RestaurantSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,
 		RestaurantType:   restaurantType,
-		ReservationName:  restaurantName,
+		ReservationName:  formattedReservationName,
 		PremiumLevel:     a.PremiumLevel,
 		ServiceTier:      a.ServiceTier,
 		PremiumAmenities: []string{"wine_pairing", "chef_special", "priority_seating"},
 	}
+}
+
+// generateReservationReference generates a realistic reservation reference code
+func (a *AgentRestaurant) generateReservationReference() string {
+	// Generate reference codes like "RES-12345", "RES-67890"
+	referenceNumber := 10000 + rand.Intn(90000)
+	return fmt.Sprintf("RES-%d", referenceNumber)
 }
 
 // generateRealisticRestaurantName generates realistic restaurant names based on cuisine type
