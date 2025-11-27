@@ -556,23 +556,48 @@ export const WantForm: React.FC<WantFormProps> = ({
             {Object.entries(params).map(([key, value], index) => (
               <div key={index} className="space-y-1">
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={key}
-                    onChange={(e) => {
-                      const newKey = e.target.value;
-                      const newParams = { ...params };
-                      if (key !== newKey) {
-                        delete newParams[key];
-                        if (newKey.trim()) {
-                          newParams[newKey] = value;
+                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
+                    <select
+                      value={key}
+                      onChange={(e) => {
+                        const newKey = e.target.value;
+                        const newParams = { ...params };
+                        if (key !== newKey) {
+                          delete newParams[key];
+                          if (newKey.trim()) {
+                            newParams[newKey] = value;
+                          }
+                          setParams(newParams);
                         }
-                        setParams(newParams);
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Parameter name"
-                  />
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select parameter...</option>
+                      {selectedWantType.parameters.map((param) => (
+                        <option key={param.name} value={param.name}>
+                          {param.name} {param.required ? '*' : ''} ({param.type})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={key}
+                      onChange={(e) => {
+                        const newKey = e.target.value;
+                        const newParams = { ...params };
+                        if (key !== newKey) {
+                          delete newParams[key];
+                          if (newKey.trim()) {
+                            newParams[newKey] = value;
+                          }
+                          setParams(newParams);
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Parameter name"
+                    />
+                  )}
                   <input
                     type="text"
                     value={String(value)}
