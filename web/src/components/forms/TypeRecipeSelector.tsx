@@ -185,14 +185,11 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
                     {backgroundStyle.hasBackgroundImage && (
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
-                    <div className="flex items-start justify-between relative z-10">
-                      <div className="flex-1">
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="flex-1 flex items-center gap-2">
                         <h4 className="font-medium text-gray-900">{item.title}</h4>
                         {item.category && (
-                          <p className="text-xs text-gray-500">{item.category}</p>
-                        )}
-                        {item.description && (
-                          <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{item.category}</span>
                         )}
                       </div>
                       {selectedId === item.id && (
