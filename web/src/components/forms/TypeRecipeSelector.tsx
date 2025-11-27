@@ -60,7 +60,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
     return [...wantTypeItems, ...recipeItems];
   }, [wantTypes, recipes]);
 
-  // Extract unique categories from want types
+  // Extract unique categories from want types and recipes
   const categories = useMemo(() => {
     const categorySet = new Set<string>();
     wantTypes.forEach(wt => {
@@ -68,17 +68,22 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
         categorySet.add(wt.category);
       }
     });
+    recipes.forEach(recipe => {
+      if (recipe.recipe?.metadata?.category) {
+        categorySet.add(recipe.recipe.metadata.category);
+      }
+    });
     return Array.from(categorySet).sort();
-  }, [wantTypes]);
+  }, [wantTypes, recipes]);
 
   // Filter items based on search query and category
   const filteredItems = useMemo(() => {
     let filtered = items;
 
-    // Apply category filter (only for want types, recipes always shown)
+    // Apply category filter (both want types and recipes with categories)
     if (selectedCategory) {
       filtered = filtered.filter(item =>
-        item.type === 'recipe' || item.category === selectedCategory
+        item.category === selectedCategory
       );
     }
 
