@@ -310,9 +310,14 @@ const ParametersTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
       <div className="space-y-4">
         {Object.entries(recipe.recipe.parameters).map(([key, value]) => (
           <TabSection key={key} title={key}>
-            <pre className="text-xs text-gray-800 bg-gray-50 p-3 rounded border overflow-x-auto whitespace-pre-wrap">
-              {formatParameterValue(value)}
-            </pre>
+            <div className="space-y-2">
+              <div>
+                <p className="text-xs text-gray-600 mb-2">Default Value:</p>
+                <pre className="text-xs text-gray-800 bg-gray-50 p-3 rounded border overflow-x-auto whitespace-pre-wrap">
+                  {formatParameterValue(value)}
+                </pre>
+              </div>
+            </div>
           </TabSection>
         ))}
       </div>
