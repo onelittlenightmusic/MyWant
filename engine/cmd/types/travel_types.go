@@ -135,11 +135,15 @@ func (r *RestaurantWant) Exec() bool {
 	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 6-9 PM
 
+	// Generate realistic restaurant name for the summary
+	restaurantName := generateRealisticRestaurantNameForTravel(restaurantType)
+	partySize := r.GetIntParam("party_size", 2)
+
 	newEvent := TimeSlot{
 		Start: dinnerStart,
 		End:   dinnerStart.Add(duration),
 		Type:  "restaurant",
-		Name:  fmt.Sprintf("%s dinner at %s restaurant", r.Metadata.Name, restaurantType),
+		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, restaurantType),
 	}
 
 	// Check for conflicts if we have existing schedule
@@ -302,6 +306,99 @@ func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
 	}
 }
 
+// generateRealisticRestaurantNameForTravel generates realistic restaurant names for travel summaries
+func generateRealisticRestaurantNameForTravel(cuisineType string) string {
+	var names map[string][]string = map[string][]string{
+		"fine dining": {
+			"L'Élégance", "The Michelin House", "Le Bernardin", "Per Se", "The French Laundry",
+			"Alinea", "The Ledbury", "Noma", "Chef's Table", "Sous Vide",
+		},
+		"casual": {
+			"The Garden Bistro", "Rustic Table", "Harvest Kitchen", "Homestead",
+			"The Local Taste", "Farm to Fork", "Urban Eats", "Downtown Cafe",
+		},
+		"buffet": {
+			"The Buffet House", "All You Can Eat Palace", "Golden Buffet", "Celebration Buffet",
+		},
+		"steakhouse": {
+			"The Prime Cut", "Bone & Barrel", "Wagyu House", "The Smokehouse",
+			"Texas Grill", "The Cattleman's", "Ribeye Room",
+		},
+		"seafood": {
+			"The Lobster Cove", "Catch of the Day", "The Oyster House", "Sea Pearl",
+			"Harbor View", "Dockside Grille", "The Fish House", "Captain's Table",
+		},
+	}
+
+	category := strings.ToLower(cuisineType)
+	if list, exists := names[category]; exists && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+
+	// Default to fine dining if unknown
+	return names["fine dining"][rand.Intn(len(names["fine dining"]))]
+}
+
+// generateRealisticHotelNameForTravel generates realistic hotel names for travel summaries
+func generateRealisticHotelNameForTravel(hotelType string) string {
+	var names map[string][]string = map[string][]string{
+		"luxury": {
+			"The Grand Plaza", "Royal Palace Hotel", "Platinum Suites", "Signature Towers",
+			"The Ritz Collection", "Prestige Residences", "Crown Jewel Hotel", "Luxury Haven",
+		},
+		"standard": {
+			"City Central Hotel", "Comfort Inn Express", "Downtown Plaza", "Urban Oasis",
+			"Gateway Hotel", "The Meridian", "Riverside Inn", "Sunrise Hotel",
+		},
+		"budget": {
+			"Budget Stay Inn", "Economy Hotel", "Value Lodge", "Basic Inn",
+			"The Affordable", "Quick Stop Hotel", "Smart Stay", "City Budget",
+		},
+		"boutique": {
+			"Artistic House", "Heritage Inn", "Boutique Noir", "Cultural Quarters",
+			"The Artisan Hotel", "Signature Boutique", "Modern Spaces", "Unique Stay",
+		},
+	}
+
+	category := strings.ToLower(hotelType)
+	if list, exists := names[category]; exists && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+
+	// Default to standard if unknown
+	return names["standard"][rand.Intn(len(names["standard"]))]
+}
+
+// generateRealisticBuffetNameForTravel generates realistic buffet names for travel summaries
+func generateRealisticBuffetNameForTravel(buffetType string) string {
+	var names map[string][]string = map[string][]string{
+		"continental": {
+			"The Continental Breakfast", "Morning Spread Buffet", "Continental Sunrise",
+			"Classic Breakfast House", "The Morning Table",
+		},
+		"international": {
+			"World Flavors Buffet", "Global Taste", "International Feast",
+			"The Passport Cafe", "Around the World Dining",
+		},
+		"asian": {
+			"Asian Cuisine Buffet", "Dragon's Feast", "The Orient Express",
+			"Asian Spice Buffet", "East Meets Plate",
+		},
+		"mediterranean": {
+			"Mediterranean Buffet", "The Greek Table", "Olive & Vine",
+			"Mediterranean Feast", "The Coastline",
+		},
+	}
+
+	category := strings.ToLower(buffetType)
+	if list, exists := names[category]; exists && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+
+	// Default to continental if unknown
+	return names["continental"][rand.Intn(len(names["continental"]))]
+}
+
 // HotelWant creates hotel stay reservations
 type HotelWant struct {
 	Want
@@ -411,11 +508,14 @@ func (h *HotelWant) Exec() bool {
 	checkOutTime := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
 		7+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 7-10 AM next day
 
+	// Generate realistic hotel name for the summary
+	hotelName := generateRealisticHotelNameForTravel(hotelType)
+
 	newEvent := TimeSlot{
 		Start: checkInTime,
 		End:   checkOutTime,
 		Type:  "hotel",
-		Name:  fmt.Sprintf("%s stay at %s hotel", h.Metadata.Name, hotelType),
+		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
 	}
 
 	// Check conflicts and retry if needed
@@ -606,11 +706,14 @@ func (b *BuffetWant) Exec() bool {
 	buffetStart := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
 		8+rand.Intn(2), rand.Intn(30), 0, 0, time.Local) // 8-10 AM
 
+	// Generate realistic buffet name for the summary
+	buffetName := generateRealisticBuffetNameForTravel(buffetType)
+
 	newEvent := TimeSlot{
 		Start: buffetStart,
 		End:   buffetStart.Add(duration),
 		Type:  "buffet",
-		Name:  fmt.Sprintf("%s %s breakfast buffet", b.Metadata.Name, buffetType),
+		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, buffetType),
 	}
 
 	if existingSchedule != nil {
