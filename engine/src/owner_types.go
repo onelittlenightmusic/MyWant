@@ -496,21 +496,14 @@ func (t *Target) computeTemplateResult() {
 		metricKey := resultSpec.WantName + "_" + statName
 		t.StoreState(metricKey, metrics[metricKey])
 
-		// Set primary result for first item
+		// Set result for first item
 		if i == 0 {
-			t.StoreState("recipeResult", primaryResult)
-			t.StoreState("primaryResult", primaryResult)
+			t.StoreState("result", fmt.Sprintf("%s: %v", resultSpec.Description, primaryResult))
 		}
 	}
 
 	// Store child count in local field
 	t.childCount = len(childWantsByName)
-
-	// Store result in a standardized format for memory dumps
-	if len(*recipeResult) > 0 {
-		firstResult := (*recipeResult)[0]
-		t.StoreState("result", fmt.Sprintf("%s: %v", firstResult.Description, primaryResult))
-	}
 
 	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name))
 }
@@ -909,10 +902,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 	}
 
 	// Store result in target's state
-	t.StoreState("recipeResult", totalProcessed)
+	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
 	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants)))
-
-	// Store result in a standardized format for memory dumps
-	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 }
