@@ -85,8 +85,12 @@ export const validateYamlWithSpec = (
     }
   }
 
-  // Validate against want type spec if provided
-  if (spec && spec.parameters && Array.isArray(spec.parameters)) {
+  // Skip parameter validation for recipe-based wants
+  // Recipe-based wants have a 'recipe' field in spec and don't use single want type definitions
+  const isRecipeBasedWant = !!specObj?.recipe;
+
+  // Validate against want type spec if provided (only for non-recipe-based wants)
+  if (!isRecipeBasedWant && spec && spec.parameters && Array.isArray(spec.parameters)) {
     const params = (specObj?.params || {}) as Record<string, any>;
 
     // Check for invalid parameters

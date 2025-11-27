@@ -153,6 +153,11 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // Populate parameters from want type examples when selectedWantType changes
   useEffect(() => {
+    // Skip if editing, or if a recipe is selected (recipe params handled separately)
+    if (selectedItemType === 'recipe') {
+      return;
+    }
+
     if (selectedWantType && !isEditing && type === selectedWantType.metadata.name) {
       // Get the first example if available, use parameter examples otherwise
       if (selectedWantType.examples && selectedWantType.examples.length > 0) {
@@ -173,7 +178,20 @@ export const WantForm: React.FC<WantFormProps> = ({
         setParams({});
       }
     }
-  }, [selectedWantType, isEditing, type]);
+  }, [selectedWantType, isEditing, type, selectedItemType]);
+
+  // Populate parameters from recipe definition when a recipe is selected
+  useEffect(() => {
+    if (selectedItemType === 'recipe' && !isEditing && recipe) {
+      const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === recipe);
+      if (selectedRecipe && selectedRecipe.recipe?.parameters) {
+        // Use recipe parameters directly
+        setParams(selectedRecipe.recipe.parameters);
+      } else {
+        setParams({});
+      }
+    }
+  }, [selectedItemType, recipe, recipes, isEditing]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
