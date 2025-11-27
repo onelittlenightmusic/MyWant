@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
+import { ChevronRight, Package, Zap } from 'lucide-react';
 import { WantType } from '@/types/wantType';
 import { Recipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -32,8 +32,6 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
   onGenerateName
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [userNameInput, setUserNameInput] = useState('');
-  const [showSuffixOptions, setShowSuffixOptions] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Convert want types and recipes to selector items
@@ -105,22 +103,8 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
     };
   }, [filteredItems]);
 
-  const selectedItem = items.find(item => item.id === selectedId);
-
   const handleSelect = (item: TypeRecipeSelectorItem) => {
     onSelect(item.id, item.type);
-  };
-
-  const generateNameForSelected = () => {
-    if (!selectedId) return;
-
-    const generatedName = onGenerateName(
-      selectedId,
-      selectedItem?.type || 'want-type',
-      userNameInput
-    );
-
-    return generatedName;
   };
 
   return (
@@ -259,40 +243,6 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
         )}
       </div>
 
-      {/* Selected Item Summary */}
-      {selectedItem && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-          <div>
-            <h4 className="font-medium text-gray-900">
-              {selectedItem.type === 'want-type' ? 'Selected Want Type' : 'Selected Recipe'}
-            </h4>
-            <p className="text-sm text-gray-600 mt-1">{selectedItem.title}</p>
-          </div>
-
-          {/* Optional Suffix Button */}
-          <button
-            type="button"
-            onClick={() => setShowSuffixOptions(!showSuffixOptions)}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-white rounded border border-gray-300 transition-colors"
-          >
-            <ChevronDown
-              className={`w-4 h-4 transition-transform flex-shrink-0 ${showSuffixOptions ? 'rotate-180' : ''}`}
-            />
-            Add custom suffix (optional)
-          </button>
-
-          {/* Suffix Input - Collapsible */}
-          {showSuffixOptions && (
-            <input
-              type="text"
-              placeholder="e.g., 'demo', 'test'"
-              value={userNameInput}
-              onChange={(e) => setUserNameInput(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 };
