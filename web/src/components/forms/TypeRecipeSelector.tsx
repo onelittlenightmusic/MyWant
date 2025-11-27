@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Package, Zap } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -33,6 +33,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -109,10 +110,69 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
     };
   }, [filteredItems]);
 
+  // Get selected item
+  const selectedItem = useMemo(() => {
+    return items.find(item => item.id === selectedId);
+  }, [items, selectedId]);
+
   const handleSelect = (item: TypeRecipeSelectorItem) => {
     onSelect(item.id, item.type);
+    setIsExpanded(false);
   };
 
+  const handleToggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  // Collapsed view - show only selected item
+  if (!isExpanded && selectedItem) {
+    const backgroundStyle = selectedItem.type === 'want-type'
+      ? getBackgroundStyle(selectedItem.name)
+      : { className: '', style: {}, hasBackgroundImage: false };
+
+    return (
+      <div className="space-y-3">
+        <div className={`border-2 rounded-lg p-4 relative overflow-hidden ${
+          selectedItem.type === 'want-type'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-green-500 bg-green-50'
+        } ${backgroundStyle.className}`}
+        style={backgroundStyle.style}>
+          {backgroundStyle.hasBackgroundImage && (
+            <div className={getBackgroundOverlayClass()}></div>
+          )}
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-3">
+              {selectedItem.type === 'want-type' ? (
+                <Zap className="w-5 h-5 text-blue-500" />
+              ) : (
+                <Package className="w-5 h-5 text-green-500" />
+              )}
+              <div>
+                <h4 className="font-medium text-gray-900">{selectedItem.title}</h4>
+                {selectedItem.category && (
+                  <p className="text-xs text-gray-600 mt-1">{selectedItem.category}</p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleExpand}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                selectedItem.type === 'want-type'
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+              }`}
+            >
+              Change
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded view - show all options
   return (
     <div className="space-y-3">
       {/* Search Input - Collapsible */}
