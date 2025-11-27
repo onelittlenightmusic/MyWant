@@ -17,6 +17,16 @@ recipe:
     dinner_duration: 2.0
     state_history_skip_count: 1
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    display_name: "Display name for the travel system"
+    restaurant_type: "Type of restaurant to book with agent support"
+    hotel_type: "Type of hotel accommodation with agent support"
+    buffet_type: "Type of buffet for breakfast with agent support"
+    dinner_duration: "Expected duration of dinner in hours"
+    state_history_skip_count: "Number of state history entries to skip for performance"
+
   wants:
     # Dinner restaurant reservation with agent support
     - metadata:

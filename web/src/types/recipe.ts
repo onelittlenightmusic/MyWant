@@ -36,9 +36,14 @@ export interface RecipeExample {
   wants: RecipeWant[];
 }
 
+export interface ParameterDescription {
+  description: string;
+}
+
 export interface RecipeContent {
   metadata: RecipeMetadata;
   parameters?: Record<string, any>;
+  parameter_descriptions?: Record<string, string>;
   wants: RecipeWant[];
   result?: RecipeResultSpec[];
   example?: RecipeExample;

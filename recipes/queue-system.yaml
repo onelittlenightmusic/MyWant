@@ -15,6 +15,14 @@ recipe:
     service_time: 0.05
     deterministic: false
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    count: "Total number of items to generate for the queue system"
+    rate: "Generation rate in items per second"
+    service_time: "Average time to service each item in the queue"
+    deterministic: "Use deterministic timing or variable timing for queue processing"
+
   wants:
     # Generator want - explicitly define all labels in recipe
     - metadata:

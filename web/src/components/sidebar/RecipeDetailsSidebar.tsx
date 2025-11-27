@@ -308,18 +308,27 @@ const ParametersTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
   <TabContent>
     {recipe.recipe.parameters && Object.keys(recipe.recipe.parameters).length > 0 ? (
       <div className="space-y-4">
-        {Object.entries(recipe.recipe.parameters).map(([key, value]) => (
-          <TabSection key={key} title={key}>
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-gray-600 mb-2">Default Value:</p>
-                <pre className="text-xs text-gray-800 bg-gray-50 p-3 rounded border overflow-x-auto whitespace-pre-wrap">
-                  {formatParameterValue(value)}
-                </pre>
+        {Object.entries(recipe.recipe.parameters).map(([key, value]) => {
+          const description = recipe.recipe.parameter_descriptions?.[key];
+          return (
+            <TabSection key={key} title={key}>
+              <div className="space-y-3">
+                {description && (
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Description:</p>
+                    <p className="text-sm text-gray-700">{description}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs text-gray-600 mb-2">Default Value:</p>
+                  <pre className="text-xs text-gray-800 bg-gray-50 p-3 rounded border overflow-x-auto whitespace-pre-wrap">
+                    {formatParameterValue(value)}
+                  </pre>
+                </div>
               </div>
-            </div>
-          </TabSection>
-        ))}
+            </TabSection>
+          );
+        })}
       </div>
     ) : (
       <EmptyState icon={Settings} message="No parameters defined for this recipe" />

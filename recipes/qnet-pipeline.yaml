@@ -20,6 +20,17 @@ recipe:
     secondary_service_time: 0.12
     final_service_time: 0.05
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    primary_count: "Total number of packets for primary stream"
+    secondary_count: "Total number of packets for secondary stream"
+    primary_rate: "Generation rate for primary stream (packets per second)"
+    secondary_rate: "Generation rate for secondary stream (packets per second)"
+    primary_service_time: "Service time for primary stream queue processing"
+    secondary_service_time: "Service time for secondary stream queue processing"
+    final_service_time: "Service time for final combined queue processing"
+
   wants:
     # Primary packet generator
     - metadata:

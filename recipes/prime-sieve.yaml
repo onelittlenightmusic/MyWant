@@ -15,6 +15,14 @@ recipe:
     end_number: 100
     description: "Generates and filters prime numbers using sieve algorithm"
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    display_name: "Display name for the recipe instance"
+    start_number: "Starting number for the range to search for primes"
+    end_number: "Ending number for the range to search for primes"
+    description: "User-friendly description of this recipe deployment"
+
   wants:
     # Prime number generator - generates consecutive numbers
     - type: prime numbers

@@ -13,6 +13,12 @@ recipe:
     coordinator_type: "level2"
     level2_authority: "senior_manager"
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    approval_id: "Unique identifier for this approval request"
+    coordinator_type: "Type of coordinator (level2 for second approval level)"
+    level2_authority: "Authority or role for level 2 approval decision"
+
   wants:
     # Evidence Provider for Level 2
     - metadata:

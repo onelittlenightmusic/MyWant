@@ -13,6 +13,12 @@ recipe:
     max_number: 100
     delay: 0.5
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    max_number: "Maximum fibonacci number to generate in the sequence"
+    delay: "Delay in seconds between generating fibonacci numbers"
+
   wants:
     # Fibonacci Generator
     - type: fibonacci generator

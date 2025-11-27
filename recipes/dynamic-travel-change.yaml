@@ -23,6 +23,22 @@ recipe:
     dinner_duration: 2.0
     flight_duration: 12.0
 
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    display_name: "Display name for the dynamic travel itinerary"
+    server_url: "URL of the flight API server for booking"
+    flight_number: "Flight number to book"
+    flight_type: "Class of service (e.g., business class, economy)"
+    from: "Departure city"
+    to: "Destination city"
+    departure_date: "Flight departure date in YYYY-MM-DD format"
+    restaurant_type: "Type of restaurant to book"
+    hotel_type: "Type of hotel accommodation"
+    buffet_type: "Type of buffet for breakfast"
+    dinner_duration: "Expected duration of dinner in hours"
+    flight_duration: "Expected duration of flight in hours"
+
   wants:
     # Flight booking with API agent - monitors and auto-reboks on delay
     - metadata:
