@@ -4,6 +4,7 @@ export interface RecipeMetadata {
   version?: string;
   type?: string;
   custom_type?: string;
+  category?: string;
 }
 
 export interface RecipeWant {

@@ -4,6 +4,7 @@ recipe:
     name: "Level 2 Approval"
     description: "Level 2 approval workflow coordinator"
     custom_type: "level 2 approval"
+    category: "approval"
     version: "1.0.0"
 
   # Recipe parameters - configurable values for Level 2 approval

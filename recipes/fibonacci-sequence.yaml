@@ -4,6 +4,7 @@ recipe:
     name: "Fibonacci Sequence"
     description: "Fibonacci sequence generator and filter"
     custom_type: "fibonacci sequence"
+    category: "mathematics"
     version: "1.0.0"
     
   # Recipe parameters - these are the configurable values

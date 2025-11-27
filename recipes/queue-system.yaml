@@ -4,6 +4,7 @@ recipe:
     name: "Queue System"
     description: "Queue system simulation with wait time analysis"
     custom_type: "wait time in queue system"
+    category: "queue"
     version: "1.0.0"
     
   # Recipe parameters - these are the configurable values

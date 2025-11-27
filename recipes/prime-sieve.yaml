@@ -4,6 +4,7 @@ recipe:
     name: "Prime Sieve"
     description: "Prime number generation and filtering pipeline"
     custom_type: "prime sieve"
+    category: "mathematics"
     version: "1.0.0"
 
   # Recipe parameters - these are the configurable values

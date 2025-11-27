@@ -4,6 +4,7 @@ recipe:
     name: "QNet Pipeline"
     description: "Dual-stream queueing network with parameterized connections"
     custom_type: "qnet pipeline"
+    category: "queue"
     version: "1.0.0"
 
   # QNet Recipe - Dual-stream queueing network with parameterized connections

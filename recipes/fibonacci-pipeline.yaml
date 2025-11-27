@@ -4,6 +4,7 @@ recipe:
     name: "Fibonacci Pipeline"
     description: "Fibonacci number generation and processing pipeline"
     custom_type: "fibonacci pipeline"
+    category: "mathematics"
     version: "1.0.0"
 
   # Recipe parameters - these are the configurable values

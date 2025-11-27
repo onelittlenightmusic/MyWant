@@ -97,6 +97,7 @@ type GenericRecipeMetadata struct {
 	Version     string `yaml:"version" json:"version"`
 	Type        string `yaml:"type,omitempty" json:"type,omitempty"`               // travel, qnet, fibonacci, etc.
 	CustomType  string `yaml:"custom_type,omitempty" json:"custom_type,omitempty"` // "wait time in queue system", etc.
+	Category    string `yaml:"category,omitempty" json:"category,omitempty"`       // approval, travel, mathematics, queue, etc.
 }
 
 // GenericRecipeConfig represents the final configuration after recipe processing

@@ -4,6 +4,7 @@ recipe:
     name: "Dynamic Travel Change with Flight API"
     description: "Travel planning with API-based flight booking, automatic monitoring, and delay-triggered rebooking"
     custom_type: "dynamic travel change"
+    category: "travel"
     version: "2.0.0"
 
   # Recipe parameters - these are the configurable values

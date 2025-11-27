@@ -4,6 +4,7 @@ recipe:
     name: "Travel Itinerary"
     description: "Travel planning system with coordination"
     custom_type: "travel itinerary planner"
+    category: "travel"
     version: "1.0.0"
     
   # Recipe parameters - these are the configurable values

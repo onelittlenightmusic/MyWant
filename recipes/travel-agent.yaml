@@ -4,6 +4,7 @@ recipe:
     name: "Travel Agent System"
     description: "Complete travel planning system with agent integration for all components"
     custom_type: "agent travel system"
+    category: "travel"
     version: "2.0.0"
 
   # Recipe parameters - these are the configurable values
