@@ -54,6 +54,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
         name: r.recipe.metadata.custom_type || '',
         title: r.recipe.metadata.name || r.recipe.metadata.custom_type || '',
         description: r.recipe.metadata.description || '',
+        category: r.recipe.metadata.category,
         icon: <Package className="w-5 h-5" />
       }));
 
