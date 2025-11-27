@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronRight, Package, Zap } from 'lucide-react';
-import { WantType } from '@/types/wantType';
-import { Recipe } from '@/types/recipe';
+import { WantTypeListItem } from '@/types/wantType';
+import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 
 export interface TypeRecipeSelectorItem {
@@ -15,8 +15,8 @@ export interface TypeRecipeSelectorItem {
 }
 
 interface TypeRecipeSelectorProps {
-  wantTypes: WantType[];
-  recipes: Recipe[];
+  wantTypes: WantTypeListItem[];
+  recipes: GenericRecipe[];
   selectedId: string | null;
   showSearch: boolean;
   onSelect: (id: string, itemType: 'want-type' | 'recipe') => void;
@@ -41,7 +41,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
       type: 'want-type' as const,
       name: wt.name,
       title: wt.title || wt.name,
-      description: wt.description || '',
+      description: wt.title || '',
       category: wt.category,
       icon: <Zap className="w-5 h-5" />
     }));
