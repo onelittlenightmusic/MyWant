@@ -34,6 +34,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [userNameInput, setUserNameInput] = useState('');
   const [showSuffixOptions, setShowSuffixOptions] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -61,19 +62,40 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
     return [...wantTypeItems, ...recipeItems];
   }, [wantTypes, recipes]);
 
-  // Filter items based on search query
+  // Extract unique categories from want types
+  const categories = useMemo(() => {
+    const categorySet = new Set<string>();
+    wantTypes.forEach(wt => {
+      if (wt.category) {
+        categorySet.add(wt.category);
+      }
+    });
+    return Array.from(categorySet).sort();
+  }, [wantTypes]);
+
+  // Filter items based on search query and category
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return items;
+    let filtered = items;
+
+    // Apply category filter (only for want types, recipes always shown)
+    if (selectedCategory) {
+      filtered = filtered.filter(item =>
+        item.type === 'recipe' || item.category === selectedCategory
+      );
     }
 
-    const query = searchQuery.toLowerCase();
-    return items.filter(item =>
-      item.title.toLowerCase().includes(query) ||
-      item.description.toLowerCase().includes(query) ||
-      item.name.toLowerCase().includes(query)
-    );
-  }, [items, searchQuery]);
+    // Apply search query filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.title.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.name.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [items, searchQuery, selectedCategory]);
 
   // Group items by type
   const groupedItems = useMemo(() => {
@@ -113,6 +135,37 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           autoFocus
         />
+      )}
+
+      {/* Category Filter - Toggle Buttons */}
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedCategory(null)}
+            className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
+              selectedCategory === null
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All
+          </button>
+          {categories.map(category => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => setSelectedCategory(category)}
+              className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors capitalize ${
+                selectedCategory === category
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Scrollable Card List */}
