@@ -1844,7 +1844,16 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
-			want.State = runtimeWant.want.State
+
+			// Lock state when copying to prevent concurrent map access
+			runtimeWant.want.stateMutex.RLock()
+			stateCopy := make(map[string]interface{})
+			for k, v := range runtimeWant.want.State {
+				stateCopy[k] = v
+			}
+			runtimeWant.want.stateMutex.RUnlock()
+
+			want.State = stateCopy
 			want.History = runtimeWant.want.History // Include history in stats writes
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
@@ -1854,12 +1863,21 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	for wantName, runtimeWant := range cb.wants {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
+
+			// Lock state when copying to prevent concurrent map access
+			runtimeWant.want.stateMutex.RLock()
+			stateCopy := make(map[string]interface{})
+			for k, v := range runtimeWant.want.State {
+				stateCopy[k] = v
+			}
+			runtimeWant.want.stateMutex.RUnlock()
+
 			wantConfig := &Want{
 				Metadata: *runtimeWant.GetMetadata(),
 				Spec:     *runtimeWant.GetSpec(),
 				// Stats field removed - data now in State
 				Status:  runtimeWant.want.Status,
-				State:   runtimeWant.want.State,
+				State:   stateCopy,
 				History: runtimeWant.want.History, // Include history in stats writes
 			}
 			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
