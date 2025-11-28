@@ -498,7 +498,12 @@ func (t *Target) computeTemplateResult() {
 
 		// Set result for first item
 		if i == 0 {
-			t.StoreState("result", fmt.Sprintf("%s: %v", resultSpec.Description, primaryResult))
+			// Format result as "stat_name: value" (e.g., "average_wait_time: 0.026")
+			statLabel := strings.TrimPrefix(resultSpec.StatName, ".")
+			if statLabel == "" {
+				statLabel = resultSpec.Description
+			}
+			t.StoreState("result", fmt.Sprintf("%s: %v", statLabel, primaryResult))
 		}
 	}
 
