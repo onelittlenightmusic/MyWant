@@ -440,17 +440,18 @@ func (t *Target) computeTemplateResult() {
 	for _, want := range allWantStates {
 		for _, ownerRef := range want.Metadata.OwnerReferences {
 			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
-				// Extract the actual want name without prefix
-				wantName := want.Metadata.Type
-				if want.Metadata.Name != "" {
-					// Try to extract base name from prefixed name (e.g., "vacation-hotel-2" -> "hotel")
-					parts := strings.Split(want.Metadata.Name, "-")
-					if len(parts) >= 2 {
-						wantName = parts[len(parts)-2] // Get the type part before the number
-					}
+				// Store by full type name (e.g., "qnet queue")
+				childWantsByName[want.Metadata.Type] = want
+
+				// Also extract and store by short type name
+				// For "qnet queue" -> also store as "queue"
+				typeParts := strings.Fields(want.Metadata.Type)
+				if len(typeParts) > 0 {
+					lastPart := typeParts[len(typeParts)-1]
+					childWantsByName[lastPart] = want
 				}
-				childWantsByName[wantName] = want
-				// Also store by exact name for recipes that specify exact names
+
+				// Also store by exact want name for recipes that specify exact names
 				if want.Metadata.Name != "" {
 					childWantsByName[want.Metadata.Name] = want
 				}
@@ -459,7 +460,12 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation\n", t.Metadata.Name, len(childWantsByName)))
+	// Log child want names for debugging result extraction
+	childNames := make([]string, 0, len(childWantsByName))
+	for name := range childWantsByName {
+		childNames = append(childNames, name)
+	}
+	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames))
 
 	// Stats are now stored in State - no separate initialization needed
 
@@ -754,7 +760,12 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
 	want, exists := childWants[spec.WantName]
 	if !exists {
-		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation\n", t.Metadata.Name, spec.WantName))
+		// Log available want names to help with debugging
+		availableNames := make([]string, 0, len(childWants))
+		for name := range childWants {
+			availableNames = append(availableNames, name)
+		}
+		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation (available: %v)\n", t.Metadata.Name, spec.WantName, availableNames))
 		return 0
 	}
 
