@@ -2122,13 +2122,32 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
 	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
 
+	// Start with globally registered labels (added via POST /api/v1/labels)
+	// These labels don't have owners - they're just registered labels
+	if s.globalLabels != nil {
+		for key, valueMap := range s.globalLabels {
+			labelKeys[key] = true
+			if labelValues[key] == nil {
+				labelValues[key] = make(map[string]bool)
+				labelToWants[key] = make(map[string]map[string]bool)
+			}
+			for value := range valueMap {
+				labelValues[key][value] = true
+				// Initialize empty owner list for this label value
+				if labelToWants[key][value] == nil {
+					labelToWants[key][value] = make(map[string]bool)
+				}
+			}
+		}
+	}
+
 	// Collect from wants in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
-				// Skip internal wants
-				if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+				// Skip internal wants and label-holder wants
+				if want.Metadata.Name != "" && (strings.HasPrefix(want.Metadata.Name, "__") || strings.HasPrefix(want.Metadata.Name, "_label-")) {
 					continue
 				}
 				for key, value := range want.Metadata.Labels {
@@ -2154,8 +2173,8 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
-			// Skip internal wants
-			if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+			// Skip internal wants and label-holder wants
+			if want.Metadata.Name != "" && (strings.HasPrefix(want.Metadata.Name, "__") || strings.HasPrefix(want.Metadata.Name, "_label-")) {
 				continue
 			}
 			for key, value := range want.Metadata.Labels {
@@ -2327,7 +2346,7 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add the label to the global label registry (a separate tracking structure)
-	// This ensures labels persist even if we can't create a want for them
+	// Labels are registered here and displayed in getLabels without creating wants
 	if s.globalLabels == nil {
 		s.globalLabels = make(map[string]map[string]bool) // key -> value -> true
 	}
@@ -2335,28 +2354,6 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		s.globalLabels[labelReq.Key] = make(map[string]bool)
 	}
 	s.globalLabels[labelReq.Key][labelReq.Value] = true
-
-	// Also try to create a want with the label for persistence
-	// Use "monitor" type which is a valid, simple type that won't execute
-	// Use a name without "__" prefix so it won't be filtered out in getLabels
-	labelWant := &mywant.Want{
-		Metadata: mywant.Metadata{
-			Name: fmt.Sprintf("_label-%s-%d", labelReq.Key, time.Now().UnixNano()),
-			Type: "monitor", // Use a valid type that can be registered
-			ID:   generateWantID(),
-			Labels: map[string]string{
-				labelReq.Key: labelReq.Value,
-			},
-		},
-		Spec: mywant.WantSpec{},
-		Status: "idle",
-	}
-
-	// Add to global builder if it exists (optional - for persistence)
-	// But the label is already registered above in globalLabels
-	if s.globalBuilder != nil {
-		_, _ = s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{labelWant})
-	}
 
 	// Return success response
 	w.WriteHeader(http.StatusCreated)
