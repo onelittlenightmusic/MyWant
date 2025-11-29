@@ -335,19 +335,25 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   if (!isOpen) return null;
 
+  const isTypeSelected = !!type || !!recipe;
+  const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
+
   const headerAction = (
     <button
       type="submit"
-      disabled={loading}
+      disabled={loading || (!isEditing && !isTypeSelected)}
       form="want-form"
-      className="flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+      className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
+        shouldGlowButton ? 'glow-button' : ''
+      }`}
+      style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
     >
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : (
         <>
           <Save className="w-3.5 h-3.5" />
-          {isEditing ? 'Update' : 'Create'}
+          {isEditing ? 'Update' : 'Add'}
         </>
       )}
     </button>
@@ -357,7 +363,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     <CreateSidebar
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Want' : 'Create New Want'}
+      title={isEditing ? 'Edit Want' : 'New Want'}
       headerAction={headerAction}
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
