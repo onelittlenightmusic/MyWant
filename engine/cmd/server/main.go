@@ -2122,19 +2122,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
 	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
 
-	// Start with globally registered labels (added via POST /api/v1/labels)
-	if s.globalLabels != nil {
-		for key, valueMap := range s.globalLabels {
-			labelKeys[key] = true
-			if labelValues[key] == nil {
-				labelValues[key] = make(map[string]bool)
-			}
-			for value := range valueMap {
-				labelValues[key][value] = true
-			}
-		}
-	}
-
 	// Collect from wants in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
