@@ -240,6 +240,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
 	wants.HandleFunc("/{id}/start", s.startWant).Methods("POST")
+	wants.HandleFunc("/{id}/labels", s.addLabelToWant).Methods("POST")
+	wants.HandleFunc("/{id}/labels", s.handleOptions).Methods("OPTIONS")
 
 	// Config CRUD endpoints - for loading recipe-based configurations
 	configs := api.PathPrefix("/configs").Subrouter()
@@ -1592,6 +1594,74 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// addLabelToWant handles POST /api/v1/wants/{id}/labels - adds a label to a want
+func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Parse label request body
+	var labelReq struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&labelReq); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate label key and value
+	if labelReq.Key == "" || labelReq.Value == "" {
+		http.Error(w, "Label key and value are required", http.StatusBadRequest)
+		return
+	}
+
+	// Search for the want by metadata.id across all executions
+	var targetWant *mywant.Want
+	var found bool
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
+				targetWant = want
+				found = true
+				break
+			}
+		}
+	}
+
+	// If not found in executions, search in global builder
+	if !found && s.globalBuilder != nil {
+		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
+			targetWant = want
+			found = true
+		}
+	}
+
+	if !found || targetWant == nil {
+		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		return
+	}
+
+	// Add the label to the want's metadata
+	if targetWant.Metadata.Labels == nil {
+		targetWant.Metadata.Labels = make(map[string]string)
+	}
+	targetWant.Metadata.Labels[labelReq.Key] = labelReq.Value
+
+	// Return success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":   "Label added successfully",
+		"wantId":    wantID,
+		"key":       labelReq.Key,
+		"value":     labelReq.Value,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.setupRoutes()
@@ -1625,6 +1695,7 @@ func (s *Server) Start() error {
 	log.Printf("  GET  /api/v1/wants/{id}/results    - Get execution results\n")
 	log.Printf("  POST /api/v1/wants/{id}/suspend    - Suspend want execution\n")
 	log.Printf("  POST /api/v1/wants/{id}/resume     - Resume want execution\n")
+	log.Printf("  POST /api/v1/wants/{id}/labels     - Add label to want\n")
 	log.Printf("  POST /api/v1/agents                - Create agent\n")
 	log.Printf("  GET  /api/v1/agents                - List agents\n")
 	log.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")

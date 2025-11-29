@@ -489,7 +489,16 @@ export const Dashboard: React.FC = () => {
                           Array.from(values).map((value) => (
                             <div
                               key={`${key}-${value}`}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.effectAllowed = 'copy';
+                                e.dataTransfer.setData('application/json', JSON.stringify({ key, value }));
+                                // Set drag image with opacity
+                                const img = new Image();
+                                e.dataTransfer.setDragImage(img, 0, 0);
+                              }}
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 cursor-move hover:bg-blue-200 transition-colors select-none"
+                              style={{ opacity: 1 }}
                             >
                               {key}: {value}
                             </div>

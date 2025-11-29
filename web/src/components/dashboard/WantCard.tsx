@@ -49,6 +49,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   const expandedContainerRef = useRef<HTMLDivElement>(null);
   const [showAnimation, setShowAnimation] = useState(false);
 
+  // State for drag and drop
+  const [isDragOver, setIsDragOver] = useState(false);
+
   // Trigger animation when expanded children section mounts
   useEffect(() => {
     if (displayIsExpanded && expandedContainerRef.current) {
@@ -118,6 +121,57 @@ export const WantCard: React.FC<WantCardProps> = ({
     });
   };
 
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  // Handle drag leave
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  // Handle drop
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      const labelData = e.dataTransfer.getData('application/json');
+      if (!labelData) return;
+
+      const { key, value } = JSON.parse(labelData);
+      const wantId = want.metadata?.id || want.id;
+
+      if (!wantId) {
+        console.error('No want ID found');
+        return;
+      }
+
+      // Add label via POST /api/v1/wants/{id}/labels
+      const response = await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+      });
+
+      if (response.ok) {
+        // Refresh the want to show updated labels
+        onView(want);
+      } else {
+        console.error('Failed to add label to want:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error dropping label:', error);
+    }
+  };
+
   // Check if this is a flight or hotel want
   const isFlightWant = want.metadata?.type === 'flight';
   const isHotelWant = want.metadata?.type === 'hotel';
@@ -128,10 +182,14 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       onClick={handleCardClick}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       data-keyboard-nav-selected={selected}
       className={classNames(
         'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
+        isDragOver && 'border-green-500 border-2 bg-green-50',
         className || ''
       )}
       style={parentBackgroundStyle.style}
