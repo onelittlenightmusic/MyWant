@@ -48,6 +48,7 @@ export const Dashboard: React.FC = () => {
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
+  const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
 
   // Derive selectedWant from wants array using selectedWantId
   // This ensures selectedWant always reflects the current data from polling
@@ -86,9 +87,42 @@ export const Dashboard: React.FC = () => {
   // Header state for sidebar
   const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: WantExecutionStatus } | null>(null);
 
+  // Fetch labels from API
+  const fetchLabels = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/v1/labels');
+      if (response.ok) {
+        const data = await response.json();
+        const labelsMap = new Map<string, Set<string>>();
+
+        // Process labelValues from API response
+        if (data.labelValues) {
+          for (const [key, valuesArray] of Object.entries(data.labelValues)) {
+            if (!labelsMap.has(key)) {
+              labelsMap.set(key, new Set());
+            }
+            if (Array.isArray(valuesArray)) {
+              (valuesArray as any[]).forEach(item => {
+                const value = typeof item === 'string' ? item : item.value;
+                if (value) {
+                  labelsMap.get(key)!.add(value);
+                }
+              });
+            }
+          }
+        }
+
+        setAllLabels(labelsMap);
+      }
+    } catch (error) {
+      console.error('Error fetching labels:', error);
+    }
+  };
+
   // Load initial data
   useEffect(() => {
     fetchWants();
+    fetchLabels();
   }, [fetchWants]);
 
   // Auto-refresh wants every 5 seconds
@@ -97,6 +131,8 @@ export const Dashboard: React.FC = () => {
       if (wants.length > 0) {
         fetchWants();
       }
+      // Also refresh labels in case new labels were added
+      fetchLabels();
     },
     {
       interval: 5000,
@@ -504,7 +540,8 @@ export const Dashboard: React.FC = () => {
                           if (newLabel.key.trim() && newLabel.value.trim()) {
                             const success = await addLabelToRegistry(newLabel.key, newLabel.value);
                             if (success) {
-                              // Refresh the wants list to show the new label
+                              // Refresh labels and wants to show the new label
+                              await fetchLabels();
                               fetchWants();
                               setNewLabel({ key: '', value: '' });
                               setShowAddLabelForm(false);
@@ -522,69 +559,48 @@ export const Dashboard: React.FC = () => {
               )}
 
               <div>
-                {wants.length === 0 ? (
+                {allLabels.size === 0 ? (
                   <p className="text-sm text-gray-500">No labels found</p>
                 ) : (
-                  (() => {
-                    // Collect all unique labels from all wants
-                    const allLabels = new Map<string, Set<string>>();
-                    wants.forEach(want => {
-                      if (want.metadata?.labels) {
-                        Object.entries(want.metadata.labels).forEach(([key, value]) => {
-                          if (!allLabels.has(key)) {
-                            allLabels.set(key, new Set());
-                          }
-                          allLabels.get(key)!.add(value);
-                        });
-                      }
-                    });
-
-                    if (allLabels.size === 0) {
-                      return <p className="text-sm text-gray-500">No labels found</p>;
-                    }
-
-                    return (
-                      <div className="flex flex-wrap gap-2">
-                        {Array.from(allLabels.entries()).map(([key, values]) => (
-                          Array.from(values).map((value) => (
-                            <div
-                              key={`${key}-${value}`}
-                              draggable
-                              onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'copy';
-                                e.dataTransfer.setData('application/json', JSON.stringify({ key, value }));
-                                // Create custom drag image
-                                const dragImage = document.createElement('div');
-                                dragImage.textContent = `${key}: ${value}`;
-                                dragImage.style.position = 'absolute';
-                                dragImage.style.left = '-9999px';
-                                dragImage.style.padding = '6px 12px';
-                                dragImage.style.borderRadius = '9999px';
-                                dragImage.style.backgroundColor = '#dbeafe';
-                                dragImage.style.color = '#1e40af';
-                                dragImage.style.fontSize = '14px';
-                                dragImage.style.fontWeight = '500';
-                                dragImage.style.whiteSpace = 'nowrap';
-                                dragImage.style.opacity = '0.8';
-                                document.body.appendChild(dragImage);
-                                e.dataTransfer.setDragImage(dragImage, 0, 0);
-                                setTimeout(() => document.body.removeChild(dragImage), 0);
-                              }}
-                              onClick={() => handleLabelClick(key, value)}
-                              className={classNames(
-                                'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer hover:shadow-md transition-all select-none',
-                                selectedLabel?.key === key && selectedLabel?.value === value
-                                  ? 'bg-blue-500 text-white shadow-md'
-                                  : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                              )}
-                            >
-                              {key}: {value}
-                            </div>
-                          ))
-                        ))}
-                      </div>
-                    );
-                  })()
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(allLabels.entries()).map(([key, values]) => (
+                      Array.from(values).map((value) => (
+                        <div
+                          key={`${key}-${value}`}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = 'copy';
+                            e.dataTransfer.setData('application/json', JSON.stringify({ key, value }));
+                            // Create custom drag image
+                            const dragImage = document.createElement('div');
+                            dragImage.textContent = `${key}: ${value}`;
+                            dragImage.style.position = 'absolute';
+                            dragImage.style.left = '-9999px';
+                            dragImage.style.padding = '6px 12px';
+                            dragImage.style.borderRadius = '9999px';
+                            dragImage.style.backgroundColor = '#dbeafe';
+                            dragImage.style.color = '#1e40af';
+                            dragImage.style.fontSize = '14px';
+                            dragImage.style.fontWeight = '500';
+                            dragImage.style.whiteSpace = 'nowrap';
+                            dragImage.style.opacity = '0.8';
+                            document.body.appendChild(dragImage);
+                            e.dataTransfer.setDragImage(dragImage, 0, 0);
+                            setTimeout(() => document.body.removeChild(dragImage), 0);
+                          }}
+                          onClick={() => handleLabelClick(key, value)}
+                          className={classNames(
+                            'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer hover:shadow-md transition-all select-none',
+                            selectedLabel?.key === key && selectedLabel?.value === value
+                              ? 'bg-blue-500 text-white shadow-md'
+                              : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                          )}
+                        >
+                          {key}: {value}
+                        </div>
+                      ))
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
