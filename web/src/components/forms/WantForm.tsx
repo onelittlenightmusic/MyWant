@@ -488,7 +488,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   <div className="text-sm text-gray-600 text-right flex-1 mr-2">
                     {Object.entries(params).map(([key, value]) => (
                       <div key={key} className="text-gray-500">
-                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{String(value)}"</span>
                       </div>
                     ))}
                   </div>

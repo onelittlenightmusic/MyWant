@@ -39,13 +39,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           className || ''
         )}
       >
-        {/* Background overlay - full screen height */}
+        {/* Background overlay - covers entire sidebar */}
         {backgroundStyle && (
           <div
-            className="absolute top-0 right-0 w-full h-screen pointer-events-none z-0"
+            className="absolute inset-0 w-full pointer-events-none z-0"
             style={{
               ...backgroundStyle,
-              backgroundAttachment: 'fixed'
+              backgroundAttachment: 'fixed',
+              minHeight: '100vh'
             }}
           />
         )}
