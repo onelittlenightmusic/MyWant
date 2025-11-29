@@ -23,6 +23,13 @@ export const getBackgroundImage = (type?: string): string | undefined => {
     restaurant: '/resources/restaurant.png',
     buffet: '/resources/buffet.png',
     evidence: '/resources/evidence.png',
+    // Mathematics category types and recipes
+    'prime numbers': '/resources/numbers.png',
+    'prime sequence': '/resources/numbers.png',
+    'fibonacci numbers': '/resources/numbers.png',
+    'fibonacci filter': '/resources/numbers.png',
+    'fibonacci sequence': '/resources/numbers.png',
+    'prime sieve': '/resources/numbers.png',
   };
 
   // Check exact type match first
