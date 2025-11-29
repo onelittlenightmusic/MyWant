@@ -23,6 +23,7 @@ interface WantGridProps {
   onGetFilteredWants?: (wants: Want[]) => void;
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
+  onCreateWant?: () => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -39,7 +40,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onResumeWant,
   onGetFilteredWants,
   expandedParents,
-  onToggleExpand
+  onToggleExpand,
+  onCreateWant
 }) => {
   const hierarchicalWants = useMemo(() => {
     // First, build a map of all wants by name for efficient lookup
@@ -146,26 +148,33 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   if (wants.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <svg
-            className="w-12 h-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No wants yet</h3>
-        <p className="text-gray-600 mb-4">
-          Get started by creating your first want configuration.
-        </p>
+      <div className="flex items-center justify-center py-16">
+        <button
+          onClick={onCreateWant}
+          className="flex flex-col items-center gap-4 p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group"
+        >
+          <div className="w-24 h-24 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors">
+            <svg
+              className="w-12 h-12 text-gray-400 group-hover:text-blue-500 transition-colors"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No wants yet</h3>
+            <p className="text-gray-600">
+              Click the plus icon to create your first want configuration.
+            </p>
+          </div>
+        </button>
       </div>
     );
   }

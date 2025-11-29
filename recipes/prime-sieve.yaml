@@ -13,7 +13,6 @@ recipe:
     display_name: "Prime Number Sieve"
     start_number: 1
     end_number: 100
-    description: "Generates and filters prime numbers using sieve algorithm"
 
   # Parameter descriptions - explain what each parameter does
   parameter_descriptions:
@@ -21,7 +20,6 @@ recipe:
     display_name: "Display name for the recipe instance"
     start_number: "Starting number for the range to search for primes"
     end_number: "Ending number for the range to search for primes"
-    description: "User-friendly description of this recipe deployment"
 
   wants:
     # Prime number generator - generates consecutive numbers

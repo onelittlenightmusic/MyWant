@@ -14,7 +14,6 @@ recipe:
     count: 10
     min_value: 0
     max_value: 1000000
-    description: "Generates and filters fibonacci numbers"
 
   # Parameter descriptions - explain what each parameter does
   parameter_descriptions:
@@ -23,7 +22,6 @@ recipe:
     count: "Number of fibonacci numbers to generate in the sequence"
     min_value: "Minimum value for filtering the fibonacci sequence"
     max_value: "Maximum value for filtering the fibonacci sequence"
-    description: "User-friendly description of this recipe deployment"
 
   wants:
     # Fibonacci number generator - generates fibonacci sequence
@@ -72,4 +70,3 @@ recipe:
             count: 10
             min_value: 0
             max_value: 1000000
-            description: "Generates and filters fibonacci numbers"

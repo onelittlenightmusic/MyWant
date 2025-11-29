@@ -382,6 +382,7 @@ export const Dashboard: React.FC = () => {
                 onGetFilteredWants={setFilteredWants}
                 expandedParents={expandedParents}
                 onToggleExpand={handleToggleExpand}
+                onCreateWant={handleCreateWant}
               />
             </div>
           </div>

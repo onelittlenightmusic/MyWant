@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, X, Code, Edit3, Search } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, Search, ChevronDown } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -45,6 +45,10 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
   const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
+  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies'>>(() => {
+    // All sections collapsed by default
+    return new Set(['parameters', 'labels', 'dependencies']);
+  });
 
   // Form state
   const [name, setName] = useState('');
@@ -120,6 +124,18 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   }, [editingWant]);
 
+  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies') => {
+    setCollapsedSections(prev => {
+      const updated = new Set(prev);
+      if (updated.has(section)) {
+        updated.delete(section);
+      } else {
+        updated.add(section);
+      }
+      return updated;
+    });
+  };
+
   const resetForm = () => {
     setIsEditing(false);
     setEditMode('form');
@@ -139,6 +155,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     }));
     setValidationError(null);
     setApiError(null);
+    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies']));
   };
 
   // Update form when want type is selected
@@ -446,314 +463,398 @@ export const WantForm: React.FC<WantFormProps> = ({
               </div>
             </div>
 
-        {/* Labels */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-base font-medium text-gray-900">Labels</h4>
-            {editingLabelKey === null && (
+            {/* Parameters - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
               <button
                 type="button"
-                onClick={() => addLabel()}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                onClick={() => toggleSection('parameters')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
               >
-                +
-              </button>
-            )}
-          </div>
-
-          {/* Display existing labels as styled chips */}
-          {Object.entries(labels).length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {Object.entries(labels).map(([key, value]) => {
-                // Don't show chip if this label is being edited
-                if (editingLabelKey === key) return null;
-
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      setEditingLabelKey(key);
-                      setEditingLabelDraft({ key, value });
-                    }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                  >
-                    {key}: {value}
-                    <X
-                      className="w-3 h-3 ml-2 hover:text-blue-900"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeLabel(key);
-                      }}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Label input form - shown when editing or adding new label */}
-          {editingLabelKey !== null && (
-            <div className="space-y-3 pt-4 border-t border-gray-200">
-              <LabelAutocomplete
-                keyValue={editingLabelDraft.key}
-                valueValue={editingLabelDraft.value}
-                onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
-                onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
-                onRemove={() => {
-                  removeLabel(editingLabelKey);
-                  setEditingLabelKey(null);
-                  setEditingLabelDraft({ key: '', value: '' });
-                }}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Only update if draft has a key value
-                    if (editingLabelDraft.key.trim()) {
-                      updateLabel(editingLabelKey === '__new__' ? '' : editingLabelKey, editingLabelDraft.key, editingLabelDraft.value);
-                    }
-                    setEditingLabelKey(null);
-                    setEditingLabelDraft({ key: '', value: '' });
-                  }}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingLabelKey(null);
-                    setEditingLabelDraft({ key: '', value: '' });
-                  }}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Parameters */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Parameters
-            </label>
-            <button
-              type="button"
-              onClick={addParam}
-              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-              disabled={!type}
-            >
-              <Plus className="w-4 h-4" />
-              Add Parameter
-            </button>
-          </div>
-
-          {/* Parameter definitions hint from want type */}
-          {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <p className="text-sm font-medium text-blue-900 mb-2">Available Parameters:</p>
-              <div className="space-y-1">
-                {selectedWantType.parameters.map((param) => (
-                  <div key={param.name} className="text-xs text-blue-800">
-                    <span className="font-medium">{param.name}</span>
-                    {param.required && <span className="text-red-600 ml-1">*</span>}
-                    <span className="text-blue-700 ml-1">({param.type})</span>
-                    {param.description && <span className="text-blue-600 ml-1">- {param.description}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {Object.entries(params).map(([key, value], index) => (
-              <div key={index} className="space-y-1">
-                <div className="flex gap-2">
-                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
-                    <select
-                      value={key}
-                      onChange={(e) => {
-                        const newKey = e.target.value;
-                        const newParams = { ...params };
-                        if (key !== newKey) {
-                          delete newParams[key];
-                          if (newKey.trim()) {
-                            newParams[newKey] = value;
-                          }
-                          setParams(newParams);
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select parameter...</option>
-                      {selectedWantType.parameters.map((param) => (
-                        <option key={param.name} value={param.name}>
-                          {param.name} {param.required ? '*' : ''} ({param.type})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={key}
-                      onChange={(e) => {
-                        const newKey = e.target.value;
-                        const newParams = { ...params };
-                        if (key !== newKey) {
-                          delete newParams[key];
-                          if (newKey.trim()) {
-                            newParams[newKey] = value;
-                          }
-                          setParams(newParams);
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Parameter name"
-                    />
-                  )}
-                  <input
-                    type="text"
-                    value={String(value)}
-                    onChange={(e) => updateParam(key, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Parameter value"
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('parameters') ? '-rotate-90' : ''
+                    }`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => removeParam(key)}
-                    className="text-red-600 hover:text-red-800 p-2"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <h4 className="text-base font-medium text-gray-900">Parameters</h4>
                 </div>
-                {/* Show parameter help text from want type definition */}
-                {selectedWantType && selectedWantType.parameters && (
-                  (() => {
-                    const paramDef = selectedWantType.parameters.find(p => p.name === key);
-                    return paramDef ? (
-                      <p className="text-xs text-gray-600 ml-3">{paramDef.description}</p>
-                    ) : null;
-                  })()
+                {collapsedSections.has('parameters') && Object.entries(params).length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {Object.entries(params).map(([key, value]) => (
+                      <div key={key} className="text-gray-500">
+                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
+              </button>
 
-        {/* Using (Dependencies) */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
-            {editingUsingIndex === null && (
+              {!collapsedSections.has('parameters') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Parameter definitions hint from want type */}
+                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm font-medium text-blue-900 mb-2">Available Parameters:</p>
+                      <div className="space-y-1">
+                        {selectedWantType.parameters.map((param) => (
+                          <div key={param.name} className="text-xs text-blue-800">
+                            <span className="font-medium">{param.name}</span>
+                            {param.required && <span className="text-red-600 ml-1">*</span>}
+                            <span className="text-blue-700 ml-1">({param.type})</span>
+                            {param.description && <span className="text-blue-600 ml-1">- {param.description}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {Object.entries(params).map(([key, value], index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex gap-2">
+                          {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
+                            <select
+                              value={key}
+                              onChange={(e) => {
+                                const newKey = e.target.value;
+                                const newParams = { ...params };
+                                if (key !== newKey) {
+                                  delete newParams[key];
+                                  if (newKey.trim()) {
+                                    newParams[newKey] = value;
+                                  }
+                                  setParams(newParams);
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="">Select parameter...</option>
+                              {selectedWantType.parameters.map((param) => (
+                                <option key={param.name} value={param.name}>
+                                  {param.name} {param.required ? '*' : ''} ({param.type})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={key}
+                              onChange={(e) => {
+                                const newKey = e.target.value;
+                                const newParams = { ...params };
+                                if (key !== newKey) {
+                                  delete newParams[key];
+                                  if (newKey.trim()) {
+                                    newParams[newKey] = value;
+                                  }
+                                  setParams(newParams);
+                                }
+                              }}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Parameter name"
+                            />
+                          )}
+                          <input
+                            type="text"
+                            value={String(value)}
+                            onChange={(e) => updateParam(key, e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Parameter value"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeParam(key)}
+                            className="text-red-600 hover:text-red-800 p-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {/* Show parameter help text from want type definition */}
+                        {selectedWantType && selectedWantType.parameters && (
+                          (() => {
+                            const paramDef = selectedWantType.parameters.find(p => p.name === key);
+                            return paramDef ? (
+                              <p className="text-xs text-gray-600 ml-3">{paramDef.description}</p>
+                            ) : null;
+                          })()
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={addParam}
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                      disabled={!type}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Parameter
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Labels - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
               <button
                 type="button"
-                onClick={addUsing}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                onClick={() => toggleSection('labels')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
               >
-                +
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('labels') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <h4 className="text-base font-medium text-gray-900">Labels</h4>
+                </div>
+                {collapsedSections.has('labels') && Object.entries(labels).length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {Object.entries(labels).map(([key, value]) => (
+                      <div key={key} className="text-gray-500">
+                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </button>
-            )}
-          </div>
 
-          {/* Display existing dependencies as styled chips */}
-          {using.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {using.map((usingItem, index) => {
-                // Don't show chip if this dependency is being edited
-                if (editingUsingIndex === index) return null;
+              {!collapsedSections.has('labels') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Display existing labels as styled chips */}
+                  {Object.entries(labels).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {Object.entries(labels).map(([key, value]) => {
+                        // Don't show chip if this label is being edited
+                        if (editingLabelKey === key) return null;
 
-                return Object.entries(usingItem).map(([key, value], keyIndex) => (
-                  <button
-                    key={`${index}-${keyIndex}`}
-                    type="button"
-                    onClick={() => {
-                      setEditingUsingIndex(index);
-                      setEditingUsingDraft({ key, value });
-                    }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                  >
-                    {key}: {value}
-                    <X
-                      className="w-3 h-3 ml-2 hover:text-blue-900"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeUsing(index);
-                      }}
-                    />
-                  </button>
-                ));
-              })}
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setEditingLabelKey(key);
+                              setEditingLabelDraft({ key, value });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                          >
+                            {key}: {value}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-blue-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeLabel(key);
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Label input form - shown when editing or adding new label */}
+                  {editingLabelKey !== null && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      <LabelAutocomplete
+                        keyValue={editingLabelDraft.key}
+                        valueValue={editingLabelDraft.value}
+                        onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
+                        onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
+                        onRemove={() => {
+                          removeLabel(editingLabelKey);
+                          setEditingLabelKey(null);
+                          setEditingLabelDraft({ key: '', value: '' });
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Only update if draft has a key value
+                            if (editingLabelDraft.key.trim()) {
+                              updateLabel(editingLabelKey === '__new__' ? '' : editingLabelKey, editingLabelDraft.key, editingLabelDraft.value);
+                            }
+                            setEditingLabelKey(null);
+                            setEditingLabelDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingLabelKey(null);
+                            setEditingLabelDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    {editingLabelKey === null && (
+                      <button
+                        type="button"
+                        onClick={() => addLabel()}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Label
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Dependency input form - shown when editing or adding new dependency */}
-          {editingUsingIndex !== null && (
-            <div className="space-y-3 pt-4 border-t border-gray-200">
-              <LabelSelectorAutocomplete
-                keyValue={editingUsingDraft.key}
-                valuValue={editingUsingDraft.value}
-                onKeyChange={(newKey) => {
-                  setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
-                }}
-                onValueChange={(newValue) => {
-                  setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
-                }}
-                onRemove={() => {
-                  if (editingUsingIndex >= 0) {
-                    removeUsing(editingUsingIndex);
-                  }
-                  setEditingUsingIndex(null);
-                  setEditingUsingDraft({ key: '', value: '' });
-                }}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Confirm the changes
-                    if (editingUsingDraft.key.trim()) {
-                      const newUsing = [...using];
-                      if (editingUsingIndex < newUsing.length) {
-                        const newItem = { ...newUsing[editingUsingIndex] };
-                        // Get the original key from the current item
-                        const originalKey = Object.keys(newItem)[0];
-                        if (originalKey) {
-                          delete newItem[originalKey];
-                        }
-                        newItem[editingUsingDraft.key] = editingUsingDraft.value;
-                        newUsing[editingUsingIndex] = newItem;
-                      } else {
-                        // Adding new dependency
-                        newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
-                      }
-                      setUsing(newUsing);
-                    }
-                    setEditingUsingIndex(null);
-                    setEditingUsingDraft({ key: '', value: '' });
-                  }}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingUsingIndex(null);
-                    setEditingUsingDraft({ key: '', value: '' });
-                  }}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-              </div>
+            {/* Dependencies - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={() => toggleSection('dependencies')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('dependencies') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
+                </div>
+                {collapsedSections.has('dependencies') && using.length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {using.map((usingItem, index) => {
+                      const [key, value] = Object.entries(usingItem)[0];
+                      return (
+                        <div key={index} className="text-gray-500">
+                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </button>
+
+              {!collapsedSections.has('dependencies') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Display existing dependencies as styled chips */}
+                  {using.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {using.map((usingItem, index) => {
+                        // Don't show chip if this dependency is being edited
+                        if (editingUsingIndex === index) return null;
+
+                        return Object.entries(usingItem).map(([key, value], keyIndex) => (
+                          <button
+                            key={`${index}-${keyIndex}`}
+                            type="button"
+                            onClick={() => {
+                              setEditingUsingIndex(index);
+                              setEditingUsingDraft({ key, value });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                          >
+                            {key}: {value}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-blue-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeUsing(index);
+                              }}
+                            />
+                          </button>
+                        ));
+                      })}
+                    </div>
+                  )}
+
+                  {/* Dependency input form - shown when editing or adding new dependency */}
+                  {editingUsingIndex !== null && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      <LabelSelectorAutocomplete
+                        keyValue={editingUsingDraft.key}
+                        valuValue={editingUsingDraft.value}
+                        onKeyChange={(newKey) => {
+                          setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
+                        }}
+                        onValueChange={(newValue) => {
+                          setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
+                        }}
+                        onRemove={() => {
+                          if (editingUsingIndex >= 0) {
+                            removeUsing(editingUsingIndex);
+                          }
+                          setEditingUsingIndex(null);
+                          setEditingUsingDraft({ key: '', value: '' });
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Confirm the changes
+                            if (editingUsingDraft.key.trim()) {
+                              const newUsing = [...using];
+                              if (editingUsingIndex < newUsing.length) {
+                                const newItem = { ...newUsing[editingUsingIndex] };
+                                // Get the original key from the current item
+                                const originalKey = Object.keys(newItem)[0];
+                                if (originalKey) {
+                                  delete newItem[originalKey];
+                                }
+                                newItem[editingUsingDraft.key] = editingUsingDraft.value;
+                                newUsing[editingUsingIndex] = newItem;
+                              } else {
+                                // Adding new dependency
+                                newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
+                              }
+                              setUsing(newUsing);
+                            }
+                            setEditingUsingIndex(null);
+                            setEditingUsingDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingUsingIndex(null);
+                            setEditingUsingDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    {editingUsingIndex === null && (
+                      <button
+                        type="button"
+                        onClick={addUsing}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Dependency
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
         {/* Recipe */}
         <div>
