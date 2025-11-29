@@ -155,6 +155,9 @@ export const Dashboard: React.FC = () => {
   // Fetch wants that use a specific label
   const handleLabelClick = async (key: string, value: string) => {
     setSelectedLabel({ key, value });
+    // Reset state immediately when clicking a new label
+    setLabelOwners([]);
+    setLabelUsers([]);
 
     try {
       // Fetch the label data which includes owners and users
@@ -165,12 +168,15 @@ export const Dashboard: React.FC = () => {
       }
 
       const data = await response.json();
+      console.log('[DEBUG] Label data received:', data);
 
       // Find the label values for this key
       if (data.labelValues && data.labelValues[key]) {
         const labelValueInfo = data.labelValues[key].find(
           (item: { value: string; owners: string[]; users: string[] }) => item.value === value
         );
+
+        console.log(`[DEBUG] Label ${key}:${value} info:`, labelValueInfo);
 
         if (labelValueInfo) {
           // Fetch all wants and filter by the owner and user IDs
@@ -186,10 +192,17 @@ export const Dashboard: React.FC = () => {
               labelValueInfo.users.includes(w.metadata?.id || w.id || '')
             );
 
+            console.log(`[DEBUG] Filtered owners (count: ${owners.length}):`, owners.map(w => w.metadata?.name || w.id));
+            console.log(`[DEBUG] Filtered users (count: ${users.length}):`, users.map(w => w.metadata?.name || w.id));
+
             setLabelOwners(owners);
             setLabelUsers(users);
           }
+        } else {
+          console.log(`[DEBUG] Label ${key}:${value} not found in API response`);
         }
+      } else {
+        console.log(`[DEBUG] Key ${key} not found in label values`);
       }
     } catch (error) {
       console.error('Error fetching label owners/users:', error);

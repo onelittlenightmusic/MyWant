@@ -55,6 +55,7 @@ type Server struct {
 	wantTypeLoader    *mywant.WantTypeLoader           // Want type definitions loader
 	errorHistory      []ErrorHistoryEntry              // Store error history
 	router            *mux.Router
+	globalLabels      map[string]map[string]bool       // Globally registered labels (key -> value -> true)
 }
 
 // WantExecution represents a running want execution
@@ -190,6 +191,7 @@ func NewServer(config ServerConfig) *Server {
 		wantTypeLoader:    wantTypeLoader,
 		errorHistory:      make([]ErrorHistoryEntry, 0),
 		router:            mux.NewRouter(),
+		globalLabels:      make(map[string]map[string]bool),
 	}
 }
 
@@ -2120,6 +2122,19 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
 	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
 
+	// Start with globally registered labels (added via POST /api/v1/labels)
+	if s.globalLabels != nil {
+		for key, valueMap := range s.globalLabels {
+			labelKeys[key] = true
+			if labelValues[key] == nil {
+				labelValues[key] = make(map[string]bool)
+			}
+			for value := range valueMap {
+				labelValues[key][value] = true
+			}
+		}
+	}
+
 	// Collect from wants in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
@@ -2249,9 +2264,26 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		}
 		sort.Strings(valueSlice)
 
+		// Ensure labelToWants[key] is initialized
+		if labelToWants[key] == nil {
+			labelToWants[key] = make(map[string]map[string]bool)
+		}
+		// Ensure labelToUsers[key] is initialized
+		if labelToUsers[key] == nil {
+			labelToUsers[key] = make(map[string]map[string]bool)
+		}
+
 		// Convert to response format with owners and users
 		valueInfos := make([]LabelValueInfo, 0, len(valueSlice))
 		for _, value := range valueSlice {
+			// Ensure the value maps exist
+			if labelToWants[key][value] == nil {
+				labelToWants[key][value] = make(map[string]bool)
+			}
+			if labelToUsers[key][value] == nil {
+				labelToUsers[key][value] = make(map[string]bool)
+			}
+
 			ownerIDs := make([]string, 0, len(labelToWants[key][value]))
 			for wantID := range labelToWants[key][value] {
 				ownerIDs = append(ownerIDs, wantID)
@@ -2307,25 +2339,35 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a minimal "label-holder" want with the label to persist it in memory
-	// Use a type that won't cause execution (internal-label-holder)
+	// Add the label to the global label registry (a separate tracking structure)
+	// This ensures labels persist even if we can't create a want for them
+	if s.globalLabels == nil {
+		s.globalLabels = make(map[string]map[string]bool) // key -> value -> true
+	}
+	if s.globalLabels[labelReq.Key] == nil {
+		s.globalLabels[labelReq.Key] = make(map[string]bool)
+	}
+	s.globalLabels[labelReq.Key][labelReq.Value] = true
+
+	// Also try to create a want with the label for persistence
+	// Use "monitor" type which is a valid, simple type that won't execute
+	// Use a name without "__" prefix so it won't be filtered out in getLabels
 	labelWant := &mywant.Want{
 		Metadata: mywant.Metadata{
-			Name: fmt.Sprintf("__label-%s-%d", labelReq.Key, time.Now().UnixNano()),
-			Type: "__internal__", // Internal type that won't be registered
+			Name: fmt.Sprintf("_label-%s-%d", labelReq.Key, time.Now().UnixNano()),
+			Type: "monitor", // Use a valid type that can be registered
 			ID:   generateWantID(),
 			Labels: map[string]string{
 				labelReq.Key: labelReq.Value,
 			},
 		},
 		Spec: mywant.WantSpec{},
-		Status: "achieved", // Mark as already achieved to prevent execution
+		Status: "idle",
 	}
 
-	// Add to global builder if it exists
-	// Even if it fails to add to the running builder, the label is still available
+	// Add to global builder if it exists (optional - for persistence)
+	// But the label is already registered above in globalLabels
 	if s.globalBuilder != nil {
-		// Try to add, but don't fail if it can't - the label data is what matters
 		_, _ = s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{labelWant})
 	}
 
