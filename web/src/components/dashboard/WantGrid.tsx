@@ -125,7 +125,15 @@ export const WantGrid: React.FC<WantGridProps> = ({
       // Include if parent matches or has matching children
       return parentMatches || hasMatchingChild;
     }).sort((a, b) => {
-      // Sort by ID to ensure consistent ordering
+      // Sort by creation timestamp (newer items at end), fallback to ID for stability
+      const createdA = a.metadata?.creationTimestamp ? new Date(a.metadata.creationTimestamp).getTime() : 0;
+      const createdB = b.metadata?.creationTimestamp ? new Date(b.metadata.creationTimestamp).getTime() : 0;
+
+      if (createdA !== createdB) {
+        return createdA - createdB; // Earlier timestamps first, newer at end
+      }
+
+      // Fallback to ID comparison for items with same timestamp
       const idA = a.metadata?.id || '';
       const idB = b.metadata?.id || '';
       return idA.localeCompare(idB);
