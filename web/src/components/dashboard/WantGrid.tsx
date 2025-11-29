@@ -238,6 +238,31 @@ export const WantGrid: React.FC<WantGridProps> = ({
           </div>
         );
       })}
+
+      {/* Add Want Card - appears after last want */}
+      <button
+        onClick={onCreateWant}
+        className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[200px]"
+      >
+        <div className="w-16 h-16 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors mb-3">
+          <svg
+            className="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        </div>
+        <p className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors font-medium">
+          Add Want
+        </p>
+      </button>
     </div>
   );
 };
