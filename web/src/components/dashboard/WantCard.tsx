@@ -130,7 +130,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       onClick={handleCardClick}
       data-keyboard-nav-selected={selected}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}
