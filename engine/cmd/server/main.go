@@ -2115,20 +2115,34 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	// Collect all unique label keys and their values from all wants
+	// Also track which wants use each label
 	labelKeys := make(map[string]bool)
-	labelValues := make(map[string]map[string]bool) // key -> (value -> true)
+	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
+	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
 
 	// Collect from wants in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
+				// Skip internal wants
+				if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+					continue
+				}
 				for key, value := range want.Metadata.Labels {
 					labelKeys[key] = true
 					if labelValues[key] == nil {
 						labelValues[key] = make(map[string]bool)
+						labelToWants[key] = make(map[string]map[string]bool)
 					}
 					labelValues[key][value] = true
+
+					// Track which wants use this label
+					if labelToWants[key][value] == nil {
+						labelToWants[key][value] = make(map[string]bool)
+					}
+					wantID := want.Metadata.ID
+					labelToWants[key][value][wantID] = true
 				}
 			}
 		}
@@ -2138,12 +2152,24 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
+			// Skip internal wants
+			if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+				continue
+			}
 			for key, value := range want.Metadata.Labels {
 				labelKeys[key] = true
 				if labelValues[key] == nil {
 					labelValues[key] = make(map[string]bool)
+					labelToWants[key] = make(map[string]map[string]bool)
 				}
 				labelValues[key][value] = true
+
+				// Track which wants use this label
+				if labelToWants[key][value] == nil {
+					labelToWants[key][value] = make(map[string]bool)
+				}
+				wantID := want.Metadata.ID
+				labelToWants[key][value][wantID] = true
 			}
 		}
 	}
@@ -2155,15 +2181,34 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(keys)
 
-	// Convert values maps to sorted slices
-	values := make(map[string][]string)
+	// Convert values and users to response format
+	type LabelValueInfo struct {
+		Value string   `json:"value"`
+		Users []string `json:"users"`
+	}
+
+	values := make(map[string][]LabelValueInfo)
 	for key, valueMap := range labelValues {
 		valueSlice := make([]string, 0, len(valueMap))
 		for value := range valueMap {
 			valueSlice = append(valueSlice, value)
 		}
 		sort.Strings(valueSlice)
-		values[key] = valueSlice
+
+		// Convert to response format with users
+		valueInfos := make([]LabelValueInfo, 0, len(valueSlice))
+		for _, value := range valueSlice {
+			userIDs := make([]string, 0, len(labelToWants[key][value]))
+			for wantID := range labelToWants[key][value] {
+				userIDs = append(userIDs, wantID)
+			}
+			sort.Strings(userIDs)
+			valueInfos = append(valueInfos, LabelValueInfo{
+				Value: value,
+				Users: userIDs,
+			})
+		}
+		values[key] = valueInfos
 	}
 
 	// Return response

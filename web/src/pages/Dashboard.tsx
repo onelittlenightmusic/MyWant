@@ -45,6 +45,8 @@ export const Dashboard: React.FC = () => {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [showAddLabelForm, setShowAddLabelForm] = useState(false);
   const [newLabel, setNewLabel] = useState<{ key: string; value: string }>({ key: '', value: '' });
+  const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
+  const [labelUsers, setLabelUsers] = useState<Want[]>([]);
 
   // Derive selectedWant from wants array using selectedWantId
   // This ensures selectedWant always reflects the current data from polling
@@ -147,6 +149,43 @@ export const Dashboard: React.FC = () => {
     const wantId = want.metadata?.id || want.id;
     setSelectedWantId(wantId || null);
     setSidebarInitialTab('agents');
+  };
+
+  // Fetch wants that use a specific label
+  const handleLabelClick = async (key: string, value: string) => {
+    setSelectedLabel({ key, value });
+
+    try {
+      // Fetch the label data which includes users
+      const response = await fetch('http://localhost:8080/api/v1/labels');
+      if (!response.ok) {
+        console.error('Failed to fetch labels');
+        return;
+      }
+
+      const data = await response.json();
+
+      // Find the label values for this key
+      if (data.labelValues && data.labelValues[key]) {
+        const labelValueInfo = data.labelValues[key].find(
+          (item: { value: string; users: string[] }) => item.value === value
+        );
+
+        if (labelValueInfo && labelValueInfo.users) {
+          // Fetch all wants and filter by the user IDs
+          const wantResponse = await fetch('http://localhost:8080/api/v1/wants');
+          if (wantResponse.ok) {
+            const wantData = await wantResponse.json();
+            const filteredWants = wantData.wants.filter((w: Want) =>
+              labelValueInfo.users.includes(w.metadata?.id || w.id || '')
+            );
+            setLabelUsers(filteredWants);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching label users:', error);
+    }
   };
 
   const handleDeleteWantConfirm = async () => {
@@ -510,7 +549,13 @@ export const Dashboard: React.FC = () => {
                                 e.dataTransfer.setDragImage(dragImage, 0, 0);
                                 setTimeout(() => document.body.removeChild(dragImage), 0);
                               }}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 cursor-move hover:bg-blue-200 transition-colors select-none"
+                              onClick={() => handleLabelClick(key, value)}
+                              className={classNames(
+                                'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer hover:shadow-md transition-all select-none',
+                                selectedLabel?.key === key && selectedLabel?.value === value
+                                  ? 'bg-blue-500 text-white shadow-md'
+                                  : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                              )}
                             >
                               {key}: {value}
                             </div>
@@ -522,6 +567,65 @@ export const Dashboard: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Users Section - Display wants using selected label */}
+            {selectedLabel && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Users
+                    <span className="text-sm text-gray-500 font-normal ml-2">
+                      ({selectedLabel.key}: {selectedLabel.value})
+                    </span>
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setSelectedLabel(null);
+                      setLabelUsers([]);
+                    }}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                    title="Clear selection"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {labelUsers.length === 0 ? (
+                  <p className="text-sm text-gray-500">No wants found using this label</p>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {labelUsers.map((want) => {
+                      const wantId = want.metadata?.id || want.id;
+                      return (
+                        <div
+                          key={wantId}
+                          onClick={() => handleViewWant(want)}
+                          className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 truncate">
+                                {want.metadata?.name || wantId}
+                              </h4>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Type: {want.metadata?.type || 'unknown'}
+                              </p>
+                              {want.status && (
+                                <div className="mt-2">
+                                  <StatusBadge status={want.status} size="sm" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
