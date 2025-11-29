@@ -412,20 +412,22 @@ export const Dashboard: React.FC = () => {
               {showAddLabelForm && (
                 <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Label key"
-                      value={newLabel.key}
-                      onChange={(e) => setNewLabel(prev => ({ ...prev, key: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Label value"
-                      value={newLabel.value}
-                      onChange={(e) => setNewLabel(prev => ({ ...prev, value: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Key"
+                        value={newLabel.key}
+                        onChange={(e) => setNewLabel(prev => ({ ...prev, key: e.target.value }))}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Value"
+                        value={newLabel.value}
+                        onChange={(e) => setNewLabel(prev => ({ ...prev, value: e.target.value }))}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
