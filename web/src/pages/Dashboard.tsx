@@ -42,6 +42,8 @@ export const Dashboard: React.FC = () => {
   const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [showAddLabelForm, setShowAddLabelForm] = useState(false);
+  const [newLabel, setNewLabel] = useState<{ key: string; value: string }>({ key: '', value: '' });
 
   // Derive selectedWant from wants array using selectedWantId
   // This ensures selectedWant always reflects the current data from polling
@@ -393,7 +395,67 @@ export const Dashboard: React.FC = () => {
           <div className="p-6 space-y-6">
             {/* All Labels Section */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Labels</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
+                <button
+                  onClick={() => setShowAddLabelForm(!showAddLabelForm)}
+                  className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  title="Add label"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Add Label Form */}
+              {showAddLabelForm && (
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Label key"
+                      value={newLabel.key}
+                      onChange={(e) => setNewLabel(prev => ({ ...prev, key: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Label value"
+                      value={newLabel.value}
+                      onChange={(e) => setNewLabel(prev => ({ ...prev, value: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setNewLabel({ key: '', value: '' });
+                          setShowAddLabelForm(false);
+                        }}
+                        className="flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (newLabel.key.trim() && newLabel.value.trim()) {
+                            // Note: This would require a backend endpoint to add labels globally
+                            // For now, this is a placeholder for future implementation
+                            console.log('Add label:', newLabel);
+                            setNewLabel({ key: '', value: '' });
+                            setShowAddLabelForm(false);
+                          }
+                        }}
+                        disabled={!newLabel.key.trim() || !newLabel.value.trim()}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 {wants.length === 0 ? (
                   <p className="text-sm text-gray-500">No labels found</p>
