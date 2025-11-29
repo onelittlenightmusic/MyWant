@@ -46,6 +46,7 @@ export const Dashboard: React.FC = () => {
   const [showAddLabelForm, setShowAddLabelForm] = useState(false);
   const [newLabel, setNewLabel] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
+  const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
 
   // Derive selectedWant from wants array using selectedWantId
@@ -156,7 +157,7 @@ export const Dashboard: React.FC = () => {
     setSelectedLabel({ key, value });
 
     try {
-      // Fetch the label data which includes users
+      // Fetch the label data which includes owners and users
       const response = await fetch('http://localhost:8080/api/v1/labels');
       if (!response.ok) {
         console.error('Failed to fetch labels');
@@ -168,23 +169,30 @@ export const Dashboard: React.FC = () => {
       // Find the label values for this key
       if (data.labelValues && data.labelValues[key]) {
         const labelValueInfo = data.labelValues[key].find(
-          (item: { value: string; users: string[] }) => item.value === value
+          (item: { value: string; owners: string[]; users: string[] }) => item.value === value
         );
 
-        if (labelValueInfo && labelValueInfo.users) {
-          // Fetch all wants and filter by the user IDs
+        if (labelValueInfo) {
+          // Fetch all wants and filter by the owner and user IDs
           const wantResponse = await fetch('http://localhost:8080/api/v1/wants');
           if (wantResponse.ok) {
             const wantData = await wantResponse.json();
-            const filteredWants = wantData.wants.filter((w: Want) =>
+
+            // Separate owners and users
+            const owners = wantData.wants.filter((w: Want) =>
+              labelValueInfo.owners.includes(w.metadata?.id || w.id || '')
+            );
+            const users = wantData.wants.filter((w: Want) =>
               labelValueInfo.users.includes(w.metadata?.id || w.id || '')
             );
-            setLabelUsers(filteredWants);
+
+            setLabelOwners(owners);
+            setLabelUsers(users);
           }
         }
       }
     } catch (error) {
-      console.error('Error fetching label users:', error);
+      console.error('Error fetching label owners/users:', error);
     }
   };
 
@@ -568,19 +576,17 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Users Section - Display wants using selected label */}
+            {/* Owners and Users Section - Display wants using selected label */}
             {selectedLabel && (
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Users
-                    <span className="text-sm text-gray-500 font-normal ml-2">
-                      ({selectedLabel.key}: {selectedLabel.value})
-                    </span>
+                    {selectedLabel.key}: {selectedLabel.value}
                   </h3>
                   <button
                     onClick={() => {
                       setSelectedLabel(null);
+                      setLabelOwners([]);
                       setLabelUsers([]);
                     }}
                     className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -592,37 +598,56 @@ export const Dashboard: React.FC = () => {
                   </button>
                 </div>
 
-                {labelUsers.length === 0 ? (
-                  <p className="text-sm text-gray-500">No wants found using this label</p>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {labelUsers.map((want) => {
-                      const wantId = want.metadata?.id || want.id;
-                      return (
-                        <div
-                          key={wantId}
-                          onClick={() => handleViewWant(want)}
-                          className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 truncate">
-                                {want.metadata?.name || wantId}
-                              </h4>
-                              <p className="text-xs text-gray-500 mt-1">
-                                Type: {want.metadata?.type || 'unknown'}
-                              </p>
-                              {want.status && (
-                                <div className="mt-2">
-                                  <StatusBadge status={want.status} size="sm" />
-                                </div>
-                              )}
-                            </div>
+                {/* Owners Section */}
+                {labelOwners.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase">Owners</h4>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      {labelOwners.map((want) => {
+                        const wantId = want.metadata?.id || want.id;
+                        return (
+                          <div
+                            key={wantId}
+                            onClick={() => handleViewWant(want)}
+                            className="p-2 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 cursor-pointer transition-colors text-center"
+                            title={want.metadata?.name || wantId}
+                          >
+                            <p className="text-xs font-medium text-gray-900 truncate">
+                              {want.metadata?.name || wantId}
+                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
+                )}
+
+                {/* Users Section */}
+                {labelUsers.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase">Users</h4>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      {labelUsers.map((want) => {
+                        const wantId = want.metadata?.id || want.id;
+                        return (
+                          <div
+                            key={wantId}
+                            onClick={() => handleViewWant(want)}
+                            className="p-2 bg-green-50 border border-green-200 rounded hover:bg-green-100 cursor-pointer transition-colors text-center"
+                            title={want.metadata?.name || wantId}
+                          >
+                            <p className="text-xs font-medium text-gray-900 truncate">
+                              {want.metadata?.name || wantId}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {labelOwners.length === 0 && labelUsers.length === 0 && (
+                  <p className="text-sm text-gray-500">No owners or users found for this label</p>
                 )}
               </div>
             )}

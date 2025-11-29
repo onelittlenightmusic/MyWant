@@ -2174,6 +2174,59 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Collect wants that use labels via 'using' selectors (users)
+	labelToUsers := make(map[string]map[string]map[string]bool) // key -> value -> (wantID -> true)
+
+	// Check executions for wants with 'using' selectors
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			currentStates := execution.Builder.GetAllWantStates()
+			for _, want := range currentStates {
+				// Skip internal wants
+				if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+					continue
+				}
+				// Check if this want uses any labels via 'using' selectors
+				for _, usingSelector := range want.Spec.Using {
+					for key, value := range usingSelector {
+						if labelToUsers[key] == nil {
+							labelToUsers[key] = make(map[string]map[string]bool)
+						}
+						if labelToUsers[key][value] == nil {
+							labelToUsers[key][value] = make(map[string]bool)
+						}
+						wantID := want.Metadata.ID
+						labelToUsers[key][value][wantID] = true
+					}
+				}
+			}
+		}
+	}
+
+	// Check global builder for wants with 'using' selectors
+	if s.globalBuilder != nil {
+		currentStates := s.globalBuilder.GetAllWantStates()
+		for _, want := range currentStates {
+			// Skip internal wants
+			if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
+				continue
+			}
+			// Check if this want uses any labels via 'using' selectors
+			for _, usingSelector := range want.Spec.Using {
+				for key, value := range usingSelector {
+					if labelToUsers[key] == nil {
+						labelToUsers[key] = make(map[string]map[string]bool)
+					}
+					if labelToUsers[key][value] == nil {
+						labelToUsers[key][value] = make(map[string]bool)
+					}
+					wantID := want.Metadata.ID
+					labelToUsers[key][value][wantID] = true
+				}
+			}
+		}
+	}
+
 	// Convert keys to sorted slice
 	keys := make([]string, 0, len(labelKeys))
 	for key := range labelKeys {
@@ -2181,10 +2234,11 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(keys)
 
-	// Convert values and users to response format
+	// Convert values and owners/users to response format
 	type LabelValueInfo struct {
-		Value string   `json:"value"`
-		Users []string `json:"users"`
+		Value  string   `json:"value"`
+		Owners []string `json:"owners"` // Wants that have this label
+		Users  []string `json:"users"`  // Wants that use this label via 'using'
 	}
 
 	values := make(map[string][]LabelValueInfo)
@@ -2195,17 +2249,25 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		}
 		sort.Strings(valueSlice)
 
-		// Convert to response format with users
+		// Convert to response format with owners and users
 		valueInfos := make([]LabelValueInfo, 0, len(valueSlice))
 		for _, value := range valueSlice {
-			userIDs := make([]string, 0, len(labelToWants[key][value]))
+			ownerIDs := make([]string, 0, len(labelToWants[key][value]))
 			for wantID := range labelToWants[key][value] {
+				ownerIDs = append(ownerIDs, wantID)
+			}
+			sort.Strings(ownerIDs)
+
+			userIDs := make([]string, 0, len(labelToUsers[key][value]))
+			for wantID := range labelToUsers[key][value] {
 				userIDs = append(userIDs, wantID)
 			}
 			sort.Strings(userIDs)
+
 			valueInfos = append(valueInfos, LabelValueInfo{
-				Value: value,
-				Users: userIDs,
+				Value:  value,
+				Owners: ownerIDs,
+				Users:  userIDs,
 			})
 		}
 		values[key] = valueInfos
