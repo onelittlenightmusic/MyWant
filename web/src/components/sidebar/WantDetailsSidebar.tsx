@@ -257,6 +257,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Get background style for sidebar (using isParentWant = true for full background)
   const sidebarBackgroundStyle = getBackgroundStyle(wantDetails.metadata?.type, true);
 
+  // Extend background style with fixed attachment and full height
+  const extendedBackgroundStyle = sidebarBackgroundStyle.style ? {
+    ...sidebarBackgroundStyle.style,
+    backgroundAttachment: 'fixed',
+    minHeight: '100vh'
+  } : undefined;
+
   const tabs = [
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'results' as TabType, label: 'Results', icon: Database },
@@ -265,10 +272,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   ];
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden" style={sidebarBackgroundStyle.style}>
+    <div className="h-full flex flex-col relative overflow-hidden" style={extendedBackgroundStyle}>
       {/* Background overlay - semi-transparent white */}
       {sidebarBackgroundStyle.hasBackgroundImage && (
-        <div className="absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none" style={{ minHeight: '100vh' }}></div>
       )}
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
