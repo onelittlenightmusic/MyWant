@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery = '',
   onSearchChange,
   title = 'MyWant Dashboard',
-  createButtonLabel = 'Create Want',
+  createButtonLabel = 'Add Want',
   itemCount,
   itemLabel,
   searchPlaceholder = 'Search wants by name, type, or labels...',
