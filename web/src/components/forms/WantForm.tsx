@@ -10,6 +10,7 @@ import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { TypeRecipeSelector } from './TypeRecipeSelector';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
+import { addLabelToRegistry } from '@/utils/labelUtils';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
@@ -272,7 +273,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setEditingLabelDraft({ key: '', value: '' }); // Initialize draft state
   };
 
-  const updateLabel = (oldKey: string, newKey: string, value: string) => {
+  const updateLabel = async (oldKey: string, newKey: string, value: string) => {
     setLabels(prev => {
       const newLabels = { ...prev };
       if (oldKey !== newKey && oldKey in newLabels) {
@@ -283,6 +284,11 @@ export const WantForm: React.FC<WantFormProps> = ({
       }
       return newLabels;
     });
+
+    // Register the label in the global registry
+    if (newKey.trim() && value.trim()) {
+      await addLabelToRegistry(newKey.trim(), value.trim());
+    }
   };
 
   const removeLabel = (key: string) => {

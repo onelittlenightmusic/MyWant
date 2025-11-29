@@ -281,6 +281,7 @@ func (s *Server) setupRoutes() {
 	// Labels endpoints - for autocomplete in want creation form
 	labels := api.PathPrefix("/labels").Subrouter()
 	labels.HandleFunc("", s.getLabels).Methods("GET")
+	labels.HandleFunc("", s.addLabel).Methods("POST")
 	labels.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
 	// Error history endpoints
@@ -2099,6 +2100,63 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		"labelKeys":   keys,
 		"labelValues": values,
 		"count":       len(keys),
+	})
+}
+
+// addLabel handles POST /api/v1/labels - adds a label to the global label registry
+// This allows registering labels even if they don't exist on any want yet
+// Labels are stored by adding a minimal want to the global builder's state for persistence
+func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Parse request body
+	var labelReq struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&labelReq); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate input
+	labelReq.Key = strings.TrimSpace(labelReq.Key)
+	labelReq.Value = strings.TrimSpace(labelReq.Value)
+
+	if labelReq.Key == "" || labelReq.Value == "" {
+		http.Error(w, "Label key and value must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	// Create a minimal "label-holder" want with the label to persist it in memory
+	// Use a type that won't cause execution (internal-label-holder)
+	labelWant := &mywant.Want{
+		Metadata: mywant.Metadata{
+			Name: fmt.Sprintf("__label-%s-%d", labelReq.Key, time.Now().UnixNano()),
+			Type: "__internal__", // Internal type that won't be registered
+			ID:   generateWantID(),
+			Labels: map[string]string{
+				labelReq.Key: labelReq.Value,
+			},
+		},
+		Spec: mywant.WantSpec{},
+		Status: "achieved", // Mark as already achieved to prevent execution
+	}
+
+	// Add to global builder if it exists
+	// Even if it fails to add to the running builder, the label is still available
+	if s.globalBuilder != nil {
+		// Try to add, but don't fail if it can't - the label data is what matters
+		_, _ = s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{labelWant})
+	}
+
+	// Return success response
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"key":     labelReq.Key,
+		"value":   labelReq.Value,
+		"message": "Label registered successfully",
 	})
 }
 

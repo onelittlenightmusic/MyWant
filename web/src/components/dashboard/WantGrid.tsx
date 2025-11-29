@@ -57,6 +57,11 @@ export const WantGrid: React.FC<WantGridProps> = ({
     const childWantsByParentId = new Map<string, Want[]>();
 
     wants.forEach(want => {
+      // Skip internal wants (prefixed with __)
+      if (want.metadata?.name?.startsWith('__')) {
+        return;
+      }
+
       const hasOwnerReferences = want.metadata?.ownerReferences && want.metadata.ownerReferences.length > 0;
 
       if (!hasOwnerReferences) {

@@ -7,6 +7,7 @@ import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboa
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames } from '@/utils/helpers';
+import { addLabelToRegistry } from '@/utils/labelUtils';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -439,13 +440,15 @@ export const Dashboard: React.FC = () => {
                         Cancel
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (newLabel.key.trim() && newLabel.value.trim()) {
-                            // Note: This would require a backend endpoint to add labels globally
-                            // For now, this is a placeholder for future implementation
-                            console.log('Add label:', newLabel);
-                            setNewLabel({ key: '', value: '' });
-                            setShowAddLabelForm(false);
+                            const success = await addLabelToRegistry(newLabel.key, newLabel.value);
+                            if (success) {
+                              // Refresh the wants list to show the new label
+                              fetchWants();
+                              setNewLabel({ key: '', value: '' });
+                              setShowAddLabelForm(false);
+                            }
                           }
                         }}
                         disabled={!newLabel.key.trim() || !newLabel.value.trim()}
