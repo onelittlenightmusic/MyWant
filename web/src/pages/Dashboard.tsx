@@ -493,12 +493,24 @@ export const Dashboard: React.FC = () => {
                               onDragStart={(e) => {
                                 e.dataTransfer.effectAllowed = 'copy';
                                 e.dataTransfer.setData('application/json', JSON.stringify({ key, value }));
-                                // Set drag image with opacity
-                                const img = new Image();
-                                e.dataTransfer.setDragImage(img, 0, 0);
+                                // Create custom drag image
+                                const dragImage = document.createElement('div');
+                                dragImage.textContent = `${key}: ${value}`;
+                                dragImage.style.position = 'absolute';
+                                dragImage.style.left = '-9999px';
+                                dragImage.style.padding = '6px 12px';
+                                dragImage.style.borderRadius = '9999px';
+                                dragImage.style.backgroundColor = '#dbeafe';
+                                dragImage.style.color = '#1e40af';
+                                dragImage.style.fontSize = '14px';
+                                dragImage.style.fontWeight = '500';
+                                dragImage.style.whiteSpace = 'nowrap';
+                                dragImage.style.opacity = '0.8';
+                                document.body.appendChild(dragImage);
+                                e.dataTransfer.setDragImage(dragImage, 0, 0);
+                                setTimeout(() => document.body.removeChild(dragImage), 0);
                               }}
                               className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 cursor-move hover:bg-blue-200 transition-colors select-none"
-                              style={{ opacity: 1 }}
                             >
                               {key}: {value}
                             </div>
