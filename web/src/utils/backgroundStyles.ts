@@ -72,7 +72,7 @@ export const getBackgroundStyle = (
   const style: React.CSSProperties | undefined = backgroundImage
     ? {
         backgroundImage: `url(${backgroundImage})`,
-        backgroundSize: '100% auto',
+        backgroundSize: 'cover',
         backgroundPosition: 'center center',
         backgroundRepeat: 'no-repeat',
         backgroundAttachment: 'scroll',
