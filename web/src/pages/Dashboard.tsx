@@ -391,6 +391,50 @@ export const Dashboard: React.FC = () => {
         {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
         <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedWant ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="p-6 space-y-6">
+            {/* All Labels Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Labels</h3>
+              <div>
+                {wants.length === 0 ? (
+                  <p className="text-sm text-gray-500">No labels found</p>
+                ) : (
+                  (() => {
+                    // Collect all unique labels from all wants
+                    const allLabels = new Map<string, Set<string>>();
+                    wants.forEach(want => {
+                      if (want.metadata?.labels) {
+                        Object.entries(want.metadata.labels).forEach(([key, value]) => {
+                          if (!allLabels.has(key)) {
+                            allLabels.set(key, new Set());
+                          }
+                          allLabels.get(key)!.add(value);
+                        });
+                      }
+                    });
+
+                    if (allLabels.size === 0) {
+                      return <p className="text-sm text-gray-500">No labels found</p>;
+                    }
+
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {Array.from(allLabels.entries()).map(([key, values]) => (
+                          Array.from(values).map((value) => (
+                            <div
+                              key={`${key}-${value}`}
+                              className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                            >
+                              {key}: {value}
+                            </div>
+                          ))
+                        ))}
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
               <div>
