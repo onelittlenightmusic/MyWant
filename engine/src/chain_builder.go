@@ -9,6 +9,7 @@ import (
 	"mywant/engine/src/chain"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )
+
+// Global ChainBuilder instance for accessing retrigger functions
+var globalChainBuilder *ChainBuilder
 
 type ChangeEventType string
 
@@ -77,6 +81,11 @@ type ChainBuilder struct {
 
 	// Connectivity warning tracking (to prevent duplicate logs in reconciliation loop)
 	warnedConnectionIssues map[string]bool // Track which wants have already logged connectivity warnings
+
+	// Completed want retrigger detection
+	labelToUsers        map[string][]string // label selector key → want names that use this label
+	wantCompletedFlags  map[string]bool     // want name → is completed?
+	completedFlagsMutex sync.RWMutex        // Protects wantCompletedFlags
 }
 
 // runtimeWant holds the runtime state of a want
@@ -127,6 +136,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		channels:         make(map[string]chain.Chan),
 		running:          false,
 		warnedConnectionIssues: make(map[string]bool), // Track logged connectivity warnings
+		labelToUsers:       make(map[string][]string),
+		wantCompletedFlags: make(map[string]bool),
 		waitGroup:        &sync.WaitGroup{},
 		// Initialize suspend/resume control
 		suspended:   false,
@@ -319,14 +330,11 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	var wantPtr *Want
 	if w, ok := wantInstance.(*Want); ok {
 		wantPtr = w
-		InfoLog("[WANT:CREATE] Direct *Want pointer found for '%s'\n", want.Metadata.Name)
 	} else {
 		// For types that embed Want, extract the Want pointer via reflection
 		wantPtr = extractWantViaReflection(wantInstance)
 		if wantPtr != nil {
-			InfoLog("[WANT:CREATE] Extracted Want pointer via reflection for '%s'\n", want.Metadata.Name)
 		} else {
-			InfoLog("[WANT:CREATE] ⚠️  No Want pointer found (direct or embedded) for '%s'\n", want.Metadata.Name)
 		}
 	}
 
@@ -338,9 +346,7 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	// Automatically wrap with OwnerAwareWant if the want has owner references
 	// This enables parent-child coordination via subscription events
 	if len(want.Metadata.OwnerReferences) > 0 {
-		InfoLog("[WANT:CREATE] Wrapping want '%s' with OwnerAwareWant (owner refs: %d)\n", want.Metadata.Name, len(want.Metadata.OwnerReferences))
 		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, wantPtr)
-		InfoLog("[WANT:CREATE] ✅ Want '%s' wrapped with OwnerAwareWant\n", want.Metadata.Name)
 	}
 
 	return wantInstance, nil
@@ -489,20 +495,34 @@ func (cb *ChainBuilder) reconcileLoop() {
 	for {
 		select {
 		case <-cb.reconcileStop:
-			InfoLog("[RECONCILE] Stopping reconcile loop")
 			return
 		case trigger := <-cb.reconcileTrigger:
-			// Handle both reconciliation and control triggers from unified channel
+			// Handle reconciliation, control, and retrigger triggers from unified channel
 			if trigger == nil {
 				continue
 			}
-			if trigger.Type == "control" && trigger.ControlCommand != nil {
-				// Handle control trigger for a specific want
-				cmd := trigger.ControlCommand
-				InfoLog("[RECONCILE] Received control trigger: %s for want %s\n", cmd.Trigger, cmd.WantID)
-				cb.distributeControlCommand(cmd)
-			} else {
+
+			// Only log retrigger types to reduce log spam
+		if trigger.Type == "check_completed_retrigger" {
+			InfoLog("[RETRIGGER:RECEIVED] Received check_completed_retrigger trigger\n")
+		}
+
+			switch trigger.Type {
+			case "control":
+				if trigger.ControlCommand != nil {
+					cmd := trigger.ControlCommand
+					// Control trigger received (logging removed to reduce spam)
+					cb.distributeControlCommand(cmd)
+				}
+
+			case "check_completed_retrigger":
+				// Processing retrigger check (logging removed)
+				cb.checkAndRetriggerCompletedWants()
+				// Retrigger check finished
+
+			default:
 				// Handle standard reconciliation trigger
+				// Standard reconciliation trigger (logging removed)
 				cb.reconcileWants()
 			}
 		case newWants := <-cb.addWantsChan:
@@ -517,7 +537,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 			}
 			cb.reconcileMutex.Unlock()
 			if addedCount > 0 {
-				InfoLog("[RECONCILE] Added %d wants asynchronously\n", addedCount)
+				// Wants added (logging removed)
 			}
 			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
@@ -526,13 +546,13 @@ func (cb *ChainBuilder) reconcileLoop() {
 			deletedCount := 0
 			for _, wantID := range wantIDs {
 				if err := cb.DeleteWantByID(wantID); err != nil {
-					InfoLog("[RECONCILE] Warning: Failed to delete want %s: %v\n", wantID, err)
+					// Failed to delete want (logging removed)
 				} else {
 					deletedCount++
 				}
 			}
 			if deletedCount > 0 {
-				InfoLog("[RECONCILE] Deleted %d wants asynchronously\n", deletedCount)
+				// Wants deleted (logging removed)
 			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
@@ -540,7 +560,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 				if newConfig, err := cb.loadMemoryConfig(); err == nil {
 					cb.config = newConfig
 				} else {
-					InfoLog("[RECONCILE] Warning: Failed to load memory config: %v\n", err)
+					// Failed to load memory (logging removed)
 				}
 				cb.reconcileWants()
 			}
@@ -563,13 +583,11 @@ func (cb *ChainBuilder) reconcileWants() {
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
-		InfoLog("[RECONCILE] Compile phase failed: %v\n", err)
 		return
 	}
 
 	// Phase 2: CONNECT - Establish want topology
 	if err := cb.connectPhase(); err != nil {
-		InfoLog("[RECONCILE] Connect phase failed: %v\n", err)
 		return
 	}
 
@@ -675,6 +693,10 @@ func (cb *ChainBuilder) connectPhase() error {
 		} else {
 		}
 	}
+
+	// Build label-to-users mapping for completed want retrigger detection
+	// This pre-computes which wants depend on each want via label selectors
+	cb.buildLabelToUsersMapping()
 
 	// Validate connectivity requirements (non-blocking - logs warnings only)
 	// Wants with missing connections will remain idle until reconciliation connects them
@@ -996,10 +1018,16 @@ func (cb *ChainBuilder) startPhase() {
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
 
-					// Log detailed info for debugging
+					// Log for coordinator startup
+					if wantName == "dynamic-travel-coordinator-5" {
+						InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+					}
 
 					// Skip if required connections are not met
 					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
+						if wantName == "dynamic-travel-coordinator-5" {
+							InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
+						}
 						continue
 					}
 				} else {
@@ -1434,7 +1462,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Create the function/want
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
-		InfoLog("[RECONCILE:ERROR] Failed to create want function for %s: %v\n", wantConfig.Metadata.Name, err)
 
 		// Create a failed want instead of returning error
 		wantPtr := &Want{
@@ -1464,19 +1491,16 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// First try direct *Want pointer
 	if w, ok := wantFunction.(*Want); ok {
 		wantPtr = w
-		InfoLog("[RECONCILE] Using direct *Want from want function for '%s'\n", wantConfig.Metadata.Name)
 	} else {
 		// Try to extract embedded Want via reflection
 		wantPtr = extractWantViaReflection(wantFunction)
 		if wantPtr != nil {
-			InfoLog("[RECONCILE] Extracted embedded Want for '%s' via reflection\n", wantConfig.Metadata.Name)
 		}
 	}
 
 	// If no Want was found in the want function, create a new one
 	// (This handles want types that don't embed or return a Want)
 	if wantPtr == nil {
-		InfoLog("[RECONCILE] Creating new Want instance for '%s' (no embedded Want found)\n", wantConfig.Metadata.Name)
 
 		// Initialize State map (simple copy since History is separate)
 		stateMap := make(map[string]interface{})
@@ -1724,32 +1748,27 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 				// Check for control signals (suspend/resume/stop/restart)
 				if cmd, received := want.want.CheckControlSignal(); received {
-					InfoLog("[CONTROL:EXEC] Want %s received control signal: %s\n", wantName, cmd.Trigger)
 					switch cmd.Trigger {
 					case ControlTriggerSuspend:
 						// Mark as suspended and change status to suspended
 						want.want.SetSuspended(true)
 						want.want.SetStatus(WantStatusSuspended)
-						InfoLog("[CONTROL:EXEC] Want %s suspended\n", wantName)
 						// Continue to next iteration (execution will be skipped while suspended)
 
 					case ControlTriggerResume:
 						// Resume execution and restore running status
 						want.want.SetSuspended(false)
 						want.want.SetStatus(WantStatusReaching)
-						InfoLog("[CONTROL:EXEC] Want %s resumed\n", wantName)
 
 					case ControlTriggerStop:
 						// Stop execution immediately
 						want.want.SetStatus(WantStatusTerminated)
-						InfoLog("[CONTROL:EXEC] Want %s stopped\n", wantName)
 						return
 
 					case ControlTriggerRestart:
 						// Restart execution from beginning
 						// Reset any execution state if needed
 						want.want.SetSuspended(false)
-						InfoLog("[CONTROL:EXEC] Want %s restarted\n", wantName)
 					}
 				}
 
@@ -1810,7 +1829,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					// This allows Target wants that created children to be properly connected
 					// and allows idle children to be started
 					if err := cb.TriggerReconcile(); err != nil {
-						InfoLog("[EXEC] Warning: Failed to trigger reconciliation after %s: %v\n", wantName, err)
 					}
 
 					// Exit the execution loop - execution is complete
@@ -1906,7 +1924,6 @@ func (cb *ChainBuilder) Execute() {
 // serverMode=true: runs indefinitely for server mode
 // serverMode=false: waits for wants to complete (batch mode)
 func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
-	InfoLog("[RECONCILE] Starting reconcile loop execution (server mode: %v)\n", serverMode)
 
 	// Initialize memory file if configured
 	if cb.memoryPath != "" {
@@ -2581,15 +2598,12 @@ func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	}
 
 	if targetRuntime == nil {
-		InfoLog("[CONTROL] Warning: Target want %s not found\n", cmd.WantID)
 		return
 	}
 
 	// Send control command to the target want's control channel
 	if err := targetRuntime.want.SendControlCommand(cmd); err != nil {
-		InfoLog("[CONTROL] Warning: Failed to send control command to want %s: %v\n", cmd.WantID, err)
 	} else {
-		InfoLog("[CONTROL] Sent %s command to want %s\n", cmd.Trigger, cmd.WantID)
 	}
 
 	// TODO: Propagate control to child wants if this is a parent want
@@ -2721,4 +2735,195 @@ func (cb *ChainBuilder) controlLoop() {
 // startControlLoop starts the suspension control loop if not already running
 func (cb *ChainBuilder) startControlLoop() {
 	go cb.controlLoop()
+}
+
+// selectorToKey converts a label selector map to a unique string key
+// Used for label-to-users mapping in completed want detection
+// Example: {role: "coordinator", stage: "final"} → "role:coordinator,stage:final"
+func (cb *ChainBuilder) selectorToKey(selector map[string]string) string {
+	if len(selector) == 0 {
+		return ""
+	}
+
+	// Sort keys for consistent ordering
+	keys := make([]string, 0, len(selector))
+	for k := range selector {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Build key string
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s:%s", k, selector[k]))
+	}
+	return strings.Join(parts, ",")
+}
+
+// buildLabelToUsersMapping constructs mapping from label selectors to want names
+// This enables O(1) lookup of which wants depend on a given want
+// Called after path generation to pre-compute dependencies
+func (cb *ChainBuilder) buildLabelToUsersMapping() {
+	cb.labelToUsers = make(map[string][]string)
+
+	for wantName, runtimeWant := range cb.wants {
+		want := runtimeWant.want
+		spec := want.GetSpec()
+		if spec == nil || spec.Using == nil {
+			continue
+		}
+
+		// For each "using" selector, record this want as a user
+		for _, selector := range spec.Using {
+			selectorKey := cb.selectorToKey(selector)
+			if selectorKey != "" {
+				cb.labelToUsers[selectorKey] = append(cb.labelToUsers[selectorKey], wantName)
+			}
+		}
+	}
+}
+
+// checkAndRetriggerCompletedWants checks for completed wants and notifies their dependents
+// Called from reconcileLoop when a completed want retrigger check trigger is received
+// This is the core async mechanism for retrigger detection
+func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
+
+	// Take snapshot of completed flags to avoid holding lock during notification
+	cb.completedFlagsMutex.RLock()
+	completedSnapshot := make(map[string]bool)
+	for name, isCompleted := range cb.wantCompletedFlags {
+		completedSnapshot[name] = isCompleted
+	}
+	cb.completedFlagsMutex.RUnlock()
+
+	// Take snapshot of wants to avoid holding lock during SetStatus
+	cb.reconcileMutex.RLock()
+	wantSnapshot := make(map[string]*runtimeWant)
+	for name, rw := range cb.wants {
+		wantSnapshot[name] = rw
+	}
+	cb.reconcileMutex.RUnlock()
+
+	// Process each completed want
+	anyWantRetriggered := false
+	for wantName, isCompleted := range completedSnapshot {
+
+		if isCompleted {
+			InfoLog("[RETRIGGER:CHECK] Checking users for completed want '%s'\n", wantName)
+			users := cb.findUsersOfCompletedWant(wantName)
+			InfoLog("[RETRIGGER:CHECK] Found %d users for '%s'\n", len(users), wantName)
+
+			if len(users) > 0 {
+				InfoLog("[RETRIGGER] Want '%s' completed, found %d users to retrigger\n", wantName, len(users))
+
+				for _, userName := range users {
+					// Reset dependent want to Idle so it can be re-executed
+					// This allows the want to pick up new data from the completed source
+					if runtimeWant, ok := wantSnapshot[userName]; ok {
+						runtimeWant.want.SetStatus(WantStatusIdle)
+						anyWantRetriggered = true
+					}
+				}
+			}
+		}
+	}
+
+	// If any want was retriggered, queue a reconciliation trigger
+	// (cannot call reconcileWants() directly due to mutex re-entrancy)
+	if anyWantRetriggered {
+		select {
+		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+			// Trigger queued successfully
+		default:
+			// Channel full, ignore (next reconciliation cycle will handle it)
+		}
+	}
+}
+
+// findUsersOfCompletedWant finds all wants that depend on a given completed want
+// Uses the pre-computed labelToUsers mapping for O(1) lookup
+// Returns slice of want names that use the completed want's labels
+func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantName string) []string {
+	// Find the completed want
+	runtimeWant, ok := cb.wants[completedWantName]
+	if !ok {
+		return []string{}
+	}
+
+	completedWant := runtimeWant.want
+	labels := completedWant.Metadata.Labels
+	if labels == nil {
+		return []string{}
+	}
+
+	// For each label in the completed want, find users
+	users := make(map[string]bool) // De-duplicate users
+
+	// Generate selector keys from completed want's labels
+	// and look up users in the pre-computed mapping
+	for labelKey, labelValue := range labels {
+		selector := map[string]string{labelKey: labelValue}
+		selectorKey := cb.selectorToKey(selector)
+		if selectorKey != "" {
+			if usersForSelector, exists := cb.labelToUsers[selectorKey]; exists {
+				for _, userName := range usersForSelector {
+					users[userName] = true
+				}
+			}
+		}
+	}
+
+	// Convert to slice
+	userList := make([]string, 0, len(users))
+	for userName := range users {
+		userList = append(userList, userName)
+	}
+	return userList
+}
+
+// UpdateCompletedFlag updates the completed flag for a want based on its status
+// Called from Want.SetStatus() to track which wants are completed
+// Uses mutex to protect concurrent access
+func (cb *ChainBuilder) UpdateCompletedFlag(wantName string, status WantStatus) {
+	cb.completedFlagsMutex.Lock()
+	defer cb.completedFlagsMutex.Unlock()
+
+	isCompleted := (status == WantStatusAchieved)
+	cb.wantCompletedFlags[wantName] = isCompleted
+}
+
+// IsCompleted returns whether a want is currently in completed state
+// Safe to call from any goroutine with RLock protection
+func (cb *ChainBuilder) IsCompleted(wantName string) bool {
+	cb.completedFlagsMutex.RLock()
+	defer cb.completedFlagsMutex.RUnlock()
+	return cb.wantCompletedFlags[wantName]
+}
+
+// TriggerCompletedWantRetriggerCheck sends a non-blocking trigger to the reconcile loop
+// to check for completed wants and notify their dependents
+// Uses the unified reconcileTrigger channel with Type="check_completed_retrigger"
+func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
+	select {
+	case cb.reconcileTrigger <- &TriggerCommand{
+		Type: "check_completed_retrigger",
+	}:
+		// Trigger sent successfully
+		InfoLog("[RETRIGGER:SEND] Non-blocking retrigger check trigger sent to reconcile loop\n")
+	default:
+		// Channel is full (rare), trigger is already pending
+		InfoLog("[RETRIGGER:SEND] Warning: reconcileTrigger channel full, skipping trigger\n")
+	}
+}
+
+// SetGlobalChainBuilder sets the global ChainBuilder instance
+// Called from server initialization to make ChainBuilder accessible to wants
+func SetGlobalChainBuilder(cb *ChainBuilder) {
+	globalChainBuilder = cb
+}
+
+// GetGlobalChainBuilder returns the global ChainBuilder instance
+// Returns nil if not yet initialized
+func GetGlobalChainBuilder() *ChainBuilder {
+	return globalChainBuilder
 }
