@@ -237,6 +237,8 @@ export const WantForm: React.FC<WantFormProps> = ({
     try {
       let wantRequest: CreateWantRequest | UpdateWantRequest;
 
+      console.log('handleSubmit - editMode:', editMode, 'form state using:', using, 'labels:', labels, 'params:', params);
+
       if (editMode === 'yaml') {
         // Parse YAML to want object
         if (!yamlContent.trim()) {
@@ -257,7 +259,10 @@ export const WantForm: React.FC<WantFormProps> = ({
           return;
         }
         wantRequest = formToWantObject();
+        console.log('handleSubmit - form mode, wantRequest:', wantRequest);
       }
+
+      console.log('handleSubmit - final wantRequest:', wantRequest);
 
       if (isEditing && editingWant?.metadata?.id) {
         await updateWant(editingWant.metadata.id, wantRequest as UpdateWantRequest);
@@ -330,15 +335,25 @@ export const WantForm: React.FC<WantFormProps> = ({
   };
 
   const addUsing = () => {
-    setUsing(prev => [...prev, { '': '' }]);
-    setEditingUsingIndex(using.length); // Start editing the new dependency
+    console.log('addUsing called, current using state:', using);
+    const newIndex = using.length; // Capture the index before state update
+    setUsing(prev => {
+      console.log('setUsing callback - prev length:', prev.length, 'new index:', newIndex);
+      return [...prev, { '': '' }];
+    });
+    setEditingUsingIndex(newIndex); // Use the captured index
     setEditingUsingDraft({ key: '', value: '' });
   };
 
   const updateUsing = (index: number, key: string, value: string) => {
-    setUsing(prev => prev.map((item, i) =>
-      i === index ? { [key]: value } : item
-    ));
+    console.log('updateUsing called - index:', index, 'key:', key, 'value:', value, 'current using:', using);
+    setUsing(prev => {
+      const updated = prev.map((item, i) =>
+        i === index ? { [key]: value } : item
+      );
+      console.log('updateUsing - updated using array:', updated);
+      return updated;
+    });
   };
 
   const removeUsing = (index: number) => {
@@ -796,6 +811,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                           type="button"
                           onClick={() => {
                             // Confirm the changes
+                            console.log('Save button clicked - editingUsingDraft:', editingUsingDraft, 'editingUsingIndex:', editingUsingIndex, 'current using:', using);
                             if (editingUsingDraft.key.trim()) {
                               const newUsing = [...using];
                               if (editingUsingIndex < newUsing.length) {
@@ -811,6 +827,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                                 // Adding new dependency
                                 newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
                               }
+                              console.log('Setting using to:', newUsing);
                               setUsing(newUsing);
                             }
                             setEditingUsingIndex(null);
