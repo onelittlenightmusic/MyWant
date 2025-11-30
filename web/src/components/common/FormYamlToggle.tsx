@@ -15,7 +15,7 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
   onModeChange
 }) => {
   return (
-    <div className="flex items-center justify-center space-x-1 bg-gray-100 rounded-lg p-1">
+    <div className="flex items-center justify-end space-x-1 bg-gray-100 rounded-lg p-1">
       <button
         type="button"
         onClick={() => onModeChange('form')}
@@ -27,7 +27,7 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
         title="Edit using form"
       >
         <Edit3 className="w-4 h-4" />
-        Form
+        {mode === 'form' && 'Form'}
       </button>
       <button
         type="button"
@@ -40,7 +40,7 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
         title="Edit as YAML"
       >
         <Code className="w-4 h-4" />
-        YAML
+        {mode === 'yaml' && 'YAML'}
       </button>
     </div>
   );

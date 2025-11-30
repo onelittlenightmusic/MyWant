@@ -375,10 +375,12 @@ export const WantForm: React.FC<WantFormProps> = ({
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
 
-        <FormYamlToggle
-          mode={editMode}
-          onModeChange={setEditMode}
-        />
+        <div className="flex justify-end">
+          <FormYamlToggle
+            mode={editMode}
+            onModeChange={setEditMode}
+          />
+        </div>
 
         {editMode === 'form' ? (
           <>

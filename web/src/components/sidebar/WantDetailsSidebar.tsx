@@ -531,7 +531,7 @@ const SettingsTab: React.FC<{
   return (
     <div className="h-full flex flex-col">
       {/* Config/Overview Toggle */}
-      <div className="flex-shrink-0 px-8 py-4">
+      <div className="flex-shrink-0 px-8 py-4 flex justify-end">
         <FormYamlToggle
           mode={configMode}
           onModeChange={onConfigModeChange}
