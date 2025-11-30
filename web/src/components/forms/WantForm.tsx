@@ -814,15 +814,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                             console.log('Save button clicked - editingUsingDraft:', editingUsingDraft, 'editingUsingIndex:', editingUsingIndex, 'current using:', using);
                             if (editingUsingDraft.key.trim()) {
                               const newUsing = [...using];
-                              if (editingUsingIndex < newUsing.length) {
-                                const newItem = { ...newUsing[editingUsingIndex] };
-                                // Get the original key from the current item
-                                const originalKey = Object.keys(newItem)[0];
-                                if (originalKey) {
-                                  delete newItem[originalKey];
-                                }
-                                newItem[editingUsingDraft.key] = editingUsingDraft.value;
-                                newUsing[editingUsingIndex] = newItem;
+                              if (editingUsingIndex !== null && editingUsingIndex < newUsing.length) {
+                                // Replace the entire item with just the new key-value pair
+                                newUsing[editingUsingIndex] = { [editingUsingDraft.key]: editingUsingDraft.value };
                               } else {
                                 // Adding new dependency
                                 newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
