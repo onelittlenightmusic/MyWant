@@ -152,27 +152,52 @@ func (c *CoordinatorWant) Exec() bool {
 	completionKey := c.DataHandler.GetCompletionKey()
 	isCompleted, _ := c.GetStateBool(completionKey, false)
 	if isCompleted {
-		// Check if there's pending data on any input channel
-		hasNewData := false
+		c.StoreLog(fmt.Sprintf("[RETRIGGER] Coordinator completed, entering retrigger mode on %d channels", inCount))
+
+		// For retrigger, we need to SYNCHRONOUSLY wait for fresh data from any channel
+		// Use a for loop to do one blocking read attempt per channel
+		hasCollectedNewData := false
 		for i := 0; i < inCount; i++ {
 			in, inChannelAvailable := c.GetInputChannel(i)
 			if !inChannelAvailable {
+				c.StoreLog(fmt.Sprintf("[RETRIGGER] Channel %d not available", i))
 				continue
 			}
+
+			// Try one BLOCKING read from this channel
+			// This will wait until data arrives or the channel closes
+			c.StoreLog(fmt.Sprintf("[RETRIGGER] Waiting for data on channel %d...", i))
 			select {
-			case <-in:
-				hasNewData = true
-				break
-			default:
+			case data, ok := <-in:
+				if ok {
+					c.StoreLog(fmt.Sprintf("[RETRIGGER] Received data on channel %d (blocking): %+v", i, data))
+					c.DataHandler.ProcessData(c, data)
+					c.receivedFromIndex[i] = true
+					hasCollectedNewData = true
+					break // Got one piece of new data, move to collection phase
+				} else {
+					c.StoreLog(fmt.Sprintf("[RETRIGGER] Channel %d closed", i))
+				}
 			}
 		}
-		if hasNewData {
-			// Reset state to process retrigger
+
+		if hasCollectedNewData {
+			// Reset completion state so we collect remaining data
+			oldReceivedCount := len(c.receivedFromIndex)
 			c.StoreState(completionKey, false)
+			c.StoreLog(fmt.Sprintf("[RETRIGGER] Detected new data, resetting completion state (was tracking %d channels)", oldReceivedCount))
+
+			// Clear previous schedules to start fresh
+			c.StoreState("schedules", nil)
+			c.StoreState("total_processed", 0)
+			c.StoreLog(fmt.Sprintf("[RETRIGGER] Cleared previous schedules, ready to collect new ones"))
+
+			// Reset tracking so we wait for all channels again
 			c.receivedFromIndex = make(map[int]bool)
-			c.StoreLog(fmt.Sprintf("[RETRIGGER] Detected new data while completed, resetting state"))
+			c.receivedFromIndex[0] = true // Mark first channel as received
 		} else {
-			// No new data, remain completed
+			// No new data available, remain completed
+			c.StoreLog(fmt.Sprintf("[RETRIGGER] No new data detected, remaining completed"))
 			return true
 		}
 	}
