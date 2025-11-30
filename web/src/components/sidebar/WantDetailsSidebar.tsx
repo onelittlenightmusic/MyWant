@@ -570,9 +570,7 @@ const SettingsTab: React.FC<{
   };
 
   const addUsing = () => {
-    const newUsing = [...using, { '': '' }];
-    setUsing(newUsing);
-    setEditingUsingIndex(newUsing.length - 1);
+    setEditingUsingIndex(using.length);  // Point to "new" index
     setEditingUsingDraft({ key: '', value: '' });
   };
 
@@ -985,7 +983,7 @@ const SettingsTab: React.FC<{
                                 throw new Error('Failed to update dependency');
                               }
 
-                              setUsing(newUsing);
+                              setUsing(filteredUsing);
                               setEditingUsingIndex(null);
                               setEditingUsingDraft({ key: '', value: '' });
                               onWantUpdate?.();
