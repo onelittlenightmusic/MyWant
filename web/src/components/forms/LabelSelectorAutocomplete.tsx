@@ -28,10 +28,10 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
 
   const { labelKeys, labelValues, fetchLabels } = useLabelHistoryStore();
 
-  // Fetch labels on mount
+  // Fetch labels on mount only
   useEffect(() => {
     fetchLabels();
-  }, [fetchLabels]);
+  }, []);
 
   // Filter keys based on input
   useEffect(() => {
@@ -68,7 +68,12 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
+      const target = e.target as HTMLElement;
+
+      // Don't close if click is on a button (Save/Cancel)
+      if (target.closest('button')) {
+        return;
+      }
 
       // Only close key dropdown if click is outside the key container
       if (keyContainerRef.current && !keyContainerRef.current.contains(target)) {

@@ -107,6 +107,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   useEffect(() => {
     if (editMode === 'form') {
       const wantObject = formToWantObject();
+      console.log('Updating YAML - wantObject:', wantObject, 'using state:', using);
       setYamlContent(stringifyYaml(wantObject));
     }
   }, [name, type, labels, params, using, recipe, editMode]);

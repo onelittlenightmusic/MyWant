@@ -62,22 +62,5 @@ export const useLabelHistoryStore = create<LabelHistoryStore>()(
   }))
 );
 
-// Auto-refresh labels every 10 seconds when they exist
-const startAutoRefresh = () => {
-  setInterval(() => {
-    const store = useLabelHistoryStore.getState();
-    // Only refresh if we have labels and no error state
-    if (store.labelKeys.length > 0 && !store.error) {
-      store.fetchLabels();
-    }
-  }, 10000);
-};
-
-// Start auto-refresh when store is first used with labels
-let autoRefreshStarted = false;
-useLabelHistoryStore.subscribe((state) => {
-  if (!autoRefreshStarted && state.labelKeys.length > 0) {
-    autoRefreshStarted = true;
-    startAutoRefresh();
-  }
-});
+// Auto-refresh is disabled to prevent excessive API calls
+// The component that uses the labels should handle periodic refresh if needed
