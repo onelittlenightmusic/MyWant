@@ -33,6 +33,10 @@ type CoordinatorWant struct {
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
 	paths              Paths
+	// Unified coordinator state tracking
+	lastKnownInCount   int                // Track previously seen input count for detecting new connections
+	receivedFromIndex  map[int]bool       // Track which input channels have received at least one value
+	lastProcessingKey  string             // Key used to mark last completion
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
@@ -42,7 +46,9 @@ func NewCoordinatorWant(
 	spec WantSpec,
 ) interface{} {
 	coordinator := &CoordinatorWant{
-		Want: Want{},
+		Want:             Want{},
+		receivedFromIndex: make(map[int]bool),
+		lastKnownInCount:  0,
 	}
 
 	// Initialize base Want fields
@@ -60,9 +66,9 @@ func NewCoordinatorWant(
 	// Set fields for base Want methods
 	coordinator.WantType = coordinatorType
 	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  requiredInputs,
+		RequiredInputs:  -1,  // Unified: accept any number of inputs
 		RequiredOutputs: 0,
-		MaxInputs:       requiredInputs,
+		MaxInputs:       -1,  // No maximum
 		MaxOutputs:      0,
 		WantType:        coordinatorType,
 		Description:     fmt.Sprintf("Generic coordinator want (%s)", coordinatorType),
@@ -130,7 +136,10 @@ func (c *CoordinatorWant) GetWant() *Want {
 	return &c.Want
 }
 
-// Exec executes the coordinator logic
+// Exec executes the coordinator logic using unified completion strategy
+// Strategy: Each input channel must send at least one value. When all connected channels
+// have sent at least one value, the coordinator completes.
+// When a new channel is added, the coordinator resets and waits again.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
@@ -139,26 +148,27 @@ func (c *CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	// Wait for all required inputs to be connected
-	if inCount < c.RequiredInputCount {
-		return false
-	}
-
-	// Check if already processed using the completion checker's key
-	completionKey := c.DataHandler.GetCompletionKey()
-	processedVal, _ := c.GetStateBool(completionKey, false)
-	if processedVal {
-		return true
+	// Detect new connections: if input count increased, reset the state
+	if inCount > c.lastKnownInCount {
+		c.lastKnownInCount = inCount
+		// Reset received status for new channels
+		// Keep previously received channels, but mark as if we need to receive again
+		c.receivedFromIndex = make(map[int]bool)
+		// Clear the completion marker to restart processing
+		completionKey := c.DataHandler.GetCompletionKey()
+		c.StoreState(completionKey, false)
 	}
 
 	// Collect data from all available input channels using non-blocking reads
-	for i := 0; i < c.GetInCount(); i++ {
+	for i := 0; i < inCount; i++ {
 		in, inChannelAvailable := c.GetInputChannel(i)
 		if !inChannelAvailable {
 			continue
 		}
 		select {
 		case data := <-in:
+			// Mark this channel as having received data
+			c.receivedFromIndex[i] = true
 			// Let the data handler process the data
 			c.DataHandler.ProcessData(c, data)
 		default:
@@ -166,18 +176,32 @@ func (c *CoordinatorWant) Exec() bool {
 		}
 	}
 
-	// Check if completion condition is met
-	if c.CompletionChecker.IsComplete(c, c.RequiredInputCount) {
-		// Mark as processed
-		c.StoreState(completionKey, true)
+	// Check if all currently connected channels have received at least one value
+	allChannelsReceived := true
+	for i := 0; i < inCount; i++ {
+		if !c.receivedFromIndex[i] {
+			allChannelsReceived = false
+			break
+		}
+	}
 
-		// Let the completion checker perform final processing
-		c.CompletionChecker.OnCompletion(c)
+	// If all channels have sent at least one value, mark completion
+	if allChannelsReceived {
+		completionKey := c.DataHandler.GetCompletionKey()
+		processedVal, _ := c.GetStateBool(completionKey, false)
 
-		// Apply any state updates from data handler
-		stateUpdates := c.DataHandler.GetStateUpdates(c)
-		if len(stateUpdates) > 0 {
-			c.StoreStateMulti(stateUpdates)
+		if !processedVal {
+			// Mark as processed
+			c.StoreState(completionKey, true)
+
+			// Let the completion checker perform final processing
+			c.CompletionChecker.OnCompletion(c)
+
+			// Apply any state updates from data handler
+			stateUpdates := c.DataHandler.GetStateUpdates(c)
+			if len(stateUpdates) > 0 {
+				c.StoreStateMulti(stateUpdates)
+			}
 		}
 
 		return true
@@ -274,11 +298,15 @@ func (h *ApprovalDataHandler) GetCompletionKey() string {
 }
 
 // ApprovalCompletionChecker checks if approval data is complete
+// In unified coordinator: completion is handled by checking if all connected channels
+// have sent at least one value. This checker is now optional but kept for backward compatibility.
 type ApprovalCompletionChecker struct {
 	Level int // 1 or 2
 }
 
 func (c *ApprovalCompletionChecker) IsComplete(want *CoordinatorWant, requiredInputs int) bool {
+	// In unified coordinator, completion is determined by whether all channels
+	// have sent at least one value (handled in Exec). This is kept for compatibility.
 	evidenceVal, _ := want.GetStateBool("evidence_received", false)
 	descriptionVal, _ := want.GetStateBool("description_received", false)
 	return evidenceVal && descriptionVal
@@ -384,11 +412,15 @@ func (h *TravelDataHandler) GetCompletionKey() string {
 }
 
 // TravelCompletionChecker checks if all travel schedules have been collected
+// In unified coordinator: completion is handled by checking if all connected channels
+// have sent at least one value (handled in Exec). This checker is now optional but kept for backward compatibility.
 type TravelCompletionChecker struct {
 	IsBuffet bool // If true, expect only 1 schedule
 }
 
 func (c *TravelCompletionChecker) IsComplete(want *CoordinatorWant, requiredInputs int) bool {
+	// In unified coordinator, completion is determined by whether all channels
+	// have sent at least one value (handled in Exec). This is kept for compatibility.
 	schedulesVal, _ := want.GetState("schedules")
 	schedules, _ := schedulesVal.([]*TravelSchedule)
 
