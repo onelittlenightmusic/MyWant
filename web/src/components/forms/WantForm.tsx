@@ -88,8 +88,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       },
       spec: {
         ...(Object.keys(params).length > 0 && { params }),
-        ...(validUsing.length > 0 && { using: validUsing }),
-        ...(recipe.trim() && { recipe: recipe.trim() })
+        ...(validUsing.length > 0 && { using: validUsing })
       }
     };
   };
