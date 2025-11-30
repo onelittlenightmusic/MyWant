@@ -464,29 +464,36 @@ const SettingsTab: React.FC<{
     setLocalUpdateError(null);
 
     try {
-      const newLabels = { ...(want.metadata.labels || {}) };
-      if (oldKey !== editingLabelDraft.key) {
-        delete newLabels[oldKey];
+      // If key changed, remove old key first
+      if (oldKey && oldKey !== editingLabelDraft.key) {
+        const deleteResponse = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${oldKey}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!deleteResponse.ok) {
+          throw new Error('Failed to remove old label');
+        }
       }
-      newLabels[editingLabelDraft.key] = editingLabelDraft.value;
 
-      const updatePayload = {
-        metadata: {
-          ...want.metadata,
-          labels: newLabels
-        },
-        spec: want.spec
-      };
-
-      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
-        method: 'PUT',
+      // Add new label
+      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload)
+        body: JSON.stringify({
+          key: editingLabelDraft.key,
+          value: editingLabelDraft.value
+        })
       });
 
       if (!response.ok) {
         throw new Error('Failed to update label');
       }
+
+      // Update local state with new label
+      setLabels(prev => ({
+        ...prev,
+        [editingLabelDraft.key]: editingLabelDraft.value
+      }));
 
       setEditingLabelKey(null);
       setEditingLabelDraft({ key: '', value: '' });
@@ -505,26 +512,21 @@ const SettingsTab: React.FC<{
     setLocalUpdateError(null);
 
     try {
-      const newLabels = { ...(want.metadata.labels || {}) };
-      delete newLabels[key];
-
-      const updatePayload = {
-        metadata: {
-          ...want.metadata,
-          labels: newLabels
-        },
-        spec: want.spec
-      };
-
-      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatePayload)
+      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
       });
 
       if (!response.ok) {
         throw new Error('Failed to remove label');
       }
+
+      // Update local state to remove label
+      setLabels(prev => {
+        const updated = { ...prev };
+        delete updated[key];
+        return updated;
+      });
 
       onWantUpdate?.();
     } catch (error) {
@@ -574,11 +576,36 @@ const SettingsTab: React.FC<{
     setEditingUsingDraft({ key: '', value: '' });
   };
 
-  const removeUsing = (index: number) => {
-    setUsing(prev => prev.filter((_, i) => i !== index));
+  const removeUsing = async (index: number) => {
+    if (!want.metadata?.id || index < 0 || index >= using.length) return;
+
+    setLocalUpdateLoading(true);
+    setLocalUpdateError(null);
+
+    try {
+      const keyToRemove = Object.keys(using[index])[0];
+      if (!keyToRemove) return;
+
+      const response = await fetch(
+        `http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${keyToRemove}`,
+        { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to remove dependency');
+      }
+
+      // Update local state to remove dependency
+      setUsing(prev => prev.filter((_, i) => i !== index));
+      onWantUpdate?.();
+    } catch (error) {
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to remove dependency');
+    } finally {
+      setLocalUpdateLoading(false);
+    }
   };
 
-  // Reset form state when want changes
+  // Reset form state when want changes or metadata is updated (including labels/dependencies)
   useEffect(() => {
     setParams(want.spec?.params || {});
     setLabels(want.metadata?.labels || {});
@@ -588,7 +615,7 @@ const SettingsTab: React.FC<{
     setEditingUsingIndex(null);
     setEditingUsingDraft({ key: '', value: '' });
     setCollapsedSections(new Set(['parameters', 'labels', 'dependencies']));
-  }, [want.metadata?.id]);
+  }, [want.metadata?.id, want.metadata?.updatedAt]);
 
   return (
     <div className="h-full flex flex-col">
@@ -913,7 +940,9 @@ const SettingsTab: React.FC<{
                               className="w-3 h-3 ml-2 hover:text-blue-900"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                removeUsing(index);
+                                removeUsing(index).catch(() => {
+                                  // Error handling is done in removeUsing function
+                                });
                               }}
                             />
                           </button>
@@ -935,8 +964,10 @@ const SettingsTab: React.FC<{
                           setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
                         }}
                         onRemove={() => {
-                          if (editingUsingIndex >= 0) {
-                            removeUsing(editingUsingIndex);
+                          if (editingUsingIndex >= 0 && editingUsingIndex < using.length) {
+                            removeUsing(editingUsingIndex).catch(() => {
+                              // Error handling is done in removeUsing function
+                            });
                           }
                           setEditingUsingIndex(null);
                           setEditingUsingDraft({ key: '', value: '' });
@@ -952,38 +983,53 @@ const SettingsTab: React.FC<{
                             setLocalUpdateError(null);
 
                             try {
-                              const newUsing = [...using];
-                              if (editingUsingIndex < newUsing.length) {
-                                const newItem = { ...newUsing[editingUsingIndex] };
-                                const originalKey = Object.keys(newItem)[0];
-                                if (originalKey) {
-                                  delete newItem[originalKey];
+                              // If editing existing dependency, remove old one first
+                              if (editingUsingIndex < using.length) {
+                                const oldDep = using[editingUsingIndex];
+                                const oldKey = Object.keys(oldDep)[0];
+                                if (oldKey && oldKey !== editingUsingDraft.key) {
+                                  const deleteResponse = await fetch(
+                                    `http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${oldKey}`,
+                                    { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
+                                  );
+                                  if (!deleteResponse.ok) {
+                                    throw new Error('Failed to remove old dependency');
+                                  }
                                 }
-                                newItem[editingUsingDraft.key] = editingUsingDraft.value;
-                                newUsing[editingUsingIndex] = newItem;
-                              } else {
-                                newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
                               }
 
-                              // Filter out any entries with empty keys before saving
-                              const filteredUsing = newUsing.filter(item => Object.keys(item)[0]?.trim());
-
-                              const updatePayload = {
-                                metadata: want.metadata,
-                                spec: { ...want.spec, using: filteredUsing }
-                              };
-
-                              const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(updatePayload)
-                              });
+                              // Add new dependency
+                              const response = await fetch(
+                                `http://localhost:8080/api/v1/wants/${want.metadata.id}/using`,
+                                {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    key: editingUsingDraft.key,
+                                    value: editingUsingDraft.value
+                                  })
+                                }
+                              );
 
                               if (!response.ok) {
                                 throw new Error('Failed to update dependency');
                               }
 
-                              setUsing(filteredUsing);
+                              // Update local state with new using dependency
+                              if (editingUsingIndex < using.length) {
+                                // Editing existing - replace it
+                                const updated = [...using];
+                                updated[editingUsingIndex] = {
+                                  [editingUsingDraft.key]: editingUsingDraft.value
+                                };
+                                setUsing(updated);
+                              } else {
+                                // Adding new dependency
+                                setUsing(prev => [...prev, {
+                                  [editingUsingDraft.key]: editingUsingDraft.value
+                                }]);
+                              }
+
                               setEditingUsingIndex(null);
                               setEditingUsingDraft({ key: '', value: '' });
                               onWantUpdate?.();

@@ -19,6 +19,7 @@ interface WantCardProps {
   className?: string;
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
+  onLabelDropped?: (wantId: string) => void;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -34,7 +35,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   onResume,
   className,
   expandedParents,
-  onToggleExpand
+  onToggleExpand,
+  onLabelDropped
 }) => {
   const wantId = want.metadata?.id || want.id;
   // Use expandedParents from keyboard navigation if provided, otherwise use local state
@@ -137,7 +139,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   };
 
   // Handle drop
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -155,18 +157,20 @@ export const WantCard: React.FC<WantCardProps> = ({
       }
 
       // Add label via POST /api/v1/wants/{id}/labels
-      const response = await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
+      fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })
-      });
-
-      if (response.ok) {
-        // Refresh the want to show updated labels
-        onView(want);
-      } else {
-        console.error('Failed to add label to want:', response.statusText);
-      }
+      })
+        .then(response => {
+          if (response.ok && onLabelDropped) {
+            // Notify parent to refresh want details
+            onLabelDropped(wantId);
+          }
+        })
+        .catch(error => {
+          console.error('Error dropping label:', error);
+        });
     } catch (error) {
       console.error('Error dropping label:', error);
     }
@@ -283,16 +287,74 @@ export const WantCard: React.FC<WantCardProps> = ({
               );
               // Get background style for child want (isParentWant = false)
               const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
+
+              // Handle drag over for child card
+              const handleChildDragOver = (e: React.DragEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+                setIsDragOver(true);
+              };
+
+              // Handle drag leave for child card
+              const handleChildDragLeave = (e: React.DragEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragOver(false);
+              };
+
+              // Handle drop for child card
+              const handleChildDrop = (e: React.DragEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragOver(false);
+
+                try {
+                  const labelData = e.dataTransfer.getData('application/json');
+                  if (!labelData) return;
+
+                  const { key, value } = JSON.parse(labelData);
+                  const childWantId = child.metadata?.id || child.id;
+
+                  if (!childWantId) {
+                    console.error('No child want ID found');
+                    return;
+                  }
+
+                  // Add label via POST /api/v1/wants/{id}/labels
+                  fetch(`http://localhost:8080/api/v1/wants/${childWantId}/labels`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, value })
+                  })
+                    .then(response => {
+                      if (response.ok && onLabelDropped) {
+                        // Notify parent to refresh want details
+                        onLabelDropped(childWantId);
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error dropping label on child:', error);
+                    });
+                } catch (error) {
+                  console.error('Error dropping label on child:', error);
+                }
+              };
+
               return (
                 <div
                   key={childId || `child-${index}`}
                   data-keyboard-nav-selected={isChildSelected}
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
-                    isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300'
+                    isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
+                    isDragOver && 'border-green-500 border-2 bg-green-50'
                   )}
                   style={childBackgroundStyle.style}
                   onClick={handleChildCardClick(child)}
+                  onDragOver={handleChildDragOver}
+                  onDragLeave={handleChildDragLeave}
+                  onDrop={handleChildDrop}
                 >
                   {/* Child want content using reusable component */}
                   <div className={classNames('p-4 w-full h-full', childBackgroundStyle.className, getBackgroundContentContainerClass(childBackgroundStyle.hasBackgroundImage))}>

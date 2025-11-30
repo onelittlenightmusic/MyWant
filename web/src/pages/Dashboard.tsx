@@ -339,6 +339,16 @@ export const Dashboard: React.FC = () => {
     });
   };
 
+  // Handler for when a label is dropped on a want
+  const handleLabelDropped = async (wantId: string) => {
+    // Refresh the wants list to get the updated want with new label
+    await fetchWants();
+
+    // Select the want and open the sidebar to show the newly added label
+    setSelectedWantId(wantId);
+    setSidebarInitialTab('settings');
+  };
+
   // Use hierarchical keyboard navigation hook
   useHierarchicalKeyboardNavigation({
     items: hierarchicalWants,
@@ -482,6 +492,7 @@ export const Dashboard: React.FC = () => {
                 expandedParents={expandedParents}
                 onToggleExpand={handleToggleExpand}
                 onCreateWant={handleCreateWant}
+                onLabelDropped={handleLabelDropped}
               />
             </div>
           </div>

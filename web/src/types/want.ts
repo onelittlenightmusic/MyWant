@@ -39,6 +39,7 @@ export interface WantMetadata {
   type: string;
   labels?: Record<string, string>;
   ownerReferences?: OwnerReference[];
+  updatedAt?: number; // Server-managed timestamp for detecting metadata changes
 }
 
 export interface WantSpec {

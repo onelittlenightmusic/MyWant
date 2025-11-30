@@ -243,7 +243,13 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
 	wants.HandleFunc("/{id}/start", s.startWant).Methods("POST")
 	wants.HandleFunc("/{id}/labels", s.addLabelToWant).Methods("POST")
+	wants.HandleFunc("/{id}/labels/{key}", s.removeLabelFromWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/labels", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/using", s.addUsingDependency).Methods("POST")
+	wants.HandleFunc("/{id}/using/{key}", s.removeUsingDependency).Methods("DELETE")
+	wants.HandleFunc("/{id}/using", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/labels/{key}", s.handleOptions).Methods("OPTIONS")
 
 	// Config CRUD endpoints - for loading recipe-based configurations
 	configs := api.PathPrefix("/configs").Subrouter()
@@ -1668,6 +1674,9 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	}
 	targetWant.Metadata.Labels[labelReq.Key] = labelReq.Value
 
+	// Update the metadata timestamp
+	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+
 	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1675,6 +1684,222 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 		"wantId":    wantID,
 		"key":       labelReq.Key,
 		"value":     labelReq.Value,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
+// removeLabelFromWant handles DELETE /api/v1/wants/{id}/labels/{key} - removes a label
+func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+	keyToRemove := vars["key"]
+
+	// Search for the want by metadata.id across all executions
+	var targetWant *mywant.Want
+	var found bool
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
+				targetWant = want
+				found = true
+				break
+			}
+		}
+	}
+
+	// If not found in executions, search in global builder
+	if !found && s.globalBuilder != nil {
+		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
+			targetWant = want
+			found = true
+		}
+	}
+
+	if !found || targetWant == nil {
+		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		return
+	}
+
+	// Remove the label with matching key
+	if targetWant.Metadata.Labels != nil {
+		delete(targetWant.Metadata.Labels, keyToRemove)
+	}
+
+	// Update the metadata timestamp
+	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+
+	// Return success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":   "Label removed successfully",
+		"wantId":    wantID,
+		"key":       keyToRemove,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
+// addUsingDependency handles POST /api/v1/wants/{id}/using - adds a using dependency
+func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Parse using dependency request body
+	var usingReq struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&usingReq); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Validate dependency key and value
+	if usingReq.Key == "" || usingReq.Value == "" {
+		http.Error(w, "Using dependency key and value are required", http.StatusBadRequest)
+		return
+	}
+
+	// Search for the want by metadata.id across all executions
+	var targetExecution *WantExecution
+	var targetWant *mywant.Want
+	var targetWantIndex int = -1
+	var found bool
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
+				targetWant = want
+				targetExecution = execution
+				found = true
+				// Find the index in config
+				for i, cfgWant := range execution.Config.Wants {
+					if cfgWant.Metadata.ID == wantID {
+						targetWantIndex = i
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// If not found in executions, search in global builder
+	if !found && s.globalBuilder != nil {
+		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
+			targetWant = want
+			found = true
+		}
+	}
+
+	if !found || targetWant == nil {
+		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		return
+	}
+
+	// Add the using dependency to the want's spec
+	if targetWant.Spec.Using == nil {
+		targetWant.Spec.Using = make([]map[string]string, 0)
+	}
+
+	// Create the new dependency entry
+	newDependency := map[string]string{usingReq.Key: usingReq.Value}
+	targetWant.Spec.Using = append(targetWant.Spec.Using, newDependency)
+
+	// Also update the config if found
+	if targetExecution != nil && targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
+		targetExecution.Config.Wants[targetWantIndex].Spec.Using = targetWant.Spec.Using
+	}
+
+	// Update the metadata timestamp
+	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+
+	// Return success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":   "Using dependency added successfully",
+		"wantId":    wantID,
+		"key":       usingReq.Key,
+		"value":     usingReq.Value,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
+// removeUsingDependency handles DELETE /api/v1/wants/{id}/using/{key} - removes a using dependency
+func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+	keyToRemove := vars["key"]
+
+	// Search for the want by metadata.id across all executions
+	var targetExecution *WantExecution
+	var targetWant *mywant.Want
+	var targetWantIndex int = -1
+	var found bool
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
+				targetWant = want
+				targetExecution = execution
+				found = true
+				// Find the index in config
+				for i, cfgWant := range execution.Config.Wants {
+					if cfgWant.Metadata.ID == wantID {
+						targetWantIndex = i
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// If not found in executions, search in global builder
+	if !found && s.globalBuilder != nil {
+		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
+			targetWant = want
+			found = true
+		}
+	}
+
+	if !found || targetWant == nil {
+		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		return
+	}
+
+	// Remove the using dependency with matching key
+	if targetWant.Spec.Using != nil {
+		newUsing := make([]map[string]string, 0)
+		for _, dep := range targetWant.Spec.Using {
+			if _, hasKey := dep[keyToRemove]; !hasKey {
+				newUsing = append(newUsing, dep)
+			}
+		}
+		targetWant.Spec.Using = newUsing
+	}
+
+	// Also update the config if found
+	if targetExecution != nil && targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
+		targetExecution.Config.Wants[targetWantIndex].Spec.Using = targetWant.Spec.Using
+	}
+
+	// Update the metadata timestamp
+	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+
+	// Return success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":   "Using dependency removed successfully",
+		"wantId":    wantID,
+		"key":       keyToRemove,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
@@ -1713,6 +1938,9 @@ func (s *Server) Start() error {
 	log.Printf("  POST /api/v1/wants/{id}/suspend    - Suspend want execution\n")
 	log.Printf("  POST /api/v1/wants/{id}/resume     - Resume want execution\n")
 	log.Printf("  POST /api/v1/wants/{id}/labels     - Add label to want\n")
+	log.Printf("  DELETE /api/v1/wants/{id}/labels/{key} - Remove label from want\n")
+	log.Printf("  POST /api/v1/wants/{id}/using      - Add using dependency to want\n")
+	log.Printf("  DELETE /api/v1/wants/{id}/using/{key} - Remove using dependency from want\n")
 	log.Printf("  POST /api/v1/agents                - Create agent\n")
 	log.Printf("  GET  /api/v1/agents                - List agents\n")
 	log.Printf("  GET  /api/v1/agents/{name}         - Get agent\n")
