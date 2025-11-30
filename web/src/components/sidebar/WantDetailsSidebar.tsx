@@ -4,6 +4,7 @@ import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
+import { FormYamlToggle } from '@/components/common/FormYamlToggle';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
@@ -68,7 +69,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [editedConfig, setEditedConfig] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
-  const [showConfigEditor, setShowConfigEditor] = useState<boolean>(false);
+  const [configMode, setConfigMode] = useState<'form' | 'yaml'>('form');
 
   // Control panel logic (use want for status since it comes from the live dashboard state)
   const isRunning = want?.status === 'reaching';
@@ -380,12 +381,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 editedConfig={editedConfig}
                 updateLoading={updateLoading}
                 updateError={updateError}
-                showConfigEditor={showConfigEditor}
+                configMode={configMode}
                 onEdit={handleEditConfig}
                 onSave={handleSaveConfig}
                 onCancel={handleCancelEdit}
                 onConfigChange={setEditedConfig}
-                onToggleConfigEditor={setShowConfigEditor}
+                onConfigModeChange={setConfigMode}
                 onWantUpdate={() => {
                   const wantId = want.metadata?.id || want.id;
                   if (wantId) {
@@ -422,12 +423,12 @@ const SettingsTab: React.FC<{
   editedConfig: string;
   updateLoading: boolean;
   updateError: string | null;
-  showConfigEditor: boolean;
+  configMode: 'form' | 'yaml';
   onEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
   onConfigChange: (value: string) => void;
-  onToggleConfigEditor: (show: boolean) => void;
+  onConfigModeChange: (mode: 'form' | 'yaml') => void;
   onWantUpdate?: () => void;
 }> = ({
   want,
@@ -435,12 +436,12 @@ const SettingsTab: React.FC<{
   editedConfig,
   updateLoading,
   updateError,
-  showConfigEditor,
+  configMode,
   onEdit,
   onSave,
   onCancel,
   onConfigChange,
-  onToggleConfigEditor,
+  onConfigModeChange,
   onWantUpdate
 }) => {
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
@@ -529,19 +530,22 @@ const SettingsTab: React.FC<{
 
   return (
     <div className="h-full flex flex-col">
-      {/* Config/Overview Toggle Button */}
-      <div className="flex-shrink-0 border-b border-gray-200 px-8 py-4">
-        <button
-          onClick={() => onToggleConfigEditor(!showConfigEditor)}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          {showConfigEditor ? 'Overview' : 'Config'}
-        </button>
+      {/* Config/Overview Toggle */}
+      <div className="flex-shrink-0 px-8 py-4">
+        <FormYamlToggle
+          mode={configMode}
+          onModeChange={onConfigModeChange}
+          yamlContent={stringifyYaml({
+            metadata: want.metadata,
+            spec: want.spec
+          })}
+          title="Configuration"
+        />
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-8">
-        {!showConfigEditor ? (
+        {configMode === 'form' ? (
           <div className="space-y-8">
             {/* Metadata Section */}
         <div className="bg-gray-50 rounded-lg p-6">

@@ -3,6 +3,7 @@ import { Save, Plus, X, Code, Edit3, Search, ChevronDown } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
+import { FormYamlToggle } from '@/components/common/FormYamlToggle';
 import { CreateSidebar } from '@/components/layout/CreateSidebar';
 import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
@@ -374,35 +375,11 @@ export const WantForm: React.FC<WantFormProps> = ({
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Mode Toggle */}
-        <div className="border-b border-gray-200 pb-4">
-          <div className="flex items-center justify-center space-x-1 bg-gray-100 rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => setEditMode('form')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                editMode === 'form'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Edit3 className="w-4 h-4" />
-              Form Editor
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditMode('yaml')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                editMode === 'yaml'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Code className="w-4 h-4" />
-              YAML Editor
-            </button>
-          </div>
-        </div>
+        <FormYamlToggle
+          mode={editMode}
+          onModeChange={setEditMode}
+          showPreview={false}
+        />
 
         {editMode === 'form' ? (
           <>
