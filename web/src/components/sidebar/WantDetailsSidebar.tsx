@@ -613,7 +613,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Parameters - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
+            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
               <button
                 type="button"
                 onClick={() => toggleSection('parameters')}
@@ -695,7 +695,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Labels - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
+            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
               <button
                 type="button"
                 onClick={() => toggleSection('labels')}
@@ -846,7 +846,7 @@ const SettingsTab: React.FC<{
       )}
 
             {/* Dependencies (using) - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
+            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
               <button
                 type="button"
                 onClick={() => toggleSection('dependencies')}
