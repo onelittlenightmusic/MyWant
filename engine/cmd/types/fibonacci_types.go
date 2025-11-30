@@ -50,6 +50,12 @@ func (g *FibonacciNumbers) Exec() bool {
 	a, b := 0, 1
 	for i := 0; i < count; i++ {
 		out <- a
+	// Trigger completed want retrigger check for any dependents
+	cb := GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 		a, b = b, a+b
 	}
 	close(out)

@@ -69,10 +69,28 @@ func (g *SeedNumbers) Exec() bool {
 
 	// Send initial seeds: 0 and 1
 	out <- FibonacciSeed{Value: 0, Position: 0, IsEnd: false}
+	// Trigger completed want retrigger check for any dependents
+	cb := GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 	out <- FibonacciSeed{Value: 1, Position: 1, IsEnd: false}
+	// Trigger completed want retrigger check for any dependents
+	cb = GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 
 	// Send end marker with max count info
 	out <- FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true}
+	// Trigger completed want retrigger check for any dependents
+	cb = GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 
 	// Store final statistics
 	g.StoreState("total_processed", 2)
@@ -149,8 +167,15 @@ func (c *FibonacciComputer) Exec() bool {
 
 		// After getting max count, start computing all remaining fibonacci numbers
 		for position < maxCount {
+			var cb *ChainBuilder
 			next := prev + current
 			out <- FibonacciSeed{Value: next, Position: position, IsEnd: false}
+			// Trigger completed want retrigger check for any dependents
+			cb = GetGlobalChainBuilder()
+			if cb != nil {
+				cb.TriggerCompletedWantRetriggerCheck()
+			}
+
 			prev = current
 			current = next
 			position++
@@ -158,7 +183,13 @@ func (c *FibonacciComputer) Exec() bool {
 		}
 
 		// Send end signal
+		var cb *ChainBuilder
 		out <- FibonacciSeed{Value: 0, Position: -1, IsEnd: true}
+		// Trigger completed want retrigger check for any dependents
+		cb = GetGlobalChainBuilder()
+		if cb != nil {
+			cb.TriggerCompletedWantRetriggerCheck()
+		}
 
 		// Update persistent state
 		c.StoreStateMulti(map[string]interface{}{

@@ -1,0 +1,38 @@
+=== Dynamic Travel Retrigger Test ===
+Start time: Sun Nov 30 20:24:36 JST 2025
+Results file: /Users/hiroyukiosaki/work/golang/MyWant/test_results/dynamic_travel_retrigger_20251130_202436.json
+
+[PHASE 1] Clearing logs and deploying...
+Deployment response: {"id":"want-450c0352-6ab9-45f2-8db0-dafd598b645f","message":"Wants created and added to execution queue","status":"created","want_ids":["want-2b598acd-0905-40e6-955e-9eb5e76bd23e"],"wants":1}
+
+[PHASE 2] Waiting 15 seconds for initial execution...
+Coordinator state after initial execution:
+{
+  "status": "achieved",
+  "flight": "Flight AA100 from New York to Los Angeles",
+  "total_processed": 4
+}
+
+[PHASE 3] Waiting 20 seconds for Flight rebooking...
+Final Flight state:
+{
+  "status": "reaching",
+  "flight_number": "AA100",
+  "total_processed": 1
+}
+
+Final Coordinator state:
+{
+  "status": "achieved",
+  "flight": "Flight AA100 from New York to Los Angeles",
+  "total_processed": 4,
+  "state_history_count": 2
+}
+
+[PHASE 4] Verifying async retrigger behavior...
+❌ FAILURE: Coordinator still shows 'Flight AA100 from New York to Los Angeles' (no change from initial)
+
+=== Test Complete ===
+Results saved to: /Users/hiroyukiosaki/work/golang/MyWant/test_results/dynamic_travel_retrigger_20251130_202436.json
+Log saved to: /Users/hiroyukiosaki/work/golang/MyWant/test_results/dynamic_travel_retrigger_20251130_202436.log
+End time: Sun Nov 30 20:25:11 JST 2025

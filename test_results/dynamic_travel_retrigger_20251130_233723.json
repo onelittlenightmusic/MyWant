@@ -1,0 +1,33 @@
+{
+  "test_name": "dynamic_travel_retrigger",
+  "timestamp": "20251130_233723",
+  "duration_seconds": 35,
+  "phases": {
+    "deployment": {
+      "id": "want-3a32d720-6afe-4c2b-9592-57417a6a93ca",
+      "message": "Wants created and added to execution queue",
+      "status": "created",
+      "want_ids": [
+        "want-d4a73e27-e24f-4851-91b3-216e3c7cddca"
+      ],
+      "wants": 1
+    },
+    "initial_state": {
+      "status": "achieved",
+      "flight": "Flight AA100 from New York to Los Angeles",
+      "total_processed": 4
+    },
+    "flight_final": {
+      "status": "reaching",
+      "flight_number": "AA100",
+      "total_processed": 1
+    },
+    "coordinator_final": {
+      "status": "achieved",
+      "flight": "Flight AA100 from New York to Los Angeles",
+      "total_processed": 4,
+      "state_history_count": 2
+    }
+  },
+  "retrigger_success": false
+}

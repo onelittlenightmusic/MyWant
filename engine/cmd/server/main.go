@@ -175,6 +175,9 @@ func NewServer(config ServerConfig) *Server {
 	globalBuilder.SetAgentRegistry(agentRegistry)
 	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes
 
+	// Set the global ChainBuilder so it can be accessed from want execution contexts
+	mywant.SetGlobalChainBuilder(globalBuilder)
+
 	// Create temporary server instance to call registerDynamicAgents
 	tempServer := &Server{}
 

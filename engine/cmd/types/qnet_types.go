@@ -126,6 +126,12 @@ func (g *Numbers) Exec() bool {
 		})
 
 		out <- QueuePacket{Num: -1, Time: 0}
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 		return true
 	}
 	g.currentCount++
@@ -151,6 +157,12 @@ func (g *Numbers) Exec() bool {
 	}
 
 	out <- QueuePacket{Num: g.currentCount, Time: g.currentTime}
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 	return false
 }
 
@@ -241,6 +253,12 @@ func (q *Queue) Exec() bool {
 		}
 		// Forward end signal to next want
 		out <- packet
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 		return true
 	}
 
@@ -270,6 +288,12 @@ func (q *Queue) Exec() bool {
 	}
 
 	out <- QueuePacket{Num: packet.Num, Time: finishTime}
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 	return false
 }
 
@@ -385,11 +409,23 @@ func (c *Combiner) Exec() bool {
 				}
 				// Forward end signal to next want
 				out <- qp
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 				return true
 			}
 
 			processed++
 			out <- qp
+	// Trigger completed want retrigger check for any dependents
+	cb := mywant.GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 		default:
 			// No data available on this channel right now
 		}

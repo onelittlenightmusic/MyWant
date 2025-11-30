@@ -190,48 +190,48 @@ func (f *FlightWant) Exec() bool {
 	// Check if agent created a flight result (read from state, not return value)
 	agentResult, hasResult := f.GetState("agent_result")
 	if hasResult && agentResult != nil {
-	f.StoreLog("Agent execution completed, processing agent result")
+		f.StoreLog("Agent execution completed, processing agent result")
 
-	// Convert agent_result to FlightSchedule
-		agentSchedule := f.extractFlightSchedule(agentResult)
-		if agentSchedule != nil {
-		// Use the agent's schedule result
-		f.SetSchedule(*agentSchedule)
+		// Convert agent_result to FlightSchedule
+	agentSchedule := f.extractFlightSchedule(agentResult)
+	if agentSchedule != nil {
+			// Use the agent's schedule result
+			f.SetSchedule(*agentSchedule)
 
-		// Send the schedule to output channel
-		flightEvent := TimeSlot{
-			Start: agentSchedule.DepartureTime,
-			End:   agentSchedule.ArrivalTime,
-			Type:  "flight",
-			Name:  agentSchedule.ReservationName,
+			// Send the schedule to output channel
+			flightEvent := TimeSlot{
+				Start: agentSchedule.DepartureTime,
+				End:   agentSchedule.ArrivalTime,
+				Type:  "flight",
+				Name:  agentSchedule.ReservationName,
+			}
+
+			travelSchedule := &TravelSchedule{
+				Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
+				Events: []TimeSlot{flightEvent},
+			}
+
+			out <- travelSchedule
+			f.StoreLog(fmt.Sprintf("Sent agent-generated schedule: %s from %s to %s",
+				agentSchedule.ReservationName,
+				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
+				agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
+
+			// Start continuous monitoring to capture all status changes
+			// Begin the 60-second stability window - the flight schedule will be monitored to detect
+			// any immediate changes (delays, cancellations, etc.) that would require rebooking.
+			// The parent Target want cannot complete until this monitoring period expires and the
+			// flight returns true (completion), signaling that the flight has stabilized.
+			if !f.monitoringActive {
+				f.monitoringActive = true
+				f.monitoringStartTime = time.Now()
+				f.StoreLog(fmt.Sprintf("Starting continuous monitoring for status changes (duration: %v)", f.monitoringDuration))
+			}
+
+			// Continue running to collect more status updates
+			// Return false to keep this want running through reconciliation cycles
+			return false
 		}
-
-		travelSchedule := &TravelSchedule{
-			Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
-			Events: []TimeSlot{flightEvent},
-		}
-
-		out <- travelSchedule
-		f.StoreLog(fmt.Sprintf("Sent agent-generated schedule: %s from %s to %s",
-			agentSchedule.ReservationName,
-			agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-			agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
-
-		// Start continuous monitoring to capture all status changes
-		// Begin the 60-second stability window - the flight schedule will be monitored to detect
-		// any immediate changes (delays, cancellations, etc.) that would require rebooking.
-		// The parent Target want cannot complete until this monitoring period expires and the
-		// flight returns true (completion), signaling that the flight has stabilized.
-		if !f.monitoringActive {
-			f.monitoringActive = true
-			f.monitoringStartTime = time.Now()
-			f.StoreLog(fmt.Sprintf("Starting continuous monitoring for status changes (duration: %v)", f.monitoringDuration))
-		}
-
-		// Continue running to collect more status updates
-		// Return false to keep this want running through reconciliation cycles
-		return false
-	}
 	}
 
 	// Check if cancellation just completed (previous_flight_id exists)
@@ -251,13 +251,13 @@ func (f *FlightWant) Exec() bool {
 		f.tryAgentExecution()
 
 		// Check if rebooking created a new flight result (read from state, not return value)
-		agentResult, hasResult := f.GetState("agent_result")
-		if hasResult && agentResult != nil {
+	agentResult, hasResult := f.GetState("agent_result")
+	if hasResult && agentResult != nil {
 			f.StoreLog("Rebooking agent execution completed, processing new flight result")
 
 			// Convert agent_result to FlightSchedule
-			agentSchedule := f.extractFlightSchedule(agentResult)
-			if agentSchedule != nil {
+	agentSchedule := f.extractFlightSchedule(agentResult)
+	if agentSchedule != nil {
 				// Use the agent's schedule result
 				f.SetSchedule(*agentSchedule)
 
@@ -274,27 +274,11 @@ func (f *FlightWant) Exec() bool {
 					Events: []TimeSlot{flightEvent},
 				}
 
-				// Get output channel for rebooking (fresh call - required for retrigger flow)
-				rebookOut, rebookConnectionAvailable := f.GetFirstOutputChannel()
-				f.StoreLog(fmt.Sprintf("[REBOOK-CHAN] GetFirstOutputChannel: available=%v", rebookConnectionAvailable))
-
-				if rebookConnectionAvailable {
-					f.StoreLog("[REBOOK-CHAN] Sending to output channel...")
-					rebookOut <- travelSchedule
-					f.StoreLog(fmt.Sprintf("Sent rebooked flight schedule: %s from %s to %s",
-						agentSchedule.ReservationName,
-						agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-						agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
-
-					// Trigger completed want retrigger check for dependent wants (e.g., Coordinator)
-					cb := GetGlobalChainBuilder()
-					if cb != nil {
-						f.StoreLog("[RETRIGGER] Triggering completed want retrigger check for dependencies")
-						cb.TriggerCompletedWantRetriggerCheck()
-					}
-				} else {
-					f.StoreLog("[REBOOK-CHAN] ERROR: No output channel available!")
-				}
+				out <- travelSchedule
+				f.StoreLog(fmt.Sprintf("Sent rebooked flight schedule: %s from %s to %s",
+					agentSchedule.ReservationName,
+					agentSchedule.DepartureTime.Format("15:04 Jan 2"),
+					agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
 
 				// Start continuous monitoring for new flight
 				if !f.monitoringActive {

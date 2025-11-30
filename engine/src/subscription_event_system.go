@@ -29,11 +29,12 @@ const (
 	EventTypeOwnerChildState EventType = "owner_child_state"
 
 	// Group B: Sync control (pre-execution) - for future use
-	EventTypePreExecution EventType = "pre_execution"
-	EventTypeMonitorAgent EventType = "monitor_agent"
-	EventTypeChannelEnd   EventType = "channel_end"
-	EventTypeStatusChange EventType = "status_change"
-	EventTypeProcessEnd   EventType = "process_end"
+	EventTypePreExecution  EventType = "pre_execution"
+	EventTypeMonitorAgent  EventType = "monitor_agent"
+	EventTypeChannelEnd    EventType = "channel_end"
+	EventTypeStatusChange  EventType = "status_change"
+	EventTypeProcessEnd    EventType = "process_end"
+	EventTypeWantRetrigger EventType = "want_retrigger"
 
 	// Group C: Blocking coordination
 	EventTypeOwnerCompletion EventType = "owner_completion"
@@ -158,6 +159,16 @@ type ChannelEndEvent struct {
 	BaseEvent
 	ChannelName string
 	Direction   string // "input" or "output"
+}
+
+// WantRetriggerEvent represents a retrigger notification from completed want detection (Group A)
+type WantRetriggerEvent struct {
+	BaseEvent
+	SourceWant  string        // Want that triggered the retrigger
+	TargetWants []string      // Wants to retrigger (usually self-only)
+	Reason      string        // Reason for retrigger
+	Payload     interface{}   // Optional data payload
+	Scope       string        // "local" or "global"
 }
 
 // UnifiedSubscriptionSystem manages all event subscriptions and delivery
