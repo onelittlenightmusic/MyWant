@@ -570,8 +570,9 @@ const SettingsTab: React.FC<{
   };
 
   const addUsing = () => {
-    setUsing(prev => [...prev, { '': '' }]);
-    setEditingUsingIndex(using.length);
+    const newUsing = [...using, { '': '' }];
+    setUsing(newUsing);
+    setEditingUsingIndex(newUsing.length - 1);
     setEditingUsingDraft({ key: '', value: '' });
   };
 
