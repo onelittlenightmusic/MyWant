@@ -535,7 +535,6 @@ const SettingsTab: React.FC<{
         <FormYamlToggle
           mode={configMode}
           onModeChange={onConfigModeChange}
-          showPreview={false}
         />
       </div>
 

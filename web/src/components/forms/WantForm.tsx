@@ -378,7 +378,6 @@ export const WantForm: React.FC<WantFormProps> = ({
         <FormYamlToggle
           mode={editMode}
           onModeChange={setEditMode}
-          showPreview={false}
         />
 
         {editMode === 'form' ? (
