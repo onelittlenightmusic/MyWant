@@ -346,24 +346,30 @@ export const WantForm: React.FC<WantFormProps> = ({
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
 
   const headerAction = (
-    <button
-      type="submit"
-      disabled={loading || (!isEditing && !isTypeSelected)}
-      form="want-form"
-      className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
-        shouldGlowButton ? 'glow-button' : ''
-      }`}
-      style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
-    >
-      {loading ? (
-        <LoadingSpinner size="sm" />
-      ) : (
-        <>
-          <Save className="w-3.5 h-3.5" />
-          {isEditing ? 'Update' : 'Add'}
-        </>
-      )}
-    </button>
+    <div className="flex items-center gap-3">
+      <FormYamlToggle
+        mode={editMode}
+        onModeChange={setEditMode}
+      />
+      <button
+        type="submit"
+        disabled={loading || (!isEditing && !isTypeSelected)}
+        form="want-form"
+        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
+          shouldGlowButton ? 'glow-button' : ''
+        }`}
+        style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
+      >
+        {loading ? (
+          <LoadingSpinner size="sm" />
+        ) : (
+          <>
+            <Save className="w-3.5 h-3.5" />
+            {isEditing ? 'Update' : 'Add'}
+          </>
+        )}
+      </button>
+    </div>
   );
 
   return (
@@ -374,13 +380,6 @@ export const WantForm: React.FC<WantFormProps> = ({
       headerAction={headerAction}
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
-
-        <div className="flex justify-end">
-          <FormYamlToggle
-            mode={editMode}
-            onModeChange={setEditMode}
-          />
-        </div>
 
         {editMode === 'form' ? (
           <>
