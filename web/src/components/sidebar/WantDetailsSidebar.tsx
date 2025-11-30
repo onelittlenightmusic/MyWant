@@ -735,10 +735,12 @@ const SettingsTab: React.FC<{
               {!collapsedSections.has('labels') && (
                 <div className="border-t border-gray-200 p-4 space-y-4">
                   {/* Display existing labels as styled chips */}
-                  {Object.entries(labels).length > 0 && (
+                  {Object.entries(labels).filter(([key]) => key.trim()).length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-4">
                       {Object.entries(labels).map(([key, value]) => {
                         if (editingLabelKey === key) return null;
+                        // Skip rendering labels with empty keys
+                        if (!key.trim()) return null;
                         return (
                           <button
                             key={key}
@@ -964,9 +966,12 @@ const SettingsTab: React.FC<{
                                 newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
                               }
 
+                              // Filter out any entries with empty keys before saving
+                              const filteredUsing = newUsing.filter(item => Object.keys(item)[0]?.trim());
+
                               const updatePayload = {
                                 metadata: want.metadata,
-                                spec: { ...want.spec, using: newUsing }
+                                spec: { ...want.spec, using: filteredUsing }
                               };
 
                               const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
