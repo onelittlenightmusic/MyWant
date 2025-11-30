@@ -22,10 +22,10 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
 }) => {
   return (
     <div className={showPreview ? 'border-b border-gray-200 pb-4' : ''}>
-      {/* Title and Toggle Buttons */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Toggle Buttons */}
+      <div className="flex items-center justify-between">
         {title && <h3 className="text-sm font-medium text-gray-700">{title}</h3>}
-        <div className={`flex items-center justify-center space-x-1 bg-gray-100 rounded-lg p-1 ${!title ? 'ml-auto' : ''}`}>
+        <div className="flex items-center justify-center space-x-1 bg-gray-100 rounded-lg p-1">
           <button
             type="button"
             onClick={() => onModeChange('form')}

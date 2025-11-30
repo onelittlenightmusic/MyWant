@@ -535,11 +535,7 @@ const SettingsTab: React.FC<{
         <FormYamlToggle
           mode={configMode}
           onModeChange={onConfigModeChange}
-          yamlContent={stringifyYaml({
-            metadata: want.metadata,
-            spec: want.spec
-          })}
-          title="Configuration"
+          showPreview={false}
         />
       </div>
 
