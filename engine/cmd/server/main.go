@@ -592,6 +592,14 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate want spec (e.g., using selectors)
+	if err := s.validateWantSpec(config); err != nil {
+		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
 	// Assign IDs to all wants if not already set
 	for _, want := range config.Wants {
 		if want.Metadata.ID == "" {
@@ -881,10 +889,17 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate want type before proceeding
+	// Validate want type and spec before proceeding
 	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
 	if err := s.validateWantTypes(tempConfig); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	if err := s.validateWantSpec(tempConfig); err != nil {
+		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
@@ -1756,6 +1771,21 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 		}
 	}
 
+	return nil
+}
+
+// validateWantSpec validates the WantSpec fields for all wants
+func (s *Server) validateWantSpec(config mywant.Config) error {
+	for _, want := range config.Wants {
+		// Validate 'using' selector entries
+		for i, selector := range want.Spec.Using {
+			for key := range selector {
+				if key == "" {
+					return fmt.Errorf("want '%s': using[%d] has empty selector key, all selector keys must be non-empty", want.Metadata.Name, i)
+				}
+			}
+		}
+	}
 	return nil
 }
 
