@@ -76,18 +76,23 @@ export const WantForm: React.FC<WantFormProps> = ({
   }, [isOpen, wantTypes.length, recipes.length, fetchWantTypes, fetchRecipes]);
 
   // Convert form data to want object
-  const formToWantObject = () => ({
-    metadata: {
-      name: name.trim(),
-      type: type.trim(),
-      ...(Object.keys(labels).length > 0 && { labels })
-    },
-    spec: {
-      ...(Object.keys(params).length > 0 && { params }),
-      ...(using.length > 0 && { using }),
-      ...(recipe.trim() && { recipe: recipe.trim() })
-    }
-  });
+  const formToWantObject = () => {
+    // Filter out using entries with empty keys
+    const validUsing = using.filter(item => Object.keys(item)[0]?.trim());
+
+    return {
+      metadata: {
+        name: name.trim(),
+        type: type.trim(),
+        ...(Object.keys(labels).length > 0 && { labels })
+      },
+      spec: {
+        ...(Object.keys(params).length > 0 && { params }),
+        ...(validUsing.length > 0 && { using: validUsing }),
+        ...(recipe.trim() && { recipe: recipe.trim() })
+      }
+    };
+  };
 
   // Convert want object to form data
   const wantObjectToForm = (want: Want) => {
