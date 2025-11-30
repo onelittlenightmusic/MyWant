@@ -579,6 +579,18 @@ const SettingsTab: React.FC<{
     setUsing(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Reset form state when want changes
+  useEffect(() => {
+    setParams(want.spec?.params || {});
+    setLabels(want.metadata?.labels || {});
+    setUsing(want.spec?.using || []);
+    setEditingLabelKey(null);
+    setEditingLabelDraft({ key: '', value: '' });
+    setEditingUsingIndex(null);
+    setEditingUsingDraft({ key: '', value: '' });
+    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies']));
+  }, [want.metadata?.id]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Config/Overview Toggle */}
