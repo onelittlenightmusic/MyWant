@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Settings, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2, Database } from 'lucide-react';
+import { RefreshCw, Settings, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2, Database, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -450,6 +450,12 @@ const SettingsTab: React.FC<{
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
   const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies'>>(() => {
+    return new Set(['parameters', 'labels', 'dependencies']);
+  });
+  const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
+  const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
+  const [using, setUsing] = useState<Array<Record<string, string>>>(want.spec?.using || []);
 
   const handleSaveLabel = async (oldKey: string) => {
     if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
@@ -528,6 +534,51 @@ const SettingsTab: React.FC<{
     }
   };
 
+  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies') => {
+    setCollapsedSections(prev => {
+      const updated = new Set(prev);
+      if (updated.has(section)) {
+        updated.delete(section);
+      } else {
+        updated.add(section);
+      }
+      return updated;
+    });
+  };
+
+  const addParam = () => {
+    setParams(prev => ({ ...prev, '': '' }));
+  };
+
+  const updateParam = (key: string, value: string) => {
+    setParams(prev => {
+      const newParams = { ...prev };
+      if (key.trim()) {
+        const numValue = Number(value);
+        newParams[key] = !isNaN(numValue) && value.trim() !== '' ? numValue : value;
+      }
+      return newParams;
+    });
+  };
+
+  const removeParam = (key: string) => {
+    setParams(prev => {
+      const newParams = { ...prev };
+      delete newParams[key];
+      return newParams;
+    });
+  };
+
+  const addUsing = () => {
+    setUsing(prev => [...prev, { '': '' }]);
+    setEditingUsingIndex(using.length);
+    setEditingUsingDraft({ key: '', value: '' });
+  };
+
+  const removeUsing = (index: number) => {
+    setUsing(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Config/Overview Toggle */}
@@ -543,115 +594,223 @@ const SettingsTab: React.FC<{
         {configMode === 'form' ? (
           <div className="space-y-8">
             {/* Metadata Section */}
-        <div className="bg-gray-50 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Name:</span>
-              <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Name:</span>
+                  <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">Type:</span>
+                  <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 text-sm">ID:</span>
+                  <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">Type:</span>
-              <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600 text-sm">ID:</span>
-              <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Labels */}
-        {want.metadata ? (
-          <div className="bg-gray-50 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-base font-medium text-gray-900">Labels</h4>
-              {editingLabelKey === null && (
-                <button
-                  onClick={() => {
-                    setEditingLabelKey('__new__');
-                    setEditingLabelDraft({ key: '', value: '' });
-                  }}
-                  disabled={updateLoading}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
-                >
-                  +
-                </button>
+            {/* Parameters - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={() => toggleSection('parameters')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('parameters') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <h4 className="text-base font-medium text-gray-900">Parameters</h4>
+                </div>
+                {collapsedSections.has('parameters') && Object.entries(params).length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {Object.entries(params).map(([key, value]) => (
+                      <div key={key} className="text-gray-500">
+                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{String(value)}"</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </button>
+
+              {!collapsedSections.has('parameters') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  <div className="space-y-2">
+                    {Object.entries(params).map(([key, value], index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={key}
+                            onChange={(e) => {
+                              const newKey = e.target.value;
+                              const newParams = { ...params };
+                              if (key !== newKey) {
+                                delete newParams[key];
+                                if (newKey.trim()) {
+                                  newParams[newKey] = value;
+                                }
+                                setParams(newParams);
+                              }
+                            }}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Parameter name"
+                          />
+                          <input
+                            type="text"
+                            value={String(value)}
+                            onChange={(e) => updateParam(key, e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Parameter value"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeParam(key)}
+                            className="text-red-600 hover:text-red-800 p-2"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={addParam}
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Parameter
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Display existing labels as styled chips */}
-            {want.metadata?.labels && Object.keys(want.metadata.labels).length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {Object.entries(want.metadata.labels).map(([key, value]) => {
-                  if (editingLabelKey === key) return null;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setEditingLabelKey(key);
-                        setEditingLabelDraft({ key, value });
-                      }}
-                      className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                      disabled={updateLoading}
-                    >
-                      {key}: {value}
-                      <X
-                        className="w-3 h-3 ml-2 hover:text-blue-900"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveLabel(key);
+            {/* Labels - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={() => toggleSection('labels')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('labels') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <h4 className="text-base font-medium text-gray-900">Labels</h4>
+                </div>
+                {collapsedSections.has('labels') && Object.entries(labels).length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {Object.entries(labels).map(([key, value]) => (
+                      <div key={key} className="text-gray-500">
+                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </button>
+
+              {!collapsedSections.has('labels') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Display existing labels as styled chips */}
+                  {Object.entries(labels).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {Object.entries(labels).map(([key, value]) => {
+                        if (editingLabelKey === key) return null;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setEditingLabelKey(key);
+                              setEditingLabelDraft({ key, value });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                          >
+                            {key}: {value}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-blue-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveLabel(key);
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Label input form - shown when editing or adding new label */}
+                  {editingLabelKey !== null && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      <LabelAutocomplete
+                        keyValue={editingLabelDraft.key}
+                        valueValue={editingLabelDraft.value}
+                        onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
+                        onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
+                        onRemove={() => {
+                          handleRemoveLabel(editingLabelKey);
+                          setEditingLabelKey(null);
+                          setEditingLabelDraft({ key: '', value: '' });
                         }}
                       />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingLabelDraft.key.trim()) {
+                              handleSaveLabel(editingLabelKey === '__new__' ? '' : editingLabelKey);
+                            }
+                            setEditingLabelKey(null);
+                            setEditingLabelDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingLabelKey(null);
+                            setEditingLabelDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-            {/* Edit form */}
-            {editingLabelKey !== null && (
-              <div className="space-y-3 pt-4 border-t border-gray-200">
-                <LabelAutocomplete
-                  keyValue={editingLabelDraft.key}
-                  valueValue={editingLabelDraft.value}
-                  onKeyChange={(key) => setEditingLabelDraft(prev => ({ ...prev, key }))}
-                  onValueChange={(value) => setEditingLabelDraft(prev => ({ ...prev, value }))}
-                  onRemove={() => {
-                    setEditingLabelKey(null);
-                    setEditingLabelDraft({ key: '', value: '' });
-                  }}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      handleSaveLabel(editingLabelKey === '__new__' ? '' : editingLabelKey);
-                    }}
-                    disabled={updateLoading || !editingLabelDraft.key.trim()}
-                    className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {updateLoading ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingLabelKey(null);
-                      setEditingLabelDraft({ key: '', value: '' });
-                      setLocalUpdateError(null);
-                    }}
-                    disabled={localUpdateLoading}
-                    className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    {editingLabelKey === null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingLabelKey('__new__');
+                          setEditingLabelDraft({ key: '', value: '' });
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Label
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {localUpdateError && (
-                  <div className="text-red-600 text-xs">{localUpdateError}</div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : null}
+              )}
+            </div>
 
       {/* Timeline */}
       {want.stats && (
@@ -686,134 +845,141 @@ const SettingsTab: React.FC<{
         </div>
       )}
 
-      {/* Dependencies (Using) */}
-      {want.spec && (
-        <div className="bg-gray-50 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
-            {editingUsingIndex === null && (
+            {/* Dependencies (using) - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
               <button
-                onClick={() => {
-                  setEditingUsingIndex(-1);
-                  setEditingUsingDraft({ key: '', value: '' });
-                }}
-                disabled={updateLoading}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50"
+                type="button"
+                onClick={() => toggleSection('dependencies')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
               >
-                +
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('dependencies') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
+                </div>
+                {collapsedSections.has('dependencies') && using.length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {using.map((usingItem, index) => {
+                      const [key, value] = Object.entries(usingItem)[0];
+                      return (
+                        <div key={index} className="text-gray-500">
+                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </button>
-            )}
-          </div>
 
-          {/* Display existing dependencies as styled chips */}
-          {want.spec.using && want.spec.using.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {want.spec.using.map((usingItem, index) => {
-                if (editingUsingIndex === index) return null;
-                return Object.entries(usingItem).map(([key, value], keyIndex) => (
-                  <button
-                    key={`${index}-${keyIndex}`}
-                    type="button"
-                    onClick={() => {
-                      setEditingUsingIndex(index);
-                      setEditingUsingDraft({ key, value });
-                    }}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                    disabled={updateLoading}
-                  >
-                    {key}: {value}
-                    <X
-                      className="w-3 h-3 ml-2 hover:text-blue-900"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Remove this dependency
-                        const newUsing = want.spec.using ? want.spec.using.filter((_, i) => i !== index) : [];
-                        const updatePayload = {
-                          metadata: want.metadata,
-                          spec: { ...want.spec, using: newUsing }
-                        };
-                        fetch(`http://localhost:8080/api/v1/wants/${want.metadata?.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify(updatePayload)
-                        }).then(() => onWantUpdate?.());
-                      }}
-                    />
-                  </button>
-                ));
-              })}
+              {!collapsedSections.has('dependencies') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Display existing dependencies as styled chips */}
+                  {using.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {using.map((usingItem, index) => {
+                        if (editingUsingIndex === index) return null;
+                        return Object.entries(usingItem).map(([key, value], keyIndex) => (
+                          <button
+                            key={`${index}-${keyIndex}`}
+                            type="button"
+                            onClick={() => {
+                              setEditingUsingIndex(index);
+                              setEditingUsingDraft({ key, value });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                          >
+                            {key}: {value}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-blue-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeUsing(index);
+                              }}
+                            />
+                          </button>
+                        ));
+                      })}
+                    </div>
+                  )}
+
+                  {/* Dependency input form - shown when editing or adding new dependency */}
+                  {editingUsingIndex !== null && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      <LabelSelectorAutocomplete
+                        keyValue={editingUsingDraft.key}
+                        valuValue={editingUsingDraft.value}
+                        onKeyChange={(newKey) => {
+                          setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
+                        }}
+                        onValueChange={(newValue) => {
+                          setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
+                        }}
+                        onRemove={() => {
+                          if (editingUsingIndex >= 0) {
+                            removeUsing(editingUsingIndex);
+                          }
+                          setEditingUsingIndex(null);
+                          setEditingUsingDraft({ key: '', value: '' });
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingUsingDraft.key.trim()) {
+                              const newUsing = [...using];
+                              if (editingUsingIndex < newUsing.length) {
+                                const newItem = { ...newUsing[editingUsingIndex] };
+                                const originalKey = Object.keys(newItem)[0];
+                                if (originalKey) {
+                                  delete newItem[originalKey];
+                                }
+                                newItem[editingUsingDraft.key] = editingUsingDraft.value;
+                                newUsing[editingUsingIndex] = newItem;
+                              } else {
+                                newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
+                              }
+                              setUsing(newUsing);
+                            }
+                            setEditingUsingIndex(null);
+                            setEditingUsingDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingUsingIndex(null);
+                            setEditingUsingDraft({ key: '', value: '' });
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    {editingUsingIndex === null && (
+                      <button
+                        type="button"
+                        onClick={addUsing}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Dependency
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Edit form for dependencies */}
-          {editingUsingIndex !== null && (
-            <div className="space-y-3 pt-4 border-t border-gray-200">
-              <LabelSelectorAutocomplete
-                keyValue={editingUsingDraft.key}
-                valuValue={editingUsingDraft.value}
-                onKeyChange={(key) => setEditingUsingDraft(prev => ({ ...prev, key }))}
-                onValueChange={(value) => setEditingUsingDraft(prev => ({ ...prev, value }))}
-                onRemove={() => {
-                  setEditingUsingIndex(null);
-                  setEditingUsingDraft({ key: '', value: '' });
-                }}
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (!editingUsingDraft.key.trim() || !want.metadata?.id) return;
-
-                    setLocalUpdateLoading(true);
-                    try {
-                      let newUsing = want.spec.using ? [...want.spec.using] : [];
-                      if (editingUsingIndex === -1) {
-                        // Adding new dependency
-                        newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
-                      } else {
-                        // Editing existing dependency
-                        const oldItem = newUsing[editingUsingIndex];
-                        const oldKey = Object.keys(oldItem)[0];
-                        newUsing[editingUsingIndex] = { [editingUsingDraft.key]: editingUsingDraft.value };
-                      }
-
-                      const updatePayload = {
-                        metadata: want.metadata,
-                        spec: { ...want.spec, using: newUsing }
-                      };
-
-                      fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(updatePayload)
-                      }).then(() => {
-                        setEditingUsingIndex(null);
-                        setEditingUsingDraft({ key: '', value: '' });
-                        onWantUpdate?.();
-                      });
-                    } finally {
-                      setLocalUpdateLoading(false);
-                    }
-                  }}
-                  disabled={localUpdateLoading || !editingUsingDraft.key.trim()}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {localUpdateLoading ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => {
-                    setEditingUsingIndex(null);
-                    setEditingUsingDraft({ key: '', value: '' });
-                  }}
-                  disabled={localUpdateLoading}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Error Information */}
       {want.status === 'failed' && want.state?.error && (
