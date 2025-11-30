@@ -1774,7 +1774,7 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 	return nil
 }
 
-// validateWantSpec validates the WantSpec fields for all wants
+// validateWantSpec validates the WantSpec and Metadata fields for all wants
 func (s *Server) validateWantSpec(config mywant.Config) error {
 	for _, want := range config.Wants {
 		// Validate 'using' selector entries
@@ -1783,6 +1783,13 @@ func (s *Server) validateWantSpec(config mywant.Config) error {
 				if key == "" {
 					return fmt.Errorf("want '%s': using[%d] has empty selector key, all selector keys must be non-empty", want.Metadata.Name, i)
 				}
+			}
+		}
+
+		// Validate 'labels' entries (no empty keys allowed)
+		for key := range want.Metadata.Labels {
+			if key == "" {
+				return fmt.Errorf("want '%s': labels has empty key, all label keys must be non-empty", want.Metadata.Name)
 			}
 		}
 	}
