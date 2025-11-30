@@ -940,8 +940,13 @@ const SettingsTab: React.FC<{
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            if (editingUsingDraft.key.trim()) {
+                          onClick={async () => {
+                            if (!editingUsingDraft.key.trim() || !want.metadata?.id) return;
+
+                            setLocalUpdateLoading(true);
+                            setLocalUpdateError(null);
+
+                            try {
                               const newUsing = [...using];
                               if (editingUsingIndex < newUsing.length) {
                                 const newItem = { ...newUsing[editingUsingIndex] };
@@ -954,14 +959,36 @@ const SettingsTab: React.FC<{
                               } else {
                                 newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
                               }
+
+                              const updatePayload = {
+                                metadata: want.metadata,
+                                spec: { ...want.spec, using: newUsing }
+                              };
+
+                              const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(updatePayload)
+                              });
+
+                              if (!response.ok) {
+                                throw new Error('Failed to update dependency');
+                              }
+
                               setUsing(newUsing);
+                              setEditingUsingIndex(null);
+                              setEditingUsingDraft({ key: '', value: '' });
+                              onWantUpdate?.();
+                            } catch (error) {
+                              setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependency');
+                            } finally {
+                              setLocalUpdateLoading(false);
                             }
-                            setEditingUsingIndex(null);
-                            setEditingUsingDraft({ key: '', value: '' });
                           }}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                          disabled={localUpdateLoading}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
                         >
-                          Save
+                          {localUpdateLoading ? 'Saving...' : 'Save'}
                         </button>
                         <button
                           type="button"
