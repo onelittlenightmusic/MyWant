@@ -896,30 +896,30 @@ const SettingsTab: React.FC<{
                     <div className="flex flex-wrap gap-2 mb-4">
                       {using.map((usingItem, index) => {
                         if (editingUsingIndex === index) return null;
-                        return Object.entries(usingItem).map(([key, value], keyIndex) => {
-                          // Skip rendering empty keys
-                          if (!key.trim()) return null;
-                          return (
-                            <button
-                              key={`${index}-${keyIndex}`}
-                              type="button"
-                              onClick={() => {
-                                setEditingUsingIndex(index);
-                                setEditingUsingDraft({ key, value });
+                        const key = Object.keys(usingItem)[0];
+                        const value = usingItem[key];
+                        // Skip rendering empty keys
+                        if (!key?.trim()) return null;
+                        return (
+                          <button
+                            key={`${index}-${key}`}
+                            type="button"
+                            onClick={() => {
+                              setEditingUsingIndex(index);
+                              setEditingUsingDraft({ key, value });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                          >
+                            {key}: {value}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-blue-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeUsing(index);
                               }}
-                              className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                            >
-                              {key}: {value}
-                              <X
-                                className="w-3 h-3 ml-2 hover:text-blue-900"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeUsing(index);
-                                }}
-                              />
-                            </button>
-                          );
-                        });
+                            />
+                          </button>
+                        );
                       })}
                     </div>
                   )}
