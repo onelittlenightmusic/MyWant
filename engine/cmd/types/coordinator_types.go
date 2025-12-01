@@ -8,8 +8,9 @@ import (
 
 // DataHandler defines the interface for processing received coordinator data
 type DataHandler interface {
-	// ProcessData handles incoming data from a channel
-	ProcessData(want *CoordinatorWant, data interface{}) bool
+	// ProcessData handles incoming data from a specific input channel
+	// channelIndex indicates which input channel the data came from
+	ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool
 	// GetStateUpdates returns state updates to apply after data collection
 	GetStateUpdates(want *CoordinatorWant) map[string]interface{}
 	// GetCompletionKey returns the key used to check if processing is complete
@@ -140,10 +141,10 @@ func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
 	// Try to receive one data packet from any input channel
-	_, data, ok := c.ReceiveFromAnyInputChannel()
+	channelIndex, data, ok := c.ReceiveFromAnyInputChannel()
 	if ok {
-		// Data received: process it and check for completion
-		c.DataHandler.ProcessData(c, data)
+		// Data received: process it with channel information
+		c.DataHandler.ProcessData(c, channelIndex, data)
 	}
 
 	// Check completion condition after each data reception (or when no data available)
@@ -178,16 +179,22 @@ func (c *CoordinatorWant) tryCompletion(inCount int) bool {
 // packets from all connected channels by checking the cache size
 func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 	// Get the data handler's cache from state
-	// For TravelDataHandler, this is "schedules"
+	// For TravelDataHandler, this is "schedules_by_channel" (map[int][]*TravelSchedule)
 	// For ApprovalDataHandler, check if evidence_received AND description_received
 	switch c.DataHandler.(type) {
 	case *TravelDataHandler:
-		schedulesVal, _ := c.GetState("schedules")
-		schedules, _ := schedulesVal.([]*TravelSchedule)
-		if schedules == nil {
+		schedulesByChannelVal, _ := c.GetState("schedules_by_channel")
+		schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
+		if schedulesByChannel == nil {
 			return false
 		}
-		return len(schedules) >= inCount
+		// Check that each connected channel (0 through inCount-1) has at least one packet
+		for i := 0; i < inCount; i++ {
+			if _, exists := schedulesByChannel[i]; !exists || len(schedulesByChannel[i]) == 0 {
+				return false
+			}
+		}
+		return true
 	case *ApprovalDataHandler:
 		// For approval, we need both evidence and description
 		evidenceVal, _ := c.GetStateBool("evidence_received", false)
@@ -210,7 +217,7 @@ type ApprovalDataHandler struct {
 	Level int // 1 or 2 for Level1 or Level2 approval
 }
 
-func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, data interface{}) bool {
+func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
 	if approvalData, ok := data.(*ApprovalData); ok {
 		stateUpdates := make(map[string]interface{})
 
@@ -339,22 +346,29 @@ type TravelDataHandler struct {
 	IsBuffet bool // If true, expect TravelSchedule from buffet
 }
 
-func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, data interface{}) bool {
+func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
 	if schedule, ok := data.(*TravelSchedule); ok {
-		// Get existing schedules from state
-		schedulesVal, _ := want.GetState("schedules")
-		schedules, _ := schedulesVal.([]*TravelSchedule)
-		if schedules == nil {
-			schedules = make([]*TravelSchedule, 0)
+		// Get existing schedules map (keyed by channel index)
+		schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
+		schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
+		if schedulesByChannel == nil {
+			schedulesByChannel = make(map[int][]*TravelSchedule)
 		}
 
-		// Append new schedule
-		schedules = append(schedules, schedule)
+		// Get or create the schedule list for this channel
+		channelSchedules := schedulesByChannel[channelIndex]
+		if channelSchedules == nil {
+			channelSchedules = make([]*TravelSchedule, 0)
+		}
+
+		// Append new schedule from this channel
+		channelSchedules = append(channelSchedules, schedule)
+		schedulesByChannel[channelIndex] = channelSchedules
 
 		// Update persistent state
 		want.StoreStateMulti(map[string]interface{}{
-			"schedules":      schedules,
-			"total_processed": len(schedules),
+			"schedules_by_channel": schedulesByChannel,
+			"total_processed":      getTotalSchedulesCount(schedulesByChannel),
 		})
 
 		return true
@@ -362,34 +376,47 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, data interface{})
 	return false
 }
 
+// getTotalSchedulesCount counts all schedules across all channels
+func getTotalSchedulesCount(schedulesByChannel map[int][]*TravelSchedule) int {
+	total := 0
+	for _, schedules := range schedulesByChannel {
+		total += len(schedules)
+	}
+	return total
+}
+
 func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]interface{} {
-	// For travel coordinator, generate final itinerary
-	schedulesVal, _ := want.GetState("schedules")
-	schedules, _ := schedulesVal.([]*TravelSchedule)
+	// For travel coordinator, generate final itinerary from all channels
+	schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
+	schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
 
 	stateUpdates := make(map[string]interface{})
 
-	if schedules != nil && len(schedules) > 0 {
-		// Combine and sort all events
+	if schedulesByChannel != nil && len(schedulesByChannel) > 0 {
+		// Combine all events from all channels
 		allEvents := make([]TimeSlot, 0)
-		for _, schedule := range schedules {
-			allEvents = append(allEvents, schedule.Events...)
-		}
-
-		// Sort events by start time
-		for i := 0; i < len(allEvents)-1; i++ {
-			for j := i + 1; j < len(allEvents); j++ {
-				if allEvents[i].Start.After(allEvents[j].Start) {
-					allEvents[i], allEvents[j] = allEvents[j], allEvents[i]
-				}
+		for _, channelSchedules := range schedulesByChannel {
+			for _, schedule := range channelSchedules {
+				allEvents = append(allEvents, schedule.Events...)
 			}
 		}
 
-		// Generate readable timeline format
-		timeline := generateTravelTimeline(allEvents)
+		if len(allEvents) > 0 {
+			// Sort events by start time
+			for i := 0; i < len(allEvents)-1; i++ {
+				for j := i + 1; j < len(allEvents); j++ {
+					if allEvents[i].Start.After(allEvents[j].Start) {
+						allEvents[i], allEvents[j] = allEvents[j], allEvents[i]
+					}
+				}
+			}
 
-		stateUpdates["final_itinerary"] = allEvents
-		stateUpdates["finalResult"] = timeline
+			// Generate readable timeline format
+			timeline := generateTravelTimeline(allEvents)
+
+			stateUpdates["final_itinerary"] = allEvents
+			stateUpdates["finalResult"] = timeline
+		}
 	}
 
 	return stateUpdates
