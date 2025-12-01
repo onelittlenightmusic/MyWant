@@ -1009,14 +1009,6 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
-		// Log idle wants for debugging retrigger
-		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusIdle && wantName == "dynamic-travel-coordinator-5" {
-				InfoLog("[STARTPHASE] Found Idle coordinator, processing...\n")
-				break
-			}
-		}
-
 		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
@@ -1027,16 +1019,8 @@ func (cb *ChainBuilder) startPhase() {
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
 
-					// Log for coordinator startup
-					if wantName == "dynamic-travel-coordinator-5" {
-						InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-					}
-
 					// Skip if required connections are not met
 					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-						if wantName == "dynamic-travel-coordinator-5" {
-							InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
-						}
 						continue
 					}
 				} else {
