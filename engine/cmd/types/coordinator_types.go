@@ -34,9 +34,8 @@ type CoordinatorWant struct {
 	CoordinatorType    string
 	paths              Paths
 	// Unified coordinator state tracking
-	lastKnownInCount   int                // Track previously seen input count for detecting new connections
-	receivedFromIndex  map[int]bool       // Track which input channels have received at least one value
-	lastProcessingKey  string             // Key used to mark last completion
+	lastKnownInCount  int          // Track previously seen input count for detecting new connections
+	receivedFromIndex map[int]bool // Track which input channels have received at least one value
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
@@ -151,12 +150,8 @@ func (c *CoordinatorWant) Exec() bool {
 	// Detect new connections: if input count increased, reset the state
 	if inCount > c.lastKnownInCount {
 		c.lastKnownInCount = inCount
-		// Reset received status for new channels
-		// Keep previously received channels, but mark as if we need to receive again
+		// Reset received status for new channels to restart processing
 		c.receivedFromIndex = make(map[int]bool)
-		// Clear the completion marker to restart processing
-		completionKey := c.DataHandler.GetCompletionKey()
-		c.StoreState(completionKey, false)
 	}
 
 	// Collect data from all available input channels using non-blocking reads
@@ -187,21 +182,13 @@ func (c *CoordinatorWant) Exec() bool {
 
 	// If all channels have sent at least one value, mark completion
 	if allChannelsReceived {
-		completionKey := c.DataHandler.GetCompletionKey()
-		processedVal, _ := c.GetStateBool(completionKey, false)
+		// Let the completion checker perform final processing
+		c.CompletionChecker.OnCompletion(c)
 
-		if !processedVal {
-			// Mark as processed
-			c.StoreState(completionKey, true)
-
-			// Let the completion checker perform final processing
-			c.CompletionChecker.OnCompletion(c)
-
-			// Apply any state updates from data handler
-			stateUpdates := c.DataHandler.GetStateUpdates(c)
-			if len(stateUpdates) > 0 {
-				c.StoreStateMulti(stateUpdates)
-			}
+		// Apply any state updates from data handler
+		stateUpdates := c.DataHandler.GetStateUpdates(c)
+		if len(stateUpdates) > 0 {
+			c.StoreStateMulti(stateUpdates)
 		}
 
 		return true
