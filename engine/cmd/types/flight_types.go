@@ -216,6 +216,12 @@ func (f *FlightWant) Exec() bool {
 				agentSchedule.ReservationName,
 				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
 				agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
+			f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
+				travelSchedule.Date.Format("2006-01-02"),
+				len(travelSchedule.Events),
+				flightEvent.Name,
+				flightEvent.Start.Format("15:04:05"),
+				flightEvent.End.Format("15:04:05")))
 
 			// Start continuous monitoring to capture all status changes
 			// Begin the 60-second stability window - the flight schedule will be monitored to detect

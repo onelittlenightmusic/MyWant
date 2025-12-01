@@ -348,6 +348,20 @@ type TravelDataHandler struct {
 
 func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
 	if schedule, ok := data.(*TravelSchedule); ok {
+		// Log packet reception with content details
+		eventDetails := ""
+		if len(schedule.Events) > 0 {
+			eventDetails = fmt.Sprintf(" [event0: %s, %s-%s]",
+				schedule.Events[0].Name,
+				schedule.Events[0].Start.Format("15:04:05"),
+				schedule.Events[0].End.Format("15:04:05"))
+		}
+		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received TravelSchedule on channel %d: Date=%s, Events=%d%s",
+			channelIndex,
+			schedule.Date.Format("2006-01-02"),
+			len(schedule.Events),
+			eventDetails))
+
 		// Get existing schedules map (keyed by channel index)
 		schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
 		schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
