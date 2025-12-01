@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"mywant/engine/src/chain"
+	"reflect"
 )
 
 // GetInputChannel returns input channel by index
@@ -70,4 +71,62 @@ func (n *Want) GetFirstOutputChannel() (chain.Chan, bool) {
 func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 	n.paths.In = inPaths
 	n.paths.Out = outPaths
+}
+
+// ReceiveFromAnyInputChannel attempts to receive data from any available input channel
+// using non-blocking select. Returns the channel index that had data, the data itself,
+// and whether a successful read occurred.
+//
+// Returns: (channelIndex, data, ok)
+//   - channelIndex: Index of the channel that provided data (-1 if no data available)
+//   - data: The data received (nil if ok is false)
+//   - ok: True if data was successfully received, false otherwise
+//
+// Usage:
+//   index, data, ok := w.ReceiveFromAnyInputChannel()
+//   if ok {
+//       fmt.Printf("Received data from channel %d: %v\n", index, data)
+//   }
+func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
+	inCount := n.GetInCount()
+	if inCount == 0 {
+		return -1, nil, false
+	}
+
+	// Build select cases dynamically for all input channels
+	cases := make([]reflect.SelectCase, inCount)
+	for i := 0; i < inCount; i++ {
+		ch, available := n.GetInputChannel(i)
+		if available {
+			cases[i] = reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(ch),
+			}
+		} else {
+			// Channel not available, use a nil case (will never match)
+			cases[i] = reflect.SelectCase{
+				Dir: reflect.SelectRecv,
+			}
+		}
+	}
+
+	// Use reflect.Select with default to make it non-blocking
+	// We need to add a default case to make it non-blocking
+	cases = append(cases, reflect.SelectCase{
+		Dir: reflect.SelectDefault,
+	})
+
+	chosen, recv, recvOK := reflect.Select(cases)
+
+	// If default case was chosen (last index), no data available
+	if chosen == len(cases)-1 {
+		return -1, nil, false
+	}
+
+	// If we got here, data was received
+	if recvOK {
+		return chosen, recv.Interface(), true
+	}
+
+	return chosen, nil, false
 }
