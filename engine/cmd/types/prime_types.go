@@ -54,12 +54,6 @@ func (g *PrimeNumbers) Exec() bool {
 
 	for i := start; i <= end; i++ {
 		out <- i
-	// Trigger completed want retrigger check for any dependents
-	cb := GetGlobalChainBuilder()
-	if cb != nil {
-		cb.TriggerCompletedWantRetriggerCheck()
-	}
-
 	}
 	close(out)
 	return true
@@ -178,12 +172,6 @@ func (f *PrimeSequence) Exec() bool {
 				foundPrimes = append(foundPrimes, val)
 				if out != nil {
 					out <- val
-	// Trigger completed want retrigger check for any dependents
-	cb := GetGlobalChainBuilder()
-	if cb != nil {
-		cb.TriggerCompletedWantRetriggerCheck()
-	}
-
 				}
 				// Update live state immediately when prime is found
 				f.StoreStateMulti(map[string]interface{}{

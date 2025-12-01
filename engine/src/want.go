@@ -159,17 +159,6 @@ func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
 
-	// Debug logging for retrigger
-	if status == WantStatusIdle {
-		InfoLog("[RETRIGGER:SETSTATUS] Setting '%s' to Idle (from %v)\n", n.Metadata.Name, oldStatus)
-	}
-
-	// Update ChainBuilder's completed flag for retrigger detection
-	cb := GetGlobalChainBuilder()
-	if cb != nil {
-		cb.UpdateCompletedFlag(n.Metadata.Name, status)
-	}
-
 	// Emit StatusChange event (Group B - synchronous control)
 	if oldStatus != status {
 		event := &StatusChangeEvent{
@@ -1233,37 +1222,5 @@ func (w *Want) GetMetadata() *Metadata {
 		return nil
 	}
 	return &w.Metadata
-}
-
-// NotifyRetriggerViaDataReceived emits a retrigger notification when this want should be restarted
-// Called by completed want detection when a dependent want has new data
-// This is an async operation - the event is emitted to the subscription system
-// Parameters:
-//   - cb: ChainBuilder for context
-//   - sourceWantName: Name of the want that sent new data
-//   - payload: Optional data payload
-func (w *Want) NotifyRetriggerViaDataReceived(cb *ChainBuilder, sourceWantName string, payload interface{}) {
-	InfoLog("[RETRIGGER:EVENT] %s received retrigger notification from source want: %s\n", w.Metadata.Name, sourceWantName)
-
-	// Create retrigger event
-	event := &WantRetriggerEvent{
-		BaseEvent: BaseEvent{
-			EventType:  EventTypeWantRetrigger,
-			SourceName: "completed_want_detector",
-			Timestamp:  time.Now(),
-			Priority:   1,
-		},
-		SourceWant:  sourceWantName,
-		TargetWants: []string{w.Metadata.Name}, // Self only
-		Reason:      "completed_want_sent_data",
-		Payload:     payload,
-		Scope:       "local",
-	}
-
-	// Emit event asynchronously via subscription system
-	InfoLog("[RETRIGGER:EVENT] Emitting WantRetriggerEvent to subscription system for %s\n", w.Metadata.Name)
-	ctx := context.Background()
-	GetGlobalSubscriptionSystem().Emit(ctx, event)
-	InfoLog("[RETRIGGER:EVENT] WantRetriggerEvent emitted successfully\n")
 }
 

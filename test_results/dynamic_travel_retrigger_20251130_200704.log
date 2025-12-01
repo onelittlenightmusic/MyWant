@@ -1,6 +1,0 @@
-=== Dynamic Travel Retrigger Test ===
-Start time: Sun Nov 30 20:07:04 JST 2025
-Results file: /Users/hiroyukiosaki/work/golang/MyWant/test_results/dynamic_travel_retrigger_20251130_200704.json
-
-[PHASE 1] Clearing logs and deploying...
-Deployment response: Invalid want type: invalid want type '' in want '': Unknown want type: ''. Available standard types: [qnet numbers prime_sink buffet qnet combiner qnet sink fibonacci_sequence prime_sequence restaurant hotel evidence description fibonacci_numbers prime_numbers flight travel_coordinator level1_coordinator level2_coordinator target qnet queue qnet collector monitor]. Available custom types: [level 2 approval dynamic travel change fibonacci sequence prime sieve qnet pipeline travel itinerary planner level 1 approval wait time in queue system agent travel system agent travel itinerary planner]

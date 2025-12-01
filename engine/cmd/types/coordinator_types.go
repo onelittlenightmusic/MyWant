@@ -148,35 +148,6 @@ func (c *CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	// Check if this is a retrigger - if we're completed but have new data available, reset state
-	completionKey := c.DataHandler.GetCompletionKey()
-	isCompleted, _ := c.GetStateBool(completionKey, false)
-	if isCompleted {
-		// Check if there's pending data on any input channel
-		hasNewData := false
-		for i := 0; i < inCount; i++ {
-			in, inChannelAvailable := c.GetInputChannel(i)
-			if !inChannelAvailable {
-				continue
-			}
-			select {
-			case <-in:
-				hasNewData = true
-				break
-			default:
-			}
-		}
-		if hasNewData {
-			// Reset state to process retrigger
-			c.StoreState(completionKey, false)
-			c.receivedFromIndex = make(map[int]bool)
-			c.StoreLog(fmt.Sprintf("[RETRIGGER] Detected new data while completed, resetting state"))
-		} else {
-			// No new data, remain completed
-			return true
-		}
-	}
-
 	// Detect new connections: if input count increased, reset the state
 	if inCount > c.lastKnownInCount {
 		c.lastKnownInCount = inCount
@@ -184,6 +155,7 @@ func (c *CoordinatorWant) Exec() bool {
 		// Keep previously received channels, but mark as if we need to receive again
 		c.receivedFromIndex = make(map[int]bool)
 		// Clear the completion marker to restart processing
+		completionKey := c.DataHandler.GetCompletionKey()
 		c.StoreState(completionKey, false)
 	}
 
@@ -197,7 +169,6 @@ func (c *CoordinatorWant) Exec() bool {
 		case data := <-in:
 			// Mark this channel as having received data
 			c.receivedFromIndex[i] = true
-			c.StoreLog(fmt.Sprintf("[RECV] Received data on channel %d: %+v", i, data))
 			// Let the data handler process the data
 			c.DataHandler.ProcessData(c, data)
 		default:

@@ -1008,14 +1008,6 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
-		// Log idle wants for debugging retrigger
-		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusIdle && wantName == "dynamic-travel-coordinator-5" {
-				InfoLog("[STARTPHASE] Found Idle coordinator, processing...\n")
-				break
-			}
-		}
-
 		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
@@ -2813,6 +2805,7 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 	cb.reconcileMutex.RUnlock()
 
 	// Process each completed want
+	anyWantRetriggered := false
 	for wantName, isCompleted := range completedSnapshot {
 
 		if isCompleted {
@@ -2828,15 +2821,23 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 					// This allows the want to pick up new data from the completed source
 					if runtimeWant, ok := wantSnapshot[userName]; ok {
 						runtimeWant.want.SetStatus(WantStatusIdle)
+						anyWantRetriggered = true
 					}
 				}
 			}
 		}
 	}
 
-	// No need to queue a reconciliation trigger.
-	// The normal ticker-based reconciliation (100ms interval) will pick up
-	// the Idle wants in the next cycle and call startPhase() to restart them.
+	// If any want was retriggered, queue a reconciliation trigger
+	// (cannot call reconcileWants() directly due to mutex re-entrancy)
+	if anyWantRetriggered {
+		select {
+		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+			// Trigger queued successfully
+		default:
+			// Channel full, ignore (next reconciliation cycle will handle it)
+		}
+	}
 }
 
 // findUsersOfCompletedWant finds all wants that depend on a given completed want

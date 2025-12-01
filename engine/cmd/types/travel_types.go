@@ -110,18 +110,6 @@ func (r *RestaurantWant) Exec() bool {
 			}
 
 			out <- travelSchedule
-
-		// Trigger completed want retrigger check for any dependents
-		cb := GetGlobalChainBuilder()
-		if cb != nil {
-			cb.TriggerCompletedWantRetriggerCheck()
-		}
-
-		// Trigger completed want retrigger check for any dependents
-		cb = GetGlobalChainBuilder()
-		if cb != nil {
-			cb.TriggerCompletedWantRetriggerCheck()
-		}
 		}
 
 		return true
@@ -490,18 +478,6 @@ func (h *HotelWant) Exec() bool {
 			}
 
 			out <- travelSchedule
-
-		// Trigger completed want retrigger check for any dependents
-		cb := GetGlobalChainBuilder()
-		if cb != nil {
-			cb.TriggerCompletedWantRetriggerCheck()
-		}
-
-		// Trigger completed want retrigger check for any dependents
-		cb = GetGlobalChainBuilder()
-		if cb != nil {
-			cb.TriggerCompletedWantRetriggerCheck()
-		}
 		}
 
 		return true
@@ -705,12 +681,6 @@ func (b *BuffetWant) Exec() bool {
 			}
 
 			out <- travelSchedule
-
-		// Trigger completed want retrigger check for any dependents
-		cb := GetGlobalChainBuilder()
-		if cb != nil {
-			cb.TriggerCompletedWantRetriggerCheck()
-		}
 		}
 
 		return true
