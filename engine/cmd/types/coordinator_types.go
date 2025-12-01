@@ -33,9 +33,8 @@ type CoordinatorWant struct {
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
 	paths              Paths
-	// Unified coordinator state tracking
-	lastKnownInCount  int          // Track previously seen input count for detecting new connections
-	receivedFromIndex map[int]bool // Track which input channels have received at least one value
+	// Track previously seen input count for detecting new connections
+	lastKnownInCount int
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
@@ -46,7 +45,6 @@ func NewCoordinatorWant(
 ) interface{} {
 	coordinator := &CoordinatorWant{
 		Want:             Want{},
-		receivedFromIndex: make(map[int]bool),
 		lastKnownInCount:  0,
 	}
 
@@ -139,6 +137,8 @@ func (c *CoordinatorWant) GetWant() *Want {
 // Strategy: Each input channel must send at least one value. When all connected channels
 // have sent at least one value, the coordinator completes.
 // When a new channel is added, the coordinator resets and waits again.
+// Completion is determined by checking the data handler's State cache (e.g., "schedules")
+// to verify it has packets from all connected channels.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
@@ -147,36 +147,34 @@ func (c *CoordinatorWant) Exec() bool {
 		return true
 	}
 
-	// Detect new connections: if input count increased, reset the state
+	// Detect new connections: if input count increased, reset the state cache
 	if inCount > c.lastKnownInCount {
 		c.lastKnownInCount = inCount
-		// Reset received status for new channels to restart processing
-		c.receivedFromIndex = make(map[int]bool)
+		// Reset cache by deleting completion key to force re-evaluation
+		completionKey := c.DataHandler.GetCompletionKey()
+		c.StoreState(completionKey, false)
 	}
 
 	// Collect data from all available input channels using the want-level function
 	// ReceiveFromAnyInputChannel watches all channels asynchronously and returns
 	// the first available data without manual iteration
 	for {
-		index, data, ok := c.ReceiveFromAnyInputChannel()
+		_, data, ok := c.ReceiveFromAnyInputChannel()
 		if !ok {
 			// No more data available on any channel
 			break
 		}
-		// Mark this channel as having received data
-		c.receivedFromIndex[index] = true
-		// Let the data handler process the data
+		// Let the data handler process the data and store in State cache
 		c.DataHandler.ProcessData(c, data)
 	}
 
-	// Check if all currently connected channels have received at least one value
-	allChannelsReceived := true
-	for i := 0; i < inCount; i++ {
-		if !c.receivedFromIndex[i] {
-			allChannelsReceived = false
-			break
-		}
-	}
+	// Check completion condition: verify cache in state has all packets from connected channels
+	// The cache is maintained by the data handler (e.g., TravelDataHandler stores "schedules")
+	// We need at least one packet from each of the currently connected channels
+	completionKey := c.DataHandler.GetCompletionKey()
+
+	// Check if data handler's cache has packets from all connected channels
+	allChannelsReceived := c.checkAllChannelsRepresentedInCache(inCount)
 
 	// If all channels have sent at least one value, mark completion
 	if allChannelsReceived {
@@ -189,10 +187,39 @@ func (c *CoordinatorWant) Exec() bool {
 			c.StoreStateMulti(stateUpdates)
 		}
 
+		// Mark as completed
+		c.StoreState(completionKey, true)
 		return true
 	}
 
 	return false // Continue waiting for more data
+}
+
+// checkAllChannelsRepresentedInCache verifies the data handler's cache has
+// packets from all connected channels by checking the cache size
+func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
+	// Get the data handler's cache from state
+	// For TravelDataHandler, this is "schedules"
+	// For ApprovalDataHandler, check if evidence_received AND description_received
+	switch c.DataHandler.(type) {
+	case *TravelDataHandler:
+		schedulesVal, _ := c.GetState("schedules")
+		schedules, _ := schedulesVal.([]*TravelSchedule)
+		if schedules == nil {
+			return false
+		}
+		return len(schedules) >= inCount
+	case *ApprovalDataHandler:
+		// For approval, we need both evidence and description
+		evidenceVal, _ := c.GetStateBool("evidence_received", false)
+		descriptionVal, _ := c.GetStateBool("description_received", false)
+		return evidenceVal && descriptionVal
+	default:
+		// Generic fallback: if we have received data, assume completion
+		// This allows for custom DataHandler implementations
+		totalProcessed, _ := c.GetStateInt("total_processed", 0)
+		return totalProcessed >= inCount
+	}
 }
 
 // ============================================================================
