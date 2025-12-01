@@ -439,24 +439,25 @@ type TravelCompletionChecker struct {
 func (c *TravelCompletionChecker) IsComplete(want *CoordinatorWant, requiredInputs int) bool {
 	// In unified coordinator, completion is determined by whether all channels
 	// have sent at least one value (handled in Exec). This is kept for compatibility.
-	schedulesVal, _ := want.GetState("schedules")
-	schedules, _ := schedulesVal.([]*TravelSchedule)
+	schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
+	schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
 
-	if schedules == nil {
+	if schedulesByChannel == nil {
 		return false
 	}
 
-	return len(schedules) >= requiredInputs
+	// Check that each connected channel has at least one schedule
+	totalSchedules := 0
+	for i := 0; i < requiredInputs; i++ {
+		if schedules, exists := schedulesByChannel[i]; !exists || len(schedules) == 0 {
+			return false
+		}
+		totalSchedules += len(schedulesByChannel[i])
+	}
+
+	return totalSchedules >= requiredInputs
 }
 
 func (c *TravelCompletionChecker) OnCompletion(want *CoordinatorWant) {
-	schedulesVal, _ := want.GetState("schedules")
-	schedules, _ := schedulesVal.([]*TravelSchedule)
-
-	count := 0
-	if schedules != nil {
-		count = len(schedules)
-	}
-
-	want.StoreLog(fmt.Sprintf("Travel coordinator completed: collected %d schedules", count))
+	// Completion logging disabled to reduce log noise
 }
