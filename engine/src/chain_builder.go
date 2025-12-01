@@ -518,8 +518,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 			case "check_completed_retrigger":
 				// Processing retrigger check (logging removed)
 				cb.checkAndRetriggerCompletedWants()
-				// Immediately reconcile to start the newly-idle wants
-				cb.reconcileWants()
+				// Retrigger check finished
 
 			default:
 				// Handle standard reconciliation trigger
