@@ -33,8 +33,6 @@ type CoordinatorWant struct {
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
 	paths              Paths
-	// Track previously seen input count for detecting new connections
-	lastKnownInCount int
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
@@ -44,8 +42,7 @@ func NewCoordinatorWant(
 	spec WantSpec,
 ) interface{} {
 	coordinator := &CoordinatorWant{
-		Want:             Want{},
-		lastKnownInCount:  0,
+		Want: Want{},
 	}
 
 	// Initialize base Want fields
@@ -145,14 +142,6 @@ func (c *CoordinatorWant) Exec() bool {
 	// If no channels are connected, mark as completed
 	if inCount == 0 {
 		return true
-	}
-
-	// Detect new connections: if input count increased, reset the state cache
-	if inCount > c.lastKnownInCount {
-		c.lastKnownInCount = inCount
-		// Reset cache by deleting completion key to force re-evaluation
-		completionKey := c.DataHandler.GetCompletionKey()
-		c.StoreState(completionKey, false)
 	}
 
 	// Collect data from all available input channels using the want-level function
