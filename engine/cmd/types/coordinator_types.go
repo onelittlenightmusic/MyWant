@@ -139,49 +139,39 @@ func (c *CoordinatorWant) GetWant() *Want {
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
-	// If no channels are connected, mark as completed
-	if inCount == 0 {
-		return true
-	}
-
-	// Collect data from all available input channels using the want-level function
-	// ReceiveFromAnyInputChannel watches all channels asynchronously and returns
-	// the first available data without manual iteration
-	for {
-		_, data, ok := c.ReceiveFromAnyInputChannel()
-		if !ok {
-			// No more data available on any channel
-			break
-		}
-		// Let the data handler process the data and store in State cache
+	// Try to receive one data packet from any input channel
+	_, data, ok := c.ReceiveFromAnyInputChannel()
+	if ok {
+		// Data received: process it and check for completion
 		c.DataHandler.ProcessData(c, data)
 	}
 
-	// Check completion condition: verify cache in state has all packets from connected channels
-	// The cache is maintained by the data handler (e.g., TravelDataHandler stores "schedules")
-	// We need at least one packet from each of the currently connected channels
-	completionKey := c.DataHandler.GetCompletionKey()
+	// Check completion condition after each data reception (or when no data available)
+	return c.tryCompletion(inCount)
+}
 
+// tryCompletion checks if all required data has been received and handles completion
+func (c *CoordinatorWant) tryCompletion(inCount int) bool {
 	// Check if data handler's cache has packets from all connected channels
-	allChannelsReceived := c.checkAllChannelsRepresentedInCache(inCount)
-
-	// If all channels have sent at least one value, mark completion
-	if allChannelsReceived {
-		// Let the completion checker perform final processing
-		c.CompletionChecker.OnCompletion(c)
-
-		// Apply any state updates from data handler
-		stateUpdates := c.DataHandler.GetStateUpdates(c)
-		if len(stateUpdates) > 0 {
-			c.StoreStateMulti(stateUpdates)
-		}
-
-		// Mark as completed
-		c.StoreState(completionKey, true)
-		return true
+	if !c.checkAllChannelsRepresentedInCache(inCount) {
+		return false // Still waiting for more data
 	}
 
-	return false // Continue waiting for more data
+	// All channels have sent at least one value: mark completion
+	completionKey := c.DataHandler.GetCompletionKey()
+
+	// Let the completion checker perform final processing
+	c.CompletionChecker.OnCompletion(c)
+
+	// Apply any state updates from data handler
+	stateUpdates := c.DataHandler.GetStateUpdates(c)
+	if len(stateUpdates) > 0 {
+		c.StoreStateMulti(stateUpdates)
+	}
+
+	// Mark as completed
+	c.StoreState(completionKey, true)
+	return true
 }
 
 // checkAllChannelsRepresentedInCache verifies the data handler's cache has
