@@ -154,21 +154,19 @@ func (c *CoordinatorWant) Exec() bool {
 		c.receivedFromIndex = make(map[int]bool)
 	}
 
-	// Collect data from all available input channels using non-blocking reads
-	for i := 0; i < inCount; i++ {
-		in, inChannelAvailable := c.GetInputChannel(i)
-		if !inChannelAvailable {
-			continue
+	// Collect data from all available input channels using the want-level function
+	// ReceiveFromAnyInputChannel watches all channels asynchronously and returns
+	// the first available data without manual iteration
+	for {
+		index, data, ok := c.ReceiveFromAnyInputChannel()
+		if !ok {
+			// No more data available on any channel
+			break
 		}
-		select {
-		case data := <-in:
-			// Mark this channel as having received data
-			c.receivedFromIndex[i] = true
-			// Let the data handler process the data
-			c.DataHandler.ProcessData(c, data)
-		default:
-			// No more data on this channel
-		}
+		// Mark this channel as having received data
+		c.receivedFromIndex[index] = true
+		// Let the data handler process the data
+		c.DataHandler.ProcessData(c, data)
 	}
 
 	// Check if all currently connected channels have received at least one value

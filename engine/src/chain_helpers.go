@@ -77,6 +77,10 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 // using non-blocking select. Returns the channel index that had data, the data itself,
 // and whether a successful read occurred.
 //
+// This function directly accesses all input channels from paths and constructs a
+// dynamic select statement to watch all channels asynchronously without iterating
+// through GetInputChannel(i).
+//
 // Returns: (channelIndex, data, ok)
 //   - channelIndex: Index of the channel that provided data (-1 if no data available)
 //   - data: The data received (nil if ok is false)
@@ -88,30 +92,32 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 //       fmt.Printf("Received data from channel %d: %v\n", index, data)
 //   }
 func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
-	inCount := n.GetInCount()
-	if inCount == 0 {
+	// Access input channels directly from paths structure
+	if len(n.paths.In) == 0 {
 		return -1, nil, false
 	}
 
-	// Build select cases dynamically for all input channels
-	cases := make([]reflect.SelectCase, inCount)
+	inCount := len(n.paths.In)
+
+	// Build select cases dynamically for all input channels from paths
+	cases := make([]reflect.SelectCase, 0, inCount+1)
+
 	for i := 0; i < inCount; i++ {
-		ch, available := n.GetInputChannel(i)
-		if available {
-			cases[i] = reflect.SelectCase{
+		pathInfo := n.paths.In[i]
+		if pathInfo.Channel != nil {
+			cases = append(cases, reflect.SelectCase{
 				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(ch),
-			}
-		} else {
-			// Channel not available, use a nil case (will never match)
-			cases[i] = reflect.SelectCase{
-				Dir: reflect.SelectRecv,
-			}
+				Chan: reflect.ValueOf(pathInfo.Channel),
+			})
 		}
 	}
 
-	// Use reflect.Select with default to make it non-blocking
-	// We need to add a default case to make it non-blocking
+	// If no valid channels found, return immediately
+	if len(cases) == 0 {
+		return -1, nil, false
+	}
+
+	// Add default case for non-blocking behavior
 	cases = append(cases, reflect.SelectCase{
 		Dir: reflect.SelectDefault,
 	})
