@@ -57,6 +57,8 @@ recipe:
           duration_hours: flight_duration
         requires:
           - create_flight
+        using:
+          - role: orchestrator
 
     # Dinner restaurant reservation with agent processing
     - metadata:
