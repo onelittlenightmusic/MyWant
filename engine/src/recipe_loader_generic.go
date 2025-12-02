@@ -335,6 +335,10 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 	}
 
 	// Namespace all using selectors with owner prefix
+	// CRITICAL: The using selector values must match the namespaced label values in other wants
+	// Example: if want A has label "role: scheduler" which becomes "role: travel:scheduler",
+	// and want B has using "role: scheduler", it must become "role: travel:scheduler"
+	// to match the namespaced label in want A
 	if want.Spec.Using != nil {
 		for i := range want.Spec.Using {
 			namespacedSelector := make(map[string]string)
