@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	. "mywant/engine/src"
 	"time"
 )
@@ -105,281 +104,216 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 	}
 }
 
-// Exec creates a flight booking reservation
-// The execution flow includes three main phases:
-// 1. Agent execution: Book or rebook flights using the agent system
-// 2. Monitoring phase: Wait for the 60-second stability window to detect any issues
-// 3. Completion: After monitoring expires, return true to complete and notify parent
+// Flight execution phases (state machine)
+const (
+	PhaseInitial    = "initial"
+	PhaseBooking    = "booking"
+	PhaseMonitoring = "monitoring"
+	PhaseCanceling  = "canceling"
+	PhaseRebooking  = "rebooking"
+	PhaseCompleted  = "completed"
+)
+
+// Exec creates a flight booking reservation using state machine pattern
+// The execution flow follows distinct phases:
+// 1. Initial: Setup phase
+// 2. Booking: Execute initial flight booking via agents
+// 3. Monitoring: Monitor flight status for 60 seconds
+// 4. Canceling: Wait for cancellation agent to complete
+// 5. Rebooking: Execute rebooking after cancellation
+// 6. Completed: Final state, return true to complete want
 func (f *FlightWant) Exec() bool {
-	// Handle continuous monitoring phase
-	// During this phase, the flight status is monitored for 60 seconds after booking/rebooking.
-	// If no issues are detected, the want completes and notifies the parent Target want that
-	// the flight reservation has stabilized. The parent can then complete once all children finish.
-	if f.monitoringActive {
-		// Continue running monitoring during the monitoring duration
-		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
-			// Still within monitoring window - check for delays
-			// Only log every 30 seconds to reduce spam
-			elapsed := time.Since(f.monitoringStartTime)
-			now := time.Now()
-			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
-				f.StoreLog(fmt.Sprintf("Monitoring cycle (elapsed: %v/%v)", elapsed, f.monitoringDuration))
-				f.lastLogTime = now
-			}
-
-			// Check for delayed flights that need cancellation and rebooking
-			// This is checked during monitoring phase so rebooking can happen immediately
-			if f.shouldCancelAndRebook() {
-				f.StoreLog("Flight status is delayed during monitoring, initiating cancellation and rebooking")
-
-				// Set flight_action to cancel_flight so the agent executor will handle it
-				// Note: Keep flight_id so agent can cancel it
-				f.StoreState("flight_action", "cancel_flight")
-
-				// Exit monitoring phase to trigger rebooking immediately
-				f.monitoringActive = false
-
-				// Reset attempted flag so agent can execute the cancellation action
-				f.StoreState("attempted", false)
-
-				f.StoreLog("Set flight_action to cancel_flight during monitoring, waiting for agent cancellation")
-
-				// Return false to trigger the rebooking flow in next cycle
-				return false
-			}
-
-			// The monitoring agent will be triggered through the normal agent execution framework
-			// during the reconciliation loop. We just need to stay in the monitoring phase
-			// by returning false to keep the want running
-
-			// Return false to keep running through reconciliation cycles
-			return false
-		} else {
-			// Monitoring duration exceeded, complete the monitoring phase
-			f.StoreLog(fmt.Sprintf("Monitoring completed (total duration: %v)", time.Since(f.monitoringStartTime)))
-			f.monitoringActive = false
-			return true
-		}
-	}
-
-	// Read parameters fresh each cycle - enables dynamic changes!
-	flightType := f.GetStringParam("flight_type", "economy")
-
-	duration := time.Duration(f.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
-
 	out, connectionAvailable := f.GetFirstOutputChannel()
 	if !connectionAvailable {
 		return true
 	}
 
-	// Check if already attempted using persistent state
-	attemptedVal, _ := f.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
-
-	if attempted {
-		// Already booked in this cycle
-		return true
+	// Get current phase from state
+	phaseVal, _ := f.GetState("flight_phase")
+	phase := ""
+	if phaseVal != nil {
+		phase, _ = phaseVal.(string)
+	}
+	if phase == "" {
+		phase = PhaseInitial
 	}
 
-	// Mark as attempted in persistent state
-	f.StoreState("attempted", true)
+	// State machine: handle each phase
+	switch phase {
 
-	// Try to use agent system if available - agent completely overrides normal execution
-	f.tryAgentExecution()
+	// === Phase 1: Initial Setup ===
+	case PhaseInitial:
+		f.StoreLog("Phase: Initial booking")
+		f.StoreState("flight_phase", PhaseBooking)
+		return false
 
-	// Check if agent created a flight result (read from state, not return value)
-	agentResult, hasResult := f.GetState("agent_result")
-	if hasResult && agentResult != nil {
-		f.StoreLog("Agent execution completed, processing agent result")
-
-		// Convert agent_result to FlightSchedule
-	agentSchedule := f.extractFlightSchedule(agentResult)
-	if agentSchedule != nil {
-			// Use the agent's schedule result
-			f.SetSchedule(*agentSchedule)
-
-			// Send the schedule to output channel
-			flightEvent := TimeSlot{
-				Start: agentSchedule.DepartureTime,
-				End:   agentSchedule.ArrivalTime,
-				Type:  "flight",
-				Name:  agentSchedule.ReservationName,
-			}
-
-			travelSchedule := &TravelSchedule{
-				Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
-				Events: []TimeSlot{flightEvent},
-			}
-
-			out <- travelSchedule
-			f.StoreLog(fmt.Sprintf("Sent agent-generated schedule: %s from %s to %s",
-				agentSchedule.ReservationName,
-				agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-				agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
-			f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
-				travelSchedule.Date.Format("2006-01-02"),
-				len(travelSchedule.Events),
-				flightEvent.Name,
-				flightEvent.Start.Format("15:04:05"),
-				flightEvent.End.Format("15:04:05")))
-
-			// Start continuous monitoring to capture all status changes
-			// Begin the 60-second stability window - the flight schedule will be monitored to detect
-			// any immediate changes (delays, cancellations, etc.) that would require rebooking.
-			// The parent Target want cannot complete until this monitoring period expires and the
-			// flight returns true (completion), signaling that the flight has stabilized.
-			if !f.monitoringActive {
-				f.monitoringActive = true
-				f.monitoringStartTime = time.Now()
-				f.StoreLog(fmt.Sprintf("Starting continuous monitoring for status changes (duration: %v)", f.monitoringDuration))
-			}
-
-			// Continue running to collect more status updates
-			// Return false to keep this want running through reconciliation cycles
-			return false
-		}
-	}
-
-	// Check if cancellation just completed (previous_flight_id exists)
-	prevFlightID, hasPrevFlight := f.GetState("previous_flight_id")
-	if hasPrevFlight && prevFlightID != nil && prevFlightID != "" {
-		// Flight was just cancelled, prepare for rebooking
-		f.StoreLog("Flight cancellation completed, preparing for rebooking")
-
-		// Reset attempted flag to allow agent to execute rebooking in this cycle
-		// This is critical - without resetting, the "attempted" check above will return true
-		f.StoreState("attempted", false)
-
-		// Don't return here - fall through to agent execution for rebooking
-		// The agent will see flight_id is empty and attempt rebooking
-
-		// Try rebooking immediately in this same cycle
+	// === Phase 2: Initial Booking ===
+	case PhaseBooking:
+		f.StoreLog("Executing initial booking")
+		f.StoreState("attempted", true)
 		f.tryAgentExecution()
 
-		// Check if rebooking created a new flight result (read from state, not return value)
-	agentResult, hasResult := f.GetState("agent_result")
-	if hasResult && agentResult != nil {
-			f.StoreLog("Rebooking agent execution completed, processing new flight result")
-
-			// Convert agent_result to FlightSchedule
-	agentSchedule := f.extractFlightSchedule(agentResult)
-	if agentSchedule != nil {
-				// Use the agent's schedule result
+		agentResult, hasResult := f.GetState("agent_result")
+		if hasResult && agentResult != nil {
+			f.StoreLog("Initial booking succeeded")
+			agentSchedule := f.extractFlightSchedule(agentResult)
+			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
 
-				// Send the schedule to output channel
-				flightEvent := TimeSlot{
-					Start: agentSchedule.DepartureTime,
-					End:   agentSchedule.ArrivalTime,
-					Type:  "flight",
-					Name:  agentSchedule.ReservationName,
-				}
+				// Send initial flight packet
+				f.sendFlightPacket(out, agentSchedule, "Initial")
 
-				travelSchedule := &TravelSchedule{
-					Date:   agentSchedule.DepartureTime.Truncate(24 * time.Hour),
-					Events: []TimeSlot{flightEvent},
-				}
+				// Transition to monitoring phase
+				f.monitoringStartTime = time.Now()
+				f.StoreState("flight_phase", PhaseMonitoring)
+				f.StoreLog("Transitioning to monitoring phase")
 
-				out <- travelSchedule
-				f.StoreLog(fmt.Sprintf("Sent rebooked flight schedule: %s from %s to %s",
-					agentSchedule.ReservationName,
-					agentSchedule.DepartureTime.Format("15:04 Jan 2"),
-					agentSchedule.ArrivalTime.Format("15:04 Jan 2")))
-				f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent rebooked TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
-					travelSchedule.Date.Format("2006-01-02"),
-					len(travelSchedule.Events),
-					flightEvent.Name,
-					flightEvent.Start.Format("15:04:05"),
-					flightEvent.End.Format("15:04:05")))
-
-				// Start continuous monitoring for new flight
-				if !f.monitoringActive {
-					f.monitoringActive = true
-					f.monitoringStartTime = time.Now()
-					f.StoreLog(fmt.Sprintf("Starting continuous monitoring for new booked flight (duration: %v)", f.monitoringDuration))
-				}
-
-				// Continue monitoring the new flight
 				return false
 			}
 		}
-	}
 
-	// Normal flight execution (only runs if agent execution didn't return a result)
-	f.StoreLog("Agent execution did not return result, using standard flight logic")
+		// Booking failed - complete
+		f.StoreLog("Initial booking failed")
+		f.StoreState("flight_phase", PhaseCompleted)
+		return true
 
-	// Check for conflicts from input
-	var existingSchedule *TravelSchedule
-	if f.paths.GetInCount() > 0 {
-		in, _ := f.GetInputChannel(0)
-		select {
-		case schedData := <-in:
-			if schedule, ok := schedData.(*TravelSchedule); ok {
-				existingSchedule = schedule
+	// === Phase 3: Monitoring ===
+	case PhaseMonitoring:
+		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
+			elapsed := time.Since(f.monitoringStartTime)
+
+			// Check for delay that triggers cancellation
+			if f.shouldCancelAndRebook() {
+				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
+				f.StoreState("flight_action", "cancel_flight")
+				f.StoreState("attempted", false)
+				f.StoreState("flight_phase", PhaseCanceling)
+				return false
 			}
-		default:
-			// No input data available
+
+			// Log monitoring progress every 30 seconds
+			now := time.Now()
+			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
+				f.StoreLog(fmt.Sprintf("Monitoring... (elapsed: %v/%v)", elapsed, f.monitoringDuration))
+				f.lastLogTime = now
+			}
+
+			return false
+
+		} else {
+			// Monitoring period expired - flight stable, complete
+			f.StoreLog("Monitoring completed successfully")
+			f.StoreState("flight_phase", PhaseCompleted)
+			return true
 		}
+
+	// === Phase 4: Canceling ===
+	case PhaseCanceling:
+		// Get the flight_id to cancel
+		flightIDVal, flightIDExists := f.GetState("flight_id")
+		if !flightIDExists || flightIDVal == "" {
+			f.StoreLog("Flight already cancelled or no flight_id found, transitioning to rebooking")
+			f.StoreState("flight_phase", PhaseRebooking)
+			f.StoreState("attempted", false)
+			return false
+		}
+
+		flightID, ok := flightIDVal.(string)
+		if !ok {
+			f.StoreLog("Invalid flight_id type, transitioning to rebooking")
+			f.StoreState("flight_phase", PhaseRebooking)
+			f.StoreState("attempted", false)
+			return false
+		}
+
+		// Execute cancel flight action
+		f.StoreLog(fmt.Sprintf("Executing cancel_flight action for flight %s", flightID))
+		f.tryAgentExecution()
+
+		// Clear flight_id after cancellation to indicate rebooking is next
+		f.StoreState("flight_id", "")
+		f.StoreLog("Cancelled flight: " + flightID)
+
+		// Transition to rebooking phase
+		f.StoreLog("Cancellation completed, transitioning to rebooking phase")
+		f.StoreState("flight_phase", PhaseRebooking)
+		f.StoreState("attempted", false)
+		return false
+
+	// === Phase 5: Rebooking ===
+	case PhaseRebooking:
+		f.StoreLog("Executing rebooking")
+		f.tryAgentExecution()
+
+		agentResult, hasResult := f.GetState("agent_result")
+		if hasResult && agentResult != nil {
+			f.StoreLog("Rebooking succeeded")
+			agentSchedule := f.extractFlightSchedule(agentResult)
+			if agentSchedule != nil {
+				f.SetSchedule(*agentSchedule)
+
+				// Send rebooked flight packet
+				f.sendFlightPacket(out, agentSchedule, "Rebooked")
+
+				// Restart monitoring for new flight
+				f.monitoringStartTime = time.Now()
+				f.StoreState("flight_phase", PhaseMonitoring)
+				f.StoreLog("Transitioning back to monitoring phase for rebooked flight")
+
+				return false
+			}
+		}
+
+		// Rebooking failed - complete
+		f.StoreLog("Rebooking failed")
+		f.StoreState("flight_phase", PhaseCompleted)
+		return true
+
+	// === Phase 6: Completed ===
+	case PhaseCompleted:
+		return true
+
+	default:
+		f.StoreLog("Unknown phase: " + phase)
+		f.StoreState("flight_phase", PhaseCompleted)
+		return true
 	}
+}
 
-	// Generate flight departure time (early morning flights common)
-	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
-	departureTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
-		6+rand.Intn(6), rand.Intn(60), 0, 0, time.Local) // 6 AM - 12 PM
-
-	newEvent := TimeSlot{
-		Start: departureTime,
-		End:   departureTime.Add(duration),
+// sendFlightPacket sends a flight schedule packet to the output channel and logs it
+func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {
+	flightEvent := TimeSlot{
+		Start: schedule.DepartureTime,
+		End:   schedule.ArrivalTime,
 		Type:  "flight",
-		Name:  fmt.Sprintf("%s %s flight booking", f.Metadata.Name, flightType),
+		Name:  schedule.ReservationName,
 	}
 
-	// Check for conflicts if we have existing schedule
-	if existingSchedule != nil {
-		for attempt := 0; attempt < 3; attempt++ {
-			conflict := false
-			for _, event := range existingSchedule.Events {
-				if f.hasTimeConflict(newEvent, event) {
-					conflict = true
-					// Retry with different time
-					departureTime = departureTime.Add(2 * time.Hour)
-					newEvent.Start = departureTime
-					newEvent.End = departureTime.Add(duration)
-					f.StoreLog(fmt.Sprintf("Conflict detected, retrying at %s", departureTime.Format("15:04")))
-					break
-				}
-			}
-			if !conflict {
-				break
-			}
-		}
+	travelSchedule := &TravelSchedule{
+		Date:   schedule.DepartureTime.Truncate(24 * time.Hour),
+		Events: []TimeSlot{flightEvent},
 	}
 
-	// Create updated schedule
-	newSchedule := &TravelSchedule{
-		Date:   baseDate,
-		Events: []TimeSlot{newEvent},
-	}
-	if existingSchedule != nil {
-		newSchedule.Events = append(existingSchedule.Events, newEvent)
+	// Type-assert to channel and send
+	if ch, ok := out.(chan *TravelSchedule); ok {
+		ch <- travelSchedule
+	} else if ch, ok := out.(chan interface{}); ok {
+		ch <- travelSchedule
 	}
 
-	// Store flight details using thread-safe StoreState (batched to minimize history entries)
-	f.StoreStateMulti(map[string]interface{}{
-		"total_processed":       1,
-		"flight_type":           flightType,
-		"departure_time":        newEvent.Start.Format("15:04 Jan 2"),
-		"arrival_time":          newEvent.End.Format("15:04 Jan 2"),
-		"flight_duration_hours": duration.Hours(),
-		"reservation_name":      newEvent.Name,
-		"schedule_date":         baseDate.Format("2006-01-02"),
-	})
+	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
+		label,
+		schedule.ReservationName,
+		schedule.DepartureTime.Format("15:04 Jan 2"),
+		schedule.ArrivalTime.Format("15:04 Jan 2")))
 
-	f.StoreLog(fmt.Sprintf("Scheduled %s from %s to %s",
-		newEvent.Name, newEvent.Start.Format("15:04 Jan 2"), newEvent.End.Format("15:04 Jan 2")))
-
-	out <- newSchedule
-	return true
+	f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
+		label,
+		travelSchedule.Date.Format("2006-01-02"),
+		len(travelSchedule.Events),
+		flightEvent.Name,
+		flightEvent.Start.Format("15:04:05"),
+		flightEvent.End.Format("15:04:05")))
 }
 
 // tryAgentExecution attempts to execute flight booking using the agent system
@@ -486,7 +420,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 
 	// Cancel and rebook if delayed
 	if status == "delayed_one_day" {
-		f.StoreLog("Detected delayed_one_day status, will cancel and rebook")
 		return true
 	}
 
@@ -509,14 +442,12 @@ func (f *FlightWant) StartContinuousMonitoring() {
 		for range ticker.C {
 			// Check if flight has been booked
 			flightIDVal, exists := f.GetState("flight_id")
-			if !exists {
-				f.StoreLog("No flight_id found, stopping monitoring")
+			if !exists || flightIDVal == "" {
 				return
 			}
 
 			flightID, ok := flightIDVal.(string)
 			if !ok || flightID == "" {
-				f.StoreLog("Invalid flight_id, stopping monitoring")
 				return
 			}
 
@@ -533,20 +464,8 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls
 			// This prevents lock contention when multiple monitoring goroutines call StoreState
 			f.BeginExecCycle()
-			err := monitor.Exec(context.Background(), &f.Want)
+			monitor.Exec(context.Background(), &f.Want)
 			f.EndExecCycle()
-
-			if err != nil {
-				f.StoreLog(fmt.Sprintf("Polling error: %v", err))
-			} else {
-				// Log the current status
-				if status, exists := f.GetState("flight_status"); exists {
-					f.StoreLog(fmt.Sprintf("Flight %s status: %v (polled at %s)",
-						flightID, status, time.Now().Format("15:04:05")))
-				}
-			}
 		}
 	}()
-
-	f.StoreLog(fmt.Sprintf("Started continuous monitoring for flight %s", f.Metadata.Name))
 }
