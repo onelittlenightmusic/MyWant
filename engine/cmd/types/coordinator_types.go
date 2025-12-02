@@ -137,10 +137,6 @@ func (c *CoordinatorWant) GetWant() *Want {
 // When a new channel is added, the coordinator resets and waits again.
 // Completion is determined by checking the data handler's State cache (e.g., "schedules")
 // to verify it has packets from all connected channels.
-//
-// IMPORTANT: The coordinator keeps polling even after initial completion to handle
-// retrigger scenarios where child wants send additional packets (e.g., rebooked flights).
-// Only return true after a grace period with no new data has elapsed.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
@@ -149,49 +145,10 @@ func (c *CoordinatorWant) Exec() bool {
 	if ok {
 		// Data received: process it with channel information
 		c.DataHandler.ProcessData(c, channelIndex, data)
-		// Reset grace period timer whenever we receive new data
-		c.StoreState("last_data_received", time.Now())
 	}
 
 	// Check completion condition after each data reception (or when no data available)
-	if c.tryCompletion(inCount) {
-		// All required data has been received. Before completing, check if we should
-		// wait a bit longer for retrigger packets (e.g., rebooked flights)
-		if !c.shouldWaitForRetriggers() {
-			return true // Ready to complete
-		}
-		// Keep polling for retriggers
-		return false
-	}
-
-	return false
-}
-
-// shouldWaitForRetriggers checks if we should continue polling for retrigger packets
-// Returns true if we should keep waiting, false if grace period has elapsed
-func (c *CoordinatorWant) shouldWaitForRetriggers() bool {
-	// Get the last time we received data
-	lastReceivedVal, exists := c.GetState("last_data_received")
-	if !exists {
-		// First time reaching completion - start grace period
-		c.StoreState("last_data_received", time.Now())
-		c.StoreState("completion_reached_at", time.Now())
-		return true
-	}
-
-	lastReceived, ok := lastReceivedVal.(time.Time)
-	if !ok {
-		return false // Invalid state, proceed to completion
-	}
-
-	// Wait 2 seconds after last data for potential retrigger packets
-	graceTimeout := 2 * time.Second
-	if time.Since(lastReceived) < graceTimeout {
-		return true // Still in grace period
-	}
-
-	// Grace period elapsed, safe to complete
-	return false
+	return c.tryCompletion(inCount)
 }
 
 // tryCompletion checks if all required data has been received and handles completion
