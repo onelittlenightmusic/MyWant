@@ -226,7 +226,9 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 				// Immediately set the schedule and complete the cycle
 			r.SetSchedule(schedule)
 				return &schedule
-			}
+		} else {
+			r.StoreLog(fmt.Sprintf("[ERROR] RestaurantWant.tryAgentExecution: type assertion failed for agent_result from monitor. Expected RestaurantSchedule, got %T", result))
+		}
 		}
 
 		// Step 2: No existing schedule found, execute AgentRestaurant
@@ -244,7 +246,9 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
 			if schedule, ok := result.(RestaurantSchedule); ok {
 				return &schedule
-			}
+		} else {
+			r.StoreLog(fmt.Sprintf("[ERROR] RestaurantWant.tryAgentExecution: type assertion failed for agent_result from agent. Expected RestaurantSchedule, got %T", result))
+		}
 		}
 
 		return nil
@@ -494,6 +498,8 @@ func (h *HotelWant) Exec() bool {
 			case schedData := <-in:
 				if schedule, ok := schedData.(*TravelSchedule); ok {
 					existingSchedule = schedule
+				} else {
+					h.StoreLog(fmt.Sprintf("[ERROR] HotelWant.tryAgentExecution: type assertion failed for input schedule. Expected *TravelSchedule, got %T", schedData))
 				}
 			default:
 				// No input data
@@ -586,6 +592,8 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 		if result, exists := h.GetState("agent_result"); exists {
 			if schedule, ok := result.(HotelSchedule); ok {
 				return &schedule
+			} else {
+				h.StoreLog(fmt.Sprintf("[ERROR] HotelWant.tryAgentExecution: type assertion failed for agent_result. Expected HotelSchedule, got %T", result))
 			}
 		}
 
@@ -696,6 +704,8 @@ func (b *BuffetWant) Exec() bool {
 			case schedData := <-in:
 				if schedule, ok := schedData.(*TravelSchedule); ok {
 					existingSchedule = schedule
+				} else {
+					b.StoreLog(fmt.Sprintf("[ERROR] BuffetWant.tryAgentExecution: type assertion failed for input schedule. Expected *TravelSchedule, got %T", schedData))
 				}
 			default:
 			}
@@ -783,6 +793,8 @@ func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 		if result, exists := b.GetState("agent_result"); exists {
 			if schedule, ok := result.(BuffetSchedule); ok {
 				return &schedule
+			} else {
+				b.StoreLog(fmt.Sprintf("[ERROR] BuffetWant.tryAgentExecution: type assertion failed for agent_result. Expected BuffetSchedule, got %T", result))
 			}
 		}
 

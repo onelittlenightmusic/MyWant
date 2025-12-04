@@ -121,8 +121,17 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 			}
 		}
 	}
+
+	// Get completion timeout parameter (default: 60 seconds)
+	// This allows time for delayed packets like Flight rebooking (delay detection ~50s)
+	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 60)
+	completionTimeout := time.Duration(completionTimeoutSeconds) * time.Second
+
 	return requiredInputs,
-		&TravelDataHandler{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"},
+		&TravelDataHandler{
+			IsBuffet:          isBuffetParam || coordinatorType == "buffet coordinator",
+			CompletionTimeout: completionTimeout,
+		},
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
@@ -139,12 +148,21 @@ func (c *CoordinatorWant) GetWant() *Want {
 // to verify it has packets from all connected channels.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
+	// outCount := c.GetOutCount()
+	// paths := c.GetPaths()
+	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
-	// Try to receive one data packet from any input channel
-	channelIndex, data, ok := c.ReceiveFromAnyInputChannel()
-	if ok {
-		// Data received: process it with channel information
-		c.DataHandler.ProcessData(c, channelIndex, data)
+	// loop while receiving data packets
+	for {
+		// Try to receive one data packet from any input channel
+		channelIndex, data, received := c.ReceiveFromAnyInputChannel()
+		if received {
+			// Data received: process it with channel information
+			c.DataHandler.ProcessData(c, channelIndex, data)
+		} else {
+			// No data available on any channel: exit loop
+			break
+		}
 	}
 
 	// Check completion condition after each data reception (or when no data available)
@@ -184,16 +202,37 @@ func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 	switch c.DataHandler.(type) {
 	case *TravelDataHandler:
 		schedulesByChannelVal, _ := c.GetState("schedules_by_channel")
-		schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
+		schedulesByChannel, ok := schedulesByChannelVal.(map[int]*TravelSchedule)
+		if !ok {
+			c.StoreLog(fmt.Sprintf("[ERROR] CoordinatorWant.checkAllChannelsRepresentedInCache: type assertion failed for schedules_by_channel. Expected map[int]*TravelSchedule, got %T", schedulesByChannelVal))
+		}
 		if schedulesByChannel == nil {
 			return false
 		}
-		// Check that each connected channel (0 through inCount-1) has at least one packet
-		for i := 0; i < inCount; i++ {
-			if _, exists := schedulesByChannel[i]; !exists || len(schedulesByChannel[i]) == 0 {
-				return false
+		// Check that we have received packets from ALL connected channels
+		if len(schedulesByChannel) != inCount {
+			return false
+		}
+
+		// All channels have sent at least one packet
+		// Now check if enough time has passed since the last packet (to allow for Rebook packets)
+		lastPacketTimeVal, _ := c.GetState("last_packet_time")
+		if lastPacketTimeVal != nil {
+			if lastPacketTime, ok := lastPacketTimeVal.(time.Time); ok {
+				timeSinceLastPacket := time.Since(lastPacketTime)
+				// Get completion timeout from handler configuration
+				// This allows Rebook packets to be received (Flight delay detection takes ~40s)
+				handler := c.DataHandler.(*TravelDataHandler)
+				completionTimeout := handler.CompletionTimeout
+				if timeSinceLastPacket < completionTimeout {
+					c.StoreLog(fmt.Sprintf("[DEBUG] Coordinator waiting for more packets (%.1fs since last packet, need %.1fs)", timeSinceLastPacket.Seconds(), completionTimeout.Seconds()))
+					return false
+				}
+				totalPacketsVal, _ := c.GetStateInt("total_packets_received", 0)
+				c.StoreLog(fmt.Sprintf("[DEBUG] Coordinator completing: received %d packets from %d channels, %.1fs since last packet", totalPacketsVal, len(schedulesByChannel), timeSinceLastPacket.Seconds()))
 			}
 		}
+
 		return true
 	case *ApprovalDataHandler:
 		// For approval, we need both evidence and description
@@ -343,76 +382,79 @@ func (c *ApprovalCompletionChecker) OnCompletion(want *CoordinatorWant) {
 
 // TravelDataHandler handles travel-specific data processing
 type TravelDataHandler struct {
-	IsBuffet bool // If true, expect TravelSchedule from buffet
+	IsBuffet          bool          // If true, expect TravelSchedule from buffet
+	CompletionTimeout time.Duration // Time to wait after last packet before completing (allows for Rebook packets)
 }
 
 func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
-	if schedule, ok := data.(*TravelSchedule); ok {
-		// Log packet reception with content details
-		eventDetails := ""
-		if len(schedule.Events) > 0 {
-			eventDetails = fmt.Sprintf(" [event0: %s, %s-%s]",
-				schedule.Events[0].Name,
-				schedule.Events[0].Start.Format("15:04:05"),
-				schedule.Events[0].End.Format("15:04:05"))
-		}
-		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received TravelSchedule on channel %d: Date=%s, Events=%d%s",
-			channelIndex,
-			schedule.Date.Format("2006-01-02"),
-			len(schedule.Events),
-			eventDetails))
+	schedule, ok := data.(*TravelSchedule)
+	if !ok {
+		want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.ProcessData: type assertion failed for data. Expected *TravelSchedule, got %T", data))
+	}
+	// Log packet reception with content details
+	eventDetails := ""
+	if len(schedule.Events) > 0 {
+		eventDetails = fmt.Sprintf(" [event0: %s, %s-%s]",
+			schedule.Events[0].Name,
+			schedule.Events[0].Start.Format("15:04:05"),
+			schedule.Events[0].End.Format("15:04:05"))
+	}
+	want.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received TravelSchedule on channel %d: Date=%s, Events=%d%s",
+		channelIndex,
+		schedule.Date.Format("2006-01-02"),
+		len(schedule.Events),
+		eventDetails))
 
 		// Get existing schedules map (keyed by channel index)
-		schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
-		schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
-		if schedulesByChannel == nil {
-			schedulesByChannel = make(map[int][]*TravelSchedule)
+	scheduleByChannelVal, _ := want.GetState("schedules_by_channel")
+	scheduleByChannel, ok := scheduleByChannelVal.(map[int]*TravelSchedule)
+	if !ok {
+		if scheduleByChannelVal == nil {
+			scheduleByChannel = make(map[int]*TravelSchedule)
 		}
-
-		// Get or create the schedule list for this channel
-		channelSchedules := schedulesByChannel[channelIndex]
-		if channelSchedules == nil {
-			channelSchedules = make([]*TravelSchedule, 0)
-		}
-
-		// Append new schedule from this channel
-		channelSchedules = append(channelSchedules, schedule)
-		schedulesByChannel[channelIndex] = channelSchedules
-
-		// Update persistent state
-		want.StoreStateMulti(map[string]interface{}{
-			"schedules_by_channel": schedulesByChannel,
-			"total_processed":      getTotalSchedulesCount(schedulesByChannel),
-		})
-
-		return true
 	}
-	return false
-}
 
-// getTotalSchedulesCount counts all schedules across all channels
-func getTotalSchedulesCount(schedulesByChannel map[int][]*TravelSchedule) int {
-	total := 0
-	for _, schedules := range schedulesByChannel {
-		total += len(schedules)
-	}
-	return total
+	// // Get or create the schedule list for this channel
+	// channelSchedule := scheduleByChannel[channelIndex]
+	// // if channelSchedules == nil {
+	// // 	channelSchedules = make(*TravelSchedule, 0)
+	// // }
+
+	// // Append new schedule from this channel
+	// channelSchedule = schedule
+	scheduleByChannel[channelIndex] = schedule
+
+	// Track total packets received
+	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
+	totalPackets := totalPacketsVal + 1
+
+	// Update persistent state
+	want.StoreStateMulti(map[string]interface{}{
+		"schedules_by_channel":    scheduleByChannel,
+		"total_packets_received":  totalPackets,
+		"last_packet_time":        time.Now(),
+	})
+
+	return true
 }
 
 func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]interface{} {
 	// For travel coordinator, generate final itinerary from all channels
-	schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
-	schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
+	scheduleByChannelVal, _ := want.GetState("schedules_by_channel")
+	scheduleByChannel, ok := scheduleByChannelVal.(map[int]*TravelSchedule)
+	if !ok && scheduleByChannelVal != nil {
+		want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.GetStateUpdates: type assertion failed for schedules_by_channel. Expected map[int][]*TravelSchedule, got %T", scheduleByChannelVal))
+	}
 
 	stateUpdates := make(map[string]interface{})
 
-	if schedulesByChannel != nil && len(schedulesByChannel) > 0 {
+	if scheduleByChannel != nil && len(scheduleByChannel) > 0 {
 		// Combine all events from all channels
 		allEvents := make([]TimeSlot, 0)
-		for _, channelSchedules := range schedulesByChannel {
-			for _, schedule := range channelSchedules {
+		for _, schedule := range scheduleByChannel {
+			// for _, schedule := range channelSchedules {
 				allEvents = append(allEvents, schedule.Events...)
-			}
+			// }
 		}
 
 		if len(allEvents) > 0 {
