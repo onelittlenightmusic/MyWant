@@ -42,7 +42,7 @@ wants:
   # Travel coordinator (parent want) - "get one day travel"
   - metadata:
       name: get one day travel
-      type: travel coordinator
+      type: coordinator
       labels:
         role: coordinator
         category: travel
@@ -51,6 +51,7 @@ wants:
     spec:
       params:
         template: "One Day Travel Itinerary"
+        completion_timeout: 2
       using:
         - role: scheduler
           template: travel_itinerary
