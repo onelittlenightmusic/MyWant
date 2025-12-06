@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api test-buffet-restart test-all
 
 # Code quality targets
 fmt:
@@ -222,6 +222,75 @@ test-recipe-api:
 	@echo ""
 	@echo "✅ Recipe API test completed!"
 
+# Test Buffet Restart (Buffet to Restaurant Transition)
+test-buffet-restart:
+	@echo "🔄 Testing Buffet to Restaurant Transition..."
+	@echo "======================================================="
+	@echo ""
+	@echo "📋 Prerequisites:"
+	@echo "  ✓ MyWant server running on http://localhost:8080"
+	@echo ""
+	@echo "📌 Test Scenario:"
+	@echo "  1. Create Buffet + Coordinator with label selector"
+	@echo "  2. Verify both complete successfully"
+	@echo "  3. Delete Buffet want"
+	@echo "  4. Create Restaurant want with same label"
+	@echo "  5. Verify Coordinator receives Restaurant schedule"
+	@echo "  6. Verify finalResult matches between Restaurant and Coordinator"
+	@echo ""
+	@echo "🧪 Running buffet restart test..."
+	@echo ""
+	bash test/test_buffet_restart.sh
+	@echo ""
+	@echo "✅ Buffet restart test completed!"
+
+# Test All Server-Based Tests
+test-all: restart-all
+	@echo ""
+	@echo "🧪 Running All Server-Based Tests..."
+	@echo "======================================================="
+	@echo ""
+	@echo "⏳ Waiting for server startup..."
+	@sleep 7
+	@echo ""
+	@echo "📊 Test Suite:"
+	@echo ""
+
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "1️⃣  Running test-concurrent-deploy..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if $(MAKE) test-concurrent-deploy; then \
+		echo "✅ test-concurrent-deploy PASSED"; \
+	else \
+		echo "❌ test-concurrent-deploy FAILED"; \
+	fi
+	@echo ""
+	@sleep 2
+
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "2️⃣  Running test-buffet-restart..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if bash test/test_buffet_restart.sh; then \
+		echo "✅ test-buffet-restart PASSED"; \
+	else \
+		echo "❌ test-buffet-restart FAILED"; \
+	fi
+	@echo ""
+	@sleep 2
+
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "3️⃣  Running test-recipe-api..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if go run test_recipe_api.go; then \
+		echo "✅ test-recipe-api PASSED"; \
+	else \
+		echo "❌ test-recipe-api FAILED"; \
+	fi
+	@echo ""
+	@echo "======================================================="
+	@echo "✅ All server-based tests completed!"
+	@echo "======================================================="
+
 # Build the mywant server binary
 build-server:
 	@echo "🏗️  Building mywant server..."
@@ -366,6 +435,8 @@ help:
 	@echo "  test-dynamic-travel-with-flight-api  - Test dynamic travel with flight status changes (requires mock server running)"
 	@echo "  test-concurrent-deploy               - Test concurrent deployment (Travel Planner + Fibonacci)"
 	@echo "  test-llm-api                         - Test LLM inference API (configure via GPT_BASE_URL env var)"
+	@echo "  test-buffet-restart                  - Test buffet to restaurant transition with coordinator"
+	@echo "  test-all                             - Run all server-based tests (builds and starts servers)"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"
 	@echo "  run-travel-recipe     - Travel with recipe system"
