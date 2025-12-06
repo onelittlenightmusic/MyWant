@@ -74,11 +74,18 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
   echo "[$(date '+%H:%M:%S')] Elapsed: ${ELAPSED}s - Coordinator: $COORDINATOR_STATUS, Hotel: $HOTEL_STATUS, Restaurant: $RESTAURANT_STATUS, Buffet: $BUFFET_STATUS, Flight: $FLIGHT_STATUS"
 
   # Check if coordinator has achieved (this is what matters for rebook detection)
+  # Note: We need to verify it stays achieved, so we'll check multiple times
   if [[ "$COORDINATOR_STATUS" == "achieved" ]]; then
-    echo ""
-    echo "✅ Coordinator has reached 'achieved' status (all schedules received and finalized)"
-    COORDINATOR_ACHIEVED=true
-    break
+    # Wait a moment and verify coordinator is still achieved
+    sleep 1
+    VERIFY_STATUS=$(curl -s http://localhost:8080/api/v1/wants/$COORDINATOR_ID 2>/dev/null | jq -r '.status // "NOT_FOUND"')
+    if [[ "$VERIFY_STATUS" == "achieved" ]]; then
+      echo ""
+      echo "✅ Coordinator has reached 'achieved' status (all schedules received and finalized)"
+      COORDINATOR_ACHIEVED=true
+      ELAPSED=$((ELAPSED + 1))  # Account for verification sleep
+      break
+    fi
   fi
 
   sleep $POLL_INTERVAL
