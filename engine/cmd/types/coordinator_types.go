@@ -180,21 +180,60 @@ func (c *CoordinatorWant) Exec() bool {
 }
 
 // tryCompletion checks if all required data has been received and handles completion
-// This now uses channelsHeard (local tracking) instead of len(data_by_channel)
-// which eliminates the need for cache resets on topology changes
-// IMPORTANT: Never returns true - allows coordinator to continue listening for delayed packets (e.g., Rebook)
+// Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights)
+// Strategy:
+// 1. When all channels first send data, record the time
+// 2. Wait for the completion timeout to expire (allows delayed packets)
+// 3. Only then mark as completed and reset channelsHeard for potential new packets
 func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) bool {
-	// Apply state updates from data handler even if not all channels have sent yet
-	// This ensures data received so far is stored
+	// Apply state updates from data handler
 	stateUpdates := c.DataHandler.GetStateUpdates(c)
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
 
-	// IMPORTANT: Always return false to keep coordinator in "achieving" state
-	// This allows it to continue listening for delayed packets (e.g., Rebook flights)
-	// The coordinator never enters "completed" state - it keeps listening indefinitely
-	return false
+	// Check if we've heard from all connected channels
+	if len(channelsHeard) != inCount {
+		return false // Still waiting for data from some channels
+	}
+
+	// All channels have sent: check if enough time has passed for delayed packets
+	completionTimeout := c.DataHandler.GetCompletionTimeout()
+	if completionTimeout > 0 {
+		lastPacketTimeVal, exists := c.GetState("last_packet_time")
+		if !exists || lastPacketTimeVal == nil {
+			// First time all channels heard: record the time
+			c.StoreState("last_packet_time", time.Now().Unix())
+			return false // Wait for timeout
+		}
+
+		// Check if timeout has expired
+		lastPacketTime, ok := lastPacketTimeVal.(int64)
+		if !ok {
+			// Try to convert from float64 (can happen with JSON marshaling)
+			if f, ok := lastPacketTimeVal.(float64); ok {
+				lastPacketTime = int64(f)
+			} else {
+				lastPacketTime = time.Now().Unix()
+			}
+		}
+
+		elapsed := time.Now().Unix() - lastPacketTime
+		if elapsed < int64(completionTimeout.Seconds()) {
+			return false // Still waiting for timeout
+		}
+	}
+
+	// All conditions met for completion
+	completionKey := c.DataHandler.GetCompletionKey()
+	c.CompletionChecker.OnCompletion(c)
+	c.StoreState(completionKey, true)
+
+	// Reset channelsHeard for potential future packet arrivals (e.g., if test continues)
+	c.channelsHeard = make(map[int]bool)
+	c.StoreState("last_packet_time", nil)
+
+	return true
 }
 
 // checkAllChannelsRepresentedInCache verifies the data handler's cache has
