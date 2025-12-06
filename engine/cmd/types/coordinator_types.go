@@ -35,7 +35,6 @@ type CoordinatorWant struct {
 	DataHandler        DataHandler
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
-	paths              Paths
 	channelsHeard 		map[int]bool
 }
 
@@ -154,22 +153,53 @@ func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 	// outCount := c.GetOutCount()
 	// paths := c.GetPaths()
-	c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
+	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d", inCount))
 
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
 
-	// loop while receiving data packets
+	// Try to receive data packets
+	received := false
 	for {
 		// Try to receive one data packet from any input channel
-		channelIndex, data, received := c.ReceiveFromAnyInputChannel()
-		if received {
+		channelIndex, data, dataReceived := c.ReceiveFromAnyInputChannel()
+		if dataReceived {
 			// Data received: mark channel as heard and process it
 			c.channelsHeard[channelIndex] = true
 			c.DataHandler.ProcessData(c, channelIndex, data)
+			received = true
 		} else {
 			// No data available on any channel: exit loop
 			break
+		}
+	}
+
+	// If no data was received at all, retry up to 3 times with 0.5s wait
+	if !received && inCount > 0 {
+		maxRetries := 3
+		for retryCount := 0; retryCount < maxRetries; retryCount++ {
+			// Wait 0.5 seconds before retrying
+			time.Sleep(500 * time.Millisecond)
+
+			// Try to receive data packets again
+			for {
+				// Try to receive one data packet from any input channel
+				channelIndex, data, dataReceived := c.ReceiveFromAnyInputChannel()
+				if dataReceived {
+					// Data received: mark channel as heard and process it
+					c.channelsHeard[channelIndex] = true
+					c.DataHandler.ProcessData(c, channelIndex, data)
+					received = true
+				} else {
+					// No data available on any channel: exit loop
+					break
+				}
+			}
+
+			// If we received data on this retry, break out of retry loop
+			if received {
+				break
+			}
 		}
 	}
 
