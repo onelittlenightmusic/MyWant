@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"log"
 	. "mywant/engine/src"
 	"time"
 )
@@ -152,9 +153,6 @@ func (c *CoordinatorWant) GetWant() *Want {
 // This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
-	// outCount := c.GetOutCount()
-	// paths := c.GetPaths()
-	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
@@ -202,23 +200,32 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 	if completionTimeout > 0 {
 		lastPacketTimeVal, exists := c.GetState("last_packet_time")
 		if !exists || lastPacketTimeVal == nil {
-			// First time all channels heard: record the time
-			c.StoreState("last_packet_time", time.Now().Unix())
+			// First time all channels heard: record the time as Unix timestamp (int64)
+			nowUnix := time.Now().Unix()
+			c.StoreState("last_packet_time", nowUnix)
 			return false // Wait for timeout
 		}
 
 		// Check if timeout has expired
-		lastPacketTime, ok := lastPacketTimeVal.(int64)
-		if !ok {
-			// Try to convert from float64 (can happen with JSON marshaling)
-			if f, ok := lastPacketTimeVal.(float64); ok {
-				lastPacketTime = int64(f)
-			} else {
-				lastPacketTime = time.Now().Unix()
-			}
+		// Handle different types that lastPacketTime might be stored as (defensive against type variations)
+		var lastPacketTime int64
+		switch v := lastPacketTimeVal.(type) {
+		case int64:
+			lastPacketTime = v
+		case float64:
+			lastPacketTime = int64(v)
+		case time.Time:
+			// If somehow it was stored as time.Time, convert to Unix
+			lastPacketTime = v.Unix()
+		default:
+			// Reset and try again for unexpected types
+			nowUnix := time.Now().Unix()
+			c.StoreState("last_packet_time", nowUnix)
+			return false
 		}
 
-		elapsed := time.Now().Unix() - lastPacketTime
+		nowUnix := time.Now().Unix()
+		elapsed := nowUnix - lastPacketTime
 		if elapsed < int64(completionTimeout.Seconds()) {
 			return false // Still waiting for timeout
 		}

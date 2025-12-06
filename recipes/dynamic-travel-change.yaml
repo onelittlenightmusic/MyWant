@@ -101,7 +101,7 @@ recipe:
         params:
           display_name: display_name
           required_inputs: 4
-          completion_timeout: 10  # Wait time for delayed packets like flight rebooking
+          completion_timeout: 75  # Wait time for delayed packets like flight rebooking (60s monitoring + buffer)
         using:
           - role: scheduler
 
