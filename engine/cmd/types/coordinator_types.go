@@ -148,15 +148,10 @@ func (c *CoordinatorWant) GetWant() *Want {
 // When a new channel is added, the coordinator resets and waits again.
 // Completion is determined by checking the data handler's State cache (e.g., "schedules")
 // to verify it has packets from all connected channels.
-func (c *CoordinatorWant) Exec() bool {
+// ResetCacheIfTopologyChanged checks if input topology changed and resets cache if needed
+// This should be called right after path synchronization in reconciliation
+func (c *CoordinatorWant) ResetCacheIfTopologyChanged() {
 	inCount := c.GetInCount()
-	// outCount := c.GetOutCount()
-	// paths := c.GetPaths()
-	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
-
-	// CRITICAL: Reset cache if input topology changed
-	// When input connections change (e.g., want deletion/addition), clear old cached data
-	// to allow processing of new inputs instead of being stuck with old data
 	lastInCountVal, _ := c.GetState("_coordinator_last_in_count")
 	lastInCount, _ := lastInCountVal.(int)
 
@@ -167,8 +162,15 @@ func (c *CoordinatorWant) Exec() bool {
 		c.StoreState("total_packets_received", 0)
 	}
 
-	// Update current input count for next cycle
+	// Update current input count for next check
 	c.StoreState("_coordinator_last_in_count", inCount)
+}
+
+func (c *CoordinatorWant) Exec() bool {
+	inCount := c.GetInCount()
+	// outCount := c.GetOutCount()
+	// paths := c.GetPaths()
+	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
 	// loop while receiving data packets
 	for {
