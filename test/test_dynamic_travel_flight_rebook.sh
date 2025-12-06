@@ -14,62 +14,9 @@ sleep 1
 
 echo ""
 echo "=== Deploying Dynamic Travel System ==="
-PAYLOAD=$(cat <<'PAYLOAD_EOF'
-{
-  "wants": [
-    {
-      "metadata": {
-        "name": "restaurant",
-        "type": "restaurant",
-        "labels": {"role": "travel_provider"}
-      },
-      "spec": {
-        "params": {"restaurant_type": "fine dining"}
-      }
-    },
-    {
-      "metadata": {
-        "name": "hotel",
-        "type": "hotel",
-        "labels": {"role": "travel_provider"}
-      },
-      "spec": {
-        "params": {"hotel_type": "luxury"}
-      }
-    },
-    {
-      "metadata": {
-        "name": "buffet",
-        "type": "buffet",
-        "labels": {"role": "travel_provider"}
-      },
-      "spec": {
-        "params": {"buffet_type": "continental"}
-      }
-    },
-    {
-      "metadata": {
-        "name": "flight",
-        "type": "flight",
-        "labels": {"role": "travel_provider"}
-      },
-      "spec": {
-        "params": {}
-      }
-    },
-    {
-      "metadata": {
-        "name": "travel_coordinator",
-        "type": "travel_coordinator"
-      },
-      "spec": {
-        "using": [{"role": "travel_provider"}]
-      }
-    }
-  ]
-}
-PAYLOAD_EOF
-)
+
+# Create payload using JSON representation
+PAYLOAD='{"wants":[{"metadata":{"name":"restaurant","type":"restaurant","labels":{"role":"travel_provider"}},"spec":{"params":{"restaurant_type":"fine dining"}}},{"metadata":{"name":"hotel","type":"hotel","labels":{"role":"travel_provider"}},"spec":{"params":{"hotel_type":"luxury"}}},{"metadata":{"name":"buffet","type":"buffet","labels":{"role":"travel_provider"}},"spec":{"params":{"buffet_type":"continental"}}},{"metadata":{"name":"flight","type":"flight","labels":{"role":"travel_provider"}},"spec":{"params":{}}},{"metadata":{"name":"travel_coordinator","type":"coordinator","labels":{"role":"coordinator"}},"spec":{"using":[{"role":"travel_provider"}]}}]}'
 
 RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/wants \
   -H "Content-Type: application/json" \
@@ -83,8 +30,8 @@ echo ""
 echo "Coordinator ID: $COORDINATOR_ID"
 
 echo ""
-echo "Waiting for execution (7 seconds)..."
-sleep 7
+echo "Waiting for execution (10 seconds for flight rebook arrival)..."
+sleep 10
 
 echo ""
 echo "=== Checking Coordinator State ==="
