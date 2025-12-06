@@ -250,13 +250,18 @@ func (f *FlightWant) Exec() bool {
 		f.tryAgentExecution()
 
 		agentResult, hasResult := f.GetState("agent_result")
+		f.StoreLog(fmt.Sprintf("[REBOOK-DEBUG] hasResult=%v, agentResult=%v (type=%T)", hasResult, agentResult, agentResult))
+
 		if hasResult && agentResult != nil {
 			f.StoreLog("Rebooking succeeded")
 			agentSchedule := f.extractFlightSchedule(agentResult)
+			f.StoreLog(fmt.Sprintf("[REBOOK-DEBUG] Extracted schedule: %+v", agentSchedule))
+
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
 
 				// Send rebooked flight packet
+				f.StoreLog("[REBOOK-DEBUG] About to send rebooked packet")
 				f.sendFlightPacket(out, agentSchedule, "Rebooked")
 
 				// Restart monitoring for new flight
@@ -275,6 +280,8 @@ func (f *FlightWant) Exec() bool {
 
 	// === Phase 6: Completed ===
 	case PhaseCompleted:
+		// Clear agent_result to prevent reuse in next execution cycle
+		f.StoreState("agent_result", nil)
 		return true
 
 	default:

@@ -301,6 +301,8 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 
 	// Update state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework
+	// IMPORTANT: Do NOT clear agent_result here - it's needed for rebooking phase to detect
+	// that a new agent execution is required. Only clear after rebooking is complete.
 	want.StoreStateMulti(map[string]interface{}{
 		"flight_status":          "canceled",
 		"status_message":         "Flight canceled by agent",
@@ -309,7 +311,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		"previous_flight_status": "canceled",
 		"flight_id":              "",
 		"attempted":              false,
-		"agent_result":           nil,
+		// DO NOT SET agent_result: nil here!
 	})
 
 	// Record activity description for agent history
