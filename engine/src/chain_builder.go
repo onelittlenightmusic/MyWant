@@ -63,9 +63,10 @@ type ChainBuilder struct {
 	deleteWantsChan  chan []string          // Buffered channel for asynchronous want deletion requests (want IDs)
 	reconcileMutex   sync.RWMutex           // Protect concurrent access
 	inReconciliation bool                   // Flag to prevent recursive reconciliation
-	running          bool                   // Execution state
-	lastConfig       Config                 // Last known config state
-	lastConfigHash   string                 // Hash of last config for change detection
+	running            bool                   // Execution state
+	lastConfig         Config                 // Last known config state
+	lastConfigHash     string                 // Hash of last config for change detection
+	lastConfigFileHash string                 // Hash of config file for change detection (batch mode)
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -483,6 +484,22 @@ func (cb *ChainBuilder) hasMemoryFileChanged() bool {
 	return currentHash != cb.lastConfigHash
 }
 
+// hasConfigFileChanged checks if config file has changed
+// Used in batch mode to detect updates to the original config file
+func (cb *ChainBuilder) hasConfigFileChanged() bool {
+	if cb.configPath == "" {
+		return false
+	}
+
+	currentHash, err := cb.calculateFileHash(cb.configPath)
+	if err != nil {
+		return false
+	}
+
+	// Use a separate hash field for config file to avoid collision with memory file hash
+	return currentHash != cb.lastConfigFileHash
+}
+
 // loadMemoryConfig loads configuration from memory file or original config
 func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
 	// If memory path is configured and file exists, load from memory
@@ -573,17 +590,17 @@ func (cb *ChainBuilder) reconcileLoop() {
 				cb.reconcileWants()
 			}
 		case <-ticker.C:
-			// Skip memory file reload if in server mode with dynamic additions
-			// This prevents memory file from overwriting newly added wants via API
-			// In server mode, API is the source of truth, not the memory file
-			if cb.hasMemoryFileChanged() && !cb.isServerMode {
-				// Load memory file into config before reconciling (only in batch/CLI mode)
-				if newConfig, err := cb.loadMemoryConfig(); err == nil {
+			// In batch mode, watch config file for changes
+			// In server mode, skip file watching (API is the source of truth)
+			if !cb.isServerMode && cb.hasConfigFileChanged() {
+				// Load config from original config file (not from memory file)
+				// Memory file is only for persistence, not for reloading configuration
+				if newConfig, err := loadConfigFromYAML(cb.configPath); err == nil {
 					cb.config = newConfig
-				} else {
-					// Failed to load memory (logging removed)
+					// Update the hash after loading
+					cb.lastConfigFileHash, _ = cb.calculateFileHash(cb.configPath)
+					cb.reconcileWants()
 				}
-				cb.reconcileWants()
 			}
 		case <-statsTicker.C:
 			cb.writeStatsToMemory()
@@ -658,6 +675,8 @@ func (cb *ChainBuilder) compilePhase() error {
 	// updates to one appear to update both, breaking change detection
 	cb.lastConfig = cb.deepCopyConfig(newConfig)
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
+	// Also track config file hash for batch mode watching
+	cb.lastConfigFileHash, _ = cb.calculateFileHash(cb.configPath)
 
 	return nil
 }
