@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	"mywant/engine/src/chain"
 	"os"
 	"path/filepath"
@@ -200,6 +201,7 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	pathMap := make(map[string]*Paths)
 
 	// Initialize empty paths for all runtime wants
+	log.Printf("[RECONCILE:PATHS] generatePathsFromConnections() called with %d runtime wants\n", len(cb.wants))
 	for wantName := range cb.wants {
 		pathMap[wantName] = &Paths{
 			In:  []PathInfo{},
@@ -213,6 +215,8 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 		// Process using connections for this want
 		if len(want.GetSpec().Using) > 0 {
+			log.Printf("[RECONCILE:PATHS] Want '%s' (type: %s) has %d using selectors\n",
+				wantName, want.GetMetadata().Type, len(want.GetSpec().Using))
 		}
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
@@ -224,6 +228,8 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 				}
 				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 					matchCount++
+					log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
+						otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
 
 					// Create using path for current want
 					// Create a channel directly typed as chain.Chan
@@ -248,12 +254,16 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						Active:  true,
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
+					log.Printf("[RECONCILE:PATHS] Created output path for '%s': %s\n", otherName, outPath.Name)
 
 					// Log output connections from other wants to Flight
 					// if strings.Contains(otherName, "flight") {
 					// 	InfoLog("[FLIGHT-CONNECT] Want '%s' sending output to '%s' via channel: %s\n", otherName, wantName, outPath.Name)
 					// }
 				}
+			}
+			if matchCount == 0 {
+				log.Printf("[RECONCILE:PATHS] WARN: Want '%s' selector %v matched 0 wants!\n", wantName, usingSelector)
 			}
 		}
 	}
@@ -561,17 +571,12 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case newWants := <-cb.addWantsChan:
 			// Add wants to config and runtime
 			cb.reconcileMutex.Lock()
-			addedCount := 0
 			for _, want := range newWants {
 				// Allow multiple wants with the same name (they may be different instances)
 				cb.config.Wants = append(cb.config.Wants, want)
 				cb.addWant(want)
-				addedCount++
 			}
 			cb.reconcileMutex.Unlock()
-			if addedCount > 0 {
-				// Wants added (logging removed)
-			}
 			// Trigger reconciliation to connect and start new wants
 			cb.reconcileWants()
 		case wantIDs := <-cb.deleteWantsChan:
@@ -720,6 +725,7 @@ func (cb *ChainBuilder) connectPhase() error {
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
+	log.Printf("[RECONCILE:SYNC] Path generation complete. Synchronizing %d wants with their paths\n", len(cb.pathMap))
 
 	// CRITICAL FIX: Synchronize generated paths to individual Want structs
 	// This ensures child wants can access their output channels when they execute
@@ -730,7 +736,10 @@ func (cb *ChainBuilder) connectPhase() error {
 			// This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
+			log.Printf("[RECONCILE:SYNC] Synchronized paths for '%s': In=%d, Out=%d\n",
+				wantName, len(paths.In), len(paths.Out))
 		} else {
+			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}
 	}
 
