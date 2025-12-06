@@ -738,13 +738,6 @@ func (cb *ChainBuilder) connectPhase() error {
 			runtimeWant.want.paths.Out = paths.Out
 			log.Printf("[RECONCILE:SYNC] Synchronized paths for '%s': In=%d, Out=%d\n",
 				wantName, len(paths.In), len(paths.Out))
-
-			// Reset cache if input topology changed
-			// This is called immediately after path synchronization
-			// Want types that maintain caches (e.g., Coordinator) override ResetCacheIfTopologyChanged()
-			if listener, ok := runtimeWant.function.(TopologyChangeListener); ok {
-				listener.ResetCacheIfTopologyChanged()
-			}
 		} else {
 			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}

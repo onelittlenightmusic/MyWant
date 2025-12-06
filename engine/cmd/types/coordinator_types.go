@@ -145,39 +145,26 @@ func (c *CoordinatorWant) GetWant() *Want {
 // Exec executes the coordinator logic using unified completion strategy
 // Strategy: Each input channel must send at least one value. When all connected channels
 // have sent at least one value, the coordinator completes.
-// When a new channel is added, the coordinator resets and waits again.
-// Completion is determined by checking the data handler's State cache (e.g., "schedules")
-// to verify it has packets from all connected channels.
-// ResetCacheIfTopologyChanged checks if input topology changed and resets cache if needed
-// This should be called right after path synchronization in reconciliation
-func (c *CoordinatorWant) ResetCacheIfTopologyChanged() {
-	inCount := c.GetInCount()
-	lastInCountVal, _ := c.GetState("_coordinator_last_in_count")
-	lastInCount, _ := lastInCountVal.(int)
-
-	if lastInCount > 0 && inCount != lastInCount {
-		// Input topology changed - reset cache to process new inputs
-		c.StoreLog(fmt.Sprintf("[COORDINATOR-TOPOLOGY-CHANGE] Input count changed %d -> %d, clearing data cache", lastInCount, inCount))
-		c.StoreState("data_by_channel", make(map[int]interface{}))
-		c.StoreState("total_packets_received", 0)
-	}
-
-	// Update current input count for next check
-	c.StoreState("_coordinator_last_in_count", inCount)
-}
-
+// When a new channel is added, the coordinator automatically re-executes with the new channel.
+// Completion is determined by tracking which channels have sent data in the current execution cycle.
+// This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 	// outCount := c.GetOutCount()
 	// paths := c.GetPaths()
 	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
+	// Track which channels we've received data from in this execution cycle
+	// This is a local map - NOT persisted to state, only used for completion detection
+	channelsHeard := make(map[int]bool)
+
 	// loop while receiving data packets
 	for {
 		// Try to receive one data packet from any input channel
 		channelIndex, data, received := c.ReceiveFromAnyInputChannel()
 		if received {
-			// Data received: process it with channel information
+			// Data received: mark channel as heard and process it
+			channelsHeard[channelIndex] = true
 			c.DataHandler.ProcessData(c, channelIndex, data)
 		} else {
 			// No data available on any channel: exit loop
@@ -185,15 +172,19 @@ func (c *CoordinatorWant) Exec() bool {
 		}
 	}
 
-	// Check completion condition after each data reception (or when no data available)
-	return c.tryCompletion(inCount)
+	// Check completion: have we heard from all required input channels?
+	// This approach is simpler than len(data_by_channel) and automatically
+	// handles topology changes without needing cache resets
+	return c.tryCompletion(inCount, channelsHeard)
 }
 
 // tryCompletion checks if all required data has been received and handles completion
-func (c *CoordinatorWant) tryCompletion(inCount int) bool {
-	// Check if data handler's cache has packets from all connected channels
-	if !c.checkAllChannelsRepresentedInCache(inCount) {
-		return false // Still waiting for more data
+// This now uses channelsHeard (local tracking) instead of len(data_by_channel)
+// which eliminates the need for cache resets on topology changes
+func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) bool {
+	// Simple completion check: have we heard from all connected channels?
+	if len(channelsHeard) != inCount {
+		return false // Still waiting for data from some channels
 	}
 
 	// All channels have sent at least one value: mark completion
