@@ -249,19 +249,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		}
 	}
 
-	// Log path generation for coordinator and restaurant
-	for wantName, paths := range pathMap {
-		if strings.Contains(wantName, "coordinator") || strings.Contains(wantName, "restaurant") {
-			fmt.Printf("[PATH-GEN] Want '%s' has %d input paths and %d output paths\n", wantName, len(paths.In), len(paths.Out))
-			for i, inPath := range paths.In {
-				fmt.Printf("[PATH-GEN]   Input[%d]: %s\n", i, inPath.Name)
-			}
-			for i, outPath := range paths.Out {
-				fmt.Printf("[PATH-GEN]   Output[%d]: %s\n", i, outPath.Name)
-			}
-		}
-	}
-
 	// Convert pointers back to values for the return type
 	result := make(map[string]Paths)
 	for wantName, pathsPtr := range pathMap {
@@ -2728,6 +2715,19 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	for _, childName := range childrenToDelete {
 		cb.reconcileMutex.Lock()
 		cb.deleteWant(childName)
+
+		// Also remove child from config to keep it in sync with cb.wants
+		// Use ID-based comparison to avoid name collisions
+		if runtimeChild, exists := cb.wants[childName]; exists {
+			childID := runtimeChild.want.Metadata.ID
+			for i, cfgWant := range cb.config.Wants {
+				if cfgWant.Metadata.ID == childID {
+					cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
+					break
+				}
+			}
+		}
+
 		cb.reconcileMutex.Unlock()
 	}
 
@@ -2735,7 +2735,8 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.Lock()
 	cb.deleteWant(wantName)
 
-	// Also remove from config so subsequent reconciliation sees the deletion
+	// Also remove from config so detectConfigChanges sees the deletion
+	// Use ID-based comparison to ensure we delete only the correct want
 	for i, cfgWant := range cb.config.Wants {
 		if cfgWant.Metadata.ID == wantID {
 			cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
