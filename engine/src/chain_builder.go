@@ -249,18 +249,18 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		}
 	}
 
-	// Log which wants are connected to Flight want after path generation
-	// for wantName, paths := range pathMap {
-	// 	if strings.Contains(wantName, "flight") {
-	// 		InfoLog("[FLIGHT-PATHS] Want '%s' has %d input paths and %d output paths\n", wantName, len(paths.In), len(paths.Out))
-	// 		for i, inPath := range paths.In {
-	// 			InfoLog("[FLIGHT-PATHS]   Input[%d]: %s\n", i, inPath.Name)
-	// 		}
-	// 		for i, outPath := range paths.Out {
-	// 			InfoLog("[FLIGHT-PATHS]   Output[%d]: %s\n", i, outPath.Name)
-	// 		}
-	// 	}
-	// }
+	// Log path generation for coordinator and restaurant
+	for wantName, paths := range pathMap {
+		if strings.Contains(wantName, "coordinator") || strings.Contains(wantName, "restaurant") {
+			fmt.Printf("[PATH-GEN] Want '%s' has %d input paths and %d output paths\n", wantName, len(paths.In), len(paths.Out))
+			for i, inPath := range paths.In {
+				fmt.Printf("[PATH-GEN]   Input[%d]: %s\n", i, inPath.Name)
+			}
+			for i, outPath := range paths.Out {
+				fmt.Printf("[PATH-GEN]   Output[%d]: %s\n", i, outPath.Name)
+			}
+		}
+	}
 
 	// Convert pointers back to values for the return type
 	result := make(map[string]Paths)
@@ -574,6 +574,8 @@ func (cb *ChainBuilder) reconcileLoop() {
 			}
 			if deletedCount > 0 {
 				// Wants deleted (logging removed)
+				// Trigger reconciliation to regenerate paths after want deletion
+				cb.reconcileWants()
 			}
 		case <-ticker.C:
 			if cb.hasMemoryFileChanged() {
@@ -2732,6 +2734,15 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	// Phase 4: Delete the parent want (with write lock)
 	cb.reconcileMutex.Lock()
 	cb.deleteWant(wantName)
+
+	// Also remove from config so subsequent reconciliation sees the deletion
+	for i, cfgWant := range cb.config.Wants {
+		if cfgWant.Metadata.ID == wantID {
+			cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
+			break
+		}
+	}
+
 	cb.reconcileMutex.Unlock()
 
 	return nil
