@@ -154,7 +154,7 @@ func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 	// outCount := c.GetOutCount()
 	// paths := c.GetPaths()
-	c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
+	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
