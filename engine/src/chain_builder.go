@@ -86,6 +86,9 @@ type ChainBuilder struct {
 	labelToUsers        map[string][]string // label selector key → want names that use this label
 	wantCompletedFlags  map[string]bool     // want name → is completed?
 	completedFlagsMutex sync.RWMutex        // Protects wantCompletedFlags
+
+	// Server mode flag
+	isServerMode bool // True when running as API server (globalBuilder), false for batch/CLI mode
 }
 
 // runtimeWant holds the runtime state of a want
@@ -174,6 +177,11 @@ func (cb *ChainBuilder) SetCustomTargetRegistry(registry *CustomTargetTypeRegist
 // SetConfigInternal sets the config for the builder (for server mode)
 func (cb *ChainBuilder) SetConfigInternal(config Config) {
 	cb.config = config
+}
+
+// SetServerMode sets the server mode flag to prevent memory file reload conflicts
+func (cb *ChainBuilder) SetServerMode(isServer bool) {
+	cb.isServerMode = isServer
 }
 
 // matchesSelector checks if want labels match the selector criteria
@@ -565,8 +573,11 @@ func (cb *ChainBuilder) reconcileLoop() {
 				cb.reconcileWants()
 			}
 		case <-ticker.C:
-			if cb.hasMemoryFileChanged() {
-				// Load memory file into config before reconciling
+			// Skip memory file reload if in server mode with dynamic additions
+			// This prevents memory file from overwriting newly added wants via API
+			// In server mode, API is the source of truth, not the memory file
+			if cb.hasMemoryFileChanged() && !cb.isServerMode {
+				// Load memory file into config before reconciling (only in batch/CLI mode)
 				if newConfig, err := cb.loadMemoryConfig(); err == nil {
 					cb.config = newConfig
 				} else {

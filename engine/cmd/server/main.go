@@ -172,6 +172,7 @@ func NewServer(config ServerConfig) *Server {
 	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
+	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
 	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes
 
