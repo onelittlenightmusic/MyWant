@@ -36,6 +36,7 @@ type CoordinatorWant struct {
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
 	paths              Paths
+	channelsHeard 		map[int]bool
 }
 
 // NewCoordinatorWant creates a new generic coordinator want
@@ -59,6 +60,7 @@ func NewCoordinatorWant(
 	coordinator.DataHandler = dataHandler
 	coordinator.CompletionChecker = completionChecker
 	coordinator.CoordinatorType = coordinatorType
+	coordinator.channelsHeard = make(map[int]bool)
 
 	// Set fields for base Want methods
 	coordinator.WantType = coordinatorType
@@ -152,11 +154,10 @@ func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 	// outCount := c.GetOutCount()
 	// paths := c.GetPaths()
-	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
+	c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
-	channelsHeard := make(map[int]bool)
 
 	// loop while receiving data packets
 	for {
@@ -164,7 +165,7 @@ func (c *CoordinatorWant) Exec() bool {
 		channelIndex, data, received := c.ReceiveFromAnyInputChannel()
 		if received {
 			// Data received: mark channel as heard and process it
-			channelsHeard[channelIndex] = true
+			c.channelsHeard[channelIndex] = true
 			c.DataHandler.ProcessData(c, channelIndex, data)
 		} else {
 			// No data available on any channel: exit loop
@@ -175,7 +176,7 @@ func (c *CoordinatorWant) Exec() bool {
 	// Check completion: have we heard from all required input channels?
 	// This approach is simpler than len(data_by_channel) and automatically
 	// handles topology changes without needing cache resets
-	return c.tryCompletion(inCount, channelsHeard)
+	return c.tryCompletion(inCount, c.channelsHeard)
 }
 
 // tryCompletion checks if all required data has been received and handles completion

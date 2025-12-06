@@ -118,11 +118,12 @@ func (g *Numbers) Exec() bool {
 	if g.currentCount >= paramCount {
 		// Store generation stats to state (for memory dump)
 		g.StoreStateMulti(map[string]interface{}{
-			"total_processed":   g.currentCount,
-			"average_wait_time": 0.0, // Generators don't have wait time
-			"total_wait_time":   0.0,
-			"current_time":      g.currentTime,
-			"current_count":     g.currentCount,
+			"total_processed":      g.currentCount,
+			"average_wait_time":    0.0, // Generators don't have wait time
+			"total_wait_time":      0.0,
+			"current_time":         g.currentTime,
+			"current_count":        g.currentCount,
+			"achieving_percentage": 100,
 		})
 
 		out <- QueuePacket{Num: -1, Time: 0}
@@ -152,6 +153,20 @@ func (g *Numbers) Exec() bool {
 
 	out <- QueuePacket{Num: g.currentCount, Time: g.currentTime}
 	return false
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for Numbers generator
+// Returns (currentCount / targetCount) * 100
+func (g *Numbers) CalculateAchievingPercentage() int {
+	paramCount := g.GetIntParam("count", g.Count)
+	if paramCount <= 0 {
+		return 0
+	}
+	percentage := (g.currentCount * 100) / paramCount
+	if percentage > 100 {
+		percentage = 100
+	}
+	return percentage
 }
 
 // Queue processes packets with a service time
@@ -307,9 +322,29 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 		"total_processed":          q.processedCount,
 		"total_wait_time":          q.waitTimeSum,
 		"current_server_free_time": q.serverFreeTime,
+		"achieving_percentage":     100,
 	})
 
 	return nil
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for Queue
+// For streaming queue, returns 100 when complete (all packets processed)
+// During streaming, this is calculated indirectly through packet count tracking
+func (q *Queue) CalculateAchievingPercentage() int {
+	// Queue is a streaming processor - returns 100 when termination is received
+	// The percentage is implicitly tracked by processedCount during streaming
+	completed, _ := q.GetStateBool("completed", false)
+	if completed {
+		return 100
+	}
+	// For streaming queue, we can't easily determine total expected packets
+	// So we return percentage based on whether any packets have been processed
+	if q.processedCount > 0 {
+		// Streaming mode: return 100 only when complete
+		return 50 // Indicate partial progress while streaming
+	}
+	return 0
 }
 
 // Combiner merges multiple using streams
@@ -486,12 +521,27 @@ func (s *Sink) Exec() bool {
 func (s *Sink) OnEnded(packet mywant.Packet) error {
 	// Store final state
 	s.StoreStateMulti(map[string]interface{}{
-		"total_processed":   s.Received,
-		"average_wait_time": 0.0, // Sinks don't add wait time
-		"total_wait_time":   0.0,
+		"total_processed":      s.Received,
+		"average_wait_time":    0.0, // Sinks don't add wait time
+		"total_wait_time":      0.0,
+		"achieving_percentage": 100,
 	})
 
 	return nil
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for Sink
+// Returns 100 when all packets have been collected (completion)
+func (s *Sink) CalculateAchievingPercentage() int {
+	completed, _ := s.GetStateBool("completed", false)
+	if completed {
+		return 100
+	}
+	// While streaming, indicate partial progress
+	if s.Received > 0 {
+		return 50
+	}
+	return 0
 }
 
 // RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder

@@ -185,6 +185,7 @@ func (r *RestaurantWant) Exec() bool {
 		"reservation_duration_hours": duration.Hours(),
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
+		"achieving_percentage":       100,
 	})
 
 	// Send to output channel only if available
@@ -255,6 +256,16 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	}
 
 	return nil
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant
+// Returns 100 if the restaurant has been attempted/executed, 0 otherwise
+func (r *RestaurantWant) CalculateAchievingPercentage() int {
+	attempted, _ := r.GetStateBool("attempted", false)
+	if attempted {
+		return 100
+	}
+	return 0
 }
 
 // executeMonitorRestaurant executes the MonitorRestaurant agent to check for existing state
@@ -554,12 +565,13 @@ func (h *HotelWant) Exec() bool {
 
 	// Store stats using thread-safe StoreState
 	h.StoreStateMulti(map[string]interface{}{
-		"total_processed":     1,
-		"hotel_type":          hotelType,
-		"check_in_time":       newEvent.Start.Format("15:04 Jan 2"),
-		"check_out_time":      newEvent.End.Format("15:04 Jan 2"),
-		"stay_duration_hours": newEvent.End.Sub(newEvent.Start).Hours(),
-		"reservation_name":    newEvent.Name,
+		"total_processed":      1,
+		"hotel_type":           hotelType,
+		"check_in_time":        newEvent.Start.Format("15:04 Jan 2"),
+		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
+		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
+		"reservation_name":     newEvent.Name,
+		"achieving_percentage": 100,
 	})
 
 	// Send to output channel only if available
@@ -568,6 +580,16 @@ func (h *HotelWant) Exec() bool {
 	}
 
 	return true
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for HotelWant
+// Returns 100 if the hotel has been attempted/executed, 0 otherwise
+func (h *HotelWant) CalculateAchievingPercentage() int {
+	attempted, _ := h.GetStateBool("attempted", false)
+	if attempted {
+		return 100
+	}
+	return 0
 }
 
 // tryAgentExecution attempts to execute hotel reservation using the agent system
@@ -755,12 +777,13 @@ func (b *BuffetWant) Exec() bool {
 
 	// Store stats using thread-safe StoreState
 	b.StoreStateMulti(map[string]interface{}{
-		"total_processed":       1,
-		"buffet_type":           buffetType,
-		"buffet_start_time":     newEvent.Start.Format("15:04 Jan 2"),
-		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
-		"buffet_duration_hours": duration.Hours(),
-		"reservation_name":      newEvent.Name,
+		"total_processed":        1,
+		"buffet_type":            buffetType,
+		"buffet_start_time":      newEvent.Start.Format("15:04 Jan 2"),
+		"buffet_end_time":        newEvent.End.Format("15:04 Jan 2"),
+		"buffet_duration_hours":  duration.Hours(),
+		"reservation_name":       newEvent.Name,
+		"achieving_percentage":   100,
 	})
 
 	// Send to output channel only if available
@@ -769,6 +792,16 @@ func (b *BuffetWant) Exec() bool {
 	}
 
 	return true
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for BuffetWant
+// Returns 100 if the buffet has been attempted/executed, 0 otherwise
+func (b *BuffetWant) CalculateAchievingPercentage() int {
+	attempted, _ := b.GetStateBool("attempted", false)
+	if attempted {
+		return 100
+	}
+	return 0
 }
 
 // tryAgentExecution attempts to execute buffet reservation using the agent system
