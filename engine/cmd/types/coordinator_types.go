@@ -182,27 +182,19 @@ func (c *CoordinatorWant) Exec() bool {
 // tryCompletion checks if all required data has been received and handles completion
 // This now uses channelsHeard (local tracking) instead of len(data_by_channel)
 // which eliminates the need for cache resets on topology changes
+// IMPORTANT: Never returns true - allows coordinator to continue listening for delayed packets (e.g., Rebook)
 func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) bool {
-	// Simple completion check: have we heard from all connected channels?
-	if len(channelsHeard) != inCount {
-		return false // Still waiting for data from some channels
-	}
-
-	// All channels have sent at least one value: mark completion
-	completionKey := c.DataHandler.GetCompletionKey()
-
-	// Let the completion checker perform final processing
-	c.CompletionChecker.OnCompletion(c)
-
-	// Apply any state updates from data handler
+	// Apply state updates from data handler even if not all channels have sent yet
+	// This ensures data received so far is stored
 	stateUpdates := c.DataHandler.GetStateUpdates(c)
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
 
-	// Mark as completed
-	c.StoreState(completionKey, true)
-	return true
+	// IMPORTANT: Always return false to keep coordinator in "achieving" state
+	// This allows it to continue listening for delayed packets (e.g., Rebook flights)
+	// The coordinator never enters "completed" state - it keeps listening indefinitely
+	return false
 }
 
 // checkAllChannelsRepresentedInCache verifies the data handler's cache has
