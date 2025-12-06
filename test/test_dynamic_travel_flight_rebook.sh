@@ -30,17 +30,17 @@ echo ""
 echo "Want ID: $WANT_ID"
 
 echo ""
-echo "Waiting for execution (7 seconds)..."
-sleep 7
-
+echo "=== Waiting for All Wants to Achieve 'achieved' Status ==="
+echo "This includes Flight's 60-second monitoring phase for rebook detection..."
 echo ""
-echo "=== Finding Coordinator Child Want ==="
 
-# List all wants to find the coordinator child
+# Maximum wait time (70 seconds to allow 60-second Flight monitoring + buffer)
+MAX_WAIT=70
+ELAPSED=0
+POLL_INTERVAL=2
+
+# First, find the coordinator want
 ALL_WANTS=$(curl -s http://localhost:8080/api/v1/wants)
-
-# Find coordinator want by looking for type "coordinator"
-# Note: Get the latest coordinator (if multiple exist from previous runs)
 COORDINATOR_ID=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "coordinator") | .metadata.id' | tail -1)
 
 if [[ -z "$COORDINATOR_ID" || "$COORDINATOR_ID" == "null" ]]; then
@@ -51,9 +51,50 @@ if [[ -z "$COORDINATOR_ID" || "$COORDINATOR_ID" == "null" ]]; then
 fi
 
 echo "Coordinator ID: $COORDINATOR_ID"
+echo ""
+
+# Polling loop to wait for all wants to achieve "achieved" status
+# We specifically wait for the coordinator to achieve since that's what matters for rebook detection
+COORDINATOR_ACHIEVED=false
+CHILD_WANTS_ACHIEVED=0
+TARGET_CHILD_WANTS=3  # restaurant, hotel, buffet (excluding flight which may not reach achieved)
+
+while [ $ELAPSED -lt $MAX_WAIT ]; do
+  ALL_WANTS=$(curl -s http://localhost:8080/api/v1/wants)
+
+  # Count coordinator achieved status
+  COORDINATOR_STATUS=$(echo "$ALL_WANTS" | jq -r ".wants[] | select(.metadata.id == \"$COORDINATOR_ID\") | .status" 2>/dev/null)
+
+  # Count key child wants
+  HOTEL_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "hotel") | .status' 2>/dev/null)
+  RESTAURANT_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "restaurant") | .status' 2>/dev/null)
+  BUFFET_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "buffet") | .status' 2>/dev/null)
+  FLIGHT_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "flight") | .status' 2>/dev/null)
+
+  echo "[$(date '+%H:%M:%S')] Elapsed: ${ELAPSED}s - Coordinator: $COORDINATOR_STATUS, Hotel: $HOTEL_STATUS, Restaurant: $RESTAURANT_STATUS, Buffet: $BUFFET_STATUS, Flight: $FLIGHT_STATUS"
+
+  # Check if coordinator has achieved (this is what matters for rebook detection)
+  if [[ "$COORDINATOR_STATUS" == "achieved" ]]; then
+    echo ""
+    echo "✅ Coordinator has reached 'achieved' status (all schedules received and finalized)"
+    COORDINATOR_ACHIEVED=true
+    break
+  fi
+
+  sleep $POLL_INTERVAL
+  ELAPSED=$((ELAPSED + POLL_INTERVAL))
+done
+
+if [ "$COORDINATOR_ACHIEVED" != "true" ]; then
+  echo ""
+  echo "⚠️  Timeout after ${MAX_WAIT}s waiting for coordinator to achieve 'achieved' status"
+  echo "Final state:"
+  curl -s http://localhost:8080/api/v1/wants | jq '.wants[] | {id: .metadata.id, type: .metadata.type, status: .status}'
+  exit 1
+fi
 
 echo ""
-echo "=== Checking Coordinator State ==="
+echo "=== Checking Coordinator Final State ==="
 WANT_RESPONSE=$(curl -s http://localhost:8080/api/v1/wants/$COORDINATOR_ID)
 
 FINAL_RESULT=$(echo "$WANT_RESPONSE" | jq -r '.state.finalResult // "NOT_FOUND"' 2>/dev/null)
@@ -62,21 +103,29 @@ STATUS=$(echo "$WANT_RESPONSE" | jq -r '.status // "NOT_FOUND"' 2>/dev/null)
 echo ""
 echo "=== Results ==="
 echo "Want Status: $STATUS"
-echo "Final Result: $FINAL_RESULT"
+echo ""
+echo "Final Result:"
+echo "$FINAL_RESULT"
 echo ""
 
-if echo "$FINAL_RESULT" | grep -q "Flight:"; then
-  echo "✅ SUCCESS: Coordinator finalResult contains complete itinerary with Flight"
+# Check for rebook information in the final result
+if echo "$FINAL_RESULT" | grep -q -i "rebook\|rebooking\|rebooked"; then
+  echo "✅ SUCCESS: Coordinator finalResult contains REBOOK information"
   echo ""
-  echo "Note: Rebook detection requires 60+ seconds (Flight monitoring timeout)"
-  echo "Current finalResult shows initial itinerary:"
-  echo "$FINAL_RESULT"
+  echo "Flight rebook detection was triggered successfully during the 60-second monitoring phase."
   exit 0
-else
-  echo "❌ FAILURE: Flight NOT found in finalResult"
+elif echo "$FINAL_RESULT" | grep -q "Flight:"; then
+  echo "⚠️  PARTIAL SUCCESS: Coordinator has Flight information but NO rebook detected"
   echo ""
-  echo "Expected to find 'Flight:' in finalResult but found:"
-  echo "$FINAL_RESULT"
+  echo "The coordinator received the flight schedule, but rebook was not triggered."
+  echo "This could mean:"
+  echo "  - Flight monitoring completed without detecting delays"
+  echo "  - Or rebook was triggered but not captured in finalResult"
+  exit 1
+else
+  echo "❌ FAILURE: Coordinator finalResult does not contain Flight or Rebook information"
+  echo ""
+  echo "Expected to find Flight and/or Rebook information in finalResult"
   echo ""
 
   echo "=== Want State Details ==="
