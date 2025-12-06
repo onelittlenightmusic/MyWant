@@ -13,10 +13,10 @@ done
 sleep 1
 
 echo ""
-echo "=== Deploying Dynamic Travel System ==="
+echo "=== Deploying Dynamic Travel Change Want ==="
 
-# Create payload using JSON representation
-PAYLOAD='{"wants":[{"metadata":{"name":"restaurant","type":"restaurant","labels":{"role":"travel_provider"}},"spec":{"params":{"restaurant_type":"fine dining"}}},{"metadata":{"name":"hotel","type":"hotel","labels":{"role":"travel_provider"}},"spec":{"params":{"hotel_type":"luxury"}}},{"metadata":{"name":"buffet","type":"buffet","labels":{"role":"travel_provider"}},"spec":{"params":{"buffet_type":"continental"}}},{"metadata":{"name":"flight","type":"flight","labels":{"role":"travel_provider"}},"spec":{"params":{}}},{"metadata":{"name":"travel_coordinator","type":"coordinator","labels":{"role":"coordinator"}},"spec":{"using":[{"role":"travel_provider"}]}}]}'
+# Deploy single dynamic travel change want
+PAYLOAD='{"wants":[{"metadata":{"name":"dynamic_travel","type":"dynamic travel change"},"spec":{"params":{}}}]}'
 
 RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/wants \
   -H "Content-Type: application/json" \
@@ -25,24 +25,24 @@ RESPONSE=$(curl -s -X POST http://localhost:8080/api/v1/wants \
 echo "Deployment response:"
 echo "$RESPONSE" | jq '.'
 
-COORDINATOR_ID=$(echo "$RESPONSE" | jq -r '.want_ids[-1]' 2>/dev/null)
+WANT_ID=$(echo "$RESPONSE" | jq -r '.want_ids[0]' 2>/dev/null)
 echo ""
-echo "Coordinator ID: $COORDINATOR_ID"
+echo "Want ID: $WANT_ID"
 
 echo ""
-echo "Waiting for execution (10 seconds for flight rebook arrival)..."
+echo "Waiting for execution (10 seconds)..."
 sleep 10
 
 echo ""
-echo "=== Checking Coordinator State ==="
-COORD_RESPONSE=$(curl -s http://localhost:8080/api/v1/wants/$COORDINATOR_ID)
+echo "=== Checking Want State ==="
+WANT_RESPONSE=$(curl -s http://localhost:8080/api/v1/wants/$WANT_ID)
 
-FINAL_RESULT=$(echo "$COORD_RESPONSE" | jq -r '.state.finalResult // "NOT_FOUND"' 2>/dev/null)
-STATUS=$(echo "$COORD_RESPONSE" | jq -r '.status // "NOT_FOUND"' 2>/dev/null)
+FINAL_RESULT=$(echo "$WANT_RESPONSE" | jq -r '.state.finalResult // "NOT_FOUND"' 2>/dev/null)
+STATUS=$(echo "$WANT_RESPONSE" | jq -r '.status // "NOT_FOUND"' 2>/dev/null)
 
 echo ""
 echo "=== Results ==="
-echo "Coordinator Status: $STATUS"
+echo "Want Status: $STATUS"
 echo "Final Result: $FINAL_RESULT"
 echo ""
 
@@ -55,11 +55,9 @@ else
   echo "Expected to find 'Rebook' in finalResult but found:"
   echo "$FINAL_RESULT"
   echo ""
-  
-  echo "=== Investigating Issue ==="
-  echo ""
-  echo "Checking all wants states:"
-  curl -s http://localhost:8080/api/v1/wants | jq '.wants[] | {id: .metadata.id, name: .metadata.name, status: .status, state: .state}' 2>/dev/null
-  
+
+  echo "=== Want State Details ==="
+  echo "$WANT_RESPONSE" | jq '.state'
+
   exit 1
 fi
