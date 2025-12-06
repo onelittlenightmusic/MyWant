@@ -738,27 +738,6 @@ func (cb *ChainBuilder) connectPhase() error {
 			runtimeWant.want.paths.Out = paths.Out
 			log.Printf("[RECONCILE:SYNC] Synchronized paths for '%s': In=%d, Out=%d\n",
 				wantName, len(paths.In), len(paths.Out))
-
-			// CRITICAL: Reset Coordinator cache if input connections changed
-			// When input topology changes (e.g., Buffet deleted, Restaurant added),
-			// Coordinator must clear old cached data to process new inputs
-			if runtimeWant.want.Metadata.Type == "coordinator" {
-				// Check if input count changed
-				lastInCountVal, _ := runtimeWant.want.GetState("_last_in_count")
-				lastInCount, _ := lastInCountVal.(int)
-				currentInCount := len(paths.In)
-
-				if lastInCount != currentInCount && lastInCount > 0 {
-					// Input topology changed - reset Coordinator cache
-					log.Printf("[RECONCILE:CACHE-RESET] Coordinator '%s' input count changed: %d -> %d, clearing data cache\n",
-						wantName, lastInCount, currentInCount)
-					runtimeWant.want.StoreState("data_by_channel", make(map[int]interface{}))
-					runtimeWant.want.StoreState("total_packets_received", 0)
-				}
-
-				// Update last known input count
-				runtimeWant.want.StoreState("_last_in_count", currentInCount)
-			}
 		} else {
 			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}

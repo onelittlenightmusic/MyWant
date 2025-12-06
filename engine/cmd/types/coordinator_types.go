@@ -154,6 +154,22 @@ func (c *CoordinatorWant) Exec() bool {
 	// paths := c.GetPaths()
 	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
+	// CRITICAL: Reset cache if input topology changed
+	// When input connections change (e.g., want deletion/addition), clear old cached data
+	// to allow processing of new inputs instead of being stuck with old data
+	lastInCountVal, _ := c.GetState("_coordinator_last_in_count")
+	lastInCount, _ := lastInCountVal.(int)
+
+	if lastInCount > 0 && inCount != lastInCount {
+		// Input topology changed - reset cache to process new inputs
+		c.StoreLog(fmt.Sprintf("[COORDINATOR-TOPOLOGY-CHANGE] Input count changed %d -> %d, clearing data cache", lastInCount, inCount))
+		c.StoreState("data_by_channel", make(map[int]interface{}))
+		c.StoreState("total_packets_received", 0)
+	}
+
+	// Update current input count for next cycle
+	c.StoreState("_coordinator_last_in_count", inCount)
+
 	// loop while receiving data packets
 	for {
 		// Try to receive one data packet from any input channel
