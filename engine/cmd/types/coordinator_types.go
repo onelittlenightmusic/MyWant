@@ -154,14 +154,10 @@ func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 	// outCount := c.GetOutCount()
 	// paths := c.GetPaths()
-	// c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d", inCount))
+	c.StoreLog(fmt.Sprintf("[COORDINATOR-EXEC] GetInCount()=%d, GetOutCount()=%d, paths.In length=%d, paths.Out length=%d\n", inCount, outCount, len(paths.In), len(paths.Out)))
 
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
-
-	// Count consecutive received=false to trigger retries
-	consecutiveNoDataCount := 0
-	maxNoDataAllowed := 3
 
 	// loop while receiving data packets
 	for {
@@ -171,16 +167,9 @@ func (c *CoordinatorWant) Exec() bool {
 			// Data received: mark channel as heard and process it
 			c.channelsHeard[channelIndex] = true
 			c.DataHandler.ProcessData(c, channelIndex, data)
-			consecutiveNoDataCount = 0 // Reset counter on successful receive
 		} else {
-			// No data available on any channel
-			consecutiveNoDataCount++
-			if consecutiveNoDataCount >= maxNoDataAllowed {
-				// We've hit max retries, exit loop
-				break
-			}
-			// Wait 0.5 seconds before retrying
-			time.Sleep(500 * time.Millisecond)
+			// No data available on any channel: exit loop
+			break
 		}
 	}
 
