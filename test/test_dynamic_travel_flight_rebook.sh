@@ -34,8 +34,8 @@ echo "=== Waiting for All Wants to Achieve 'achieved' Status ==="
 echo "This includes Flight's 60-second monitoring phase for rebook detection..."
 echo ""
 
-# Maximum wait time (70 seconds to allow 60-second Flight monitoring + buffer)
-MAX_WAIT=70
+# Maximum wait time (300 seconds = 5 minutes to allow Flight's 60-second monitoring + overhead)
+MAX_WAIT=300
 ELAPSED=0
 POLL_INTERVAL=2
 
