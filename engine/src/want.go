@@ -1224,3 +1224,10 @@ func (w *Want) GetMetadata() *Metadata {
 	return &w.Metadata
 }
 
+// ResetCacheIfTopologyChanged is a hook method called when want topology changes
+// Default implementation does nothing - want types that maintain caches can override this
+// to reset their caches when input/output connections change
+func (w *Want) ResetCacheIfTopologyChanged() {
+	// Default no-op implementation for most want types
+}
+
