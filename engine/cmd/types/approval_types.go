@@ -87,6 +87,7 @@ func (e *EvidenceWant) Exec() bool {
 		"approval_id":          e.ApprovalID,
 		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
 		"total_processed":      1,
+		"achieving_percentage": 100,
 	})
 
 	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.GetOutCount()))
@@ -101,6 +102,16 @@ func (e *EvidenceWant) Exec() bool {
 	}
 	e.SendPacketMulti(evidenceData, outputs)
 	return true
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant
+// Returns 100 if evidence has been provided, 0 otherwise
+func (e *EvidenceWant) CalculateAchievingPercentage() int {
+	provided, _ := e.GetStateBool("evidence_provided", false)
+	if provided {
+		return 100
+	}
+	return 0
 }
 
 // DescriptionWant provides description data for approval processes
@@ -168,6 +179,7 @@ func (d *DescriptionWant) Exec() bool {
 		"description":             description,
 		"description_provided_at": descriptionData.Timestamp.Format(time.RFC3339),
 		"total_processed":         1,
+		"achieving_percentage":    100,
 	})
 
 	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.GetOutCount()))
@@ -182,6 +194,16 @@ func (d *DescriptionWant) Exec() bool {
 	}
 	d.SendPacketMulti(descriptionData, outputs)
 	return true
+}
+
+// CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant
+// Returns 100 if description has been provided, 0 otherwise
+func (d *DescriptionWant) CalculateAchievingPercentage() int {
+	provided, _ := d.GetStateBool("description_provided", false)
+	if provided {
+		return 100
+	}
+	return 0
 }
 
 // Level1CoordinatorWant handles Level 1 approval coordination

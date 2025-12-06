@@ -697,6 +697,30 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	return defaultValue, false
 }
 
+// CalculateAchievingPercentage computes the progress percentage toward completion.
+// This is a virtual method that want type implementations should override to provide
+// type-specific completion percentage calculation.
+// Default implementation returns 0 unless the want has reached completion status,
+// in which case it returns 100.
+// Want types should override this to provide meaningful progress indicators:
+//   - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%)
+//   - QueueWant: Calculate based on processedCount / total capacity
+//   - Numbers generator: Calculate based on currentCount / target count
+//   - Coordinator: Calculate based on channels heard / total required channels
+//   - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
+func (n *Want) CalculateAchievingPercentage() int {
+	// Default implementation: check if completed
+	// Want types should override this method for specific logic
+	switch n.Status {
+	case "completed", "achieved":
+		return 100
+	case "idle", "reaching", "suspended":
+		return 0
+	default:
+		return 0
+	}
+}
+
 // addAggregatedStateHistory creates a single history entry with complete state as YAML
 // Uses differential checking to prevent duplicate entries when state hasn't actually changed
 // Only creates a history entry if the state differs from the last recorded state
