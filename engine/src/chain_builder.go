@@ -1138,7 +1138,6 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
 
-
 	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
 	for _, want := range oldConfig.Wants {

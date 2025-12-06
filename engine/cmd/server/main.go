@@ -1004,10 +1004,11 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// Also update config if it was removed
-				if configIndex >= 0 {
-					execution.Builder.SetConfigInternal(execution.Config)
-				}
+				// NOTE: Do NOT call SetConfigInternal with partial execution config!
+				// API-created wants from different executions should not affect the global config.
+				// The global config is only for wants loaded from YAML files or recipe-based creation.
+				// Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
+				// This was the root cause of the bug where deleting buffet caused coordinator to be deleted.
 			} else {
 			}
 
