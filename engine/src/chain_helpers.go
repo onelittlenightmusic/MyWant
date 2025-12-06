@@ -100,7 +100,9 @@ func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
 	inCount := len(n.paths.In)
 
 	// Build select cases dynamically for all input channels from paths
+	// IMPORTANT: Must track the original channel index mapping!
 	cases := make([]reflect.SelectCase, 0, inCount+1)
+	channelIndexMap := make([]int, 0, inCount+1)  // Maps case index -> original channel index
 
 	for i := 0; i < inCount; i++ {
 		pathInfo := n.paths.In[i]
@@ -109,6 +111,7 @@ func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
 				Dir:  reflect.SelectRecv,
 				Chan: reflect.ValueOf(pathInfo.Channel),
 			})
+			channelIndexMap = append(channelIndexMap, i)  // Track which channel index this case corresponds to
 		}
 	}
 
@@ -121,6 +124,8 @@ func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
 	cases = append(cases, reflect.SelectCase{
 		Dir: reflect.SelectDefault,
 	})
+	// Default case doesn't map to a channel index, but we track it anyway
+	channelIndexMap = append(channelIndexMap, -1)
 
 	chosen, recv, recvOK := reflect.Select(cases)
 
@@ -130,9 +135,11 @@ func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
 	}
 
 	// If we got here, data was received
+	// IMPORTANT: Return the ORIGINAL channel index, not the case index!
 	if recvOK {
-		return chosen, recv.Interface(), true
+		originalIndex := channelIndexMap[chosen]
+		return originalIndex, recv.Interface(), true
 	}
 
-	return chosen, nil, false
+	return channelIndexMap[chosen], nil, false
 }

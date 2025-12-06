@@ -238,7 +238,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			want.StoreLog(fmt.Sprintf("State recorded (hash: %s)", currentStateHash[:8]))
 		} else {
 			// No status change - don't create history entry, but still update other flight details
-			want.StoreLog(fmt.Sprintf("Flight details changed but status is still: %s", newStatus))
+			// Removed verbose log: "Flight details changed but status is still: ..."
 			m.LastRecordedStateHash = currentStateHash
 		}
 		want.StoreStateMulti(updates)

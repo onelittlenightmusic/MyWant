@@ -226,6 +226,11 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					}
 					paths.In = append(paths.In, inPath)
 
+					// Log connection details, especially for Flight want
+					// if strings.Contains(wantName, "flight") {
+					// 	InfoLog("[FLIGHT-CONNECT] Flight want '%s' receiving input from '%s' on channel: %s\n", wantName, otherName, inPath.Name)
+					// }
+
 					// Create corresponding output path for the matching want
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
@@ -234,12 +239,28 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						Active:  true,
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
+
+					// Log output connections from other wants to Flight
+					// if strings.Contains(otherName, "flight") {
+					// 	InfoLog("[FLIGHT-CONNECT] Want '%s' sending output to '%s' via channel: %s\n", otherName, wantName, outPath.Name)
+					// }
 				}
-			}
-			if matchCount == 0 {
 			}
 		}
 	}
+
+	// Log which wants are connected to Flight want after path generation
+	// for wantName, paths := range pathMap {
+	// 	if strings.Contains(wantName, "flight") {
+	// 		InfoLog("[FLIGHT-PATHS] Want '%s' has %d input paths and %d output paths\n", wantName, len(paths.In), len(paths.Out))
+	// 		for i, inPath := range paths.In {
+	// 			InfoLog("[FLIGHT-PATHS]   Input[%d]: %s\n", i, inPath.Name)
+	// 		}
+	// 		for i, outPath := range paths.Out {
+	// 			InfoLog("[FLIGHT-PATHS]   Output[%d]: %s\n", i, outPath.Name)
+	// 		}
+	// 	}
+	// }
 
 	// Convert pointers back to values for the return type
 	result := make(map[string]Paths)

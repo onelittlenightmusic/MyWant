@@ -124,9 +124,9 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		}
 	}
 
-	// Get completion timeout parameter (default: 60 seconds)
-	// This allows time for delayed packets like Flight rebooking (delay detection ~50s)
-	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 60)
+	// Get completion timeout parameter (default: 0 seconds = immediate completion)
+	// Set to non-zero (e.g., 60) to wait for delayed packets like Flight rebooking
+	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 0)
 	completionTimeout := time.Duration(completionTimeoutSeconds) * time.Second
 
 	return requiredInputs,
@@ -230,11 +230,10 @@ func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 			if lastPacketTime, ok := lastPacketTimeVal.(time.Time); ok {
 				timeSinceLastPacket := time.Since(lastPacketTime)
 				if timeSinceLastPacket < completionTimeout {
-					c.StoreLog(fmt.Sprintf("[DEBUG] Coordinator waiting for more packets (%.1fs since last packet, need %.1fs)", timeSinceLastPacket.Seconds(), completionTimeout.Seconds()))
+					// Waiting for completion timeout - removed verbose debug log
 					return false
 				}
-				totalPacketsVal, _ := c.GetStateInt("total_packets_received", 0)
-				c.StoreLog(fmt.Sprintf("[DEBUG] Coordinator completing: received %d packets from %d channels, %.1fs since last packet", totalPacketsVal, dataCount, timeSinceLastPacket.Seconds()))
+				// Coordinator completing - removed verbose debug log
 			}
 		}
 	}

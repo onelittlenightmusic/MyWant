@@ -57,8 +57,6 @@ recipe:
           duration_hours: flight_duration
         requires:
           - create_flight
-        using:
-          - role: orchestrator
 
     # Dinner restaurant reservation with agent processing
     - metadata:
@@ -103,6 +101,7 @@ recipe:
         params:
           display_name: display_name
           required_inputs: 4
+          completion_timeout: 10  # Wait time for delayed packets like flight rebooking
         using:
           - role: scheduler
 

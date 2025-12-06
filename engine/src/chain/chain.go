@@ -50,7 +50,7 @@ func (c *C_chain) Start(f func(Chan) bool) {
 		return
 	}
 	start := next_start()
-	c.In = make(chan Tuple)
+	c.In = make(chan Tuple, 10)
 	c.Ch_start = c.In
 	go func(ch1 Chan) {
 		start()
@@ -62,7 +62,7 @@ func (c *C_chain) Add(f func(Chan, Chan) bool) {
 	if c.In == nil {
 		//Start
 		start := next_start()
-		c.In = make(chan Tuple)
+		c.In = make(chan Tuple, 10)
 		c.Ch_start = c.In
 		go func(ch1 Chan) {
 			start()
@@ -108,7 +108,7 @@ func Chain() (start_func func(func(Chan) bool),
 			return
 		}
 		start := next_start()
-		in = make(chan Tuple)
+		in = make(chan Tuple, 10)
 		cstart = in
 		go func(ch1 Chan) {
 			start()

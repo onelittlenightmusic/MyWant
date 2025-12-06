@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	. "mywant/engine/src"
+	"mywant/engine/src/chain"
 	"time"
 )
 
@@ -124,9 +125,12 @@ const (
 // 6. Completed: Final state, return true to complete want
 func (f *FlightWant) Exec() bool {
 	out, connectionAvailable := f.GetFirstOutputChannel()
+	// f.StoreLog(fmt.Sprintf("[DEBUG-EXEC] GetFirstOutputChannel returned: available=%v, out=%v", connectionAvailable, out != nil))
 	if !connectionAvailable {
+		f.StoreLog("[DEBUG-EXEC] NO OUTPUT CHANNELS AVAILABLE - Returning complete (true)")
 		return true
 	}
+	// f.StoreLog("[DEBUG-EXEC] Output channels available - Proceeding with execution")
 
 	// Get current phase from state
 	phaseVal, _ := f.GetState("flight_phase")
@@ -294,26 +298,27 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		Events: []TimeSlot{flightEvent},
 	}
 
-	// Type-assert to channel and send
-	if ch, ok := out.(chan *TravelSchedule); ok {
+	// Send to output channel (if available)
+	// The channel is chain.Chan (which is chan Tuple), send directly without type assertion
+	if ch, ok := out.(chain.Chan); ok {
 		ch <- travelSchedule
-	} else if ch, ok := out.(chan interface{}); ok {
-		ch <- travelSchedule
+
+		f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
+			label,
+			schedule.ReservationName,
+			schedule.DepartureTime.Format("15:04 Jan 2"),
+			schedule.ArrivalTime.Format("15:04 Jan 2")))
+
+		f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
+			label,
+			travelSchedule.Date.Format("2006-01-02"),
+			len(travelSchedule.Events),
+			flightEvent.Name,
+			flightEvent.Start.Format("15:04:05"),
+			flightEvent.End.Format("15:04:05")))
+	} else {
+		f.StoreLog(fmt.Sprintf("[ERROR] sendFlightPacket: output channel type assertion failed. Expected chain.Chan, got %T", out))
 	}
-
-	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
-		label,
-		schedule.ReservationName,
-		schedule.DepartureTime.Format("15:04 Jan 2"),
-		schedule.ArrivalTime.Format("15:04 Jan 2")))
-
-	f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
-		label,
-		travelSchedule.Date.Format("2006-01-02"),
-		len(travelSchedule.Events),
-		flightEvent.Name,
-		flightEvent.Start.Format("15:04:05"),
-		flightEvent.End.Format("15:04:05")))
 }
 
 // tryAgentExecution attempts to execute flight booking using the agent system
