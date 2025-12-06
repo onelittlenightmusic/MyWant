@@ -30,12 +30,30 @@ echo ""
 echo "Want ID: $WANT_ID"
 
 echo ""
-echo "Waiting for execution (10 seconds)..."
-sleep 10
+echo "Waiting for execution (7 seconds)..."
+sleep 7
 
 echo ""
-echo "=== Checking Want State ==="
-WANT_RESPONSE=$(curl -s http://localhost:8080/api/v1/wants/$WANT_ID)
+echo "=== Finding Coordinator Child Want ==="
+
+# List all wants to find the coordinator child
+ALL_WANTS=$(curl -s http://localhost:8080/api/v1/wants)
+
+# Find coordinator want by looking for type "coordinator" in the child wants
+COORDINATOR_ID=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "coordinator" and (.metadata.id | contains("dynamic_travel"))) | .metadata.id' | head -1)
+
+if [[ -z "$COORDINATOR_ID" || "$COORDINATOR_ID" == "null" ]]; then
+  echo "❌ ERROR: Could not find coordinator child want"
+  echo "Available wants:"
+  echo "$ALL_WANTS" | jq '.wants[] | {id: .metadata.id, type: .metadata.type}'
+  exit 1
+fi
+
+echo "Coordinator ID: $COORDINATOR_ID"
+
+echo ""
+echo "=== Checking Coordinator State ==="
+WANT_RESPONSE=$(curl -s http://localhost:8080/api/v1/wants/$COORDINATOR_ID)
 
 FINAL_RESULT=$(echo "$WANT_RESPONSE" | jq -r '.state.finalResult // "NOT_FOUND"' 2>/dev/null)
 STATUS=$(echo "$WANT_RESPONSE" | jq -r '.status // "NOT_FOUND"' 2>/dev/null)
