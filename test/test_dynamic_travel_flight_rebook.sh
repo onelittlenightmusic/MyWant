@@ -53,48 +53,41 @@ fi
 echo "Coordinator ID: $COORDINATOR_ID"
 echo ""
 
-# Polling loop to wait for all wants to achieve "achieved" status
-# We specifically wait for the coordinator to achieve since that's what matters for rebook detection
-COORDINATOR_ACHIEVED=false
-CHILD_WANTS_ACHIEVED=0
-TARGET_CHILD_WANTS=3  # restaurant, hotel, buffet (excluding flight which may not reach achieved)
+# Polling loop to wait for ALL wants to achieve "achieved" status
+# Including Flight which has a 60-second monitoring phase for rebook detection
+ALL_WANTS_ACHIEVED=false
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
   ALL_WANTS=$(curl -s http://localhost:8080/api/v1/wants)
 
-  # Count coordinator achieved status
-  COORDINATOR_STATUS=$(echo "$ALL_WANTS" | jq -r ".wants[] | select(.metadata.id == \"$COORDINATOR_ID\") | .status" 2>/dev/null)
+  # Count total wants and achieved wants
+  TOTAL_WANTS=$(echo "$ALL_WANTS" | jq '.wants | length')
+  ACHIEVED_WANTS=$(echo "$ALL_WANTS" | jq '[.wants[] | select(.status == "achieved")] | length')
 
-  # Count key child wants
+  # Get individual want statuses for display
+  COORDINATOR_STATUS=$(echo "$ALL_WANTS" | jq -r ".wants[] | select(.metadata.id == \"$COORDINATOR_ID\") | .status" 2>/dev/null)
   HOTEL_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "hotel") | .status' 2>/dev/null)
   RESTAURANT_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "restaurant") | .status' 2>/dev/null)
   BUFFET_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "buffet") | .status' 2>/dev/null)
   FLIGHT_STATUS=$(echo "$ALL_WANTS" | jq -r '.wants[] | select(.metadata.type == "flight") | .status' 2>/dev/null)
 
-  echo "[$(date '+%H:%M:%S')] Elapsed: ${ELAPSED}s - Coordinator: $COORDINATOR_STATUS, Hotel: $HOTEL_STATUS, Restaurant: $RESTAURANT_STATUS, Buffet: $BUFFET_STATUS, Flight: $FLIGHT_STATUS"
+  echo "[$(date '+%H:%M:%S')] Elapsed: ${ELAPSED}s - Progress: $ACHIEVED_WANTS/$TOTAL_WANTS achieved | Coordinator: $COORDINATOR_STATUS, Hotel: $HOTEL_STATUS, Restaurant: $RESTAURANT_STATUS, Buffet: $BUFFET_STATUS, Flight: $FLIGHT_STATUS"
 
-  # Check if coordinator has achieved (this is what matters for rebook detection)
-  # Note: We need to verify it stays achieved, so we'll check multiple times
-  if [[ "$COORDINATOR_STATUS" == "achieved" ]]; then
-    # Wait a moment and verify coordinator is still achieved
-    sleep 1
-    VERIFY_STATUS=$(curl -s http://localhost:8080/api/v1/wants/$COORDINATOR_ID 2>/dev/null | jq -r '.status // "NOT_FOUND"')
-    if [[ "$VERIFY_STATUS" == "achieved" ]]; then
-      echo ""
-      echo "✅ Coordinator has reached 'achieved' status (all schedules received and finalized)"
-      COORDINATOR_ACHIEVED=true
-      ELAPSED=$((ELAPSED + 1))  # Account for verification sleep
-      break
-    fi
+  # Check if ALL wants have achieved status
+  if [ "$ACHIEVED_WANTS" -eq "$TOTAL_WANTS" ] && [ "$TOTAL_WANTS" -gt 0 ]; then
+    echo ""
+    echo "✅ ALL WANTS HAVE REACHED 'achieved' STATUS (including Flight's 60-second monitoring)"
+    ALL_WANTS_ACHIEVED=true
+    break
   fi
 
   sleep $POLL_INTERVAL
   ELAPSED=$((ELAPSED + POLL_INTERVAL))
 done
 
-if [ "$COORDINATOR_ACHIEVED" != "true" ]; then
+if [ "$ALL_WANTS_ACHIEVED" != "true" ]; then
   echo ""
-  echo "⚠️  Timeout after ${MAX_WAIT}s waiting for coordinator to achieve 'achieved' status"
+  echo "⚠️  Timeout after ${MAX_WAIT}s waiting for ALL wants to achieve 'achieved' status"
   echo "Final state:"
   curl -s http://localhost:8080/api/v1/wants | jq '.wants[] | {id: .metadata.id, type: .metadata.type, status: .status}'
   exit 1
