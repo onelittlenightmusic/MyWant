@@ -173,12 +173,19 @@ func (n *Want) SetStatus(status WantStatus) {
 			NewStatus: status,
 		}
 		n.GetSubscriptionSystem().Emit(context.Background(), event)
+
+		// Automatically notify ChainBuilder when want reaches achieved status
+		// This enables receiver wants (like Coordinators) to self-notify completion
+		if status == WantStatusAchieved {
+			n.NotifyCompletion()
+		}
 	}
 }
 
 // NotifyCompletion notifies the ChainBuilder that this want has achieved completion
-// This method should be called by receiver wants (like Coordinators) when they reach completion
-// Replaces the previous pattern of sender wanting UpdateCompletedFlag
+// Called automatically by SetStatus() when want reaches WantStatusAchieved
+// This enables wants (especially receivers like Coordinators) to self-notify completion
+// Replaces the previous pattern where senders would call UpdateCompletedFlag
 func (n *Want) NotifyCompletion() {
 	cb := GetGlobalChainBuilder()
 	if cb == nil {
