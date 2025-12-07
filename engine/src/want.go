@@ -1126,6 +1126,13 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 	}
 
 	n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
+
+	// Trigger retrigger check to allow achieved wants to re-execute with new packets
+	cb := GetGlobalChainBuilder()
+	if cb != nil {
+		cb.TriggerCompletedWantRetriggerCheck()
+	}
+
 	return nil
 }
 
