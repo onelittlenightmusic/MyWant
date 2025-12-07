@@ -185,6 +185,11 @@ func (n *Want) SetStatus(status WantStatus) {
 			if cb != nil {
 				cb.UpdateCompletedFlag(n.Metadata.Name, status)
 				log.Printf("[SET-STATUS] UpdateCompletedFlag called for '%s'\n", n.Metadata.Name)
+
+				// Trigger the retrigger check to process this completion
+				// This notifies dependent wants and re-executes them with new data
+				log.Printf("[SET-STATUS] Want '%s' achieved - triggering retrigger check\n", n.Metadata.Name)
+				cb.TriggerCompletedWantRetriggerCheck()
 			} else {
 				log.Printf("[SET-STATUS] WARNING: GlobalChainBuilder is nil for '%s'\n", n.Metadata.Name)
 			}
