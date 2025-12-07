@@ -2956,6 +2956,18 @@ func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantName string) []str
 // UpdateCompletedFlag updates the completed flag for a want based on its status
 // Called from Want.SetStatus() to track which wants are completed
 // Uses mutex to protect concurrent access
+// MarkWantCompleted is the new preferred method for wants to notify the ChainBuilder of completion
+// Called by receiver wants (e.g., Coordinators) when they reach completion state
+// Replaces the previous pattern where senders would call UpdateCompletedFlag
+func (cb *ChainBuilder) MarkWantCompleted(wantName string, status WantStatus) {
+	cb.completedFlagsMutex.Lock()
+	defer cb.completedFlagsMutex.Unlock()
+
+	isCompleted := (status == WantStatusAchieved)
+	cb.wantCompletedFlags[wantName] = isCompleted
+	log.Printf("[WANT-COMPLETED] Want '%s' notified completion with status=%s\n", wantName, status)
+}
+
 func (cb *ChainBuilder) UpdateCompletedFlag(wantName string, status WantStatus) {
 	cb.completedFlagsMutex.Lock()
 	defer cb.completedFlagsMutex.Unlock()

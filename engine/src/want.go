@@ -176,6 +176,19 @@ func (n *Want) SetStatus(status WantStatus) {
 	}
 }
 
+// NotifyCompletion notifies the ChainBuilder that this want has achieved completion
+// This method should be called by receiver wants (like Coordinators) when they reach completion
+// Replaces the previous pattern of sender wanting UpdateCompletedFlag
+func (n *Want) NotifyCompletion() {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return // No global builder available
+	}
+
+	// Notify ChainBuilder that this want is now completed
+	cb.MarkWantCompleted(n.Metadata.Name, n.Status)
+}
+
 // ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
 // This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety
 // and preventing deadlocks from external callers

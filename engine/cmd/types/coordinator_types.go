@@ -236,6 +236,10 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
 
+	// Notify ChainBuilder that this coordinator has reached completion
+	// This allows the coordinator to notify dependents of retrigger events
+	c.NotifyCompletion()
+
 	return true
 }
 
