@@ -1130,7 +1130,10 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 	// Trigger retrigger check to allow achieved wants to re-execute with new packets
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
+		n.StoreLog("[SEND:MULTI-RETRIGGER] Calling TriggerCompletedWantRetriggerCheck")
 		cb.TriggerCompletedWantRetriggerCheck()
+	} else {
+		n.StoreLog("[SEND:MULTI-RETRIGGER] WARNING: GetGlobalChainBuilder returned nil!")
 	}
 
 	return nil
