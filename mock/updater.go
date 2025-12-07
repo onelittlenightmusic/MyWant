@@ -67,12 +67,12 @@ func (u *StatusUpdater) ScheduleUpdates(reservationID string) {
 	}
 
 	// Schedule first update: details changed after 20 seconds
-	timer1 := time.AfterFunc(20*time.Second, func() {
+	timer1 := time.AfterFunc(5*time.Second, func() {
 		u.updateToDetailsChanged(reservationID)
 	})
 
 	// Schedule second update: delayed after 40 seconds (20 + 20)
-	timer2 := time.AfterFunc(40*time.Second, func() {
+	timer2 := time.AfterFunc(10*time.Second, func() {
 		u.updateToDelayed(reservationID)
 	})
 

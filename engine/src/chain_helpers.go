@@ -3,6 +3,7 @@ package mywant
 import (
 	"mywant/engine/src/chain"
 	"reflect"
+	"time"
 )
 
 // GetInputChannel returns input channel by index
@@ -91,7 +92,7 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 //   if ok {
 //       fmt.Printf("Received data from channel %d: %v\n", index, data)
 //   }
-func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
+func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interface{}, bool) {
 	// Access input channels directly from paths structure
 	if len(n.paths.In) == 0 {
 		return -1, nil, false
@@ -120,9 +121,10 @@ func (n *Want) ReceiveFromAnyInputChannel() (int, interface{}, bool) {
 		return -1, nil, false
 	}
 
+	timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
 	// Add default case for non-blocking behavior
 	cases = append(cases, reflect.SelectCase{
-		Dir: reflect.SelectDefault,
+		Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
 	})
 	// Default case doesn't map to a channel index, but we track it anyway
 	channelIndexMap = append(channelIndexMap, -1)

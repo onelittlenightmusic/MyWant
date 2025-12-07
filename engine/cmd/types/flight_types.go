@@ -34,7 +34,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 		// status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
 		// window expires, if no issues are detected, the FlightWant completes and notifies the
 		// parent Target want, allowing the entire travel plan to complete.
-		monitoringDuration: 60 * time.Second,
+		monitoringDuration: 30 * time.Second,
 	}
 
 	// Initialize base Want fields

@@ -142,9 +142,9 @@ func (f *FibonacciSequence) Exec() bool {
 	}
 
 	// Close any output channels (though this should be the end point)
-	for i := 0; i < f.paths.GetOutCount(); i++ {
-		close(f.paths.Out[i].Channel)
-	}
+	// for i := 0; i < f.paths.GetOutCount(); i++ {
+	// 	close(f.paths.Out[i].Channel)
+	// }
 
 	// Store final state - persist filtered slice and counts using StoreState only
 	f.StoreStateMulti(map[string]interface{}{
@@ -189,6 +189,5 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
 func RegisterFibonacciWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("fibonacci numbers", NewFibonacciNumbers)
-	builder.RegisterWantType("fibonacci sequence", NewFibonacciSequence)
 	builder.RegisterWantType("fibonacci filter", NewFibonacciFilter)
 }

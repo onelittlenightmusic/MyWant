@@ -2863,14 +2863,15 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	}
 
 	want := runtimeWant.want
-	InfoLog("[RETRIGGER-RECEIVER] Retriggering receiver want '%s' (ID: %s, Status: %s)\n", wantName, want.Metadata.ID, want.GetStatus())
+	// InfoLog("[RETRIGGER-RECEIVER] Retriggering receiver want '%s' (ID: %s, Status: %s)\n", wantName, want.Metadata.ID, want.GetStatus())
 
 	// Reset to Idle if it's achieved
 	if want.GetStatus() == WantStatusAchieved {
 		want.SetStatus(WantStatusIdle)
 		InfoLog("[RETRIGGER-RECEIVER] Successfully reset '%s' to Idle for re-execution\n", wantName)
+		// InfoLog("[RETRIGGER-RECEIVER] Verify status after reset: '%s' now has status %s\n", wantName, want.GetStatus())
 
-		// Queue a reconciliation trigger to re-execute
+		// Queue a reconciliation trigger to let the reconcile loop handle the retry
 		select {
 		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
 			InfoLog("[RETRIGGER-RECEIVER] Queued reconciliation trigger for '%s'\n", wantName)
@@ -2878,7 +2879,7 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 			// Channel full, ignore (next reconciliation cycle will handle it)
 		}
 	} else {
-		InfoLog("[RETRIGGER-RECEIVER] Receiver want '%s' is not achieved (status: %s), skipping retrigger\n", wantName, want.GetStatus())
+		// InfoLog("[RETRIGGER-RECEIVER] Receiver want '%s' is not achieved (status: %s), skipping retrigger\n", wantName, want.GetStatus())
 	}
 }
 
@@ -3032,7 +3033,7 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 		Type: "check_completed_retrigger",
 	}:
 		// Trigger sent successfully
-		InfoLog("[RETRIGGER:SEND] Non-blocking retrigger check trigger sent to reconcile loop\n")
+		// InfoLog("[RETRIGGER:SEND] Non-blocking retrigger check trigger sent to reconcile loop\n")
 	default:
 		// Channel is full (rare), trigger is already pending
 		InfoLog("[RETRIGGER:SEND] Warning: reconcileTrigger channel full, skipping trigger\n")

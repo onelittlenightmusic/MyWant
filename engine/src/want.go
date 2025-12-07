@@ -1109,8 +1109,8 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 	}
 
 	sentCount := 0
-	n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] paths.Out has %d outputs", len(paths.Out)))
-	for i, pathInfo := range paths.Out {
+	// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] paths.Out has %d outputs", len(paths.Out)))
+	for _, pathInfo := range paths.Out {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
 		}
@@ -1119,31 +1119,31 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 		select {
 		case pathInfo.Channel <- packet:
 			sentCount++
-			n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d, target: %s", i, pathInfo.TargetWantName))
+			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d, target: %s", i, pathInfo.TargetWantName))
 		default:
 			// Channel is full, try blocking send
 			pathInfo.Channel <- packet
 			sentCount++
-			n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d (blocking), target: %s", i, pathInfo.TargetWantName))
+			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d (blocking), target: %s", i, pathInfo.TargetWantName))
 		}
 	}
 
-	n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
+	// n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
 
 	// Trigger retrigger for each receiver that got the packet
 	// This is receiver-centric retrigger: if achieved want receives new packet, it should re-execute
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
-		for i, pathInfo := range paths.Out {
+		for _, pathInfo := range paths.Out {
 			if pathInfo.Channel == nil {
 				continue
 			}
 			targetWantName := pathInfo.TargetWantName
-			n.StoreLog(fmt.Sprintf("[SEND:MULTI-RETRIGGER] Retriggering receiver: %s (channel %d)", targetWantName, i))
+			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-RETRIGGER] Retriggering receiver: %s (channel %d)", targetWantName, i))
 			cb.RetriggerReceiverWant(targetWantName)
 		}
 	} else {
-		n.StoreLog("[SEND:MULTI-RETRIGGER] WARNING: GetGlobalChainBuilder returned nil!")
+		// n.StoreLog("[SEND:MULTI-RETRIGGER] WARNING: GetGlobalChainBuilder returned nil!")
 	}
 
 	return nil

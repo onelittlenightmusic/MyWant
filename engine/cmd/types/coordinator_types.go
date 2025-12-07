@@ -153,13 +153,23 @@ func (c *CoordinatorWant) GetWant() *Want {
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
+	c.StoreLog(fmt.Sprintf("[COORDINATOR] Started"))
+
+	// // CRITICAL: Reset channelsHeard at the start of each execution cycle
+	// // This ensures that when a coordinator is retriggered (e.g., to receive a rebooked packet),
+	// // it doesn't think it has already received all packets from the previous execution.
+	// // Without this reset, a retriggered coordinator would complete immediately.
+	// c.channelsHeard = make(map[int]bool)
+
 	// Track which channels we've received data from in this execution cycle
 	// This is a local map - NOT persisted to state, only used for completion detection
 
+	timeout := 2000
 	// loop while receiving data packets
 	for {
+		// time.Sleep(1000*time.Millisecond)
 		// Try to receive one data packet from any input channel
-		channelIndex, data, received := c.ReceiveFromAnyInputChannel()
+		channelIndex, data, received := c.ReceiveFromAnyInputChannel(timeout)
 		if received {
 			// Data received: mark channel as heard and process it
 			c.channelsHeard[channelIndex] = true
