@@ -1076,83 +1076,33 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 }
 
 // SendPacketMulti broadcasts a packet to all output channels
-// This method capsules multi-output broadcasting logic at the want level
-// Useful for scenarios where a want needs to provide output to multiple consumers
-// Example: Evidence provider sending evidence to multiple approval coordinators
-// Enhanced with retrigger logic: if a receiver is already achieved, mark it as completed
-// and trigger retrigger check so it can re-execute with the new packet data
-func (n *Want) SendPacketMulti(packet interface{}, outputs []Chan) error {
-	if len(outputs) == 0 {
+// This method sends packets through paths defined in the want's output paths
+// Each output path contains the channel and target want name
+func (n *Want) SendPacketMulti(packet interface{}) error {
+	// Get the Want's paths to access output channels
+	paths := n.GetPaths()
+	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
 	}
 
-	// Get the Want's paths to access TargetWantName for each output
-	paths := n.GetPaths()
-	if paths == nil || paths.Out == nil {
-		// Fallback: just send without retrigger logic
-		for i, out := range outputs {
-			if out == nil {
-				fmt.Printf("[WARN] Output channel %d is nil in SendPacketMulti\n", i)
-				continue
-			}
-			out <- packet
-		}
-		return nil
-	}
-
-	// Check channel buffer status before sending to optimize retrigger decision
-	// Only retrigger if channel is empty (no buffered packets waiting)
-	channelHasBuffer := make(map[Chan]bool)
-	for _, out := range outputs {
-		if out == nil {
-			continue
+	sentCount := 0
+	for _, pathInfo := range paths.Out {
+		if pathInfo.Channel == nil {
+			continue // Skip nil channels
 		}
 
-		// Non-blocking check: if channel is full, there's a buffered packet
+		// Send packet through the channel
 		select {
-		case out <- packet:
-			// Packet sent successfully, channel was not full
-			channelHasBuffer[out] = false
+		case pathInfo.Channel <- packet:
+			sentCount++
 		default:
-			// Channel is full (shouldn't happen with buffer size 10, but check anyway)
-			// Try again with blocking send
-			out <- packet
-			channelHasBuffer[out] = true
+			// Channel is full, try blocking send
+			pathInfo.Channel <- packet
+			sentCount++
 		}
 	}
 
-	// After sending, check if any receivers are already achieved
-	// If so, mark them as completed and trigger retrigger
-	cb := GetGlobalChainBuilder()
-	if cb == nil {
-		return nil // No global builder, skip retrigger logic
-	}
-
-	// Check each output path's target want
-	for i, pathInfo := range paths.Out {
-		if i >= len(outputs) || outputs[i] == nil {
-			continue
-		}
-
-		targetName := pathInfo.TargetWantName
-		if targetName == "" {
-			continue // No target want name, skip
-		}
-
-		// Check if target want is already achieved
-		if cb.IsCompleted(targetName) {
-			// Target is achieved, need to retrigger it so it can re-execute with new packet
-			// Only retrigger if channel doesn't have buffered packets (optimization)
-			if !channelHasBuffer[outputs[i]] {
-				InfoLog("[SEND:RETRIGGER] Target '%s' is achieved, triggering retrigger to re-execute with new packet\n", targetName)
-				cb.UpdateCompletedFlag(targetName, WantStatusAchieved) // Mark as completed again
-				cb.TriggerCompletedWantRetriggerCheck()                // Trigger retrigger check
-			} else {
-				InfoLog("[SEND:SKIP-RETRIGGER] Target '%s' is achieved but channel has buffered packets, skipping retrigger\n", targetName)
-			}
-		}
-	}
-
+	n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
 	return nil
 }
 

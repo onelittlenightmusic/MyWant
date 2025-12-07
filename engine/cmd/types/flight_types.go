@@ -305,30 +305,23 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		Events: []TimeSlot{flightEvent},
 	}
 
-	// Send to output channel (if available)
-	// The channel is Chan (which is chan Tuple)
-	if ch, ok := out.(Chan); ok {
-		// Use SendPacketMulti to send with retrigger logic
-		// This ensures that if the receiver is already achieved, it will be retriggered
-		outputs := []Chan{ch}
-		f.SendPacketMulti(travelSchedule, outputs)
+	// Send via SendPacketMulti which uses paths from want setup
+	// Paths.Out contains the channels configured during want initialization
+	f.SendPacketMulti(travelSchedule)
 
-		f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
-			label,
-			schedule.ReservationName,
-			schedule.DepartureTime.Format("15:04 Jan 2"),
-			schedule.ArrivalTime.Format("15:04 Jan 2")))
+	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
+		label,
+		schedule.ReservationName,
+		schedule.DepartureTime.Format("15:04 Jan 2"),
+		schedule.ArrivalTime.Format("15:04 Jan 2")))
 
-		f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
-			label,
-			travelSchedule.Date.Format("2006-01-02"),
-			len(travelSchedule.Events),
-			flightEvent.Name,
-			flightEvent.Start.Format("15:04:05"),
-			flightEvent.End.Format("15:04:05")))
-	} else {
-		f.StoreLog(fmt.Sprintf("[ERROR] sendFlightPacket: output channel type assertion failed. Expected chain.Chan, got %T", out))
-	}
+	f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
+		label,
+		travelSchedule.Date.Format("2006-01-02"),
+		len(travelSchedule.Events),
+		flightEvent.Name,
+		flightEvent.Start.Format("15:04:05"),
+		flightEvent.End.Format("15:04:05")))
 }
 
 // tryAgentExecution attempts to execute flight booking using the agent system

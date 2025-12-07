@@ -80,8 +80,8 @@ func (r *RestaurantWant) Exec() bool {
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel
-	out, connectionAvailable := r.GetFirstOutputChannel()
+	// Get connection availability status
+	_, connectionAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -109,7 +109,7 @@ func (r *RestaurantWant) Exec() bool {
 				Events: []TimeSlot{restaurantEvent},
 			}
 
-			r.SendPacketMulti(travelSchedule, []Chan{out})
+			r.SendPacketMulti(travelSchedule)
 		}
 
 		return true
@@ -191,7 +191,7 @@ func (r *RestaurantWant) Exec() bool {
 	// Send to output channel only if available
 	if connectionAvailable {
 		// Use SendPacketMulti to send with retrigger logic for achieved receivers
-		r.SendPacketMulti(newSchedule, []Chan{out})
+		r.SendPacketMulti(newSchedule)
 	}
 
 	return true
@@ -464,8 +464,8 @@ func (h *HotelWant) Exec() bool {
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel
-	out, connectionAvailable := h.GetFirstOutputChannel()
+	// Get connection availability status
+	_, connectionAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -493,7 +493,7 @@ func (h *HotelWant) Exec() bool {
 				Events: []TimeSlot{hotelEvent},
 			}
 
-			h.SendPacketMulti(travelSchedule, []Chan{out})
+			h.SendPacketMulti(travelSchedule)
 		}
 
 		return true
@@ -577,7 +577,7 @@ func (h *HotelWant) Exec() bool {
 
 	// Send to output channel only if available
 	if connectionAvailable {
-		h.SendPacketMulti(newSchedule, []Chan{out})
+		h.SendPacketMulti(newSchedule)
 	}
 
 	return true
@@ -682,8 +682,8 @@ func (b *BuffetWant) Exec() bool {
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 
-	// Get output channel
-	out, connectionAvailable := b.GetFirstOutputChannel()
+	// Get connection availability status
+	_, connectionAvailable := b.GetFirstOutputChannel()
 
 	if attempted {
 		return true
@@ -711,7 +711,7 @@ func (b *BuffetWant) Exec() bool {
 				Events: []TimeSlot{buffetEvent},
 			}
 
-			b.SendPacketMulti(travelSchedule, []Chan{out})
+			b.SendPacketMulti(travelSchedule)
 		}
 
 		return true
@@ -790,7 +790,7 @@ func (b *BuffetWant) Exec() bool {
 	// Send to output channel only if available
 	if connectionAvailable {
 		// Use SendPacketMulti to send with retrigger logic for achieved receivers
-		b.SendPacketMulti(newSchedule, []Chan{out})
+		b.SendPacketMulti(newSchedule)
 	}
 
 	return true

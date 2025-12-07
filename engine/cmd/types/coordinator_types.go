@@ -194,18 +194,20 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 		return false // Still waiting for data from some channels
 	}
 
-	// All channels have sent: check if enough time has passed for delayed packets
-	completionTimeout := c.DataHandler.GetCompletionTimeout()
-	if completionTimeout > 0 {
-		lastPacketTimeVal, exists := c.GetState("last_packet_time")
-		if !exists || lastPacketTimeVal == nil {
-			// First time all channels heard: record the time as Unix timestamp (int64)
-			nowUnix := time.Now().Unix()
-			c.StoreState("last_packet_time", nowUnix)
-			return false // Wait for timeout
-		}
+	// All channels have sent: record the first time (independent of timeout)
+	lastPacketTimeVal, exists := c.GetState("last_packet_time")
+	if !exists || lastPacketTimeVal == nil {
+		nowUnix := time.Now().Unix()
+		c.StoreState("last_packet_time", nowUnix)
+	}
 
-		// Check if timeout has expired
+	// Check if there's a completion timeout requirement
+	completionTimeout := c.DataHandler.GetCompletionTimeout()
+
+	if completionTimeout > 0 {
+		// Timeout is configured: need to wait for it to expire
+		lastPacketTimeVal, _ := c.GetState("last_packet_time")
+
 		// Handle different types that lastPacketTime might be stored as (defensive against type variations)
 		var lastPacketTime int64
 		switch v := lastPacketTimeVal.(type) {
@@ -217,7 +219,7 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 			// If somehow it was stored as time.Time, convert to Unix
 			lastPacketTime = v.Unix()
 		default:
-			// Reset and try again for unexpected types
+			// If somehow still nil/invalid, this shouldn't happen since we just set it above
 			nowUnix := time.Now().Unix()
 			c.StoreState("last_packet_time", nowUnix)
 			return false
@@ -225,19 +227,14 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 
 		nowUnix := time.Now().Unix()
 		elapsed := nowUnix - lastPacketTime
+
 		if elapsed < int64(completionTimeout.Seconds()) {
 			return false // Still waiting for timeout
 		}
 	}
-
-	// All conditions met for completion
 	completionKey := c.DataHandler.GetCompletionKey()
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
-
-	// Reset channelsHeard for potential future packet arrivals (e.g., if test continues)
-	c.channelsHeard = make(map[int]bool)
-	c.StoreState("last_packet_time", nil)
 
 	return true
 }
@@ -486,11 +483,18 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	totalPackets := totalPacketsVal + 1
 
 	// Update persistent state with generic key
-	want.StoreStateMulti(map[string]interface{}{
-		"data_by_channel":         dataByChannel,
-		"total_packets_received":  totalPackets,
-		"last_packet_time":        time.Now(),
-	})
+	// Don't overwrite last_packet_time if it's already been set (for timeout tracking)
+	stateUpdates := map[string]interface{}{
+		"data_by_channel":        dataByChannel,
+		"total_packets_received": totalPackets,
+	}
+
+	// Only set last_packet_time if it hasn't been set yet
+	if lastPacketTimeVal, exists := want.GetState("last_packet_time"); !exists || lastPacketTimeVal == nil {
+		stateUpdates["last_packet_time"] = time.Now().Unix()
+	}
+
+	want.StoreStateMulti(stateUpdates)
 
 	return true
 }

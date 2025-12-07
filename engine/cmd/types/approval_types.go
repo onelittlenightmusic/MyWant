@@ -93,14 +93,7 @@ func (e *EvidenceWant) Exec() bool {
 	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.GetOutCount()))
 
 	// Broadcast evidence to all output channels using SendPacketMulti
-	outputs := make([]Chan, e.GetOutCount())
-	for i := 0; i < e.GetOutCount(); i++ {
-		outChannel, available := e.GetOutputChannel(i)
-		if available {
-			outputs[i] = outChannel
-		}
-	}
-	e.SendPacketMulti(evidenceData, outputs)
+	e.SendPacketMulti(evidenceData)
 	return true
 }
 
@@ -185,14 +178,7 @@ func (d *DescriptionWant) Exec() bool {
 	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.GetOutCount()))
 
 	// Broadcast description to all output channels using SendPacketMulti
-	outputs := make([]Chan, d.GetOutCount())
-	for i := 0; i < d.GetOutCount(); i++ {
-		outChannel, available := d.GetOutputChannel(i)
-		if available {
-			outputs[i] = outChannel
-		}
-	}
-	d.SendPacketMulti(descriptionData, outputs)
+	d.SendPacketMulti(descriptionData)
 	return true
 }
 
