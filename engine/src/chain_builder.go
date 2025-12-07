@@ -1865,19 +1865,13 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 
 				if finished {
-
+	
 					// Update want status to completed
 					cb.reconcileMutex.RLock()
 					runtimeWant, exists := cb.wants[wantName]
 					cb.reconcileMutex.RUnlock()
 					if exists {
 						runtimeWant.want.SetStatus(WantStatusAchieved)
-					}
-
-					// Trigger reconciliation after want completes
-					// This allows Target wants that created children to be properly connected
-					// and allows idle children to be started
-					if err := cb.TriggerReconcile(); err != nil {
 					}
 
 					// Exit the execution loop - execution is complete
