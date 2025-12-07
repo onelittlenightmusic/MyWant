@@ -173,6 +173,16 @@ func (n *Want) SetStatus(status WantStatus) {
 			NewStatus: status,
 		}
 		n.GetSubscriptionSystem().Emit(context.Background(), event)
+
+		// Register completion in ChainBuilder for retrigger system
+		// When a want reaches WantStatusAchieved, mark it as completed
+		// This enables the retrigger mechanism to notify dependent wants
+		if status == WantStatusAchieved {
+			cb := GetGlobalChainBuilder()
+			if cb != nil {
+				cb.UpdateCompletedFlag(n.Metadata.Name, status)
+			}
+		}
 	}
 }
 
