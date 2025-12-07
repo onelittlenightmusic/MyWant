@@ -110,11 +110,6 @@ func (g *Numbers) Exec() bool {
 		g.State = make(map[string]interface{})
 	}
 
-	out, connectionAvailable := g.GetFirstOutputChannel()
-	if !connectionAvailable {
-		return true
-	}
-
 	if g.currentCount >= paramCount {
 		// Store generation stats to state (for memory dump)
 		g.StoreStateMulti(map[string]interface{}{
@@ -126,7 +121,7 @@ func (g *Numbers) Exec() bool {
 			"achieving_percentage": 100,
 		})
 
-		out <- QueuePacket{Num: -1, Time: 0}
+		g.SendPacketMulti(QueuePacket{Num: -1, Time: 0})
 		return true
 	}
 	g.currentCount++
@@ -151,7 +146,7 @@ func (g *Numbers) Exec() bool {
 		})
 	}
 
-	out <- QueuePacket{Num: g.currentCount, Time: g.currentTime}
+	g.SendPacketMulti(QueuePacket{Num: g.currentCount, Time: g.currentTime})
 	return false
 }
 
@@ -237,12 +232,6 @@ func (q *Queue) Exec() bool {
 		return true
 	}
 
-	// Get output channel
-	out, connectionAvailable := q.GetOutputChannel(0)
-	if !connectionAvailable {
-		return true
-	}
-
 	packet := (<-in).(QueuePacket)
 
 	// Check for termination packet and forward it
@@ -255,7 +244,7 @@ func (q *Queue) Exec() bool {
 			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
-		out <- packet
+		q.SendPacketMulti(packet)
 		return true
 	}
 
@@ -284,7 +273,7 @@ func (q *Queue) Exec() bool {
 		q.lastBatchCount = q.processedCount
 	}
 
-	out <- QueuePacket{Num: packet.Num, Time: finishTime}
+	q.SendPacketMulti(QueuePacket{Num: packet.Num, Time: finishTime})
 	return false
 }
 
@@ -398,10 +387,6 @@ func (c *Combiner) Exec() bool {
 	if c.paths.GetInCount() == 0 || c.paths.GetOutCount() == 0 {
 		return true
 	}
-	out, connectionAvailable := c.GetOutputChannel(0)
-	if !connectionAvailable {
-		return true
-	}
 
 	// Simple combiner: just forward all packets from all inputs
 	for i := 0; i < c.paths.GetInCount(); i++ {
@@ -419,12 +404,12 @@ func (c *Combiner) Exec() bool {
 					c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 				}
 				// Forward end signal to next want
-				out <- qp
+				c.SendPacketMulti(qp)
 				return true
 			}
 
 			processed++
-			out <- qp
+			c.SendPacketMulti(qp)
 		default:
 			// No data available on this channel right now
 		}

@@ -39,12 +39,6 @@ func (g *PrimeNumbers) Exec() bool {
 	// Check if already completed using persistent state
 	completed, _ := g.GetStateBool("completed", false)
 
-	// Validate output channel is available
-	out, connectionAvailable := g.GetFirstOutputChannel()
-	if !connectionAvailable {
-		return true
-	}
-
 	if completed {
 		return true
 	}
@@ -53,9 +47,8 @@ func (g *PrimeNumbers) Exec() bool {
 	g.StoreState("completed", true)
 
 	for i := start; i <= end; i++ {
-		out <- i
+		g.SendPacketMulti(i)
 	}
-	close(out)
 	return true
 }
 
@@ -121,11 +114,6 @@ func (f *PrimeSequence) Exec() bool {
 	// Mark as completed in persistent state
 	f.StoreState("completed", true)
 
-	var out Chan
-	if f.paths.GetOutCount() > 0 {
-		out, _ = f.GetOutputChannel(0)
-	}
-
 	// Get persistent foundPrimes slice or create new one using GetState only
 	foundPrimesVal, exists := f.GetState("foundPrimes")
 	foundPrimes := make([]int, 0)
@@ -170,8 +158,8 @@ func (f *PrimeSequence) Exec() bool {
 			// If it's prime, add to memoized primes and pass through
 			if isPrime {
 				foundPrimes = append(foundPrimes, val)
-				if out != nil {
-					out <- val
+				if f.paths.GetOutCount() > 0 {
+					f.SendPacketMulti(val)
 				}
 				// Update live state immediately when prime is found
 				f.StoreStateMulti(map[string]interface{}{
@@ -187,9 +175,6 @@ func (f *PrimeSequence) Exec() bool {
 				"last_number_processed": val,
 			})
 		}
-	}
-	if out != nil {
-		close(out)
 	}
 
 	// Store found primes in state for collection using StoreState only

@@ -86,7 +86,7 @@ type ChainBuilder struct {
 
 	// Completed want retrigger detection
 	labelToUsers        map[string][]string // label selector key → want names that use this label
-	wantCompletedFlags  map[string]bool     // want name → is completed?
+	wantCompletedFlags  map[string]bool     // want ID → is completed?
 	completedFlagsMutex sync.RWMutex        // Protects wantCompletedFlags
 
 	// Server mode flag
@@ -2876,17 +2876,17 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 	}
 	cb.reconcileMutex.RUnlock()
 
-	// Process each completed want
+	// Process each completed want (using want ID)
 	anyWantRetriggered := false
-	for wantName, isCompleted := range completedSnapshot {
+	for wantID, isCompleted := range completedSnapshot {
 
 		if isCompleted {
-			InfoLog("[RETRIGGER:CHECK] Checking users for completed want '%s'\n", wantName)
-			users := cb.findUsersOfCompletedWant(wantName)
-			InfoLog("[RETRIGGER:CHECK] Found %d users for '%s'\n", len(users), wantName)
+			InfoLog("[RETRIGGER:CHECK] Checking users for completed want ID '%s'\n", wantID)
+			users := cb.findUsersOfCompletedWant(wantID)
+			InfoLog("[RETRIGGER:CHECK] Found %d users for want ID '%s'\n", len(users), wantID)
 
 			if len(users) > 0 {
-				InfoLog("[RETRIGGER] Want '%s' completed, found %d users to retrigger\n", wantName, len(users))
+				InfoLog("[RETRIGGER] Want ID '%s' completed, found %d users to retrigger\n", wantID, len(users))
 
 				for _, userName := range users {
 					// Reset dependent want to Idle so it can be re-executed
@@ -2913,12 +2913,20 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 }
 
 // findUsersOfCompletedWant finds all wants that depend on a given completed want
+// Takes want ID as parameter and uses it to look up the want in cb.wants by name
 // Uses the pre-computed labelToUsers mapping for O(1) lookup
 // Returns slice of want names that use the completed want's labels
-func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantName string) []string {
-	// Find the completed want
-	runtimeWant, ok := cb.wants[completedWantName]
-	if !ok {
+func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []string {
+	// Find the completed want by iterating through wants to find one with matching ID
+	var runtimeWant *runtimeWant
+	for _, rw := range cb.wants {
+		if rw.want.Metadata.ID == completedWantID {
+			runtimeWant = rw
+			break
+		}
+	}
+
+	if runtimeWant == nil {
 		return []string{}
 	}
 
@@ -2957,32 +2965,35 @@ func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantName string) []str
 // Called from Want.SetStatus() to track which wants are completed
 // Uses mutex to protect concurrent access
 // MarkWantCompleted is the new preferred method for wants to notify the ChainBuilder of completion
+// MarkWantCompleted marks a want as completed using want ID
 // Called by receiver wants (e.g., Coordinators) when they reach completion state
 // Replaces the previous pattern where senders would call UpdateCompletedFlag
-func (cb *ChainBuilder) MarkWantCompleted(wantName string, status WantStatus) {
+func (cb *ChainBuilder) MarkWantCompleted(wantID string, status WantStatus) {
 	cb.completedFlagsMutex.Lock()
 	defer cb.completedFlagsMutex.Unlock()
 
 	isCompleted := (status == WantStatusAchieved)
-	cb.wantCompletedFlags[wantName] = isCompleted
-	log.Printf("[WANT-COMPLETED] Want '%s' notified completion with status=%s\n", wantName, status)
+	cb.wantCompletedFlags[wantID] = isCompleted
+	log.Printf("[WANT-COMPLETED] Want ID '%s' notified completion with status=%s\n", wantID, status)
 }
 
-func (cb *ChainBuilder) UpdateCompletedFlag(wantName string, status WantStatus) {
+// UpdateCompletedFlag updates completion flag using want ID
+// Deprecated: Use MarkWantCompleted instead
+func (cb *ChainBuilder) UpdateCompletedFlag(wantID string, status WantStatus) {
 	cb.completedFlagsMutex.Lock()
 	defer cb.completedFlagsMutex.Unlock()
 
 	isCompleted := (status == WantStatusAchieved)
-	cb.wantCompletedFlags[wantName] = isCompleted
-	log.Printf("[UPDATE-COMPLETED-FLAG] Want '%s' status=%s, isCompleted=%v\n", wantName, status, isCompleted)
+	cb.wantCompletedFlags[wantID] = isCompleted
+	log.Printf("[UPDATE-COMPLETED-FLAG] Want ID '%s' status=%s, isCompleted=%v\n", wantID, status, isCompleted)
 }
 
 // IsCompleted returns whether a want is currently in completed state
 // Safe to call from any goroutine with RLock protection
-func (cb *ChainBuilder) IsCompleted(wantName string) bool {
+func (cb *ChainBuilder) IsCompleted(wantID string) bool {
 	cb.completedFlagsMutex.RLock()
 	defer cb.completedFlagsMutex.RUnlock()
-	return cb.wantCompletedFlags[wantName]
+	return cb.wantCompletedFlags[wantID]
 }
 
 // TriggerCompletedWantRetriggerCheck sends a non-blocking trigger to the reconcile loop

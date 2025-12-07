@@ -34,12 +34,6 @@ func (g *FibonacciNumbers) Exec() bool {
 	// Check if already completed using persistent state
 	completed, _ := g.GetStateBool("completed", false)
 
-	// Validate output channel is available
-	out, connectionAvailable := g.GetFirstOutputChannel()
-	if !connectionAvailable {
-		return true
-	}
-
 	if completed {
 		return true
 	}
@@ -49,10 +43,9 @@ func (g *FibonacciNumbers) Exec() bool {
 
 	a, b := 0, 1
 	for i := 0; i < count; i++ {
-		out <- a
+		g.SendPacketMulti(a)
 		a, b = b, a+b
 	}
-	close(out)
 	return true
 }
 

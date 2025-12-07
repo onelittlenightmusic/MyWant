@@ -192,12 +192,11 @@ func (n *Want) NotifyCompletion() {
 		return // No global builder available
 	}
 
-	// Notify ChainBuilder that this want is now completed
-	cb.MarkWantCompleted(n.Metadata.Name, n.Status)
+	// Notify ChainBuilder that this want is now completed using want ID (not name)
+	cb.MarkWantCompleted(n.Metadata.ID, n.Status)
 
-	// Trigger retrigger check to notify dependent wants
-	// This ensures that wants depending on this completed want are re-executed
-	cb.TriggerCompletedWantRetriggerCheck()
+	// Note: Retrigger is triggered by SendPacketMulti(), not here
+	// Only wants that send packets should trigger dependent want re-execution
 }
 
 // ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
