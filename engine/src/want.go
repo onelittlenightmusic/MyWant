@@ -3,7 +3,6 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -159,7 +158,6 @@ type Want struct {
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
-	log.Printf("[SET-STATUS] Want '%s': %s -> %s\n", n.Metadata.Name, oldStatus, status)
 
 	// Emit StatusChange event (Group B - synchronous control)
 	if oldStatus != status {
@@ -175,25 +173,6 @@ func (n *Want) SetStatus(status WantStatus) {
 			NewStatus: status,
 		}
 		n.GetSubscriptionSystem().Emit(context.Background(), event)
-
-		// Register completion in ChainBuilder for retrigger system
-		// When a want reaches WantStatusAchieved, mark it as completed
-		// This enables the retrigger mechanism to notify dependent wants
-		if status == WantStatusAchieved {
-			log.Printf("[SET-STATUS] Want '%s' achieved - calling UpdateCompletedFlag\n", n.Metadata.Name)
-			cb := GetGlobalChainBuilder()
-			if cb != nil {
-				cb.UpdateCompletedFlag(n.Metadata.Name, status)
-				log.Printf("[SET-STATUS] UpdateCompletedFlag called for '%s'\n", n.Metadata.Name)
-
-				// Trigger the retrigger check to process this completion
-				// This notifies dependent wants and re-executes them with new data
-				log.Printf("[SET-STATUS] Want '%s' achieved - triggering retrigger check\n", n.Metadata.Name)
-				cb.TriggerCompletedWantRetriggerCheck()
-			} else {
-				log.Printf("[SET-STATUS] WARNING: GlobalChainBuilder is nil for '%s'\n", n.Metadata.Name)
-			}
-		}
 	}
 }
 
@@ -1100,18 +1079,80 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 // This method capsules multi-output broadcasting logic at the want level
 // Useful for scenarios where a want needs to provide output to multiple consumers
 // Example: Evidence provider sending evidence to multiple approval coordinators
+// Enhanced with retrigger logic: if a receiver is already achieved, mark it as completed
+// and trigger retrigger check so it can re-execute with the new packet data
 func (n *Want) SendPacketMulti(packet interface{}, outputs []Chan) error {
 	if len(outputs) == 0 {
 		return nil // No outputs to send to
 	}
 
-	for i, out := range outputs {
+	// Get the Want's paths to access TargetWantName for each output
+	paths := n.GetPaths()
+	if paths == nil || paths.Out == nil {
+		// Fallback: just send without retrigger logic
+		for i, out := range outputs {
+			if out == nil {
+				fmt.Printf("[WARN] Output channel %d is nil in SendPacketMulti\n", i)
+				continue
+			}
+			out <- packet
+		}
+		return nil
+	}
+
+	// Check channel buffer status before sending to optimize retrigger decision
+	// Only retrigger if channel is empty (no buffered packets waiting)
+	channelHasBuffer := make(map[Chan]bool)
+	for _, out := range outputs {
 		if out == nil {
-			fmt.Printf("[WARN] Output channel %d is nil in SendPacketMulti\n", i)
 			continue
 		}
-		out <- packet
+
+		// Non-blocking check: if channel is full, there's a buffered packet
+		select {
+		case out <- packet:
+			// Packet sent successfully, channel was not full
+			channelHasBuffer[out] = false
+		default:
+			// Channel is full (shouldn't happen with buffer size 10, but check anyway)
+			// Try again with blocking send
+			out <- packet
+			channelHasBuffer[out] = true
+		}
 	}
+
+	// After sending, check if any receivers are already achieved
+	// If so, mark them as completed and trigger retrigger
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return nil // No global builder, skip retrigger logic
+	}
+
+	// Check each output path's target want
+	for i, pathInfo := range paths.Out {
+		if i >= len(outputs) || outputs[i] == nil {
+			continue
+		}
+
+		targetName := pathInfo.TargetWantName
+		if targetName == "" {
+			continue // No target want name, skip
+		}
+
+		// Check if target want is already achieved
+		if cb.IsCompleted(targetName) {
+			// Target is achieved, need to retrigger it so it can re-execute with new packet
+			// Only retrigger if channel doesn't have buffered packets (optimization)
+			if !channelHasBuffer[outputs[i]] {
+				InfoLog("[SEND:RETRIGGER] Target '%s' is achieved, triggering retrigger to re-execute with new packet\n", targetName)
+				cb.UpdateCompletedFlag(targetName, WantStatusAchieved) // Mark as completed again
+				cb.TriggerCompletedWantRetriggerCheck()                // Trigger retrigger check
+			} else {
+				InfoLog("[SEND:SKIP-RETRIGGER] Target '%s' is achieved but channel has buffered packets, skipping retrigger\n", targetName)
+			}
+		}
+	}
+
 	return nil
 }
 

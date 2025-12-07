@@ -249,9 +249,10 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					// Create corresponding output path for the matching want
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
-						Channel: inPath.Channel, // Same channel, shared connection
-						Name:    inPath.Name,
-						Active:  true,
+						Channel:        inPath.Channel, // Same channel, shared connection
+						Name:           inPath.Name,
+						Active:         true,
+						TargetWantName: wantName, // Set target want name for output path
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
 					// log.Printf("[RECONCILE:PATHS] Created output path for '%s': %s\n", otherName, outPath.Name)

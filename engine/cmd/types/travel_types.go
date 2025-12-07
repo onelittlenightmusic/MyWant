@@ -109,7 +109,7 @@ func (r *RestaurantWant) Exec() bool {
 				Events: []TimeSlot{restaurantEvent},
 			}
 
-			out <- travelSchedule
+			r.SendPacketMulti(travelSchedule, []Chan{out})
 		}
 
 		return true
@@ -190,7 +190,8 @@ func (r *RestaurantWant) Exec() bool {
 
 	// Send to output channel only if available
 	if connectionAvailable {
-		out <- newSchedule
+		// Use SendPacketMulti to send with retrigger logic for achieved receivers
+		r.SendPacketMulti(newSchedule, []Chan{out})
 	}
 
 	return true
@@ -492,7 +493,7 @@ func (h *HotelWant) Exec() bool {
 				Events: []TimeSlot{hotelEvent},
 			}
 
-			out <- travelSchedule
+			h.SendPacketMulti(travelSchedule, []Chan{out})
 		}
 
 		return true
@@ -576,7 +577,7 @@ func (h *HotelWant) Exec() bool {
 
 	// Send to output channel only if available
 	if connectionAvailable {
-		out <- newSchedule
+		h.SendPacketMulti(newSchedule, []Chan{out})
 	}
 
 	return true
@@ -710,7 +711,7 @@ func (b *BuffetWant) Exec() bool {
 				Events: []TimeSlot{buffetEvent},
 			}
 
-			out <- travelSchedule
+			b.SendPacketMulti(travelSchedule, []Chan{out})
 		}
 
 		return true
@@ -788,7 +789,8 @@ func (b *BuffetWant) Exec() bool {
 
 	// Send to output channel only if available
 	if connectionAvailable {
-		out <- newSchedule
+		// Use SendPacketMulti to send with retrigger logic for achieved receivers
+		b.SendPacketMulti(newSchedule, []Chan{out})
 	}
 
 	return true

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	. "mywant/engine/src"
-	"mywant/engine/src/chain"
 	"time"
 )
 
@@ -292,6 +291,7 @@ func (f *FlightWant) Exec() bool {
 }
 
 // sendFlightPacket sends a flight schedule packet to the output channel and logs it
+// Uses SendPacketMulti to send with retrigger logic for achieved receivers
 func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {
 	flightEvent := TimeSlot{
 		Start: schedule.DepartureTime,
@@ -306,9 +306,12 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 	}
 
 	// Send to output channel (if available)
-	// The channel is chain.Chan (which is chan Tuple), send directly without type assertion
-	if ch, ok := out.(chain.Chan); ok {
-		ch <- travelSchedule
+	// The channel is Chan (which is chan Tuple)
+	if ch, ok := out.(Chan); ok {
+		// Use SendPacketMulti to send with retrigger logic
+		// This ensures that if the receiver is already achieved, it will be retriggered
+		outputs := []Chan{ch}
+		f.SendPacketMulti(travelSchedule, outputs)
 
 		f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
 			label,

@@ -146,9 +146,10 @@ type Config struct {
 
 // PathInfo represents connection information for a single path
 type PathInfo struct {
-	Channel chain.Chan
-	Name    string
-	Active  bool
+	Channel        chain.Chan
+	Name           string
+	Active         bool
+	TargetWantName string // For output paths, the name of the target want that receives this packet
 }
 
 // Paths manages all input and output connections for a want
