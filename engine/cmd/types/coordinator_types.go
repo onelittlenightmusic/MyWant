@@ -163,6 +163,7 @@ func (c *CoordinatorWant) Exec() bool {
 		if received {
 			// Data received: mark channel as heard and process it
 			c.channelsHeard[channelIndex] = true
+			c.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received packet from channel %d", channelIndex))
 			c.DataHandler.ProcessData(c, channelIndex, data)
 		} else {
 			// No data available on any channel: exit loop
