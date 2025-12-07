@@ -194,6 +194,10 @@ func (n *Want) NotifyCompletion() {
 
 	// Notify ChainBuilder that this want is now completed
 	cb.MarkWantCompleted(n.Metadata.Name, n.Status)
+
+	// Trigger retrigger check to notify dependent wants
+	// This ensures that wants depending on this completed want are re-executed
+	cb.TriggerCompletedWantRetriggerCheck()
 }
 
 // ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
