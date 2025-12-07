@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	. "mywant/engine/src"
 	"strings"

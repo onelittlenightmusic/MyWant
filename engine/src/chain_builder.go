@@ -2961,6 +2961,7 @@ func (cb *ChainBuilder) UpdateCompletedFlag(wantName string, status WantStatus) 
 
 	isCompleted := (status == WantStatusAchieved)
 	cb.wantCompletedFlags[wantName] = isCompleted
+	log.Printf("[UPDATE-COMPLETED-FLAG] Want '%s' status=%s, isCompleted=%v\n", wantName, status, isCompleted)
 }
 
 // IsCompleted returns whether a want is currently in completed state

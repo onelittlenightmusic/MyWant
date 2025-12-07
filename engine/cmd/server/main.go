@@ -176,6 +176,9 @@ func NewServer(config ServerConfig) *Server {
 	globalBuilder.SetAgentRegistry(agentRegistry)
 	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes
 
+	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
+	mywant.SetGlobalChainBuilder(globalBuilder)
+
 	// Create temporary server instance to call registerDynamicAgents
 	tempServer := &Server{}
 

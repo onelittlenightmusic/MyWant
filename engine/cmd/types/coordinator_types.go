@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"log"
 	. "mywant/engine/src"
 	"time"
 )

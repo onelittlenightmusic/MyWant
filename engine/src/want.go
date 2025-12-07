@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -158,6 +159,7 @@ type Want struct {
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
+	log.Printf("[SET-STATUS] Want '%s': %s -> %s\n", n.Metadata.Name, oldStatus, status)
 
 	// Emit StatusChange event (Group B - synchronous control)
 	if oldStatus != status {
@@ -178,9 +180,13 @@ func (n *Want) SetStatus(status WantStatus) {
 		// When a want reaches WantStatusAchieved, mark it as completed
 		// This enables the retrigger mechanism to notify dependent wants
 		if status == WantStatusAchieved {
+			log.Printf("[SET-STATUS] Want '%s' achieved - calling UpdateCompletedFlag\n", n.Metadata.Name)
 			cb := GetGlobalChainBuilder()
 			if cb != nil {
 				cb.UpdateCompletedFlag(n.Metadata.Name, status)
+				log.Printf("[SET-STATUS] UpdateCompletedFlag called for '%s'\n", n.Metadata.Name)
+			} else {
+				log.Printf("[SET-STATUS] WARNING: GlobalChainBuilder is nil for '%s'\n", n.Metadata.Name)
 			}
 		}
 	}
