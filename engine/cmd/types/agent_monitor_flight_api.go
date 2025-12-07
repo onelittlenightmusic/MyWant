@@ -96,7 +96,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
 		if historyStrs, ok := historyI.([]interface{}); ok {
-			want.StoreLog(fmt.Sprintf("Restoring %d status history entries from state (interface{})", len(historyStrs)))
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
 					// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
@@ -112,13 +111,10 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 						if !found {
 							m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 						}
-					} else {
-						want.StoreLog(fmt.Sprintf("Failed to parse history entry (interface{}): %s", entry))
 					}
 				}
 			}
 		} else if historyStrs, ok := historyI.([]string); ok {
-			want.StoreLog(fmt.Sprintf("Restoring %d status history entries from state ([]string)", len(historyStrs)))
 			for _, entry := range historyStrs {
 				// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
 				if parsed, ok := parseStatusHistoryEntry(entry); ok {
@@ -133,8 +129,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 					if !found {
 						m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
 					}
-				} else {
-					want.StoreLog(fmt.Sprintf("Failed to parse history entry ([]string): %s", entry))
 				}
 			}
 		}
@@ -214,6 +208,8 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 			}
 			updates["agent_result"] = schedule
+			want.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight schedule packet: FlightNumber=%s, From=%s, To=%s, Status=%s",
+				schedule.FlightNumber, reservation.From, reservation.To, newStatus))
 
 			// Store all status history in state
 			statusHistoryStrs := make([]string, 0)
