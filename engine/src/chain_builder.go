@@ -2849,6 +2849,39 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 	}
 }
 
+// RetriggerReceiverWant directly retriggeres a receiver want by name
+// This is used when a sender transmits a packet to an achieved receiver
+// The receiver should be reset to Idle so it can re-execute with the new packet
+func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
+	cb.reconcileMutex.RLock()
+	runtimeWant, exists := cb.wants[wantName]
+	cb.reconcileMutex.RUnlock()
+
+	if !exists {
+		InfoLog("[RETRIGGER-RECEIVER] WARNING: receiver want '%s' not found\n", wantName)
+		return
+	}
+
+	want := runtimeWant.want
+	InfoLog("[RETRIGGER-RECEIVER] Retriggering receiver want '%s' (ID: %s, Status: %s)\n", wantName, want.Metadata.ID, want.GetStatus())
+
+	// Reset to Idle if it's achieved
+	if want.GetStatus() == WantStatusAchieved {
+		want.SetStatus(WantStatusIdle)
+		InfoLog("[RETRIGGER-RECEIVER] Successfully reset '%s' to Idle for re-execution\n", wantName)
+
+		// Queue a reconciliation trigger to re-execute
+		select {
+		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+			InfoLog("[RETRIGGER-RECEIVER] Queued reconciliation trigger for '%s'\n", wantName)
+		default:
+			// Channel full, ignore (next reconciliation cycle will handle it)
+		}
+	} else {
+		InfoLog("[RETRIGGER-RECEIVER] Receiver want '%s' is not achieved (status: %s), skipping retrigger\n", wantName, want.GetStatus())
+	}
+}
+
 // checkAndRetriggerCompletedWants checks for completed wants and notifies their dependents
 // Called from reconcileLoop when a completed want retrigger check trigger is received
 // This is the core async mechanism for retrigger detection
