@@ -67,7 +67,7 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 	return monitor
 }
 
-// Exec implements the ChainWant interface
+// Exec implements the Executable interface
 func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusReaching)

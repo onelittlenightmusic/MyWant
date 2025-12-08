@@ -13,7 +13,7 @@ The main document covering:
 - Want type definition patterns with multiple examples
 - Registration system and type registration process
 - Parameter extraction patterns for all data types
-- Execution interfaces (ChainWant, PacketHandler)
+- Execution interfaces (Executable, PacketHandler)
 - Connectivity metadata system
 - State management with thread safety
 - YAML configuration structure

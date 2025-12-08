@@ -90,7 +90,7 @@ func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification
 	}
 }
 
-// GetWant returns the underlying want for ChainWant interface compatibility
+// GetWant returns the underlying want for Executable interface compatibility
 func (bnw *BaseNotifiableWant) GetWant() *Want {
 	return bnw.Want
 }

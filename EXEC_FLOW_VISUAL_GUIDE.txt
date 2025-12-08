@@ -131,7 +131,7 @@ Step 4: Launch goroutine to execute
 │   for {                                              │
 │     runtimeWant.BeginExecCycle()                     │
 │                                                       │
-│     finished := chainWant.Exec(                      │
+│     finished := executable.Exec(                      │
 │       usingChans,    // [0]=evidence, [1]=desc,      │
 │       outputChans    // [2]=global provider          │
 │     )                                                │

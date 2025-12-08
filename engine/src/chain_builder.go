@@ -1764,7 +1764,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	}
 
 	// Start want execution with direct Exec() calls
-	if chainWant, ok := want.function.(ChainWant); ok {
+	if executable, ok := want.function.(Executable); ok {
 		want.want.SetStatus(WantStatusReaching)
 
 		// Initialize stop channel if not already initialized
@@ -1854,7 +1854,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				}
 
 				// Direct call - no parameters needed, channels are in want.paths
-				finished := chainWant.Exec()
+				finished := executable.Exec()
 
 				// End execution cycle and commit batched state changes
 				cb.reconcileMutex.RLock()

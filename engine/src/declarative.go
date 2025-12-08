@@ -114,7 +114,7 @@ func (p *BasePacket) SetEnded(ended bool)  { p.ended = ended }
 func (p *BasePacket) GetData() interface{} { return p.data }
 
 // ChainWant represents a want that can execute directly
-type ChainWant interface {
+type Executable interface {
 	Exec() bool
 }
 

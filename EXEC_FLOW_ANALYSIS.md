@@ -5,12 +5,12 @@ This document traces how the `Exec()` method is called for wants and how the "us
 
 ---
 
-## 1. ChainWant Interface Definition
+## 1. Executable Interface Definition
 
 **Location**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:117-120`
 
 ```go
-type ChainWant interface {
+type Executable interface {
 	Exec(using []chain.Chan, outputs []chain.Chan) bool
 	GetWant() *Want
 }
@@ -93,7 +93,7 @@ For each want, the function processes:
 
 | Item | File | Lines |
 |------|------|-------|
-| ChainWant Interface | declarative.go | 117-120 |
+| Executable Interface | declarative.go | 117-120 |
 | PathInfo/Paths Types | declarative.go | 149-159 |
 | generatePathsFromConnections() | chain_builder.go | 156-288 |
 | Local using processing | chain_builder.go | 172-230 |

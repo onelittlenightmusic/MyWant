@@ -42,7 +42,7 @@ if finished {
     break
 }
 ```
-- **Trigger**: Only when `chainWant.Exec()` returns `true`
+- **Trigger**: Only when `executable.Exec()` returns `true`
 - **Problem**: Coordinator Exec() returns `false` while waiting for inputs
 - **Impact**: Status never transitions while want loops
 
@@ -100,7 +100,7 @@ Exec() {
 - Returns `false` for every call while `len(schedules) < 3`
 - In the execution loop (line 1651-1681 in chain_builder.go):
   ```go
-  finished := chainWant.Exec()
+  finished := executable.Exec()
   // ...
   if finished {
       // Set to Completed
@@ -164,10 +164,7 @@ for {
     runtimeWant.want.paths.Out = activeOutputPaths
     runtimeWant.want.BeginExecCycle()
     
-    // Execute want
-    finished := chainWant.Exec()
-    
-    // Commit state changes
+    finished := executable.Exec()
     runtimeWant.want.EndExecCycle()
     
     if finished {

@@ -379,11 +379,11 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 ## 6. EXECUTION INTERFACES
 
-### 6.1 ChainWant Interface
+### 6.1 Executable Interface
 **File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:116`
 
 ```go
-type ChainWant interface {
+type Executable interface {
     Exec(using []chain.Chan, outputs []chain.Chan) bool
     GetWant() *Want
 }

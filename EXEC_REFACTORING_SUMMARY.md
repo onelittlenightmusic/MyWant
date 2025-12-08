@@ -6,8 +6,8 @@ Successfully refactored the Want execution model to remove channel parameters fr
 ## Changes Made
 
 ### 1. Interface Changes (engine/src/declarative.go)
-- **Before**: `type ChainWant interface { Exec(using []Chan, outputs []Chan) bool }`
-- **After**: `type ChainWant interface { Exec() bool }`
+- **Before**: `type Executable interface { Exec(using []Chan, outputs []Chan) bool }`
+- **After**: `type Executable interface { Exec() bool }`
 
 This change moves channel management from method parameters to internal state accessed through the Want struct's `paths` field.
 
@@ -82,7 +82,7 @@ The following files still have Exec() methods with the old `(using []Chan, outpu
 - engine/cmd/types/flight_types.go (1 method)
 
 These compile successfully because:
-1. They don't directly implement the ChainWant interface
+1. They don't directly implement the Executable interface
 2. They may use adapter patterns or be handled through reflection/dynamic dispatch
 3. The server successfully builds and passes all tests
 

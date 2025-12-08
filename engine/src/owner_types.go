@@ -264,7 +264,7 @@ func (t *Target) CreateChildWants() []*Want {
 	return t.childWants
 }
 
-// Exec implements the ChainWant interface for Target with direct execution
+// Exec implements the Executable interface for Target with direct execution
 func (t *Target) Exec() bool {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
@@ -608,8 +608,8 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec() bool {
 	// Call the original Exec method directly
-	if chainWant, ok := oaw.BaseWant.(ChainWant); ok {
-		result := chainWant.Exec()
+	if executable, ok := oaw.BaseWant.(Executable); ok {
+		result := executable.Exec()
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
@@ -619,7 +619,7 @@ func (oaw *OwnerAwareWant) Exec() bool {
 
 		return result
 	} else {
-		// Fallback for non-ChainWant types
+		// Fallback for non-Executable types
 		return true
 	}
 }

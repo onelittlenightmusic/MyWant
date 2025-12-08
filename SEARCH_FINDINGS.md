@@ -23,7 +23,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
     go func() {
         for {
             runtimeWant.want.BeginExecCycle()
-            finished := chainWant.Exec(usingChans, outputChans)  // LINE 1630
+            finished := executable.Exec(usingChans, outputChans)  // LINE 1630
             runtimeWant.want.EndExecCycle()
             if finished { break }
         }

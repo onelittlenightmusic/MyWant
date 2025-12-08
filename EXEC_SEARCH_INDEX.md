@@ -70,7 +70,7 @@ Contents:
 
 | Concept | File | Lines | Details |
 |---------|------|-------|---------|
-| ChainWant Interface | declarative.go | 117-120 | Method signature for Exec() |
+| Executable Interface | declarative.go | 117-120 | Method signature for Exec() |
 | PathInfo/Paths Types | declarative.go | 149-159 | Data structures for paths |
 | generatePathsFromConnections() | chain_builder.go | 156-288 | Main path generation function |
 | Local using processing | chain_builder.go | 172-230 | Process want.spec.Using |
@@ -101,7 +101,7 @@ type Paths struct {
 }
 ```
 
-### ChainWant Interface
+### Executable Interface
 ```go
 type ChainWant interface {
     Exec(using []chain.Chan, outputs []chain.Chan) bool
