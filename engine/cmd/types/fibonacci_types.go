@@ -8,7 +8,6 @@ import (
 type FibonacciNumbers struct {
 	Want
 	Count int
-	paths Paths
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
@@ -28,18 +27,24 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Exec() bool {
+	defer func() {
+		for _, path := range g.GetPaths().Out {
+			close(path.Channel)
+		}
+	}()
+
 	// Read parameters fresh each cycle - enables dynamic changes!
 	count := g.GetIntParam("count", 20)
 
-	// Check if already completed using persistent state
-	completed, _ := g.GetStateBool("completed", false)
+	// Check if already achieved using persistent state
+	achieved, _ := g.GetStateBool("achieved", false)
 
-	if completed {
+	if achieved {
 		return true
 	}
 
-	// Mark as completed in persistent state
-	g.StoreState("completed", true)
+	// Mark as achieved in persistent state
+	g.StoreState("achieved", true)
 
 	a, b := 0, 1
 	for i := 0; i < count; i++ {
@@ -60,7 +65,6 @@ type FibonacciFilter struct {
 	MinValue int
 	MaxValue int
 	filtered []int
-	paths    Paths
 }
 
 // NewFibonacciFilter creates a new fibonacci filter want
@@ -108,22 +112,10 @@ func (f *FibonacciFilter) Exec() bool {
 		return true
 	}
 
-	// Check if already completed using persistent state
-	completed, _ := f.GetStateBool("completed", false)
-	if completed {
+	// Check if already achieved using persistent state
+	achieved, _ := f.GetStateBool("achieved", false)
+	if achieved {
 		return true
-	}
-
-	// Mark as completed in persistent state
-	f.StoreState("completed", true)
-
-	// Get persistent filtered slice or create new one using GetState only
-	filteredVal, exists := f.GetState("filtered")
-	f.filtered = make([]int, 0)
-	if exists {
-		if filt, ok := filteredVal.([]int); ok {
-			f.filtered = filt
-		}
 	}
 
 	totalProcessed := 0
@@ -145,6 +137,9 @@ func (f *FibonacciFilter) Exec() bool {
 		"count":           len(f.filtered),
 		"total_processed": totalProcessed,
 	})
+
+	// Mark as achieved in persistent state after processing all inputs and storing state
+	f.StoreState("achieved", true)
 
 	return true
 }

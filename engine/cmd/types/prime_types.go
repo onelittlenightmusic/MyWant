@@ -31,20 +31,25 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Exec() bool {
+	defer func() {
+		for _, path := range g.GetPaths().Out {
+			close(path.Channel)
+		}
+	}()
 	// Read parameters fresh each cycle - enables dynamic changes!
 	start := g.GetIntParam("start", 2)
 
 	end := g.GetIntParam("end", 100)
 
-	// Check if already completed using persistent state
-	completed, _ := g.GetStateBool("completed", false)
+	// Check if already achieved using persistent state
+	achieved, _ := g.GetStateBool("achieved", false)
 
-	if completed {
+	if achieved {
 		return true
 	}
 
-	// Mark as completed in persistent state
-	g.StoreState("completed", true)
+	// Mark as achieved in persistent state
+	g.StoreState("achieved", true)
 
 	for i := start; i <= end; i++ {
 		g.SendPacketMulti(i)
@@ -105,14 +110,14 @@ func (f *PrimeSequence) Exec() bool {
 		return true
 	}
 
-	// Check if already completed using persistent state
-	completed, _ := f.GetStateBool("completed", false)
-	if completed {
+	// Check if already achieved using persistent state
+	achieved, _ := f.GetStateBool("achieved", false)
+	if achieved {
 		return true
 	}
 
-	// Mark as completed in persistent state
-	f.StoreState("completed", true)
+	// Mark as achieved in persistent state
+	f.StoreState("achieved", true)
 
 	// Get persistent foundPrimes slice or create new one using GetState only
 	foundPrimesVal, exists := f.GetState("foundPrimes")
@@ -158,15 +163,15 @@ func (f *PrimeSequence) Exec() bool {
 			// If it's prime, add to memoized primes and pass through
 			if isPrime {
 				foundPrimes = append(foundPrimes, val)
-				if f.paths.GetOutCount() > 0 {
-					f.SendPacketMulti(val)
-				}
+				// if f.paths.GetOutCount() > 0 {
+				// 	f.SendPacketMulti(val)
+				// }
 				// Update live state immediately when prime is found
-				f.StoreStateMulti(map[string]interface{}{
-					"foundPrimes":    foundPrimes,
-					"primeCount":     len(foundPrimes),
-					"lastPrimeFound": val,
-				})
+				// f.StoreStateMulti(map[string]interface{}{
+				// 	"foundPrimes":    foundPrimes,
+				// 	"primeCount":     len(foundPrimes),
+				// 	"lastPrimeFound": val,
+				// })
 			}
 
 			// Update live state for each processed number
@@ -187,89 +192,89 @@ func (f *PrimeSequence) Exec() bool {
 	return true
 }
 
-// PrimeSink collects and displays results
-type PrimeSink struct {
-	Want
-	Received int
-	paths    Paths
-}
+// // PrimeSink collects and displays results
+// type PrimeSink struct {
+// 	Want
+// 	Received int
+// 	paths    Paths
+// }
 
-// NewPrimeSink creates a new prime sink want
-func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} {
-	sink := &PrimeSink{
-		Want:     Want{},
-		Received: 0,
-	}
+// // NewPrimeSink creates a new prime sink want
+// func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} {
+// 	sink := &PrimeSink{
+// 		Want:     Want{},
+// 		Received: 0,
+// 	}
 
-	// Initialize base Want fields
-	sink.Init(metadata, spec)
+// 	// Initialize base Want fields
+// 	sink.Init(metadata, spec)
 
-	// Set fields for base Want methods
-	sink.WantType = "prime sink"
-	sink.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 0,
-		MaxInputs:       -1,
-		MaxOutputs:      0,
-		WantType:        "prime sink",
-		Description:     "Prime sink/collector",
-	}
+// 	// Set fields for base Want methods
+// 	sink.WantType = "prime sink"
+// 	sink.ConnectivityMetadata = ConnectivityMetadata{
+// 		RequiredInputs:  1,
+// 		RequiredOutputs: 0,
+// 		MaxInputs:       -1,
+// 		MaxOutputs:      0,
+// 		WantType:        "prime sink",
+// 		Description:     "Prime sink/collector",
+// 	}
 
-	return sink
-}
+// 	return sink
+// }
 
-func (s *PrimeSink) GetWant() interface{} {
-	return &s.Want
-}
+// func (s *PrimeSink) GetWant() interface{} {
+// 	return &s.Want
+// }
 
-// Exec returns the generalized chain function for the sink
-func (s *PrimeSink) Exec() bool {
-	// Validate input channel is available
-	in, connectionAvailable := s.GetFirstInputChannel()
-	if !connectionAvailable {
-		return true
-	}
+// // Exec returns the generalized chain function for the sink
+// func (s *PrimeSink) Exec() bool {
+// 	// Validate input channel is available
+// 	in, connectionAvailable := s.GetFirstInputChannel()
+// 	if !connectionAvailable {
+// 		return true
+// 	}
 
-	// Check if already completed using persistent state
-	completed, _ := s.GetStateBool("completed", false)
-	if completed {
-		return true
-	}
+// 	// Check if already achieved using persistent state
+// 	achieved, _ := s.GetStateBool("achieved", false)
+// 	if achieved {
+// 		return true
+// 	}
 
-	// Mark as completed in persistent state
-	s.StoreState("completed", true)
+// 	// Mark as achieved in persistent state
+// 	s.StoreState("achieved", true)
 
-	// Use persistent state for received count
-	received, _ := s.State["received"].(int)
+// 	// Use persistent state for received count
+// 	received, _ := s.State["received"].(int)
 
-	primes := make([]int, 0)
-	for val := range in {
-		if prime, ok := val.(int); ok {
-			primes = append(primes, prime)
-			received++
-		}
-	}
+// 	primes := make([]int, 0)
+// 	for val := range in {
+// 		if prime, ok := val.(int); ok {
+// 			primes = append(primes, prime)
+// 			received++
+// 		}
+// 	}
 
-	// Update persistent state
-	s.State["received"] = received
+// 	// Update persistent state
+// 	s.State["received"] = received
 
-	// Store collected primes in state
-	s.StoreStateMulti(map[string]interface{}{
-		"primes":         primes,
-		"total_received": received,
-	})
+// 	// Store collected primes in state
+// 	s.StoreStateMulti(map[string]interface{}{
+// 		"primes":         primes,
+// 		"total_received": received,
+// 	})
 
-	if s.State == nil {
-		s.State = make(map[string]interface{})
-	}
-	s.State["total_processed"] = received
+// 	if s.State == nil {
+// 		s.State = make(map[string]interface{})
+// 	}
+// 	s.State["total_processed"] = received
 
-	return true
-}
+// 	return true
+// }
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("prime numbers", NewPrimeNumbers)
 	builder.RegisterWantType("prime sequence", NewPrimeSequence)
-	builder.RegisterWantType("prime sink", NewPrimeSink)
+	// builder.RegisterWantType("prime sink", NewPrimeSink)
 }
