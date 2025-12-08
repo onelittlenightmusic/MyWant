@@ -300,27 +300,30 @@ type RestaurantSchedule struct {
 
 // SetSchedule sets the restaurant reservation schedule and updates all related state
 func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
-	// Store basic restaurant booking information
-	r.Want.StoreState("attempted", true)
-	r.Want.StoreState("reservation_start_time", schedule.ReservationTime.Format("15:04"))
-	r.Want.StoreState("reservation_end_time", schedule.ReservationTime.Add(time.Duration(schedule.DurationHours*float64(time.Hour))).Format("15:04"))
-	r.Want.StoreState("restaurant_type", schedule.RestaurantType)
-	r.Want.StoreState("reservation_duration_hours", schedule.DurationHours)
-	r.Want.StoreState("reservation_name", schedule.ReservationName)
-	r.Want.StoreState("total_processed", 1)
-	r.Want.StoreState("schedule_date", schedule.ReservationTime.Format("2006-01-02"))
+	stateUpdates := map[string]interface{}{
+		"attempted":                  true,
+		"reservation_start_time":     schedule.ReservationTime.Format("15:04"),
+		"reservation_end_time":       schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04"),
+		"restaurant_type":            schedule.RestaurantType,
+		"reservation_duration_hours": schedule.DurationHours,
+		"reservation_name":           schedule.ReservationName,
+		"total_processed":            1,
+		"schedule_date":              schedule.ReservationTime.Format("2006-01-02"),
+	}
 
 	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
-		r.Want.StoreState("premium_processed", true)
-		r.Want.StoreState("premium_level", schedule.PremiumLevel)
+		stateUpdates["premium_processed"] = true
+		stateUpdates["premium_level"] = schedule.PremiumLevel
 	}
 	if schedule.ServiceTier != "" {
-		r.Want.StoreState("service_tier", schedule.ServiceTier)
+		stateUpdates["service_tier"] = schedule.ServiceTier
 	}
 	if len(schedule.PremiumAmenities) > 0 {
-		r.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
 	}
+
+	r.Want.StoreStateMulti(stateUpdates)
 }
 
 // generateRealisticRestaurantNameForTravel generates realistic restaurant names for travel summaries
@@ -852,26 +855,29 @@ type BuffetSchedule struct {
 
 // SetSchedule sets the buffet reservation schedule and updates all related state
 func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
-	// Store basic buffet booking information
-	b.Want.StoreState("attempted", true)
-	b.Want.StoreState("buffet_start_time", schedule.ReservationTime.Format("15:04 Jan 2"))
-	b.Want.StoreState("buffet_end_time", schedule.ReservationTime.Add(time.Duration(schedule.DurationHours*float64(time.Hour))).Format("15:04 Jan 2"))
-	b.Want.StoreState("buffet_type", schedule.BuffetType)
-	b.Want.StoreState("buffet_duration_hours", schedule.DurationHours)
-	b.Want.StoreState("reservation_name", schedule.ReservationName)
-	b.Want.StoreState("total_processed", 1)
+	stateUpdates := map[string]interface{}{
+		"attempted":               true,
+		"buffet_start_time":       schedule.ReservationTime.Format("15:04 Jan 2"),
+		"buffet_end_time":         schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
+		"buffet_type":             schedule.BuffetType,
+		"buffet_duration_hours":   schedule.DurationHours,
+		"reservation_name":        schedule.ReservationName,
+		"total_processed":         1,
+	}
 
 	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
-		b.Want.StoreState("premium_processed", true)
-		b.Want.StoreState("premium_level", schedule.PremiumLevel)
+		stateUpdates["premium_processed"] = true
+		stateUpdates["premium_level"] = schedule.PremiumLevel
 	}
 	if schedule.ServiceTier != "" {
-		b.Want.StoreState("service_tier", schedule.ServiceTier)
+		stateUpdates["service_tier"] = schedule.ServiceTier
 	}
 	if len(schedule.PremiumAmenities) > 0 {
-		b.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
 	}
+
+	b.Want.StoreStateMulti(stateUpdates)
 }
 
 // Helper function to check time conflicts
@@ -897,26 +903,29 @@ type HotelSchedule struct {
 
 // SetSchedule sets the hotel booking schedule and updates all related state
 func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
-	// Store basic hotel booking information
-	h.Want.StoreState("attempted", true)
-	h.Want.StoreState("check_in_time", schedule.CheckInTime.Format("15:04 Jan 2"))
-	h.Want.StoreState("check_out_time", schedule.CheckOutTime.Format("15:04 Jan 2"))
-	h.Want.StoreState("hotel_type", schedule.HotelType)
-	h.Want.StoreState("stay_duration_hours", schedule.StayDurationHours)
-	h.Want.StoreState("reservation_name", schedule.ReservationName)
-	h.Want.StoreState("total_processed", 1)
+	stateUpdates := map[string]interface{}{
+		"attempted":           true,
+		"check_in_time":       schedule.CheckInTime.Format("15:04 Jan 2"),
+		"check_out_time":      schedule.CheckOutTime.Format("15:04 Jan 2"),
+		"hotel_type":          schedule.HotelType,
+		"stay_duration_hours": schedule.StayDurationHours,
+		"reservation_name":    schedule.ReservationName,
+		"total_processed":     1,
+	}
 
 	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
-		h.Want.StoreState("premium_processed", true)
-		h.Want.StoreState("premium_level", schedule.PremiumLevel)
+		stateUpdates["premium_processed"] = true
+		stateUpdates["premium_level"] = schedule.PremiumLevel
 	}
 	if schedule.ServiceTier != "" {
-		h.Want.StoreState("service_tier", schedule.ServiceTier)
+		stateUpdates["service_tier"] = schedule.ServiceTier
 	}
 	if len(schedule.PremiumAmenities) > 0 {
-		h.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
 	}
+
+	h.Want.StoreStateMulti(stateUpdates)
 
 	// No need to send output here anymore - handled directly in Exec method
 }

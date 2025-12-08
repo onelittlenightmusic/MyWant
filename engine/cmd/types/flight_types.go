@@ -188,9 +188,11 @@ func (f *FlightWant) Exec() bool {
 			// Check for delay that triggers cancellation
 			if f.shouldCancelAndRebook() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
-				f.StoreState("flight_action", "cancel_flight")
-				f.StoreState("attempted", false)
-				f.StoreState("flight_phase", PhaseCanceling)
+				f.StoreStateMulti(map[string]interface{}{
+					"flight_action": "cancel_flight",
+					"attempted":     false,
+					"flight_phase":  PhaseCanceling,
+				})
 				return false
 			}
 
@@ -215,17 +217,19 @@ func (f *FlightWant) Exec() bool {
 		// Get the flight_id to cancel
 		flightIDVal, flightIDExists := f.GetState("flight_id")
 		if !flightIDExists || flightIDVal == "" {
-			f.StoreLog("Flight already cancelled or no flight_id found, transitioning to rebooking")
-			f.StoreState("flight_phase", PhaseRebooking)
-			f.StoreState("attempted", false)
-			return false
+			f.StoreStateMulti(map[string]interface{}{
+							"flight_phase": PhaseRebooking,
+							"attempted":    false,
+						})			return false
 		}
 
 		flightID, ok := flightIDVal.(string)
 		if !ok {
 			f.StoreLog("Invalid flight_id type, transitioning to rebooking")
-			f.StoreState("flight_phase", PhaseRebooking)
-			f.StoreState("attempted", false)
+			f.StoreStateMulti(map[string]interface{}{
+				"flight_phase": PhaseRebooking,
+				"attempted":    false,
+			})
 			return false
 		}
 
@@ -239,8 +243,10 @@ func (f *FlightWant) Exec() bool {
 
 		// Transition to rebooking phase
 		f.StoreLog("Cancellation completed, transitioning to rebooking phase")
-		f.StoreState("flight_phase", PhaseRebooking)
-		f.StoreState("attempted", false)
+		f.StoreStateMulti(map[string]interface{}{
+			"flight_phase": PhaseRebooking,
+			"attempted":    false,
+		})
 		return false
 
 	// === Phase 5: Rebooking ===
@@ -338,8 +344,10 @@ func (f *FlightWant) tryAgentExecution() {
 		f.StoreLog("Executing agents via ExecuteAgents() for proper tracking")
 		if err := f.ExecuteAgents(); err != nil {
 			f.StoreLog(fmt.Sprintf("Dynamic agent execution failed: %v", err))
-			f.StoreState("agent_execution_status", "failed")
-			f.StoreState("agent_execution_error", err.Error())
+			f.StoreStateMulti(map[string]interface{}{
+				"agent_execution_status": "failed",
+				"agent_execution_error":  err.Error(),
+			})
 			return
 		}
 
@@ -378,28 +386,31 @@ type FlightSchedule struct {
 
 // SetSchedule sets the flight booking schedule and updates all related state
 func (f *FlightWant) SetSchedule(schedule FlightSchedule) {
-	// Store basic flight booking information
-	f.Want.StoreState("attempted", true)
-	f.Want.StoreState("departure_time", schedule.DepartureTime.Format("15:04 Jan 2"))
-	f.Want.StoreState("arrival_time", schedule.ArrivalTime.Format("15:04 Jan 2"))
-	f.Want.StoreState("flight_type", schedule.FlightType)
-	f.Want.StoreState("flight_duration_hours", schedule.ArrivalTime.Sub(schedule.DepartureTime).Hours())
-	f.Want.StoreState("flight_number", schedule.FlightNumber)
-	f.Want.StoreState("reservation_name", schedule.ReservationName)
-	f.Want.StoreState("total_processed", 1)
-	f.Want.StoreState("schedule_date", schedule.DepartureTime.Format("2006-01-02"))
+	stateUpdates := map[string]interface{}{
+		"attempted":             true,
+		"departure_time":        schedule.DepartureTime.Format("15:04 Jan 2"),
+		"arrival_time":          schedule.ArrivalTime.Format("15:04 Jan 2"),
+		"flight_type":           schedule.FlightType,
+		"flight_duration_hours": schedule.ArrivalTime.Sub(schedule.DepartureTime).Hours(),
+		"flight_number":         schedule.FlightNumber,
+		"reservation_name":      schedule.ReservationName,
+		"total_processed":       1,
+		"schedule_date":         schedule.DepartureTime.Format("2006-01-02"),
+	}
 
 	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
-		f.Want.StoreState("premium_processed", true)
-		f.Want.StoreState("premium_level", schedule.PremiumLevel)
+		stateUpdates["premium_processed"] = true
+		stateUpdates["premium_level"] = schedule.PremiumLevel
 	}
 	if schedule.ServiceTier != "" {
-		f.Want.StoreState("service_tier", schedule.ServiceTier)
+		stateUpdates["service_tier"] = schedule.ServiceTier
 	}
 	if len(schedule.PremiumAmenities) > 0 {
-		f.Want.StoreState("premium_amenities", schedule.PremiumAmenities)
+		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
 	}
+
+	f.Want.StoreStateMulti(stateUpdates)
 }
 
 // Helper function to check time conflicts

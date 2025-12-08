@@ -42,9 +42,11 @@ func (g *FibonacciNumbers) Exec() bool {
 	g.SendPacketMulti(a)
 
 	// Update state
-	g.StoreState("a", b)
-	g.StoreState("b", a+b)
-	g.StoreState("sent_count", sentCount+1)
+	g.StoreStateMulti(map[string]interface{}{
+		"a":          b,
+		"b":          a + b,
+		"sent_count": sentCount + 1,
+	})
 
 	return false
 }
@@ -110,18 +112,19 @@ func (f *FibonacciFilter) Exec() bool {
 	totalProcessed := 0
 
 	// Process all input numbers and filter them
-	for {
-		_, i, ok := f.ReceiveFromAnyInputChannel(100)
-		if !ok {
-			break
-		}
+	_, i, ok := f.ReceiveFromAnyInputChannel(100)
+	if !ok {
+		// Mark as achieved in persistent state after processing all inputs and storing state
+		f.StoreState("achieved", true)
 
-		if val, ok := i.(int); ok {
-			totalProcessed++
-			// Filter based on min/max values
-			if val >= minValue && val <= maxValue {
-				f.filtered = append(f.filtered, val)
-			}
+		return true
+	}
+
+	if val, ok := i.(int); ok {
+		totalProcessed++
+		// Filter based on min/max values
+		if val >= minValue && val <= maxValue {
+			f.filtered = append(f.filtered, val)
 		}
 	}
 
@@ -132,10 +135,8 @@ func (f *FibonacciFilter) Exec() bool {
 		"total_processed": totalProcessed,
 	})
 
-	// Mark as achieved in persistent state after processing all inputs and storing state
-	f.StoreState("achieved", true)
 
-	return true
+	return false
 }
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
