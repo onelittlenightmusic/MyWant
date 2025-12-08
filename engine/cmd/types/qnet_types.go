@@ -226,13 +226,12 @@ func (q *Queue) Exec() bool {
 	// Local persistent state variables are used instead of State map
 	// This ensures they persist across cycles without batching interference
 
-	// Get input channel
-	in, connectionAvailable := q.GetInputChannel(0)
-	if !connectionAvailable {
-		return true
+	_, i, ok := q.ReceiveFromAnyInputChannel(100)
+	if !ok {
+		return false
 	}
 
-	packet := (<-in).(QueuePacket)
+	packet := i.(QueuePacket)
 
 	// Check for termination packet and forward it
 	if packet.IsEnded() {
@@ -472,34 +471,39 @@ func (s *Sink) GetWant() *mywant.Want {
 
 // Exec executes the sink directly
 func (s *Sink) Exec() bool {
-	// Validate input channel is available
-	in, connectionAvailable := s.GetFirstInputChannel()
-	if !connectionAvailable {
-		return true
-	}
-
 	// Check if already completed using persistent state
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {
 		return true
 	}
 
-	// Block waiting for data from using channel
-	packet := (<-in).(QueuePacket)
-
-	// Check for termination packet
-	if packet.IsEnded() {
-		// Mark as completed in persistent state
-		s.StoreState("completed", true)
-		// Trigger OnEnded callback
-		if err := s.OnEnded(&packet); err != nil {
-			s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
+	for {
+		_, i, ok := s.ReceiveFromAnyInputChannel(100)
+		if !ok {
+			// No packet received, but we don't want to end the sink.
+			// The sink should wait until a termination packet is received.
+			// We return false to continue the execution loop.
+			// If we return true, the sink will be marked as completed and will not process any more packets.
+			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever.
+			// if the timeout is reached, the loop will continue to the next iteration.
+			return false
 		}
-		return true
-	}
 
-	s.Received++
-	return false // Continue waiting for more packets
+		packet := i.(QueuePacket)
+
+		// Check for termination packet
+		if packet.IsEnded() {
+			// Mark as completed in persistent state
+			s.StoreState("completed", true)
+			// Trigger OnEnded callback
+			if err := s.OnEnded(&packet); err != nil {
+				s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
+			}
+			return true
+		}
+
+		s.Received++
+	}
 }
 
 // OnEnded implements PacketHandler interface for Sink termination callbacks

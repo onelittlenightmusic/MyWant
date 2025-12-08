@@ -105,10 +105,6 @@ func (f *PrimeSequence) GetWant() interface{} {
 func (f *PrimeSequence) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	// Note: prime parameter available but not used in current implementation
-	in, connectionAvailable := f.GetFirstInputChannel()
-	if !connectionAvailable {
-		return true
-	}
 
 	// Check if already achieved using persistent state
 	achieved, _ := f.GetStateBool("achieved", false)
@@ -137,7 +133,12 @@ func (f *PrimeSequence) Exec() bool {
 		}
 	}
 
-	for i := range in {
+	for {
+		_, i, ok := f.ReceiveFromAnyInputChannel(100)
+		if !ok {
+			break
+		}
+
 		if val, ok := i.(int); ok {
 			totalProcessed++
 			isPrime := true

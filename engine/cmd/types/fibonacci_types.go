@@ -106,12 +106,6 @@ func (f *FibonacciFilter) Exec() bool {
 	minValue := f.GetIntParam("min_value", 0)
 	maxValue := f.GetIntParam("max_value", 1000000)
 
-	// Validate input channel is available
-	in, connectionAvailable := f.GetFirstInputChannel()
-	if !connectionAvailable {
-		return true
-	}
-
 	// Check if already achieved using persistent state
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {
@@ -121,7 +115,12 @@ func (f *FibonacciFilter) Exec() bool {
 	totalProcessed := 0
 
 	// Process all input numbers and filter them
-	for i := range in {
+	for {
+		_, i, ok := f.ReceiveFromAnyInputChannel(100)
+		if !ok {
+			break
+		}
+
 		if val, ok := i.(int); ok {
 			totalProcessed++
 			// Filter based on min/max values
