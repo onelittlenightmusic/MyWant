@@ -36,11 +36,6 @@ func (g *FibonacciNumbers) Exec() bool {
 	sentCount, _ := g.GetStateInt("sent_count", 0)
 
 	if sentCount >= count {
-		defer func() {
-			for _, path := range g.GetPaths().Out {
-				close(path.Channel)
-			}
-		}()
 		return true
 	}
 

@@ -42,11 +42,6 @@ func (g *PrimeNumbers) Exec() bool {
 	}
 
 	if currentNumber > end {
-		defer func() {
-			for _, path := range g.GetPaths().Out {
-				close(path.Channel)
-			}
-		}()
 		return true
 	}
 
