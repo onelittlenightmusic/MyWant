@@ -31,30 +31,31 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Exec() bool {
-	defer func() {
-		for _, path := range g.GetPaths().Out {
-			close(path.Channel)
-		}
-	}()
 	// Read parameters fresh each cycle - enables dynamic changes!
 	start := g.GetIntParam("start", 2)
-
 	end := g.GetIntParam("end", 100)
 
-	// Check if already achieved using persistent state
-	achieved, _ := g.GetStateBool("achieved", false)
+	// Get state
+	currentNumber, exists := g.GetStateInt("current_number", start)
+	if !exists {
+		currentNumber = start
+	}
 
-	if achieved {
+	if currentNumber > end {
+		defer func() {
+			for _, path := range g.GetPaths().Out {
+				close(path.Channel)
+			}
+		}()
 		return true
 	}
 
-	// Mark as achieved in persistent state
-	g.StoreState("achieved", true)
+	g.SendPacketMulti(currentNumber)
 
-	for i := start; i <= end; i++ {
-		g.SendPacketMulti(i)
-	}
-	return true
+	// Update state
+	g.StoreState("current_number", currentNumber+1)
+
+	return false
 }
 
 // GetWant returns the underlying Want

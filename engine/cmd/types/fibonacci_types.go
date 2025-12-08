@@ -27,31 +27,31 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Exec() bool {
-	defer func() {
-		for _, path := range g.GetPaths().Out {
-			close(path.Channel)
-		}
-	}()
-
 	// Read parameters fresh each cycle - enables dynamic changes!
 	count := g.GetIntParam("count", 20)
 
-	// Check if already achieved using persistent state
-	achieved, _ := g.GetStateBool("achieved", false)
+	// Get state
+	a, _ := g.GetStateInt("a", 0)
+	b, _ := g.GetStateInt("b", 1)
+	sentCount, _ := g.GetStateInt("sent_count", 0)
 
-	if achieved {
+	if sentCount >= count {
+		defer func() {
+			for _, path := range g.GetPaths().Out {
+				close(path.Channel)
+			}
+		}()
 		return true
 	}
 
-	// Mark as achieved in persistent state
-	g.StoreState("achieved", true)
+	g.SendPacketMulti(a)
 
-	a, b := 0, 1
-	for i := 0; i < count; i++ {
-		g.SendPacketMulti(a)
-		a, b = b, a+b
-	}
-	return true
+	// Update state
+	g.StoreState("a", b)
+	g.StoreState("b", a+b)
+	g.StoreState("sent_count", sentCount+1)
+
+	return false
 }
 
 // GetWant returns the underlying Want
