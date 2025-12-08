@@ -220,7 +220,8 @@ func (f *FlightWant) Exec() bool {
 			f.StoreStateMulti(map[string]interface{}{
 							"flight_phase": PhaseRebooking,
 							"attempted":    false,
-						})			return false
+						})
+			return false
 		}
 
 		flightID, ok := flightIDVal.(string)
