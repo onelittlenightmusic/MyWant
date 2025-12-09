@@ -32,10 +32,6 @@ type FlightWant struct {
 	paths Paths
 }
 
-func (f *FlightWant) GetWantType() string {
-	return "flight"
-}
-
 func (f *FlightWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -66,7 +62,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&flight.Want)
 	flight.Locals = locals
 
-	flight.WantType = flight.GetWantType()
+	flight.WantType = "flight"
 	flight.ConnectivityMetadata = flight.GetConnectivityMetadata()
 
 	return flight

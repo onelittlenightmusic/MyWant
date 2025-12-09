@@ -71,10 +71,6 @@ type RestaurantWant struct {
 	Want
 }
 
-func (r *RestaurantWant) GetWantType() string {
-	return "restaurant"
-}
-
 func (r *RestaurantWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -100,7 +96,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&restaurant.Want)
 	restaurant.Locals = locals
 
-	restaurant.WantType = restaurant.GetWantType()
+	restaurant.WantType = "restaurant"
 	restaurant.ConnectivityMetadata = restaurant.GetConnectivityMetadata()
 
 	return restaurant
@@ -431,10 +427,6 @@ type HotelWant struct {
 	Want
 }
 
-func (h *HotelWant) GetWantType() string {
-	return "hotel"
-}
-
 func (h *HotelWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -461,7 +453,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&hotel.Want)
 	hotel.Locals = locals
 
-	hotel.WantType = hotel.GetWantType()
+	hotel.WantType = "hotel"
 	hotel.ConnectivityMetadata = hotel.GetConnectivityMetadata()
 
 	return hotel
@@ -634,10 +626,6 @@ type BuffetWant struct {
 	Want
 }
 
-func (b *BuffetWant) GetWantType() string {
-	return "buffet"
-}
-
 func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -662,7 +650,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&buffet.Want)
 	buffet.Locals = locals
 
-	buffet.WantType = buffet.GetWantType()
+	buffet.WantType = "buffet"
 	buffet.ConnectivityMetadata = buffet.GetConnectivityMetadata()
 
 	return buffet
