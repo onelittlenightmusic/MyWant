@@ -19,12 +19,7 @@ type AgentFlight struct {
 func NewAgentFlight(name string, capabilities []string, uses []string, premiumLevel string) *AgentFlight {
 	return &AgentFlight{
 		DoAgent: DoAgent{
-			BaseAgent: BaseAgent{
-				Name:         name,
-				Capabilities: capabilities,
-				Uses:         uses,
-				Type:         DoAgentType,
-			},
+			BaseAgent: *NewBaseAgent(name, capabilities, uses, DoAgentType),
 		},
 		PremiumLevel: premiumLevel,
 		ServiceTier:  "premium",

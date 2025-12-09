@@ -19,12 +19,7 @@ type AgentRestaurant struct {
 func NewAgentRestaurant(name string, capabilities []string, uses []string, premiumLevel string) *AgentRestaurant {
 	return &AgentRestaurant{
 		DoAgent: DoAgent{
-			BaseAgent: BaseAgent{
-				Name:         name,
-				Capabilities: capabilities,
-				Uses:         uses,
-				Type:         DoAgentType,
-			},
+			BaseAgent: *NewBaseAgent(name, capabilities, uses, DoAgentType),
 		},
 		PremiumLevel: premiumLevel,
 		ServiceTier:  "premium",

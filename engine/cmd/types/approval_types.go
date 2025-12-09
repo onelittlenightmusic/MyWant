@@ -183,12 +183,14 @@ func (d *DescriptionWant) CalculateAchievingPercentage() int {
 }
 
 // Level1CoordinatorWant handles Level 1 approval coordination Note: This type is kept for backward compatibility but NewCoordinatorWant is preferred
+// Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
 type Level1CoordinatorWant struct {
 	Want
 	ApprovalID      string
 	CoordinatorType string
 }
 
+// Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
 func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator := &Level1CoordinatorWant{
 		Want:            Want{},

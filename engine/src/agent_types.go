@@ -37,6 +37,16 @@ type BaseAgent struct {
 	Type         AgentType `yaml:"type"`
 }
 
+// NewBaseAgent creates a new BaseAgent with the given parameters. This is the canonical constructor for creating agents.
+func NewBaseAgent(name string, capabilities []string, uses []string, agentType AgentType) *BaseAgent {
+	return &BaseAgent{
+		Name:         name,
+		Capabilities: capabilities,
+		Uses:         uses,
+		Type:         agentType,
+	}
+}
+
 func (a *BaseAgent) GetCapabilities() []string {
 	return a.Capabilities
 }
