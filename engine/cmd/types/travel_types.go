@@ -20,21 +20,6 @@ func (r *RestaurantWantLocals) InitLocals(want *Want) {
 	r.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
 }
 
-func (r *RestaurantWantLocals) GetWantType() string {
-	return "restaurant"
-}
-
-func (r *RestaurantWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "restaurant",
-		Description:     "Restaurant reservation scheduling want",
-	}
-}
-
 // HotelWantLocals holds type-specific local state for HotelWant
 type HotelWantLocals struct {
 	HotelType string
@@ -48,21 +33,6 @@ func (h *HotelWantLocals) InitLocals(want *Want) {
 	h.CheckOut = 8 * time.Hour
 }
 
-func (h *HotelWantLocals) GetWantType() string {
-	return "hotel"
-}
-
-func (h *HotelWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "hotel",
-		Description:     "Hotel reservation scheduling want",
-	}
-}
-
 // BuffetWantLocals holds type-specific local state for BuffetWant
 type BuffetWantLocals struct {
 	BuffetType string
@@ -72,21 +42,6 @@ type BuffetWantLocals struct {
 func (b *BuffetWantLocals) InitLocals(want *Want) {
 	b.BuffetType = want.GetStringParam("buffet_type", "continental")
 	b.Duration = 1*time.Hour + 30*time.Minute
-}
-
-func (b *BuffetWantLocals) GetWantType() string {
-	return "buffet"
-}
-
-func (b *BuffetWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "buffet",
-		Description:     "Breakfast buffet scheduling want",
-	}
 }
 
 // TimeSlot represents a time period with start and end times
@@ -116,6 +71,21 @@ type RestaurantWant struct {
 	Want
 }
 
+func (r *RestaurantWant) GetWantType() string {
+	return "restaurant"
+}
+
+func (r *RestaurantWant) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "restaurant",
+		Description:     "Restaurant reservation scheduling want",
+	}
+}
+
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	restaurant := &RestaurantWant{
@@ -130,8 +100,8 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&restaurant.Want)
 	restaurant.Locals = locals
 
-	restaurant.WantType = locals.GetWantType()
-	restaurant.ConnectivityMetadata = locals.GetConnectivityMetadata()
+	restaurant.WantType = restaurant.GetWantType()
+	restaurant.ConnectivityMetadata = restaurant.GetConnectivityMetadata()
 
 	return restaurant
 }
@@ -461,6 +431,21 @@ type HotelWant struct {
 	Want
 }
 
+func (h *HotelWant) GetWantType() string {
+	return "hotel"
+}
+
+func (h *HotelWant) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "hotel",
+		Description:     "Hotel reservation scheduling want",
+	}
+}
+
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	hotel := &HotelWant{
@@ -476,8 +461,8 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&hotel.Want)
 	hotel.Locals = locals
 
-	hotel.WantType = locals.GetWantType()
-	hotel.ConnectivityMetadata = locals.GetConnectivityMetadata()
+	hotel.WantType = hotel.GetWantType()
+	hotel.ConnectivityMetadata = hotel.GetConnectivityMetadata()
 
 	return hotel
 }
@@ -649,6 +634,21 @@ type BuffetWant struct {
 	Want
 }
 
+func (b *BuffetWant) GetWantType() string {
+	return "buffet"
+}
+
+func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "buffet",
+		Description:     "Breakfast buffet scheduling want",
+	}
+}
+
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	buffet := &BuffetWant{
 		Want: Want{},
@@ -662,8 +662,8 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&buffet.Want)
 	buffet.Locals = locals
 
-	buffet.WantType = locals.GetWantType()
-	buffet.ConnectivityMetadata = locals.GetConnectivityMetadata()
+	buffet.WantType = buffet.GetWantType()
+	buffet.ConnectivityMetadata = buffet.GetConnectivityMetadata()
 
 	return buffet
 }

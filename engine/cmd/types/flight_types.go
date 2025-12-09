@@ -26,11 +26,17 @@ func (f *FlightWantLocals) InitLocals(want *Want) {
 	f.monitoringDuration = 30 * time.Second
 }
 
-func (f *FlightWantLocals) GetWantType() string {
+// FlightWant creates flight booking reservations
+type FlightWant struct {
+	Want
+	paths Paths
+}
+
+func (f *FlightWant) GetWantType() string {
 	return "flight"
 }
 
-func (f *FlightWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
+func (f *FlightWant) GetConnectivityMetadata() ConnectivityMetadata {
 	return ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
@@ -39,12 +45,6 @@ func (f *FlightWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
 		WantType:        "flight",
 		Description:     "Flight booking scheduling want",
 	}
-}
-
-// FlightWant creates flight booking reservations
-type FlightWant struct {
-	Want
-	paths Paths
 }
 
 // NewFlightWant creates a new flight booking want
@@ -66,8 +66,8 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.InitLocals(&flight.Want)
 	flight.Locals = locals
 
-	flight.WantType = locals.GetWantType()
-	flight.ConnectivityMetadata = locals.GetConnectivityMetadata()
+	flight.WantType = flight.GetWantType()
+	flight.ConnectivityMetadata = flight.GetConnectivityMetadata()
 
 	return flight
 }

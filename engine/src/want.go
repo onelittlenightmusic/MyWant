@@ -104,10 +104,6 @@ func getCurrentTimestamp() int64 {
 type WantLocals interface {
 	// InitLocals initializes type-specific local fields from spec parameters
 	InitLocals(want *Want)
-	// GetConnectivityMetadata returns the connectivity requirements for this want type
-	GetConnectivityMetadata() ConnectivityMetadata
-	// GetWantType returns the want type identifier
-	GetWantType() string
 }
 
 // WantFactory defines the interface for creating want functions
