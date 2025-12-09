@@ -1,2 +1,0 @@
-engine/cmd/demos/demo_packet_wakeup.go:7:2: package mywant/engine/cmd/types is not in std (/opt/homebrew/opt/go/libexec/src/mywant/engine/cmd/types)
-engine/cmd/demos/demo_packet_wakeup.go:6:2: package mywant/engine/src is not in std (/opt/homebrew/opt/go/libexec/src/mywant/engine/src)
