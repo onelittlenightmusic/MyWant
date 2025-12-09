@@ -109,6 +109,49 @@ type WantLocals interface {
 // WantFactory defines the interface for creating want functions
 type WantFactory func(metadata Metadata, spec WantSpec) interface{}
 
+// LocalsFactory defines a factory function for creating WantLocals instances
+type LocalsFactory func() WantLocals
+
+// NewWant is a generic constructor that creates a Want with type-specific Locals
+// This eliminates the need for individual NewXxxWant functions for simple want types
+// Usage:
+//
+//	func NewMyWant(metadata Metadata, spec WantSpec) interface{} {
+//	    return NewWant(
+//	        metadata,
+//	        spec,
+//	        func() WantLocals { return &MyWantLocals{DefaultField: "value"} },
+//	        ConnectivityMetadata{RequiredInputs: 1, ...},
+//	        "my_want_type",
+//	    )
+//	}
+func NewWant(
+	metadata Metadata,
+	spec WantSpec,
+	localsFactory LocalsFactory,
+	connectivityMeta ConnectivityMetadata,
+	wantType string,
+) interface{} {
+	want := &Want{
+		Metadata: metadata,
+		Spec:     spec,
+	}
+	want.Init(metadata, spec)
+
+	// Create and initialize Locals if factory is provided
+	if localsFactory != nil {
+		locals := localsFactory()
+		locals.InitLocals(want)
+		want.Locals = locals
+	}
+
+	// Set type-specific fields
+	want.WantType = wantType
+	want.ConnectivityMetadata = connectivityMeta
+
+	return want
+}
+
 // Want represents a processing unit in the chain
 type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`

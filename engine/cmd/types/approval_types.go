@@ -24,23 +24,35 @@ type ApprovalResult struct {
 	Comments     string
 }
 
-// EvidenceWant provides evidence data for approval processes
-type EvidenceWant struct {
-	Want
+// EvidenceWantLocals holds type-specific local state for EvidenceWant
+type EvidenceWantLocals struct {
 	EvidenceType string
 	ApprovalID   string
 }
 
+func (e *EvidenceWantLocals) InitLocals(want *Want) {
+	e.EvidenceType = want.GetStringParam("evidence_type", "document")
+	e.ApprovalID = want.GetStringParam("approval_id", "")
+}
+
+// EvidenceWant provides evidence data for approval processes
+type EvidenceWant struct {
+	Want
+}
+
 func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 	evidence := &EvidenceWant{
-		Want:         Want{},
-		EvidenceType: "document",
+		Want: Want{},
 	}
 	evidence.Init(metadata, spec)
 
-	evidence.EvidenceType = evidence.GetStringParam("evidence_type", "document")
+	locals := &EvidenceWantLocals{
+		EvidenceType: "document",
+		ApprovalID:   "",
+	}
+	locals.InitLocals(&evidence.Want)
+	evidence.Locals = locals
 
-	evidence.ApprovalID = evidence.GetStringParam("approval_id", "")
 	evidence.WantType = "evidence"
 	evidence.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -55,6 +67,12 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (e *EvidenceWant) Exec() bool {
+	locals, ok := e.Locals.(*EvidenceWantLocals)
+	if !ok {
+		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
+		return true
+	}
+
 	provided, _ := e.GetStateBool("evidence_provided", false)
 
 	if provided {
@@ -62,20 +80,20 @@ func (e *EvidenceWant) Exec() bool {
 	}
 	e.StoreState("evidence_provided", true)
 	evidenceData := &ApprovalData{
-		ApprovalID:  e.ApprovalID,
-		Evidence:    fmt.Sprintf("Evidence of type '%s' for approval %s", e.EvidenceType, e.ApprovalID),
+		ApprovalID:  locals.ApprovalID,
+		Evidence:    fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID),
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
 	e.StoreStateMulti(map[string]interface{}{
-		"evidence_type":        e.EvidenceType,
-		"approval_id":          e.ApprovalID,
+		"evidence_type":        locals.EvidenceType,
+		"approval_id":          locals.ApprovalID,
 		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
 		"total_processed":      1,
 		"achieving_percentage": 100,
 	})
 
-	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", e.EvidenceType, e.ApprovalID, e.GetOutCount()))
+	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount()))
 
 	// Broadcast evidence to all output channels using SendPacketMulti
 	e.SendPacketMulti(evidenceData)
@@ -91,23 +109,35 @@ func (e *EvidenceWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-// DescriptionWant provides description data for approval processes
-type DescriptionWant struct {
-	Want
+// DescriptionWantLocals holds type-specific local state for DescriptionWant
+type DescriptionWantLocals struct {
 	DescriptionFormat string
 	ApprovalID        string
 }
 
+func (d *DescriptionWantLocals) InitLocals(want *Want) {
+	d.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
+	d.ApprovalID = want.GetStringParam("approval_id", "")
+}
+
+// DescriptionWant provides description data for approval processes
+type DescriptionWant struct {
+	Want
+}
+
 func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 	description := &DescriptionWant{
-		Want:              Want{},
-		DescriptionFormat: "Request for approval: %s",
+		Want: Want{},
 	}
 	description.Init(metadata, spec)
 
-	description.DescriptionFormat = description.GetStringParam("description_format", "Request for approval: %s")
+	locals := &DescriptionWantLocals{
+		DescriptionFormat: "Request for approval: %s",
+		ApprovalID:        "",
+	}
+	locals.InitLocals(&description.Want)
+	description.Locals = locals
 
-	description.ApprovalID = description.GetStringParam("approval_id", "")
 	description.WantType = "description"
 	description.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -122,22 +152,28 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (d *DescriptionWant) Exec() bool {
+	locals, ok := d.Locals.(*DescriptionWantLocals)
+	if !ok {
+		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")
+		return true
+	}
+
 	provided, _ := d.GetStateBool("description_provided", false)
 
 	if provided {
 		return true
 	}
 	d.StoreState("description_provided", true)
-	description := fmt.Sprintf(d.DescriptionFormat, d.ApprovalID)
+	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
 	descriptionData := &ApprovalData{
-		ApprovalID:  d.ApprovalID,
+		ApprovalID:  locals.ApprovalID,
 		Evidence:    nil,
 		Description: description,
 		Timestamp:   time.Now(),
 	}
 	d.StoreStateMulti(map[string]interface{}{
-		"description_format":      d.DescriptionFormat,
-		"approval_id":             d.ApprovalID,
+		"description_format":      locals.DescriptionFormat,
+		"approval_id":             locals.ApprovalID,
 		"description":             description,
 		"description_provided_at": descriptionData.Timestamp.Format(time.RFC3339),
 		"total_processed":         1,

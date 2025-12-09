@@ -12,34 +12,37 @@ type FibonacciSeed struct {
 	IsEnd    bool
 }
 
+// SeedNumbersLocals holds type-specific local state for SeedNumbers want
+type SeedNumbersLocals struct {
+	MaxCount int
+}
+
+func (s *SeedNumbersLocals) InitLocals(want *Want) {
+	s.MaxCount = want.GetIntParam("max_count", 15)
+}
+
 // SeedNumbers provides initial fibonacci seeds (0, 1)
 type SeedNumbers struct {
 	Want
-	MaxCount int
-	paths    Paths
+	paths Paths
 }
 
 // NewSeedNumbers creates a new seed numbers want
 func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
-	gen := &SeedNumbers{
-		Want:     Want{},
-		MaxCount: 15,
-	}
-	gen.Init(metadata, spec)
-
-	// Extract max_count parameter with automatic type conversion
-	gen.MaxCount = gen.GetIntParam("max_count", 15)
-	gen.WantType = "seed numbers"
-	gen.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       0,
-		MaxOutputs:      -1,
-		WantType:        "seed numbers",
-		Description:     "Fibonacci seed generator",
-	}
-
-	return gen
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &SeedNumbersLocals{MaxCount: 15} },
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       0,
+			MaxOutputs:      -1,
+			WantType:        "seed numbers",
+			Description:     "Fibonacci seed generator",
+		},
+		"seed numbers",
+	)
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
@@ -59,6 +62,25 @@ func (g *SeedNumbers) Exec() bool {
 	return true
 }
 
+// FibonacciComputerLocals holds type-specific local state for FibonacciComputer want
+type FibonacciComputerLocals struct {
+	prev   int
+	current int
+	position int
+	maxCount int
+	processed int
+	initialized bool
+}
+
+func (f *FibonacciComputerLocals) InitLocals(want *Want) {
+	f.prev = 0
+	f.current = 0
+	f.position = 0
+	f.maxCount = 15
+	f.processed = 0
+	f.initialized = false
+}
+
 // FibonacciComputer computes the next fibonacci number from two using
 type FibonacciComputer struct {
 	Want
@@ -67,21 +89,20 @@ type FibonacciComputer struct {
 
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
-	computer := &FibonacciComputer{
-		Want: Want{},
-	}
-	computer.Init(metadata, spec)
-	computer.WantType = "fibonacci computer"
-	computer.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      -1,
-		WantType:        "fibonacci computer",
-		Description:     "Fibonacci number computer",
-	}
-
-	return computer
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &FibonacciComputerLocals{} },
+		ConnectivityMetadata{
+			RequiredInputs:  1,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      -1,
+			WantType:        "fibonacci computer",
+			Description:     "Fibonacci number computer",
+		},
+		"fibonacci computer",
+	)
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
@@ -153,6 +174,21 @@ func (c *FibonacciComputer) Exec() bool {
 	return false
 }
 
+// FibonacciMergerLocals holds type-specific local state for FibonacciMerger want
+type FibonacciMergerLocals struct {
+	seedUsingClosed bool
+	computedUsingClosed bool
+	processed int
+	maxCountReceived bool
+}
+
+func (f *FibonacciMergerLocals) InitLocals(want *Want) {
+	f.seedUsingClosed = false
+	f.computedUsingClosed = false
+	f.processed = 0
+	f.maxCountReceived = false
+}
+
 // FibonacciMerger merges seed values with computed values
 type FibonacciMerger struct {
 	Want
@@ -161,21 +197,20 @@ type FibonacciMerger struct {
 
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
-	merger := &FibonacciMerger{
-		Want: Want{},
-	}
-	merger.Init(metadata, spec)
-	merger.WantType = "fibonacci merger"
-	merger.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  2,
-		RequiredOutputs: 1,
-		MaxInputs:       2,
-		MaxOutputs:      1,
-		WantType:        "fibonacci merger",
-		Description:     "Fibonacci merger",
-	}
-
-	return merger
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &FibonacciMergerLocals{} },
+		ConnectivityMetadata{
+			RequiredInputs:  2,
+			RequiredOutputs: 1,
+			MaxInputs:       2,
+			MaxOutputs:      1,
+			WantType:        "fibonacci merger",
+			Description:     "Fibonacci merger",
+		},
+		"fibonacci merger",
+	)
 }
 
 // Exec returns the generalized chain function for the fibonacci merger

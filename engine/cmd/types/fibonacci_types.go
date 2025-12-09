@@ -4,23 +4,36 @@ import (
 	. "mywant/engine/src"
 )
 
+// FibonacciNumbersLocals holds type-specific local state for FibonacciNumbers want
+type FibonacciNumbersLocals struct {
+	Count int
+}
+
+func (f *FibonacciNumbersLocals) InitLocals(want *Want) {
+	f.Count = want.GetIntParam("count", 20)
+}
+
 // FibonacciNumbers generates fibonacci sequence numbers
 type FibonacciNumbers struct {
 	Want
-	Count int
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
 func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
-	gen := &FibonacciNumbers{
-		Want:  Want{},
-		Count: 20,
-	}
-	gen.Init(metadata, spec)
-
-	gen.Count = gen.GetIntParam("count", 20)
-
-	return gen
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &FibonacciNumbersLocals{Count: 20} },
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       0,
+			MaxOutputs:      -1,
+			WantType:        "fibonacci numbers",
+			Description:     "Fibonacci sequence generator",
+		},
+		"fibonacci numbers",
+	)
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -44,43 +57,56 @@ func (g *FibonacciNumbers) Exec() bool {
 	return false
 }
 
-// FibonacciFilter filters fibonacci numbers based on criteria
-type FibonacciFilter struct {
-	Want
+// FibonacciFilterLocals holds type-specific local state for FibonacciFilter want
+type FibonacciFilterLocals struct {
 	MinValue int
 	MaxValue int
 	filtered []int
 }
 
+func (f *FibonacciFilterLocals) InitLocals(want *Want) {
+	f.MinValue = want.GetIntParam("min_value", 0)
+	f.MaxValue = want.GetIntParam("max_value", 1000000)
+	f.filtered = make([]int, 0)
+}
+
+// FibonacciFilter filters fibonacci numbers based on criteria
+type FibonacciFilter struct {
+	Want
+}
+
 // NewFibonacciFilter creates a new fibonacci filter want
 func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
-	filter := &FibonacciFilter{
-		Want:     Want{},
-		MinValue: 0,
-		MaxValue: 1000000,
-		filtered: make([]int, 0),
-	}
-	filter.Init(metadata, spec)
-
-	filter.MinValue = filter.GetIntParam("min_value", 0)
-	filter.MaxValue = filter.GetIntParam("max_value", 1000000)
-	filter.WantType = "fibonacci filter"
-	filter.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 0,
-		MaxInputs:       1,
-		MaxOutputs:      0,
-		WantType:        "fibonacci filter",
-		Description:     "Fibonacci number filter (terminal)",
-	}
-
-	return filter
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals {
+			return &FibonacciFilterLocals{
+				MinValue: 0,
+				MaxValue: 1000000,
+				filtered: make([]int, 0),
+			}
+		},
+		ConnectivityMetadata{
+			RequiredInputs:  1,
+			RequiredOutputs: 0,
+			MaxInputs:       1,
+			MaxOutputs:      0,
+			WantType:        "fibonacci filter",
+			Description:     "Fibonacci number filter (terminal)",
+		},
+		"fibonacci filter",
+	)
 }
 
 // Exec returns the generalized chain function for the filter
 func (f *FibonacciFilter) Exec() bool {
-	minValue := f.GetIntParam("min_value", 0)
-	maxValue := f.GetIntParam("max_value", 1000000)
+	locals, ok := f.Locals.(*FibonacciFilterLocals)
+	if !ok {
+		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")
+		return true
+	}
+
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {
 		return true
@@ -97,13 +123,13 @@ func (f *FibonacciFilter) Exec() bool {
 	if val, ok := i.(int); ok {
 		totalProcessed++
 		// Filter based on min/max values
-		if val >= minValue && val <= maxValue {
-			f.filtered = append(f.filtered, val)
+		if val >= locals.MinValue && val <= locals.MaxValue {
+			locals.filtered = append(locals.filtered, val)
 		}
 	}
 	f.StoreStateMulti(map[string]interface{}{
-		"filtered":        f.filtered,
-		"count":           len(f.filtered),
+		"filtered":        locals.filtered,
+		"count":           len(locals.filtered),
 		"total_processed": totalProcessed,
 	})
 

@@ -32,40 +32,30 @@ type FlightWant struct {
 	paths Paths
 }
 
-func (f *FlightWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "flight",
-		Description:     "Flight booking scheduling want",
-	}
-}
-
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
-	flight := &FlightWant{
-		Want:  Want{},
-		paths: Paths{},
-	}
-	flight.Init(metadata, spec)
-
-	// Create and initialize FlightWantLocals
-	locals := &FlightWantLocals{
-		FlightType:        "economy",
-		Duration:          12 * time.Hour,
-		DepartureDate:     "2024-01-01",
-		monitoringActive:  false,
-		monitoringDuration: 30 * time.Second,
-	}
-	locals.InitLocals(&flight.Want)
-	flight.Locals = locals
-
-	flight.WantType = "flight"
-	flight.ConnectivityMetadata = flight.GetConnectivityMetadata()
-
-	return flight
+	return NewWant(
+		metadata,
+		spec,
+		func() WantLocals {
+			return &FlightWantLocals{
+				FlightType:        "economy",
+				Duration:          12 * time.Hour,
+				DepartureDate:     "2024-01-01",
+				monitoringActive:  false,
+				monitoringDuration: 30 * time.Second,
+			}
+		},
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      1,
+			WantType:        "flight",
+			Description:     "Flight booking scheduling want",
+		},
+		"flight",
+	)
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule

@@ -71,35 +71,31 @@ type RestaurantWant struct {
 	Want
 }
 
-func (r *RestaurantWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "restaurant",
-		Description:     "Restaurant reservation scheduling want",
-	}
-}
-
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
-	restaurant := &RestaurantWant{
-		Want: Want{},
-	}
-	restaurant.Init(metadata, spec)
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals {
+			return &RestaurantWantLocals{
+				RestaurantType: "casual",
+				Duration:       2 * time.Hour,
+			}
+		},
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      1,
+			WantType:        "restaurant",
+			Description:     "Restaurant reservation scheduling want",
+		},
+		"restaurant",
+	)
 
-	locals := &RestaurantWantLocals{
-		RestaurantType: "casual",
-		Duration:       2 * time.Hour,
-	}
-	locals.InitLocals(&restaurant.Want)
-	restaurant.Locals = locals
-
-	restaurant.WantType = "restaurant"
-	restaurant.ConnectivityMetadata = restaurant.GetConnectivityMetadata()
-
-	return restaurant
+	// Type assert to *Want and wrap in RestaurantWant
+	baseWant := want.(*Want)
+	return &RestaurantWant{Want: *baseWant}
 }
 
 // Exec creates a restaurant reservation
@@ -427,36 +423,32 @@ type HotelWant struct {
 	Want
 }
 
-func (h *HotelWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "hotel",
-		Description:     "Hotel reservation scheduling want",
-	}
-}
-
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
-	hotel := &HotelWant{
-		Want: Want{},
-	}
-	hotel.Init(metadata, spec)
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals {
+			return &HotelWantLocals{
+				HotelType: "standard",
+				CheckIn:   22 * time.Hour,
+				CheckOut:  8 * time.Hour,
+			}
+		},
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      1,
+			WantType:        "hotel",
+			Description:     "Hotel reservation scheduling want",
+		},
+		"hotel",
+	)
 
-	locals := &HotelWantLocals{
-		HotelType: "standard",
-		CheckIn:   22 * time.Hour,
-		CheckOut:  8 * time.Hour,
-	}
-	locals.InitLocals(&hotel.Want)
-	hotel.Locals = locals
-
-	hotel.WantType = "hotel"
-	hotel.ConnectivityMetadata = hotel.GetConnectivityMetadata()
-
-	return hotel
+	// Type assert to *Want and wrap in HotelWant
+	baseWant := want.(*Want)
+	return &HotelWant{Want: *baseWant}
 }
 
 func (h *HotelWant) Exec() bool {
@@ -626,34 +618,30 @@ type BuffetWant struct {
 	Want
 }
 
-func (b *BuffetWant) GetConnectivityMetadata() ConnectivityMetadata {
-	return ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "buffet",
-		Description:     "Breakfast buffet scheduling want",
-	}
-}
-
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
-	buffet := &BuffetWant{
-		Want: Want{},
-	}
-	buffet.Init(metadata, spec)
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals {
+			return &BuffetWantLocals{
+				BuffetType: "continental",
+				Duration:   1*time.Hour + 30*time.Minute,
+			}
+		},
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      1,
+			WantType:        "buffet",
+			Description:     "Breakfast buffet scheduling want",
+		},
+		"buffet",
+	)
 
-	locals := &BuffetWantLocals{
-		BuffetType: "continental",
-		Duration:   1*time.Hour + 30*time.Minute,
-	}
-	locals.InitLocals(&buffet.Want)
-	buffet.Locals = locals
-
-	buffet.WantType = "buffet"
-	buffet.ConnectivityMetadata = buffet.GetConnectivityMetadata()
-
-	return buffet
+	// Type assert to *Want and wrap in BuffetWant
+	baseWant := want.(*Want)
+	return &BuffetWant{Want: *baseWant}
 }
 
 func (b *BuffetWant) Exec() bool {

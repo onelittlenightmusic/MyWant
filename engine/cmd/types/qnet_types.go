@@ -7,6 +7,64 @@ import (
 	mywant "mywant/engine/src"
 )
 
+// NumbersLocals holds type-specific local state for Numbers want
+type NumbersLocals struct {
+	Rate                float64
+	Count               int
+	batchUpdateInterval int
+	cycleCount          int
+	currentTime         float64
+	currentCount        int
+}
+
+func (n *NumbersLocals) InitLocals(want *mywant.Want) {
+	n.Rate = want.GetFloatParam("rate", 1.0)
+	n.Count = want.GetIntParam("count", 100)
+	n.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
+	n.cycleCount = 0
+	n.currentTime = 0.0
+	n.currentCount = 0
+}
+
+// QueueLocals holds type-specific local state for Queue want
+type QueueLocals struct {
+	ServiceTime         float64
+	batchUpdateInterval int
+	lastBatchCount      int
+	cycleCount          int
+	serverFreeTime      float64
+	waitTimeSum         float64
+	processedCount      int
+}
+
+func (q *QueueLocals) InitLocals(want *mywant.Want) {
+	q.ServiceTime = want.GetFloatParam("service_time", 1.0)
+	q.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
+	q.lastBatchCount = 0
+	q.cycleCount = 0
+	q.serverFreeTime = 0.0
+	q.waitTimeSum = 0.0
+	q.processedCount = 0
+}
+
+// CombinerLocals holds type-specific local state for Combiner want
+type CombinerLocals struct {
+	Operation string
+}
+
+func (c *CombinerLocals) InitLocals(want *mywant.Want) {
+	c.Operation = want.GetStringParam("operation", "merge")
+}
+
+// SinkLocals holds type-specific local state for Sink want
+type SinkLocals struct {
+	Received int
+}
+
+func (s *SinkLocals) InitLocals(want *mywant.Want) {
+	s.Received = 0
+}
+
 // QueuePacket represents data flowing through the chain
 type QueuePacket struct {
 	mywant.BasePacket
@@ -42,33 +100,12 @@ func ExpRand64() float64 {
 // Numbers creates packets and sends them downstream
 type Numbers struct {
 	mywant.Want
-	Rate                float64
-	Count               int
-	paths               mywant.Paths
-	batchUpdateInterval int     // Batch interval for state history recording
-	cycleCount          int     // Track cycles for history recording intervals
-	currentTime         float64 // Local state: current simulation time
-	currentCount        int     // Local state: current packet count
+	paths mywant.Paths
 }
 
 // PacketNumbers creates a new numbers want
 func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	gen := &Numbers{
-		Want:                mywant.Want{},
-		Rate:                1.0,
-		Count:               100,
-		batchUpdateInterval: 100, // Default: update state every 100 packets
-		cycleCount:          0,
-	}
-	gen.Init(metadata, spec)
-
-	gen.Rate = gen.GetFloatParam("rate", 1.0)
-	gen.Count = gen.GetIntParam("count", 100)
-
-	// Allow configurable batch update interval
-	gen.batchUpdateInterval = gen.GetIntParam("batch_interval", 100)
-	gen.WantType = "sequence"
-	gen.ConnectivityMetadata = mywant.ConnectivityMetadata{
+	connectivityMetadata := mywant.ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       0,
@@ -77,62 +114,79 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Description:     "Packet generator want",
 	}
 
-	return gen
+	return mywant.NewWant(
+		metadata,
+		spec,
+		func() mywant.WantLocals { return &NumbersLocals{} },
+		connectivityMetadata,
+		"sequence",
+	)
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Exec() bool {
-	useDeterministic := g.GetBoolParam("deterministic", false)
-	paramCount := g.GetIntParam("count", g.Count)
+	locals, ok := g.Locals.(*NumbersLocals)
+	if !ok {
+		g.StoreLog("ERROR: Failed to access NumbersLocals from Want.Locals")
+		return true
+	}
 
-	paramRate := g.GetFloatParam("rate", g.Rate)
+	useDeterministic := g.GetBoolParam("deterministic", false)
+	paramCount := g.GetIntParam("count", locals.Count)
+
+	paramRate := g.GetFloatParam("rate", locals.Rate)
 	if g.State == nil {
 		g.State = make(map[string]interface{})
 	}
 
-	if g.currentCount >= paramCount {
+	if locals.currentCount >= paramCount {
 		g.StoreStateMulti(map[string]interface{}{
-			"total_processed":      g.currentCount,
+			"total_processed":      locals.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
 			"total_wait_time":      0.0,
-			"current_time":         g.currentTime,
-			"current_count":        g.currentCount,
+			"current_time":         locals.currentTime,
+			"current_count":        locals.currentCount,
 			"achieving_percentage": 100,
 		})
 
 		g.SendPacketMulti(QueuePacket{Num: -1, Time: 0})
 		return true
 	}
-	g.currentCount++
+	locals.currentCount++
 
 	if useDeterministic {
 		// Deterministic inter-arrival time (rate = 1/interval)
-		g.currentTime += 1.0 / paramRate
+		locals.currentTime += 1.0 / paramRate
 	} else {
 		// Exponential inter-arrival time (rate = 1/mean_interval) ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
-		g.currentTime += ExpRand64() / paramRate
+		locals.currentTime += ExpRand64() / paramRate
 	}
-	g.cycleCount++
+	locals.cycleCount++
 
 	// Batch mechanism: only update state history every N packets to reduce history entries
-	if g.currentCount%g.batchUpdateInterval == 0 {
+	if locals.currentCount%locals.batchUpdateInterval == 0 {
 		g.StoreStateMulti(map[string]interface{}{
-			"current_time":  g.currentTime,
-			"current_count": g.currentCount,
+			"current_time":  locals.currentTime,
+			"current_count": locals.currentCount,
 		})
 	}
 
-	g.SendPacketMulti(QueuePacket{Num: g.currentCount, Time: g.currentTime})
+	g.SendPacketMulti(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
 	return false
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for Numbers generator Returns (currentCount / targetCount) * 100
 func (g *Numbers) CalculateAchievingPercentage() int {
-	paramCount := g.GetIntParam("count", g.Count)
+	locals, ok := g.Locals.(*NumbersLocals)
+	if !ok {
+		return 0
+	}
+
+	paramCount := g.GetIntParam("count", locals.Count)
 	if paramCount <= 0 {
 		return 0
 	}
-	percentage := (g.currentCount * 100) / paramCount
+	percentage := (locals.currentCount * 100) / paramCount
 	if percentage > 100 {
 		percentage = 100
 	}
@@ -142,35 +196,12 @@ func (g *Numbers) CalculateAchievingPercentage() int {
 // Queue processes packets with a service time
 type Queue struct {
 	mywant.Want
-	ServiceTime float64
-	paths       mywant.Paths
-	// Batch mechanism for state updates
-	batchSize           int
-	batchUpdateInterval int
-	lastBatchCount      int
-	cycleCount          int // Track cycles for history recording intervals
-	// Local persistent state (not in State map, survives across cycles)
-	serverFreeTime float64 // When the server will be free
-	waitTimeSum    float64 // Accumulated wait time
-	processedCount int     // Number of packets processed
+	paths mywant.Paths
 }
 
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	queue := &Queue{
-		Want:                mywant.Want{},
-		ServiceTime:         1.0,
-		batchUpdateInterval: 100, // Default: update state every 100 packets
-		lastBatchCount:      0,
-	}
-	queue.Init(metadata, spec)
-
-	queue.ServiceTime = queue.GetFloatParam("service_time", 1.0)
-
-	// Allow configurable batch update interval
-	queue.batchUpdateInterval = queue.GetIntParam("batch_interval", 100)
-	queue.WantType = "queue"
-	queue.ConnectivityMetadata = mywant.ConnectivityMetadata{
+	connectivityMetadata := mywant.ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -179,17 +210,26 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Description:     "Queue processing want",
 	}
 
-	return queue
+	return mywant.NewWant(
+		metadata,
+		spec,
+		func() mywant.WantLocals { return &QueueLocals{} },
+		connectivityMetadata,
+		"queue",
+	)
 }
 
 // Exec executes the queue processing directly with batch mechanism
 func (q *Queue) Exec() bool {
-	// Using direct Exec approach for dynamic parameter reading
+	locals, ok := q.Locals.(*QueueLocals)
+	if !ok {
+		q.StoreLog("ERROR: Failed to access QueueLocals from Want.Locals")
+		return true
+	}
+
 	if q.State == nil {
 		q.State = make(map[string]interface{})
 	}
-
-	// Local persistent state variables are used instead of State map This ensures they persist across cycles without batching interference
 
 	_, i, ok := q.ReceiveFromAnyInputChannel(100)
 	if !ok {
@@ -199,10 +239,10 @@ func (q *Queue) Exec() bool {
 	packet := i.(QueuePacket)
 	if packet.IsEnded() {
 		// Always flush batch and store final state when terminating
-		q.flushBatch()
+		q.flushBatch(locals)
 
 		// Trigger OnEnded callback
-		if err := q.OnEnded(&packet); err != nil {
+		if err := q.OnEnded(&packet, locals); err != nil {
 			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
@@ -210,22 +250,22 @@ func (q *Queue) Exec() bool {
 		return true
 	}
 	arrivalTime := packet.Time
-	startServiceTime := math.Max(arrivalTime, q.serverFreeTime)
+	startServiceTime := math.Max(arrivalTime, locals.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
-	serviceTime := q.GetFloatParam("service_time", q.ServiceTime)
+	serviceTime := q.GetFloatParam("service_time", locals.ServiceTime)
 
 	finishTime := startServiceTime + serviceTime
-	q.serverFreeTime = finishTime
+	locals.serverFreeTime = finishTime
 
-	q.waitTimeSum += waitTime
-	q.processedCount++
-	q.cycleCount++
+	locals.waitTimeSum += waitTime
+	locals.processedCount++
+	locals.cycleCount++
 
 	// Batch mechanism: only update statistics every N packets
-	if q.processedCount%q.batchUpdateInterval == 0 {
+	if locals.processedCount%locals.batchUpdateInterval == 0 {
 		q.StoreState("last_packet_wait_time", waitTime)
-		q.flushBatch()
-		q.lastBatchCount = q.processedCount
+		q.flushBatch(locals)
+		locals.lastBatchCount = locals.processedCount
 	}
 
 	q.SendPacketMulti(QueuePacket{Num: packet.Num, Time: finishTime})
@@ -233,37 +273,37 @@ func (q *Queue) Exec() bool {
 }
 
 // flushBatch commits all accumulated statistics to state
-func (q *Queue) flushBatch() {
+func (q *Queue) flushBatch(locals *QueueLocals) {
 	// Calculate average wait time
 	avgWaitTime := 0.0
-	if q.processedCount > 0 {
-		avgWaitTime = q.waitTimeSum / float64(q.processedCount)
+	if locals.processedCount > 0 {
+		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
 
 	// Batch update all statistics at once
 	q.StoreStateMulti(map[string]interface{}{
-		"serverFreeTime":           q.serverFreeTime,
-		"waitTimeSum":              q.waitTimeSum,
-		"processedCount":           q.processedCount,
+		"serverFreeTime":           locals.serverFreeTime,
+		"waitTimeSum":              locals.waitTimeSum,
+		"processedCount":           locals.processedCount,
 		"average_wait_time":        avgWaitTime,
-		"total_processed":          q.processedCount,
-		"total_wait_time":          q.waitTimeSum,
-		"current_server_free_time": q.serverFreeTime,
+		"total_processed":          locals.processedCount,
+		"total_wait_time":          locals.waitTimeSum,
+		"current_server_free_time": locals.serverFreeTime,
 	})
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
-func (q *Queue) OnEnded(packet mywant.Packet) error {
+func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	// Calculate final statistics from local persistent state
 	avgWaitTime := 0.0
-	if q.processedCount > 0 {
-		avgWaitTime = q.waitTimeSum / float64(q.processedCount)
+	if locals.processedCount > 0 {
+		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
 	q.StoreStateMulti(map[string]interface{}{
 		"average_wait_time":        avgWaitTime,
-		"total_processed":          q.processedCount,
-		"total_wait_time":          q.waitTimeSum,
-		"current_server_free_time": q.serverFreeTime,
+		"total_processed":          locals.processedCount,
+		"total_wait_time":          locals.waitTimeSum,
+		"current_server_free_time": locals.serverFreeTime,
 		"achieving_percentage":     100,
 	})
 
@@ -272,13 +312,17 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 
 // CalculateAchievingPercentage calculates the progress toward completion for Queue For streaming queue, returns 100 when complete (all packets processed) During streaming, this is calculated indirectly through packet count tracking
 func (q *Queue) CalculateAchievingPercentage() int {
+	locals, ok := q.Locals.(*QueueLocals)
+	if !ok {
+		return 0
+	}
 	// Queue is a streaming processor - returns 100 when termination is received The percentage is implicitly tracked by processedCount during streaming
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
 		return 100
 	}
 	// For streaming queue, we can't easily determine total expected packets So we return percentage based on whether any packets have been processed
-	if q.processedCount > 0 {
+	if locals.processedCount > 0 {
 		// Streaming mode: return 100 only when complete
 		return 50 // Indicate partial progress while streaming
 	}
@@ -288,20 +332,11 @@ func (q *Queue) CalculateAchievingPercentage() int {
 // Combiner merges multiple using streams
 type Combiner struct {
 	mywant.Want
-	Operation string
-	paths     mywant.Paths
+	paths mywant.Paths
 }
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	combiner := &Combiner{
-		Want:      mywant.Want{},
-		Operation: "merge",
-	}
-	combiner.Init(metadata, spec)
-
-	combiner.Operation = combiner.GetStringParam("operation", "merge")
-	combiner.WantType = "combiner"
-	combiner.ConnectivityMetadata = mywant.ConnectivityMetadata{
+	connectivityMetadata := mywant.ConnectivityMetadata{
 		RequiredInputs:  2,
 		RequiredOutputs: 1,
 		MaxInputs:       -1,
@@ -310,11 +345,23 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Description:     "Stream combiner want",
 	}
 
-	return combiner
+	return mywant.NewWant(
+		metadata,
+		spec,
+		func() mywant.WantLocals { return &CombinerLocals{} },
+		connectivityMetadata,
+		"combiner",
+	)
 }
 
 // Exec executes the combiner directly
 func (c *Combiner) Exec() bool {
+	locals, ok := c.Locals.(*CombinerLocals)
+	if !ok {
+		c.StoreLog("ERROR: Failed to access CombinerLocals from Want.Locals")
+		return true
+	}
+
 	if c.State == nil {
 		c.State = make(map[string]interface{})
 	}
@@ -333,7 +380,7 @@ func (c *Combiner) Exec() bool {
 			qp := packet.(QueuePacket)
 			if qp.IsEnded() {
 				// Trigger OnEnded callback
-				if err := c.OnEnded(&qp); err != nil {
+				if err := c.OnEnded(&qp, locals); err != nil {
 					c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 				}
 				// Forward end signal to next want
@@ -353,7 +400,7 @@ func (c *Combiner) Exec() bool {
 }
 
 // OnEnded implements PacketHandler interface for Combiner termination callbacks
-func (c *Combiner) OnEnded(packet mywant.Packet) error {
+func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
 	processed, _ := c.State["processed"].(int)
 	c.StoreStateMulti(map[string]interface{}{
@@ -368,19 +415,12 @@ func (c *Combiner) OnEnded(packet mywant.Packet) error {
 // Sink collects and terminates the packet stream
 type Sink struct {
 	mywant.Want
-	Received int
-	paths    mywant.Paths
+	paths mywant.Paths
 }
 
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	sink := &Sink{
-		Want:     mywant.Want{},
-		Received: 0,
-	}
-	sink.Init(metadata, spec)
-	sink.WantType = "sink"
-	sink.ConnectivityMetadata = mywant.ConnectivityMetadata{
+	connectivityMetadata := mywant.ConnectivityMetadata{
 		RequiredInputs:  1,
 		RequiredOutputs: 0,
 		MaxInputs:       -1,
@@ -389,11 +429,23 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Description:     "Data sink/collector want",
 	}
 
-	return sink
+	return mywant.NewWant(
+		metadata,
+		spec,
+		func() mywant.WantLocals { return &SinkLocals{} },
+		connectivityMetadata,
+		"sink",
+	)
 }
 
 // Exec executes the sink directly
 func (s *Sink) Exec() bool {
+	locals, ok := s.Locals.(*SinkLocals)
+	if !ok {
+		s.StoreLog("ERROR: Failed to access SinkLocals from Want.Locals")
+		return true
+	}
+
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {
 		return true
@@ -411,20 +463,20 @@ func (s *Sink) Exec() bool {
 		if packet.IsEnded() {
 			s.StoreState("completed", true)
 			// Trigger OnEnded callback
-			if err := s.OnEnded(&packet); err != nil {
+			if err := s.OnEnded(&packet, locals); err != nil {
 				s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 			}
 			return true
 		}
 
-		s.Received++
+		locals.Received++
 	}
 }
 
 // OnEnded implements PacketHandler interface for Sink termination callbacks
-func (s *Sink) OnEnded(packet mywant.Packet) error {
+func (s *Sink) OnEnded(packet mywant.Packet, locals *SinkLocals) error {
 	s.StoreStateMulti(map[string]interface{}{
-		"total_processed":      s.Received,
+		"total_processed":      locals.Received,
 		"average_wait_time":    0.0, // Sinks don't add wait time
 		"total_wait_time":      0.0,
 		"achieving_percentage": 100,
@@ -435,12 +487,16 @@ func (s *Sink) OnEnded(packet mywant.Packet) error {
 
 // CalculateAchievingPercentage calculates the progress toward completion for Sink Returns 100 when all packets have been collected (completion)
 func (s *Sink) CalculateAchievingPercentage() int {
+	locals, ok := s.Locals.(*SinkLocals)
+	if !ok {
+		return 0
+	}
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {
 		return 100
 	}
 	// While streaming, indicate partial progress
-	if s.Received > 0 {
+	if locals.Received > 0 {
 		return 50
 	}
 	return 0
