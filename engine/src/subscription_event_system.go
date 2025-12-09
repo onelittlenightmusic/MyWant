@@ -187,8 +187,7 @@ func NewUnifiedSubscriptionSystem() *UnifiedSubscriptionSystem {
 		enableLogging:  false, // Disable by default for clean output
 	}
 
-	// Set default processing modes for each event type
-	// Group A: Async notifications
+	// Set default processing modes for each event type Group A: Async notifications
 	uss.SetProcessingMode(EventTypeStateChange, ProcessAsync)
 	uss.SetProcessingMode(EventTypeParameterChange, ProcessAsync)
 	uss.SetProcessingMode(EventTypeOwnerChildState, ProcessAsync)

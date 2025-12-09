@@ -27,8 +27,7 @@ func (p *QueuePacket) GetData() interface{} {
 	}{p.Num, p.Time}
 }
 
-// ExpRand64 generates exponentially distributed random numbers with improved precision
-// Uses inverse transform sampling with better numerical stability than standard library
+// ExpRand64 generates exponentially distributed random numbers with improved precision Uses inverse transform sampling with better numerical stability than standard library
 func ExpRand64() float64 {
 	// Generate uniform random number in (0,1) avoiding exactly 0 and 1
 	u := rand.Float64()
@@ -40,8 +39,7 @@ func ExpRand64() float64 {
 		u = 1.0 - math.SmallestNonzeroFloat64
 	}
 
-	// Use inverse transform: -ln(u) for exponential distribution
-	// This provides better distribution than the standard library's algorithm
+	// Use inverse transform: -ln(u) for exponential distribution This provides better distribution than the standard library's algorithm
 	return -math.Log(u)
 }
 
@@ -125,8 +123,7 @@ func (g *Numbers) Exec() bool {
 		// Deterministic inter-arrival time (rate = 1/interval)
 		g.currentTime += 1.0 / paramRate
 	} else {
-		// Exponential inter-arrival time (rate = 1/mean_interval)
-		// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
+		// Exponential inter-arrival time (rate = 1/mean_interval) ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
 		g.currentTime += ExpRand64() / paramRate
 	}
 
@@ -145,8 +142,7 @@ func (g *Numbers) Exec() bool {
 	return false
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for Numbers generator
-// Returns (currentCount / targetCount) * 100
+// CalculateAchievingPercentage calculates the progress toward completion for Numbers generator Returns (currentCount / targetCount) * 100
 func (g *Numbers) CalculateAchievingPercentage() int {
 	paramCount := g.GetIntParam("count", g.Count)
 	if paramCount <= 0 {
@@ -213,8 +209,7 @@ func (q *Queue) Exec() bool {
 		q.State = make(map[string]interface{})
 	}
 
-	// Local persistent state variables are used instead of State map
-	// This ensures they persist across cycles without batching interference
+	// Local persistent state variables are used instead of State map This ensures they persist across cycles without batching interference
 
 	_, i, ok := q.ReceiveFromAnyInputChannel(100)
 	if !ok {
@@ -306,18 +301,14 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 	return nil
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for Queue
-// For streaming queue, returns 100 when complete (all packets processed)
-// During streaming, this is calculated indirectly through packet count tracking
+// CalculateAchievingPercentage calculates the progress toward completion for Queue For streaming queue, returns 100 when complete (all packets processed) During streaming, this is calculated indirectly through packet count tracking
 func (q *Queue) CalculateAchievingPercentage() int {
-	// Queue is a streaming processor - returns 100 when termination is received
-	// The percentage is implicitly tracked by processedCount during streaming
+	// Queue is a streaming processor - returns 100 when termination is received The percentage is implicitly tracked by processedCount during streaming
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
 		return 100
 	}
-	// For streaming queue, we can't easily determine total expected packets
-	// So we return percentage based on whether any packets have been processed
+	// For streaming queue, we can't easily determine total expected packets So we return percentage based on whether any packets have been processed
 	if q.processedCount > 0 {
 		// Streaming mode: return 100 only when complete
 		return 50 // Indicate partial progress while streaming
@@ -460,12 +451,8 @@ func (s *Sink) Exec() bool {
 	for {
 		_, i, ok := s.ReceiveFromAnyInputChannel(100)
 		if !ok {
-			// No packet received, but we don't want to end the sink.
-			// The sink should wait until a termination packet is received.
-			// We return false to continue the execution loop.
-			// If we return true, the sink will be marked as completed and will not process any more packets.
-			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever.
-			// if the timeout is reached, the loop will continue to the next iteration.
+			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return false to continue the execution loop. If we return true, the sink will be marked as completed and will not process any more packets.
+			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
 			return false
 		}
 
@@ -499,8 +486,7 @@ func (s *Sink) OnEnded(packet mywant.Packet) error {
 	return nil
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for Sink
-// Returns 100 when all packets have been collected (completion)
+// CalculateAchievingPercentage calculates the progress toward completion for Sink Returns 100 when all packets have been collected (completion)
 func (s *Sink) CalculateAchievingPercentage() int {
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {

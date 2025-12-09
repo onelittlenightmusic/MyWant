@@ -40,8 +40,7 @@ func next_end() func() {
 }
 
 type C_chain struct {
-	//	start, end func(func(Chan)(bool))
-	//	add func(func(_, _ Chan)(bool))
+	// start, end func(func(Chan)(bool)) add func(func(_, _ Chan)(bool))
 	In, Ch_start chan Tuple
 }
 

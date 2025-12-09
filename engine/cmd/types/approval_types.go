@@ -93,8 +93,7 @@ func (e *EvidenceWant) Exec() bool {
 	return true
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant
-// Returns 100 if evidence has been provided, 0 otherwise
+// CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
 func (e *EvidenceWant) CalculateAchievingPercentage() int {
 	provided, _ := e.GetStateBool("evidence_provided", false)
 	if provided {
@@ -174,8 +173,7 @@ func (d *DescriptionWant) Exec() bool {
 	return true
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant
-// Returns 100 if description has been provided, 0 otherwise
+// CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
 func (d *DescriptionWant) CalculateAchievingPercentage() int {
 	provided, _ := d.GetStateBool("description_provided", false)
 	if provided {
@@ -184,8 +182,7 @@ func (d *DescriptionWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-// Level1CoordinatorWant handles Level 1 approval coordination
-// Note: This type is kept for backward compatibility but NewCoordinatorWant is preferred
+// Level1CoordinatorWant handles Level 1 approval coordination Note: This type is kept for backward compatibility but NewCoordinatorWant is preferred
 type Level1CoordinatorWant struct {
 	Want
 	ApprovalID      string
@@ -321,15 +318,12 @@ func (l *Level1CoordinatorWant) Exec() bool {
 	return false // Continue waiting for inputs
 }
 
-// Level1CoordinatorWant and Level2CoordinatorWant now use the generic CoordinatorWant
-// with ApprovalDataHandler and ApprovalCompletionChecker
-// The type field in metadata determines the configuration automatically
+// Level1CoordinatorWant and Level2CoordinatorWant now use the generic CoordinatorWant with ApprovalDataHandler and ApprovalCompletionChecker The type field in metadata determines the configuration automatically
 
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("evidence", NewEvidenceWant)
 	builder.RegisterWantType("description", NewDescriptionWant)
-	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
-	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
+	// Coordinator type - handles all coordinator variations (approval, travel, buffet) Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }

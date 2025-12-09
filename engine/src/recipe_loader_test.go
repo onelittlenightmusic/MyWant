@@ -172,8 +172,7 @@ func TestRecipeDefaults(t *testing.T) {
 		t.Error("Default label not applied")
 	}
 
-	// Note: Default params are applied through mergeDRYDefaults function
-	// which is tested separately
+	// Note: Default params are applied through mergeDRYDefaults function which is tested separately
 }
 
 func TestWantMatchingLogic(t *testing.T) {

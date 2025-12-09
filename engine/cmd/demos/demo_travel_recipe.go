@@ -24,10 +24,7 @@ func main() {
 		yamlFile = os.Args[1]
 	}
 
-	// Get duration from command line (default 120 seconds for full delay cycle)
-	// Mock server timeline:
-	// T+0s: confirmed
-	// T+40s: delayed_one_day (trigger rebooking)
+	// Get duration from command line (default 120 seconds for full delay cycle) Mock server timeline: T+0s: confirmed T+40s: delayed_one_day (trigger rebooking)
 	// T+80s: confirmed again
 	durationSeconds := 120
 	if len(os.Args) > 2 {
@@ -52,15 +49,13 @@ func main() {
 	}
 	fmt.Println()
 
-	// Create chain builder with standard constructor
-	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+	// Create chain builder with standard constructor Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	builder := NewChainBuilder(config)
 
 	// Create and configure agent registry - same as server mode
 	agentRegistry := NewAgentRegistry()
 
-	// Load capabilities from YAML files (from project root, accounting for engine subdirectory)
-	// Try both relative paths since go run -C engine changes the working directory
+	// Load capabilities from YAML files (from project root, accounting for engine subdirectory) Try both relative paths since go run -C engine changes the working directory
 	capPaths := []string{"../capabilities/", "capabilities/"}
 	var capPath string
 	for _, p := range capPaths {
@@ -100,8 +95,7 @@ func main() {
 	}
 	fmt.Printf("\n")
 
-	// Manually register the AgentFlightAPI agent with the loaded capability
-	// This ensures we have the flight API agent available with proper implementation
+	// Manually register the AgentFlightAPI agent with the loaded capability This ensures we have the flight API agent available with proper implementation
 	flightAPIAgent := types.NewAgentFlightAPI(
 		"agent_flight_api",
 		[]string{"flight_api_agency"}, // Must match capability name that provides create_flight

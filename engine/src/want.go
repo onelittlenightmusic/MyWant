@@ -87,16 +87,14 @@ type ControlCommand struct {
 	Reason    string         `json:"reason,omitempty"`
 }
 
-// TriggerCommand is a union type that wraps either a reconciliation trigger or a control command
-// This allows reconcileTrigger channel to handle both types of signals in a unified way
+// TriggerCommand is a union type that wraps either a reconciliation trigger or a control command This allows reconcileTrigger channel to handle both types of signals in a unified way
 type TriggerCommand struct {
 	Type             string           // "reconcile" or "control"
 	ControlCommand   *ControlCommand  // Non-nil for control triggers
 	ReconcileTrigger bool             // Non-zero for reconciliation triggers
 }
 
-// WantStats is deprecated - use State field instead
-// Keeping type alias for backward compatibility during transition
+// WantStats is deprecated - use State field instead Keeping type alias for backward compatibility during transition
 type WantStats = map[string]interface{}
 
 // getCurrentTimestamp returns current Unix timestamp
@@ -174,18 +172,14 @@ func (n *Want) SetStatus(status WantStatus) {
 		}
 		n.GetSubscriptionSystem().Emit(context.Background(), event)
 
-		// Automatically notify ChainBuilder when want reaches achieved status
-		// This enables receiver wants (like Coordinators) to self-notify completion
+		// Automatically notify ChainBuilder when want reaches achieved status This enables receiver wants (like Coordinators) to self-notify completion
 		if status == WantStatusAchieved {
 			n.NotifyCompletion()
 		}
 	}
 }
 
-// NotifyCompletion notifies the ChainBuilder that this want has achieved completion
-// Called automatically by SetStatus() when want reaches WantStatusAchieved
-// This enables wants (especially receivers like Coordinators) to self-notify completion
-// Replaces the previous pattern where senders would call UpdateCompletedFlag
+// NotifyCompletion notifies the ChainBuilder that this want has achieved completion Called automatically by SetStatus() when want reaches WantStatusAchieved This enables wants (especially receivers like Coordinators) to self-notify completion Replaces the previous pattern where senders would call UpdateCompletedFlag
 func (n *Want) NotifyCompletion() {
 	cb := GetGlobalChainBuilder()
 	if cb == nil {
@@ -195,13 +189,10 @@ func (n *Want) NotifyCompletion() {
 	// Notify ChainBuilder that this want is now completed using want ID (not name)
 	cb.MarkWantCompleted(n.Metadata.ID, n.Status)
 
-	// Note: Retrigger is triggered by SendPacketMulti(), not here
-	// Only wants that send packets should trigger dependent want re-execution
+	// Note: Retrigger is triggered by SendPacketMulti(), not here Only wants that send packets should trigger dependent want re-execution
 }
 
-// ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
-// This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety
-// and preventing deadlocks from external callers
+// ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety and preventing deadlocks from external callers
 func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 	if sourceState == nil {
 		return
@@ -222,8 +213,7 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 	}
 }
 
-// SetStateAtomic sets multiple state values atomically with proper mutex protection
-// This method handles ALL mutex locking internally so external callers don't need to manage synchronization
+// SetStateAtomic sets multiple state values atomically with proper mutex protection This method handles ALL mutex locking internally so external callers don't need to manage synchronization
 func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 	if stateData == nil {
 		return
@@ -286,8 +276,7 @@ func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 func (n *Want) BeginExecCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
-	// Always create fresh maps to avoid concurrent map access issues
-	// This is safer than iterating and deleting from existing maps
+	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
 	n.pendingStateChanges = make(map[string]interface{})
 	n.pendingParameterChanges = make(map[string]interface{})
 	// Initialize log buffer for this exec cycle
@@ -361,8 +350,7 @@ func (n *Want) AggregateChanges() {
 	}
 }
 
-// valuesEqual compares two interface{} values for equality
-// Handles different types properly including strings, numbers, booleans, etc.
+// valuesEqual compares two interface{} values for equality Handles different types properly including strings, numbers, booleans, etc.
 func (n *Want) valuesEqual(val1, val2 interface{}) bool {
 	// Handle nil cases
 	if val1 == nil && val2 == nil {
@@ -376,8 +364,7 @@ func (n *Want) valuesEqual(val1, val2 interface{}) bool {
 	return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
 }
 
-// stateSnapshotsEqual compares two state snapshots (maps) for deep equality
-// Returns true if both maps have identical keys and values
+// stateSnapshotsEqual compares two state snapshots (maps) for deep equality Returns true if both maps have identical keys and values
 func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) bool {
 	// Check if lengths match
 	if len(snapshot1) != len(snapshot2) {
@@ -400,9 +387,7 @@ func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) 
 	return true
 }
 
-// isSignificantStateFields checks if only minor/metadata fields have changed
-// Returns true if ONLY status-like fields have changed (fields ending with "_status")
-// Returns false if significant functional fields have changed
+// isSignificantStateFields checks if only minor/metadata fields have changed Returns true if ONLY status-like fields have changed (fields ending with "_status") Returns false if significant functional fields have changed
 func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) bool {
 	// Get all keys that changed
 	changedKeys := make(map[string]bool)
@@ -445,8 +430,7 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) boo
 	return true
 }
 
-// getSignificantStateChanges extracts only the significant (non-status) changes between states
-// Returns a map of only the functional changes, excluding status and metadata fields
+// getSignificantStateChanges extracts only the significant (non-status) changes between states Returns a map of only the functional changes, excluding status and metadata fields
 func (n *Want) getSignificantStateChanges(oldState, newState map[string]interface{}) map[string]interface{} {
 	significantChanges := make(map[string]interface{})
 
@@ -497,8 +481,7 @@ func (n *Want) SendControlCommand(cmd *ControlCommand) error {
 	}
 }
 
-// CheckControlSignal checks for control commands without blocking
-// Returns (command, received, error)
+// CheckControlSignal checks for control commands without blocking Returns (command, received, error)
 func (n *Want) CheckControlSignal() (*ControlCommand, bool) {
 	if n.controlChannel == nil {
 		return nil, false
@@ -525,11 +508,9 @@ func (n *Want) SetSuspended(suspended bool) {
 	n.suspended = suspended
 }
 
-// StoreState stores a key-value pair in the want's state
-// Only adds to state history if the value has actually changed (differential tracking)
+// StoreState stores a key-value pair in the want's state Only adds to state history if the value has actually changed (differential tracking)
 func (n *Want) StoreState(key string, value interface{}) {
-	// CRITICAL: Always use mutex to protect both State and pendingStateChanges
-	// Agent goroutines can call StoreState concurrently, so we must synchronize access
+	// CRITICAL: Always use mutex to protect both State and pendingStateChanges Agent goroutines can call StoreState concurrently, so we must synchronize access
 	n.stateMutex.Lock()
 
 	// Get previous value to check if it's actually different
@@ -542,15 +523,13 @@ func (n *Want) StoreState(key string, value interface{}) {
 		return
 	}
 
-	// Value has changed, store it
-	// Store the state - preserve existing State to maintain parameterHistory
+	// Value has changed, store it Store the state - preserve existing State to maintain parameterHistory
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
 	n.State[key] = value
 
-	// Stage the change in pending state changes
-	// This allows us to batch related changes and create minimal history entries
+	// Stage the change in pending state changes This allows us to batch related changes and create minimal history entries
 	if n.pendingStateChanges == nil {
 		n.pendingStateChanges = make(map[string]interface{})
 	}
@@ -558,8 +537,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 	n.stateMutex.Unlock()
 
 
-	// Create and send notifications AFTER releasing the lock
-	// The notification data is already captured, so no need to hold the lock
+	// Create and send notifications AFTER releasing the lock The notification data is already captured, so no need to hold the lock
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
 		StateKey:       key,
@@ -572,14 +550,8 @@ func (n *Want) StoreState(key string, value interface{}) {
 	sendStateNotifications(notification)
 }
 
-// StoreStateMulti stores multiple state values in a single operation, more efficient than multiple StoreState calls
-// Batches all updates together to minimize lock contention and history entries
-// Usage:
-//   want.StoreStateMulti(map[string]interface{}{
-//       "description_received": true,
-//       "description_text": "some text",
-//       "description_provided": true,
-//   })
+// StoreStateMulti stores multiple state values in a single operation, more efficient than multiple StoreState calls Batches all updates together to minimize lock contention and history entries Usage: want.StoreStateMulti(map[string]interface{}{
+// "description_received": true, "description_text": "some text", "description_provided": true, })
 func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
 	n.stateMutex.Lock()
@@ -598,8 +570,7 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 			continue
 		}
 
-		// Value has changed, store it
-		// Store the state - preserve existing State to maintain history
+		// Value has changed, store it Store the state - preserve existing State to maintain history
 		if n.State == nil {
 			n.State = make(map[string]interface{})
 		}
@@ -624,17 +595,13 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 
 	n.stateMutex.Unlock()
 
-	// Send notifications AFTER releasing the lock
-	// Batch all notifications together
+	// Send notifications AFTER releasing the lock Batch all notifications together
 	for _, notification := range notifications {
 		sendStateNotifications(notification)
 	}
 }
 
-// StoreLog appends a log message to the want's log buffer during an Exec cycle
-// Logs are aggregated and written to LogHistory at the end of each Exec cycle
-// Usage within Exec():
-//   want.StoreLog("Processing packet #1")
+// StoreLog appends a log message to the want's log buffer during an Exec cycle Logs are aggregated and written to LogHistory at the end of each Exec cycle Usage within Exec(): want.StoreLog("Processing packet #1")
 //   want.StoreLog("Calculation complete: result = 42")
 func (n *Want) StoreLog(message string) {
 	// Only buffer logs if we're in an Exec cycle
@@ -642,15 +609,11 @@ func (n *Want) StoreLog(message string) {
 		return
 	}
 
-	// Append the log message to the pending logs buffer
-	// No lock needed here since pendingLogs is only accessed during the current Exec cycle
+	// Append the log message to the pending logs buffer No lock needed here since pendingLogs is only accessed during the current Exec cycle
 	n.pendingLogs = append(n.pendingLogs, message)
 }
 
-// GetState retrieves a state value atomically with mutex protection
-// This method encapsulates all stateMutex access for state reads, ensuring thread safety
-// Returns (value, exists) to indicate whether the key exists in state
-// All state reads must go through this method to maintain proper encapsulation
+// GetState retrieves a state value atomically with mutex protection This method encapsulates all stateMutex access for state reads, ensuring thread safety Returns (value, exists) to indicate whether the key exists in state All state reads must go through this method to maintain proper encapsulation
 func (n *Want) GetState(key string) (interface{}, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
@@ -663,13 +626,8 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 	return value, exists
 }
 
-// GetStateBool retrieves a boolean state value with type assertion
-// Returns (defaultValue, false) if the key doesn't exist or the value is not a bool
-// Usage:
-//   provided, ok := want.GetStateBool("description_provided", false)
-//   if ok {
-//       // provided is a valid bool
-//   }
+// GetStateBool retrieves a boolean state value with type assertion Returns (defaultValue, false) if the key doesn't exist or the value is not a bool Usage: provided, ok := want.GetStateBool("description_provided", false)
+// if ok { // provided is a valid bool }
 func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	value, exists := n.GetState(key)
 	if !exists {
@@ -681,14 +639,8 @@ func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	return defaultValue, false
 }
 
-// GetStateInt retrieves an integer state value with type assertion
-// Supports both int and float64 types
-// Returns (defaultValue, false) if the key doesn't exist or the value cannot be converted to int
-// Usage:
-//   count, ok := want.GetStateInt("total_processed", 0)
-//   if ok {
-//       // count is a valid int
-//   }
+// GetStateInt retrieves an integer state value with type assertion Supports both int and float64 types Returns (defaultValue, false) if the key doesn't exist or the value cannot be converted to int Usage:
+// count, ok := want.GetStateInt("total_processed", 0) if ok { // count is a valid int }
 func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	value, exists := n.GetState(key)
 	if !exists {
@@ -702,13 +654,8 @@ func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	return defaultValue, false
 }
 
-// GetStateString retrieves a string state value with type assertion
-// Returns (defaultValue, false) if the key doesn't exist or the value is not a string
-// Usage:
-//   name, ok := want.GetStateString("current_name", "unknown")
-//   if ok {
-//       // name is a valid string
-//   }
+// GetStateString retrieves a string state value with type assertion Returns (defaultValue, false) if the key doesn't exist or the value is not a string Usage: name, ok := want.GetStateString("current_name", "unknown")
+// if ok { // name is a valid string }
 func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	value, exists := n.GetState(key)
 	if !exists {
@@ -720,20 +667,11 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	return defaultValue, false
 }
 
-// CalculateAchievingPercentage computes the progress percentage toward completion.
-// This is a virtual method that want type implementations should override to provide
-// type-specific completion percentage calculation.
-// Default implementation returns 0 unless the want has reached completion status,
-// in which case it returns 100.
-// Want types should override this to provide meaningful progress indicators:
-//   - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%)
-//   - QueueWant: Calculate based on processedCount / total capacity
-//   - Numbers generator: Calculate based on currentCount / target count
-//   - Coordinator: Calculate based on channels heard / total required channels
-//   - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
+// CalculateAchievingPercentage computes the progress percentage toward completion. This is a virtual method that want type implementations should override to provide type-specific completion percentage calculation. Default implementation returns 0 unless the want has reached completion status,
+// in which case it returns 100. Want types should override this to provide meaningful progress indicators: - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%) - QueueWant: Calculate based on processedCount / total capacity
+// - Numbers generator: Calculate based on currentCount / target count - Coordinator: Calculate based on channels heard / total required channels - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
 func (n *Want) CalculateAchievingPercentage() int {
-	// Default implementation: check if completed
-	// Want types should override this method for specific logic
+	// Default implementation: check if completed Want types should override this method for specific logic
 	switch n.Status {
 	case "completed", "achieved":
 		return 100
@@ -744,10 +682,7 @@ func (n *Want) CalculateAchievingPercentage() int {
 	}
 }
 
-// addAggregatedStateHistory creates a single history entry with complete state as YAML
-// Uses differential checking to prevent duplicate entries when state hasn't actually changed
-// Only creates a history entry if the state differs from the last recorded state
-// NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
+// addAggregatedStateHistory creates a single history entry with complete state as YAML Uses differential checking to prevent duplicate entries when state hasn't actually changed Only creates a history entry if the state differs from the last recorded state NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
 // ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
 func (n *Want) addAggregatedStateHistory() {
 	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
@@ -758,13 +693,10 @@ func (n *Want) addAggregatedStateHistory() {
 		n.State = make(map[string]interface{})
 	}
 
-	// Create a copy of current state while holding lock (use unsafe read since we already hold lock)
-	// IMPORTANT: Exclude agent metadata fields (current_agent, running_agents) from state history
-	// These are operational metadata tracked separately in AgentHistory, not actual want state
+	// Create a copy of current state while holding lock (use unsafe read since we already hold lock) IMPORTANT: Exclude agent metadata fields (current_agent, running_agents) from state history These are operational metadata tracked separately in AgentHistory, not actual want state
 	stateSnapshot := make(map[string]interface{})
 	for key, value := range n.State {
-		// Skip agent metadata fields - they cause false history duplicates since they change
-		// multiple times during agent execution but don't represent actual want state changes
+		// Skip agent metadata fields - they cause false history duplicates since they change multiple times during agent execution but don't represent actual want state changes
 		if key == "current_agent" || key == "running_agents" {
 			continue
 		}
@@ -778,8 +710,7 @@ func (n *Want) addAggregatedStateHistory() {
 		// Convert interface{} to map[string]interface{} for comparison
 		lastState, ok := lastEntry.StateValue.(map[string]interface{})
 		if !ok {
-			// If lastState is not the expected type, proceed with recording
-			// This handles initialization or type changes
+			// If lastState is not the expected type, proceed with recording This handles initialization or type changes
 			lastState = make(map[string]interface{})
 		}
 
@@ -789,11 +720,9 @@ func (n *Want) addAggregatedStateHistory() {
 			return
 		}
 
-		// SMART MERGING: If only status fields changed, merge into the previous entry
-		// This prevents duplicate history entries when only status_* fields are updated
+		// SMART MERGING: If only status fields changed, merge into the previous entry This prevents duplicate history entries when only status_* fields are updated
 		if n.isOnlyStatusChange(lastState, stateSnapshot) {
-			// Update the last entry's state with the new status values
-			// This consolidates status-only updates into the previous functional change
+			// Update the last entry's state with the new status values This consolidates status-only updates into the previous functional change
 			if lastStateMap, ok := n.History.StateHistory[len(n.History.StateHistory)-1].StateValue.(map[string]interface{}); ok {
 				// Copy status and metadata fields from the new snapshot to the last entry
 				for key, newVal := range stateSnapshot {
@@ -859,16 +788,13 @@ func (n *Want) addAggregatedParameterHistory() {
 	}
 }
 
-// addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle
-// Concatenates multiple log lines separated by newlines
-// Also writes the logs to the actual log file via InfoLog
+// addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle Concatenates multiple log lines separated by newlines Also writes the logs to the actual log file via InfoLog
 func (n *Want) addAggregatedLogHistory() {
 	if len(n.pendingLogs) == 0 {
 		return
 	}
 
-	// Concatenate all log messages with newlines
-	// This preserves the order and allows reading individual lines
+	// Concatenate all log messages with newlines This preserves the order and allows reading individual lines
 	logsText := ""
 	for i, log := range n.pendingLogs {
 		if i > 0 {
@@ -904,8 +830,7 @@ func (n *Want) addAggregatedLogHistory() {
 	n.pendingLogs = make([]string, 0)
 	n.stateMutex.Unlock()
 
-	// Write logs to the actual log file via InfoLog (after releasing lock to avoid holding it during I/O)
-	// Split by newlines and output each line separately so each gets a timestamp
+	// Write logs to the actual log file via InfoLog (after releasing lock to avoid holding it during I/O) Split by newlines and output each line separately so each gets a timestamp
 	lines := strings.Split(logsText, "\n")
 	for _, line := range lines {
 		if line != "" { // Skip empty lines
@@ -972,14 +897,12 @@ func (n *Want) InitializeSubscriptionSystem() {
 	}
 }
 
-// GetSubscriptionSystem returns the GLOBAL subscription system
-// All wants share the same subscription system to enable cross-want event delivery
+// GetSubscriptionSystem returns the GLOBAL subscription system All wants share the same subscription system to enable cross-want event delivery
 func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
 }
 
-// migrateAgentHistoryFromState removes agent_history from state if it exists
-// This ensures agent history is only stored in the top-level AgentHistory field
+// migrateAgentHistoryFromState removes agent_history from state if it exists This ensures agent history is only stored in the top-level AgentHistory field
 func (n *Want) migrateAgentHistoryFromState() {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
@@ -1040,8 +963,7 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
 
-	// Store final statistics
-	// Stats are now stored directly in State - no separate stats field
+	// Store final statistics Stats are now stored directly in State - no separate stats field
 
 	// Stop all running agents
 	n.StopAllAgents()
@@ -1077,8 +999,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
 
-	// Store statistics at failure
-	// Stats are now stored directly in State - no separate stats field
+	// Store statistics at failure Stats are now stored directly in State - no separate stats field
 
 	// Stop all running agents
 	n.StopAllAgents()
@@ -1098,9 +1019,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
-// SendPacketMulti broadcasts a packet to all output channels
-// This method sends packets through paths defined in the want's output paths
-// Each output path contains the channel and target want name
+// SendPacketMulti broadcasts a packet to all output channels This method sends packets through paths defined in the want's output paths Each output path contains the channel and target want name
 func (n *Want) SendPacketMulti(packet interface{}) error {
 	// Get the Want's paths to access output channels
 	paths := n.GetPaths()
@@ -1130,8 +1049,7 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 
 	// n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
 
-	// Trigger retrigger for each receiver that got the packet
-	// This is receiver-centric retrigger: if achieved want receives new packet, it should re-execute
+	// Trigger retrigger for each receiver that got the packet This is receiver-centric retrigger: if achieved want receives new packet, it should re-execute
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		for _, pathInfo := range paths.Out {
@@ -1149,14 +1067,12 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 	return nil
 }
 
-// GetType returns the want type
-// This method eliminates the need for duplicate implementations in all want types
+// GetType returns the want type This method eliminates the need for duplicate implementations in all want types
 func (n *Want) GetType() string {
 	return n.WantType
 }
 
-// GetConnectivityMetadata returns the connectivity metadata
-// This method eliminates the need for duplicate implementations in all want types
+// GetConnectivityMetadata returns the connectivity metadata This method eliminates the need for duplicate implementations in all want types
 func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
 	return n.ConnectivityMetadata
 }
@@ -1176,31 +1092,20 @@ func (n *Want) GetPaths() *Paths {
 	return &n.paths
 }
 
-// Init initializes the Want base type with metadata and spec, plus type-specific fields
-// This is a helper method used by all want constructors to reduce boilerplate
-// Usage in want types:
-//   func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
-//       w := &MyWant{Want: Want{}}
-//       w.Init(metadata, spec)  // Common initialization
-//       w.WantType = "my_type"  // Type-specific fields
-//       w.ConnectivityMetadata = ConnectivityMetadata{...}
-//       return w
-//   }
+// Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
+// w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
+// return w }
 func (n *Want) Init(metadata Metadata, spec WantSpec) {
 	n.Metadata = metadata
 	n.Spec = spec
 	n.Status = WantStatusIdle
 	n.State = make(map[string]interface{})
-	// Initialize paths field to avoid nil reference errors
-	// This is critical for the new Exec() signature that uses paths field
+	// Initialize paths field to avoid nil reference errors This is critical for the new Exec() signature that uses paths field
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 }
 
-// GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion
-// Supports both int and float64 types, returning the provided default if not found
-// Usage:
-//   count := want.GetIntParam("count", 100)  // Returns int, converts float64 if needed
+// GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion Supports both int and float64 types, returning the provided default if not found Usage: count := want.GetIntParam("count", 100)  // Returns int, converts float64 if needed
 func (n *Want) GetIntParam(key string, defaultValue int) int {
 	if value, ok := n.Spec.Params[key]; ok {
 		if intVal, ok := value.(int); ok {
@@ -1212,10 +1117,7 @@ func (n *Want) GetIntParam(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// GetFloatParam extracts a float parameter from WantSpec.Params with automatic type conversion
-// Supports both float64 and int types, returning the provided default if not found
-// Usage:
-//   rate := want.GetFloatParam("rate", 1.0)  // Returns float64, converts int if needed
+// GetFloatParam extracts a float parameter from WantSpec.Params with automatic type conversion Supports both float64 and int types, returning the provided default if not found Usage: rate := want.GetFloatParam("rate", 1.0)  // Returns float64, converts int if needed
 func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	if value, ok := n.Spec.Params[key]; ok {
 		if floatVal, ok := value.(float64); ok {
@@ -1227,10 +1129,7 @@ func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	return defaultValue
 }
 
-// GetStringParam extracts a string parameter from WantSpec.Params
-// Returns the provided default if not found or if the value is not a string
-// Usage:
-//   name := want.GetStringParam("name", "default_name")
+// GetStringParam extracts a string parameter from WantSpec.Params Returns the provided default if not found or if the value is not a string Usage: name := want.GetStringParam("name", "default_name")
 func (n *Want) GetStringParam(key string, defaultValue string) string {
 	if value, ok := n.Spec.Params[key]; ok {
 		if strVal, ok := value.(string); ok {
@@ -1252,10 +1151,7 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
-// IncrementIntState increments an integer value in State by 1
-// If the key doesn't exist, initializes it to 1
-// Returns the new value after increment
-// Usage:
+// IncrementIntState increments an integer value in State by 1 If the key doesn't exist, initializes it to 1 Returns the new value after increment Usage:
 //   count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
 	// Initialize state if needed
@@ -1283,9 +1179,7 @@ func (n *Want) IncrementIntState(key string) int {
 	return newValue
 }
 
-// GetSpec returns a pointer to the Want's Spec field
-// This provides controlled access to the Spec, following the encapsulation principle
-// Returns nil if the Want is nil
+// GetSpec returns a pointer to the Want's Spec field This provides controlled access to the Spec, following the encapsulation principle Returns nil if the Want is nil
 func (w *Want) GetSpec() *WantSpec {
 	if w == nil {
 		return nil
@@ -1293,9 +1187,7 @@ func (w *Want) GetSpec() *WantSpec {
 	return &w.Spec
 }
 
-// GetMetadata returns a pointer to the Want's Metadata field
-// This provides controlled access to the Metadata, following the encapsulation principle
-// Returns nil if the Want is nil
+// GetMetadata returns a pointer to the Want's Metadata field This provides controlled access to the Metadata, following the encapsulation principle Returns nil if the Want is nil
 func (w *Want) GetMetadata() *Metadata {
 	if w == nil {
 		return nil

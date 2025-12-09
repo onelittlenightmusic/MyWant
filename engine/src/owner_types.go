@@ -125,8 +125,7 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	allComplete := tcs.target.checkAllChildrenComplete()
 	tcs.target.childCompletionMutex.Unlock()
 
-	// If all children are complete, signal the target via channel (only for old-style blocking)
-	// Note: New implementation uses polling in Exec(), not channel-based signaling
+	// If all children are complete, signal the target via channel (only for old-style blocking) Note: New implementation uses polling in Exec(), not channel-based signaling
 	if allComplete {
 		select {
 		case tcs.target.childrenDone <- true:
@@ -144,8 +143,7 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 // checkAllChildrenComplete checks if all child wants have completed (must hold childCompletionMutex)
 func (t *Target) checkAllChildrenComplete() bool {
-	// If we have no children yet AND no completions have arrived, we can't be complete
-	// (children are still being added asynchronously)
+	// If we have no children yet AND no completions have arrived, we can't be complete (children are still being added asynchronously)
 	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
 		return false
 	}
@@ -206,8 +204,7 @@ func (t *Target) resolveRecipeParameters() {
 		resolvedParams["count"] = t.MaxDisplay
 	}
 
-	// CRITICAL: Override prefix with target name to prevent label cross-contamination
-	// Each target must have a unique prefix to namespace its child wants' labels
+	// CRITICAL: Override prefix with target name to prevent label cross-contamination Each target must have a unique prefix to namespace its child wants' labels
 	resolvedParams["prefix"] = t.Metadata.Name
 
 	// Update recipe parameters with resolved values
@@ -227,9 +224,7 @@ func (t *Target) CreateChildWants() []*Want {
 		return []*Want{}
 	}
 
-	// VALIDATION: Prevent want type name conflicts between parent and children
-	// This prevents infinite loops where a want type references a recipe that contains
-	// a want of the same type, which would cause recursive instantiation
+	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
 	for _, childWant := range config.Wants {
 		if childWant.Metadata.Type == parentType {
@@ -443,8 +438,7 @@ func (t *Target) computeTemplateResult() {
 				// Store by full type name (e.g., "qnet queue")
 				childWantsByName[want.Metadata.Type] = want
 
-				// Also extract and store by short type name
-				// For "qnet queue" -> also store as "queue"
+				// Also extract and store by short type name For "qnet queue" -> also store as "queue"
 				typeParts := strings.Fields(want.Metadata.Type)
 				if len(typeParts) > 0 {
 					lastPart := typeParts[len(typeParts)-1]
@@ -521,9 +515,7 @@ func (t *Target) computeTemplateResult() {
 
 // addChildWantsToMemory adds child wants to the memory configuration
 func (t *Target) addChildWantsToMemory() error {
-	// This is a placeholder - in a real implementation, this would
-	// interact with the ChainBuilder to add wants to the memory file
-	// For now, we'll assume the reconcile loop will pick up the wants
+	// This is a placeholder - in a real implementation, this would interact with the ChainBuilder to add wants to the memory file For now, we'll assume the reconcile loop will pick up the wants
 	t.StoreLog(fmt.Sprintf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants)))
 	return nil
 }
@@ -536,8 +528,7 @@ type OwnerAwareWant struct {
 	WantName   string
 }
 
-// NewOwnerAwareWant creates a wrapper that adds parent notification to any want
-// wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
+// NewOwnerAwareWant creates a wrapper that adds parent notification to any want wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
 func NewOwnerAwareWant(baseWant interface{}, metadata Metadata, wantPtr *Want) *OwnerAwareWant {
 	// Find target name from owner references
 	targetName := ""
@@ -645,8 +636,7 @@ func (oaw *OwnerAwareWant) SetPaths(inPaths []PathInfo, outPaths []PathInfo) {
 	}
 }
 
-// Channel delegation methods for OwnerAwareWant
-// These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
+// Channel delegation methods for OwnerAwareWant These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
 
 // GetInputChannel delegates to the stored Want
 func (oaw *OwnerAwareWant) GetInputChannel(index int) (chain.Chan, bool) {
@@ -729,8 +719,7 @@ func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
 	if oaw.Want == nil {
 		oaw.Want = want
 	}
-	// For now, we'll rely on the child wants to call our notification method directly
-	// This is a placeholder for a more sophisticated hooking mechanism
+	// For now, we'll rely on the child wants to call our notification method directly This is a placeholder for a more sophisticated hooking mechanism
 }
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
@@ -746,14 +735,8 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		return target
 	})
 
-	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction()
-	// All wants with OwnerReferences are automatically wrapped at creation time,
-	// eliminating the need for registration-time wrapping and registration order dependencies.
-	//
-	// This means:
-	// 1. Domain types can be registered in any order (QNet, Travel, etc.)
-	// 2. No need for separate "NoOwner" builder variants
-	// 3. Wrapping happens at runtime based on actual metadata, not factory registration
+	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies. 
+	// This means: 1. Domain types can be registered in any order (QNet, Travel, etc.) 2. No need for separate "NoOwner" builder variants 3. Wrapping happens at runtime based on actual metadata, not factory registration
 }
 
 // getResultFromSpec extracts a specific result value from child wants using recipe specification

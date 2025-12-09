@@ -38,8 +38,7 @@ func main() {
 		}
 	}
 
-	// Create chain builder with standard constructor
-	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+	// Create chain builder with standard constructor Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	builder := mywant.NewChainBuilder(config)
 
 	// Register domain-specific want types

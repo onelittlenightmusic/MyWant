@@ -367,20 +367,16 @@ func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent) {
 	agent.Monitor = r.genericMonitorAction
 }
 
-// genericDoAction is the default action for all DoAgents
-// Agents don't need special implementations - state initialization is externalized to want types
+// genericDoAction is the default action for all DoAgents Agents don't need special implementations - state initialization is externalized to want types
 func (r *AgentRegistry) genericDoAction(ctx context.Context, want *Want) error {
 	InfoLog("[AGENT] DoAgent executing for want: %s\n", want.Metadata.Name)
-	// State initialization happens in the want type's agent execution logic
-	// This is just a placeholder that confirms the agent executed
+	// State initialization happens in the want type's agent execution logic This is just a placeholder that confirms the agent executed
 	return nil
 }
 
-// genericMonitorAction is the default monitor for all MonitorAgents
-// Agents don't need special implementations - monitoring logic is externalized to want types
+// genericMonitorAction is the default monitor for all MonitorAgents Agents don't need special implementations - monitoring logic is externalized to want types
 func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) error {
 	InfoLog("[AGENT] MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
-	// Monitoring logic happens in the want type's agent execution logic
-	// This is just a placeholder that confirms the monitor executed
+	// Monitoring logic happens in the want type's agent execution logic This is just a placeholder that confirms the monitor executed
 	return nil
 }

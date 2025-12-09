@@ -50,10 +50,7 @@ func NewMonitorFlightAPI(name string, capabilities []string, uses []string, serv
 	}
 }
 
-// Exec polls the mock server for flight status updates
-// NOTE: This agent runs ONE TIME per ExecuteAgents() call
-// The continuous polling loop is handled by the Want's Exec method (FlightWant)
-// Individual agents should NOT implement their own polling loops
+// Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Exec method (FlightWant) Individual agents should NOT implement their own polling loops
 func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Get flight ID from state (set by AgentFlightAPI)
 	flightID, exists := want.GetState("flight_id")
@@ -72,8 +69,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	// Check if enough time has passed since last poll (5-second polling interval)
-	// This prevents excessive polling even when Exec() is called frequently (every 100ms)
+	// Check if enough time has passed since last poll (5-second polling interval) This prevents excessive polling even when Exec() is called frequently (every 100ms)
 	now := time.Now()
 	if !m.LastPollTime.IsZero() && now.Sub(m.LastPollTime) < m.PollInterval {
 		// Skip this polling cycle - wait for PollInterval to elapse
@@ -92,8 +88,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		m.LastKnownStatus = "unknown" // Default if not found in state
 	}
 
-	// Restore status history from want state for persistence
-	// Do NOT clear history - it accumulates across multiple monitoring executions
+	// Restore status history from want state for persistence Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
 		if historyStrs, ok := historyI.([]interface{}); ok {
 			for _, entryI := range historyStrs {
@@ -163,9 +158,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	currentStateJSON, _ := json.Marshal(reservation)
 	currentStateHash := fmt.Sprintf("%x", md5.Sum(currentStateJSON))
 
-	// Only update state if state has actually changed (differential history)
-	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
-	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+	// Only update state if state has actually changed (differential history) NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go Individual agents should NOT call BeginExecCycle/EndExecCycle
 	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
 		updates := map[string]interface{}{
 			"flight_id":      reservation.ID,
@@ -233,8 +226,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			m.LastRecordedStateHash = currentStateHash
 			want.StoreLog(fmt.Sprintf("State recorded (hash: %s)", currentStateHash[:8]))
 		} else {
-			// No status change - don't create history entry, but still update other flight details
-			// Removed verbose log: "Flight details changed but status is still: ..."
+			// No status change - don't create history entry, but still update other flight details Removed verbose log: "Flight details changed but status is still: ..."
 			m.LastRecordedStateHash = currentStateHash
 		}
 		want.StoreStateMulti(updates)
@@ -253,9 +245,7 @@ func (m *MonitorFlightAPI) WasStatusChanged() bool {
 	return len(m.StatusChangeHistory) > 0
 }
 
-// parseStatusHistoryEntry parses a status history entry with format:
-// "HH:MM:SS: OldStatus -> NewStatus (Details)"
-// This uses string manipulation instead of fmt.Sscanf to properly handle status strings with spaces
+// parseStatusHistoryEntry parses a status history entry with format: "HH:MM:SS: OldStatus -> NewStatus (Details)" This uses string manipulation instead of fmt.Sscanf to properly handle status strings with spaces
 func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	// Find the first colon that separates timestamp from status transition
 	colonIdx := findFirstColon(entry)

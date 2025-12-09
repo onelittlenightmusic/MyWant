@@ -166,8 +166,7 @@ type RecipeFile struct {
 
 // loadDefaultRecipes provides fallback hardcoded recipes (simplified)
 func (rl *RecipeLoader) loadDefaultRecipes() error {
-	// Since we have recipe files in the recipes directory,
-	// we don't need complex default recipes anymore
+	// Since we have recipe files in the recipes directory, we don't need complex default recipes anymore
 	InfoLog("[RECIPE] No recipe directory found, but using simplified defaults\n")
 	return nil
 }
@@ -293,8 +292,7 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 	return want, nil
 }
 
-// generateLabels is deprecated - labels should be defined in recipe files
-// This function is kept for legacy compatibility but should not be used for new recipes
+// generateLabels is deprecated - labels should be defined in recipe files This function is kept for legacy compatibility but should not be used for new recipes
 func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]string {
 	// Return empty map - all labels should be explicitly defined in recipes
 	labels := make(map[string]string)

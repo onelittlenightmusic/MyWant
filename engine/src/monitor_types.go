@@ -122,8 +122,7 @@ func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 				err := monitorAgent.Monitor(context.Background(), mw.Want)
 				if err != nil {
 					log.Printf("❌ Monitor %s agent execution failed: %v\n", mw.Want.Metadata.Name, err)
-					// Optionally set want status to failed, but continue monitoring
-					// mw.Want.SetStatus(WantStatusFailed)
+					// Optionally set want status to failed, but continue monitoring mw.Want.SetStatus(WantStatusFailed)
 				}
 			}
 		}

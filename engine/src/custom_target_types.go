@@ -182,8 +182,7 @@ func NewQueueSystemTarget(metadata Metadata, spec WantSpec) *Target {
 	// Create base target with queue system specific defaults
 	baseSpec := spec
 
-	// Set default recipe if not specified
-	// Note: Recipe field removed - using direct params instead
+	// Set default recipe if not specified Note: Recipe field removed - using direct params instead
 
 	// Merge with queue system defaults
 	if baseSpec.Params == nil {

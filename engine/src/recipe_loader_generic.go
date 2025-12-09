@@ -30,8 +30,7 @@ type GenericRecipe struct {
 	Recipe RecipeContent `yaml:"recipe" json:"recipe"`
 }
 
-// RecipeResult defines how to compute results from recipe execution
-// Supports both legacy format (primary/metrics) and new flat array format
+// RecipeResult defines how to compute results from recipe execution Supports both legacy format (primary/metrics) and new flat array format
 type RecipeResult []RecipeResultSpec
 
 // RecipeResultSpec specifies which want and stat to use for result computation
@@ -334,10 +333,7 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 		want.Metadata.Labels = namespacedLabels
 	}
 
-	// Namespace all using selectors with owner prefix
-	// CRITICAL: The using selector values must match the namespaced label values in other wants
-	// Example: if want A has label "role: scheduler" which becomes "role: travel:scheduler",
-	// and want B has using "role: scheduler", it must become "role: travel:scheduler"
+	// Namespace all using selectors with owner prefix CRITICAL: The using selector values must match the namespaced label values in other wants Example: if want A has label "role: scheduler" which becomes "role: travel:scheduler", and want B has using "role: scheduler", it must become "role: travel:scheduler"
 	// to match the namespaced label in want A
 	if want.Spec.Using != nil {
 		for i := range want.Spec.Using {
@@ -421,19 +417,15 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, 
 	return substituted
 }
 
-// autoConnect implements auto-connection logic for RecipeAgent wants
-// NOTE: This is legacy recipe-level auto-connection.
-// The real auto-connection happens system-wide during the connection phase in declarative.go
+// autoConnect implements auto-connection logic for RecipeAgent wants NOTE: This is legacy recipe-level auto-connection. The real auto-connection happens system-wide during the connection phase in declarative.go
 func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, params map[string]interface{}) *Want {
-	// Recipe-level auto-connection is limited because it can only see wants within the same recipe
-	// System-wide auto-connection in declarative.go handles the full implementation
+	// Recipe-level auto-connection is limited because it can only see wants within the same recipe System-wide auto-connection in declarative.go handles the full implementation
 	return want
 }
 
 // validateRecipeWithSpec validates recipe YAML data against the recipe OpenAPI spec
 func validateRecipeWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec for recipes
-	// Try to find the spec directory - check both "spec" and "../spec"
+	// Load the OpenAPI spec for recipes Try to find the spec directory - check both "spec" and "../spec"
 	specPath := "spec/recipe-spec.yaml"
 	if _, err := os.Stat("spec"); os.IsNotExist(err) {
 		specPath = "../spec/recipe-spec.yaml"
@@ -587,8 +579,7 @@ func validateRecipeWantsStructure(wants interface{}) error {
 	return nil
 }
 
-// validateRecipeResultStructure validates the structure of recipe result
-// Supports both legacy format (object with primary/metrics) and new format (flat array)
+// validateRecipeResultStructure validates the structure of recipe result Supports both legacy format (object with primary/metrics) and new format (flat array)
 func validateRecipeResultStructure(result interface{}) error {
 	// Try new format first (flat array)
 	if resultArray, ok := result.([]interface{}); ok {

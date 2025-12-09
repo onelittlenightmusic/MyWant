@@ -61,8 +61,7 @@ type DoAgent struct {
 
 func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
 	if a.Action != nil {
-		// Begin batching cycle for all state changes from agent execution
-		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+		// Begin batching cycle for all state changes from agent execution This includes agent-generated state changes and any subsequent SetSchedule() calls
 		want.BeginExecCycle()
 
 		err := a.Action(ctx, want)
@@ -82,8 +81,7 @@ type MonitorAgent struct {
 
 func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
 	if a.Monitor != nil {
-		// Begin batching cycle for all state changes from agent execution
-		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+		// Begin batching cycle for all state changes from agent execution This includes agent-generated state changes and any subsequent SetSchedule() calls
 		want.BeginExecCycle()
 
 		err := a.Monitor(ctx, want)

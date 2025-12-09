@@ -8,8 +8,7 @@ import (
 
 // DataHandler defines the interface for processing received coordinator data
 type DataHandler interface {
-	// ProcessData handles incoming data from a specific input channel
-	// channelIndex indicates which input channel the data came from
+	// ProcessData handles incoming data from a specific input channel channelIndex indicates which input channel the data came from
 	ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool
 	// GetStateUpdates returns state updates to apply after data collection
 	GetStateUpdates(want *CoordinatorWant) map[string]interface{}
@@ -27,8 +26,7 @@ type CompletionChecker interface {
 	OnCompletion(want *CoordinatorWant)
 }
 
-// CoordinatorWant is a generic coordinator that collects data from multiple input channels
-// and processes it according to customizable handlers
+// CoordinatorWant is a generic coordinator that collects data from multiple input channels and processes it according to customizable handlers
 type CoordinatorWant struct {
 	Want
 	RequiredInputCount int
@@ -39,8 +37,7 @@ type CoordinatorWant struct {
 	channelsHeard 		map[int]bool
 }
 
-// NewCoordinatorWant creates a new generic coordinator want
-// It automatically determines the required inputs and handlers based on the want type
+// NewCoordinatorWant creates a new generic coordinator want It automatically determines the required inputs and handlers based on the want type
 func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
@@ -76,10 +73,7 @@ func NewCoordinatorWant(
 	return coordinator
 }
 
-// getCoordinatorConfig returns the configuration for a coordinator based on its type and parameters
-// It determines the data handler and completion checker based on:
-// 1. The want type from metadata
-// 2. Coordinator-specific parameters (coordinator_level, coordinator_type, is_buffet, required_inputs)
+// getCoordinatorConfig returns the configuration for a coordinator based on its type and parameters It determines the data handler and completion checker based on: 1. The want type from metadata 2. Coordinator-specific parameters (coordinator_level, coordinator_type, is_buffet, required_inputs)
 // This enables full customization of coordinator behavior through parameters
 func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {
 	// Get parameters from want specs
@@ -88,8 +82,7 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 	isBuffetParam := want.GetBoolParam("is_buffet", false)
 	coordinatorTypeParam := want.GetStringParam("coordinator_type", "")
 
-	// Determine handler based on coordinator type and parameters
-	// Priority: explicit params > type-specific defaults > generic fallback
+	// Determine handler based on coordinator type and parameters Priority: explicit params > type-specific defaults > generic fallback
 
 	// Determine approval level from coordinator type name (backward compat) or parameter
 	approvalLevel := coordinatorLevel
@@ -126,8 +119,7 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		}
 	}
 
-	// Get completion timeout parameter (default: 0 seconds = immediate completion)
-	// Set to non-zero (e.g., 60) to wait for delayed packets like Flight rebooking
+	// Get completion timeout parameter (default: 0 seconds = immediate completion) Set to non-zero (e.g., 60) to wait for delayed packets like Flight rebooking
 	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 0)
 	completionTimeout := time.Duration(completionTimeoutSeconds) * time.Second
 
@@ -139,31 +131,22 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
-// Exec executes the coordinator logic using unified completion strategy
-// Strategy: Each input channel must send at least one value. When all connected channels
-// have sent at least one value, the coordinator completes.
-// When a new channel is added, the coordinator automatically re-executes with the new channel.
-// Completion is determined by tracking which channels have sent data in the current execution cycle.
-// This simple approach automatically handles topology changes without needing cache resets.
+// Exec executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
+// Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Exec() bool {
 	inCount := c.GetInCount()
 
 	c.StoreLog(fmt.Sprintf("[COORDINATOR] Started"))
 
-	// // CRITICAL: Reset channelsHeard at the start of each execution cycle
-	// // This ensures that when a coordinator is retriggered (e.g., to receive a rebooked packet),
-	// // it doesn't think it has already received all packets from the previous execution.
-	// // Without this reset, a retriggered coordinator would complete immediately.
+	// // CRITICAL: Reset channelsHeard at the start of each execution cycle // This ensures that when a coordinator is retriggered (e.g., to receive a rebooked packet), // it doesn't think it has already received all packets from the previous execution. // Without this reset, a retriggered coordinator would complete immediately.
 	// c.channelsHeard = make(map[int]bool)
 
-	// Track which channels we've received data from in this execution cycle
-	// This is a local map - NOT persisted to state, only used for completion detection
+	// Track which channels we've received data from in this execution cycle This is a local map - NOT persisted to state, only used for completion detection
 
 	timeout := 2000
 	// loop while receiving data packets
 	for {
-		// time.Sleep(1000*time.Millisecond)
-		// Try to receive one data packet from any input channel
+		// time.Sleep(1000*time.Millisecond) Try to receive one data packet from any input channel
 		channelIndex, data, received := c.ReceiveFromAnyInputChannel(timeout)
 		if received {
 			// Data received: mark channel as heard and process it
@@ -176,18 +159,12 @@ func (c *CoordinatorWant) Exec() bool {
 		}
 	}
 
-	// Check completion: have we heard from all required input channels?
-	// This approach is simpler than len(data_by_channel) and automatically
-	// handles topology changes without needing cache resets
+	// Check completion: have we heard from all required input channels? This approach is simpler than len(data_by_channel) and automatically handles topology changes without needing cache resets
 	return c.tryCompletion(inCount, c.channelsHeard)
 }
 
-// tryCompletion checks if all required data has been received and handles completion
-// Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights)
-// Strategy:
-// 1. When all channels first send data, record the time
-// 2. Wait for the completion timeout to expire (allows delayed packets)
-// 3. Only then mark as completed and reset channelsHeard for potential new packets
+// tryCompletion checks if all required data has been received and handles completion Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights) Strategy: 1. When all channels first send data, record the time
+// 2. Wait for the completion timeout to expire (allows delayed packets) 3. Only then mark as completed and reset channelsHeard for potential new packets
 func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) bool {
 	// Apply state updates from data handler
 	stateUpdates := c.DataHandler.GetStateUpdates(c)
@@ -245,8 +222,7 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 	return true
 }
 
-// checkAllChannelsRepresentedInCache verifies the data handler's cache has
-// packets from all connected channels using common logic
+// checkAllChannelsRepresentedInCache verifies the data handler's cache has packets from all connected channels using common logic
 func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 	// Common logic for all handlers: check data_by_channel
 	dataByChannelVal, _ := c.GetState("data_by_channel")
@@ -271,8 +247,7 @@ func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 		return false
 	}
 
-	// All channels have sent at least one packet
-	// Now check if enough time has passed since the last packet (allows for delayed packets like Rebook)
+	// All channels have sent at least one packet Now check if enough time has passed since the last packet (allows for delayed packets like Rebook)
 	completionTimeout := c.DataHandler.GetCompletionTimeout()
 	if completionTimeout > 0 {
 		lastPacketTimeVal, _ := c.GetState("last_packet_time")
@@ -291,9 +266,7 @@ func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 	return true
 }
 
-// ============================================================================
-// Approval-Specific Handlers
-// ============================================================================
+// ============================================================================ Approval-Specific Handlers ============================================================================
 
 // ApprovalDataHandler handles approval-specific data processing
 type ApprovalDataHandler struct {
@@ -401,16 +374,13 @@ func (h *ApprovalDataHandler) GetCompletionTimeout() time.Duration {
 	return 0
 }
 
-// ApprovalCompletionChecker checks if approval data is complete
-// In unified coordinator: completion is handled by checking if all connected channels
-// have sent at least one value. This checker is now optional but kept for backward compatibility.
+// ApprovalCompletionChecker checks if approval data is complete In unified coordinator: completion is handled by checking if all connected channels have sent at least one value. This checker is now optional but kept for backward compatibility.
 type ApprovalCompletionChecker struct {
 	Level int // 1 or 2
 }
 
 func (c *ApprovalCompletionChecker) IsComplete(want *CoordinatorWant, requiredInputs int) bool {
-	// In unified coordinator, completion is determined by whether all channels
-	// have sent at least one value (handled in Exec). This is kept for compatibility.
+	// In unified coordinator, completion is determined by whether all channels have sent at least one value (handled in Exec). This is kept for compatibility.
 	evidenceVal, _ := want.GetStateBool("evidence_received", false)
 	descriptionVal, _ := want.GetStateBool("description_received", false)
 	return evidenceVal && descriptionVal
@@ -443,9 +413,7 @@ func (c *ApprovalCompletionChecker) OnCompletion(want *CoordinatorWant) {
 		approvalID, status, approverID, time.Now().Format("15:04:05")))
 }
 
-// ============================================================================
-// Travel-Specific Handlers
-// ============================================================================
+// ============================================================================ Travel-Specific Handlers ============================================================================
 
 // TravelDataHandler handles travel-specific data processing
 type TravelDataHandler struct {
@@ -488,8 +456,7 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	totalPackets := totalPacketsVal + 1
 
-	// Update persistent state with generic key
-	// Don't overwrite last_packet_time if it's already been set (for timeout tracking)
+	// Update persistent state with generic key Don't overwrite last_packet_time if it's already been set (for timeout tracking)
 	stateUpdates := map[string]interface{}{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
@@ -568,16 +535,13 @@ func (h *TravelDataHandler) GetCompletionTimeout() time.Duration {
 	return h.CompletionTimeout
 }
 
-// TravelCompletionChecker checks if all travel schedules have been collected
-// In unified coordinator: completion is handled by checking if all connected channels
-// have sent at least one value (handled in Exec). This checker is now optional but kept for backward compatibility.
+// TravelCompletionChecker checks if all travel schedules have been collected In unified coordinator: completion is handled by checking if all connected channels have sent at least one value (handled in Exec). This checker is now optional but kept for backward compatibility.
 type TravelCompletionChecker struct {
 	IsBuffet bool // If true, expect only 1 schedule
 }
 
 func (c *TravelCompletionChecker) IsComplete(want *CoordinatorWant, requiredInputs int) bool {
-	// In unified coordinator, completion is determined by whether all channels
-	// have sent at least one value (handled in Exec). This is kept for compatibility.
+	// In unified coordinator, completion is determined by whether all channels have sent at least one value (handled in Exec). This is kept for compatibility.
 	schedulesByChannelVal, _ := want.GetState("schedules_by_channel")
 	schedulesByChannel, _ := schedulesByChannelVal.(map[int][]*TravelSchedule)
 

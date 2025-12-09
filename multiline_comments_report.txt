@@ -1,0 +1,2355 @@
+====================================================================================================
+MULTI-LINE COMMENTS IN engine/ DIRECTORY - FULL REPORT
+====================================================================================================
+
+Total: 292 multi-line comments
+
+
+====================================================================================================
+#1 - engine/cmd/demos/demo_qnet_owner.go
+Lines: 41-42 (2 lines)
+====================================================================================================
+	// Create chain builder with standard constructor
+	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+
+====================================================================================================
+#2 - engine/cmd/demos/demo_travel_recipe.go
+Lines: 27-31 (5 lines)
+====================================================================================================
+	// Get duration from command line (default 120 seconds for full delay cycle)
+	// Mock server timeline:
+	// T+0s: confirmed
+	// T+40s: delayed_one_day (trigger rebooking)
+	// T+80s: confirmed again
+
+====================================================================================================
+#3 - engine/cmd/demos/demo_travel_recipe.go
+Lines: 55-56 (2 lines)
+====================================================================================================
+	// Create chain builder with standard constructor
+	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+
+====================================================================================================
+#4 - engine/cmd/demos/demo_travel_recipe.go
+Lines: 62-63 (2 lines)
+====================================================================================================
+	// Load capabilities from YAML files (from project root, accounting for engine subdirectory)
+	// Try both relative paths since go run -C engine changes the working directory
+
+====================================================================================================
+#5 - engine/cmd/demos/demo_travel_recipe.go
+Lines: 103-104 (2 lines)
+====================================================================================================
+	// Manually register the AgentFlightAPI agent with the loaded capability
+	// This ensures we have the flight API agent available with proper implementation
+
+====================================================================================================
+#6 - engine/cmd/server/main.go
+Lines: 171-172 (2 lines)
+====================================================================================================
+	// Create global builder for server mode with empty config
+	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+
+====================================================================================================
+#7 - engine/cmd/server/main.go
+Lines: 185-186 (2 lines)
+====================================================================================================
+	// Register dynamic agent implementations on global registry
+	// This provides the actual Action/Monitor functions for YAML-loaded agents
+
+====================================================================================================
+#8 - engine/cmd/server/main.go
+Lines: 407-408 (2 lines)
+====================================================================================================
+// createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files
+// Uses the same logic as offline demo programs for DRY principle
+
+====================================================================================================
+#9 - engine/cmd/server/main.go
+Lines: 460-461 (2 lines)
+====================================================================================================
+// executeConfigLikeDemo executes config using the same logic as demo programs
+// This is the DRY implementation that reuses offline mode logic
+
+====================================================================================================
+#10 - engine/cmd/server/main.go
+Lines: 525-526 (2 lines)
+====================================================================================================
+			// Set up the Flight API agent with the actual implementation
+			// Agent has flight_api_agency capability which gives: create_flight and cancel_flight
+
+====================================================================================================
+#11 - engine/cmd/server/main.go
+Lines: 543-544 (2 lines)
+====================================================================================================
+			// Set up the Monitor Flight agent with the actual implementation
+			// Note: Monitor agents don't provide capabilities, they observe/monitor state
+
+====================================================================================================
+#12 - engine/cmd/server/main.go
+Lines: 556-559 (4 lines)
+====================================================================================================
+// createWant handles POST /api/v1/wants - creates a new want object
+// Supports two formats:
+// 1. Single Want object (JSON/YAML)
+// 2. Config object with wants array (for recipe-based configs)
+
+====================================================================================================
+#13 - engine/cmd/server/main.go
+Lines: 686-687 (2 lines)
+====================================================================================================
+	// Collect all wants from all executions in memory dump format
+	// Use map to deduplicate wants by ID (same want may exist across multiple executions)
+
+====================================================================================================
+#14 - engine/cmd/server/main.go
+Lines: 928-929 (2 lines)
+====================================================================================================
+	// Use ChainBuilder's UpdateWant API - automatically triggers reconciliation
+	// UpdateWant handles reconciliation internally via reconcileTrigger channel
+
+====================================================================================================
+#15 - engine/cmd/server/main.go
+Lines: 1010-1014 (5 lines)
+====================================================================================================
+				// NOTE: Do NOT call SetConfigInternal with partial execution config!
+				// API-created wants from different executions should not affect the global config.
+				// The global config is only for wants loaded from YAML files or recipe-based creation.
+				// Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
+				// This was the root cause of the bug where deleting buffet caused coordinator to be deleted.
+
+====================================================================================================
+#16 - engine/cmd/server/main.go
+Lines: 1916-1917 (2 lines)
+====================================================================================================
+	// Register all want types on global builder before starting reconcile loop
+	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+
+====================================================================================================
+#17 - engine/cmd/server/main.go
+Lines: 1967-1969 (3 lines)
+====================================================================================================
+// validateWantTypes validates that all want types are known before execution
+// Uses the global builder which has all registries already configured
+// Allows either want.Type or want.Spec.Recipe to be specified
+
+====================================================================================================
+#18 - engine/cmd/server/main.go
+Lines: 1971-1973 (3 lines)
+====================================================================================================
+	// Check each want type by trying to create a minimal want
+	// Using globalBuilder ensures we validate against the exact same registries
+	// that will be used during actual execution
+
+====================================================================================================
+#19 - engine/cmd/server/main.go
+Lines: 1999-2000 (2 lines)
+====================================================================================================
+		// Try to create the want function to check if type is valid
+		// This uses the globalBuilder which has all registries synchronized
+
+====================================================================================================
+#20 - engine/cmd/server/main.go
+Lines: 2389-2390 (2 lines)
+====================================================================================================
+	// Collect all unique label keys and their values from all wants
+	// Also track which wants use each label
+
+====================================================================================================
+#21 - engine/cmd/server/main.go
+Lines: 2395-2396 (2 lines)
+====================================================================================================
+	// Start with globally registered labels (added via POST /api/v1/labels)
+	// These labels don't have owners - they're just registered labels
+
+====================================================================================================
+#22 - engine/cmd/server/main.go
+Lines: 2592-2594 (3 lines)
+====================================================================================================
+// addLabel handles POST /api/v1/labels - adds a label to the global label registry
+// This allows registering labels even if they don't exist on any want yet
+// Labels are stored by adding a minimal want to the global builder's state for persistence
+
+====================================================================================================
+#23 - engine/cmd/server/main.go
+Lines: 2618-2619 (2 lines)
+====================================================================================================
+	// Add the label to the global label registry (a separate tracking structure)
+	// Labels are registered here and displayed in getLabels without creating wants
+
+====================================================================================================
+#24 - engine/cmd/server/main.go
+Lines: 2721-2726 (6 lines)
+====================================================================================================
+	// Parse command line arguments: [port] [host] [debug]
+	// Examples:
+	//   ./server           - port 8080, localhost, no debug
+	//   ./server 8080      - port 8080, localhost, no debug
+	//   ./server 8080 0.0.0.0 - port 8080, 0.0.0.0, no debug
+	//   ./server 8080 0.0.0.0 debug - port 8080, 0.0.0.0, debug enabled
+
+====================================================================================================
+#25 - engine/cmd/types/agent_flight.go
+Lines: 34-36 (3 lines)
+====================================================================================================
+// Exec executes flight agent actions and returns FlightSchedule
+// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+// Individual agents should NOT call BeginExecCycle/EndExecCycle
+
+====================================================================================================
+#26 - engine/cmd/types/agent_flight.go
+Lines: 41-42 (2 lines)
+====================================================================================================
+	// Store the result using StoreState method
+	// NOTE: Wrapping is handled by the framework, not here
+
+====================================================================================================
+#27 - engine/cmd/types/agent_flight_api.go
+Lines: 16-19 (4 lines)
+====================================================================================================
+// AgentFlightAPI creates and manages flight reservations via REST API
+// Provides two capabilities from flight_api_agency:
+// - create_flight: Exec() method creates new flight reservations via POST /api/flights
+// - cancel_flight: CancelFlight() method cancels existing flights via DELETE /api/flights/{id}
+
+====================================================================================================
+#28 - engine/cmd/types/agent_flight_api.go
+Lines: 63-65 (3 lines)
+====================================================================================================
+// Exec implements the Agent interface and handles both create_flight and cancel_flight actions
+// Reads the "flight_action" state to determine which action to perform
+// This satisfies the agent framework's requirement for Exec() method
+
+====================================================================================================
+#29 - engine/cmd/types/agent_flight_api.go
+Lines: 97-106 (10 lines)
+====================================================================================================
+// CreateFlight implements the create_flight capability
+// Creates a flight reservation via POST /api/flights to the mock server
+// Flight status lifecycle:
+// 1. "in process" - while registration is in progress
+// 2. "created" - after successful API response
+// 3. "confirmed" - when monitor api checks the status
+// Supports two date parameter formats:
+// 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
+// 2. departure_time: RFC3339 format - used directly
+// When rebooking (previous_flight_id exists), generates new flight number and adjusted departure time
+
+====================================================================================================
+#30 - engine/cmd/types/agent_flight_api.go
+Lines: 126-127 (2 lines)
+====================================================================================================
+		// Generate alternative flight numbers based on base flight
+		// e.g., AA100 -> AA101, AA102, etc.
+
+====================================================================================================
+#31 - engine/cmd/types/agent_flight_api.go
+Lines: 143-144 (2 lines)
+====================================================================================================
+	// Parse departure and arrival times
+	// First try to get departure_date parameter (YYYY-MM-DD format)
+
+====================================================================================================
+#32 - engine/cmd/types/agent_flight_api.go
+Lines: 233-235 (3 lines)
+====================================================================================================
+	// Store reservation in want state
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+
+====================================================================================================
+#33 - engine/cmd/types/agent_flight_api.go
+Lines: 267-268 (2 lines)
+====================================================================================================
+// CancelFlight implements the cancel_flight capability
+// Cancels a flight reservation via DELETE /api/flights/{id} to the mock server
+
+====================================================================================================
+#34 - engine/cmd/types/agent_flight_api.go
+Lines: 302-305 (4 lines)
+====================================================================================================
+	// Update state
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework
+	// IMPORTANT: Do NOT clear agent_result here - it's needed for rebooking phase to detect
+	// that a new agent execution is required. Only clear after rebooking is complete.
+
+====================================================================================================
+#35 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 53-56 (4 lines)
+====================================================================================================
+// Exec polls the mock server for flight status updates
+// NOTE: This agent runs ONE TIME per ExecuteAgents() call
+// The continuous polling loop is handled by the Want's Exec method (FlightWant)
+// Individual agents should NOT implement their own polling loops
+
+====================================================================================================
+#36 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 75-76 (2 lines)
+====================================================================================================
+	// Check if enough time has passed since last poll (5-second polling interval)
+	// This prevents excessive polling even when Exec() is called frequently (every 100ms)
+
+====================================================================================================
+#37 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 95-96 (2 lines)
+====================================================================================================
+	// Restore status history from want state for persistence
+	// Do NOT clear history - it accumulates across multiple monitoring executions
+
+====================================================================================================
+#38 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 166-168 (3 lines)
+====================================================================================================
+	// Only update state if state has actually changed (differential history)
+	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
+	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+
+====================================================================================================
+#39 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 236-237 (2 lines)
+====================================================================================================
+			// No status change - don't create history entry, but still update other flight details
+			// Removed verbose log: "Flight details changed but status is still: ..."
+
+====================================================================================================
+#40 - engine/cmd/types/agent_monitor_flight_api.go
+Lines: 256-258 (3 lines)
+====================================================================================================
+// parseStatusHistoryEntry parses a status history entry with format:
+// "HH:MM:SS: OldStatus -> NewStatus (Details)"
+// This uses string manipulation instead of fmt.Sscanf to properly handle status strings with spaces
+
+====================================================================================================
+#41 - engine/cmd/types/approval_types.go
+Lines: 96-97 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant
+// Returns 100 if evidence has been provided, 0 otherwise
+
+====================================================================================================
+#42 - engine/cmd/types/approval_types.go
+Lines: 177-178 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant
+// Returns 100 if description has been provided, 0 otherwise
+
+====================================================================================================
+#43 - engine/cmd/types/approval_types.go
+Lines: 187-188 (2 lines)
+====================================================================================================
+// Level1CoordinatorWant handles Level 1 approval coordination
+// Note: This type is kept for backward compatibility but NewCoordinatorWant is preferred
+
+====================================================================================================
+#44 - engine/cmd/types/approval_types.go
+Lines: 324-326 (3 lines)
+====================================================================================================
+// Level1CoordinatorWant and Level2CoordinatorWant now use the generic CoordinatorWant
+// with ApprovalDataHandler and ApprovalCompletionChecker
+// The type field in metadata determines the configuration automatically
+
+====================================================================================================
+#45 - engine/cmd/types/approval_types.go
+Lines: 332-333 (2 lines)
+====================================================================================================
+	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
+	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
+
+====================================================================================================
+#46 - engine/cmd/types/coordinator_types.go
+Lines: 11-12 (2 lines)
+====================================================================================================
+	// ProcessData handles incoming data from a specific input channel
+	// channelIndex indicates which input channel the data came from
+
+====================================================================================================
+#47 - engine/cmd/types/coordinator_types.go
+Lines: 30-31 (2 lines)
+====================================================================================================
+// CoordinatorWant is a generic coordinator that collects data from multiple input channels
+// and processes it according to customizable handlers
+
+====================================================================================================
+#48 - engine/cmd/types/coordinator_types.go
+Lines: 42-43 (2 lines)
+====================================================================================================
+// NewCoordinatorWant creates a new generic coordinator want
+// It automatically determines the required inputs and handlers based on the want type
+
+====================================================================================================
+#49 - engine/cmd/types/coordinator_types.go
+Lines: 79-83 (5 lines)
+====================================================================================================
+// getCoordinatorConfig returns the configuration for a coordinator based on its type and parameters
+// It determines the data handler and completion checker based on:
+// 1. The want type from metadata
+// 2. Coordinator-specific parameters (coordinator_level, coordinator_type, is_buffet, required_inputs)
+// This enables full customization of coordinator behavior through parameters
+
+====================================================================================================
+#50 - engine/cmd/types/coordinator_types.go
+Lines: 91-92 (2 lines)
+====================================================================================================
+	// Determine handler based on coordinator type and parameters
+	// Priority: explicit params > type-specific defaults > generic fallback
+
+====================================================================================================
+#51 - engine/cmd/types/coordinator_types.go
+Lines: 129-130 (2 lines)
+====================================================================================================
+	// Get completion timeout parameter (default: 0 seconds = immediate completion)
+	// Set to non-zero (e.g., 60) to wait for delayed packets like Flight rebooking
+
+====================================================================================================
+#52 - engine/cmd/types/coordinator_types.go
+Lines: 142-147 (6 lines)
+====================================================================================================
+// Exec executes the coordinator logic using unified completion strategy
+// Strategy: Each input channel must send at least one value. When all connected channels
+// have sent at least one value, the coordinator completes.
+// When a new channel is added, the coordinator automatically re-executes with the new channel.
+// Completion is determined by tracking which channels have sent data in the current execution cycle.
+// This simple approach automatically handles topology changes without needing cache resets.
+
+====================================================================================================
+#53 - engine/cmd/types/coordinator_types.go
+Lines: 153-157 (5 lines)
+====================================================================================================
+	// // CRITICAL: Reset channelsHeard at the start of each execution cycle
+	// // This ensures that when a coordinator is retriggered (e.g., to receive a rebooked packet),
+	// // it doesn't think it has already received all packets from the previous execution.
+	// // Without this reset, a retriggered coordinator would complete immediately.
+	// c.channelsHeard = make(map[int]bool)
+
+====================================================================================================
+#54 - engine/cmd/types/coordinator_types.go
+Lines: 159-160 (2 lines)
+====================================================================================================
+	// Track which channels we've received data from in this execution cycle
+	// This is a local map - NOT persisted to state, only used for completion detection
+
+====================================================================================================
+#55 - engine/cmd/types/coordinator_types.go
+Lines: 165-166 (2 lines)
+====================================================================================================
+		// time.Sleep(1000*time.Millisecond)
+		// Try to receive one data packet from any input channel
+
+====================================================================================================
+#56 - engine/cmd/types/coordinator_types.go
+Lines: 179-181 (3 lines)
+====================================================================================================
+	// Check completion: have we heard from all required input channels?
+	// This approach is simpler than len(data_by_channel) and automatically
+	// handles topology changes without needing cache resets
+
+====================================================================================================
+#57 - engine/cmd/types/coordinator_types.go
+Lines: 185-190 (6 lines)
+====================================================================================================
+// tryCompletion checks if all required data has been received and handles completion
+// Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights)
+// Strategy:
+// 1. When all channels first send data, record the time
+// 2. Wait for the completion timeout to expire (allows delayed packets)
+// 3. Only then mark as completed and reset channelsHeard for potential new packets
+
+====================================================================================================
+#58 - engine/cmd/types/coordinator_types.go
+Lines: 248-249 (2 lines)
+====================================================================================================
+// checkAllChannelsRepresentedInCache verifies the data handler's cache has
+// packets from all connected channels using common logic
+
+====================================================================================================
+#59 - engine/cmd/types/coordinator_types.go
+Lines: 274-275 (2 lines)
+====================================================================================================
+	// All channels have sent at least one packet
+	// Now check if enough time has passed since the last packet (allows for delayed packets like Rebook)
+
+====================================================================================================
+#60 - engine/cmd/types/coordinator_types.go
+Lines: 294-296 (3 lines)
+====================================================================================================
+// ============================================================================
+// Approval-Specific Handlers
+// ============================================================================
+
+====================================================================================================
+#61 - engine/cmd/types/coordinator_types.go
+Lines: 404-406 (3 lines)
+====================================================================================================
+// ApprovalCompletionChecker checks if approval data is complete
+// In unified coordinator: completion is handled by checking if all connected channels
+// have sent at least one value. This checker is now optional but kept for backward compatibility.
+
+====================================================================================================
+#62 - engine/cmd/types/coordinator_types.go
+Lines: 412-413 (2 lines)
+====================================================================================================
+	// In unified coordinator, completion is determined by whether all channels
+	// have sent at least one value (handled in Exec). This is kept for compatibility.
+
+====================================================================================================
+#63 - engine/cmd/types/coordinator_types.go
+Lines: 446-448 (3 lines)
+====================================================================================================
+// ============================================================================
+// Travel-Specific Handlers
+// ============================================================================
+
+====================================================================================================
+#64 - engine/cmd/types/coordinator_types.go
+Lines: 491-492 (2 lines)
+====================================================================================================
+	// Update persistent state with generic key
+	// Don't overwrite last_packet_time if it's already been set (for timeout tracking)
+
+====================================================================================================
+#65 - engine/cmd/types/coordinator_types.go
+Lines: 571-573 (3 lines)
+====================================================================================================
+// TravelCompletionChecker checks if all travel schedules have been collected
+// In unified coordinator: completion is handled by checking if all connected channels
+// have sent at least one value (handled in Exec). This checker is now optional but kept for backward compatibility.
+
+====================================================================================================
+#66 - engine/cmd/types/coordinator_types.go
+Lines: 579-580 (2 lines)
+====================================================================================================
+	// In unified coordinator, completion is determined by whether all channels
+	// have sent at least one value (handled in Exec). This is kept for compatibility.
+
+====================================================================================================
+#67 - engine/cmd/types/flight_types.go
+Lines: 31-36 (6 lines)
+====================================================================================================
+		// monitoringDuration: 60-second window to monitor flight status for stability
+		// After initial booking or rebooking, the system monitors the flight schedule for 60 seconds
+		// to ensure it has stabilized before marking completion. This allows detection of immediate
+		// status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
+		// window expires, if no issues are detected, the FlightWant completes and notifies the
+		// parent Target want, allowing the entire travel plan to complete.
+
+====================================================================================================
+#68 - engine/cmd/types/flight_types.go
+Lines: 113-120 (8 lines)
+====================================================================================================
+// Exec creates a flight booking reservation using state machine pattern
+// The execution flow follows distinct phases:
+// 1. Initial: Setup phase
+// 2. Booking: Execute initial flight booking via agents
+// 3. Monitoring: Monitor flight status for 60 seconds
+// 4. Canceling: Wait for cancellation agent to complete
+// 5. Rebooking: Execute rebooking after cancellation
+// 6. Completed: Final state, return true to complete want
+
+====================================================================================================
+#69 - engine/cmd/types/flight_types.go
+Lines: 296-297 (2 lines)
+====================================================================================================
+// sendFlightPacket sends a flight schedule packet to the output channel and logs it
+// Uses SendPacketMulti to send with retrigger logic for achieved receivers
+
+====================================================================================================
+#70 - engine/cmd/types/flight_types.go
+Lines: 311-312 (2 lines)
+====================================================================================================
+	// Send via SendPacketMulti which uses paths from want setup
+	// Paths.Out contains the channels configured during want initialization
+
+====================================================================================================
+#71 - engine/cmd/types/flight_types.go
+Lines: 330-331 (2 lines)
+====================================================================================================
+// tryAgentExecution attempts to execute flight booking using the agent system
+// Returns the FlightSchedule if successful, nil if no agent execution
+
+====================================================================================================
+#72 - engine/cmd/types/flight_types.go
+Lines: 451-452 (2 lines)
+====================================================================================================
+// StartContinuousMonitoring starts a background goroutine to continuously poll flight status
+// This is called after the flight is successfully booked via agents
+
+====================================================================================================
+#73 - engine/cmd/types/flight_types.go
+Lines: 480-481 (2 lines)
+====================================================================================================
+			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls
+			// This prevents lock contention when multiple monitoring goroutines call StoreState
+
+====================================================================================================
+#74 - engine/cmd/types/prime_types.go
+Lines: 93-94 (2 lines)
+====================================================================================================
+	// Read parameters fresh each cycle - enables dynamic changes!
+	// Note: prime parameter available but not used in current implementation
+
+====================================================================================================
+#75 - engine/cmd/types/prime_types.go
+Lines: 154-162 (9 lines)
+====================================================================================================
+				// if f.paths.GetOutCount() > 0 {
+				// 	f.SendPacketMulti(val)
+				// }
+				// Update live state immediately when prime is found
+				// f.StoreStateMulti(map[string]interface{}{
+				// 	"foundPrimes":    foundPrimes,
+				// 	"primeCount":     len(foundPrimes),
+				// 	"lastPrimeFound": val,
+				// })
+
+====================================================================================================
+#76 - engine/cmd/types/prime_types.go
+Lines: 183-188 (6 lines)
+====================================================================================================
+// // PrimeSink collects and displays results
+// type PrimeSink struct {
+// 	Want
+// 	Received int
+// 	paths    Paths
+// }
+
+====================================================================================================
+#77 - engine/cmd/types/prime_types.go
+Lines: 190-195 (6 lines)
+====================================================================================================
+// // NewPrimeSink creates a new prime sink want
+// func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} {
+// 	sink := &PrimeSink{
+// 		Want:     Want{},
+// 		Received: 0,
+// 	}
+
+====================================================================================================
+#78 - engine/cmd/types/prime_types.go
+Lines: 197-198 (2 lines)
+====================================================================================================
+// 	// Initialize base Want fields
+// 	sink.Init(metadata, spec)
+
+====================================================================================================
+#79 - engine/cmd/types/prime_types.go
+Lines: 200-209 (10 lines)
+====================================================================================================
+// 	// Set fields for base Want methods
+// 	sink.WantType = "prime sink"
+// 	sink.ConnectivityMetadata = ConnectivityMetadata{
+// 		RequiredInputs:  1,
+// 		RequiredOutputs: 0,
+// 		MaxInputs:       -1,
+// 		MaxOutputs:      0,
+// 		WantType:        "prime sink",
+// 		Description:     "Prime sink/collector",
+// 	}
+
+====================================================================================================
+#80 - engine/cmd/types/prime_types.go
+Lines: 211-212 (2 lines)
+====================================================================================================
+// 	return sink
+// }
+
+====================================================================================================
+#81 - engine/cmd/types/prime_types.go
+Lines: 214-216 (3 lines)
+====================================================================================================
+// func (s *PrimeSink) GetWant() interface{} {
+// 	return &s.Want
+// }
+
+====================================================================================================
+#82 - engine/cmd/types/prime_types.go
+Lines: 218-224 (7 lines)
+====================================================================================================
+// // Exec returns the generalized chain function for the sink
+// func (s *PrimeSink) Exec() bool {
+// 	// Validate input channel is available
+// 	in, connectionAvailable := s.GetFirstInputChannel()
+// 	if !connectionAvailable {
+// 		return true
+// 	}
+
+====================================================================================================
+#83 - engine/cmd/types/prime_types.go
+Lines: 226-230 (5 lines)
+====================================================================================================
+// 	// Check if already achieved using persistent state
+// 	achieved, _ := s.GetStateBool("achieved", false)
+// 	if achieved {
+// 		return true
+// 	}
+
+====================================================================================================
+#84 - engine/cmd/types/prime_types.go
+Lines: 232-233 (2 lines)
+====================================================================================================
+// 	// Mark as achieved in persistent state
+// 	s.StoreState("achieved", true)
+
+====================================================================================================
+#85 - engine/cmd/types/prime_types.go
+Lines: 235-236 (2 lines)
+====================================================================================================
+// 	// Use persistent state for received count
+// 	received, _ := s.State["received"].(int)
+
+====================================================================================================
+#86 - engine/cmd/types/prime_types.go
+Lines: 238-244 (7 lines)
+====================================================================================================
+// 	primes := make([]int, 0)
+// 	for val := range in {
+// 		if prime, ok := val.(int); ok {
+// 			primes = append(primes, prime)
+// 			received++
+// 		}
+// 	}
+
+====================================================================================================
+#87 - engine/cmd/types/prime_types.go
+Lines: 246-247 (2 lines)
+====================================================================================================
+// 	// Update persistent state
+// 	s.State["received"] = received
+
+====================================================================================================
+#88 - engine/cmd/types/prime_types.go
+Lines: 249-253 (5 lines)
+====================================================================================================
+// 	// Store collected primes in state
+// 	s.StoreStateMulti(map[string]interface{}{
+// 		"primes":         primes,
+// 		"total_received": received,
+// 	})
+
+====================================================================================================
+#89 - engine/cmd/types/prime_types.go
+Lines: 255-258 (4 lines)
+====================================================================================================
+// 	if s.State == nil {
+// 		s.State = make(map[string]interface{})
+// 	}
+// 	s.State["total_processed"] = received
+
+====================================================================================================
+#90 - engine/cmd/types/prime_types.go
+Lines: 260-261 (2 lines)
+====================================================================================================
+// 	return true
+// }
+
+====================================================================================================
+#91 - engine/cmd/types/qnet_types.go
+Lines: 30-31 (2 lines)
+====================================================================================================
+// ExpRand64 generates exponentially distributed random numbers with improved precision
+// Uses inverse transform sampling with better numerical stability than standard library
+
+====================================================================================================
+#92 - engine/cmd/types/qnet_types.go
+Lines: 43-44 (2 lines)
+====================================================================================================
+	// Use inverse transform: -ln(u) for exponential distribution
+	// This provides better distribution than the standard library's algorithm
+
+====================================================================================================
+#93 - engine/cmd/types/qnet_types.go
+Lines: 128-129 (2 lines)
+====================================================================================================
+		// Exponential inter-arrival time (rate = 1/mean_interval)
+		// ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
+
+====================================================================================================
+#94 - engine/cmd/types/qnet_types.go
+Lines: 148-149 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for Numbers generator
+// Returns (currentCount / targetCount) * 100
+
+====================================================================================================
+#95 - engine/cmd/types/qnet_types.go
+Lines: 216-217 (2 lines)
+====================================================================================================
+	// Local persistent state variables are used instead of State map
+	// This ensures they persist across cycles without batching interference
+
+====================================================================================================
+#96 - engine/cmd/types/qnet_types.go
+Lines: 309-311 (3 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for Queue
+// For streaming queue, returns 100 when complete (all packets processed)
+// During streaming, this is calculated indirectly through packet count tracking
+
+====================================================================================================
+#97 - engine/cmd/types/qnet_types.go
+Lines: 313-314 (2 lines)
+====================================================================================================
+	// Queue is a streaming processor - returns 100 when termination is received
+	// The percentage is implicitly tracked by processedCount during streaming
+
+====================================================================================================
+#98 - engine/cmd/types/qnet_types.go
+Lines: 319-320 (2 lines)
+====================================================================================================
+	// For streaming queue, we can't easily determine total expected packets
+	// So we return percentage based on whether any packets have been processed
+
+====================================================================================================
+#99 - engine/cmd/types/qnet_types.go
+Lines: 463-468 (6 lines)
+====================================================================================================
+			// No packet received, but we don't want to end the sink.
+			// The sink should wait until a termination packet is received.
+			// We return false to continue the execution loop.
+			// If we return true, the sink will be marked as completed and will not process any more packets.
+			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever.
+			// if the timeout is reached, the loop will continue to the next iteration.
+
+====================================================================================================
+#100 - engine/cmd/types/qnet_types.go
+Lines: 502-503 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for Sink
+// Returns 100 when all packets have been collected (completion)
+
+====================================================================================================
+#101 - engine/cmd/types/travel_types.go
+Lines: 196-197 (2 lines)
+====================================================================================================
+// tryAgentExecution attempts to execute restaurant reservation using the agent system
+// Returns the RestaurantSchedule if successful, nil if no agent execution
+
+====================================================================================================
+#102 - engine/cmd/types/travel_types.go
+Lines: 242-243 (2 lines)
+====================================================================================================
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+
+====================================================================================================
+#103 - engine/cmd/types/travel_types.go
+Lines: 258-259 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant
+// Returns 100 if the restaurant has been attempted/executed, 0 otherwise
+
+====================================================================================================
+#104 - engine/cmd/types/travel_types.go
+Lines: 581-582 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for HotelWant
+// Returns 100 if the hotel has been attempted/executed, 0 otherwise
+
+====================================================================================================
+#105 - engine/cmd/types/travel_types.go
+Lines: 591-592 (2 lines)
+====================================================================================================
+// tryAgentExecution attempts to execute hotel reservation using the agent system
+// Returns the HotelSchedule if successful, nil if no agent execution
+
+====================================================================================================
+#106 - engine/cmd/types/travel_types.go
+Lines: 608-609 (2 lines)
+====================================================================================================
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+
+====================================================================================================
+#107 - engine/cmd/types/travel_types.go
+Lines: 790-791 (2 lines)
+====================================================================================================
+// CalculateAchievingPercentage calculates the progress toward completion for BuffetWant
+// Returns 100 if the buffet has been attempted/executed, 0 otherwise
+
+====================================================================================================
+#108 - engine/cmd/types/travel_types.go
+Lines: 800-801 (2 lines)
+====================================================================================================
+// tryAgentExecution attempts to execute buffet reservation using the agent system
+// Returns the BuffetSchedule if successful, nil if no agent execution
+
+====================================================================================================
+#109 - engine/cmd/types/travel_types.go
+Lines: 817-818 (2 lines)
+====================================================================================================
+		// Wait for agent to complete and retrieve result
+		// Check for agent_result in state
+
+====================================================================================================
+#110 - engine/cmd/types/travel_types.go
+Lines: 957-960 (4 lines)
+====================================================================================================
+// TravelCoordinatorWant orchestrates the entire travel itinerary
+// RegisterTravelWantTypes registers all travel-related want types
+// Note: All coordinators now use the unified "coordinator" type
+// Configuration is determined by parameters (is_buffet, required_inputs, etc.)
+
+====================================================================================================
+#111 - engine/src/agent_loader.go
+Lines: 370-371 (2 lines)
+====================================================================================================
+// genericDoAction is the default action for all DoAgents
+// Agents don't need special implementations - state initialization is externalized to want types
+
+====================================================================================================
+#112 - engine/src/agent_loader.go
+Lines: 374-375 (2 lines)
+====================================================================================================
+	// State initialization happens in the want type's agent execution logic
+	// This is just a placeholder that confirms the agent executed
+
+====================================================================================================
+#113 - engine/src/agent_loader.go
+Lines: 379-380 (2 lines)
+====================================================================================================
+// genericMonitorAction is the default monitor for all MonitorAgents
+// Agents don't need special implementations - monitoring logic is externalized to want types
+
+====================================================================================================
+#114 - engine/src/agent_loader.go
+Lines: 383-384 (2 lines)
+====================================================================================================
+	// Monitoring logic happens in the want type's agent execution logic
+	// This is just a placeholder that confirms the monitor executed
+
+====================================================================================================
+#115 - engine/src/agent_types.go
+Lines: 64-65 (2 lines)
+====================================================================================================
+		// Begin batching cycle for all state changes from agent execution
+		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+
+====================================================================================================
+#116 - engine/src/agent_types.go
+Lines: 85-86 (2 lines)
+====================================================================================================
+		// Begin batching cycle for all state changes from agent execution
+		// This includes agent-generated state changes and any subsequent SetSchedule() calls
+
+====================================================================================================
+#117 - engine/src/chain/chain.go
+Lines: 43-44 (2 lines)
+====================================================================================================
+	//	start, end func(func(Chan)(bool))
+	//	add func(func(_, _ Chan)(bool))
+
+====================================================================================================
+#118 - engine/src/chain_builder.go
+Lines: 32-34 (3 lines)
+====================================================================================================
+	// GlobalExecutionInterval defines the sleep interval between goroutine execution cycles
+	// This prevents CPU spinning in tight execution loops for want execution goroutines
+	// Set to 100ms to reduce CPU usage during concurrent want execution
+
+====================================================================================================
+#119 - engine/src/chain_builder.go
+Lines: 37-38 (2 lines)
+====================================================================================================
+	// GlobalReconcileInterval defines the frequency of reconcile loop operations
+	// This controls how often the system checks for memory file changes and writes statistics
+
+====================================================================================================
+#120 - engine/src/chain_builder.go
+Lines: 103-104 (2 lines)
+====================================================================================================
+// GetSpec returns a pointer to the runtimeWant's Spec field
+// by delegating to the underlying want's GetSpec() method
+
+====================================================================================================
+#121 - engine/src/chain_builder.go
+Lines: 112-113 (2 lines)
+====================================================================================================
+// GetMetadata returns a pointer to the runtimeWant's Metadata field
+// by delegating to the underlying want's GetMetadata() method
+
+====================================================================================================
+#122 - engine/src/chain_builder.go
+Lines: 154-156 (3 lines)
+====================================================================================================
+	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes()
+	// This avoids duplicate scanning logs when multiple ChainBuilder instances are created
+	// Recipe registry is passed via the environment during server initialization
+
+====================================================================================================
+#123 - engine/src/chain_builder.go
+Lines: 203-204 (2 lines)
+====================================================================================================
+	// Initialize empty paths for all runtime wants
+	// log.Printf("[RECONCILE:PATHS] generatePathsFromConnections() called with %d runtime wants\n", len(cb.wants))
+
+====================================================================================================
+#124 - engine/src/chain_builder.go
+Lines: 216-220 (5 lines)
+====================================================================================================
+		// Process using connections for this want
+		// if len(want.GetSpec().Using) > 0 {
+		// 	log.Printf("[RECONCILE:PATHS] Want '%s' (type: %s) has %d using selectors\n",
+		// 		wantName, want.GetMetadata().Type, len(want.GetSpec().Using))
+		// }
+
+====================================================================================================
+#125 - engine/src/chain_builder.go
+Lines: 231-232 (2 lines)
+====================================================================================================
+					// log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
+						// otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
+
+====================================================================================================
+#126 - engine/src/chain_builder.go
+Lines: 234-235 (2 lines)
+====================================================================================================
+					// Create using path for current want
+					// Create a channel directly typed as chain.Chan
+
+====================================================================================================
+#127 - engine/src/chain_builder.go
+Lines: 244-247 (4 lines)
+====================================================================================================
+					// Log connection details, especially for Flight want
+					// if strings.Contains(wantName, "flight") {
+					// 	InfoLog("[FLIGHT-CONNECT] Flight want '%s' receiving input from '%s' on channel: %s\n", wantName, otherName, inPath.Name)
+					// }
+
+====================================================================================================
+#128 - engine/src/chain_builder.go
+Lines: 260-263 (4 lines)
+====================================================================================================
+					// Log output connections from other wants to Flight
+					// if strings.Contains(otherName, "flight") {
+					// 	InfoLog("[FLIGHT-CONNECT] Want '%s' sending output to '%s' via channel: %s\n", otherName, wantName, outPath.Name)
+					// }
+
+====================================================================================================
+#129 - engine/src/chain_builder.go
+Lines: 266-268 (3 lines)
+====================================================================================================
+			// if matchCount == 0 {
+			// 	log.Printf("[RECONCILE:PATHS] WARN: Want '%s' selector %v matched 0 wants!\n", wantName, usingSelector)
+			// }
+
+====================================================================================================
+#130 - engine/src/chain_builder.go
+Lines: 280-282 (3 lines)
+====================================================================================================
+// validateConnections validates that all wants have their connectivity requirements satisfied
+// Note: Validation checks are performed but not logged to console (debug info not needed in normal operation)
+// Reconciliation will run again once idle wants execute and create missing connections via child wants/autoconnection
+
+====================================================================================================
+#131 - engine/src/chain_builder.go
+Lines: 293-294 (2 lines)
+====================================================================================================
+		// Store connectivity status for reconcile loop decision
+		// If required inputs not met, mark want as waiting for connections
+
+====================================================================================================
+#132 - engine/src/chain_builder.go
+Lines: 318-319 (2 lines)
+====================================================================================================
+	// For all wants, enforce normal connectivity requirements
+	// If want has required inputs, check if they're satisfied
+
+====================================================================================================
+#133 - engine/src/chain_builder.go
+Lines: 374-375 (2 lines)
+====================================================================================================
+	// Automatically wrap with OwnerAwareWant if the want has owner references
+	// This enables parent-child coordination via subscription events
+
+====================================================================================================
+#134 - engine/src/chain_builder.go
+Lines: 410-411 (2 lines)
+====================================================================================================
+	// Automatically wrap with OwnerAwareWant if the custom target has owner references
+	// This enables parent-child coordination via subscription events (critical for nested targets)
+
+====================================================================================================
+#135 - engine/src/chain_builder.go
+Lines: 498-499 (2 lines)
+====================================================================================================
+// hasConfigFileChanged checks if config file has changed
+// Used in batch mode to detect updates to the original config file
+
+====================================================================================================
+#136 - engine/src/chain_builder.go
+Lines: 532-533 (2 lines)
+====================================================================================================
+	// Use GlobalReconcileInterval (100ms) for memory file checks and statistics
+	// This is separate from GlobalExecutionInterval (20ms) which is used for want execution
+
+====================================================================================================
+#137 - engine/src/chain_builder.go
+Lines: 568-569 (2 lines)
+====================================================================================================
+				// Handle standard reconciliation trigger
+				// Standard reconciliation trigger (logging removed)
+
+====================================================================================================
+#138 - engine/src/chain_builder.go
+Lines: 594-595 (2 lines)
+====================================================================================================
+				// Wants deleted (logging removed)
+				// Trigger reconciliation to regenerate paths after want deletion
+
+====================================================================================================
+#139 - engine/src/chain_builder.go
+Lines: 599-600 (2 lines)
+====================================================================================================
+			// In batch mode, watch config file for changes
+			// In server mode, skip file watching (API is the source of truth)
+
+====================================================================================================
+#140 - engine/src/chain_builder.go
+Lines: 602-603 (2 lines)
+====================================================================================================
+				// Load config from original config file (not from memory file)
+				// Memory file is only for persistence, not for reloading configuration
+
+====================================================================================================
+#141 - engine/src/chain_builder.go
+Lines: 617-618 (2 lines)
+====================================================================================================
+// reconcileWants performs reconciliation when config changes or during initial load
+// Separated into explicit phases: compile -> connect -> start
+
+====================================================================================================
+#142 - engine/src/chain_builder.go
+Lines: 646-647 (2 lines)
+====================================================================================================
+	// Use current config as source of truth during runtime
+	// Memory file is only loaded on initial startup
+
+====================================================================================================
+#143 - engine/src/chain_builder.go
+Lines: 678-681 (4 lines)
+====================================================================================================
+	// Update last config and hash
+	// IMPORTANT: Make a deep copy to avoid reference aliasing issues
+	// When both lastConfig and config point to the same Want objects,
+	// updates to one appear to update both, breaking change detection
+
+====================================================================================================
+#144 - engine/src/chain_builder.go
+Lines: 697-698 (2 lines)
+====================================================================================================
+	// Build parameter subscription connectivity for Target wants
+	// This references the owner-children relationships already established in OwnerReferences metadata
+
+====================================================================================================
+#145 - engine/src/chain_builder.go
+Lines: 731-733 (3 lines)
+====================================================================================================
+	// CRITICAL FIX: Synchronize generated paths to individual Want structs
+	// This ensures child wants can access their output channels when they execute
+	// NOTE: Caller (reconcileWants) already holds reconcileMutex, so we don't lock here
+
+====================================================================================================
+#146 - engine/src/chain_builder.go
+Lines: 736-737 (2 lines)
+====================================================================================================
+			// Update the want's paths field with the generated paths
+			// This makes output/input channels available to the want during execution
+
+====================================================================================================
+#147 - engine/src/chain_builder.go
+Lines: 740-741 (2 lines)
+====================================================================================================
+			// log.Printf("[RECONCILE:SYNC] Synchronized paths for '%s': In=%d, Out=%d\n",
+			// 	wantName, len(paths.In), len(paths.Out))
+
+====================================================================================================
+#148 - engine/src/chain_builder.go
+Lines: 747-748 (2 lines)
+====================================================================================================
+	// Build label-to-users mapping for completed want retrigger detection
+	// This pre-computes which wants depend on each want via label selectors
+
+====================================================================================================
+#149 - engine/src/chain_builder.go
+Lines: 751-752 (2 lines)
+====================================================================================================
+	// Validate connectivity requirements (non-blocking - logs warnings only)
+	// Wants with missing connections will remain idle until reconciliation connects them
+
+====================================================================================================
+#150 - engine/src/chain_builder.go
+Lines: 954-955 (2 lines)
+====================================================================================================
+			// Only auto-connect to data provider wants (evidence, description)
+			// Skip coordinators and target wants
+
+====================================================================================================
+#151 - engine/src/chain_builder.go
+Lines: 1012-1013 (2 lines)
+====================================================================================================
+	// Generate unique connection label based on consumer want
+	// Extract meaningful identifier from consumer (e.g., level1, level2, etc.)
+
+====================================================================================================
+#152 - engine/src/chain_builder.go
+Lines: 1104-1105 (2 lines)
+====================================================================================================
+		// Third pass: start any idle wants that now have required connections available
+		// This allows wants with inputs from just-completed upstream wants to execute
+
+====================================================================================================
+#153 - engine/src/chain_builder.go
+Lines: 1126-1127 (2 lines)
+====================================================================================================
+// shouldRestartCompletedWant checks if a completed want should restart
+// because its upstream wants are running or idle (have new data)
+
+====================================================================================================
+#154 - engine/src/chain_builder.go
+Lines: 1237-1238 (2 lines)
+====================================================================================================
+// deepCopyConfig creates a deep copy of a Config to prevent reference aliasing
+// This is critical for change detection to work correctly
+
+====================================================================================================
+#155 - engine/src/chain_builder.go
+Lines: 1342-1343 (2 lines)
+====================================================================================================
+// applyWantChanges applies want changes in sink-to-generator order
+// Note: Connections are rebuilt in separate connectPhase()
+
+====================================================================================================
+#156 - engine/src/chain_builder.go
+Lines: 1358-1359 (2 lines)
+====================================================================================================
+			// Sync ALL fields from config want to runtime want
+			// This is the single synchronization point for config→runtime
+
+====================================================================================================
+#157 - engine/src/chain_builder.go
+Lines: 1372-1374 (3 lines)
+====================================================================================================
+					// Update the spec reference to point to the new config want's spec
+					// This ensures generatePathsFromConnections sees the updated spec
+					// spec is now part of want object, removed redundant copy
+
+====================================================================================================
+#158 - engine/src/chain_builder.go
+Lines: 1383-1384 (2 lines)
+====================================================================================================
+					// Sync metadata
+					// metadata is now part of want object, removed redundant copy
+
+====================================================================================================
+#159 - engine/src/chain_builder.go
+Lines: 1550-1551 (2 lines)
+====================================================================================================
+	// If no Want was found in the want function, create a new one
+	// (This handles want types that don't embed or return a Want)
+
+====================================================================================================
+#160 - engine/src/chain_builder.go
+Lines: 1636-1637 (2 lines)
+====================================================================================================
+	// If not found in runtime, search in config wants
+	// This handles newly created wants that haven't been promoted to runtime yet
+
+====================================================================================================
+#161 - engine/src/chain_builder.go
+Lines: 1647-1649 (3 lines)
+====================================================================================================
+// UpdateWant updates an existing want's configuration (params, labels, using fields, etc.)
+// Automatically triggers reconciliation to process topology changes
+// Works in both backend API and batch modes
+
+====================================================================================================
+#162 - engine/src/chain_builder.go
+Lines: 1691-1692 (2 lines)
+====================================================================================================
+		// Close the stop channel to signal all goroutines listening on it
+		// This is safe to call multiple times and will wake up all select statements
+
+====================================================================================================
+#163 - engine/src/chain_builder.go
+Lines: 1713-1714 (2 lines)
+====================================================================================================
+	// Check if this want's connectivity requirements are satisfied
+	// If not, skip execution - the reconcile loop will retry once connections are available
+
+====================================================================================================
+#164 - engine/src/chain_builder.go
+Lines: 1721-1722 (2 lines)
+====================================================================================================
+	// Get paths for this want - they should already be built by the Reconcile loop
+	// For wants with no 'using' selectors (entry points), paths will be empty which is fine
+
+====================================================================================================
+#165 - engine/src/chain_builder.go
+Lines: 1728-1729 (2 lines)
+====================================================================================================
+	// Only require paths if the want has 'using' selectors
+	// Entry point wants (like Target) don't need paths
+
+====================================================================================================
+#166 - engine/src/chain_builder.go
+Lines: 1734-1735 (2 lines)
+====================================================================================================
+	// Check if connectivity requirements are satisfied before executing
+	// If not satisfied, trigger reconciliation to re-attempt path generation
+
+====================================================================================================
+#167 - engine/src/chain_builder.go
+Lines: 1818-1819 (2 lines)
+====================================================================================================
+						// Restart execution from beginning
+						// Reset any execution state if needed
+
+====================================================================================================
+#168 - engine/src/chain_builder.go
+Lines: 1960-1961 (2 lines)
+====================================================================================================
+// Execute starts the reconcile loop and initial want execution
+// For server mode, this runs indefinitely. For batch mode, it waits for completion.
+
+====================================================================================================
+#169 - engine/src/chain_builder.go
+Lines: 1966-1968 (3 lines)
+====================================================================================================
+// ExecuteWithMode starts execution with specified mode
+// serverMode=true: runs indefinitely for server mode
+// serverMode=false: waits for wants to complete (batch mode)
+
+====================================================================================================
+#170 - engine/src/chain_builder.go
+Lines: 1998-1999 (2 lines)
+====================================================================================================
+	// Batch mode: wait for initial wants and completion
+	// Wait for initial wants to be created by reconcileLoop
+
+====================================================================================================
+#171 - engine/src/chain_builder.go
+Lines: 2011-2012 (2 lines)
+====================================================================================================
+	// Start all initial wants
+	// Create a snapshot of wants while holding lock to avoid concurrent map iteration
+
+====================================================================================================
+#172 - engine/src/chain_builder.go
+Lines: 2052-2054 (3 lines)
+====================================================================================================
+// AddWantsAsync sends wants to be added asynchronously through the reconcile loop
+// This is the preferred method for adding wants from within executing Target wants
+// to avoid deadlock since the caller may already hold locks
+
+====================================================================================================
+#173 - engine/src/chain_builder.go
+Lines: 2064-2065 (2 lines)
+====================================================================================================
+// AddWantsAsyncWithTracking sends wants asynchronously and returns their IDs for tracking
+// The caller can use the returned IDs to poll with AreWantsAdded() to confirm addition
+
+====================================================================================================
+#174 - engine/src/chain_builder.go
+Lines: 2084-2085 (2 lines)
+====================================================================================================
+// AreWantsAdded checks if all wants with the given IDs have been added to the runtime
+// Returns true only if ALL wants are present in the runtime
+
+====================================================================================================
+#175 - engine/src/chain_builder.go
+Lines: 2111-2112 (2 lines)
+====================================================================================================
+// DeleteWantsAsync sends want IDs to be deleted asynchronously through the reconcile loop
+// This is the preferred method for deleting wants to avoid race conditions
+
+====================================================================================================
+#176 - engine/src/chain_builder.go
+Lines: 2122-2123 (2 lines)
+====================================================================================================
+// DeleteWantsAsyncWithTracking sends want IDs to be deleted asynchronously and returns them for tracking
+// The caller can use the returned IDs to poll with AreWantsDeleted() to confirm deletion
+
+====================================================================================================
+#177 - engine/src/chain_builder.go
+Lines: 2131-2132 (2 lines)
+====================================================================================================
+// AreWantsDeleted checks if all wants with the given IDs have been removed from the runtime
+// Returns true only if ALL wants are no longer present in the runtime
+
+====================================================================================================
+#178 - engine/src/chain_builder.go
+Lines: 2155-2156 (2 lines)
+====================================================================================================
+// addDynamicWantUnsafe adds a want without acquiring the mutex (internal use only)
+// Must be called while holding reconcileMutex or within addWantsChan handler
+
+====================================================================================================
+#179 - engine/src/chain_builder.go
+Lines: 2307-2308 (2 lines)
+====================================================================================================
+	// For now, do basic validation by checking that we can load and parse both spec and data
+	// A full OpenAPI->JSON Schema conversion would be more complex and is beyond current scope
+
+====================================================================================================
+#180 - engine/src/chain_builder.go
+Lines: 2431-2432 (2 lines)
+====================================================================================================
+		// Fallback to current directory with memory subdirectory
+		// Try to find the memory directory - check both "memory" and "../memory"
+
+====================================================================================================
+#181 - engine/src/chain_builder.go
+Lines: 2443-2444 (2 lines)
+====================================================================================================
+	// Note: Caller must hold reconcileMutex lock for safe concurrent access
+	// Convert want map to slice to match config format, preserving runtime spec
+
+====================================================================================================
+#182 - engine/src/chain_builder.go
+Lines: 2517-2519 (3 lines)
+====================================================================================================
+// ==============================
+// Suspend/Resume Control Methods
+// ==============================
+
+====================================================================================================
+#183 - engine/src/chain_builder.go
+Lines: 2627-2628 (2 lines)
+====================================================================================================
+// distributeControlCommand distributes a control command to target want(s)
+// and propagates to child wants if the target is a parent want
+
+====================================================================================================
+#184 - engine/src/chain_builder.go
+Lines: 2633-2634 (2 lines)
+====================================================================================================
+	// Find the target want by metadata.id (WantID is the metadata ID)
+	// We need to search through all wants since cb.wants uses wantName as key
+
+====================================================================================================
+#185 - engine/src/chain_builder.go
+Lines: 2652-2653 (2 lines)
+====================================================================================================
+	// TODO: Propagate control to child wants if this is a parent want
+	// This will require finding parent-child relationships in the Target want implementation
+
+====================================================================================================
+#186 - engine/src/chain_builder.go
+Lines: 2700-2701 (2 lines)
+====================================================================================================
+// DeleteWantByID removes a want from runtime by its ID
+// If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
+
+====================================================================================================
+#187 - engine/src/chain_builder.go
+Lines: 2752-2753 (2 lines)
+====================================================================================================
+		// Also remove child from config to keep it in sync with cb.wants
+		// Use ID-based comparison to avoid name collisions
+
+====================================================================================================
+#188 - engine/src/chain_builder.go
+Lines: 2771-2772 (2 lines)
+====================================================================================================
+	// Also remove from config so detectConfigChanges sees the deletion
+	// Use ID-based comparison to ensure we delete only the correct want
+
+====================================================================================================
+#189 - engine/src/chain_builder.go
+Lines: 2806-2808 (3 lines)
+====================================================================================================
+// selectorToKey converts a label selector map to a unique string key
+// Used for label-to-users mapping in completed want detection
+// Example: {role: "coordinator", stage: "final"} → "role:coordinator,stage:final"
+
+====================================================================================================
+#190 - engine/src/chain_builder.go
+Lines: 2829-2831 (3 lines)
+====================================================================================================
+// buildLabelToUsersMapping constructs mapping from label selectors to want names
+// This enables O(1) lookup of which wants depend on a given want
+// Called after path generation to pre-compute dependencies
+
+====================================================================================================
+#191 - engine/src/chain_builder.go
+Lines: 2852-2854 (3 lines)
+====================================================================================================
+// RetriggerReceiverWant directly retriggeres a receiver want by name
+// This is used when a sender transmits a packet to an achieved receiver
+// The receiver should be reset to Idle so it can re-execute with the new packet
+
+====================================================================================================
+#192 - engine/src/chain_builder.go
+Lines: 2886-2888 (3 lines)
+====================================================================================================
+// checkAndRetriggerCompletedWants checks for completed wants and notifies their dependents
+// Called from reconcileLoop when a completed want retrigger check trigger is received
+// This is the core async mechanism for retrigger detection
+
+====================================================================================================
+#193 - engine/src/chain_builder.go
+Lines: 2920-2921 (2 lines)
+====================================================================================================
+					// Reset dependent want to Idle so it can be re-executed
+					// This allows the want to pick up new data from the completed source
+
+====================================================================================================
+#194 - engine/src/chain_builder.go
+Lines: 2931-2932 (2 lines)
+====================================================================================================
+	// If any want was retriggered, queue a reconciliation trigger
+	// (cannot call reconcileWants() directly due to mutex re-entrancy)
+
+====================================================================================================
+#195 - engine/src/chain_builder.go
+Lines: 2943-2946 (4 lines)
+====================================================================================================
+// findUsersOfCompletedWant finds all wants that depend on a given completed want
+// Takes want ID as parameter and uses it to look up the want in cb.wants by name
+// Uses the pre-computed labelToUsers mapping for O(1) lookup
+// Returns slice of want names that use the completed want's labels
+
+====================================================================================================
+#196 - engine/src/chain_builder.go
+Lines: 2970-2971 (2 lines)
+====================================================================================================
+	// Generate selector keys from completed want's labels
+	// and look up users in the pre-computed mapping
+
+====================================================================================================
+#197 - engine/src/chain_builder.go
+Lines: 2992-2998 (7 lines)
+====================================================================================================
+// UpdateCompletedFlag updates the completed flag for a want based on its status
+// Called from Want.SetStatus() to track which wants are completed
+// Uses mutex to protect concurrent access
+// MarkWantCompleted is the new preferred method for wants to notify the ChainBuilder of completion
+// MarkWantCompleted marks a want as completed using want ID
+// Called by receiver wants (e.g., Coordinators) when they reach completion state
+// Replaces the previous pattern where senders would call UpdateCompletedFlag
+
+====================================================================================================
+#198 - engine/src/chain_builder.go
+Lines: 3008-3009 (2 lines)
+====================================================================================================
+// UpdateCompletedFlag updates completion flag using want ID
+// Deprecated: Use MarkWantCompleted instead
+
+====================================================================================================
+#199 - engine/src/chain_builder.go
+Lines: 3019-3020 (2 lines)
+====================================================================================================
+// IsCompleted returns whether a want is currently in completed state
+// Safe to call from any goroutine with RLock protection
+
+====================================================================================================
+#200 - engine/src/chain_builder.go
+Lines: 3027-3029 (3 lines)
+====================================================================================================
+// TriggerCompletedWantRetriggerCheck sends a non-blocking trigger to the reconcile loop
+// to check for completed wants and notify their dependents
+// Uses the unified reconcileTrigger channel with Type="check_completed_retrigger"
+
+====================================================================================================
+#201 - engine/src/chain_builder.go
+Lines: 3035-3036 (2 lines)
+====================================================================================================
+		// Trigger sent successfully
+		// InfoLog("[RETRIGGER:SEND] Non-blocking retrigger check trigger sent to reconcile loop\n")
+
+====================================================================================================
+#202 - engine/src/chain_builder.go
+Lines: 3043-3044 (2 lines)
+====================================================================================================
+// SetGlobalChainBuilder sets the global ChainBuilder instance
+// Called from server initialization to make ChainBuilder accessible to wants
+
+====================================================================================================
+#203 - engine/src/chain_builder.go
+Lines: 3049-3050 (2 lines)
+====================================================================================================
+// GetGlobalChainBuilder returns the global ChainBuilder instance
+// Returns nil if not yet initialized
+
+====================================================================================================
+#204 - engine/src/chain_helpers.go
+Lines: 9-17 (9 lines)
+====================================================================================================
+// GetInputChannel returns input channel by index
+// Returns (nil, false) if not available, (channel, true) if available
+//
+// Usage:
+//   in, connectionAvailable := w.GetInputChannel(0)
+//   if !connectionAvailable {
+//       return true
+//   }
+//   data := (<-in).(DataType)
+
+====================================================================================================
+#205 - engine/src/chain_helpers.go
+Lines: 25-33 (9 lines)
+====================================================================================================
+// GetOutputChannel returns output channel by index
+// Returns (nil, false) if not available, (channel, true) if available
+//
+// Usage:
+//   out, connectionAvailable := w.GetOutputChannel(0)
+//   if !connectionAvailable {
+//       return true
+//   }
+//   out <- Data{Value: 42}
+
+====================================================================================================
+#206 - engine/src/chain_helpers.go
+Lines: 41-49 (9 lines)
+====================================================================================================
+// GetFirstInputChannel returns the first input channel from paths
+// Returns (nil, false) if no input channels available, (channel, true) if available
+//
+// Usage:
+//   in, connectionAvailable := w.GetFirstInputChannel()
+//   if !connectionAvailable {
+//       return true
+//   }
+//   data := (<-in).(DataType)
+
+====================================================================================================
+#207 - engine/src/chain_helpers.go
+Lines: 54-62 (9 lines)
+====================================================================================================
+// GetFirstOutputChannel returns the first output channel from paths
+// Returns (nil, false) if no output channels available, (channel, true) if available
+//
+// Usage:
+//   out, connectionAvailable := w.GetFirstOutputChannel()
+//   if !connectionAvailable {
+//       return true
+//   }
+//   out <- Data{Value: 42}
+
+====================================================================================================
+#208 - engine/src/chain_helpers.go
+Lines: 67-71 (5 lines)
+====================================================================================================
+// SetPaths sets both input and output paths for this want
+// This is the proper way to synchronize paths instead of direct field access
+//
+// Usage:
+//   w.SetPaths(inPaths, outPaths)
+
+====================================================================================================
+#209 - engine/src/chain_helpers.go
+Lines: 77-94 (18 lines)
+====================================================================================================
+// ReceiveFromAnyInputChannel attempts to receive data from any available input channel
+// using non-blocking select. Returns the channel index that had data, the data itself,
+// and whether a successful read occurred.
+//
+// This function directly accesses all input channels from paths and constructs a
+// dynamic select statement to watch all channels asynchronously without iterating
+// through GetInputChannel(i).
+//
+// Returns: (channelIndex, data, ok)
+//   - channelIndex: Index of the channel that provided data (-1 if no data available)
+//   - data: The data received (nil if ok is false)
+//   - ok: True if data was successfully received, false otherwise
+//
+// Usage:
+//   index, data, ok := w.ReceiveFromAnyInputChannel()
+//   if ok {
+//       fmt.Printf("Received data from channel %d: %v\n", index, data)
+//   }
+
+====================================================================================================
+#210 - engine/src/chain_helpers.go
+Lines: 103-104 (2 lines)
+====================================================================================================
+	// Build select cases dynamically for all input channels from paths
+	// IMPORTANT: Must track the original channel index mapping!
+
+====================================================================================================
+#211 - engine/src/chain_helpers.go
+Lines: 139-140 (2 lines)
+====================================================================================================
+	// If we got here, data was received
+	// IMPORTANT: Return the ORIGINAL channel index, not the case index!
+
+====================================================================================================
+#212 - engine/src/custom_target_types.go
+Lines: 185-186 (2 lines)
+====================================================================================================
+	// Set default recipe if not specified
+	// Note: Recipe field removed - using direct params instead
+
+====================================================================================================
+#213 - engine/src/logging.go
+Lines: 7-8 (2 lines)
+====================================================================================================
+// InfoLog logs informational messages with timestamps
+// It's used for all prefixed logs to ensure they display timestamps
+
+====================================================================================================
+#214 - engine/src/monitor_types.go
+Lines: 125-126 (2 lines)
+====================================================================================================
+					// Optionally set want status to failed, but continue monitoring
+					// mw.Want.SetStatus(WantStatusFailed)
+
+====================================================================================================
+#215 - engine/src/owner_types.go
+Lines: 128-129 (2 lines)
+====================================================================================================
+	// If all children are complete, signal the target via channel (only for old-style blocking)
+	// Note: New implementation uses polling in Exec(), not channel-based signaling
+
+====================================================================================================
+#216 - engine/src/owner_types.go
+Lines: 147-148 (2 lines)
+====================================================================================================
+	// If we have no children yet AND no completions have arrived, we can't be complete
+	// (children are still being added asynchronously)
+
+====================================================================================================
+#217 - engine/src/owner_types.go
+Lines: 209-210 (2 lines)
+====================================================================================================
+	// CRITICAL: Override prefix with target name to prevent label cross-contamination
+	// Each target must have a unique prefix to namespace its child wants' labels
+
+====================================================================================================
+#218 - engine/src/owner_types.go
+Lines: 230-232 (3 lines)
+====================================================================================================
+	// VALIDATION: Prevent want type name conflicts between parent and children
+	// This prevents infinite loops where a want type references a recipe that contains
+	// a want of the same type, which would cause recursive instantiation
+
+====================================================================================================
+#219 - engine/src/owner_types.go
+Lines: 446-447 (2 lines)
+====================================================================================================
+				// Also extract and store by short type name
+				// For "qnet queue" -> also store as "queue"
+
+====================================================================================================
+#220 - engine/src/owner_types.go
+Lines: 524-526 (3 lines)
+====================================================================================================
+	// This is a placeholder - in a real implementation, this would
+	// interact with the ChainBuilder to add wants to the memory file
+	// For now, we'll assume the reconcile loop will pick up the wants
+
+====================================================================================================
+#221 - engine/src/owner_types.go
+Lines: 539-540 (2 lines)
+====================================================================================================
+// NewOwnerAwareWant creates a wrapper that adds parent notification to any want
+// wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
+
+====================================================================================================
+#222 - engine/src/owner_types.go
+Lines: 648-649 (2 lines)
+====================================================================================================
+// Channel delegation methods for OwnerAwareWant
+// These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
+
+====================================================================================================
+#223 - engine/src/owner_types.go
+Lines: 732-733 (2 lines)
+====================================================================================================
+	// For now, we'll rely on the child wants to call our notification method directly
+	// This is a placeholder for a more sophisticated hooking mechanism
+
+====================================================================================================
+#224 - engine/src/owner_types.go
+Lines: 749-756 (8 lines)
+====================================================================================================
+	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction()
+	// All wants with OwnerReferences are automatically wrapped at creation time,
+	// eliminating the need for registration-time wrapping and registration order dependencies.
+	//
+	// This means:
+	// 1. Domain types can be registered in any order (QNet, Travel, etc.)
+	// 2. No need for separate "NoOwner" builder variants
+	// 3. Wrapping happens at runtime based on actual metadata, not factory registration
+
+====================================================================================================
+#225 - engine/src/recipe_loader.go
+Lines: 169-170 (2 lines)
+====================================================================================================
+	// Since we have recipe files in the recipes directory,
+	// we don't need complex default recipes anymore
+
+====================================================================================================
+#226 - engine/src/recipe_loader.go
+Lines: 296-297 (2 lines)
+====================================================================================================
+// generateLabels is deprecated - labels should be defined in recipe files
+// This function is kept for legacy compatibility but should not be used for new recipes
+
+====================================================================================================
+#227 - engine/src/recipe_loader_generic.go
+Lines: 33-34 (2 lines)
+====================================================================================================
+// RecipeResult defines how to compute results from recipe execution
+// Supports both legacy format (primary/metrics) and new flat array format
+
+====================================================================================================
+#228 - engine/src/recipe_loader_generic.go
+Lines: 337-341 (5 lines)
+====================================================================================================
+	// Namespace all using selectors with owner prefix
+	// CRITICAL: The using selector values must match the namespaced label values in other wants
+	// Example: if want A has label "role: scheduler" which becomes "role: travel:scheduler",
+	// and want B has using "role: scheduler", it must become "role: travel:scheduler"
+	// to match the namespaced label in want A
+
+====================================================================================================
+#229 - engine/src/recipe_loader_generic.go
+Lines: 424-426 (3 lines)
+====================================================================================================
+// autoConnect implements auto-connection logic for RecipeAgent wants
+// NOTE: This is legacy recipe-level auto-connection.
+// The real auto-connection happens system-wide during the connection phase in declarative.go
+
+====================================================================================================
+#230 - engine/src/recipe_loader_generic.go
+Lines: 428-429 (2 lines)
+====================================================================================================
+	// Recipe-level auto-connection is limited because it can only see wants within the same recipe
+	// System-wide auto-connection in declarative.go handles the full implementation
+
+====================================================================================================
+#231 - engine/src/recipe_loader_generic.go
+Lines: 435-436 (2 lines)
+====================================================================================================
+	// Load the OpenAPI spec for recipes
+	// Try to find the spec directory - check both "spec" and "../spec"
+
+====================================================================================================
+#232 - engine/src/recipe_loader_generic.go
+Lines: 590-591 (2 lines)
+====================================================================================================
+// validateRecipeResultStructure validates the structure of recipe result
+// Supports both legacy format (object with primary/metrics) and new format (flat array)
+
+====================================================================================================
+#233 - engine/src/recipe_loader_test.go
+Lines: 175-176 (2 lines)
+====================================================================================================
+	// Note: Default params are applied through mergeDRYDefaults function
+	// which is tested separately
+
+====================================================================================================
+#234 - engine/src/subscription_event_system.go
+Lines: 190-191 (2 lines)
+====================================================================================================
+	// Set default processing modes for each event type
+	// Group A: Async notifications
+
+====================================================================================================
+#235 - engine/src/want.go
+Lines: 90-91 (2 lines)
+====================================================================================================
+// TriggerCommand is a union type that wraps either a reconciliation trigger or a control command
+// This allows reconcileTrigger channel to handle both types of signals in a unified way
+
+====================================================================================================
+#236 - engine/src/want.go
+Lines: 98-99 (2 lines)
+====================================================================================================
+// WantStats is deprecated - use State field instead
+// Keeping type alias for backward compatibility during transition
+
+====================================================================================================
+#237 - engine/src/want.go
+Lines: 177-178 (2 lines)
+====================================================================================================
+		// Automatically notify ChainBuilder when want reaches achieved status
+		// This enables receiver wants (like Coordinators) to self-notify completion
+
+====================================================================================================
+#238 - engine/src/want.go
+Lines: 185-188 (4 lines)
+====================================================================================================
+// NotifyCompletion notifies the ChainBuilder that this want has achieved completion
+// Called automatically by SetStatus() when want reaches WantStatusAchieved
+// This enables wants (especially receivers like Coordinators) to self-notify completion
+// Replaces the previous pattern where senders would call UpdateCompletedFlag
+
+====================================================================================================
+#239 - engine/src/want.go
+Lines: 198-199 (2 lines)
+====================================================================================================
+	// Note: Retrigger is triggered by SendPacketMulti(), not here
+	// Only wants that send packets should trigger dependent want re-execution
+
+====================================================================================================
+#240 - engine/src/want.go
+Lines: 202-204 (3 lines)
+====================================================================================================
+// ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection
+// This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety
+// and preventing deadlocks from external callers
+
+====================================================================================================
+#241 - engine/src/want.go
+Lines: 225-226 (2 lines)
+====================================================================================================
+// SetStateAtomic sets multiple state values atomically with proper mutex protection
+// This method handles ALL mutex locking internally so external callers don't need to manage synchronization
+
+====================================================================================================
+#242 - engine/src/want.go
+Lines: 289-290 (2 lines)
+====================================================================================================
+	// Always create fresh maps to avoid concurrent map access issues
+	// This is safer than iterating and deleting from existing maps
+
+====================================================================================================
+#243 - engine/src/want.go
+Lines: 364-365 (2 lines)
+====================================================================================================
+// valuesEqual compares two interface{} values for equality
+// Handles different types properly including strings, numbers, booleans, etc.
+
+====================================================================================================
+#244 - engine/src/want.go
+Lines: 379-380 (2 lines)
+====================================================================================================
+// stateSnapshotsEqual compares two state snapshots (maps) for deep equality
+// Returns true if both maps have identical keys and values
+
+====================================================================================================
+#245 - engine/src/want.go
+Lines: 403-405 (3 lines)
+====================================================================================================
+// isSignificantStateFields checks if only minor/metadata fields have changed
+// Returns true if ONLY status-like fields have changed (fields ending with "_status")
+// Returns false if significant functional fields have changed
+
+====================================================================================================
+#246 - engine/src/want.go
+Lines: 448-449 (2 lines)
+====================================================================================================
+// getSignificantStateChanges extracts only the significant (non-status) changes between states
+// Returns a map of only the functional changes, excluding status and metadata fields
+
+====================================================================================================
+#247 - engine/src/want.go
+Lines: 500-501 (2 lines)
+====================================================================================================
+// CheckControlSignal checks for control commands without blocking
+// Returns (command, received, error)
+
+====================================================================================================
+#248 - engine/src/want.go
+Lines: 528-529 (2 lines)
+====================================================================================================
+// StoreState stores a key-value pair in the want's state
+// Only adds to state history if the value has actually changed (differential tracking)
+
+====================================================================================================
+#249 - engine/src/want.go
+Lines: 531-532 (2 lines)
+====================================================================================================
+	// CRITICAL: Always use mutex to protect both State and pendingStateChanges
+	// Agent goroutines can call StoreState concurrently, so we must synchronize access
+
+====================================================================================================
+#250 - engine/src/want.go
+Lines: 545-546 (2 lines)
+====================================================================================================
+	// Value has changed, store it
+	// Store the state - preserve existing State to maintain parameterHistory
+
+====================================================================================================
+#251 - engine/src/want.go
+Lines: 552-553 (2 lines)
+====================================================================================================
+	// Stage the change in pending state changes
+	// This allows us to batch related changes and create minimal history entries
+
+====================================================================================================
+#252 - engine/src/want.go
+Lines: 561-562 (2 lines)
+====================================================================================================
+	// Create and send notifications AFTER releasing the lock
+	// The notification data is already captured, so no need to hold the lock
+
+====================================================================================================
+#253 - engine/src/want.go
+Lines: 575-582 (8 lines)
+====================================================================================================
+// StoreStateMulti stores multiple state values in a single operation, more efficient than multiple StoreState calls
+// Batches all updates together to minimize lock contention and history entries
+// Usage:
+//   want.StoreStateMulti(map[string]interface{}{
+//       "description_received": true,
+//       "description_text": "some text",
+//       "description_provided": true,
+//   })
+
+====================================================================================================
+#254 - engine/src/want.go
+Lines: 601-602 (2 lines)
+====================================================================================================
+		// Value has changed, store it
+		// Store the state - preserve existing State to maintain history
+
+====================================================================================================
+#255 - engine/src/want.go
+Lines: 627-628 (2 lines)
+====================================================================================================
+	// Send notifications AFTER releasing the lock
+	// Batch all notifications together
+
+====================================================================================================
+#256 - engine/src/want.go
+Lines: 634-638 (5 lines)
+====================================================================================================
+// StoreLog appends a log message to the want's log buffer during an Exec cycle
+// Logs are aggregated and written to LogHistory at the end of each Exec cycle
+// Usage within Exec():
+//   want.StoreLog("Processing packet #1")
+//   want.StoreLog("Calculation complete: result = 42")
+
+====================================================================================================
+#257 - engine/src/want.go
+Lines: 645-646 (2 lines)
+====================================================================================================
+	// Append the log message to the pending logs buffer
+	// No lock needed here since pendingLogs is only accessed during the current Exec cycle
+
+====================================================================================================
+#258 - engine/src/want.go
+Lines: 650-653 (4 lines)
+====================================================================================================
+// GetState retrieves a state value atomically with mutex protection
+// This method encapsulates all stateMutex access for state reads, ensuring thread safety
+// Returns (value, exists) to indicate whether the key exists in state
+// All state reads must go through this method to maintain proper encapsulation
+
+====================================================================================================
+#259 - engine/src/want.go
+Lines: 666-672 (7 lines)
+====================================================================================================
+// GetStateBool retrieves a boolean state value with type assertion
+// Returns (defaultValue, false) if the key doesn't exist or the value is not a bool
+// Usage:
+//   provided, ok := want.GetStateBool("description_provided", false)
+//   if ok {
+//       // provided is a valid bool
+//   }
+
+====================================================================================================
+#260 - engine/src/want.go
+Lines: 684-691 (8 lines)
+====================================================================================================
+// GetStateInt retrieves an integer state value with type assertion
+// Supports both int and float64 types
+// Returns (defaultValue, false) if the key doesn't exist or the value cannot be converted to int
+// Usage:
+//   count, ok := want.GetStateInt("total_processed", 0)
+//   if ok {
+//       // count is a valid int
+//   }
+
+====================================================================================================
+#261 - engine/src/want.go
+Lines: 705-711 (7 lines)
+====================================================================================================
+// GetStateString retrieves a string state value with type assertion
+// Returns (defaultValue, false) if the key doesn't exist or the value is not a string
+// Usage:
+//   name, ok := want.GetStateString("current_name", "unknown")
+//   if ok {
+//       // name is a valid string
+//   }
+
+====================================================================================================
+#262 - engine/src/want.go
+Lines: 723-733 (11 lines)
+====================================================================================================
+// CalculateAchievingPercentage computes the progress percentage toward completion.
+// This is a virtual method that want type implementations should override to provide
+// type-specific completion percentage calculation.
+// Default implementation returns 0 unless the want has reached completion status,
+// in which case it returns 100.
+// Want types should override this to provide meaningful progress indicators:
+//   - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%)
+//   - QueueWant: Calculate based on processedCount / total capacity
+//   - Numbers generator: Calculate based on currentCount / target count
+//   - Coordinator: Calculate based on channels heard / total required channels
+//   - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
+
+====================================================================================================
+#263 - engine/src/want.go
+Lines: 735-736 (2 lines)
+====================================================================================================
+	// Default implementation: check if completed
+	// Want types should override this method for specific logic
+
+====================================================================================================
+#264 - engine/src/want.go
+Lines: 747-751 (5 lines)
+====================================================================================================
+// addAggregatedStateHistory creates a single history entry with complete state as YAML
+// Uses differential checking to prevent duplicate entries when state hasn't actually changed
+// Only creates a history entry if the state differs from the last recorded state
+// NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
+// ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
+
+====================================================================================================
+#265 - engine/src/want.go
+Lines: 761-763 (3 lines)
+====================================================================================================
+	// Create a copy of current state while holding lock (use unsafe read since we already hold lock)
+	// IMPORTANT: Exclude agent metadata fields (current_agent, running_agents) from state history
+	// These are operational metadata tracked separately in AgentHistory, not actual want state
+
+====================================================================================================
+#266 - engine/src/want.go
+Lines: 766-767 (2 lines)
+====================================================================================================
+		// Skip agent metadata fields - they cause false history duplicates since they change
+		// multiple times during agent execution but don't represent actual want state changes
+
+====================================================================================================
+#267 - engine/src/want.go
+Lines: 781-782 (2 lines)
+====================================================================================================
+			// If lastState is not the expected type, proceed with recording
+			// This handles initialization or type changes
+
+====================================================================================================
+#268 - engine/src/want.go
+Lines: 792-793 (2 lines)
+====================================================================================================
+		// SMART MERGING: If only status fields changed, merge into the previous entry
+		// This prevents duplicate history entries when only status_* fields are updated
+
+====================================================================================================
+#269 - engine/src/want.go
+Lines: 795-796 (2 lines)
+====================================================================================================
+			// Update the last entry's state with the new status values
+			// This consolidates status-only updates into the previous functional change
+
+====================================================================================================
+#270 - engine/src/want.go
+Lines: 862-864 (3 lines)
+====================================================================================================
+// addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle
+// Concatenates multiple log lines separated by newlines
+// Also writes the logs to the actual log file via InfoLog
+
+====================================================================================================
+#271 - engine/src/want.go
+Lines: 870-871 (2 lines)
+====================================================================================================
+	// Concatenate all log messages with newlines
+	// This preserves the order and allows reading individual lines
+
+====================================================================================================
+#272 - engine/src/want.go
+Lines: 907-908 (2 lines)
+====================================================================================================
+	// Write logs to the actual log file via InfoLog (after releasing lock to avoid holding it during I/O)
+	// Split by newlines and output each line separately so each gets a timestamp
+
+====================================================================================================
+#273 - engine/src/want.go
+Lines: 975-976 (2 lines)
+====================================================================================================
+// GetSubscriptionSystem returns the GLOBAL subscription system
+// All wants share the same subscription system to enable cross-want event delivery
+
+====================================================================================================
+#274 - engine/src/want.go
+Lines: 981-982 (2 lines)
+====================================================================================================
+// migrateAgentHistoryFromState removes agent_history from state if it exists
+// This ensures agent history is only stored in the top-level AgentHistory field
+
+====================================================================================================
+#275 - engine/src/want.go
+Lines: 1043-1044 (2 lines)
+====================================================================================================
+	// Store final statistics
+	// Stats are now stored directly in State - no separate stats field
+
+====================================================================================================
+#276 - engine/src/want.go
+Lines: 1080-1081 (2 lines)
+====================================================================================================
+	// Store statistics at failure
+	// Stats are now stored directly in State - no separate stats field
+
+====================================================================================================
+#277 - engine/src/want.go
+Lines: 1101-1103 (3 lines)
+====================================================================================================
+// SendPacketMulti broadcasts a packet to all output channels
+// This method sends packets through paths defined in the want's output paths
+// Each output path contains the channel and target want name
+
+====================================================================================================
+#278 - engine/src/want.go
+Lines: 1133-1134 (2 lines)
+====================================================================================================
+	// Trigger retrigger for each receiver that got the packet
+	// This is receiver-centric retrigger: if achieved want receives new packet, it should re-execute
+
+====================================================================================================
+#279 - engine/src/want.go
+Lines: 1152-1153 (2 lines)
+====================================================================================================
+// GetType returns the want type
+// This method eliminates the need for duplicate implementations in all want types
+
+====================================================================================================
+#280 - engine/src/want.go
+Lines: 1158-1159 (2 lines)
+====================================================================================================
+// GetConnectivityMetadata returns the connectivity metadata
+// This method eliminates the need for duplicate implementations in all want types
+
+====================================================================================================
+#281 - engine/src/want.go
+Lines: 1179-1188 (10 lines)
+====================================================================================================
+// Init initializes the Want base type with metadata and spec, plus type-specific fields
+// This is a helper method used by all want constructors to reduce boilerplate
+// Usage in want types:
+//   func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
+//       w := &MyWant{Want: Want{}}
+//       w.Init(metadata, spec)  // Common initialization
+//       w.WantType = "my_type"  // Type-specific fields
+//       w.ConnectivityMetadata = ConnectivityMetadata{...}
+//       return w
+//   }
+
+====================================================================================================
+#282 - engine/src/want.go
+Lines: 1194-1195 (2 lines)
+====================================================================================================
+	// Initialize paths field to avoid nil reference errors
+	// This is critical for the new Exec() signature that uses paths field
+
+====================================================================================================
+#283 - engine/src/want.go
+Lines: 1200-1203 (4 lines)
+====================================================================================================
+// GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion
+// Supports both int and float64 types, returning the provided default if not found
+// Usage:
+//   count := want.GetIntParam("count", 100)  // Returns int, converts float64 if needed
+
+====================================================================================================
+#284 - engine/src/want.go
+Lines: 1215-1218 (4 lines)
+====================================================================================================
+// GetFloatParam extracts a float parameter from WantSpec.Params with automatic type conversion
+// Supports both float64 and int types, returning the provided default if not found
+// Usage:
+//   rate := want.GetFloatParam("rate", 1.0)  // Returns float64, converts int if needed
+
+====================================================================================================
+#285 - engine/src/want.go
+Lines: 1230-1233 (4 lines)
+====================================================================================================
+// GetStringParam extracts a string parameter from WantSpec.Params
+// Returns the provided default if not found or if the value is not a string
+// Usage:
+//   name := want.GetStringParam("name", "default_name")
+
+====================================================================================================
+#286 - engine/src/want.go
+Lines: 1255-1259 (5 lines)
+====================================================================================================
+// IncrementIntState increments an integer value in State by 1
+// If the key doesn't exist, initializes it to 1
+// Returns the new value after increment
+// Usage:
+//   count := want.IncrementIntState("total_processed")  // Returns new count
+
+====================================================================================================
+#287 - engine/src/want.go
+Lines: 1286-1288 (3 lines)
+====================================================================================================
+// GetSpec returns a pointer to the Want's Spec field
+// This provides controlled access to the Spec, following the encapsulation principle
+// Returns nil if the Want is nil
+
+====================================================================================================
+#288 - engine/src/want.go
+Lines: 1296-1298 (3 lines)
+====================================================================================================
+// GetMetadata returns a pointer to the Want's Metadata field
+// This provides controlled access to the Metadata, following the encapsulation principle
+// Returns nil if the Want is nil
+
+====================================================================================================
+#289 - engine/src/want_agent.go
+Lines: 24-28 (5 lines)
+====================================================================================================
+// SetAgentActivity sets the activity description for an agent execution
+// This should be called by agents to describe what action was performed
+// Example: "Flight reservation has been created" or "Hotel booking confirmed"
+// Will find the last execution record for this agent and set the activity
+// regardless of current status (running, completed, or failed)
+
+====================================================================================================
+#290 - engine/src/want_agent.go
+Lines: 34-35 (2 lines)
+====================================================================================================
+	// Find the last execution record for this agent and set the activity
+	// Search from the end to find the most recent execution
+
+====================================================================================================
+#291 - engine/src/want_agent.go
+Lines: 168-170 (3 lines)
+====================================================================================================
+		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle
+		// This ensures all agent state changes are batched into a single history entry
+		// Individual agents should NOT call BeginExecCycle/EndExecCycle themselves
+
+====================================================================================================
+#292 - engine/src/want_agent.go
+Lines: 278-281 (4 lines)
+====================================================================================================
+// StageStateChange stages state changes for later commit (used by agents)
+// Can be called with either:
+// 1. Single key-value: StageStateChange("key", "value")
+// 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
+
+
+====================================================================================================
+SUMMARY
+====================================================================================================
+
+Total multi-line comments: 292
+Total comment lines: 858
+
+By length:
+  2-line comments: 195
+  3-5 line comments: 71
+  6-10 line comments: 24
+  11+ line comments: 2
+
+Top 15 files by comment count:
+   1. engine/src/chain_builder.go: 86
+   2. engine/src/want.go: 54
+   3. engine/cmd/types/coordinator_types.go: 21
+   4. engine/cmd/server/main.go: 19
+   5. engine/cmd/types/prime_types.go: 17
+   6. engine/cmd/types/qnet_types.go: 10
+   7. engine/cmd/types/travel_types.go: 10
+   8. engine/src/owner_types.go: 10
+   9. engine/cmd/types/agent_flight_api.go: 8
+  10. engine/src/chain_helpers.go: 8
+  11. engine/cmd/types/flight_types.go: 7
+  12. engine/cmd/types/agent_monitor_flight_api.go: 6
+  13. engine/src/recipe_loader_generic.go: 6
+  14. engine/cmd/types/approval_types.go: 5
+  15. engine/cmd/demos/demo_travel_recipe.go: 4

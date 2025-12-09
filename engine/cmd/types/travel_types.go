@@ -193,8 +193,7 @@ func (r *RestaurantWant) Exec() bool {
 	return true
 }
 
-// tryAgentExecution attempts to execute restaurant reservation using the agent system
-// Returns the RestaurantSchedule if successful, nil if no agent execution
+// tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
 func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	// Check if this want has agent requirements
 	if len(r.Spec.Requires) > 0 {
@@ -239,8 +238,7 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		r.StoreState("agent_execution_status", "completed")
 		r.StoreState("execution_source", "agent")
 
-		// Wait for agent to complete and retrieve result
-		// Check for agent_result in state
+		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
 			if schedule, ok := result.(RestaurantSchedule); ok {
 				return &schedule
@@ -255,8 +253,7 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	return nil
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant
-// Returns 100 if the restaurant has been attempted/executed, 0 otherwise
+// CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant Returns 100 if the restaurant has been attempted/executed, 0 otherwise
 func (r *RestaurantWant) CalculateAchievingPercentage() int {
 	attempted, _ := r.GetStateBool("attempted", false)
 	if attempted {
@@ -578,8 +575,7 @@ func (h *HotelWant) Exec() bool {
 	return true
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for HotelWant
-// Returns 100 if the hotel has been attempted/executed, 0 otherwise
+// CalculateAchievingPercentage calculates the progress toward completion for HotelWant Returns 100 if the hotel has been attempted/executed, 0 otherwise
 func (h *HotelWant) CalculateAchievingPercentage() int {
 	attempted, _ := h.GetStateBool("attempted", false)
 	if attempted {
@@ -588,8 +584,7 @@ func (h *HotelWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-// tryAgentExecution attempts to execute hotel reservation using the agent system
-// Returns the HotelSchedule if successful, nil if no agent execution
+// tryAgentExecution attempts to execute hotel reservation using the agent system Returns the HotelSchedule if successful, nil if no agent execution
 func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 	// Check if this want has agent requirements
 	if len(h.Spec.Requires) > 0 {
@@ -605,8 +600,7 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 
 		h.StoreState("agent_execution_status", "completed")
 
-		// Wait for agent to complete and retrieve result
-		// Check for agent_result in state
+		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if result, exists := h.GetState("agent_result"); exists {
 			if schedule, ok := result.(HotelSchedule); ok {
 				return &schedule
@@ -787,8 +781,7 @@ func (b *BuffetWant) Exec() bool {
 	return true
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for BuffetWant
-// Returns 100 if the buffet has been attempted/executed, 0 otherwise
+// CalculateAchievingPercentage calculates the progress toward completion for BuffetWant Returns 100 if the buffet has been attempted/executed, 0 otherwise
 func (b *BuffetWant) CalculateAchievingPercentage() int {
 	attempted, _ := b.GetStateBool("attempted", false)
 	if attempted {
@@ -797,8 +790,7 @@ func (b *BuffetWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-// tryAgentExecution attempts to execute buffet reservation using the agent system
-// Returns the BuffetSchedule if successful, nil if no agent execution
+// tryAgentExecution attempts to execute buffet reservation using the agent system Returns the BuffetSchedule if successful, nil if no agent execution
 func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 	// Check if this want has agent requirements
 	if len(b.Spec.Requires) > 0 {
@@ -814,8 +806,7 @@ func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 
 		b.StoreState("agent_execution_status", "completed")
 
-		// Wait for agent to complete and retrieve result
-		// Check for agent_result in state
+		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if result, exists := b.GetState("agent_result"); exists {
 			if schedule, ok := result.(BuffetSchedule); ok {
 				return &schedule
@@ -954,10 +945,7 @@ func generateTravelTimeline(events []TimeSlot) string {
 	return timeline
 }
 
-// TravelCoordinatorWant orchestrates the entire travel itinerary
-// RegisterTravelWantTypes registers all travel-related want types
-// Note: All coordinators now use the unified "coordinator" type
-// Configuration is determined by parameters (is_buffet, required_inputs, etc.)
+// TravelCoordinatorWant orchestrates the entire travel itinerary RegisterTravelWantTypes registers all travel-related want types Note: All coordinators now use the unified "coordinator" type Configuration is determined by parameters (is_buffet, required_inputs, etc.)
 func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("flight", NewFlightWant)
 	builder.RegisterWantType("restaurant", NewRestaurantWant)

@@ -168,8 +168,7 @@ func NewServer(config ServerConfig) *Server {
 		log.Printf("[SERVER] Loaded want type definitions: %v\n", stats)
 	}
 
-	// Create global builder for server mode with empty config
-	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+	// Create global builder for server mode with empty config Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
@@ -182,8 +181,7 @@ func NewServer(config ServerConfig) *Server {
 	// Create temporary server instance to call registerDynamicAgents
 	tempServer := &Server{}
 
-	// Register dynamic agent implementations on global registry
-	// This provides the actual Action/Monitor functions for YAML-loaded agents
+	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
 	tempServer.registerDynamicAgents(agentRegistry)
 
 	return &Server{
@@ -404,8 +402,7 @@ func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error
 	}, nil
 }
 
-// createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files
-// Uses the same logic as offline demo programs for DRY principle
+// createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files Uses the same logic as offline demo programs for DRY principle
 func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -457,8 +454,7 @@ func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// executeConfigLikeDemo executes config using the same logic as demo programs
-// This is the DRY implementation that reuses offline mode logic
+// executeConfigLikeDemo executes config using the same logic as demo programs This is the DRY implementation that reuses offline mode logic
 func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywant.Config, *mywant.ChainBuilder, error) {
 	// Step 1: Load configuration using automatic recipe loading (same as demo_travel_agent_full.go:23)
 	config, err := mywant.LoadConfigFromYAML(configPath)
@@ -522,8 +518,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 	// Get the agent_flight_api from registry if it exists
 	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
 		if doAgent, ok := agent.(*mywant.DoAgent); ok {
-			// Set up the Flight API agent with the actual implementation
-			// Agent has flight_api_agency capability which gives: create_flight and cancel_flight
+			// Set up the Flight API agent with the actual implementation Agent has flight_api_agency capability which gives: create_flight and cancel_flight
 			flightAgent := types.NewAgentFlightAPI(
 				"agent_flight_api",
 				[]string{"flight_api_agency"},
@@ -540,8 +535,7 @@ func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
 	// Get the monitor_flight_api from registry if it exists
 	if agent, exists := agentRegistry.GetAgent("monitor_flight_api"); exists {
 		if monitorAgent, ok := agent.(*mywant.MonitorAgent); ok {
-			// Set up the Monitor Flight agent with the actual implementation
-			// Note: Monitor agents don't provide capabilities, they observe/monitor state
+			// Set up the Monitor Flight agent with the actual implementation Note: Monitor agents don't provide capabilities, they observe/monitor state
 			flightMonitor := types.NewMonitorFlightAPI(
 				"monitor_flight_api",
 				[]string{},
@@ -553,10 +547,7 @@ func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
 	}
 }
 
-// createWant handles POST /api/v1/wants - creates a new want object
-// Supports two formats:
-// 1. Single Want object (JSON/YAML)
-// 2. Config object with wants array (for recipe-based configs)
+// createWant handles POST /api/v1/wants - creates a new want object Supports two formats: 1. Single Want object (JSON/YAML) 2. Config object with wants array (for recipe-based configs)
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -683,8 +674,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Collect all wants from all executions in memory dump format
-	// Use map to deduplicate wants by ID (same want may exist across multiple executions)
+	// Collect all wants from all executions in memory dump format Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
 	for _, execution := range s.wants {
@@ -925,8 +915,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
 	}
 
-	// Use ChainBuilder's UpdateWant API - automatically triggers reconciliation
-	// UpdateWant handles reconciliation internally via reconcileTrigger channel
+	// Use ChainBuilder's UpdateWant API - automatically triggers reconciliation UpdateWant handles reconciliation internally via reconcileTrigger channel
 	if targetExecution.Builder != nil {
 		targetExecution.Builder.UpdateWant(updatedWant)
 	}
@@ -1007,10 +996,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// NOTE: Do NOT call SetConfigInternal with partial execution config!
-				// API-created wants from different executions should not affect the global config.
-				// The global config is only for wants loaded from YAML files or recipe-based creation.
-				// Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
+				// NOTE: Do NOT call SetConfigInternal with partial execution config! API-created wants from different executions should not affect the global config. The global config is only for wants loaded from YAML files or recipe-based creation. Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
 				// This was the root cause of the bug where deleting buffet caused coordinator to be deleted.
 			} else {
 			}
@@ -1913,8 +1899,7 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Start() error {
 	s.setupRoutes()
 
-	// Register all want types on global builder before starting reconcile loop
-	// Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
+	// Register all want types on global builder before starting reconcile loop Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	types.RegisterQNetWantTypes(s.globalBuilder)
 	types.RegisterFibonacciWantTypes(s.globalBuilder)
 	types.RegisterPrimeWantTypes(s.globalBuilder)
@@ -1964,13 +1949,9 @@ func (s *Server) Start() error {
 	return http.ListenAndServe(addr, s.router)
 }
 
-// validateWantTypes validates that all want types are known before execution
-// Uses the global builder which has all registries already configured
-// Allows either want.Type or want.Spec.Recipe to be specified
+// validateWantTypes validates that all want types are known before execution Uses the global builder which has all registries already configured Allows either want.Type or want.Spec.Recipe to be specified
 func (s *Server) validateWantTypes(config mywant.Config) error {
-	// Check each want type by trying to create a minimal want
-	// Using globalBuilder ensures we validate against the exact same registries
-	// that will be used during actual execution
+	// Check each want type by trying to create a minimal want Using globalBuilder ensures we validate against the exact same registries that will be used during actual execution
 	for _, want := range config.Wants {
 		wantType := want.Metadata.Type
 		hasRecipe := want.Spec.Recipe != ""
@@ -1996,8 +1977,7 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 			},
 		}
 
-		// Try to create the want function to check if type is valid
-		// This uses the globalBuilder which has all registries synchronized
+		// Try to create the want function to check if type is valid This uses the globalBuilder which has all registries synchronized
 		_, err := s.globalBuilder.TestCreateWantFunction(testWant)
 		if err != nil {
 			return fmt.Errorf("invalid want type '%s' in want '%s': %v", wantType, want.Metadata.Name, err)
@@ -2386,14 +2366,12 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Collect all unique label keys and their values from all wants
-	// Also track which wants use each label
+	// Collect all unique label keys and their values from all wants Also track which wants use each label
 	labelKeys := make(map[string]bool)
 	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
 	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
 
-	// Start with globally registered labels (added via POST /api/v1/labels)
-	// These labels don't have owners - they're just registered labels
+	// Start with globally registered labels (added via POST /api/v1/labels) These labels don't have owners - they're just registered labels
 	if s.globalLabels != nil {
 		for key, valueMap := range s.globalLabels {
 			labelKeys[key] = true
@@ -2589,9 +2567,7 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// addLabel handles POST /api/v1/labels - adds a label to the global label registry
-// This allows registering labels even if they don't exist on any want yet
-// Labels are stored by adding a minimal want to the global builder's state for persistence
+// addLabel handles POST /api/v1/labels - adds a label to the global label registry This allows registering labels even if they don't exist on any want yet Labels are stored by adding a minimal want to the global builder's state for persistence
 func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2615,8 +2591,7 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add the label to the global label registry (a separate tracking structure)
-	// Labels are registered here and displayed in getLabels without creating wants
+	// Add the label to the global label registry (a separate tracking structure) Labels are registered here and displayed in getLabels without creating wants
 	if s.globalLabels == nil {
 		s.globalLabels = make(map[string]map[string]bool) // key -> value -> true
 	}
@@ -2718,12 +2693,8 @@ func main() {
 	log.SetOutput(logFile)
 	log.SetFlags(log.Ldate | log.Ltime)
 
-	// Parse command line arguments: [port] [host] [debug]
-	// Examples:
-	//   ./server           - port 8080, localhost, no debug
-	//   ./server 8080      - port 8080, localhost, no debug
-	//   ./server 8080 0.0.0.0 - port 8080, 0.0.0.0, no debug
-	//   ./server 8080 0.0.0.0 debug - port 8080, 0.0.0.0, debug enabled
+	// Parse command line arguments: [port] [host] [debug] Examples: ./server           - port 8080, localhost, no debug ./server 8080      - port 8080, localhost, no debug
+	// ./server 8080 0.0.0.0 - port 8080, 0.0.0.0, no debug ./server 8080 0.0.0.0 debug - port 8080, 0.0.0.0, debug enabled
 	port := 8080
 	host := "localhost"
 	debugEnabled := false

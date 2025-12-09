@@ -21,18 +21,15 @@ func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
 
-// SetAgentActivity sets the activity description for an agent execution
-// This should be called by agents to describe what action was performed
-// Example: "Flight reservation has been created" or "Hotel booking confirmed"
-// Will find the last execution record for this agent and set the activity
+// SetAgentActivity sets the activity description for an agent execution This should be called by agents to describe what action was performed
+// Example: "Flight reservation has been created" or "Hotel booking confirmed" Will find the last execution record for this agent and set the activity
 // regardless of current status (running, completed, or failed)
 func (n *Want) SetAgentActivity(agentName string, activity string) {
 	if n.History.AgentHistory == nil {
 		return
 	}
 
-	// Find the last execution record for this agent and set the activity
-	// Search from the end to find the most recent execution
+	// Find the last execution record for this agent and set the activity Search from the end to find the most recent execution
 	for i := len(n.History.AgentHistory) - 1; i >= 0; i-- {
 		if n.History.AgentHistory[i].AgentName == agentName {
 			n.History.AgentHistory[i].Activity = activity
@@ -165,8 +162,7 @@ func (n *Want) executeAgent(agent Agent) error {
 			delete(n.runningAgents, agent.GetName())
 		}()
 
-		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle
-		// This ensures all agent state changes are batched into a single history entry
+		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
 		// Individual agents should NOT call BeginExecCycle/EndExecCycle themselves
 		n.BeginExecCycle()
 
@@ -275,10 +271,8 @@ func (n *Want) StopAgent(agentName string) {
 	}
 }
 
-// StageStateChange stages state changes for later commit (used by agents)
-// Can be called with either:
-// 1. Single key-value: StageStateChange("key", "value")
-// 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
+// StageStateChange stages state changes for later commit (used by agents) Can be called with either:
+// 1. Single key-value: StageStateChange("key", "value") 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
 func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) error {
 	n.agentStateMutex.Lock()
 	defer n.agentStateMutex.Unlock()

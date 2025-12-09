@@ -28,12 +28,8 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 		Duration:           12 * time.Hour, // Default 12 hour flight
 		DepartureDate:      "2024-01-01",   // Default departure date
 		monitoringActive:   false,
-		// monitoringDuration: 60-second window to monitor flight status for stability
-		// After initial booking or rebooking, the system monitors the flight schedule for 60 seconds
-		// to ensure it has stabilized before marking completion. This allows detection of immediate
-		// status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
-		// window expires, if no issues are detected, the FlightWant completes and notifies the
-		// parent Target want, allowing the entire travel plan to complete.
+		// monitoringDuration: 60-second window to monitor flight status for stability After initial booking or rebooking, the system monitors the flight schedule for 60 seconds to ensure it has stabilized before marking completion. This allows detection of immediate status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
+		// window expires, if no issues are detected, the FlightWant completes and notifies the parent Target want, allowing the entire travel plan to complete.
 		monitoringDuration: 30 * time.Second,
 	}
 
@@ -110,14 +106,8 @@ const (
 	PhaseCompleted  = "completed"
 )
 
-// Exec creates a flight booking reservation using state machine pattern
-// The execution flow follows distinct phases:
-// 1. Initial: Setup phase
-// 2. Booking: Execute initial flight booking via agents
-// 3. Monitoring: Monitor flight status for 60 seconds
-// 4. Canceling: Wait for cancellation agent to complete
-// 5. Rebooking: Execute rebooking after cancellation
-// 6. Completed: Final state, return true to complete want
+// Exec creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
+// 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state, return true to complete want
 func (f *FlightWant) Exec() bool {
 	out, connectionAvailable := f.GetFirstOutputChannel()
 	// f.StoreLog(fmt.Sprintf("[DEBUG-EXEC] GetFirstOutputChannel returned: available=%v, out=%v", connectionAvailable, out != nil))
@@ -293,8 +283,7 @@ func (f *FlightWant) Exec() bool {
 	}
 }
 
-// sendFlightPacket sends a flight schedule packet to the output channel and logs it
-// Uses SendPacketMulti to send with retrigger logic for achieved receivers
+// sendFlightPacket sends a flight schedule packet to the output channel and logs it Uses SendPacketMulti to send with retrigger logic for achieved receivers
 func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {
 	flightEvent := TimeSlot{
 		Start: schedule.DepartureTime,
@@ -308,8 +297,7 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		Events: []TimeSlot{flightEvent},
 	}
 
-	// Send via SendPacketMulti which uses paths from want setup
-	// Paths.Out contains the channels configured during want initialization
+	// Send via SendPacketMulti which uses paths from want setup Paths.Out contains the channels configured during want initialization
 	f.SendPacketMulti(travelSchedule)
 
 	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
@@ -327,8 +315,7 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		flightEvent.End.Format("15:04:05")))
 }
 
-// tryAgentExecution attempts to execute flight booking using the agent system
-// Returns the FlightSchedule if successful, nil if no agent execution
+// tryAgentExecution attempts to execute flight booking using the agent system Returns the FlightSchedule if successful, nil if no agent execution
 func (f *FlightWant) tryAgentExecution() {
 	// Check if this want has agent requirements
 	if len(f.Spec.Requires) > 0 {
@@ -448,8 +435,7 @@ func (f *FlightWant) GetStateValue(key string) interface{} {
 	return val
 }
 
-// StartContinuousMonitoring starts a background goroutine to continuously poll flight status
-// This is called after the flight is successfully booked via agents
+// StartContinuousMonitoring starts a background goroutine to continuously poll flight status This is called after the flight is successfully booked via agents
 func (f *FlightWant) StartContinuousMonitoring() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -477,8 +463,7 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			// Create monitor agent and poll
 			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
-			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls
-			// This prevents lock contention when multiple monitoring goroutines call StoreState
+			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState
 			f.BeginExecCycle()
 			monitor.Exec(context.Background(), &f.Want)
 			f.EndExecCycle()
