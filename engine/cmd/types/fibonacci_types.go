@@ -9,10 +9,6 @@ type FibonacciNumbersLocals struct {
 	Count int
 }
 
-func (f *FibonacciNumbersLocals) InitLocals(want *Want) {
-	f.Count = want.GetIntParam("count", 20)
-}
-
 // FibonacciNumbers generates fibonacci sequence numbers
 type FibonacciNumbers struct {
 	Want
@@ -20,10 +16,10 @@ type FibonacciNumbers struct {
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
 func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals { return &FibonacciNumbersLocals{Count: 20} },
+		func() WantLocals { return &FibonacciNumbersLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -33,7 +29,12 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci sequence generator",
 		},
 		"fibonacci numbers",
-	)
+	).(*Want)
+
+	locals := want.Locals.(*FibonacciNumbersLocals)
+	locals.Count = want.GetIntParam("count", 20)
+
+	return want
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -64,12 +65,6 @@ type FibonacciFilterLocals struct {
 	filtered []int
 }
 
-func (f *FibonacciFilterLocals) InitLocals(want *Want) {
-	f.MinValue = want.GetIntParam("min_value", 0)
-	f.MaxValue = want.GetIntParam("max_value", 1000000)
-	f.filtered = make([]int, 0)
-}
-
 // FibonacciFilter filters fibonacci numbers based on criteria
 type FibonacciFilter struct {
 	Want
@@ -77,16 +72,10 @@ type FibonacciFilter struct {
 
 // NewFibonacciFilter creates a new fibonacci filter want
 func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &FibonacciFilterLocals{
-				MinValue: 0,
-				MaxValue: 1000000,
-				filtered: make([]int, 0),
-			}
-		},
+		func() WantLocals { return &FibonacciFilterLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -96,7 +85,14 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number filter (terminal)",
 		},
 		"fibonacci filter",
-	)
+	).(*Want)
+
+	locals := want.Locals.(*FibonacciFilterLocals)
+	locals.MinValue = want.GetIntParam("min_value", 0)
+	locals.MaxValue = want.GetIntParam("max_value", 1000000)
+	locals.filtered = make([]int, 0)
+
+	return want
 }
 
 // Exec returns the generalized chain function for the filter

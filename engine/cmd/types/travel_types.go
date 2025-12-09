@@ -15,11 +15,6 @@ type RestaurantWantLocals struct {
 	Duration       time.Duration
 }
 
-func (r *RestaurantWantLocals) InitLocals(want *Want) {
-	r.RestaurantType = want.GetStringParam("restaurant_type", "casual")
-	r.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
-}
-
 // HotelWantLocals holds type-specific local state for HotelWant
 type HotelWantLocals struct {
 	HotelType string
@@ -27,21 +22,10 @@ type HotelWantLocals struct {
 	CheckOut  time.Duration
 }
 
-func (h *HotelWantLocals) InitLocals(want *Want) {
-	h.HotelType = want.GetStringParam("hotel_type", "standard")
-	h.CheckIn = 22 * time.Hour
-	h.CheckOut = 8 * time.Hour
-}
-
 // BuffetWantLocals holds type-specific local state for BuffetWant
 type BuffetWantLocals struct {
 	BuffetType string
 	Duration   time.Duration
-}
-
-func (b *BuffetWantLocals) InitLocals(want *Want) {
-	b.BuffetType = want.GetStringParam("buffet_type", "continental")
-	b.Duration = 1*time.Hour + 30*time.Minute
 }
 
 // TimeSlot represents a time period with start and end times
@@ -76,12 +60,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &RestaurantWantLocals{
-				RestaurantType: "casual",
-				Duration:       2 * time.Hour,
-			}
-		},
+		func() WantLocals { return &RestaurantWantLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -91,11 +70,13 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Restaurant reservation scheduling want",
 		},
 		"restaurant",
-	)
+	).(*Want)
 
-	// Type assert to *Want and wrap in RestaurantWant
-	baseWant := want.(*Want)
-	return &RestaurantWant{Want: *baseWant}
+	locals := want.Locals.(*RestaurantWantLocals)
+	locals.RestaurantType = want.GetStringParam("restaurant_type", "casual")
+	locals.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
+
+	return &RestaurantWant{Want: *want}
 }
 
 // Exec creates a restaurant reservation
@@ -428,13 +409,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &HotelWantLocals{
-				HotelType: "standard",
-				CheckIn:   22 * time.Hour,
-				CheckOut:  8 * time.Hour,
-			}
-		},
+		func() WantLocals { return &HotelWantLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -444,11 +419,14 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Hotel reservation scheduling want",
 		},
 		"hotel",
-	)
+	).(*Want)
 
-	// Type assert to *Want and wrap in HotelWant
-	baseWant := want.(*Want)
-	return &HotelWant{Want: *baseWant}
+	locals := want.Locals.(*HotelWantLocals)
+	locals.HotelType = want.GetStringParam("hotel_type", "standard")
+	locals.CheckIn = 22 * time.Hour
+	locals.CheckOut = 8 * time.Hour
+
+	return &HotelWant{Want: *want}
 }
 
 func (h *HotelWant) Exec() bool {
@@ -622,12 +600,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &BuffetWantLocals{
-				BuffetType: "continental",
-				Duration:   1*time.Hour + 30*time.Minute,
-			}
-		},
+		func() WantLocals { return &BuffetWantLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -637,11 +610,13 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Breakfast buffet scheduling want",
 		},
 		"buffet",
-	)
+	).(*Want)
 
-	// Type assert to *Want and wrap in BuffetWant
-	baseWant := want.(*Want)
-	return &BuffetWant{Want: *baseWant}
+	locals := want.Locals.(*BuffetWantLocals)
+	locals.BuffetType = want.GetStringParam("buffet_type", "continental")
+	locals.Duration = 1*time.Hour + 30*time.Minute
+
+	return &BuffetWant{Want: *want}
 }
 
 func (b *BuffetWant) Exec() bool {

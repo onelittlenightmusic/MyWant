@@ -101,9 +101,9 @@ func getCurrentTimestamp() int64 {
 }
 
 // WantLocals defines the interface for type-specific local state in wants
+// WantLocals is the base interface for type-specific want local state
+// Implementations should initialize their fields in the constructor after NewWant() is called
 type WantLocals interface {
-	// InitLocals initializes type-specific local fields from spec parameters
-	InitLocals(want *Want)
 }
 
 // WantFactory defines the interface for creating want functions
@@ -113,17 +113,24 @@ type WantFactory func(metadata Metadata, spec WantSpec) interface{}
 type LocalsFactory func() WantLocals
 
 // NewWant is a generic constructor that creates a Want with type-specific Locals
+// Type-specific initialization should be done in the constructor after calling NewWant().
 // This eliminates the need for individual NewXxxWant functions for simple want types
 // Usage:
 //
 //	func NewMyWant(metadata Metadata, spec WantSpec) interface{} {
-//	    return NewWant(
+//	    want := NewWant(
 //	        metadata,
 //	        spec,
-//	        func() WantLocals { return &MyWantLocals{DefaultField: "value"} },
+//	        func() WantLocals { return &MyWantLocals{} },
 //	        ConnectivityMetadata{RequiredInputs: 1, ...},
 //	        "my_want_type",
-//	    )
+//	    ).(*Want)
+//
+//	    // Initialize Locals fields after want creation
+//	    locals := want.Locals.(*MyWantLocals)
+//	    locals.MyField = want.GetStringParam("my_field", "default")
+//
+//	    return want
 //	}
 func NewWant(
 	metadata Metadata,
@@ -138,10 +145,9 @@ func NewWant(
 	}
 	want.Init(metadata, spec)
 
-	// Create and initialize Locals if factory is provided
+	// Create Locals if factory is provided
 	if localsFactory != nil {
 		locals := localsFactory()
-		locals.InitLocals(want)
 		want.Locals = locals
 	}
 

@@ -30,40 +30,32 @@ type EvidenceWantLocals struct {
 	ApprovalID   string
 }
 
-func (e *EvidenceWantLocals) InitLocals(want *Want) {
-	e.EvidenceType = want.GetStringParam("evidence_type", "document")
-	e.ApprovalID = want.GetStringParam("approval_id", "")
-}
-
 // EvidenceWant provides evidence data for approval processes
 type EvidenceWant struct {
 	Want
 }
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
-	evidence := &EvidenceWant{
-		Want: Want{},
-	}
-	evidence.Init(metadata, spec)
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &EvidenceWantLocals{} },
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       0,
+			MaxOutputs:      -1,
+			WantType:        "evidence",
+			Description:     "Evidence provider for approval processes",
+		},
+		"evidence",
+	).(*Want)
 
-	locals := &EvidenceWantLocals{
-		EvidenceType: "document",
-		ApprovalID:   "",
-	}
-	locals.InitLocals(&evidence.Want)
-	evidence.Locals = locals
+	locals := want.Locals.(*EvidenceWantLocals)
+	locals.EvidenceType = want.GetStringParam("evidence_type", "document")
+	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	evidence.WantType = "evidence"
-	evidence.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       0,
-		MaxOutputs:      -1,
-		WantType:        "evidence",
-		Description:     "Evidence provider for approval processes",
-	}
-
-	return evidence
+	return &EvidenceWant{Want: *want}
 }
 
 func (e *EvidenceWant) Exec() bool {
@@ -115,40 +107,32 @@ type DescriptionWantLocals struct {
 	ApprovalID        string
 }
 
-func (d *DescriptionWantLocals) InitLocals(want *Want) {
-	d.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
-	d.ApprovalID = want.GetStringParam("approval_id", "")
-}
-
 // DescriptionWant provides description data for approval processes
 type DescriptionWant struct {
 	Want
 }
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
-	description := &DescriptionWant{
-		Want: Want{},
-	}
-	description.Init(metadata, spec)
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return &DescriptionWantLocals{} },
+		ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       0,
+			MaxOutputs:      -1,
+			WantType:        "description",
+			Description:     "Description provider for approval processes",
+		},
+		"description",
+	).(*Want)
 
-	locals := &DescriptionWantLocals{
-		DescriptionFormat: "Request for approval: %s",
-		ApprovalID:        "",
-	}
-	locals.InitLocals(&description.Want)
-	description.Locals = locals
+	locals := want.Locals.(*DescriptionWantLocals)
+	locals.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
+	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	description.WantType = "description"
-	description.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       0,
-		MaxOutputs:      -1,
-		WantType:        "description",
-		Description:     "Description provider for approval processes",
-	}
-
-	return description
+	return &DescriptionWant{Want: *want}
 }
 
 func (d *DescriptionWant) Exec() bool {

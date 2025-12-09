@@ -10,11 +10,6 @@ type PrimeNumbersLocals struct {
 	End   int
 }
 
-func (p *PrimeNumbersLocals) InitLocals(want *Want) {
-	p.Start = want.GetIntParam("start", 2)
-	p.End = want.GetIntParam("end", 100)
-}
-
 // PrimeNumbers creates numbers and sends them downstream
 type PrimeNumbers struct {
 	Want
@@ -23,10 +18,10 @@ type PrimeNumbers struct {
 
 // NewPrimeNumbers creates a new prime numbers want
 func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals { return &PrimeNumbersLocals{Start: 2, End: 100} },
+		func() WantLocals { return &PrimeNumbersLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -36,7 +31,13 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number generator",
 		},
 		"prime numbers",
-	)
+	).(*Want)
+
+	locals := want.Locals.(*PrimeNumbersLocals)
+	locals.Start = want.GetIntParam("start", 2)
+	locals.End = want.GetIntParam("end", 100)
+
+	return want
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -64,11 +65,6 @@ type PrimeSequenceLocals struct {
 	foundPrimes []int
 }
 
-func (p *PrimeSequenceLocals) InitLocals(want *Want) {
-	p.Prime = want.GetIntParam("prime", 2)
-	p.foundPrimes = make([]int, 0)
-}
-
 // PrimeSequence filters out multiples of a prime number
 type PrimeSequence struct {
 	Want
@@ -77,15 +73,10 @@ type PrimeSequence struct {
 
 // NewPrimeSequence creates a new prime sequence want
 func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &PrimeSequenceLocals{
-				Prime:       2,
-				foundPrimes: make([]int, 0),
-			}
-		},
+		func() WantLocals { return &PrimeSequenceLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -95,7 +86,13 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number sequence",
 		},
 		"prime sequence",
-	)
+	).(*Want)
+
+	locals := want.Locals.(*PrimeSequenceLocals)
+	locals.Prime = want.GetIntParam("prime", 2)
+	locals.foundPrimes = make([]int, 0)
+
+	return want
 }
 
 // Exec returns the generalized chain function for the filter

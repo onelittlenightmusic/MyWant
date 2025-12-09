@@ -17,15 +17,6 @@ type NumbersLocals struct {
 	currentCount        int
 }
 
-func (n *NumbersLocals) InitLocals(want *mywant.Want) {
-	n.Rate = want.GetFloatParam("rate", 1.0)
-	n.Count = want.GetIntParam("count", 100)
-	n.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
-	n.cycleCount = 0
-	n.currentTime = 0.0
-	n.currentCount = 0
-}
-
 // QueueLocals holds type-specific local state for Queue want
 type QueueLocals struct {
 	ServiceTime         float64
@@ -37,32 +28,14 @@ type QueueLocals struct {
 	processedCount      int
 }
 
-func (q *QueueLocals) InitLocals(want *mywant.Want) {
-	q.ServiceTime = want.GetFloatParam("service_time", 1.0)
-	q.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
-	q.lastBatchCount = 0
-	q.cycleCount = 0
-	q.serverFreeTime = 0.0
-	q.waitTimeSum = 0.0
-	q.processedCount = 0
-}
-
 // CombinerLocals holds type-specific local state for Combiner want
 type CombinerLocals struct {
 	Operation string
 }
 
-func (c *CombinerLocals) InitLocals(want *mywant.Want) {
-	c.Operation = want.GetStringParam("operation", "merge")
-}
-
 // SinkLocals holds type-specific local state for Sink want
 type SinkLocals struct {
 	Received int
-}
-
-func (s *SinkLocals) InitLocals(want *mywant.Want) {
-	s.Received = 0
 }
 
 // QueuePacket represents data flowing through the chain
@@ -105,22 +78,30 @@ type Numbers struct {
 
 // PacketNumbers creates a new numbers want
 func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	connectivityMetadata := mywant.ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       0,
-		MaxOutputs:      -1,
-		WantType:        "sequence",
-		Description:     "Packet generator want",
-	}
-
-	return mywant.NewWant(
+	want := mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &NumbersLocals{} },
-		connectivityMetadata,
+		mywant.ConnectivityMetadata{
+			RequiredInputs:  0,
+			RequiredOutputs: 1,
+			MaxInputs:       0,
+			MaxOutputs:      -1,
+			WantType:        "sequence",
+			Description:     "Packet generator want",
+		},
 		"sequence",
-	)
+	).(*mywant.Want)
+
+	locals := want.Locals.(*NumbersLocals)
+	locals.Rate = want.GetFloatParam("rate", 1.0)
+	locals.Count = want.GetIntParam("count", 100)
+	locals.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
+	locals.cycleCount = 0
+	locals.currentTime = 0.0
+	locals.currentCount = 0
+
+	return want
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
@@ -201,22 +182,31 @@ type Queue struct {
 
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	connectivityMetadata := mywant.ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      -1,
-		WantType:        "queue",
-		Description:     "Queue processing want",
-	}
-
-	return mywant.NewWant(
+	want := mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &QueueLocals{} },
-		connectivityMetadata,
+		mywant.ConnectivityMetadata{
+			RequiredInputs:  1,
+			RequiredOutputs: 1,
+			MaxInputs:       1,
+			MaxOutputs:      -1,
+			WantType:        "queue",
+			Description:     "Queue processing want",
+		},
 		"queue",
-	)
+	).(*mywant.Want)
+
+	locals := want.Locals.(*QueueLocals)
+	locals.ServiceTime = want.GetFloatParam("service_time", 1.0)
+	locals.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
+	locals.lastBatchCount = 0
+	locals.cycleCount = 0
+	locals.serverFreeTime = 0.0
+	locals.waitTimeSum = 0.0
+	locals.processedCount = 0
+
+	return want
 }
 
 // Exec executes the queue processing directly with batch mechanism
@@ -336,22 +326,25 @@ type Combiner struct {
 }
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	connectivityMetadata := mywant.ConnectivityMetadata{
-		RequiredInputs:  2,
-		RequiredOutputs: 1,
-		MaxInputs:       -1,
-		MaxOutputs:      -1,
-		WantType:        "combiner",
-		Description:     "Stream combiner want",
-	}
-
-	return mywant.NewWant(
+	want := mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &CombinerLocals{} },
-		connectivityMetadata,
+		mywant.ConnectivityMetadata{
+			RequiredInputs:  2,
+			RequiredOutputs: 1,
+			MaxInputs:       -1,
+			MaxOutputs:      -1,
+			WantType:        "combiner",
+			Description:     "Stream combiner want",
+		},
 		"combiner",
-	)
+	).(*mywant.Want)
+
+	locals := want.Locals.(*CombinerLocals)
+	locals.Operation = want.GetStringParam("operation", "merge")
+
+	return want
 }
 
 // Exec executes the combiner directly
@@ -420,22 +413,25 @@ type Sink struct {
 
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	connectivityMetadata := mywant.ConnectivityMetadata{
-		RequiredInputs:  1,
-		RequiredOutputs: 0,
-		MaxInputs:       -1,
-		MaxOutputs:      0,
-		WantType:        "sink",
-		Description:     "Data sink/collector want",
-	}
-
-	return mywant.NewWant(
+	want := mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &SinkLocals{} },
-		connectivityMetadata,
+		mywant.ConnectivityMetadata{
+			RequiredInputs:  1,
+			RequiredOutputs: 0,
+			MaxInputs:       -1,
+			MaxOutputs:      0,
+			WantType:        "sink",
+			Description:     "Data sink/collector want",
+		},
 		"sink",
-	)
+	).(*mywant.Want)
+
+	locals := want.Locals.(*SinkLocals)
+	locals.Received = 0
+
+	return want
 }
 
 // Exec executes the sink directly

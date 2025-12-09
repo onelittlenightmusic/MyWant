@@ -18,14 +18,6 @@ type FlightWantLocals struct {
 	lastLogTime        time.Time     // Track last monitoring log time to reduce spam
 }
 
-func (f *FlightWantLocals) InitLocals(want *Want) {
-	f.FlightType = want.GetStringParam("flight_type", "economy")
-	f.Duration = time.Duration(want.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
-	f.DepartureDate = want.GetStringParam("departure_date", "2024-01-01")
-	f.monitoringActive = false
-	f.monitoringDuration = 30 * time.Second
-}
-
 // FlightWant creates flight booking reservations
 type FlightWant struct {
 	Want
@@ -34,18 +26,10 @@ type FlightWant struct {
 
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals {
-			return &FlightWantLocals{
-				FlightType:        "economy",
-				Duration:          12 * time.Hour,
-				DepartureDate:     "2024-01-01",
-				monitoringActive:  false,
-				monitoringDuration: 30 * time.Second,
-			}
-		},
+		func() WantLocals { return &FlightWantLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -55,7 +39,17 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Flight booking scheduling want",
 		},
 		"flight",
-	)
+	).(*Want)
+
+	// Initialize Locals after want is created
+	locals := want.Locals.(*FlightWantLocals)
+	locals.FlightType = want.GetStringParam("flight_type", "economy")
+	locals.Duration = time.Duration(want.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
+	locals.DepartureDate = want.GetStringParam("departure_date", "2024-01-01")
+	locals.monitoringActive = false
+	locals.monitoringDuration = 30 * time.Second
+
+	return want
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule

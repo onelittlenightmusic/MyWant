@@ -17,10 +17,6 @@ type SeedNumbersLocals struct {
 	MaxCount int
 }
 
-func (s *SeedNumbersLocals) InitLocals(want *Want) {
-	s.MaxCount = want.GetIntParam("max_count", 15)
-}
-
 // SeedNumbers provides initial fibonacci seeds (0, 1)
 type SeedNumbers struct {
 	Want
@@ -29,10 +25,10 @@ type SeedNumbers struct {
 
 // NewSeedNumbers creates a new seed numbers want
 func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
-		func() WantLocals { return &SeedNumbersLocals{MaxCount: 15} },
+		func() WantLocals { return &SeedNumbersLocals{} },
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -42,7 +38,12 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci seed generator",
 		},
 		"seed numbers",
-	)
+	).(*Want)
+
+	locals := want.Locals.(*SeedNumbersLocals)
+	locals.MaxCount = want.GetIntParam("max_count", 15)
+
+	return want
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
@@ -72,15 +73,6 @@ type FibonacciComputerLocals struct {
 	initialized bool
 }
 
-func (f *FibonacciComputerLocals) InitLocals(want *Want) {
-	f.prev = 0
-	f.current = 0
-	f.position = 0
-	f.maxCount = 15
-	f.processed = 0
-	f.initialized = false
-}
-
 // FibonacciComputer computes the next fibonacci number from two using
 type FibonacciComputer struct {
 	Want
@@ -89,7 +81,7 @@ type FibonacciComputer struct {
 
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &FibonacciComputerLocals{} },
@@ -102,7 +94,18 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number computer",
 		},
 		"fibonacci computer",
-	)
+	).(*Want)
+
+	// Initialize locals with default values
+	locals := want.Locals.(*FibonacciComputerLocals)
+	locals.prev = 0
+	locals.current = 0
+	locals.position = 0
+	locals.maxCount = 15
+	locals.processed = 0
+	locals.initialized = false
+
+	return want
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
@@ -182,13 +185,6 @@ type FibonacciMergerLocals struct {
 	maxCountReceived bool
 }
 
-func (f *FibonacciMergerLocals) InitLocals(want *Want) {
-	f.seedUsingClosed = false
-	f.computedUsingClosed = false
-	f.processed = 0
-	f.maxCountReceived = false
-}
-
 // FibonacciMerger merges seed values with computed values
 type FibonacciMerger struct {
 	Want
@@ -197,7 +193,7 @@ type FibonacciMerger struct {
 
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
-	return NewWant(
+	want := NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &FibonacciMergerLocals{} },
@@ -210,7 +206,16 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci merger",
 		},
 		"fibonacci merger",
-	)
+	).(*Want)
+
+	// Initialize locals with default values
+	locals := want.Locals.(*FibonacciMergerLocals)
+	locals.seedUsingClosed = false
+	locals.computedUsingClosed = false
+	locals.processed = 0
+	locals.maxCountReceived = false
+
+	return want
 }
 
 // Exec returns the generalized chain function for the fibonacci merger
