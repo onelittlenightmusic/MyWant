@@ -7,38 +7,31 @@ import (
 	"time"
 )
 
-// FlightWant creates flight booking reservations
-type FlightWant struct {
-	Want
-	FlightType          string
-	Duration            time.Duration
-	DepartureDate       string // Departure date in YYYY-MM-DD format
-	paths               Paths
+// FlightWantLocals holds type-specific local state for FlightWant
+type FlightWantLocals struct {
+	FlightType         string
+	Duration           time.Duration
+	DepartureDate      string // Departure date in YYYY-MM-DD format
 	monitoringStartTime time.Time
-	monitoringDuration  time.Duration // How long to monitor for status changes
-	monitoringActive    bool          // Whether monitoring is currently active
-	lastLogTime         time.Time     // Track last monitoring log time to reduce spam
+	monitoringDuration time.Duration // How long to monitor for status changes
+	monitoringActive   bool          // Whether monitoring is currently active
+	lastLogTime        time.Time     // Track last monitoring log time to reduce spam
 }
 
-// NewFlightWant creates a new flight booking want
-func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
-	flight := &FlightWant{
-		Want:               Want{},
-		FlightType:         "economy",
-		Duration:           12 * time.Hour, // Default 12 hour flight
-		DepartureDate:      "2024-01-01",   // Default departure date
-		monitoringActive:   false,
-		// monitoringDuration: 60-second window to monitor flight status for stability After initial booking or rebooking, the system monitors the flight schedule for 60 seconds to ensure it has stabilized before marking completion. This allows detection of immediate status changes (delays, cancellations) that would trigger rebooking. Once the 60-second
-		// window expires, if no issues are detected, the FlightWant completes and notifies the parent Target want, allowing the entire travel plan to complete.
-		monitoringDuration: 30 * time.Second,
-	}
-	flight.Init(metadata, spec)
+func (f *FlightWantLocals) InitLocals(want *Want) {
+	f.FlightType = want.GetStringParam("flight_type", "economy")
+	f.Duration = time.Duration(want.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
+	f.DepartureDate = want.GetStringParam("departure_date", "2024-01-01")
+	f.monitoringActive = false
+	f.monitoringDuration = 30 * time.Second
+}
 
-	flight.FlightType = flight.GetStringParam("flight_type", "economy")
-	flight.Duration = time.Duration(flight.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
-	flight.DepartureDate = flight.GetStringParam("departure_date", "2024-01-01")
-	flight.WantType = "flight"
-	flight.ConnectivityMetadata = ConnectivityMetadata{
+func (f *FlightWantLocals) GetWantType() string {
+	return "flight"
+}
+
+func (f *FlightWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
 		RequiredInputs:  0,
 		RequiredOutputs: 1,
 		MaxInputs:       1,
@@ -46,6 +39,35 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 		WantType:        "flight",
 		Description:     "Flight booking scheduling want",
 	}
+}
+
+// FlightWant creates flight booking reservations
+type FlightWant struct {
+	Want
+	paths Paths
+}
+
+// NewFlightWant creates a new flight booking want
+func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
+	flight := &FlightWant{
+		Want:  Want{},
+		paths: Paths{},
+	}
+	flight.Init(metadata, spec)
+
+	// Create and initialize FlightWantLocals
+	locals := &FlightWantLocals{
+		FlightType:        "economy",
+		Duration:          12 * time.Hour,
+		DepartureDate:     "2024-01-01",
+		monitoringActive:  false,
+		monitoringDuration: 30 * time.Second,
+	}
+	locals.InitLocals(&flight.Want)
+	flight.Locals = locals
+
+	flight.WantType = locals.GetWantType()
+	flight.ConnectivityMetadata = locals.GetConnectivityMetadata()
 
 	return flight
 }
@@ -103,13 +125,18 @@ const (
 // Exec creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
 // 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state, return true to complete want
 func (f *FlightWant) Exec() bool {
+	locals, ok := f.Locals.(*FlightWantLocals)
+	if !ok {
+		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")
+		return true
+	}
+
 	out, connectionAvailable := f.GetFirstOutputChannel()
-	// f.StoreLog(fmt.Sprintf("[DEBUG-EXEC] GetFirstOutputChannel returned: available=%v, out=%v", connectionAvailable, out != nil))
 	if !connectionAvailable {
 		f.StoreLog("[DEBUG-EXEC] NO OUTPUT CHANNELS AVAILABLE - Returning complete (true)")
 		return true
 	}
-	// f.StoreLog("[DEBUG-EXEC] Output channels available - Proceeding with execution")
+
 	phaseVal, _ := f.GetState("flight_phase")
 	phase := ""
 	if phaseVal != nil {
@@ -143,7 +170,7 @@ func (f *FlightWant) Exec() bool {
 				f.sendFlightPacket(out, agentSchedule, "Initial")
 
 				// Transition to monitoring phase
-				f.monitoringStartTime = time.Now()
+				locals.monitoringStartTime = time.Now()
 				f.StoreState("flight_phase", PhaseMonitoring)
 				f.StoreLog("Transitioning to monitoring phase")
 
@@ -158,8 +185,8 @@ func (f *FlightWant) Exec() bool {
 
 	// === Phase 3: Monitoring ===
 	case PhaseMonitoring:
-		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
-			elapsed := time.Since(f.monitoringStartTime)
+		if time.Since(locals.monitoringStartTime) < locals.monitoringDuration {
+			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
 				f.StoreStateMulti(map[string]interface{}{
@@ -172,9 +199,9 @@ func (f *FlightWant) Exec() bool {
 
 			// Log monitoring progress every 30 seconds
 			now := time.Now()
-			if f.lastLogTime.IsZero() || now.Sub(f.lastLogTime) >= 30*time.Second {
-				f.StoreLog(fmt.Sprintf("Monitoring... (elapsed: %v/%v)", elapsed, f.monitoringDuration))
-				f.lastLogTime = now
+			if locals.lastLogTime.IsZero() || now.Sub(locals.lastLogTime) >= 30*time.Second {
+				f.StoreLog(fmt.Sprintf("Monitoring... (elapsed: %v/%v)", elapsed, locals.monitoringDuration))
+				locals.lastLogTime = now
 			}
 
 			return false
@@ -242,7 +269,7 @@ func (f *FlightWant) Exec() bool {
 				f.sendFlightPacket(out, agentSchedule, "Rebooked")
 
 				// Restart monitoring for new flight
-				f.monitoringStartTime = time.Now()
+				locals.monitoringStartTime = time.Now()
 				f.StoreState("flight_phase", PhaseMonitoring)
 				f.StoreLog("Transitioning back to monitoring phase for rebooked flight")
 

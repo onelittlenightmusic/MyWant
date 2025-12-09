@@ -9,6 +9,86 @@ import (
 	"time"
 )
 
+// RestaurantWantLocals holds type-specific local state for RestaurantWant
+type RestaurantWantLocals struct {
+	RestaurantType string
+	Duration       time.Duration
+}
+
+func (r *RestaurantWantLocals) InitLocals(want *Want) {
+	r.RestaurantType = want.GetStringParam("restaurant_type", "casual")
+	r.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
+}
+
+func (r *RestaurantWantLocals) GetWantType() string {
+	return "restaurant"
+}
+
+func (r *RestaurantWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "restaurant",
+		Description:     "Restaurant reservation scheduling want",
+	}
+}
+
+// HotelWantLocals holds type-specific local state for HotelWant
+type HotelWantLocals struct {
+	HotelType string
+	CheckIn   time.Duration
+	CheckOut  time.Duration
+}
+
+func (h *HotelWantLocals) InitLocals(want *Want) {
+	h.HotelType = want.GetStringParam("hotel_type", "standard")
+	h.CheckIn = 22 * time.Hour
+	h.CheckOut = 8 * time.Hour
+}
+
+func (h *HotelWantLocals) GetWantType() string {
+	return "hotel"
+}
+
+func (h *HotelWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "hotel",
+		Description:     "Hotel reservation scheduling want",
+	}
+}
+
+// BuffetWantLocals holds type-specific local state for BuffetWant
+type BuffetWantLocals struct {
+	BuffetType string
+	Duration   time.Duration
+}
+
+func (b *BuffetWantLocals) InitLocals(want *Want) {
+	b.BuffetType = want.GetStringParam("buffet_type", "continental")
+	b.Duration = 1*time.Hour + 30*time.Minute
+}
+
+func (b *BuffetWantLocals) GetWantType() string {
+	return "buffet"
+}
+
+func (b *BuffetWantLocals) GetConnectivityMetadata() ConnectivityMetadata {
+	return ConnectivityMetadata{
+		RequiredInputs:  0,
+		RequiredOutputs: 1,
+		MaxInputs:       1,
+		MaxOutputs:      1,
+		WantType:        "buffet",
+		Description:     "Breakfast buffet scheduling want",
+	}
+}
+
 // TimeSlot represents a time period with start and end times
 type TimeSlot struct {
 	Start time.Time
@@ -34,38 +114,36 @@ type ScheduleConflict struct {
 // RestaurantWant creates dinner restaurant reservations
 type RestaurantWant struct {
 	Want
-	RestaurantType string
-	Duration       time.Duration
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	restaurant := &RestaurantWant{
-		Want:           Want{},
-		RestaurantType: "casual",
-		Duration:       2 * time.Hour, // Default 2 hour dinner
+		Want: Want{},
 	}
 	restaurant.Init(metadata, spec)
 
-	restaurant.RestaurantType = restaurant.GetStringParam("restaurant_type", "casual")
-	restaurant.Duration = time.Duration(restaurant.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
-	restaurant.WantType = "restaurant"
-	restaurant.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "restaurant",
-		Description:     "Restaurant reservation scheduling want",
+	locals := &RestaurantWantLocals{
+		RestaurantType: "casual",
+		Duration:       2 * time.Hour,
 	}
+	locals.InitLocals(&restaurant.Want)
+	restaurant.Locals = locals
+
+	restaurant.WantType = locals.GetWantType()
+	restaurant.ConnectivityMetadata = locals.GetConnectivityMetadata()
 
 	return restaurant
 }
 
 // Exec creates a restaurant reservation
 func (r *RestaurantWant) Exec() bool {
-	restaurantType := r.GetStringParam("restaurant_type", "casual")
-	duration := time.Duration(r.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
+	locals, ok := r.Locals.(*RestaurantWantLocals)
+	if !ok {
+		r.StoreLog("ERROR: Failed to access RestaurantWantLocals from Want.Locals")
+		return true
+	}
+
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 	_, connectionAvailable := r.GetFirstOutputChannel()
@@ -118,14 +196,14 @@ func (r *RestaurantWant) Exec() bool {
 		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 6-9 PM
 
 	// Generate realistic restaurant name for the summary
-	restaurantName := generateRealisticRestaurantNameForTravel(restaurantType)
+	restaurantName := generateRealisticRestaurantNameForTravel(locals.RestaurantType)
 	partySize := r.GetIntParam("party_size", 2)
 
 	newEvent := TimeSlot{
 		Start: dinnerStart,
-		End:   dinnerStart.Add(duration),
+		End:   dinnerStart.Add(locals.Duration),
 		Type:  "restaurant",
-		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, restaurantType),
+		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, locals.RestaurantType),
 	}
 	if existingSchedule != nil {
 		for attempt := 0; attempt < 3; attempt++ {
@@ -136,7 +214,7 @@ func (r *RestaurantWant) Exec() bool {
 					// Retry with different time
 				dinnerStart = dinnerStart.Add(time.Hour)
 					newEvent.Start = dinnerStart
-					newEvent.End = dinnerStart.Add(duration)
+					newEvent.End = dinnerStart.Add(locals.Duration)
 					break
 				}
 			}
@@ -154,10 +232,10 @@ func (r *RestaurantWant) Exec() bool {
 	}
 	r.StoreStateMulti(map[string]interface{}{
 		"total_processed":            1,
-		"reservation_type":           restaurantType,
+		"reservation_type":           locals.RestaurantType,
 		"reservation_start_time":     newEvent.Start.Format("15:04"),
 		"reservation_end_time":       newEvent.End.Format("15:04"),
-		"reservation_duration_hours": duration.Hours(),
+		"reservation_duration_hours": locals.Duration.Hours(),
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
@@ -381,37 +459,36 @@ func generateRealisticBuffetNameForTravel(buffetType string) string {
 // HotelWant creates hotel stay reservations
 type HotelWant struct {
 	Want
-	HotelType string
-	CheckIn   time.Duration
-	CheckOut  time.Duration
 }
 
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	hotel := &HotelWant{
-		Want:      Want{},
-		HotelType: "standard",
-		CheckIn:   22 * time.Hour, // 10 PM
-		CheckOut:  8 * time.Hour,  // 8 AM next day
+		Want: Want{},
 	}
 	hotel.Init(metadata, spec)
 
-	hotel.HotelType = hotel.GetStringParam("hotel_type", "standard")
-	hotel.WantType = "hotel"
-	hotel.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "hotel",
-		Description:     "Hotel reservation scheduling want",
+	locals := &HotelWantLocals{
+		HotelType: "standard",
+		CheckIn:   22 * time.Hour,
+		CheckOut:  8 * time.Hour,
 	}
+	locals.InitLocals(&hotel.Want)
+	hotel.Locals = locals
+
+	hotel.WantType = locals.GetWantType()
+	hotel.ConnectivityMetadata = locals.GetConnectivityMetadata()
 
 	return hotel
 }
 
 func (h *HotelWant) Exec() bool {
-	hotelType := h.GetStringParam("hotel_type", "standard")
+	locals, ok := h.Locals.(*HotelWantLocals)
+	if !ok {
+		h.StoreLog("ERROR: Failed to access HotelWantLocals from Want.Locals")
+		return true
+	}
+
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 	_, connectionAvailable := h.GetFirstOutputChannel()
@@ -471,13 +548,13 @@ func (h *HotelWant) Exec() bool {
 		7+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 7-10 AM next day
 
 	// Generate realistic hotel name for the summary
-	hotelName := generateRealisticHotelNameForTravel(hotelType)
+	hotelName := generateRealisticHotelNameForTravel(locals.HotelType)
 
 	newEvent := TimeSlot{
 		Start: checkInTime,
 		End:   checkOutTime,
 		Type:  "hotel",
-		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
+		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, locals.HotelType),
 	}
 	if existingSchedule != nil {
 		for attempt := 0; attempt < 3; attempt++ {
@@ -506,7 +583,7 @@ func (h *HotelWant) Exec() bool {
 	}
 	h.StoreStateMulti(map[string]interface{}{
 		"total_processed":      1,
-		"hotel_type":           hotelType,
+		"hotel_type":           locals.HotelType,
 		"check_in_time":        newEvent.Start.Format("15:04 Jan 2"),
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
@@ -570,36 +647,34 @@ func getStateKeys(state map[string]interface{}) []string {
 // BuffetWant creates breakfast buffet reservations
 type BuffetWant struct {
 	Want
-	BuffetType string
-	Duration   time.Duration
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	buffet := &BuffetWant{
-		Want:       Want{},
-		BuffetType: "continental",
-		Duration:   1*time.Hour + 30*time.Minute, // 1.5 hour breakfast
+		Want: Want{},
 	}
 	buffet.Init(metadata, spec)
 
-	buffet.BuffetType = buffet.GetStringParam("buffet_type", "continental")
-	buffet.WantType = "buffet"
-	buffet.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  0,
-		RequiredOutputs: 1,
-		MaxInputs:       1,
-		MaxOutputs:      1,
-		WantType:        "buffet",
-		Description:     "Breakfast buffet scheduling want",
+	locals := &BuffetWantLocals{
+		BuffetType: "continental",
+		Duration:   1*time.Hour + 30*time.Minute,
 	}
+	locals.InitLocals(&buffet.Want)
+	buffet.Locals = locals
+
+	buffet.WantType = locals.GetWantType()
+	buffet.ConnectivityMetadata = locals.GetConnectivityMetadata()
 
 	return buffet
 }
 
 func (b *BuffetWant) Exec() bool {
-	buffetType := b.GetStringParam("buffet_type", "continental")
+	locals, ok := b.Locals.(*BuffetWantLocals)
+	if !ok {
+		b.StoreLog("ERROR: Failed to access BuffetWantLocals from Want.Locals")
+		return true
+	}
 
-	duration := 1*time.Hour + 30*time.Minute // Default 1.5 hour breakfast
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 	_, connectionAvailable := b.GetFirstOutputChannel()
@@ -656,13 +731,13 @@ func (b *BuffetWant) Exec() bool {
 		8+rand.Intn(2), rand.Intn(30), 0, 0, time.Local) // 8-10 AM
 
 	// Generate realistic buffet name for the summary
-	buffetName := generateRealisticBuffetNameForTravel(buffetType)
+	buffetName := generateRealisticBuffetNameForTravel(locals.BuffetType)
 
 	newEvent := TimeSlot{
 		Start: buffetStart,
-		End:   buffetStart.Add(duration),
+		End:   buffetStart.Add(locals.Duration),
 		Type:  "buffet",
-		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, buffetType),
+		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, locals.BuffetType),
 	}
 
 	if existingSchedule != nil {
@@ -673,7 +748,7 @@ func (b *BuffetWant) Exec() bool {
 					conflict = true
 				buffetStart = buffetStart.Add(30 * time.Minute)
 					newEvent.Start = buffetStart
-					newEvent.End = buffetStart.Add(duration)
+					newEvent.End = buffetStart.Add(locals.Duration)
 					break
 				}
 			}
@@ -692,10 +767,10 @@ func (b *BuffetWant) Exec() bool {
 	}
 	b.StoreStateMulti(map[string]interface{}{
 		"total_processed":        1,
-		"buffet_type":            buffetType,
+		"buffet_type":            locals.BuffetType,
 		"buffet_start_time":      newEvent.Start.Format("15:04 Jan 2"),
 		"buffet_end_time":        newEvent.End.Format("15:04 Jan 2"),
-		"buffet_duration_hours":  duration.Hours(),
+		"buffet_duration_hours":  locals.Duration.Hours(),
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})

@@ -100,6 +100,16 @@ func getCurrentTimestamp() int64 {
 	return time.Now().Unix()
 }
 
+// WantLocals defines the interface for type-specific local state in wants
+type WantLocals interface {
+	// InitLocals initializes type-specific local fields from spec parameters
+	InitLocals(want *Want)
+	// GetConnectivityMetadata returns the connectivity requirements for this want type
+	GetConnectivityMetadata() ConnectivityMetadata
+	// GetWantType returns the want type identifier
+	GetWantType() string
+}
+
 // WantFactory defines the interface for creating want functions
 type WantFactory func(metadata Metadata, spec WantSpec) interface{}
 
@@ -148,6 +158,9 @@ type Want struct {
 	WantType             string               `json:"-" yaml:"-"`
 	paths                Paths                `json:"-" yaml:"-"`
 	ConnectivityMetadata ConnectivityMetadata `json:"-" yaml:"-"`
+
+	// Type-specific local state managed by WantLocals interface
+	Locals WantLocals `json:"-" yaml:"-"`
 }
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
