@@ -58,10 +58,6 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	return flight
 }
 
-func (f *FlightWant) GetWant() *Want {
-	return &f.Want
-}
-
 // extractFlightSchedule converts agent_result from state to FlightSchedule
 func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 	// Handle both map[string]interface{} and FlightSchedule types

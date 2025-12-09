@@ -58,10 +58,6 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 	return evidence
 }
 
-func (e *EvidenceWant) GetWant() *Want {
-	return &e.Want
-}
-
 func (e *EvidenceWant) Exec() bool {
 	// Check if already provided evidence
 	provided, _ := e.GetStateBool("evidence_provided", false)
@@ -139,10 +135,6 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 	}
 
 	return description
-}
-
-func (d *DescriptionWant) GetWant() *Want {
-	return &d.Want
 }
 
 func (d *DescriptionWant) Exec() bool {
@@ -225,10 +217,6 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	}
 
 	return coordinator
-}
-
-func (l *Level1CoordinatorWant) GetWant() interface{} {
-	return &l.Want
 }
 
 func (l *Level1CoordinatorWant) Exec() bool {

@@ -66,10 +66,6 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 	return restaurant
 }
 
-func (r *RestaurantWant) GetWant() *Want {
-	return &r.Want
-}
-
 // Exec creates a restaurant reservation
 func (r *RestaurantWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
@@ -455,10 +451,6 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 	return hotel
 }
 
-func (h *HotelWant) GetWant() *Want {
-	return &h.Want
-}
-
 func (h *HotelWant) Exec() bool {
 	// Read parameters fresh each cycle - enables dynamic changes!
 	hotelType := h.GetStringParam("hotel_type", "standard")
@@ -669,10 +661,6 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 	}
 
 	return buffet
-}
-
-func (b *BuffetWant) GetWant() *Want {
-	return &b.Want
 }
 
 func (b *BuffetWant) Exec() bool {

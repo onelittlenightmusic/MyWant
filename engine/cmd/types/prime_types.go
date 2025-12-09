@@ -53,11 +53,6 @@ func (g *PrimeNumbers) Exec() bool {
 	return false
 }
 
-// GetWant returns the underlying Want
-func (g *PrimeNumbers) GetWant() interface{} {
-	return &g.Want
-}
-
 // PrimeSequence filters out multiples of a prime number
 type PrimeSequence struct {
 	Want
@@ -91,10 +86,6 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 	}
 
 	return filter
-}
-
-func (f *PrimeSequence) GetWant() interface{} {
-	return &f.Want
 }
 
 // Exec returns the generalized chain function for the filter

@@ -51,11 +51,6 @@ func (g *FibonacciNumbers) Exec() bool {
 	return false
 }
 
-// GetWant returns the underlying Want
-func (g *FibonacciNumbers) GetWant() interface{} {
-	return &g.Want
-}
-
 // FibonacciFilter filters fibonacci numbers based on criteria
 type FibonacciFilter struct {
 	Want
@@ -91,10 +86,6 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 	}
 
 	return filter
-}
-
-func (f *FibonacciFilter) GetWant() interface{} {
-	return &f.Want
 }
 
 // Exec returns the generalized chain function for the filter

@@ -90,11 +90,6 @@ func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification
 	}
 }
 
-// GetWant returns the underlying want for Executable interface compatibility
-func (bnw *BaseNotifiableWant) GetWant() *Want {
-	return bnw.Want
-}
-
 // GetNotificationBufferSize returns current buffer usage
 func (bnw *BaseNotifiableWant) GetNotificationBufferSize() int {
 	return len(bnw.NotificationBuffer)

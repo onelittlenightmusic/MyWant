@@ -90,11 +90,6 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	return gen
 }
 
-// Getmywant.Want returns the embedded mywant.Want
-func (g *Numbers) GetWant() *mywant.Want {
-	return &g.Want
-}
-
 // Exec executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Exec() bool {
 	// Read parameters fresh each cycle - this enables dynamic param changes!
@@ -209,11 +204,6 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	}
 
 	return queue
-}
-
-// Getmywant.Want returns the embedded mywant.Want
-func (q *Queue) GetWant() *mywant.Want {
-	return &q.Want
 }
 
 // Exec executes the queue processing directly with batch mechanism
@@ -367,11 +357,6 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	return combiner
 }
 
-// Getmywant.Want returns the embedded mywant.Want
-func (c *Combiner) GetWant() *mywant.Want {
-	return &c.Want
-}
-
 // Exec executes the combiner directly
 func (c *Combiner) Exec() bool {
 	// Initialize state if needed
@@ -462,11 +447,6 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	}
 
 	return sink
-}
-
-// Getmywant.Want returns the embedded mywant.Want
-func (s *Sink) GetWant() *mywant.Want {
-	return &s.Want
 }
 
 // Exec executes the sink directly

@@ -139,11 +139,6 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
-// GetWant returns the base Want struct
-func (c *CoordinatorWant) GetWant() *Want {
-	return &c.Want
-}
-
 // Exec executes the coordinator logic using unified completion strategy
 // Strategy: Each input channel must send at least one value. When all connected channels
 // have sent at least one value, the coordinator completes.
