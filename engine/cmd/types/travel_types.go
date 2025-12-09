@@ -45,14 +45,10 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 		RestaurantType: "casual",
 		Duration:       2 * time.Hour, // Default 2 hour dinner
 	}
-
-	// Initialize base Want fields
 	restaurant.Init(metadata, spec)
 
 	restaurant.RestaurantType = restaurant.GetStringParam("restaurant_type", "casual")
 	restaurant.Duration = time.Duration(restaurant.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
-
-	// Set fields for base Want methods
 	restaurant.WantType = "restaurant"
 	restaurant.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -68,30 +64,21 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec creates a restaurant reservation
 func (r *RestaurantWant) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	restaurantType := r.GetStringParam("restaurant_type", "casual")
 	duration := time.Duration(r.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
-
-	// Check if already attempted using persistent state
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
-
-	// Get connection availability status
 	_, connectionAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
 		return true
 	}
-
-	// Mark as attempted in persistent state
 	r.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := r.tryAgentExecution(); agentSchedule != nil {
 		// Use the agent's schedule result
 		r.SetSchedule(*agentSchedule)
-
-		// Send the schedule to output channel only if available
 		if connectionAvailable {
 			restaurantEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
@@ -110,8 +97,6 @@ func (r *RestaurantWant) Exec() bool {
 
 		return true
 	}
-
-	// Check for conflicts from input
 	var existingSchedule *TravelSchedule
 	if r.GetInCount() > 0 {
 		in, connectionAvailable := r.GetInputChannel(0)
@@ -142,8 +127,6 @@ func (r *RestaurantWant) Exec() bool {
 		Type:  "restaurant",
 		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, restaurantType),
 	}
-
-	// Check for conflicts if we have existing schedule
 	if existingSchedule != nil {
 		for attempt := 0; attempt < 3; attempt++ {
 			conflict := false
@@ -162,8 +145,6 @@ func (r *RestaurantWant) Exec() bool {
 			}
 		}
 	}
-
-	// Create updated schedule
 	newSchedule := &TravelSchedule{
 		Date:   baseDate,
 		Events: []TimeSlot{newEvent},
@@ -171,8 +152,6 @@ func (r *RestaurantWant) Exec() bool {
 	if existingSchedule != nil {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
-
-	// Store stats using thread-safe StoreState
 	r.StoreStateMulti(map[string]interface{}{
 		"total_processed":            1,
 		"reservation_type":           restaurantType,
@@ -183,8 +162,6 @@ func (r *RestaurantWant) Exec() bool {
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
 	})
-
-	// Send to output channel only if available
 	if connectionAvailable {
 		// Use SendPacketMulti to send with retrigger logic for achieved receivers
 		r.SendPacketMulti(newSchedule)
@@ -195,14 +172,10 @@ func (r *RestaurantWant) Exec() bool {
 
 // tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
 func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
-	// Check if this want has agent requirements
 	if len(r.Spec.Requires) > 0 {
-		// Store the requirements in want state for tracking
 		r.StoreState("agent_requirements", r.Spec.Requires)
 
 		// Step 1: Execute MonitorRestaurant first to check for existing state
-
-		// Create and execute MonitorRestaurant directly inline to avoid context issues
 		monitorAgent := NewMonitorRestaurant(
 			"restaurant_monitor",
 			[]string{"restaurant_agency"},
@@ -214,8 +187,6 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		}
 
 		r.AggregateChanges()
-
-		// Check if MonitorRestaurant found an existing schedule
 		if result, exists := r.GetState("agent_result"); exists && result != nil {
 			if schedule, ok := result.(RestaurantSchedule); ok {
 				r.StoreState("execution_source", "monitor")
@@ -264,7 +235,6 @@ func (r *RestaurantWant) CalculateAchievingPercentage() int {
 
 // executeMonitorRestaurant executes the MonitorRestaurant agent to check for existing state
 func (r *RestaurantWant) executeMonitorRestaurant() error {
-	// Create a MonitorRestaurant instance
 	monitorAgent := NewMonitorRestaurant(
 		"restaurant_monitor",
 		[]string{"restaurant_agency"},
@@ -290,8 +260,6 @@ type RestaurantSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
-
-// SetSchedule sets the restaurant reservation schedule and updates all related state
 func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
 	stateUpdates := map[string]interface{}{
 		"attempted":                  true,
@@ -303,8 +271,6 @@ func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
 		"total_processed":            1,
 		"schedule_date":              schedule.ReservationTime.Format("2006-01-02"),
 	}
-
-	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
 		stateUpdates["premium_level"] = schedule.PremiumLevel
@@ -428,13 +394,9 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 		CheckIn:   22 * time.Hour, // 10 PM
 		CheckOut:  8 * time.Hour,  // 8 AM next day
 	}
-
-	// Initialize base Want fields
 	hotel.Init(metadata, spec)
 
 	hotel.HotelType = hotel.GetStringParam("hotel_type", "standard")
-
-	// Set fields for base Want methods
 	hotel.WantType = "hotel"
 	hotel.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -449,29 +411,20 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (h *HotelWant) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	hotelType := h.GetStringParam("hotel_type", "standard")
-
-	// Check if already attempted using persistent state
 	attemptedVal, _ := h.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
-
-	// Get connection availability status
 	_, connectionAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
 		return true
 	}
-
-	// Mark as attempted in persistent state
 	h.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := h.tryAgentExecution(); agentSchedule != nil {
 		// Use the agent's schedule result
 		h.SetSchedule(*agentSchedule)
-
-		// Send the schedule to output channel only if available
 		if connectionAvailable {
 			hotelEvent := TimeSlot{
 				Start: agentSchedule.CheckInTime,
@@ -492,8 +445,6 @@ func (h *HotelWant) Exec() bool {
 	}
 
 	// Normal hotel execution (only runs if agent execution didn't return a result)
-
-	// Check for existing schedule
 	var existingSchedule *TravelSchedule
 	if h.GetInCount() > 0 {
 		in, connectionAvailable := h.GetInputChannel(0)
@@ -528,8 +479,6 @@ func (h *HotelWant) Exec() bool {
 		Type:  "hotel",
 		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
 	}
-
-	// Check conflicts and retry if needed
 	if existingSchedule != nil {
 		for attempt := 0; attempt < 3; attempt++ {
 			conflict := false
@@ -555,8 +504,6 @@ func (h *HotelWant) Exec() bool {
 	if existingSchedule != nil {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
-
-	// Store stats using thread-safe StoreState
 	h.StoreStateMulti(map[string]interface{}{
 		"total_processed":      1,
 		"hotel_type":           hotelType,
@@ -566,8 +513,6 @@ func (h *HotelWant) Exec() bool {
 		"reservation_name":     newEvent.Name,
 		"achieving_percentage": 100,
 	})
-
-	// Send to output channel only if available
 	if connectionAvailable {
 		h.SendPacketMulti(newSchedule)
 	}
@@ -586,9 +531,7 @@ func (h *HotelWant) CalculateAchievingPercentage() int {
 
 // tryAgentExecution attempts to execute hotel reservation using the agent system Returns the HotelSchedule if successful, nil if no agent execution
 func (h *HotelWant) tryAgentExecution() *HotelSchedule {
-	// Check if this want has agent requirements
 	if len(h.Spec.Requires) > 0 {
-		// Store the requirements in want state for tracking
 	h.StoreState("agent_requirements", h.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
@@ -637,13 +580,9 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 		BuffetType: "continental",
 		Duration:   1*time.Hour + 30*time.Minute, // 1.5 hour breakfast
 	}
-
-	// Initialize base Want fields
 	buffet.Init(metadata, spec)
 
 	buffet.BuffetType = buffet.GetStringParam("buffet_type", "continental")
-
-	// Set fields for base Want methods
 	buffet.WantType = "buffet"
 	buffet.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -658,31 +597,22 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (b *BuffetWant) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	buffetType := b.GetStringParam("buffet_type", "continental")
 
 	duration := 1*time.Hour + 30*time.Minute // Default 1.5 hour breakfast
-
-	// Check if already attempted using persistent state
 	attemptedVal, _ := b.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
-
-	// Get connection availability status
 	_, connectionAvailable := b.GetFirstOutputChannel()
 
 	if attempted {
 		return true
 	}
-
-	// Mark as attempted in persistent state
 	b.StoreState("attempted", true)
 
 	// Try to use agent system if available - agent completely overrides normal execution
 	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
 		// Use the agent's schedule result
 		b.SetSchedule(*agentSchedule)
-
-		// Send the schedule to output channel only if available
 		if connectionAvailable {
 			buffetEvent := TimeSlot{
 				Start: agentSchedule.ReservationTime,
@@ -760,8 +690,6 @@ func (b *BuffetWant) Exec() bool {
 	if existingSchedule != nil {
 		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
-
-	// Store stats using thread-safe StoreState
 	b.StoreStateMulti(map[string]interface{}{
 		"total_processed":        1,
 		"buffet_type":            buffetType,
@@ -771,8 +699,6 @@ func (b *BuffetWant) Exec() bool {
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})
-
-	// Send to output channel only if available
 	if connectionAvailable {
 		// Use SendPacketMulti to send with retrigger logic for achieved receivers
 		b.SendPacketMulti(newSchedule)
@@ -792,9 +718,7 @@ func (b *BuffetWant) CalculateAchievingPercentage() int {
 
 // tryAgentExecution attempts to execute buffet reservation using the agent system Returns the BuffetSchedule if successful, nil if no agent execution
 func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
-	// Check if this want has agent requirements
 	if len(b.Spec.Requires) > 0 {
-		// Store the requirements in want state for tracking
 	b.StoreState("agent_requirements", b.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
@@ -831,8 +755,6 @@ type BuffetSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
-
-// SetSchedule sets the buffet reservation schedule and updates all related state
 func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
 	stateUpdates := map[string]interface{}{
 		"attempted":               true,
@@ -843,8 +765,6 @@ func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
 		"reservation_name":        schedule.ReservationName,
 		"total_processed":         1,
 	}
-
-	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
 		stateUpdates["premium_level"] = schedule.PremiumLevel
@@ -879,8 +799,6 @@ type HotelSchedule struct {
 	ServiceTier       string    `json:"service_tier,omitempty"`
 	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
 }
-
-// SetSchedule sets the hotel booking schedule and updates all related state
 func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
 	stateUpdates := map[string]interface{}{
 		"attempted":           true,
@@ -891,8 +809,6 @@ func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
 		"reservation_name":    schedule.ReservationName,
 		"total_processed":     1,
 	}
-
-	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
 		stateUpdates["premium_level"] = schedule.PremiumLevel

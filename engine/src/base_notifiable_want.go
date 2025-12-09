@@ -63,18 +63,12 @@ func (bnw *BaseNotifiableWant) StopNotificationProcessing() {
 	bnw.isRunning = false
 	close(bnw.NotificationBuffer)
 }
-
-// handleNotification can be overridden by specific want types
 func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification) {
 	fmt.Printf("[NOTIFICATION] %s received: %s.%s = %v (type: %s)\n",
 		bnw.Want.Metadata.Name, notification.SourceWantName,
 		notification.StateKey, notification.StateValue, notification.NotificationType)
-
-	// Store notification in want's state for inspection
 	notificationKey := fmt.Sprintf("last_notification_%s_%s", notification.SourceWantName, notification.StateKey)
 	bnw.Want.StoreState(notificationKey, notification)
-
-	// Store timestamp of last notification
 	bnw.Want.StoreState("last_notification_time", notification.Timestamp)
 
 	// Keep count of notifications received
@@ -89,13 +83,9 @@ func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification
 		bnw.Want.StoreState(countKey, 1)
 	}
 }
-
-// GetNotificationBufferSize returns current buffer usage
 func (bnw *BaseNotifiableWant) GetNotificationBufferSize() int {
 	return len(bnw.NotificationBuffer)
 }
-
-// GetNotificationBufferCapacity returns buffer capacity
 func (bnw *BaseNotifiableWant) GetNotificationBufferCapacity() int {
 	return bnw.BufferSize
 }

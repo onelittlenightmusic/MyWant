@@ -17,8 +17,6 @@ func main() {
 		fmt.Printf("Error loading config: %v\n", err)
 		return
 	}
-
-	// Create builder with trigger system
 	builder := src.NewChainBuilder(config)
 	types.RegisterTravelWantTypes(builder)
 

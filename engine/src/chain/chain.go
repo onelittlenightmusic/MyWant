@@ -69,7 +69,6 @@ func (c *C_chain) Add(f func(Chan, Chan) bool) {
 			}
 		}(c.Ch_start)
 	} else {
-		//Add
 		prev_in, cout := c.In, make(Chan, 10)
 		c.In = cout
 		go func(ch1, ch2 Chan) {

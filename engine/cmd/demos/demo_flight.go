@@ -28,14 +28,10 @@ func main() {
 	fmt.Println("=== Flight Booking Demo ===")
 	fmt.Println("This demo shows automatic flight rebooking when delays occur")
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register flight want type
 	RegisterFlightWantType(builder)
-
-	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -81,15 +77,12 @@ loop:
 }
 
 func printFlightStatus(builder *ChainBuilder) {
-	// Get the flight want
 	wants := builder.GetConfig().Wants
 	if len(wants) == 0 {
 		return
 	}
 
 	want := wants[0]
-
-	// Check state
 	if flightID, exists := want.State["flight_id"]; exists {
 		status, _ := want.State["flight_status"]
 		message, _ := want.State["status_message"]
@@ -102,7 +95,6 @@ func cleanupFlights(builder *ChainBuilder) {
 
 	// Access wants and clean up any FlightWant instances
 	for _, want := range builder.GetConfig().Wants {
-		// Check if it's a FlightWant by checking metadata type
 		if want.Metadata.Type == "flight" {
 			// The cleanup will be handled by defer in the want's lifecycle
 			fmt.Printf("Cleaned up flight want: %s\n", want.Metadata.Name)

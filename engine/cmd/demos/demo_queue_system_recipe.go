@@ -14,8 +14,6 @@ func main() {
 	fmt.Println("- Recipe defines: generator, queue, sink wants")
 	fmt.Println("- Uses unified generic recipe structure")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-queue-system-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -34,8 +32,6 @@ func main() {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, sink)

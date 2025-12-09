@@ -13,8 +13,6 @@ func main() {
 	fmt.Println("==============================")
 	fmt.Println("This demo tests automatic wake-up of completed wants when receiving packets.")
 	fmt.Println()
-
-	// Get config file from command line or use default
 	configFile := "config/config-packet-test.yaml"
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
@@ -27,8 +25,6 @@ func main() {
 	}
 
 	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config.Wants))
-
-	// Create chain builder
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types

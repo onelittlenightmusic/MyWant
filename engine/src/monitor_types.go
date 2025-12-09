@@ -71,15 +71,11 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusReaching)
-
-	// Store initial state (if not already set)
 	if _, exists := mw.Want.GetState("start_time"); !exists {
 		mw.Want.StoreState("start_time", time.Now())
 		mw.Want.StoreState("status", "monitoring")
 		mw.Want.StoreState("alerts_triggered", 0)
 	}
-
-	// Get the MonitorAgent from the registry
 	var monitorAgent *MonitorAgent
 	if agentRegistry := mw.Want.GetAgentRegistry(); agentRegistry != nil {
 		if agent, exists := agentRegistry.GetAgent(mw.Want.Metadata.Name); exists {
@@ -131,8 +127,6 @@ func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 	log.Printf("🔍 Monitor %s continuous monitoring started\n", mw.Want.Metadata.Name)
 	return true // Indicate that this Exec call is "finished" (the goroutine is now handling monitoring)
 }
-
-// handleNotification overrides the base implementation with monitoring logic
 func (mw *MonitorWant) handleNotification(notification StateNotification) {
 	// Call base implementation first
 	mw.BaseNotifiableWant.handleNotification(notification)
@@ -143,14 +137,11 @@ func (mw *MonitorWant) handleNotification(notification StateNotification) {
 			mw.triggerAlert(notification, threshold)
 		}
 	}
-
-	// Store monitoring statistics
 	mw.updateMonitoringStats(notification)
 }
 
 // shouldAlert determines if an alert should be triggered
 func (mw *MonitorWant) shouldAlert(value interface{}, threshold interface{}) bool {
-	// Convert values to float64 for numeric comparison
 	valueFloat, valueOk := mw.toFloat64(value)
 	thresholdFloat, thresholdOk := mw.toFloat64(threshold)
 
@@ -194,11 +185,7 @@ func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold in
 			notification.SourceWantName, notification.StateKey,
 			notification.StateValue, threshold),
 	}
-
-	// Store alert
 	mw.Alerts = append(mw.Alerts, alert)
-
-	// Update state
 	mw.Want.StoreState("last_alert", alert.Message)
 	mw.Want.StoreState("last_alert_time", alert.Timestamp)
 
@@ -256,8 +243,6 @@ func (mw *MonitorWant) updateMonitoringStats(notification StateNotification) {
 			sources = sourceList
 		}
 	}
-
-	// Add source if not already tracked
 	found := false
 	for _, source := range sources {
 		if source == notification.SourceWantName {
@@ -270,8 +255,6 @@ func (mw *MonitorWant) updateMonitoringStats(notification StateNotification) {
 		mw.Want.StoreState(sourcesKey, sources)
 	}
 }
-
-// GetAlerts returns all triggered alerts
 func (mw *MonitorWant) GetAlerts() []AlertRecord {
 	return mw.Alerts
 }

@@ -30,8 +30,6 @@ func NewAgentBuffet(name string, capabilities []string, uses []string, premiumLe
 func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
 	// Generate buffet reservation schedule
 	schedule := a.generateBuffetSchedule(want)
-
-	// Store the result using StoreState method
 	want.StoreState("agent_result", schedule)
 
 	// Record activity description for agent history
@@ -68,8 +66,6 @@ func (a *AgentBuffet) generateBuffetSchedule(want *Want) BuffetSchedule {
 
 	// Extract buffet type from want parameters
 	buffetType := want.GetStringParam("buffet_type", "international")
-
-	// Create and return structured buffet schedule
 	return BuffetSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,

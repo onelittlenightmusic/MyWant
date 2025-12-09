@@ -96,8 +96,6 @@ type TriggerCommand struct {
 
 // WantStats is deprecated - use State field instead Keeping type alias for backward compatibility during transition
 type WantStats = map[string]interface{}
-
-// getCurrentTimestamp returns current Unix timestamp
 func getCurrentTimestamp() int64 {
 	return time.Now().Unix()
 }
@@ -151,8 +149,6 @@ type Want struct {
 	paths                Paths                `json:"-" yaml:"-"`
 	ConnectivityMetadata ConnectivityMetadata `json:"-" yaml:"-"`
 }
-
-// SetStatus updates the want's status and emits StatusChange event
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
@@ -201,8 +197,6 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 	// CRITICAL: Protect State map access with stateMutex during reconciliation
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
-
-	// Initialize State map if not exists
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
@@ -212,8 +206,6 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 		n.State[k] = v
 	}
 }
-
-// SetStateAtomic sets multiple state values atomically with proper mutex protection This method handles ALL mutex locking internally so external callers don't need to manage synchronization
 func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 	if stateData == nil {
 		return
@@ -222,13 +214,9 @@ func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 	// Acquire mutex to protect State map access
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
-
-	// Initialize State map if not exists
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
-
-	// Set all state data atomically
 	for k, v := range stateData {
 		n.State[k] = v
 	}
@@ -236,7 +224,6 @@ func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 
 // UpdateParameter updates a parameter and propagates the change to children
 func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
-	// Get previous value for history tracking
 	var previousValue interface{}
 	if n.Spec.Params != nil {
 		previousValue = n.Spec.Params[paramName]
@@ -255,11 +242,8 @@ func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 		}
 		n.pendingParameterChanges[paramName] = paramValue
 	} else {
-		// Add to parameter history immediately if not in exec cycle
 		n.addToParameterHistory(paramName, paramValue, previousValue)
 	}
-
-	// Create parameter change notification to propagate to children
 	notification := StateNotification{
 		SourceWantName:   n.Metadata.Name,
 		StateKey:         paramName,
@@ -267,8 +251,6 @@ func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 		Timestamp:        time.Now(),
 		NotificationType: NotificationParameter,
 	}
-
-	// Send parameter change notification to children
 	sendParameterNotifications(notification)
 }
 
@@ -279,7 +261,6 @@ func (n *Want) BeginExecCycle() {
 	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
 	n.pendingStateChanges = make(map[string]interface{})
 	n.pendingParameterChanges = make(map[string]interface{})
-	// Initialize log buffer for this exec cycle
 	n.pendingLogs = make([]string, 0)
 }
 
@@ -288,8 +269,6 @@ func (n *Want) EndExecCycle() {
 	if !n.inExecCycle {
 		return
 	}
-
-	// Handle state changes
 	n.stateMutex.Lock()
 	changeCount := len(n.pendingStateChanges)
 	n.stateMutex.Unlock()
@@ -298,8 +277,6 @@ func (n *Want) EndExecCycle() {
 	}
 
 	n.AggregateChanges()
-
-	// Handle log aggregation
 	if len(n.pendingLogs) > 0 {
 		n.addAggregatedLogHistory()
 	}
@@ -322,7 +299,6 @@ func (n *Want) AggregateChanges() {
 
 	// Apply changes INSIDE the lock to prevent concurrent map read/write
 	if len(changesCopy) > 0 {
-		// Create a single aggregated state history entry with complete state snapshot
 		if n.State == nil {
 			n.State = make(map[string]interface{})
 		}
@@ -333,16 +309,10 @@ func (n *Want) AggregateChanges() {
 		}
 	}
 	n.stateMutex.Unlock()
-
-
-	// Create history entries (each will acquire lock internally)
 	if len(changesCopy) > 0 {
 		n.addAggregatedStateHistory()
 	}
-
-	// Handle parameter changes
 	if len(n.pendingParameterChanges) > 0 {
-		// Create one aggregated parameter history entry
 		n.addAggregatedParameterHistory()
 
 		// Clear pending parameter changes after aggregating
@@ -352,7 +322,6 @@ func (n *Want) AggregateChanges() {
 
 // valuesEqual compares two interface{} values for equality Handles different types properly including strings, numbers, booleans, etc.
 func (n *Want) valuesEqual(val1, val2 interface{}) bool {
-	// Handle nil cases
 	if val1 == nil && val2 == nil {
 		return true
 	}
@@ -366,12 +335,9 @@ func (n *Want) valuesEqual(val1, val2 interface{}) bool {
 
 // stateSnapshotsEqual compares two state snapshots (maps) for deep equality Returns true if both maps have identical keys and values
 func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) bool {
-	// Check if lengths match
 	if len(snapshot1) != len(snapshot2) {
 		return false
 	}
-
-	// Check if all keys and values match
 	for key, val1 := range snapshot1 {
 		val2, exists := snapshot2[key]
 		if !exists {
@@ -389,18 +355,13 @@ func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) 
 
 // isSignificantStateFields checks if only minor/metadata fields have changed Returns true if ONLY status-like fields have changed (fields ending with "_status") Returns false if significant functional fields have changed
 func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) bool {
-	// Get all keys that changed
 	changedKeys := make(map[string]bool)
-
-	// Check for keys that exist in old but not new, or have different values
 	for key, oldVal := range oldState {
 		newVal, exists := newState[key]
 		if !exists || !n.valuesEqual(oldVal, newVal) {
 			changedKeys[key] = true
 		}
 	}
-
-	// Check for keys that exist in new but not old
 	for key := range newState {
 		if _, exists := oldState[key]; !exists {
 			changedKeys[key] = true
@@ -411,8 +372,6 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) boo
 	if len(changedKeys) == 0 {
 		return true
 	}
-
-	// Check if ALL changed keys are status-like fields (ending with "_status")
 	for changedKey := range changedKeys {
 		// Status-like fields: end with "_status" or are known metadata fields
 		isStatusField := len(changedKey) >= 7 && changedKey[len(changedKey)-7:] == "_status"
@@ -429,12 +388,8 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) boo
 	// All changed fields are status-like
 	return true
 }
-
-// getSignificantStateChanges extracts only the significant (non-status) changes between states Returns a map of only the functional changes, excluding status and metadata fields
 func (n *Want) getSignificantStateChanges(oldState, newState map[string]interface{}) map[string]interface{} {
 	significantChanges := make(map[string]interface{})
-
-	// Check all keys in new state
 	for key, newVal := range newState {
 		// Skip status-like fields
 		isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
@@ -455,20 +410,14 @@ func (n *Want) getSignificantStateChanges(oldState, newState map[string]interfac
 
 	return significantChanges
 }
-
-// GetStatus returns the current want status
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
-
-// InitializeControlChannel initializes the control channel if not already done
 func (n *Want) InitializeControlChannel() {
 	if n.controlChannel == nil {
 		n.controlChannel = make(chan *ControlCommand, 10) // Buffered for non-blocking receives
 	}
 }
-
-// SendControlCommand sends a control command to this want's control channel (non-blocking)
 func (n *Want) SendControlCommand(cmd *ControlCommand) error {
 	if n.controlChannel == nil {
 		return fmt.Errorf("control channel not initialized for want %s", n.Metadata.Name)
@@ -480,8 +429,6 @@ func (n *Want) SendControlCommand(cmd *ControlCommand) error {
 		return fmt.Errorf("control channel full for want %s", n.Metadata.Name)
 	}
 }
-
-// CheckControlSignal checks for control commands without blocking Returns (command, received, error)
 func (n *Want) CheckControlSignal() (*ControlCommand, bool) {
 	if n.controlChannel == nil {
 		return nil, false
@@ -500,23 +447,15 @@ func (n *Want) IsSuspended() bool {
 	defer n.controlMu.Unlock()
 	return n.suspended
 }
-
-// SetSuspended sets the want's suspension state
 func (n *Want) SetSuspended(suspended bool) {
 	n.controlMu.Lock()
 	defer n.controlMu.Unlock()
 	n.suspended = suspended
 }
-
-// StoreState stores a key-value pair in the want's state Only adds to state history if the value has actually changed (differential tracking)
 func (n *Want) StoreState(key string, value interface{}) {
 	// CRITICAL: Always use mutex to protect both State and pendingStateChanges Agent goroutines can call StoreState concurrently, so we must synchronize access
 	n.stateMutex.Lock()
-
-	// Get previous value to check if it's actually different
 	previousValue, exists := n.getStateUnsafe(key)
-
-	// Check if the value has actually changed (DIFFERENTIAL CHECK)
 	if exists && n.valuesEqual(previousValue, value) {
 		// No change, skip entirely
 		n.stateMutex.Unlock()
@@ -535,9 +474,6 @@ func (n *Want) StoreState(key string, value interface{}) {
 	}
 	n.pendingStateChanges[key] = value
 	n.stateMutex.Unlock()
-
-
-	// Create and send notifications AFTER releasing the lock The notification data is already captured, so no need to hold the lock
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
 		StateKey:       key,
@@ -545,12 +481,8 @@ func (n *Want) StoreState(key string, value interface{}) {
 		PreviousValue:  previousValue,
 		Timestamp:      time.Now(),
 	}
-
-	// Send notifications (no lock needed - just passing data)
 	sendStateNotifications(notification)
 }
-
-// StoreStateMulti stores multiple state values in a single operation, more efficient than multiple StoreState calls Batches all updates together to minimize lock contention and history entries Usage: want.StoreStateMulti(map[string]interface{}{
 // "description_received": true, "description_text": "some text", "description_provided": true, })
 func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
@@ -558,13 +490,8 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 
 	// Collect all notifications before releasing the lock
 	var notifications []StateNotification
-
-	// Process each update
 	for key, value := range updates {
-		// Get previous value to check if it's actually different
 		previousValue, exists := n.getStateUnsafe(key)
-
-		// Check if the value has actually changed (DIFFERENTIAL CHECK)
 		if exists && n.valuesEqual(previousValue, value) {
 			// No change, skip this key
 			continue
@@ -594,26 +521,18 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 	}
 
 	n.stateMutex.Unlock()
-
-	// Send notifications AFTER releasing the lock Batch all notifications together
 	for _, notification := range notifications {
 		sendStateNotifications(notification)
 	}
 }
-
-// StoreLog appends a log message to the want's log buffer during an Exec cycle Logs are aggregated and written to LogHistory at the end of each Exec cycle Usage within Exec(): want.StoreLog("Processing packet #1")
 //   want.StoreLog("Calculation complete: result = 42")
 func (n *Want) StoreLog(message string) {
 	// Only buffer logs if we're in an Exec cycle
 	if !n.inExecCycle {
 		return
 	}
-
-	// Append the log message to the pending logs buffer No lock needed here since pendingLogs is only accessed during the current Exec cycle
 	n.pendingLogs = append(n.pendingLogs, message)
 }
-
-// GetState retrieves a state value atomically with mutex protection This method encapsulates all stateMutex access for state reads, ensuring thread safety Returns (value, exists) to indicate whether the key exists in state All state reads must go through this method to maintain proper encapsulation
 func (n *Want) GetState(key string) (interface{}, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
@@ -625,8 +544,6 @@ func (n *Want) GetState(key string) (interface{}, bool) {
 	value, exists := n.State[key]
 	return value, exists
 }
-
-// GetStateBool retrieves a boolean state value with type assertion Returns (defaultValue, false) if the key doesn't exist or the value is not a bool Usage: provided, ok := want.GetStateBool("description_provided", false)
 // if ok { // provided is a valid bool }
 func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	value, exists := n.GetState(key)
@@ -638,8 +555,6 @@ func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	}
 	return defaultValue, false
 }
-
-// GetStateInt retrieves an integer state value with type assertion Supports both int and float64 types Returns (defaultValue, false) if the key doesn't exist or the value cannot be converted to int Usage:
 // count, ok := want.GetStateInt("total_processed", 0) if ok { // count is a valid int }
 func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	value, exists := n.GetState(key)
@@ -653,8 +568,6 @@ func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	}
 	return defaultValue, false
 }
-
-// GetStateString retrieves a string state value with type assertion Returns (defaultValue, false) if the key doesn't exist or the value is not a string Usage: name, ok := want.GetStateString("current_name", "unknown")
 // if ok { // name is a valid string }
 func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	value, exists := n.GetState(key)
@@ -681,8 +594,6 @@ func (n *Want) CalculateAchievingPercentage() int {
 		return 0
 	}
 }
-
-// addAggregatedStateHistory creates a single history entry with complete state as YAML Uses differential checking to prevent duplicate entries when state hasn't actually changed Only creates a history entry if the state differs from the last recorded state NOTE: Excludes current_agent and running_agents as these are operational metadata tracked in AgentHistory
 // ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
 func (n *Want) addAggregatedStateHistory() {
 	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
@@ -692,8 +603,6 @@ func (n *Want) addAggregatedStateHistory() {
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
-
-	// Create a copy of current state while holding lock (use unsafe read since we already hold lock) IMPORTANT: Exclude agent metadata fields (current_agent, running_agents) from state history These are operational metadata tracked separately in AgentHistory, not actual want state
 	stateSnapshot := make(map[string]interface{})
 	for key, value := range n.State {
 		// Skip agent metadata fields - they cause false history duplicates since they change multiple times during agent execution but don't represent actual want state changes
@@ -706,8 +615,6 @@ func (n *Want) addAggregatedStateHistory() {
 	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
 	if len(n.History.StateHistory) > 0 {
 		lastEntry := n.History.StateHistory[len(n.History.StateHistory)-1]
-
-		// Convert interface{} to map[string]interface{} for comparison
 		lastState, ok := lastEntry.StateValue.(map[string]interface{})
 		if !ok {
 			// If lastState is not the expected type, proceed with recording This handles initialization or type changes
@@ -722,7 +629,6 @@ func (n *Want) addAggregatedStateHistory() {
 
 		// SMART MERGING: If only status fields changed, merge into the previous entry This prevents duplicate history entries when only status_* fields are updated
 		if n.isOnlyStatusChange(lastState, stateSnapshot) {
-			// Update the last entry's state with the new status values This consolidates status-only updates into the previous functional change
 			if lastStateMap, ok := n.History.StateHistory[len(n.History.StateHistory)-1].StateValue.(map[string]interface{}); ok {
 				// Copy status and metadata fields from the new snapshot to the last entry
 				for key, newVal := range stateSnapshot {
@@ -748,21 +654,15 @@ func (n *Want) addAggregatedStateHistory() {
 		StateValue: stateSnapshot,
 		Timestamp:  time.Now(),
 	}
-
-	// Append the new entry to History field
 	if n.History.StateHistory == nil {
 		n.History.StateHistory = make([]StateHistoryEntry, 0)
 	}
 	n.History.StateHistory = append(n.History.StateHistory, entry)
 }
-
-// addAggregatedParameterHistory creates a single history entry with all parameter changes as object
 func (n *Want) addAggregatedParameterHistory() {
 	if len(n.pendingParameterChanges) == 0 {
 		return
 	}
-
-	// Create a single entry with all parameter changes as object
 	entry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
 		StateValue: n.pendingParameterChanges,
@@ -772,8 +672,6 @@ func (n *Want) addAggregatedParameterHistory() {
 	// CRITICAL: Protect History.ParameterHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
-
-	// Append the new entry to parameter history
 	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
 
 	// Limit history size (keep last 50 entries for parameters)
@@ -787,8 +685,6 @@ func (n *Want) addAggregatedParameterHistory() {
 		delete(n.pendingParameterChanges, k)
 	}
 }
-
-// addAggregatedLogHistory creates a single log history entry from all logs in the current Exec cycle Concatenates multiple log lines separated by newlines Also writes the logs to the actual log file via InfoLog
 func (n *Want) addAggregatedLogHistory() {
 	if len(n.pendingLogs) == 0 {
 		return
@@ -802,8 +698,6 @@ func (n *Want) addAggregatedLogHistory() {
 		}
 		logsText += log
 	}
-
-	// Create a single log history entry with all logs from this cycle
 	entry := LogHistoryEntry{
 		Timestamp: time.Now().Unix(),
 		Logs:      logsText,
@@ -811,13 +705,9 @@ func (n *Want) addAggregatedLogHistory() {
 
 	// CRITICAL: Protect History.LogHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
-
-	// Initialize LogHistory if nil
 	if n.History.LogHistory == nil {
 		n.History.LogHistory = make([]LogHistoryEntry, 0)
 	}
-
-	// Append the new log entry to log history
 	n.History.LogHistory = append(n.History.LogHistory, entry)
 
 	// Limit history size (keep last 100 entries for logs)
@@ -850,10 +740,7 @@ func (n *Want) copyCurrentState() map[string]interface{} {
 	}
 	return stateCopy
 }
-
-// addToParameterHistory adds a parameter change to the want's parameter history (for non-exec-cycle changes)
 func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, previousValue interface{}) {
-	// Create a single-parameter entry in aggregated format (like stateHistory)
 	paramMap := map[string]interface{}{
 		paramName: paramValue,
 	}
@@ -867,8 +754,6 @@ func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, p
 	// CRITICAL: Protect History.ParameterHistory access with stateMutex to prevent concurrent slice mutations
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
-
-	// Add to parameter history in History field
 	n.History.ParameterHistory = append(n.History.ParameterHistory, entry)
 
 	// Limit history size (keep last 50 entries for parameters)
@@ -880,8 +765,6 @@ func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, p
 	fmt.Printf("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
 		n.Metadata.Name, paramName, previousValue, paramValue)
 }
-
-// GetParameter gets a parameter value from the want's spec
 func (n *Want) GetParameter(paramName string) (interface{}, bool) {
 	if n.Spec.Params == nil {
 		return nil, false
@@ -889,15 +772,11 @@ func (n *Want) GetParameter(paramName string) (interface{}, bool) {
 	value, exists := n.Spec.Params[paramName]
 	return value, exists
 }
-
-// InitializeSubscriptionSystem initializes the subscription system for this want
 func (n *Want) InitializeSubscriptionSystem() {
 	if n.subscriptionSystem == nil {
 		n.subscriptionSystem = NewUnifiedSubscriptionSystem()
 	}
 }
-
-// GetSubscriptionSystem returns the GLOBAL subscription system All wants share the same subscription system to enable cross-want event delivery
 func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
 }
@@ -914,8 +793,6 @@ func (n *Want) migrateAgentHistoryFromState() {
 		}
 	}
 }
-
-// getStateUnsafe returns state without locking (for internal use when already locked)
 func (n *Want) getStateUnsafe(key string) (interface{}, bool) {
 	if n.State == nil {
 		return nil, false
@@ -923,8 +800,6 @@ func (n *Want) getStateUnsafe(key string) (interface{}, bool) {
 	value, exists := n.State[key]
 	return value, exists
 }
-
-// GetAllState returns the entire state map
 func (n *Want) GetAllState() map[string]interface{} {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
@@ -932,15 +807,12 @@ func (n *Want) GetAllState() map[string]interface{} {
 	if n.State == nil {
 		return make(map[string]interface{})
 	}
-	// Return a copy to prevent external modifications
 	stateCopy := make(map[string]interface{})
 	for k, v := range n.State {
 		stateCopy[k] = v
 	}
 	return stateCopy
 }
-
-// GetStopChannel returns the stop channel for the want
 func (n *Want) GetStopChannel() chan struct{} {
 	if n.stopChannel == nil {
 		n.stopChannel = make(chan struct{})
@@ -951,19 +823,13 @@ func (n *Want) GetStopChannel() chan struct{} {
 // OnProcessEnd handles state storage when the want process ends
 func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 	n.SetStatus(WantStatusAchieved)
-
-	// Store final state
 	for key, value := range finalState {
 		n.StoreState(key, value)
 	}
-
-	// Store completion timestamp
 	n.StoreState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
-
-	// Store final statistics Stats are now stored directly in State - no separate stats field
 
 	// Stop all running agents
 	n.StopAllAgents()
@@ -986,20 +852,14 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 // OnProcessFail handles state storage when the want process fails
 func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	n.SetStatus(WantStatusFailed)
-
-	// Store error state
 	for key, value := range errorState {
 		n.StoreState(key, value)
 	}
-
-	// Store error information
 	n.StoreState("error", err.Error())
 	n.StoreState("failure_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
-
-	// Store statistics at failure Stats are now stored directly in State - no separate stats field
 
 	// Stop all running agents
 	n.StopAllAgents()
@@ -1018,10 +878,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-
-// SendPacketMulti broadcasts a packet to all output channels This method sends packets through paths defined in the want's output paths Each output path contains the channel and target want name
 func (n *Want) SendPacketMulti(packet interface{}) error {
-	// Get the Want's paths to access output channels
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
@@ -1033,8 +890,6 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
 		}
-
-		// Send packet through the channel
 		select {
 		case pathInfo.Channel <- packet:
 			sentCount++
@@ -1066,46 +921,32 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 
 	return nil
 }
-
-// GetType returns the want type This method eliminates the need for duplicate implementations in all want types
 func (n *Want) GetType() string {
 	return n.WantType
 }
-
-// GetConnectivityMetadata returns the connectivity metadata This method eliminates the need for duplicate implementations in all want types
 func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
 	return n.ConnectivityMetadata
 }
-
-// GetInCount returns the number of input paths
 func (n *Want) GetInCount() int {
 	return n.paths.GetInCount()
 }
-
-// GetOutCount returns the number of output paths
 func (n *Want) GetOutCount() int {
 	return n.paths.GetOutCount()
 }
-
-// GetPaths returns the paths field
 func (n *Want) GetPaths() *Paths {
 	return &n.paths
 }
 
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
-// return w }
 func (n *Want) Init(metadata Metadata, spec WantSpec) {
 	n.Metadata = metadata
 	n.Spec = spec
 	n.Status = WantStatusIdle
 	n.State = make(map[string]interface{})
-	// Initialize paths field to avoid nil reference errors This is critical for the new Exec() signature that uses paths field
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 }
-
-// GetIntParam extracts an integer parameter from WantSpec.Params with automatic type conversion Supports both int and float64 types, returning the provided default if not found Usage: count := want.GetIntParam("count", 100)  // Returns int, converts float64 if needed
 func (n *Want) GetIntParam(key string, defaultValue int) int {
 	if value, ok := n.Spec.Params[key]; ok {
 		if intVal, ok := value.(int); ok {
@@ -1116,8 +957,6 @@ func (n *Want) GetIntParam(key string, defaultValue int) int {
 	}
 	return defaultValue
 }
-
-// GetFloatParam extracts a float parameter from WantSpec.Params with automatic type conversion Supports both float64 and int types, returning the provided default if not found Usage: rate := want.GetFloatParam("rate", 1.0)  // Returns float64, converts int if needed
 func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	if value, ok := n.Spec.Params[key]; ok {
 		if floatVal, ok := value.(float64); ok {
@@ -1128,8 +967,6 @@ func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	}
 	return defaultValue
 }
-
-// GetStringParam extracts a string parameter from WantSpec.Params Returns the provided default if not found or if the value is not a string Usage: name := want.GetStringParam("name", "default_name")
 func (n *Want) GetStringParam(key string, defaultValue string) string {
 	if value, ok := n.Spec.Params[key]; ok {
 		if strVal, ok := value.(string); ok {
@@ -1138,8 +975,6 @@ func (n *Want) GetStringParam(key string, defaultValue string) string {
 	}
 	return defaultValue
 }
-
-// GetBoolParam extracts a bool parameter from WantSpec.Params with automatic type conversion
 func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	if value, ok := n.Spec.Params[key]; ok {
 		if boolVal, ok := value.(bool); ok {
@@ -1150,11 +985,8 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	}
 	return defaultValue
 }
-
-// IncrementIntState increments an integer value in State by 1 If the key doesn't exist, initializes it to 1 Returns the new value after increment Usage:
 //   count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
-	// Initialize state if needed
 	if n.State == nil {
 		n.State = make(map[string]interface{})
 	}
@@ -1178,21 +1010,16 @@ func (n *Want) IncrementIntState(key string) int {
 
 	return newValue
 }
-
-// GetSpec returns a pointer to the Want's Spec field This provides controlled access to the Spec, following the encapsulation principle Returns nil if the Want is nil
 func (w *Want) GetSpec() *WantSpec {
 	if w == nil {
 		return nil
 	}
 	return &w.Spec
 }
-
-// GetMetadata returns a pointer to the Want's Metadata field This provides controlled access to the Metadata, following the encapsulation principle Returns nil if the Want is nil
 func (w *Want) GetMetadata() *Metadata {
 	if w == nil {
 		return nil
 	}
 	return &w.Metadata
 }
-
 

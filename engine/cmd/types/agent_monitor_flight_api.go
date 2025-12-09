@@ -52,7 +52,6 @@ func NewMonitorFlightAPI(name string, capabilities []string, uses []string, serv
 
 // Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Exec method (FlightWant) Individual agents should NOT implement their own polling loops
 func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
-	// Get flight ID from state (set by AgentFlightAPI)
 	flightID, exists := want.GetState("flight_id")
 	if !exists {
 		return fmt.Errorf("no flight_id found in state - flight not created yet")
@@ -68,8 +67,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		want.StoreLog("Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
 		return nil
 	}
-
-	// Check if enough time has passed since last poll (5-second polling interval) This prevents excessive polling even when Exec() is called frequently (every 100ms)
 	now := time.Now()
 	if !m.LastPollTime.IsZero() && now.Sub(m.LastPollTime) < m.PollInterval {
 		// Skip this polling cycle - wait for PollInterval to elapse
@@ -93,7 +90,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		if historyStrs, ok := historyI.([]interface{}); ok {
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
-					// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
 					if parsed, ok := parseStatusHistoryEntry(entry); ok {
 						// Only add if not already in history
 						found := false
@@ -111,7 +107,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			}
 		} else if historyStrs, ok := historyI.([]string); ok {
 			for _, entry := range historyStrs {
-				// Parse history entry format: "HH:MM:SS: OldStatus -> NewStatus (Details)"
 				if parsed, ok := parseStatusHistoryEntry(entry); ok {
 					// Only add if not already in history
 					found := false
@@ -128,28 +123,20 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			}
 		}
 	}
-
-	// GET the flight details
 	url := fmt.Sprintf("%s/api/flights/%s", m.ServerURL, flightIDStr)
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to get flight status: %v", err)
 	}
 	defer resp.Body.Close()
-
-	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-
-	// Parse response
 	var reservation FlightReservation
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	// Check for status change first (differential history - only record if state changed)
 	newStatus := reservation.Status
 	oldStatus := m.LastKnownStatus
 	hasStateChange := newStatus != oldStatus
@@ -192,8 +179,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
 				oldStatus, newStatus, reservation.FlightNumber, reservation.StatusMessage)
 			want.SetAgentActivity(m.Name, activity)
-
-			// Store complete flight info when status changes
 			schedule := FlightSchedule{
 				DepartureTime:   reservation.DepartureTime,
 				ArrivalTime:     reservation.ArrivalTime,
@@ -203,8 +188,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			updates["agent_result"] = schedule
 			want.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight schedule packet: FlightNumber=%s, From=%s, To=%s, Status=%s",
 				schedule.FlightNumber, reservation.From, reservation.To, newStatus))
-
-			// Store all status history in state
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range m.StatusChangeHistory {
 				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
@@ -234,8 +217,6 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	return nil
 }
-
-// GetStatusChangeHistory returns the history of status changes
 func (m *MonitorFlightAPI) GetStatusChangeHistory() []StatusChange {
 	return m.StatusChangeHistory
 }
@@ -244,10 +225,7 @@ func (m *MonitorFlightAPI) GetStatusChangeHistory() []StatusChange {
 func (m *MonitorFlightAPI) WasStatusChanged() bool {
 	return len(m.StatusChangeHistory) > 0
 }
-
-// parseStatusHistoryEntry parses a status history entry with format: "HH:MM:SS: OldStatus -> NewStatus (Details)" This uses string manipulation instead of fmt.Sscanf to properly handle status strings with spaces
 func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
-	// Find the first colon that separates timestamp from status transition
 	colonIdx := findFirstColon(entry)
 	if colonIdx < 0 || colonIdx+2 >= len(entry) {
 		return StatusChange{}, false
@@ -256,8 +234,6 @@ func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	// Extract timestamp part (before first colon)
 	timestampStr := entry[:colonIdx]
 	rest := strings.TrimSpace(entry[colonIdx+1:])
-
-	// Find " -> " arrow separator
 	arrowIdx := strings.Index(rest, " -> ")
 	if arrowIdx < 0 {
 		return StatusChange{}, false
@@ -266,8 +242,6 @@ func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	// Extract old status (after colon, before arrow)
 	oldStatus := strings.TrimSpace(rest[:arrowIdx])
 	afterArrow := strings.TrimSpace(rest[arrowIdx+4:])
-
-	// Find the opening parenthesis for details
 	parenIdx := strings.Index(afterArrow, "(")
 	if parenIdx < 0 {
 		return StatusChange{}, false
@@ -281,11 +255,7 @@ func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	if len(detailsPart) < 2 || !strings.HasPrefix(detailsPart, "(") || !strings.HasSuffix(detailsPart, ")") {
 		return StatusChange{}, false
 	}
-
-	// Remove parentheses from details
 	details := strings.TrimSpace(detailsPart[1 : len(detailsPart)-1])
-
-	// Parse timestamp
 	parsedTime, err := time.Parse("15:04:05", timestampStr)
 	if err != nil {
 		parsedTime = time.Now() // Fallback
@@ -298,8 +268,6 @@ func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 		Details:   details,
 	}, true
 }
-
-// findFirstColon finds the index of the first colon in the string
 func findFirstColon(s string) int {
 	for i, ch := range s {
 		if ch == ':' {

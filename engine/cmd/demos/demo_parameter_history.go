@@ -14,8 +14,6 @@ func main() {
 	fmt.Println("This demo tests the parameterHistory functionality by")
 	fmt.Println("creating a simple want and then updating its parameters")
 	fmt.Println("multiple times to verify parameter history tracking.")
-
-	// Create a simple config with one want
 	config := &mywant.Config{
 		Wants: []mywant.Want{
 			{
@@ -38,14 +36,10 @@ func main() {
 			},
 		},
 	}
-
-	// Create chain builder and register types
 	builder := mywant.NewChainBuilder(*config)
 	types.RegisterQNetWantTypes(builder)
 
 	fmt.Println("🔧 Creating test want...")
-
-	// Get access to the test want before execution for parameter updates
 	testWant := &config.Wants[0]
 
 	fmt.Println("📝 Testing parameter updates...")
@@ -73,15 +67,11 @@ func main() {
 
 	fmt.Println("  → Adding new parameter 'description'")
 	testWant.UpdateParameter("description", "test parameter")
-
-	// Check state before execution
 	fmt.Printf("📊 State before execution: %+v\n", testWant.State)
 
 	// Now execute the chain
 	fmt.Println("🚀 Starting chain execution...")
 	builder.Execute()
-
-	// Check state after execution
 	fmt.Printf("📊 State after execution: %+v\n", testWant.State)
 
 	fmt.Println("✅ Parameter history test completed!")

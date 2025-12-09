@@ -98,8 +98,6 @@ func (t *Target) subscribeToChildCompletion() {
 type TargetCompletionSubscription struct {
 	target *Target
 }
-
-// GetSubscriberName returns the subscriber name
 func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
 	return tcs.target.Metadata.Name + "-completion-handler"
 }
@@ -140,8 +138,6 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		ExecutionControl: ExecutionContinue,
 	}
 }
-
-// checkAllChildrenComplete checks if all child wants have completed (must hold childCompletionMutex)
 func (t *Target) checkAllChildrenComplete() bool {
 	// If we have no children yet AND no completions have arrived, we can't be complete (children are still being added asynchronously)
 	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
@@ -160,13 +156,9 @@ func (t *Target) checkAllChildrenComplete() bool {
 	}
 	return true
 }
-
-// SetBuilder sets the ChainBuilder reference for dynamic want creation
 func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
-
-// SetRecipeLoader sets the GenericRecipeLoader reference for recipe-based child creation
 func (t *Target) SetRecipeLoader(loader *GenericRecipeLoader) {
 	t.recipeLoader = loader
 	// Resolve recipe parameters using recipe defaults when loader is available
@@ -178,17 +170,11 @@ func (t *Target) resolveRecipeParameters() {
 	if t.recipeLoader == nil {
 		return
 	}
-
-	// Get recipe parameters to access default values
 	recipeParams, err := t.recipeLoader.GetRecipeParameters(t.RecipePath)
 	if err != nil {
 		return
 	}
-
-	// Create resolved parameters map starting with recipe defaults
 	resolvedParams := make(map[string]interface{})
-
-	// Set default values from recipe parameter definitions
 	for key, value := range recipeParams {
 		resolvedParams[key] = value
 	}
@@ -197,8 +183,6 @@ func (t *Target) resolveRecipeParameters() {
 	for key, value := range t.RecipeParams {
 		resolvedParams[key] = value
 	}
-
-	// Add target-specific parameters that may be referenced by recipes
 	resolvedParams["targetName"] = t.Metadata.Name
 	if _, hasCount := resolvedParams["count"]; !hasCount {
 		resolvedParams["count"] = t.MaxDisplay
@@ -210,8 +194,6 @@ func (t *Target) resolveRecipeParameters() {
 	// Update recipe parameters with resolved values
 	t.RecipeParams = resolvedParams
 }
-
-// CreateChildWants dynamically creates child wants based on external recipes
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
@@ -235,8 +217,6 @@ func (t *Target) CreateChildWants() []*Want {
 			return []*Want{}
 		}
 	}
-
-	// Add owner references to all child wants
 	for i := range config.Wants {
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
 			{
@@ -248,7 +228,6 @@ func (t *Target) CreateChildWants() []*Want {
 				BlockOwnerDeletion: true,
 			},
 		}
-		// Add owner label for easier identification
 		if config.Wants[i].Metadata.Labels == nil {
 			config.Wants[i].Metadata.Labels = make(map[string]string)
 		}
@@ -264,8 +243,6 @@ func (t *Target) Exec() bool {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
-
-		// Send child wants to reconcile loop asynchronously
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
 			return false
@@ -302,7 +279,6 @@ func (t *Target) Exec() bool {
 	return true
 }
 
-
 // UpdateParameter updates a parameter and pushes it to child wants
 func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 	// Update our own parameter first
@@ -326,8 +302,6 @@ func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
 		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue))
 	t.UpdateParameter(paramName, paramValue)
 }
-
-// GetParameterValue gets the current value of a parameter
 func (t *Target) GetParameterValue(paramName string) interface{} {
 	if value, ok := t.Spec.Params[paramName]; ok {
 		return value
@@ -340,8 +314,6 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue interface{
 	if t.builder == nil {
 		return
 	}
-
-	// Get all child wants that have owner references pointing to this target
 	for wantName, runtimeWant := range t.builder.wants {
 		if t.isChildWant(runtimeWant.want) {
 			// Map target parameters to child parameters based on naming patterns
@@ -389,8 +361,6 @@ func (t *Target) mapParameterNameForChild(targetParamName string, childWantType 
 			"display_format": "display_format",
 		},
 	}
-
-	// Look up mapping for this child type
 	if typeMapping, exists := parameterMappings[childWantType]; exists {
 		if childParam, exists := typeMapping[targetParamName]; exists {
 			return childParam
@@ -412,8 +382,6 @@ func (t *Target) computeTemplateResult() {
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
-
-	// Get recipe result definition
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
 		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err))
@@ -426,16 +394,11 @@ func (t *Target) computeTemplateResult() {
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
-
-	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
 	childWantsByName := make(map[string]*Want)
-
-	// Build map of child wants by name
 	for _, want := range allWantStates {
 		for _, ownerRef := range want.Metadata.OwnerReferences {
 			if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
-				// Store by full type name (e.g., "qnet queue")
 				childWantsByName[want.Metadata.Type] = want
 
 				// Also extract and store by short type name For "qnet queue" -> also store as "queue"
@@ -462,15 +425,11 @@ func (t *Target) computeTemplateResult() {
 	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames))
 
 	// Stats are now stored in State - no separate initialization needed
-
-	// Process all result specs from the new flat array format (outside lock to avoid deadlock)
 	var primaryResult interface{}
 	metrics := make(map[string]interface{})
 
 	for i, resultSpec := range *recipeResult {
 		resultValue := t.getResultFromSpec(resultSpec, childWantsByName)
-
-		// Store in metrics map with cleaned key name
 		statName := strings.TrimPrefix(resultSpec.StatName, ".")
 		if statName == "" {
 			statName = "all_metrics"
@@ -486,8 +445,6 @@ func (t *Target) computeTemplateResult() {
 			t.StoreLog(fmt.Sprintf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue))
 		}
 	}
-
-	// Store all computed results through StoreState() which handles mutex protection
 	for i, resultSpec := range *recipeResult {
 		statName := strings.TrimPrefix(resultSpec.StatName, ".")
 		if statName == "" {
@@ -495,10 +452,7 @@ func (t *Target) computeTemplateResult() {
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		t.StoreState(metricKey, metrics[metricKey])
-
-		// Set result for first item
 		if i == 0 {
-			// Format result as "stat_name: value" (e.g., "average_wait_time: 0.026")
 			statLabel := strings.TrimPrefix(resultSpec.StatName, ".")
 			if statLabel == "" {
 				statLabel = resultSpec.Description
@@ -506,14 +460,10 @@ func (t *Target) computeTemplateResult() {
 			t.StoreState("result", fmt.Sprintf("%s: %v", statLabel, primaryResult))
 		}
 	}
-
-	// Store child count in local field
 	t.childCount = len(childWantsByName)
 
 	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name))
 }
-
-// addChildWantsToMemory adds child wants to the memory configuration
 func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would interact with the ChainBuilder to add wants to the memory file For now, we'll assume the reconcile loop will pick up the wants
 	t.StoreLog(fmt.Sprintf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants)))
@@ -530,7 +480,6 @@ type OwnerAwareWant struct {
 
 // NewOwnerAwareWant creates a wrapper that adds parent notification to any want wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
 func NewOwnerAwareWant(baseWant interface{}, metadata Metadata, wantPtr *Want) *OwnerAwareWant {
-	// Find target name from owner references
 	targetName := ""
 	for _, ownerRef := range metadata.OwnerReferences {
 		if ownerRef.Controller && ownerRef.Kind == "Want" {
@@ -560,20 +509,16 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 
 	// Use reflection to inspect the value
 	v := reflect.ValueOf(baseWant)
-
-	// Handle pointer types
 	if v.Kind() == reflect.Ptr {
 		elem := v.Elem()
 
 		// Try to find a Want field in the struct
 		if elem.Kind() == reflect.Struct {
-			// Look for a field named "Want"
 			wantField := elem.FieldByName("Want")
 
 			if wantField.IsValid() {
 				// Case 1: Embedded Want struct (e.g., RestaurantWant.Want)
 				if wantField.Kind() == reflect.Struct {
-					// Get the address of the Want field
 					if wantField.CanAddr() {
 						wantAddr := wantField.Addr()
 						// Type assert to *Want
@@ -628,8 +573,6 @@ func (oaw *OwnerAwareWant) EndExecCycle() {
 		oaw.Want.EndExecCycle()
 	}
 }
-
-// SetPaths delegates to the stored Want to set input/output paths
 func (oaw *OwnerAwareWant) SetPaths(inPaths []PathInfo, outPaths []PathInfo) {
 	if oaw.Want != nil {
 		oaw.Want.SetPaths(inPaths, outPaths)
@@ -637,48 +580,36 @@ func (oaw *OwnerAwareWant) SetPaths(inPaths []PathInfo, outPaths []PathInfo) {
 }
 
 // Channel delegation methods for OwnerAwareWant These methods delegate to the stored Want pointer to provide access to paths.In and paths.Out
-
-// GetInputChannel delegates to the stored Want
 func (oaw *OwnerAwareWant) GetInputChannel(index int) (chain.Chan, bool) {
 	if oaw.Want != nil {
 		return oaw.Want.GetInputChannel(index)
 	}
 	return nil, true
 }
-
-// GetOutputChannel delegates to the stored Want
 func (oaw *OwnerAwareWant) GetOutputChannel(index int) (chain.Chan, bool) {
 	if oaw.Want != nil {
 		return oaw.Want.GetOutputChannel(index)
 	}
 	return nil, true
 }
-
-// GetFirstInputChannel delegates to the stored Want
 func (oaw *OwnerAwareWant) GetFirstInputChannel() (chain.Chan, bool) {
 	if oaw.Want != nil {
 		return oaw.Want.GetFirstInputChannel()
 	}
 	return nil, true
 }
-
-// GetFirstOutputChannel delegates to the stored Want
 func (oaw *OwnerAwareWant) GetFirstOutputChannel() (chain.Chan, bool) {
 	if oaw.Want != nil {
 		return oaw.Want.GetFirstOutputChannel()
 	}
 	return nil, true
 }
-
-// GetMetadata delegates to the stored Want
 func (oaw *OwnerAwareWant) GetMetadata() *Metadata {
 	if oaw.Want != nil {
 		return oaw.Want.GetMetadata()
 	}
 	return nil
 }
-
-// GetSpec delegates to the stored Want
 func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
 	if oaw.Want != nil {
 		return oaw.Want.GetSpec()
@@ -696,8 +627,6 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 		}
 		return
 	}
-
-	// Create OwnerCompletionEvent
 	event := &OwnerCompletionEvent{
 		BaseEvent: BaseEvent{
 			EventType:  EventTypeOwnerCompletion,
@@ -712,10 +641,7 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 	// Emit through subscription system (blocking mode)
 	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-
-// setupStateNotifications sets up state change monitoring for this want
 func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
-	// Set the Want reference if not already set
 	if oaw.Want == nil {
 		oaw.Want = want
 	}
@@ -724,7 +650,6 @@ func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
-	// Initialize generic recipe loader
 	recipeLoader := NewGenericRecipeLoader("recipes")
 
 	// Register target type with recipe support
@@ -738,8 +663,6 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies. 
 	// This means: 1. Domain types can be registered in any order (QNet, Travel, etc.) 2. No need for separate "NoOwner" builder variants 3. Wrapping happens at runtime based on actual metadata, not factory registration
 }
-
-// getResultFromSpec extracts a specific result value from child wants using recipe specification
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
 	want, exists := childWants[spec.WantName]
 	if !exists {
@@ -751,11 +674,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation (available: %v)\n", t.Metadata.Name, spec.WantName, availableNames))
 		return 0
 	}
-
-	// Handle JSON path-like stat names
 	statName := spec.StatName
-
-	// Handle JSON path syntax
 	if strings.HasPrefix(statName, ".") {
 		return t.extractValueByPath(want.State, statName)
 	}
@@ -795,12 +714,9 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 
 // extractValueByPath extracts values using JSON path-like syntax
 func (t *Target) extractValueByPath(data map[string]interface{}, path string) interface{} {
-	// Handle root path "." - return entire data
 	if path == "." {
 		return data
 	}
-
-	// Handle field access like ".average_wait_time"
 	if strings.HasPrefix(path, ".") {
 		fieldName := strings.TrimPrefix(path, ".")
 
@@ -813,8 +729,6 @@ func (t *Target) extractValueByPath(data map[string]interface{}, path string) in
 		if value, ok := data[strings.ToLower(fieldName)]; ok {
 			return value
 		}
-
-		// Handle underscore/camelCase variations
 		if strings.Contains(fieldName, "_") {
 			// Try camelCase version
 			camelCase := t.toCamelCase(fieldName)
@@ -863,7 +777,6 @@ func (t *Target) toSnakeCase(str string) string {
 
 // computeFallbackResultUnsafe provides simple aggregation without mutex protection (caller must hold mutex)
 func (t *Target) computeFallbackResultUnsafe() {
-	// Get all wants that might be child wants for this target
 	allWantStates := t.builder.GetAllWantStates()
 	var childWants []*Want
 
@@ -894,13 +807,9 @@ func (t *Target) computeFallbackResultUnsafe() {
 			}
 		}
 	}
-
-	// Initialize State map if not exists
 	if t.State == nil {
 		t.State = make(map[string]interface{})
 	}
-
-	// Store result in target's state
 	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
 	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants)))

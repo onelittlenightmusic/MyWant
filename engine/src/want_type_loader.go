@@ -131,8 +131,6 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 func (w *WantTypeLoader) LoadAllWantTypes() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-
-	// Find all YAML files in want_types directory and subdirectories
 	var yamlFiles []string
 	err := filepath.Walk(w.directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -216,8 +214,6 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 	}
 
 	def := &wrapper.WantType
-
-	// Validate definition
 	err = w.validateDefinition(def)
 	if err != nil {
 		return nil, fmt.Errorf("validation failed: %v", err)
@@ -225,10 +221,7 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 
 	return def, nil
 }
-
-// validateDefinition validates a want type definition
 func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
-	// Check metadata fields
 	if def.Metadata.Name == "" {
 		return fmt.Errorf("metadata.name is required")
 	}
@@ -247,8 +240,6 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 	if def.Metadata.Pattern == "" {
 		return fmt.Errorf("metadata.pattern is required")
 	}
-
-	// Validate pattern
 	validPattern := false
 	for _, vp := range w.validPatterns {
 		if def.Metadata.Pattern == vp {
@@ -259,8 +250,6 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 	if !validPattern {
 		return fmt.Errorf("invalid pattern: %s (must be one of: %v)", def.Metadata.Pattern, w.validPatterns)
 	}
-
-	// Validate parameters
 	for _, param := range def.Parameters {
 		if param.Name == "" {
 			return fmt.Errorf("parameter missing name")
@@ -269,8 +258,6 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 			return fmt.Errorf("parameter %s missing type", param.Name)
 		}
 	}
-
-	// Validate state definitions
 	for _, state := range def.State {
 		if state.Name == "" {
 			return fmt.Errorf("state key missing name")
@@ -282,16 +269,12 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 
 	return nil
 }
-
-// GetDefinition retrieves a want type definition by name
 func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	return w.definitions[name]
 }
-
-// GetAll returns all loaded want type definitions
 func (w *WantTypeLoader) GetAll() []*WantTypeDefinition {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -318,8 +301,6 @@ func (w *WantTypeLoader) ListByCategory(category string) []*WantTypeDefinition {
 	if defs == nil {
 		return []*WantTypeDefinition{}
 	}
-
-	// Return a copy
 	result := make([]*WantTypeDefinition, len(defs))
 	copy(result, defs)
 	return result
@@ -334,14 +315,10 @@ func (w *WantTypeLoader) ListByPattern(pattern string) []*WantTypeDefinition {
 	if defs == nil {
 		return []*WantTypeDefinition{}
 	}
-
-	// Return a copy
 	result := make([]*WantTypeDefinition, len(defs))
 	copy(result, defs)
 	return result
 }
-
-// GetCategories returns all available categories
 func (w *WantTypeLoader) GetCategories() []string {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -353,16 +330,12 @@ func (w *WantTypeLoader) GetCategories() []string {
 	sort.Strings(categories)
 	return categories
 }
-
-// GetPatterns returns all available patterns
 func (w *WantTypeLoader) GetPatterns() []string {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	return w.validPatterns
 }
-
-// GetStats returns statistics about loaded definitions
 func (w *WantTypeLoader) GetStats() map[string]interface{} {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
@@ -389,21 +362,15 @@ func (w *WantTypeLoader) GetStats() map[string]interface{} {
 
 	return stats
 }
-
-// ValidateParameterValues validates actual parameter values against a definition
 func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[string]interface{}) error {
 	def := w.GetDefinition(typeName)
 	if def == nil {
 		return fmt.Errorf("unknown want type: %s", typeName)
 	}
-
-	// Build parameter index for quick lookup
 	paramIndex := make(map[string]*ParameterDef)
 	for i, p := range def.Parameters {
 		paramIndex[p.Name] = &def.Parameters[i]
 	}
-
-	// Check all required parameters are provided
 	for _, paramDef := range def.Parameters {
 		if paramDef.Required {
 			if _, exists := params[paramDef.Name]; !exists {
@@ -411,8 +378,6 @@ func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[str
 			}
 		}
 	}
-
-	// Validate each provided parameter
 	for paramName, paramValue := range params {
 		paramDef, exists := paramIndex[paramName]
 		if !exists {

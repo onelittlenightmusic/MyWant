@@ -65,8 +65,6 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 			return err
 		}
 	}
-
-	// Parse the YAML content
 	var restaurantState RestaurantState
 	if err := yaml.Unmarshal(data, &restaurantState); err != nil {
 		want.StoreLog(fmt.Sprintf("Error parsing YAML: %v", err))
@@ -76,10 +74,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 	// Debug: Print parsed state
 	want.StoreLog(fmt.Sprintf("DEBUG: Parsed state: %+v", restaurantState))
 	want.StoreLog(fmt.Sprintf("DEBUG: Start time: %v, IsZero: %v", restaurantState.State.Start, restaurantState.State.Start.IsZero()))
-
-	// Store the state information using StoreState
 	if !restaurantState.State.Start.IsZero() {
-		// Convert to RestaurantSchedule format
 		duration := restaurantState.State.End.Sub(restaurantState.State.Start)
 
 		schedule := RestaurantSchedule{
@@ -113,8 +108,6 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 		})
 		want.StoreLog(fmt.Sprintf("No existing schedule found in %s - stored first record", filename))
 	}
-
-	// Increment execution count for next call
 	m.ExecutionCount++
 
 	return nil

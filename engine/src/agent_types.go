@@ -183,8 +183,6 @@ func (r *AgentRegistry) GetCapability(name string) (Capability, bool) {
 	cap, exists := r.capabilities[name]
 	return cap, exists
 }
-
-// GetAllAgents returns all registered agents
 func (r *AgentRegistry) GetAllAgents() []Agent {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
@@ -195,8 +193,6 @@ func (r *AgentRegistry) GetAllAgents() []Agent {
 	}
 	return agents
 }
-
-// GetAllCapabilities returns all registered capabilities
 func (r *AgentRegistry) GetAllCapabilities() []Capability {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
@@ -217,11 +213,7 @@ func (r *AgentRegistry) UnregisterAgent(name string) bool {
 	if !exists {
 		return false
 	}
-
-	// Remove agent from agents map
 	delete(r.agents, name)
-
-	// Remove agent from capability mappings
 	for _, capName := range agent.GetCapabilities() {
 		if cap, exists := r.capabilities[capName]; exists {
 			for _, gives := range cap.Gives {
@@ -248,11 +240,7 @@ func (r *AgentRegistry) UnregisterCapability(name string) bool {
 	if !exists {
 		return false
 	}
-
-	// Remove capability from capabilities map
 	delete(r.capabilities, name)
-
-	// Remove capability mappings
 	for _, gives := range cap.Gives {
 		delete(r.capabilityToAgents, gives)
 	}

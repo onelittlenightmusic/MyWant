@@ -10,8 +10,6 @@ import (
 func main() {
 	fmt.Println("QNet Validation Demo")
 	fmt.Println("===================")
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_qnet.go <config-file-path>")
 		os.Exit(1)
@@ -26,8 +24,6 @@ func main() {
 	}
 
 	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Wants))
-
-	// Create chain builder
 	builder := mywant.NewChainBuilder(config)
 
 	// Register qnet node types

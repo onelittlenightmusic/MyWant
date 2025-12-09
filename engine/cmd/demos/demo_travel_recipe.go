@@ -17,14 +17,10 @@ func main() {
 	fmt.Println("- Flight monitoring enables automatic rebooking on delay detection")
 	fmt.Println("- Demo runs for extended duration to observe complete cycle")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-travel-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
-
-	// Get duration from command line (default 120 seconds for full delay cycle) Mock server timeline: T+0s: confirmed T+40s: delayed_one_day (trigger rebooking)
 	// T+80s: confirmed again
 	durationSeconds := 120
 	if len(os.Args) > 2 {
@@ -48,11 +44,7 @@ func main() {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-
-	// Create chain builder with standard constructor Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	builder := NewChainBuilder(config)
-
-	// Create and configure agent registry - same as server mode
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities from YAML files (from project root, accounting for engine subdirectory) Try both relative paths since go run -C engine changes the working directory
@@ -61,7 +53,6 @@ func main() {
 	for _, p := range capPaths {
 		fmt.Printf("  Trying to load capabilities from %s...\n", p)
 		if err := agentRegistry.LoadCapabilities(p); err == nil {
-			// Check if we actually loaded any capabilities
 			loadedCount := len(agentRegistry.GetAllCapabilities())
 			fmt.Printf("    Loaded %d capabilities from %s\n", loadedCount, p)
 			if loadedCount > 0 {
@@ -124,8 +115,6 @@ func main() {
 	startTime := time.Now()
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
-
-	// Create a channel to control execution
 	done := make(chan bool, 1)
 
 	// Start execution in background
@@ -148,8 +137,6 @@ func main() {
 
 		case <-ticker.C:
 			elapsed := time.Since(startTime).Seconds()
-
-			// Check if we've reached the timeout
 			if elapsed >= float64(durationSeconds) {
 				fmt.Printf("\n⏱️  Duration timeout reached (%.0fs)\n", elapsed)
 				fmt.Println("\n📊 Final Execution State:")

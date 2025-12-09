@@ -11,8 +11,6 @@ import (
 func main() {
 	fmt.Printf("🎯 Starting Hierarchical Approval Demo\n")
 	fmt.Printf("======================================\n")
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_hierarchical_approval.go <config-file-path>")
 		os.Exit(1)
@@ -25,8 +23,6 @@ func main() {
 		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		os.Exit(1)
 	}
-
-	// Create chain builder
 	builder := mywant.NewChainBuilder(config)
 
 	// Custom target types are auto-registered during builder creation

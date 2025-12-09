@@ -96,16 +96,12 @@ type runtimeWant struct {
 	function interface{}
 	want     *Want
 }
-
-// GetSpec returns a pointer to the runtimeWant's Spec field by delegating to the underlying want's GetSpec() method
 func (rw *runtimeWant) GetSpec() *WantSpec {
 	if rw == nil || rw.want == nil {
 		return nil
 	}
 	return rw.want.GetSpec()
 }
-
-// GetMetadata returns a pointer to the runtimeWant's Metadata field by delegating to the underlying want's GetMetadata() method
 func (rw *runtimeWant) GetMetadata() *Metadata {
 	if rw == nil || rw.want == nil {
 		return nil
@@ -139,7 +135,6 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		labelToUsers:       make(map[string][]string),
 		wantCompletedFlags: make(map[string]bool),
 		waitGroup:        &sync.WaitGroup{},
-		// Initialize suspend/resume control
 		suspended:   false,
 		suspendChan: make(chan bool),
 		resumeChan:  make(chan bool),
@@ -158,23 +153,15 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
 	cb.registry[wantType] = factory
 }
-
-// SetAgentRegistry sets the agent registry for the chain builder
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
-
-// SetCustomTargetRegistry sets the custom target type registry for the chain builder
 func (cb *ChainBuilder) SetCustomTargetRegistry(registry *CustomTargetTypeRegistry) {
 	cb.customRegistry = registry
 }
-
-// SetConfigInternal sets the config for the builder (for server mode)
 func (cb *ChainBuilder) SetConfigInternal(config Config) {
 	cb.config = config
 }
-
-// SetServerMode sets the server mode flag to prevent memory file reload conflicts
 func (cb *ChainBuilder) SetServerMode(isServer bool) {
 	cb.isServerMode = isServer
 }
@@ -192,25 +179,17 @@ func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector m
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	pathMap := make(map[string]*Paths)
-
-	// Initialize empty paths for all runtime wants log.Printf("[RECONCILE:PATHS] generatePathsFromConnections() called with %d runtime wants\n", len(cb.wants))
 	for wantName := range cb.wants {
 		pathMap[wantName] = &Paths{
 			In:  []PathInfo{},
 			Out: []PathInfo{},
 		}
 	}
-
-	// Create connections based on using selectors
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
-
-		// Process using connections for this want if len(want.GetSpec().Using) > 0 { log.Printf("[RECONCILE:PATHS] Want '%s' (type: %s) has %d using selectors\n", wantName, want.GetMetadata().Type, len(want.GetSpec().Using))
 		// }
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-
-			// Find wants that match this using selector (from runtime only - all wants should be here by connectPhase)
 			for otherName, otherWant := range cb.wants {
 				if wantName == otherName {
 					continue // Skip self-matching
@@ -219,8 +198,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					matchCount++
 					// log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
 						// otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
-
-					// Create using path for current want Create a channel directly typed as chain.Chan
 					ch := make(chain.Chan, 10)
 					inPath := PathInfo{
 						Channel: ch,
@@ -230,8 +207,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					paths.In = append(paths.In, inPath)
 
 					// Log connection details, especially for Flight want if strings.Contains(wantName, "flight") { InfoLog("[FLIGHT-CONNECT] Flight want '%s' receiving input from '%s' on channel: %s\n", wantName, otherName, inPath.Name) }
-
-					// Create corresponding output path for the matching want
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
 						Channel:        inPath.Channel, // Same channel, shared connection
@@ -248,33 +223,23 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 			// if matchCount == 0 { log.Printf("[RECONCILE:PATHS] WARN: Want '%s' selector %v matched 0 wants!\n", wantName, usingSelector) }
 		}
 	}
-
-	// Convert pointers back to values for the return type
 	result := make(map[string]Paths)
 	for wantName, pathsPtr := range pathMap {
 		result[wantName] = *pathsPtr
 	}
 	return result
 }
-
-// validateConnections validates that all wants have their connectivity requirements satisfied Note: Validation checks are performed but not logged to console (debug info not needed in normal operation) Reconciliation will run again once idle wants execute and create missing connections via child wants/autoconnection
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
-
-		// Check if this is an enhanced want that has connectivity requirements
 		meta := want.want.GetConnectivityMetadata()
 
 		inCount := len(paths.In)
 		outCount := len(paths.Out)
-
-		// Store connectivity status for reconcile loop decision If required inputs not met, mark want as waiting for connections
 		if inCount < meta.RequiredInputs {
 		}
 		if outCount < meta.RequiredOutputs {
 		}
-
-		// Validate constraints
 		if meta.MaxInputs >= 0 && inCount > meta.MaxInputs {
 		}
 		if meta.MaxOutputs >= 0 && outCount > meta.MaxOutputs {
@@ -285,8 +250,6 @@ func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 // isConnectivitySatisfied checks if a want's connectivity requirements are met
 func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWant, pathMap map[string]Paths) bool {
 	paths := pathMap[wantName]
-
-	// Check if this is an enhanced want that has connectivity requirements
 	meta := want.want.GetConnectivityMetadata()
 
 	inCount := len(paths.In)
@@ -304,12 +267,8 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 
 	return true
 }
-
-// createWantFunction creates the appropriate function based on want type using registry
 func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 	wantType := want.Metadata.Type
-
-	// Check if it's a custom target type first
 	if cb.customRegistry.IsCustomType(wantType) {
 		return cb.createCustomTargetWant(want)
 	}
@@ -341,8 +300,6 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 		} else {
 		}
 	}
-
-	// Set agent registry if available
 	if cb.agentRegistry != nil && wantPtr != nil {
 		wantPtr.SetAgentRegistry(cb.agentRegistry)
 	}
@@ -359,8 +316,6 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (interface{}, error) {
 	return cb.createWantFunction(want)
 }
-
-// createCustomTargetWant creates a custom target want using the registry
 func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) {
 	config, exists := cb.customRegistry.Get(want.Metadata.Type)
 	if !exists {
@@ -371,14 +326,8 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 
 	// Merge custom type defaults with user-provided spec
 	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
-
-	// Create the custom target using the registered function
 	target := config.CreateTargetFunc(want.Metadata, mergedSpec)
-
-	// Set up target with builder and recipe loader (if available)
 	target.SetBuilder(cb)
-
-	// Set up recipe loader for custom targets
 	recipeLoader := NewGenericRecipeLoader("recipes")
 	target.SetRecipeLoader(recipeLoader)
 
@@ -394,8 +343,6 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 // mergeWithCustomDefaults merges user spec with custom type defaults
 func (cb *ChainBuilder) mergeWithCustomDefaults(spec WantSpec, config CustomTargetTypeConfig) WantSpec {
 	merged := spec
-
-	// Initialize params if nil
 	if merged.Params == nil {
 		merged.Params = make(map[string]interface{})
 	}
@@ -513,7 +460,6 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-cb.reconcileStop:
 			return
 		case trigger := <-cb.reconcileTrigger:
-			// Handle reconciliation, control, and retrigger triggers from unified channel
 			if trigger == nil {
 				continue
 			}
@@ -532,16 +478,13 @@ func (cb *ChainBuilder) reconcileLoop() {
 				}
 
 			case "check_completed_retrigger":
-				// Processing retrigger check (logging removed)
 				cb.checkAndRetriggerCompletedWants()
 				// Retrigger check finished
 
 			default:
-				// Handle standard reconciliation trigger Standard reconciliation trigger (logging removed)
 				cb.reconcileWants()
 			}
 		case newWants := <-cb.addWantsChan:
-			// Add wants to config and runtime
 			cb.reconcileMutex.Lock()
 			for _, want := range newWants {
 				// Allow multiple wants with the same name (they may be different instances)
@@ -586,11 +529,8 @@ func (cb *ChainBuilder) reconcileLoop() {
 func (cb *ChainBuilder) reconcileWants() {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
-
-	// Set flag to prevent recursive reconciliation
 	cb.inReconciliation = true
 	defer func() { cb.inReconciliation = false }()
-
 
 	// Phase 1: COMPILE - Load and validate configuration
 	if err := cb.compilePhase(); err != nil {
@@ -612,8 +552,6 @@ func (cb *ChainBuilder) compilePhase() error {
 
 	// Use current config as source of truth during runtime Memory file is only loaded on initial startup
 	newConfig := cb.config
-
-	// Check if this is initial load (no lastConfig set)
 	isInitialLoad := len(cb.lastConfig.Wants) == 0
 
 	if isInitialLoad {
@@ -636,7 +574,6 @@ func (cb *ChainBuilder) compilePhase() error {
 			return nil
 		}
 
-
 		// Apply changes in reverse dependency order (sink to generator)
 		cb.applyWantChanges(changes)
 	}
@@ -652,18 +589,11 @@ func (cb *ChainBuilder) compilePhase() error {
 
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
-
-
-	// Process auto-connections for RecipeAgent wants before generating paths
 	cb.processAutoConnections()
-
-	// Build parameter subscription connectivity for Target wants This references the owner-children relationships already established in OwnerReferences metadata
 	targetCount := 0
 	for _, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
 			targetCount++
-
-			// Find children by checking OwnerReferences.UID in other wants
 			childCount := 0
 			ownerID := runtimeWant.want.Metadata.ID
 			for _, childRuntime := range cb.wants {
@@ -676,9 +606,7 @@ func (cb *ChainBuilder) connectPhase() error {
 				}
 			}
 
-
 			if target.RecipePath != "" && target.recipeLoader != nil {
-				// Parse recipe to build parameter subscription map based on ownership
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
 				}
 			}
@@ -701,11 +629,7 @@ func (cb *ChainBuilder) connectPhase() error {
 			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}
 	}
-
-	// Build label-to-users mapping for completed want retrigger detection This pre-computes which wants depend on each want via label selectors
 	cb.buildLabelToUsersMapping()
-
-	// Validate connectivity requirements (non-blocking - logs warnings only) Wants with missing connections will remain idle until reconciliation connects them
 	cb.validateConnections(cb.pathMap)
 
 	// Rebuild channels based on new topology
@@ -726,8 +650,6 @@ func (cb *ChainBuilder) connectPhase() error {
 
 	return nil
 }
-
-// buildTargetParameterSubscriptions builds parameter subscription map using actual runtime child want names
 func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error {
 	// Read and parse the recipe file
 	recipeData, err := os.ReadFile(target.RecipePath)
@@ -753,11 +675,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 	if err := yaml.Unmarshal(recipeData, &recipeDoc); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-
-	// Initialize subscription map (clear existing to avoid duplicates on reconnection)
 	target.parameterSubscriptions = make(map[string][]string)
-
-	// Find actual runtime children by OwnerReference.UID
 	targetID := target.Metadata.ID
 	runtimeChildren := make(map[string]*Want) // Map: want type -> runtime want
 	for childWantName, childRuntime := range cb.wants {
@@ -771,10 +689,7 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 			}
 		}
 	}
-
-	// Build subscription map using actual runtime child want names
 	for _, recipeWant := range recipeDoc.Recipe.Wants {
-		// Find the actual runtime child by type
 		childType := recipeWant.Metadata.Type
 		runtimeChild, exists := runtimeChildren[childType]
 		if !exists {
@@ -786,7 +701,6 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 
 		// Iterate through child's params to find which parent params it uses
 		for _, childParamValue := range recipeWant.Spec.Params {
-			// Check if this param value references a parent parameter (simple string match)
 			if paramRefStr, ok := childParamValue.(string); ok {
 				// If the value matches a parent parameter name, it's a subscription
 				if _, exists := target.RecipeParams[paramRefStr]; exists {
@@ -799,11 +713,8 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 		}
 	}
 
-
 	return nil
 }
-
-// processAutoConnections handles system-wide auto-connection for RecipeAgent wants
 func (cb *ChainBuilder) processAutoConnections() {
 
 	// Collect all wants with RecipeAgent enabled
@@ -812,15 +723,11 @@ func (cb *ChainBuilder) processAutoConnections() {
 
 	for _, runtimeWant := range cb.wants {
 		allWants = append(allWants, runtimeWant)
-
-		// Check if want has RecipeAgent enabled in its metadata or state
 		want := runtimeWant.want
 		if cb.hasRecipeAgent(want) {
 			autoConnectWants = append(autoConnectWants, runtimeWant)
 		}
 	}
-
-	// Process auto-connections for each RecipeAgent want
 	for _, runtimeWant := range autoConnectWants {
 		want := runtimeWant.want
 		cb.autoConnectWant(want, allWants)
@@ -831,14 +738,11 @@ func (cb *ChainBuilder) processAutoConnections() {
 
 // hasRecipeAgent checks if a want has RecipeAgent functionality enabled
 func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
-	// Check if want has coordinator role (typical for RecipeAgent wants)
 	if want.Metadata.Labels != nil {
 		if role, ok := want.Metadata.Labels["role"]; ok && role == "coordinator" {
 			return true
 		}
 	}
-
-	// Check for specific coordinator types
 	if want.Metadata.Type == "level1_coordinator" || want.Metadata.Type == "level2_coordinator" {
 		return true
 	}
@@ -848,11 +752,7 @@ func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
 
 // autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
 func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
-
-	// Look for approval_id in want's params or labels
 	approvalID := ""
-
-	// Check params first
 	if want.Spec.Params != nil {
 		if approvalVal, ok := want.Spec.Params["approval_id"]; ok {
 			if approvalStr, ok := approvalVal.(string); ok {
@@ -860,8 +760,6 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 			}
 		}
 	}
-
-	// Check labels if not found in params
 	if approvalID == "" && want.Metadata.Labels != nil {
 		if approvalVal, ok := want.Metadata.Labels["approval_id"]; ok {
 			approvalID = approvalVal
@@ -871,16 +769,11 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	if approvalID == "" {
 		return
 	}
-
-
-	// Initialize using selectors if nil
 	if want.Spec.Using == nil {
 		want.Spec.Using = make([]map[string]string, 0)
 	}
 
 	connectionsAdded := 0
-
-	// Find all other wants with the same approval_id for auto-connection
 	for _, otherRuntimeWant := range allWants {
 		otherWant := otherRuntimeWant.want
 
@@ -888,8 +781,6 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 		if otherWant.Metadata.Name == want.Metadata.Name {
 			continue
 		}
-
-		// Check if other want has matching approval_id
 		otherApprovalID := ""
 		if otherWant.Spec.Params != nil {
 			if approvalVal, ok := otherWant.Spec.Params["approval_id"]; ok {
@@ -911,11 +802,8 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 			if otherWant.Metadata.Labels != nil {
 				role := otherWant.Metadata.Labels["role"]
 				if role == "evidence-provider" || role == "description-provider" {
-					// Add unique connection label to source want first
 					connectionKey := cb.generateConnectionKey(want)
 					cb.addConnectionLabel(otherWant, want)
-
-					// Create using selector based on the unique label we just added
 					selector := make(map[string]string)
 					if connectionKey != "" {
 						labelKey := fmt.Sprintf("used_by_%s", connectionKey)
@@ -924,8 +812,6 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 						// Fallback to role-based selector if no unique key generated
 						selector["role"] = role
 					}
-
-					// Check for duplicate connections
 					duplicate := false
 					for _, existingSelector := range want.Spec.Using {
 						if len(existingSelector) == len(selector) {
@@ -957,8 +843,6 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	}
 
 }
-
-// addConnectionLabel adds a unique label to source want indicating which coordinator is using it
 func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want) {
 	if sourceWant.Metadata.Labels == nil {
 		sourceWant.Metadata.Labels = make(map[string]string)
@@ -977,7 +861,6 @@ func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want)
 func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
 	// Try to extract meaningful identifier from labels first
 	if consumerWant.Metadata.Labels != nil {
-		// Check for approval_level, component, or other identifying labels
 		if level, ok := consumerWant.Metadata.Labels["approval_level"]; ok {
 			return fmt.Sprintf("level%s", level)
 		}
@@ -1015,7 +898,6 @@ func (cb *ChainBuilder) startPhase() {
 		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
-				// Check if connectivity requirements are met
 				paths := cb.pathMap[wantName]
 				if w, ok := want.function.(*Want); ok {
 					meta := w.GetConnectivityMetadata()
@@ -1054,12 +936,10 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-
 		// Third pass: start any idle wants that now have required connections available This allows wants with inputs from just-completed upstream wants to execute
 		additionalStarted := 0
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
-				// Check if connectivity requirements are now met
 				paths := cb.pathMap[wantName]
 				meta := want.want.GetConnectivityMetadata()
 				inCount := len(paths.In)
@@ -1078,13 +958,11 @@ func (cb *ChainBuilder) startPhase() {
 
 // shouldRestartCompletedWant checks if a completed want should restart because its upstream wants are running or idle (have new data)
 func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtimeWant) bool {
-	// Check if any upstream wants (using) are running or idle
 	for _, usingSelector := range want.GetSpec().Using {
 		for otherName, otherWant := range cb.wants {
 			if otherName == wantName {
 				continue
 			}
-			// Check if upstream matches selector and is running/idle
 			if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 				status := otherWant.want.GetStatus()
 				if status == WantStatusReaching || status == WantStatusIdle {
@@ -1099,8 +977,6 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 // detectConfigChanges compares configs and returns change events
 func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
 	var changes []ChangeEvent
-
-	// Create maps for easier comparison
 	oldWants := make(map[string]*Want)
 	for _, want := range oldConfig.Wants {
 		oldWants[want.Metadata.Name] = want
@@ -1110,11 +986,8 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	for _, want := range newConfig.Wants {
 		newWants[want.Metadata.Name] = want
 	}
-
-	// Find additions and updates
 	for name, newWant := range newWants {
 		if oldWant, exists := oldWants[name]; exists {
-			// Check if want changed
 			if !cb.wantsEqual(oldWant, newWant) {
 				changes = append(changes, ChangeEvent{
 					Type:     ChangeEventUpdate,
@@ -1132,8 +1005,6 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 			})
 		}
 	}
-
-	// Find deletions
 	for name := range oldWants {
 		if _, exists := newWants[name]; !exists {
 			changes = append(changes, ChangeEvent{
@@ -1307,7 +1178,6 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 
 			// Sync ALL fields from config want to runtime want This is the single synchronization point for config→runtime
 			if runtimeWant, exists := cb.wants[change.WantName]; exists {
-				// Find the updated want in config (UpdateWant replaces it in the array)
 				var updatedConfigWant *Want
 				for _, cfgWant := range cb.config.Wants {
 					if cfgWant.Metadata.ID == change.Want.Metadata.ID {
@@ -1394,24 +1264,18 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 
 // calculateDependencyLevel recursively calculates dependency level for a want
 func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[string]int, visited, inProgress map[string]bool) int {
-	// Check for circular dependency
 	if inProgress[wantName] {
 		return 0 // Break cycles by assigning level 0
 	}
-
-	// Return cached result
 	if visited[wantName] {
 		return levels[wantName]
 	}
 
 	inProgress[wantName] = true
-
-	// Get want config from current runtime or config
 	var wantConfig *Want
 	if want, exists := cb.wants[wantName]; exists {
 		wantConfig = want.want
 	} else {
-		// Look for want in current config
 		found := false
 		for _, configWant := range cb.config.Wants {
 			if configWant.Metadata.Name == wantName {
@@ -1430,10 +1294,7 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 	}
 
 	maxDependencyLevel := 0
-
-	// Find dependencies from using selectors
 	for _, usingSelector := range wantConfig.Spec.Using {
-		// Find wants that match this selector
 		for _, configWant := range cb.config.Wants {
 			if cb.matchesSelector(configWant.Metadata.Labels, usingSelector) {
 				depLevel := cb.calculateDependencyLevel(configWant.Metadata.Name, levels, visited, inProgress)
@@ -1451,14 +1312,9 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 
 	return maxDependencyLevel
 }
-
-// addWant adds a new want to the runtime (private method)
 func (cb *ChainBuilder) addWant(wantConfig *Want) {
-	// Create the function/want
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
-
-		// Create a failed want instead of returning error
 		wantPtr := &Want{
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
@@ -1468,8 +1324,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			},
 			History: wantConfig.History,
 		}
-
-		// Initialize subscription system even for failed wants
 		wantPtr.InitializeSubscriptionSystem()
 
 		runtimeWant := &runtimeWant{
@@ -1495,8 +1349,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	// If no Want was found in the want function, create a new one (This handles want types that don't embed or return a Want)
 	if wantPtr == nil {
-
-		// Initialize State map (simple copy since History is separate)
 		stateMap := make(map[string]interface{})
 		if wantConfig.State != nil {
 			// Copy all state data
@@ -1507,10 +1359,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Copy History field from config
 		historyField := wantConfig.History
-
-		// Initialize parameterHistory with initial parameters if empty
 		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
-			// Create one entry with all initial parameters as object
 			entry := StateHistoryEntry{
 				WantName:   wantConfig.Metadata.Name,
 				StateValue: wantConfig.Spec.Params,
@@ -1544,8 +1393,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Update history
 		wantPtr.History = wantConfig.History
-
-		// Initialize parameterHistory with initial parameters if empty
 		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
 			entry := StateHistoryEntry{
 				WantName:   wantConfig.Metadata.Name,
@@ -1555,8 +1402,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
 		}
 	}
-
-	// Initialize subscription system for the want
 	wantPtr.InitializeSubscriptionSystem()
 
 	runtimeWant := &runtimeWant{
@@ -1568,8 +1413,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Register want for notification system
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
 }
-
-// FindWantByID searches for a want by its metadata.id across all runtime wants
 func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	// First search in runtime wants
 	for wantName, runtimeWant := range cb.wants {
@@ -1590,8 +1433,6 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 
 // UpdateWant updates an existing want's configuration (params, labels, using fields, etc.) Automatically triggers reconciliation to process topology changes Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-
-	// Find the existing want by metadata.id using universal search
 	_, _, exists := cb.FindWantByID(wantConfig.Metadata.ID)
 	if !exists {
 		// Want not found, add as new
@@ -1624,17 +1465,12 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 // deleteWant removes a want from runtime and signals its goroutines to stop
 func (cb *ChainBuilder) deleteWant(wantName string) {
-	// Send stop signal to the want's goroutine
 	if runtimeWant, exists := cb.wants[wantName]; exists {
 		if runtimeWant.want.stopChannel == nil {
 			runtimeWant.want.stopChannel = make(chan struct{})
 		}
-
-		// Close the stop channel to signal all goroutines listening on it This is safe to call multiple times and will wake up all select statements
 		close(runtimeWant.want.stopChannel)
 	}
-
-	// Remove want from registry
 	delete(cb.wants, wantName)
 }
 
@@ -1646,40 +1482,27 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
-	// Check if want is already running or completed to prevent duplicate starts
 	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusAchieved {
 		return
 	}
-
-	// Check if this want's connectivity requirements are satisfied If not, skip execution - the reconcile loop will retry once connections are available
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		// Set to Idle state so the Third pass in reconcile can retry this want
 		want.want.SetStatus(WantStatusIdle)
 		return
 	}
-
-	// Get paths for this want - they should already be built by the Reconcile loop For wants with no 'using' selectors (entry points), paths will be empty which is fine
 	paths, pathsExist := cb.pathMap[wantName]
-
-	// Check if this want has any using selectors (dependencies on other wants)
 	hasUsingSelectors := len(want.want.Spec.Using) > 0
 
 	// Only require paths if the want has 'using' selectors Entry point wants (like Target) don't need paths
 	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
 		return
 	}
-
-	// Check if connectivity requirements are satisfied before executing If not satisfied, trigger reconciliation to re-attempt path generation
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		// Set to Idle state so the Third pass in reconcile can retry this want
 		want.want.SetStatus(WantStatusIdle)
 		// Trigger reconciliation to retry path generation and connection
 		if err := cb.TriggerReconcile(); err != nil {
 		}
 		return
 	}
-
-	// Initialize pathMap entry if it doesn't exist yet (for entry point wants)
 	if !pathsExist {
 		cb.pathMap[wantName] = Paths{In: []PathInfo{}, Out: []PathInfo{}}
 		paths = cb.pathMap[wantName]
@@ -1703,13 +1526,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Start want execution with direct Exec() calls
 	if executable, ok := want.function.(Executable); ok {
 		want.want.SetStatus(WantStatusReaching)
-
-		// Initialize stop channel if not already initialized
 		if want.want.stopChannel == nil {
 			want.want.stopChannel = make(chan struct{})
 		}
-
-		// Initialize control channel for suspend/resume/stop/restart operations
 		want.want.InitializeControlChannel()
 
 		cb.waitGroup.Add(1)
@@ -1722,7 +1541,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			}()
 
 			for {
-				// Check if stop signal was sent (non-blocking check)
 				select {
 				case <-want.want.stopChannel:
 					// Stop signal received - exit gracefully
@@ -1731,12 +1549,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				default:
 					// Continue execution
 				}
-
-				// Check for control signals (suspend/resume/stop/restart)
 				if cmd, received := want.want.CheckControlSignal(); received {
 					switch cmd.Trigger {
 					case ControlTriggerSuspend:
-						// Mark as suspended and change status to suspended
 						want.want.SetSuspended(true)
 						want.want.SetStatus(WantStatusSuspended)
 						// Continue to next iteration (execution will be skipped while suspended)
@@ -1773,12 +1588,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 					want.want.SetStatus(WantStatusTerminated)
 					return
 				}
-
-				// Set the resolved paths with actual channels before execution using proper setter
 				runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
 				runtimeWant.want.BeginExecCycle()
-
-				// Check again before executing (want might have been deleted while we were setting up)
 				select {
 				case <-want.want.stopChannel:
 					// Stop signal received before execution - abort
@@ -1826,8 +1637,6 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	if cb.memoryPath == "" {
 		return
 	}
-
-	// Create a comprehensive config that includes ALL wants (both config and runtime)
 	updatedConfig := Config{
 		Wants: make([]*Want, 0),
 	}
@@ -1900,18 +1709,12 @@ func (cb *ChainBuilder) Execute() {
 
 // ExecuteWithMode starts execution with specified mode serverMode=true: runs indefinitely for server mode serverMode=false: waits for wants to complete (batch mode)
 func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
-
-	// Initialize memory file if configured
 	if cb.memoryPath != "" {
 		if err := cb.copyConfigToMemory(); err == nil {
 			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 		}
 	}
-
-	// Initialize empty lastConfig so reconcileLoop can detect initial load
 	cb.lastConfig = Config{Wants: []*Want{}}
-
-	// Mark as running
 	cb.reconcileMutex.Lock()
 	cb.running = true
 	cb.reconcileMutex.Unlock()
@@ -1961,8 +1764,6 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Stop suspension control loop
 	cb.controlStop <- true
-
-	// Mark as not running
 	cb.reconcileMutex.Lock()
 	cb.running = false
 	cb.reconcileMutex.Unlock()
@@ -1970,8 +1771,6 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	// Final memory dump - ensure it completes before returning (silent - routine operation)
 	cb.dumpWantMemoryToYAML()
 }
-
-// GetAllWantStates returns the states of all wants
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	states := make(map[string]*Want)
 	for name, want := range cb.wants {
@@ -1979,8 +1778,6 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	}
 	return states
 }
-
-// AddWantsAsync sends wants to be added asynchronously through the reconcile loop This is the preferred method for adding wants from within executing Target wants to avoid deadlock since the caller may already hold locks
 func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
 	select {
 	case cb.addWantsChan <- wants:
@@ -1989,8 +1786,6 @@ func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
 		return fmt.Errorf("failed to send wants to reconcile loop (channel full)")
 	}
 }
-
-// AddWantsAsyncWithTracking sends wants asynchronously and returns their IDs for tracking The caller can use the returned IDs to poll with AreWantsAdded() to confirm addition
 func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, error) {
 	// Extract IDs from wants
 	ids := make([]string, len(wants))
@@ -2000,8 +1795,6 @@ func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, erro
 		}
 		ids[i] = want.Metadata.ID
 	}
-
-	// Send wants asynchronously
 	if err := cb.AddWantsAsync(wants); err != nil {
 		return nil, err
 	}
@@ -2017,8 +1810,6 @@ func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
 
 	cb.reconcileMutex.RLock()
 	defer cb.reconcileMutex.RUnlock()
-
-	// Check if all wants are in the runtime
 	for _, id := range wantIDs {
 		found := false
 		for _, rw := range cb.wants {
@@ -2061,8 +1852,6 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 
 	cb.reconcileMutex.RLock()
 	defer cb.reconcileMutex.RUnlock()
-
-	// Check if all wants are deleted (not in runtime)
 	for _, id := range wantIDs {
 		for _, rw := range cb.wants {
 			if rw.want.Metadata.ID == id {
@@ -2075,18 +1864,11 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 	// All wants are gone
 	return true
 }
-
-// addDynamicWantUnsafe adds a want without acquiring the mutex (internal use only) Must be called while holding reconcileMutex or within addWantsChan handler
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
-	// Check for duplicate name and skip if exists
 	if _, exists := cb.wants[want.Metadata.Name]; exists {
 		return nil
 	}
-
-	// Add want to the configuration
 	cb.config.Wants = append(cb.config.Wants, want)
-
-	// Create runtime want
 	cb.addWant(want)
 
 	// Trigger reconciliation to process the new want
@@ -2120,14 +1902,10 @@ func loadConfigFromYAML(filename string) (Config, error) {
 	if err != nil {
 		return config, fmt.Errorf("failed to read YAML file: %w", err)
 	}
-
-	// Validate against OpenAPI spec before parsing
 	err = validateConfigWithSpec(data)
 	if err != nil {
 		return config, fmt.Errorf("config validation failed: %w", err)
 	}
-
-	// Parse the validated YAML
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
@@ -2161,14 +1939,10 @@ func assignWantIDs(config *Config) {
 // loadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation
 func loadConfigFromYAMLBytes(data []byte) (Config, error) {
 	var config Config
-
-	// Validate against OpenAPI spec before parsing
 	err := validateConfigWithSpec(data)
 	if err != nil {
 		return config, fmt.Errorf("config validation failed: %w", err)
 	}
-
-	// Parse the validated YAML
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
@@ -2179,8 +1953,6 @@ func loadConfigFromYAMLBytes(data []byte) (Config, error) {
 
 	return config, nil
 }
-
-// validateConfigWithSpec validates YAML config data against the OpenAPI spec
 func validateConfigWithSpec(yamlData []byte) error {
 	// Load the OpenAPI spec - try multiple paths to handle different working directories
 	loader := openapi3.NewLoader()
@@ -2204,15 +1976,11 @@ func validateConfigWithSpec(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to load OpenAPI spec from any of the tried paths %v: %w", specPaths, err)
 	}
-
-	// Validate the spec itself
 	ctx := context.Background()
 	err = spec.Validate(ctx)
 	if err != nil {
 		return fmt.Errorf("OpenAPI spec is invalid: %w", err)
 	}
-
-	// Convert YAML to JSON for validation
 	var yamlObj interface{}
 	err = yaml.Unmarshal(yamlData, &yamlObj)
 	if err != nil {
@@ -2220,8 +1988,6 @@ func validateConfigWithSpec(yamlData []byte) error {
 	}
 
 	// jsonData conversion removed - not needed for basic validation
-
-	// Get the Config schema from the OpenAPI spec and convert to JSON Schema
 	configSchemaRef := spec.Components.Schemas["Config"]
 	if configSchemaRef == nil {
 		return fmt.Errorf("Config schema not found in OpenAPI spec")
@@ -2235,8 +2001,6 @@ func validateConfigWithSpec(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("invalid YAML structure: %w", err)
 	}
-
-	// Check if it has either 'wants' array or 'recipe' reference (matching our Config schema)
 	hasWants := false
 	hasRecipe := false
 
@@ -2274,8 +2038,6 @@ func validateConfigWithSpec(yamlData []byte) error {
 
 	return nil
 }
-
-// validateWantsStructure validates the basic structure of wants array
 func validateWantsStructure(wants interface{}) error {
 	wantsArray, ok := wants.([]interface{})
 	if !ok {
@@ -2287,8 +2049,6 @@ func validateWantsStructure(wants interface{}) error {
 		if !ok {
 			return fmt.Errorf("want at index %d must be an object", i)
 		}
-
-		// Check required metadata field
 		metadata, ok := wantObj["metadata"]
 		if !ok {
 			return fmt.Errorf("want at index %d missing required 'metadata' field", i)
@@ -2298,8 +2058,6 @@ func validateWantsStructure(wants interface{}) error {
 		if !ok {
 			return fmt.Errorf("want at index %d 'metadata' must be an object", i)
 		}
-
-		// Check required metadata.name and metadata.type
 		if name, ok := metadataObj["name"]; !ok || name == "" {
 			return fmt.Errorf("want at index %d missing required 'metadata.name' field", i)
 		}
@@ -2307,8 +2065,6 @@ func validateWantsStructure(wants interface{}) error {
 		if wantType, ok := metadataObj["type"]; !ok || wantType == "" {
 			return fmt.Errorf("want at index %d missing required 'metadata.type' field", i)
 		}
-
-		// Check required spec field
 		spec, ok := wantObj["spec"]
 		if !ok {
 			return fmt.Errorf("want at index %d missing required 'spec' field", i)
@@ -2318,8 +2074,6 @@ func validateWantsStructure(wants interface{}) error {
 		if !ok {
 			return fmt.Errorf("want at index %d 'spec' must be an object", i)
 		}
-
-		// Check required spec.params field
 		if params, ok := specObj["params"]; !ok {
 			return fmt.Errorf("want at index %d missing required 'spec.params' field", i)
 		} else {
@@ -2341,7 +2095,6 @@ type WantMemoryDump struct {
 
 // dumpWantMemoryToYAML dumps all want information to a timestamped YAML file in memory directory
 func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
-	// Create timestamp-based filename
 	timestamp := time.Now().Format("20060102-150405")
 
 	// Use memory directory if available
@@ -2479,8 +2232,6 @@ func (cb *ChainBuilder) RestartWant(wantID string) error {
 	}
 	return cb.SendControlCommand(cmd)
 }
-
-// SendControlCommand sends a control command to the reconcile loop for distribution
 func (cb *ChainBuilder) SendControlCommand(cmd *ControlCommand) error {
 	select {
 	case cb.reconcileTrigger <- &TriggerCommand{
@@ -2546,8 +2297,6 @@ func (cb *ChainBuilder) IsSuspended() bool {
 func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	cb.reconcileMutex.RLock()
 	defer cb.reconcileMutex.RUnlock()
-
-	// Find the target want by metadata.id (WantID is the metadata ID) We need to search through all wants since cb.wants uses wantName as key
 	var targetRuntime *runtimeWant
 	for _, runtime := range cb.wants {
 		if runtime.want.Metadata.ID == cmd.WantID {
@@ -2559,8 +2308,6 @@ func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	if targetRuntime == nil {
 		return
 	}
-
-	// Send control command to the target want's control channel
 	if err := targetRuntime.want.SendControlCommand(cmd); err != nil {
 	} else {
 	}
@@ -2727,16 +2474,12 @@ func (cb *ChainBuilder) selectorToKey(selector map[string]string) string {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-
-	// Build key string
 	var parts []string
 	for _, k := range keys {
 		parts = append(parts, fmt.Sprintf("%s:%s", k, selector[k]))
 	}
 	return strings.Join(parts, ",")
 }
-
-// buildLabelToUsersMapping constructs mapping from label selectors to want names This enables O(1) lookup of which wants depend on a given want Called after path generation to pre-compute dependencies
 func (cb *ChainBuilder) buildLabelToUsersMapping() {
 	cb.labelToUsers = make(map[string][]string)
 
@@ -2788,8 +2531,6 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		// InfoLog("[RETRIGGER-RECEIVER] Receiver want '%s' is not achieved (status: %s), skipping retrigger\n", wantName, want.GetStatus())
 	}
 }
-
-// checkAndRetriggerCompletedWants checks for completed wants and notifies their dependents Called from reconcileLoop when a completed want retrigger check trigger is received This is the core async mechanism for retrigger detection
 func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 
 	// Take snapshot of completed flags to avoid holding lock during notification
@@ -2807,8 +2548,6 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 		wantSnapshot[name] = rw
 	}
 	cb.reconcileMutex.RUnlock()
-
-	// Process each completed want (using want ID)
 	anyWantRetriggered := false
 	for wantID, isCompleted := range completedSnapshot {
 
@@ -2841,10 +2580,7 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 		}
 	}
 }
-
-// findUsersOfCompletedWant finds all wants that depend on a given completed want Takes want ID as parameter and uses it to look up the want in cb.wants by name Uses the pre-computed labelToUsers mapping for O(1) lookup Returns slice of want names that use the completed want's labels
 func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []string {
-	// Find the completed want by iterating through wants to find one with matching ID
 	var runtimeWant *runtimeWant
 	for _, rw := range cb.wants {
 		if rw.want.Metadata.ID == completedWantID {
@@ -2878,8 +2614,6 @@ func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []strin
 			}
 		}
 	}
-
-	// Convert to slice
 	userList := make([]string, 0, len(users))
 	for userName := range users {
 		userList = append(userList, userName)
@@ -2927,13 +2661,9 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 		InfoLog("[RETRIGGER:SEND] Warning: reconcileTrigger channel full, skipping trigger\n")
 	}
 }
-
-// SetGlobalChainBuilder sets the global ChainBuilder instance Called from server initialization to make ChainBuilder accessible to wants
 func SetGlobalChainBuilder(cb *ChainBuilder) {
 	globalChainBuilder = cb
 }
-
-// GetGlobalChainBuilder returns the global ChainBuilder instance Returns nil if not yet initialized
 func GetGlobalChainBuilder() *ChainBuilder {
 	return globalChainBuilder
 }

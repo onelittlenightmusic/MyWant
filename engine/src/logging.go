@@ -8,8 +8,6 @@ import (
 func InfoLog(format string, v ...interface{}) {
 	log.Printf(format, v...)
 }
-
-// ErrorLog logs error messages with timestamps
 func ErrorLog(format string, v ...interface{}) {
 	log.Printf("[ERROR] "+format, v...)
 }

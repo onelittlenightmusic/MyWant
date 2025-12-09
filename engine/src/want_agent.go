@@ -7,29 +7,21 @@ import (
 )
 
 // Agent execution methods for Want
-
-// SetAgentRegistry sets the agent registry for this want
 func (n *Want) SetAgentRegistry(registry *AgentRegistry) {
 	n.agentRegistry = registry
 	if n.runningAgents == nil {
 		n.runningAgents = make(map[string]context.CancelFunc)
 	}
 }
-
-// GetAgentRegistry returns the agent registry for this want
 func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
-
-// SetAgentActivity sets the activity description for an agent execution This should be called by agents to describe what action was performed
 // Example: "Flight reservation has been created" or "Hotel booking confirmed" Will find the last execution record for this agent and set the activity
 // regardless of current status (running, completed, or failed)
 func (n *Want) SetAgentActivity(agentName string, activity string) {
 	if n.History.AgentHistory == nil {
 		return
 	}
-
-	// Find the last execution record for this agent and set the activity Search from the end to find the most recent execution
 	for i := len(n.History.AgentHistory) - 1; i >= 0; i-- {
 		if n.History.AgentHistory[i].AgentName == agentName {
 			n.History.AgentHistory[i].Activity = activity
@@ -77,31 +69,21 @@ func (n *Want) ExecuteAgents() error {
 // executeAgent executes a single agent in a goroutine
 func (n *Want) executeAgent(agent Agent) error {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Store cancel function for later cleanup
 	n.runningAgents[agent.GetName()] = cancel
-
-	// Initialize agent tracking fields if needed
 	if n.RunningAgents == nil {
 		n.RunningAgents = make([]string, 0)
 	}
 	if n.History.AgentHistory == nil {
 		n.History.AgentHistory = make([]AgentExecution, 0)
 	}
-
-	// Add to running agents list
 	n.RunningAgents = append(n.RunningAgents, agent.GetName())
 	n.CurrentAgent = agent.GetName()
-
-	// Store agent information in state for history tracking (batched to reduce history bloat)
 	{
 		n.BeginExecCycle()
 		n.StoreState("current_agent", agent.GetName())
 		n.StoreState("running_agents", n.RunningAgents)
 		n.EndExecCycle()
 	}
-
-	// Create agent execution record
 	agentExec := AgentExecution{
 		AgentName: agent.GetName(),
 		AgentType: string(agent.GetType()),
@@ -121,8 +103,6 @@ func (n *Want) executeAgent(agent Agent) error {
 					break
 				}
 			}
-
-			// Remove from running agents list
 			for i, runningAgent := range n.RunningAgents {
 				if runningAgent == agent.GetName() {
 					n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
@@ -134,11 +114,8 @@ func (n *Want) executeAgent(agent Agent) error {
 			if len(n.RunningAgents) == 0 {
 				n.CurrentAgent = ""
 			} else {
-				// Set to the last running agent
 				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 			}
-
-			// Update state with current agent and running agents info (batched)
 			{
 				n.BeginExecCycle()
 				n.StoreState("current_agent", n.CurrentAgent)
@@ -158,7 +135,6 @@ func (n *Want) executeAgent(agent Agent) error {
 				}
 				// AgentHistory is now managed separately from state
 			}
-			// Remove from running agents when done
 			delete(n.runningAgents, agent.GetName())
 		}()
 
@@ -178,7 +154,6 @@ func (n *Want) executeAgent(agent Agent) error {
 			}
 			// AgentHistory is now managed separately from state
 		} else {
-			// Mark as completed
 			for i := range n.History.AgentHistory {
 				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
 					n.History.AgentHistory[i].Status = "achieved"
@@ -251,8 +226,6 @@ func (n *Want) StopAgent(agentName string) {
 				break
 			}
 		}
-
-		// Remove from running agents list
 		for i, runningAgent := range n.RunningAgents {
 			if runningAgent == agentName {
 				n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
@@ -280,8 +253,6 @@ func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) e
 	if n.agentStateChanges == nil {
 		n.agentStateChanges = make(map[string]interface{})
 	}
-
-	// Handle object case: StageStateChange(map[string]interface{}{...})
 	if len(value) == 0 {
 		if stateObject, ok := keyOrObject.(map[string]interface{}); ok {
 			for k, v := range stateObject {
@@ -292,8 +263,6 @@ func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) e
 		// Invalid usage - no value provided and not a map
 		return fmt.Errorf("StageStateChange: when called with single argument, it must be map[string]interface{}")
 	}
-
-	// Handle single key-value case: StageStateChange("key", "value")
 	if len(value) == 1 {
 		if key, ok := keyOrObject.(string); ok {
 			n.agentStateChanges[key] = value[0]
@@ -315,8 +284,6 @@ func (n *Want) CommitStateChanges() {
 		n.agentStateMutex.Unlock()
 		return
 	}
-
-	// Create a copy of staged changes to apply
 	changesCopy := make(map[string]interface{})
 	for k, v := range n.agentStateChanges {
 		changesCopy[k] = v
@@ -347,8 +314,6 @@ func (n *Want) CommitStateChanges() {
 	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
 		changeCount, n.Metadata.Name)
 }
-
-// GetStagedChanges returns a copy of currently staged changes (for debugging)
 func (n *Want) GetStagedChanges() map[string]interface{} {
 	n.agentStateMutex.RLock()
 	defer n.agentStateMutex.Unlock()
@@ -363,8 +328,6 @@ func (n *Want) GetStagedChanges() map[string]interface{} {
 	}
 	return staged
 }
-
-// GetAgentHistoryByName returns all agent executions for a specific agent name
 func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
 	if n.History.AgentHistory == nil {
 		return []AgentExecution{}
@@ -378,8 +341,6 @@ func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
 	}
 	return result
 }
-
-// GetAgentHistoryByType returns all agent executions for a specific agent type
 func (n *Want) GetAgentHistoryByType(agentType string) []AgentExecution {
 	if n.History.AgentHistory == nil {
 		return []AgentExecution{}
@@ -393,8 +354,6 @@ func (n *Want) GetAgentHistoryByType(agentType string) []AgentExecution {
 	}
 	return result
 }
-
-// GetAgentHistoryGroupedByName returns agent history grouped by agent name
 func (n *Want) GetAgentHistoryGroupedByName() map[string][]AgentExecution {
 	if n.History.AgentHistory == nil {
 		return make(map[string][]AgentExecution)
@@ -406,8 +365,6 @@ func (n *Want) GetAgentHistoryGroupedByName() map[string][]AgentExecution {
 	}
 	return grouped
 }
-
-// GetAgentHistoryGroupedByType returns agent history grouped by agent type
 func (n *Want) GetAgentHistoryGroupedByType() map[string][]AgentExecution {
 	if n.History.AgentHistory == nil {
 		return make(map[string][]AgentExecution)

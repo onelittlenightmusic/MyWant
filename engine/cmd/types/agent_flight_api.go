@@ -32,8 +32,6 @@ type FlightReservation struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
-
-// CreateFlightRequest represents the request to create a flight
 type CreateFlightRequest struct {
 	FlightNumber  string    `json:"flight_number"`
 	From          string    `json:"from"`
@@ -59,7 +57,6 @@ func NewAgentFlightAPI(name string, capabilities []string, uses []string, server
 
 // Exec implements the Agent interface and handles both create_flight and cancel_flight actions Reads the "flight_action" state to determine which action to perform This satisfies the agent framework's requirement for Exec() method
 func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
-	// Check if there's a specific action to perform
 	actionVal, exists := want.GetState("flight_action")
 	if exists && actionVal != nil {
 		action, ok := actionVal.(string)
@@ -88,18 +85,11 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Default to create_flight if no action specified
 	return a.CreateFlight(ctx, want)
 }
-
-// CreateFlight implements the create_flight capability Creates a flight reservation via POST /api/flights to the mock server Flight status lifecycle: 1. "in process" - while registration is in progress
 // 2. "created" - after successful API response 3. "confirmed" - when monitor api checks the status Supports two date parameter formats: 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
 // 2. departure_time: RFC3339 format - used directly When rebooking (previous_flight_id exists), generates new flight number and adjusted departure time
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
-	// Get flight parameters from want params
 	params := want.Spec.Params
-
-	// Set initial status to "in process" before starting registration
 	want.StoreState("flight_status", "in process")
-
-	// Check if this is a rebooking (previous_flight_id exists)
 	prevFlightID, hasPrevFlight := want.GetState("previous_flight_id")
 	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
 
@@ -126,19 +116,14 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	if to == "" {
 		to = "Los Angeles"
 	}
-
-	// Parse departure and arrival times First try to get departure_date parameter (YYYY-MM-DD format)
 	departureDate, _ := params["departure_date"].(string)
 	var departureTime time.Time
 	var arrivalTime time.Time
 
 	if departureDate != "" {
-		// Parse departure_date as YYYY-MM-DD and set to 8:00 AM on that date
 		parsedDate, err := time.Parse("2006-01-02", departureDate)
 		if err == nil {
-			// Set departure time to 8:00 AM on the given date
 			departureTime = parsedDate.Add(8 * time.Hour)
-			// Set arrival time to 3.5 hours after departure
 			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
 
 			// For rebooking, schedule next available flight (add 2-4 hours to departure)
@@ -180,8 +165,6 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 				departureTime.Format(time.RFC3339)))
 		}
 	}
-
-	// Create flight request
 	request := CreateFlightRequest{
 		FlightNumber:  flightNumber,
 		From:          from,
@@ -203,20 +186,14 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to create flight: %v", err)
 	}
 	defer resp.Body.Close()
-
-	// Check response status
 	if resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to create flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-
-	// Parse response
 	var reservation FlightReservation
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	// Store reservation in want state NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go Individual agents should NOT call BeginExecCycle/EndExecCycle
 	want.StoreStateMulti(map[string]interface{}{
 		"flight_id":      reservation.ID,
 		"flight_status":  "created",
@@ -250,7 +227,6 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 
 // CancelFlight implements the cancel_flight capability Cancels a flight reservation via DELETE /api/flights/{id} to the mock server
 func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
-	// Get flight ID from state
 	flightID, exists := want.GetState("flight_id")
 	if !exists {
 		return fmt.Errorf("no flight_id found in state")
@@ -260,8 +236,6 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	if !ok {
 		return fmt.Errorf("flight_id is not a string")
 	}
-
-	// Create DELETE request
 	url := fmt.Sprintf("%s/api/flights/%s", a.ServerURL, flightIDStr)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
@@ -275,14 +249,10 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to cancel flight: %v", err)
 	}
 	defer resp.Body.Close()
-
-	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-
-	// Update state NOTE: Exec cycle wrapping is handled by the agent execution framework IMPORTANT: Do NOT clear agent_result here - it's needed for rebooking phase to detect that a new agent execution is required. Only clear after rebooking is complete.
 	want.StoreStateMulti(map[string]interface{}{
 		"flight_status":          "canceled",
 		"status_message":         "Flight canceled by agent",

@@ -124,7 +124,6 @@ func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	migratedCount := 0
 	for _, runtimeWant := range cb.wants {
 		if runtimeWant.want != nil {
-			// Check if migration is needed before running it
 			if runtimeWant.want.State != nil {
 				if _, exists := runtimeWant.want.State["agent_history"]; exists {
 					runtimeWant.want.migrateAgentHistoryFromState()
@@ -157,18 +156,12 @@ type Paths struct {
 	In  []PathInfo
 	Out []PathInfo
 }
-
-// GetInCount returns the total number of input paths
 func (p *Paths) GetInCount() int {
 	return len(p.In)
 }
-
-// GetOutCount returns the total number of output paths
 func (p *Paths) GetOutCount() int {
 	return len(p.Out)
 }
-
-// GetActiveInCount returns the number of active input paths
 func (p *Paths) GetActiveInCount() int {
 	count := 0
 	for _, path := range p.In {
@@ -178,8 +171,6 @@ func (p *Paths) GetActiveInCount() int {
 	}
 	return count
 }
-
-// GetActiveOutCount returns the number of active output paths
 func (p *Paths) GetActiveOutCount() int {
 	count := 0
 	for _, path := range p.Out {
@@ -199,6 +190,5 @@ type ConnectivityMetadata struct {
 	WantType        string
 	Description     string
 }
-
 
 // ChangeEventType represents the type of change detected

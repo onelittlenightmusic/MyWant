@@ -69,8 +69,6 @@ func TestWantExecCycle(t *testing.T) {
 
 	// Test exec cycle batching
 	want.BeginExecCycle()
-
-	// Store multiple state changes during exec cycle
 	want.StoreState("key1", "value1")
 	want.StoreState("key2", "value2")
 

@@ -84,8 +84,6 @@ func TestChannelBuffering(t *testing.T) {
 
 func TestChannelClosure(t *testing.T) {
 	ch := make(Chan, 1)
-
-	// Send data and close
 	ch <- map[string]interface{}{"key": "test", "value": "data"}
 	close(ch)
 

@@ -30,8 +30,6 @@ func NewAgentRestaurant(name string, capabilities []string, uses []string, premi
 func (a *AgentRestaurant) Exec(ctx context.Context, want *Want) error {
 	// Generate restaurant reservation schedule
 	schedule := a.generateRestaurantSchedule(want)
-
-	// Store the result using StoreState method
 	want.StoreState("agent_result", schedule)
 
 	// Record activity description for agent history
@@ -68,8 +66,6 @@ func (a *AgentRestaurant) generateRestaurantSchedule(want *Want) RestaurantSched
 	partySize := want.GetIntParam("party_size", 2)
 	reservationReference := a.generateReservationReference()
 	formattedReservationName := fmt.Sprintf("%s - Party of %d (%s)", restaurantName, partySize, reservationReference)
-
-	// Create and return structured restaurant schedule
 	return RestaurantSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,

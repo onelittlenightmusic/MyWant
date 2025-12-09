@@ -14,8 +14,6 @@ func main() {
 	fmt.Println("- Recipe defines: fibonacci_generator, fibonacci_filter wants")
 	fmt.Println("- Filter collects fibonacci results without sink")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-fibonacci-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -33,8 +31,6 @@ func main() {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register fibonacci want types
@@ -42,8 +38,6 @@ func main() {
 
 	fmt.Println("🏁 Executing recipe-based fibonacci sequence...")
 	builder.Execute()
-
-	// Get final state from all wants
 	states := builder.GetAllWantStates()
 
 	fmt.Println("\n📊 Final Fibonacci Sequence Results:")

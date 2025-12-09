@@ -18,8 +18,6 @@ type QueuePacket struct {
 func (p *QueuePacket) IsEnded() bool {
 	return p.Num < 0 || p.BasePacket.IsEnded()
 }
-
-// GetData returns the packet's queue-specific data
 func (p *QueuePacket) GetData() interface{} {
 	return struct {
 		Num  int
@@ -31,8 +29,6 @@ func (p *QueuePacket) GetData() interface{} {
 func ExpRand64() float64 {
 	// Generate uniform random number in (0,1) avoiding exactly 0 and 1
 	u := rand.Float64()
-
-	// Handle edge cases for better numerical stability
 	if u == 0.0 {
 		u = math.SmallestNonzeroFloat64
 	} else if u == 1.0 {
@@ -64,8 +60,6 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		batchUpdateInterval: 100, // Default: update state every 100 packets
 		cycleCount:          0,
 	}
-
-	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
 	gen.Rate = gen.GetFloatParam("rate", 1.0)
@@ -73,8 +67,6 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 
 	// Allow configurable batch update interval
 	gen.batchUpdateInterval = gen.GetIntParam("batch_interval", 100)
-
-	// Set fields for base Want methods
 	gen.WantType = "sequence"
 	gen.ConnectivityMetadata = mywant.ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -90,21 +82,15 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 
 // Exec executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Exec() bool {
-	// Read parameters fresh each cycle - this enables dynamic param changes!
 	useDeterministic := g.GetBoolParam("deterministic", false)
-
-	// Read count and rate parameters fresh each cycle
 	paramCount := g.GetIntParam("count", g.Count)
 
 	paramRate := g.GetFloatParam("rate", g.Rate)
-
-	// Initialize state map if not present
 	if g.State == nil {
 		g.State = make(map[string]interface{})
 	}
 
 	if g.currentCount >= paramCount {
-		// Store generation stats to state (for memory dump)
 		g.StoreStateMulti(map[string]interface{}{
 			"total_processed":      g.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
@@ -126,8 +112,6 @@ func (g *Numbers) Exec() bool {
 		// Exponential inter-arrival time (rate = 1/mean_interval) ExpRand64() returns Exp(1), so divide by rate to get correct mean interval
 		g.currentTime += ExpRand64() / paramRate
 	}
-
-	// Increment cycle counter for batching history entries
 	g.cycleCount++
 
 	// Batch mechanism: only update state history every N packets to reduce history entries
@@ -179,16 +163,12 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		batchUpdateInterval: 100, // Default: update state every 100 packets
 		lastBatchCount:      0,
 	}
-
-	// Initialize base Want fields
 	queue.Init(metadata, spec)
 
 	queue.ServiceTime = queue.GetFloatParam("service_time", 1.0)
 
 	// Allow configurable batch update interval
 	queue.batchUpdateInterval = queue.GetIntParam("batch_interval", 100)
-
-	// Set fields for base Want methods
 	queue.WantType = "queue"
 	queue.ConnectivityMetadata = mywant.ConnectivityMetadata{
 		RequiredInputs:  1,
@@ -217,8 +197,6 @@ func (q *Queue) Exec() bool {
 	}
 
 	packet := i.(QueuePacket)
-
-	// Check for termination packet and forward it
 	if packet.IsEnded() {
 		// Always flush batch and store final state when terminating
 		q.flushBatch()
@@ -231,13 +209,9 @@ func (q *Queue) Exec() bool {
 		q.SendPacketMulti(packet)
 		return true
 	}
-
-	// Process the packet...
 	arrivalTime := packet.Time
 	startServiceTime := math.Max(arrivalTime, q.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
-
-	// Read service time from parameters (can change dynamically!)
 	serviceTime := q.GetFloatParam("service_time", q.ServiceTime)
 
 	finishTime := startServiceTime + serviceTime
@@ -245,13 +219,10 @@ func (q *Queue) Exec() bool {
 
 	q.waitTimeSum += waitTime
 	q.processedCount++
-
-	// Increment cycle counter for batching history entries
 	q.cycleCount++
 
 	// Batch mechanism: only update statistics every N packets
 	if q.processedCount%q.batchUpdateInterval == 0 {
-		// Store packet-specific info only at batch intervals to reduce history entries
 		q.StoreState("last_packet_wait_time", waitTime)
 		q.flushBatch()
 		q.lastBatchCount = q.processedCount
@@ -288,8 +259,6 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 	if q.processedCount > 0 {
 		avgWaitTime = q.waitTimeSum / float64(q.processedCount)
 	}
-
-	// Store final state
 	q.StoreStateMulti(map[string]interface{}{
 		"average_wait_time":        avgWaitTime,
 		"total_processed":          q.processedCount,
@@ -328,13 +297,9 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Want:      mywant.Want{},
 		Operation: "merge",
 	}
-
-	// Initialize base Want fields
 	combiner.Init(metadata, spec)
 
 	combiner.Operation = combiner.GetStringParam("operation", "merge")
-
-	// Set fields for base Want methods
 	combiner.WantType = "combiner"
 	combiner.ConnectivityMetadata = mywant.ConnectivityMetadata{
 		RequiredInputs:  2,
@@ -350,15 +315,10 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 
 // Exec executes the combiner directly
 func (c *Combiner) Exec() bool {
-	// Initialize state if needed
 	if c.State == nil {
 		c.State = make(map[string]interface{})
 	}
-
-	// Get persistent state
 	processed, _ := c.State["processed"].(int)
-
-	// Validate channels are available
 	if c.paths.GetInCount() == 0 || c.paths.GetOutCount() == 0 {
 		return true
 	}
@@ -371,8 +331,6 @@ func (c *Combiner) Exec() bool {
 				continue
 			}
 			qp := packet.(QueuePacket)
-
-			// Check for termination packet and forward it
 			if qp.IsEnded() {
 				// Trigger OnEnded callback
 				if err := c.OnEnded(&qp); err != nil {
@@ -398,8 +356,6 @@ func (c *Combiner) Exec() bool {
 func (c *Combiner) OnEnded(packet mywant.Packet) error {
 	// Extract combiner-specific statistics from state
 	processed, _ := c.State["processed"].(int)
-
-	// Store final state
 	c.StoreStateMulti(map[string]interface{}{
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time
@@ -422,11 +378,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		Want:     mywant.Want{},
 		Received: 0,
 	}
-
-	// Initialize base Want fields
 	sink.Init(metadata, spec)
-
-	// Set fields for base Want methods
 	sink.WantType = "sink"
 	sink.ConnectivityMetadata = mywant.ConnectivityMetadata{
 		RequiredInputs:  1,
@@ -442,7 +394,6 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 
 // Exec executes the sink directly
 func (s *Sink) Exec() bool {
-	// Check if already completed using persistent state
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {
 		return true
@@ -457,10 +408,7 @@ func (s *Sink) Exec() bool {
 		}
 
 		packet := i.(QueuePacket)
-
-		// Check for termination packet
 		if packet.IsEnded() {
-			// Mark as completed in persistent state
 			s.StoreState("completed", true)
 			// Trigger OnEnded callback
 			if err := s.OnEnded(&packet); err != nil {
@@ -475,7 +423,6 @@ func (s *Sink) Exec() bool {
 
 // OnEnded implements PacketHandler interface for Sink termination callbacks
 func (s *Sink) OnEnded(packet mywant.Packet) error {
-	// Store final state
 	s.StoreStateMulti(map[string]interface{}{
 		"total_processed":      s.Received,
 		"average_wait_time":    0.0, // Sinks don't add wait time

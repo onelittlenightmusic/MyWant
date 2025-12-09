@@ -32,15 +32,11 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 		// window expires, if no issues are detected, the FlightWant completes and notifies the parent Target want, allowing the entire travel plan to complete.
 		monitoringDuration: 30 * time.Second,
 	}
-
-	// Initialize base Want fields
 	flight.Init(metadata, spec)
 
 	flight.FlightType = flight.GetStringParam("flight_type", "economy")
 	flight.Duration = time.Duration(flight.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
 	flight.DepartureDate = flight.GetStringParam("departure_date", "2024-01-01")
-
-	// Set fields for base Want methods
 	flight.WantType = "flight"
 	flight.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -56,7 +52,6 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
 func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
-	// Handle both map[string]interface{} and FlightSchedule types
 	var schedule FlightSchedule
 	switch v := result.(type) {
 	case FlightSchedule:
@@ -64,7 +59,6 @@ func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 	case *FlightSchedule:
 		return v
 	case map[string]interface{}:
-		// Convert map to FlightSchedule
 		if dt, ok := v["departure_time"].(time.Time); ok {
 			schedule.DepartureTime = dt
 		}
@@ -116,8 +110,6 @@ func (f *FlightWant) Exec() bool {
 		return true
 	}
 	// f.StoreLog("[DEBUG-EXEC] Output channels available - Proceeding with execution")
-
-	// Get current phase from state
 	phaseVal, _ := f.GetState("flight_phase")
 	phase := ""
 	if phaseVal != nil {
@@ -148,8 +140,6 @@ func (f *FlightWant) Exec() bool {
 			agentSchedule := f.extractFlightSchedule(agentResult)
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
-
-				// Send initial flight packet
 				f.sendFlightPacket(out, agentSchedule, "Initial")
 
 				// Transition to monitoring phase
@@ -170,8 +160,6 @@ func (f *FlightWant) Exec() bool {
 	case PhaseMonitoring:
 		if time.Since(f.monitoringStartTime) < f.monitoringDuration {
 			elapsed := time.Since(f.monitoringStartTime)
-
-			// Check for delay that triggers cancellation
 			if f.shouldCancelAndRebook() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
 				f.StoreStateMulti(map[string]interface{}{
@@ -200,7 +188,6 @@ func (f *FlightWant) Exec() bool {
 
 	// === Phase 4: Canceling ===
 	case PhaseCanceling:
-		// Get the flight_id to cancel
 		flightIDVal, flightIDExists := f.GetState("flight_id")
 		if !flightIDExists || flightIDVal == "" {
 			f.StoreStateMulti(map[string]interface{}{
@@ -251,8 +238,6 @@ func (f *FlightWant) Exec() bool {
 
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
-
-				// Send rebooked flight packet
 				f.StoreLog("[REBOOK-DEBUG] About to send rebooked packet")
 				f.sendFlightPacket(out, agentSchedule, "Rebooked")
 
@@ -282,8 +267,6 @@ func (f *FlightWant) Exec() bool {
 		return true
 	}
 }
-
-// sendFlightPacket sends a flight schedule packet to the output channel and logs it Uses SendPacketMulti to send with retrigger logic for achieved receivers
 func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {
 	flightEvent := TimeSlot{
 		Start: schedule.DepartureTime,
@@ -296,8 +279,6 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		Date:   schedule.DepartureTime.Truncate(24 * time.Hour),
 		Events: []TimeSlot{flightEvent},
 	}
-
-	// Send via SendPacketMulti which uses paths from want setup Paths.Out contains the channels configured during want initialization
 	f.SendPacketMulti(travelSchedule)
 
 	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
@@ -317,11 +298,8 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 
 // tryAgentExecution attempts to execute flight booking using the agent system Returns the FlightSchedule if successful, nil if no agent execution
 func (f *FlightWant) tryAgentExecution() {
-	// Check if this want has agent requirements
 	if len(f.Spec.Requires) > 0 {
 		f.StoreLog(fmt.Sprintf("Want has agent requirements: %v", f.Spec.Requires))
-
-		// Store the requirements in want state for tracking
 		f.StoreState("agent_requirements", f.Spec.Requires)
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
@@ -337,8 +315,6 @@ func (f *FlightWant) tryAgentExecution() {
 
 		f.StoreLog("Dynamic agent execution completed successfully")
 		f.StoreState("agent_execution_status", "completed")
-
-		// Check for agent_result in state
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			f.StoreLog(fmt.Sprintf("Found agent_result in state: %+v", result))
 			f.StoreState("execution_source", "agent")
@@ -367,8 +343,6 @@ type FlightSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
-
-// SetSchedule sets the flight booking schedule and updates all related state
 func (f *FlightWant) SetSchedule(schedule FlightSchedule) {
 	stateUpdates := map[string]interface{}{
 		"attempted":             true,
@@ -381,8 +355,6 @@ func (f *FlightWant) SetSchedule(schedule FlightSchedule) {
 		"total_processed":       1,
 		"schedule_date":         schedule.DepartureTime.Format("2006-01-02"),
 	}
-
-	// Store premium information if provided
 	if schedule.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
 		stateUpdates["premium_level"] = schedule.PremiumLevel
@@ -404,13 +376,10 @@ func (f *FlightWant) hasTimeConflict(event1, event2 TimeSlot) bool {
 
 // shouldCancelAndRebook checks if the current flight should be cancelled due to delay
 func (f *FlightWant) shouldCancelAndRebook() bool {
-	// Check if flight has been created
 	flightIDVal, exists := f.GetState("flight_id")
 	if !exists || flightIDVal == "" {
 		return false
 	}
-
-	// Check current flight status
 	statusVal, exists := f.GetState("flight_status")
 	if !exists {
 		return false
@@ -428,8 +397,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 
 	return false
 }
-
-// GetStateValue is a helper to safely get state value
 func (f *FlightWant) GetStateValue(key string) interface{} {
 	val, _ := f.GetState(key)
 	return val
@@ -442,7 +409,6 @@ func (f *FlightWant) StartContinuousMonitoring() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			// Check if flight has been booked
 			flightIDVal, exists := f.GetState("flight_id")
 			if !exists || flightIDVal == "" {
 				return
@@ -452,15 +418,11 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			if !ok || flightID == "" {
 				return
 			}
-
-			// Get server URL from params
 			params := f.Spec.Params
 			serverURL, ok := params["server_url"].(string)
 			if !ok || serverURL == "" {
 				serverURL = "http://localhost:8081"
 			}
-
-			// Create monitor agent and poll
 			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
 			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState

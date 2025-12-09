@@ -25,14 +25,10 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 		Want:     Want{},
 		MaxCount: 15,
 	}
-
-	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
 	// Extract max_count parameter with automatic type conversion
 	gen.MaxCount = gen.GetIntParam("max_count", 15)
-
-	// Set fields for base Want methods
 	gen.WantType = "seed numbers"
 	gen.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -48,27 +44,16 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the seed numbers generator
 func (g *SeedNumbers) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	maxCount := g.GetIntParam("max_count", 15)
-
-	// Check if already completed using persistent state
 	completed, _ := g.GetStateBool("completed", false)
 
 	if completed {
 		return true
 	}
-
-	// Mark as completed in persistent state
 	g.StoreState("completed", true)
-
-	// Send initial seeds: 0 and 1
 	g.SendPacketMulti(FibonacciSeed{Value: 0, Position: 0, IsEnd: false})
 	g.SendPacketMulti(FibonacciSeed{Value: 1, Position: 1, IsEnd: false})
-
-	// Send end marker with max count info
 	g.SendPacketMulti(FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true})
-
-	// Store final statistics
 	g.StoreState("total_processed", 2)
 	g.StoreLog(fmt.Sprintf("Generated initial seeds: 0, 1 (max_count: %d)", maxCount))
 	return true
@@ -85,11 +70,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 	computer := &FibonacciComputer{
 		Want: Want{},
 	}
-
-	// Initialize base Want fields
 	computer.Init(metadata, spec)
-
-	// Set fields for base Want methods
 	computer.WantType = "fibonacci computer"
 	computer.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
@@ -105,13 +86,10 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the fibonacci computer
 func (c *FibonacciComputer) Exec() bool {
-	// Get input channel
 	in, inputUnavailable := c.GetInputChannel(0)
 	if inputUnavailable {
 		return true
 	}
-
-	// Initialize persistent state variables
 	prev, _ := c.GetStateInt("prev", 0)
 	current, _ := c.GetStateInt("current", 0)
 	if current == 0 {
@@ -144,11 +122,7 @@ func (c *FibonacciComputer) Exec() bool {
 			position++
 			processed++
 		}
-
-		// Send end signal
 		c.SendPacketMulti(FibonacciSeed{Value: 0, Position: -1, IsEnd: true})
-
-		// Update persistent state
 		c.StoreStateMulti(map[string]interface{}{
 			"prev": prev,
 			"current": current,
@@ -160,8 +134,6 @@ func (c *FibonacciComputer) Exec() bool {
 		c.StoreLog(fmt.Sprintf("Computed %d fibonacci numbers", processed))
 		return true
 	}
-
-	// Initialize with first two seeds
 	if !initialized {
 		if seed.Position == 0 {
 			prev = seed.Value
@@ -192,11 +164,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 	merger := &FibonacciMerger{
 		Want: Want{},
 	}
-
-	// Initialize base Want fields
 	merger.Init(metadata, spec)
-
-	// Set fields for base Want methods
 	merger.WantType = "fibonacci merger"
 	merger.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  2,
@@ -224,8 +192,6 @@ func (m *FibonacciMerger) Exec() bool {
 
 	seedIn, _ := m.GetInputChannel(0)     // From seed generator
 	computedIn, _ := m.GetInputChannel(1) // From fibonacci computer (feedback loop)
-
-	// Handle both using with blocking select
 	select {
 	case seed := <-seedIn:
 		fibSeed := seed.(FibonacciSeed)

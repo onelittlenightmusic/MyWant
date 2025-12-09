@@ -67,7 +67,6 @@ func TestChainBuilderWithRealConfig(t *testing.T) {
 }
 
 func TestMemoryReconciliation(t *testing.T) {
-	// Create temporary directory for test
 	tempDir := t.TempDir()
 	memoryPath := filepath.Join(tempDir, "test-memory.yaml")
 
@@ -109,8 +108,6 @@ func TestMemoryReconciliation(t *testing.T) {
 func TestDynamicWantAddition(t *testing.T) {
 	config := Config{Wants: []*Want{}}
 	builder := NewChainBuilder(config)
-
-	// Add dynamic want
 	dynamicWant := &Want{
 		Metadata: Metadata{Name: "dynamic", Type: "test"},
 		Spec:     WantSpec{Params: make(map[string]interface{})},
@@ -163,8 +160,6 @@ func TestStateNotificationSystem(t *testing.T) {
 
 func TestConnectivityValidation(t *testing.T) {
 	builder := NewChainBuilder(Config{Wants: []*Want{}})
-
-	// Create test paths
 	pathMap := map[string]Paths{
 		"want1": {
 			In:  []PathInfo{{Name: "input", Active: true}},
@@ -258,8 +253,6 @@ func TestWantEquality(t *testing.T) {
 
 func TestFileHashCalculation(t *testing.T) {
 	builder := NewChainBuilder(Config{Wants: []*Want{}})
-
-	// Create temporary file
 	tempFile := filepath.Join(t.TempDir(), "test.txt")
 	err := os.WriteFile(tempFile, []byte("test content"), 0644)
 	if err != nil {

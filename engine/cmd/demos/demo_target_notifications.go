@@ -19,8 +19,6 @@ func main() {
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
 	}
-
-	// Get absolute path
 	absPath, err := filepath.Abs(configPath)
 	if err != nil {
 		fmt.Printf("Error getting absolute path: %v\n", err)
@@ -37,8 +35,6 @@ func main() {
 	}
 
 	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
-
-	// Create and configure chain builder
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types

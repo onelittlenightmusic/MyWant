@@ -15,8 +15,6 @@ func main() {
 	fmt.Println("- Hotel stay overnight")
 	fmt.Println("- Breakfast buffet next morning")
 	fmt.Println()
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_travel.go <config-file-path>")
 		os.Exit(1)
@@ -31,8 +29,6 @@ func main() {
 	}
 
 	fmt.Printf("Loaded %d travel wants from configuration\n", len(config.Wants))
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register travel want types

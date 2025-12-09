@@ -17,8 +17,6 @@ func main() {
 	fmt.Println("- Final processing and collection")
 	fmt.Println("- All using connections defined in recipe YAML")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-qnet-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -40,8 +38,6 @@ func main() {
 		}
 	}
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, combiner, sink)

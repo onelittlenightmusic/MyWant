@@ -55,29 +55,21 @@ func loadAgentSpec() (*openapi3.T, error) {
 
 	return nil, fmt.Errorf("failed to load agent OpenAPI spec from paths %v: %w", specPaths, lastErr)
 }
-
-// validateCapabilityWithSpec validates capability YAML data against the OpenAPI spec
 func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
 		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
 	}
-
-	// Validate the spec itself
 	ctx := context.Background()
 	err = spec.Validate(ctx)
 	if err != nil {
 		return fmt.Errorf("agent OpenAPI spec is invalid: %w", err)
 	}
-
-	// Get the CapabilityConfig schema from the spec
 	capabilitySchemaRef := spec.Components.Schemas["CapabilityConfig"]
 	if capabilitySchemaRef == nil {
 		return fmt.Errorf("CapabilityConfig schema not found in agent OpenAPI spec")
 	}
-
-	// Convert YAML to generic structure for validation
 	var yamlContent interface{}
 	if err := yaml.Unmarshal(yamlData, &yamlContent); err != nil {
 		return fmt.Errorf("failed to parse capability YAML: %w", err)
@@ -91,15 +83,11 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	InfoLog("[VALIDATION] Capability '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
-
-// validateCapabilityStructure validates the structure of capability content
 func validateCapabilityStructure(content interface{}) error {
 	contentObj, ok := content.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("capability content must be an object")
 	}
-
-	// Check required capabilities field
 	capabilities, ok := contentObj["capabilities"]
 	if !ok {
 		return fmt.Errorf("missing required 'capabilities' field")
@@ -113,15 +101,11 @@ func validateCapabilityStructure(content interface{}) error {
 	if len(capabilitiesArray) == 0 {
 		return fmt.Errorf("capabilities array cannot be empty")
 	}
-
-	// Validate each capability
 	for i, cap := range capabilitiesArray {
 		capObj, ok := cap.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("capability at index %d must be an object", i)
 		}
-
-		// Check required fields
 		if name, ok := capObj["name"]; !ok || name == "" {
 			return fmt.Errorf("capability at index %d missing required 'name' field", i)
 		}
@@ -130,8 +114,6 @@ func validateCapabilityStructure(content interface{}) error {
 		if !ok {
 			return fmt.Errorf("capability at index %d missing required 'gives' field", i)
 		}
-
-		// Validate gives array
 		givesArray, ok := gives.([]interface{})
 		if !ok {
 			return fmt.Errorf("capability at index %d 'gives' must be an array", i)
@@ -156,8 +138,6 @@ func (r *AgentRegistry) loadCapabilityFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
-
-	// Validate against OpenAPI spec
 	err = validateCapabilityWithSpec(data, filename)
 	if err != nil {
 		return fmt.Errorf("capability validation failed for %s: %w", filename, err)
@@ -189,29 +169,21 @@ func (r *AgentRegistry) LoadAgents(path string) error {
 
 	return nil
 }
-
-// validateAgentWithSpec validates agent YAML data against the OpenAPI spec
 func validateAgentWithSpec(yamlData []byte, filename string) error {
 	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
 		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
 	}
-
-	// Validate the spec itself
 	ctx := context.Background()
 	err = spec.Validate(ctx)
 	if err != nil {
 		return fmt.Errorf("agent OpenAPI spec is invalid: %w", err)
 	}
-
-	// Get the AgentConfig schema from the spec
 	agentSchemaRef := spec.Components.Schemas["AgentConfig"]
 	if agentSchemaRef == nil {
 		return fmt.Errorf("AgentConfig schema not found in agent OpenAPI spec")
 	}
-
-	// Convert YAML to generic structure for validation
 	var yamlContent interface{}
 	if err := yaml.Unmarshal(yamlData, &yamlContent); err != nil {
 		return fmt.Errorf("failed to parse agent YAML: %w", err)
@@ -225,15 +197,11 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 	InfoLog("[VALIDATION] Agent '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
-
-// validateAgentStructure validates the structure of agent content
 func validateAgentStructure(content interface{}) error {
 	contentObj, ok := content.(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("agent content must be an object")
 	}
-
-	// Check required agents field
 	agents, ok := contentObj["agents"]
 	if !ok {
 		return fmt.Errorf("missing required 'agents' field")
@@ -247,15 +215,11 @@ func validateAgentStructure(content interface{}) error {
 	if len(agentsArray) == 0 {
 		return fmt.Errorf("agents array cannot be empty")
 	}
-
-	// Validate each agent
 	for i, agent := range agentsArray {
 		agentObj, ok := agent.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("agent at index %d must be an object", i)
 		}
-
-		// Check required fields
 		if name, ok := agentObj["name"]; !ok || name == "" {
 			return fmt.Errorf("agent at index %d missing required 'name' field", i)
 		}
@@ -275,7 +239,6 @@ func validateAgentStructure(content interface{}) error {
 		if capabilities, ok := agentObj["capabilities"]; !ok {
 			return fmt.Errorf("agent at index %d missing required 'capabilities' field", i)
 		} else {
-			// Validate capabilities array
 			capabilitiesArray, ok := capabilities.([]interface{})
 			if !ok {
 				return fmt.Errorf("agent at index %d 'capabilities' must be an array", i)
@@ -291,8 +254,6 @@ func validateAgentStructure(content interface{}) error {
 				}
 			}
 		}
-
-		// Validate optional uses field if present
 		if uses, ok := agentObj["uses"]; ok {
 			usesArray, ok := uses.([]interface{})
 			if !ok {
@@ -315,8 +276,6 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
-
-	// Validate against OpenAPI spec
 	err = validateAgentWithSpec(data, filename)
 	if err != nil {
 		return fmt.Errorf("agent validation failed for %s: %w", filename, err)

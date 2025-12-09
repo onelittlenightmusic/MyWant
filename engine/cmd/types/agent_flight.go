@@ -31,8 +31,6 @@ func NewAgentFlight(name string, capabilities []string, uses []string, premiumLe
 func (a *AgentFlight) Exec(ctx context.Context, want *Want) error {
 	// Generate flight booking schedule
 	schedule := a.generateFlightSchedule(want)
-
-	// Store the result using StoreState method NOTE: Wrapping is handled by the framework, not here
 	want.StoreState("agent_result", schedule)
 
 	// Record activity description for agent history
@@ -66,8 +64,6 @@ func (a *AgentFlight) generateFlightSchedule(want *Want) FlightSchedule {
 
 	// Generate flight number
 	flightNumber := fmt.Sprintf("FL%d", 100+rand.Intn(900))
-
-	// Create and return structured flight schedule
 	return FlightSchedule{
 		DepartureTime:    departureTime,
 		ArrivalTime:      arrivalTime,

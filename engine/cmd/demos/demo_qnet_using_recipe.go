@@ -17,8 +17,6 @@ func main() {
 	fmt.Println("- queue-final using: [role: merger]")
 	fmt.Println("- collector-end using: [role: processor, stage: final]")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-qnet-using-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -41,8 +39,6 @@ func main() {
 		}
 	}
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types

@@ -13,8 +13,6 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("travel wants from the travel-itinerary recipe at runtime.")
 	fmt.Println()
-
-	// Get YAML file from command line argument or use default
 	yamlFile := "config/config-travel-target.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -37,8 +35,6 @@ func main() {
 			fmt.Printf("  Parameters: %v\n", want.Spec.Params)
 		}
 	}
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register travel want types first

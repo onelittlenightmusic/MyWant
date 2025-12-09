@@ -14,8 +14,6 @@ func main() {
 	fmt.Println("- Recipe defines: prime_generator, prime_filter wants")
 	fmt.Println("- Target parent collects filtered prime results")
 	fmt.Println()
-
-	// Get YAML file from command line argument
 	yamlFile := "config/config-prime-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -33,8 +31,6 @@ func main() {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register prime want types
@@ -42,8 +38,6 @@ func main() {
 
 	fmt.Println("🏁 Executing recipe-based prime sieve...")
 	builder.Execute()
-
-	// Get final state from all wants
 	states := builder.GetAllWantStates()
 
 	fmt.Println("\n📊 Final Prime Sieve Results:")

@@ -30,8 +30,6 @@ func NewAgentPremium(name string, capabilities []string, uses []string, premiumL
 func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 	// Generate premium hotel booking schedule
 	schedule := a.generateHotelSchedule(want)
-
-	// Store the result using StoreState method
 	want.StoreState("agent_result", schedule)
 
 	// Record activity description for agent history
@@ -64,8 +62,6 @@ func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
 
 	// Extract hotel type from want parameters
 	hotelType := want.GetStringParam("hotel_type", "luxury")
-
-	// Create and return structured hotel schedule
 	return HotelSchedule{
 		CheckInTime:       checkInTime,
 		CheckOutTime:      checkOutTime,

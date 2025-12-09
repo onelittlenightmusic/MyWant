@@ -16,8 +16,6 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 		Want:  Want{},
 		Count: 20,
 	}
-
-	// Initialize base Want fields
 	gen.Init(metadata, spec)
 
 	gen.Count = gen.GetIntParam("count", 20)
@@ -27,10 +25,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	count := g.GetIntParam("count", 20)
-
-	// Get state
 	a, _ := g.GetStateInt("a", 0)
 	b, _ := g.GetStateInt("b", 1)
 	sentCount, _ := g.GetStateInt("sent_count", 0)
@@ -40,8 +35,6 @@ func (g *FibonacciNumbers) Exec() bool {
 	}
 
 	g.SendPacketMulti(a)
-
-	// Update state
 	g.StoreStateMulti(map[string]interface{}{
 		"a":          b,
 		"b":          a + b,
@@ -67,14 +60,10 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 		MaxValue: 1000000,
 		filtered: make([]int, 0),
 	}
-
-	// Initialize base Want fields
 	filter.Init(metadata, spec)
 
 	filter.MinValue = filter.GetIntParam("min_value", 0)
 	filter.MaxValue = filter.GetIntParam("max_value", 1000000)
-
-	// Set fields for base Want methods
 	filter.WantType = "fibonacci filter"
 	filter.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  1,
@@ -90,22 +79,16 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the filter
 func (f *FibonacciFilter) Exec() bool {
-	// Read parameters fresh each cycle - enables dynamic changes!
 	minValue := f.GetIntParam("min_value", 0)
 	maxValue := f.GetIntParam("max_value", 1000000)
-
-	// Check if already achieved using persistent state
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {
 		return true
 	}
 
 	totalProcessed := 0
-
-	// Process all input numbers and filter them
 	_, i, ok := f.ReceiveFromAnyInputChannel(100)
 	if !ok {
-		// Mark as achieved in persistent state after processing all inputs and storing state
 		f.StoreState("achieved", true)
 
 		return true
@@ -118,14 +101,11 @@ func (f *FibonacciFilter) Exec() bool {
 			f.filtered = append(f.filtered, val)
 		}
 	}
-
-	// Store final state - persist filtered slice and counts using StoreState only
 	f.StoreStateMulti(map[string]interface{}{
 		"filtered":        f.filtered,
 		"count":           len(f.filtered),
 		"total_processed": totalProcessed,
 	})
-
 
 	return false
 }

@@ -62,8 +62,6 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 		want.StoreLog(fmt.Sprintf("Error reading %s: %v", filepath, err))
 		return err
 	}
-
-	// Parse the YAML content
 	var flightState FlightState
 	if err := yaml.Unmarshal(data, &flightState); err != nil {
 		want.StoreLog(fmt.Sprintf("Error parsing YAML: %v", err))
@@ -74,10 +72,7 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 	want.StoreLog(fmt.Sprintf("DEBUG: Parsed state: %+v", flightState))
 	want.StoreLog(fmt.Sprintf("DEBUG: Departure time: %v, IsZero: %v",
 		flightState.State.DepartureTime, flightState.State.DepartureTime.IsZero()))
-
-	// Store the state information using StoreState
 	if !flightState.State.DepartureTime.IsZero() {
-		// Convert to FlightSchedule format
 		schedule := FlightSchedule{
 			DepartureTime:    flightState.State.DepartureTime,
 			ArrivalTime:      flightState.State.ArrivalTime,
@@ -110,8 +105,6 @@ func (m *MonitorFlight) Exec(ctx context.Context, want *Want) error {
 		})
 		want.StoreLog(fmt.Sprintf("No existing schedule found in %s - stored first record", filename))
 	}
-
-	// Increment execution count for next call
 	m.ExecutionCount++
 
 	return nil

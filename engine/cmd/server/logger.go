@@ -23,8 +23,6 @@ func DebugLogf(format string, v ...interface{}) {
 func InfoLog(format string, v ...interface{}) {
 	log.Printf("[INFO] "+format, v...)
 }
-
-// ErrorLog logs error messages (always shown)
 func ErrorLog(format string, v ...interface{}) {
 	log.Printf("[ERROR] "+format, v...)
 }

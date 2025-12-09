@@ -32,35 +32,24 @@ func UnregisterWant(wantName string) {
 	defer wantRegistryMutex.Unlock()
 	delete(wantRegistry, wantName)
 }
-
-// findWantByName retrieves a want from the registry
 func findWantByName(wantName string) *Want {
 	wantRegistryMutex.RLock()
 	defer wantRegistryMutex.RUnlock()
 	return wantRegistry[wantName]
 }
-
-// sendStateNotifications handles all notification types
 func sendStateNotifications(notification StateNotification) {
 	// Emit state change through unified subscription system
 	emitStateChangeEvent(notification)
-
-	// Send owner-child notifications (child -> parent state updates)
 	sendOwnerChildNotifications(notification)
-
-	// Store in history for debugging
 	storeNotificationHistory(notification)
 }
 
 // emitStateChangeEvent emits a state change through the unified subscription system
 func emitStateChangeEvent(notification StateNotification) {
-	// Find source want to emit from its subscription system
 	want := findWantByName(notification.SourceWantName)
 	if want == nil {
 		return
 	}
-
-	// Create StateChangeEvent
 	event := &StateChangeEvent{
 		BaseEvent: BaseEvent{
 			EventType:  EventTypeStateChange,
@@ -77,17 +66,12 @@ func emitStateChangeEvent(notification StateNotification) {
 	// Emit through subscription system (async)
 	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-
-// sendParameterNotifications handles parameter change propagation to children (reverse direction)
 func sendParameterNotifications(notification StateNotification) {
 	// Emit through unified subscription system
 	emitParameterChangeEvent(notification)
-
-	// Find all wants that have this want as their owner (i.e., children)
 	wantRegistryMutex.RLock()
 	childWants := make([]*Want, 0)
 	for _, childWant := range wantRegistry {
-		// Check if this child has the notification source as its owner
 		for _, ownerRef := range childWant.Metadata.OwnerReferences {
 			if ownerRef.Name == notification.SourceWantName && ownerRef.Controller && ownerRef.Kind == "Want" {
 				childWants = append(childWants, childWant)
@@ -96,27 +80,20 @@ func sendParameterNotifications(notification StateNotification) {
 		}
 	}
 	wantRegistryMutex.RUnlock()
-
-	// Set child wants to idle for restart (handles parameter change restart)
 	for _, childWant := range childWants {
 		fmt.Printf("[PARAMETER CHANGE] %s: Parameter %s changed to %v, setting status to idle for restart\n",
 			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
 		childWant.SetStatus(WantStatusIdle)
 	}
-
-	// Store in history for debugging
 	storeNotificationHistory(notification)
 }
 
 // emitParameterChangeEvent emits a parameter change through the unified subscription system
 func emitParameterChangeEvent(notification StateNotification) {
-	// Find source want to emit from its subscription system
 	want := findWantByName(notification.SourceWantName)
 	if want == nil {
 		return
 	}
-
-	// Create ParameterChangeEvent
 	event := &ParameterChangeEvent{
 		BaseEvent: BaseEvent{
 			EventType:  EventTypeParameterChange,
@@ -133,10 +110,7 @@ func emitParameterChangeEvent(notification StateNotification) {
 	// Emit through subscription system (async)
 	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-
-// sendOwnerChildNotifications handles parent-child notifications (child -> parent)
 func sendOwnerChildNotifications(notification StateNotification) {
-	// Find the want to get its OwnerReferences
 	want := findWantByName(notification.SourceWantName)
 	if want == nil {
 		return
@@ -155,13 +129,10 @@ func sendOwnerChildNotifications(notification StateNotification) {
 
 // emitOwnerChildStateEvent emits an owner-child state notification through the unified subscription system
 func emitOwnerChildStateEvent(notification StateNotification, ownerName string) {
-	// Find source want to emit from its subscription system
 	want := findWantByName(notification.SourceWantName)
 	if want == nil {
 		return
 	}
-
-	// Create OwnerChildStateEvent
 	event := &OwnerChildStateEvent{
 		BaseEvent: BaseEvent{
 			EventType:  EventTypeOwnerChildState,
@@ -177,13 +148,9 @@ func emitOwnerChildStateEvent(notification StateNotification, ownerName string) 
 	// Emit through subscription system (async)
 	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-
-// storeNotificationHistory stores notification for debugging
 func storeNotificationHistory(notification StateNotification) {
 	historyMutex.Lock()
 	defer historyMutex.Unlock()
-
-	// Add to history
 	notificationHistory = append(notificationHistory, notification)
 
 	// Trim history if too long
@@ -191,8 +158,6 @@ func storeNotificationHistory(notification StateNotification) {
 		notificationHistory = notificationHistory[len(notificationHistory)-maxNotificationHistory:]
 	}
 }
-
-// GetNotificationHistory returns recent notification history for debugging
 func GetNotificationHistory(limit int) []StateNotification {
 	historyMutex.RLock()
 	defer historyMutex.RUnlock()

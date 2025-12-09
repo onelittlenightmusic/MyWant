@@ -11,8 +11,6 @@ func main() {
 	fmt.Println("🧪 Testing Parent-Child Lifecycle with Parameter Updates")
 	fmt.Println("=========================================================")
 	fmt.Println()
-
-	// Create a simple config with target want
 	config := &mywant.Config{
 		Wants: []*mywant.Want{
 			{
@@ -36,8 +34,6 @@ func main() {
 			},
 		},
 	}
-
-	// Create chain builder
 	builder := mywant.NewChainBuilder(*config)
 
 	// Register want types
@@ -70,7 +66,6 @@ func main() {
 				// At 5 seconds, if parent is completed, update parameter
 				if i == 4 && state.Status == mywant.WantStatusCompleted {
 					fmt.Println("\n🔄 === UPDATING PARAMETER ===")
-					// Get the actual Target object
 					if function, exists := builder.GetWantFunction(name); exists {
 						if target, ok := function.(*mywant.Target); ok {
 							fmt.Printf("🔄 Changing service_time from 0.1 to 0.05\n")

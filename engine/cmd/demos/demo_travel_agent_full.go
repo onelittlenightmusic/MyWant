@@ -11,8 +11,6 @@ import (
 func main() {
 	fmt.Println("🏨 Full Travel Agent Demo (Complete Agent Integration)")
 	fmt.Println("====================================================")
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_travel_agent_full.go <config-file-path>")
 		os.Exit(1)
@@ -33,11 +31,7 @@ func main() {
 			fmt.Printf("    Requires: %v\n", want.Spec.Requires)
 		}
 	}
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
-
-	// Create and configure agent registry
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities and agents
@@ -96,8 +90,6 @@ func main() {
 
 	agentRegistry.RegisterAgent(agentBuffet)
 	fmt.Printf("🔧 Dynamically registered Buffet Agent: %s\n", agentBuffet.GetName())
-
-	// Set agent registry on the builder
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register travel want types

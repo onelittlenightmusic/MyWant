@@ -36,15 +36,11 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 		Want:         Want{},
 		EvidenceType: "document",
 	}
-
-	// Initialize base Want fields
 	evidence.Init(metadata, spec)
 
 	evidence.EvidenceType = evidence.GetStringParam("evidence_type", "document")
 
 	evidence.ApprovalID = evidence.GetStringParam("approval_id", "")
-
-	// Set fields for base Want methods
 	evidence.WantType = "evidence"
 	evidence.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -59,25 +55,18 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (e *EvidenceWant) Exec() bool {
-	// Check if already provided evidence
 	provided, _ := e.GetStateBool("evidence_provided", false)
 
 	if provided {
 		return true
 	}
-
-	// Mark as provided in state
 	e.StoreState("evidence_provided", true)
-
-	// Create evidence data
 	evidenceData := &ApprovalData{
 		ApprovalID:  e.ApprovalID,
 		Evidence:    fmt.Sprintf("Evidence of type '%s' for approval %s", e.EvidenceType, e.ApprovalID),
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
-
-	// Store state
 	e.StoreStateMulti(map[string]interface{}{
 		"evidence_type":        e.EvidenceType,
 		"approval_id":          e.ApprovalID,
@@ -114,15 +103,11 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 		Want:              Want{},
 		DescriptionFormat: "Request for approval: %s",
 	}
-
-	// Initialize base Want fields
 	description.Init(metadata, spec)
 
 	description.DescriptionFormat = description.GetStringParam("description_format", "Request for approval: %s")
 
 	description.ApprovalID = description.GetStringParam("approval_id", "")
-
-	// Set fields for base Want methods
 	description.WantType = "description"
 	description.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  0,
@@ -137,17 +122,12 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (d *DescriptionWant) Exec() bool {
-	// Check if already provided description
 	provided, _ := d.GetStateBool("description_provided", false)
 
 	if provided {
 		return true
 	}
-
-	// Mark as provided in state
 	d.StoreState("description_provided", true)
-
-	// Create description data
 	description := fmt.Sprintf(d.DescriptionFormat, d.ApprovalID)
 	descriptionData := &ApprovalData{
 		ApprovalID:  d.ApprovalID,
@@ -155,8 +135,6 @@ func (d *DescriptionWant) Exec() bool {
 		Description: description,
 		Timestamp:   time.Now(),
 	}
-
-	// Store state
 	d.StoreStateMulti(map[string]interface{}{
 		"description_format":      d.DescriptionFormat,
 		"approval_id":             d.ApprovalID,
@@ -196,15 +174,11 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 		Want:            Want{},
 		CoordinatorType: "level1",
 	}
-
-	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
 
 	coordinator.ApprovalID = coordinator.GetStringParam("approval_id", "")
 
 	coordinator.CoordinatorType = coordinator.GetStringParam("coordinator_type", "level1")
-
-	// Set fields for base Want methods
 	coordinator.WantType = "level1_coordinator"
 	coordinator.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  2,
@@ -219,7 +193,6 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 }
 
 func (l *Level1CoordinatorWant) Exec() bool {
-	// Check if approval already processed
 	processed, _ := l.GetStateBool("approval_processed", false)
 
 	if processed {
@@ -276,8 +249,6 @@ func (l *Level1CoordinatorWant) Exec() bool {
 			// No more data
 		}
 	}
-
-	// Process approval when both evidence and description are received
 	if evidenceReceived && descriptionReceived {
 		l.StoreState("approval_processed", true)
 
@@ -290,8 +261,6 @@ func (l *Level1CoordinatorWant) Exec() bool {
 			ApproverID:   "level1-manager",
 			Comments:     "Level 1 approval granted",
 		}
-
-		// Store final state including evidence and description completion info
 		stateUpdates := map[string]interface{}{
 			"approval_status":             result.Status,
 			"approval_level":              result.Level,

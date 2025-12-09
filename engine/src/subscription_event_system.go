@@ -10,8 +10,6 @@ import (
 // Global subscription system shared across all wants
 var globalSubscriptionSystem *UnifiedSubscriptionSystem
 var globalSubscriptionSystemOnce sync.Once
-
-// GetGlobalSubscriptionSystem returns the global subscription system instance
 func GetGlobalSubscriptionSystem() *UnifiedSubscriptionSystem {
 	globalSubscriptionSystemOnce.Do(func() {
 		globalSubscriptionSystem = NewUnifiedSubscriptionSystem()
@@ -50,8 +48,6 @@ const (
 	ExecutionBlock     ExecutionControl = "block"     // Wait for condition
 	ExecutionRestart   ExecutionControl = "restart"   // Restart from beginning
 )
-
-// ProcessingMode defines when and how events are processed
 type ProcessingMode int
 
 const (
@@ -138,8 +134,6 @@ type MonitorAgentEvent struct {
 	AgentName   string
 	MonitorData map[string]interface{}
 }
-
-// ProcessEndEvent represents process end notification (Group B)
 type ProcessEndEvent struct {
 	BaseEvent
 	FinalState map[string]interface{}
@@ -164,8 +158,6 @@ type ChannelEndEvent struct {
 type UnifiedSubscriptionSystem struct {
 	// Subscription storage: eventType -> list of subscriptions
 	subscriptions map[EventType][]EventSubscription
-
-	// Processing mode per event type
 	processingMode map[EventType]ProcessingMode
 
 	// Priority ordering for sync processing
@@ -186,8 +178,6 @@ func NewUnifiedSubscriptionSystem() *UnifiedSubscriptionSystem {
 		syncPriority:   make(map[EventType]int),
 		enableLogging:  false, // Disable by default for clean output
 	}
-
-	// Set default processing modes for each event type Group A: Async notifications
 	uss.SetProcessingMode(EventTypeStateChange, ProcessAsync)
 	uss.SetProcessingMode(EventTypeParameterChange, ProcessAsync)
 	uss.SetProcessingMode(EventTypeOwnerChildState, ProcessAsync)
@@ -205,8 +195,6 @@ func NewUnifiedSubscriptionSystem() *UnifiedSubscriptionSystem {
 
 	return uss
 }
-
-// SetProcessingMode sets the processing mode for an event type
 func (uss *UnifiedSubscriptionSystem) SetProcessingMode(eventType EventType, mode ProcessingMode) {
 	uss.mutex.Lock()
 	defer uss.mutex.Unlock()
@@ -313,8 +301,6 @@ func (uss *UnifiedSubscriptionSystem) emitBlock(ctx context.Context, event WantE
 	}
 	return responses
 }
-
-// GetSubscriberCount returns the number of subscribers for an event type
 func (uss *UnifiedSubscriptionSystem) GetSubscriberCount(eventType EventType) int {
 	uss.mutex.RLock()
 	defer uss.mutex.RUnlock()

@@ -8,13 +8,9 @@ import (
 
 // DataHandler defines the interface for processing received coordinator data
 type DataHandler interface {
-	// ProcessData handles incoming data from a specific input channel channelIndex indicates which input channel the data came from
 	ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool
-	// GetStateUpdates returns state updates to apply after data collection
 	GetStateUpdates(want *CoordinatorWant) map[string]interface{}
-	// GetCompletionKey returns the key used to check if processing is complete
 	GetCompletionKey() string
-	// GetCompletionTimeout returns the duration to wait after last packet before completing
 	GetCompletionTimeout() time.Duration
 }
 
@@ -45,8 +41,6 @@ func NewCoordinatorWant(
 	coordinator := &CoordinatorWant{
 		Want: Want{},
 	}
-
-	// Initialize base Want fields
 	coordinator.Init(metadata, spec)
 
 	// Determine coordinator configuration based on want type
@@ -58,8 +52,6 @@ func NewCoordinatorWant(
 	coordinator.CompletionChecker = completionChecker
 	coordinator.CoordinatorType = coordinatorType
 	coordinator.channelsHeard = make(map[int]bool)
-
-	// Set fields for base Want methods
 	coordinator.WantType = coordinatorType
 	coordinator.ConnectivityMetadata = ConnectivityMetadata{
 		RequiredInputs:  -1,  // Unified: accept any number of inputs
@@ -72,11 +64,8 @@ func NewCoordinatorWant(
 
 	return coordinator
 }
-
-// getCoordinatorConfig returns the configuration for a coordinator based on its type and parameters It determines the data handler and completion checker based on: 1. The want type from metadata 2. Coordinator-specific parameters (coordinator_level, coordinator_type, is_buffet, required_inputs)
 // This enables full customization of coordinator behavior through parameters
 func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {
-	// Get parameters from want specs
 	requiredInputsParam := want.GetIntParam("required_inputs", -1)
 	coordinatorLevel := want.GetIntParam("coordinator_level", -1)
 	isBuffetParam := want.GetBoolParam("is_buffet", false)
@@ -89,8 +78,6 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 	if approvalLevel <= 0 && (coordinatorType == "level2_coordinator") {
 		approvalLevel = 2
 	}
-
-	// Check if this is an approval coordinator
 	if coordinatorTypeParam == "approval" || approvalLevel > 0 || coordinatorType == "level1_coordinator" || coordinatorType == "level2_coordinator" {
 		if approvalLevel <= 0 {
 			approvalLevel = 1
@@ -99,11 +86,8 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 			&ApprovalDataHandler{Level: approvalLevel},
 			&ApprovalCompletionChecker{Level: approvalLevel}
 	}
-
-	// Check if this is a travel/buffet coordinator
 	requiredInputs := requiredInputsParam
 	if requiredInputs <= 0 {
-		// Handle legacy coordinator type names
 		switch coordinatorType {
 		case "travel coordinator":
 			requiredInputs = 3
@@ -118,8 +102,6 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 			}
 		}
 	}
-
-	// Get completion timeout parameter (default: 0 seconds = immediate completion) Set to non-zero (e.g., 60) to wait for delayed packets like Flight rebooking
 	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 0)
 	completionTimeout := time.Duration(completionTimeoutSeconds) * time.Second
 
@@ -158,8 +140,6 @@ func (c *CoordinatorWant) Exec() bool {
 			break
 		}
 	}
-
-	// Check completion: have we heard from all required input channels? This approach is simpler than len(data_by_channel) and automatically handles topology changes without needing cache resets
 	return c.tryCompletion(inCount, c.channelsHeard)
 }
 
@@ -171,8 +151,6 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
-
-	// Check if we've heard from all connected channels
 	if len(channelsHeard) != inCount {
 		return false // Still waiting for data from some channels
 	}
@@ -183,15 +161,11 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 		nowUnix := time.Now().Unix()
 		c.StoreState("last_packet_time", nowUnix)
 	}
-
-	// Check if there's a completion timeout requirement
 	completionTimeout := c.DataHandler.GetCompletionTimeout()
 
 	if completionTimeout > 0 {
 		// Timeout is configured: need to wait for it to expire
 		lastPacketTimeVal, _ := c.GetState("last_packet_time")
-
-		// Handle different types that lastPacketTime might be stored as (defensive against type variations)
 		var lastPacketTime int64
 		switch v := lastPacketTimeVal.(type) {
 		case int64:
@@ -221,16 +195,12 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 
 	return true
 }
-
-// checkAllChannelsRepresentedInCache verifies the data handler's cache has packets from all connected channels using common logic
 func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 	// Common logic for all handlers: check data_by_channel
 	dataByChannelVal, _ := c.GetState("data_by_channel")
 	if dataByChannelVal == nil {
 		return false
 	}
-
-	// Handle both map[int]interface{} (direct) and map[string]interface{} (after JSON serialization)
 	var dataCount int
 	switch v := dataByChannelVal.(type) {
 	case map[int]interface{}:
@@ -241,8 +211,6 @@ func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
 		c.StoreLog(fmt.Sprintf("[ERROR] CoordinatorWant.checkAllChannelsRepresentedInCache: type assertion failed for data_by_channel. Expected map[int]interface{} or map[string]interface{}, got %T", dataByChannelVal))
 		return false
 	}
-
-	// Check that we have received packets from ALL connected channels
 	if dataCount != inCount {
 		return false
 	}
@@ -275,7 +243,6 @@ type ApprovalDataHandler struct {
 
 func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
 	if approvalData, ok := data.(*ApprovalData); ok {
-		// Get existing data map (keyed by channel index) - generic state key
 		dataByChannelVal, _ := want.GetState("data_by_channel")
 		dataByChannel, ok := dataByChannelVal.(map[int]interface{})
 		if !ok {
@@ -283,8 +250,6 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 				dataByChannel = make(map[int]interface{})
 			}
 		}
-
-		// Store approval data for this channel
 		dataByChannel[channelIndex] = approvalData
 
 		// Prepare state updates (includes legacy keys for backward compatibility)
@@ -324,7 +289,6 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 }
 
 func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]interface{} {
-	// Get level2 authority from want if available
 	level2Authority := want.GetStringParam("level2_authority", "senior_manager")
 
 	stateUpdates := map[string]interface{}{
@@ -332,8 +296,6 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 		"evidence_provider_complete":  true,
 		"description_provider_complete": true,
 	}
-
-	// Check which level this is
 	levelKey := "approval_level"
 	approverIDKey := "approver_id"
 	commentsKey := "comments"
@@ -439,8 +401,6 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 		schedule.Date.Format("2006-01-02"),
 		len(schedule.Events),
 		eventDetails))
-
-	// Get existing data map (keyed by channel index) - generic state key
 	dataByChannelVal, _ := want.GetState("data_by_channel")
 	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
 	if !ok {
@@ -448,15 +408,11 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 			dataByChannel = make(map[int]interface{})
 		}
 	}
-
-	// Store schedule data for this channel
 	dataByChannel[channelIndex] = schedule
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	totalPackets := totalPacketsVal + 1
-
-	// Update persistent state with generic key Don't overwrite last_packet_time if it's already been set (for timeout tracking)
 	stateUpdates := map[string]interface{}{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
@@ -477,8 +433,6 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]in
 	dataByChannelVal, _ := want.GetState("data_by_channel")
 
 	stateUpdates := make(map[string]interface{})
-
-	// Handle both map[int]interface{} (direct) and map[string]interface{} (after JSON serialization)
 	allEvents := make([]TimeSlot, 0)
 	switch v := dataByChannelVal.(type) {
 	case map[int]interface{}:
@@ -548,8 +502,6 @@ func (c *TravelCompletionChecker) IsComplete(want *CoordinatorWant, requiredInpu
 	if schedulesByChannel == nil {
 		return false
 	}
-
-	// Check that each connected channel has at least one schedule
 	totalSchedules := 0
 	for i := 0; i < requiredInputs; i++ {
 		if schedules, exists := schedulesByChannel[i]; !exists || len(schedules) == 0 {

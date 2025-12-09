@@ -13,8 +13,6 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("other wants from the qnet-pipeline recipe at runtime.")
 	fmt.Println()
-
-	// Get YAML file from command line argument or use default
 	yamlFile := "config/config-qnet.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
@@ -37,8 +35,6 @@ func main() {
 			fmt.Printf("  Parameters: %v\n", want.Spec.Params)
 		}
 	}
-
-	// Create chain builder with standard constructor Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	builder := mywant.NewChainBuilder(config)
 
 	// Register domain-specific want types

@@ -11,8 +11,6 @@ import (
 func main() {
 	fmt.Println("🏨 Travel Agent Demo (Recipe-based with Agent Integration)")
 	fmt.Println("=========================================================")
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_travel_agent.go <config-file-path>")
 		os.Exit(1)
@@ -33,11 +31,7 @@ func main() {
 			fmt.Printf("    Requires: %v\n", want.Spec.Requires)
 		}
 	}
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
-
-	// Create and configure agent registry
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities and agents
@@ -56,8 +50,6 @@ func main() {
 		[]string{"xxx"},
 		"platinum",
 	)
-
-	// Set a simple action that delegates to the AgentPremium.Exec() method
 	agentPremium.Action = func(ctx context.Context, want *Want) error {
 		fmt.Printf("[AGENT_PREMIUM_ACTION] Simple action called, delegating to AgentPremium.Exec()\n")
 		return agentPremium.Exec(ctx, want)
@@ -65,8 +57,6 @@ func main() {
 
 	agentRegistry.RegisterAgent(agentPremium)
 	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
-
-	// Set agent registry on the builder
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register travel want types

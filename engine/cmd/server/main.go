@@ -27,8 +27,6 @@ type ServerConfig struct {
 	Host  string `json:"host"`
 	Debug bool   `json:"debug"`
 }
-
-// ErrorHistoryEntry represents an API error with detailed context
 type ErrorHistoryEntry struct {
 	ID          string      `json:"id"`
 	Timestamp   string      `json:"timestamp"`
@@ -111,8 +109,6 @@ type OllamaResponse struct {
 	EvalCount          int    `json:"eval_count,omitempty"`
 	EvalDuration       int64  `json:"eval_duration,omitempty"`
 }
-
-// buildWantResponse creates a response with grouped agent history nested in history
 func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
 	response := &WantResponseWithGroupedAgents{
 		Metadata: want.Metadata,
@@ -134,7 +130,6 @@ func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
 
 // NewServer creates a new MyWant server
 func NewServer(config ServerConfig) *Server {
-	// Create agent registry and load existing capabilities/agents
 	agentRegistry := mywant.NewAgentRegistry()
 
 	// Load capabilities and agents from directories if they exist
@@ -145,8 +140,6 @@ func NewServer(config ServerConfig) *Server {
 	if err := agentRegistry.LoadAgents("agents/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
-
-	// Create recipe registry
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
 	// Load recipes from recipes/ directory as custom types
@@ -167,8 +160,6 @@ func NewServer(config ServerConfig) *Server {
 		stats := wantTypeLoader.GetStats()
 		log.Printf("[SERVER] Loaded want type definitions: %v\n", stats)
 	}
-
-	// Create global builder for server mode with empty config Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
@@ -177,8 +168,6 @@ func NewServer(config ServerConfig) *Server {
 
 	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
 	mywant.SetGlobalChainBuilder(globalBuilder)
-
-	// Create temporary server instance to call registerDynamicAgents
 	tempServer := &Server{}
 
 	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
@@ -203,8 +192,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		// Handle preflight OPTIONS request
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -213,18 +200,13 @@ func corsMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-// handleOptions handles OPTIONS requests for CORS preflight
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.WriteHeader(http.StatusOK)
 }
-
-// setupRoutes configures the HTTP routes
 func (s *Server) setupRoutes() {
-	// Add CORS middleware to the main router
 	s.router.Use(corsMiddleware)
 
 	api := s.router.PathPrefix("/api/v1").Subrouter()
@@ -295,8 +277,6 @@ func (s *Server) setupRoutes() {
 	labels.HandleFunc("", s.getLabels).Methods("GET")
 	labels.HandleFunc("", s.addLabel).Methods("POST")
 	labels.HandleFunc("", s.handleOptions).Methods("OPTIONS")
-
-	// Error history endpoints
 	errors := api.PathPrefix("/errors").Subrouter()
 	errors.HandleFunc("", s.listErrorHistory).Methods("GET")
 	errors.HandleFunc("/{id}", s.getErrorHistoryEntry).Methods("GET")
@@ -318,8 +298,6 @@ func (s *Server) setupRoutes() {
 // queryLLM handles POST /api/v1/llm/query - sends a query to the Ollama LLM
 func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Parse request
 	var req LLMRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errorMsg := "Invalid request format"
@@ -342,15 +320,12 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return
 	}
-
-	// Return success
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
 
 // callOllamaLLM calls the Ollama LLM API
 func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error) {
-	// Get Ollama base URL from environment variable or use default
 	ollamaURL := os.Getenv("GPT_BASE_URL")
 	if ollamaURL == "" {
 		ollamaURL = "localhost:11434"
@@ -360,8 +335,6 @@ func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error
 	if !strings.HasPrefix(ollamaURL, "http://") && !strings.HasPrefix(ollamaURL, "https://") {
 		ollamaURL = "http://" + ollamaURL
 	}
-
-	// Create Ollama request
 	ollamaReq := OllamaRequest{
 		Model:  model,
 		Prompt: prompt,
@@ -381,28 +354,20 @@ func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error
 		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
 	}
 	defer resp.Body.Close()
-
-	// Check response status
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("Ollama returned status %d: %s", resp.StatusCode, string(body))
 	}
-
-	// Parse response
 	var ollamaResp OllamaResponse
 	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
 		return nil, fmt.Errorf("failed to decode Ollama response: %w", err)
 	}
-
-	// Return formatted response
 	return &LLMResponse{
 		Response:  ollamaResp.Response,
 		Model:     ollamaResp.Model,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
-
-// createConfig handles POST /api/v1/configs - creates a configuration from recipe-based config files Uses the same logic as offline demo programs for DRY principle
 func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -412,8 +377,6 @@ func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Generate unique ID for this configuration execution
 	configID := generateWantID()
-
-	// Create temporary config file
 	tempConfigPath := fmt.Sprintf("/tmp/config-%s.yaml", configID)
 	if err := os.WriteFile(tempConfigPath, configData, 0644); err != nil {
 		errorMsg := fmt.Sprintf("Failed to create temporary config file: %v", err)
@@ -431,19 +394,13 @@ func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
-
-	// Create execution tracking
 	execution := &WantExecution{
 		ID:      configID,
 		Config:  config,
 		Status:  "completed",
 		Builder: builder,
 	}
-
-	// Store the execution
 	s.wants[configID] = execution
-
-	// Return created configuration
 	w.WriteHeader(http.StatusCreated)
 	response := map[string]interface{}{
 		"id":      configID,
@@ -486,8 +443,6 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 
 	// Register dynamic agents (same as demo_travel_agent_full.go:52-98)
 	s.registerDynamicAgents(agentRegistry)
-
-	// Set agent registry on the builder (same as demo_travel_agent_full.go:100)
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Step 4: Register want types (same as demo_travel_agent_full.go:103)
@@ -512,13 +467,9 @@ func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
 	setupMonitorFlightAgents(agentRegistry)
 
 }
-
-// setupFlightAPIAgents sets up the Flight API agent implementations
 func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
-	// Get the agent_flight_api from registry if it exists
 	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
 		if doAgent, ok := agent.(*mywant.DoAgent); ok {
-			// Set up the Flight API agent with the actual implementation Agent has flight_api_agency capability which gives: create_flight and cancel_flight
 			flightAgent := types.NewAgentFlightAPI(
 				"agent_flight_api",
 				[]string{"flight_api_agency"},
@@ -529,13 +480,9 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 		}
 	}
 }
-
-// setupMonitorFlightAgents sets up the Monitor Flight agent implementations
 func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
-	// Get the monitor_flight_api from registry if it exists
 	if agent, exists := agentRegistry.GetAgent("monitor_flight_api"); exists {
 		if monitorAgent, ok := agent.(*mywant.MonitorAgent); ok {
-			// Set up the Monitor Flight agent with the actual implementation Note: Monitor agents don't provide capabilities, they observe/monitor state
 			flightMonitor := types.NewMonitorFlightAPI(
 				"monitor_flight_api",
 				[]string{},
@@ -546,8 +493,6 @@ func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
 		}
 	}
 }
-
-// createWant handles POST /api/v1/wants - creates a new want object Supports two formats: 1. Single Want object (JSON/YAML) 2. Config object with wants array (for recipe-based configs)
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -580,20 +525,14 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Invalid request: must be either a Want object or Config with wants array. Error: %v", configErr), http.StatusBadRequest)
 			return
 		}
-
-		// Create config with single want
 		config = mywant.Config{Wants: []*mywant.Want{newWant}}
 	}
-
-	// Validate want type before proceeding
 	if err := s.validateWantTypes(config); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
-
-	// Validate want spec (e.g., using selectors)
 	if err := s.validateWantSpec(config); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
@@ -610,22 +549,15 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 
 	// Generate unique ID for this execution (group of wants)
 	executionID := generateWantID()
-
-	// Create want execution with global builder (server mode)
 	execution := &WantExecution{
 		ID:      executionID,
 		Config:  config,
 		Status:  "created",
 		Builder: s.globalBuilder, // Use shared global builder
 	}
-
-	// Store the execution
 	s.wants[executionID] = execution
-
-	// Add all wants to global builder asynchronously with tracking
 	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
 	if err != nil {
-		// Remove from wants map since they weren't added to builder
 		delete(s.wants, executionID)
 		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
 		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
@@ -646,8 +578,6 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		// API-level logging for want creation
 		InfoLog("[API:CREATE] Want created: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 	}
-
-	// Return created execution with first want ID as reference
 	w.WriteHeader(http.StatusCreated)
 
 	// Safety check for invalid want count
@@ -678,10 +608,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	wantsByID := make(map[string]*mywant.Want)
 
 	for _, execution := range s.wants {
-		// Get current want states from the builder (builder always exists)
 		currentStates := execution.Builder.GetAllWantStates()
 		for _, want := range currentStates {
-			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
 				Metadata: want.Metadata,
 				Spec:     want.Spec,
@@ -689,14 +617,10 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				History:  want.History,
 				State:    make(map[string]interface{}),
 			}
-
-			// Get current runtime state and copy to the snapshot
 			currentState := want.GetAllState()
 			for k, v := range currentState {
 				wantCopy.State[k] = v
 			}
-
-			// Store by ID to deduplicate (keep latest version)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -705,7 +629,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	if len(wantsByID) == 0 && s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
-			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
 				Metadata: want.Metadata,
 				Spec:     want.Spec,
@@ -713,26 +636,17 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				History:  want.History,
 				State:    make(map[string]interface{}),
 			}
-
-			// Get current runtime state and copy to the snapshot
 			currentState := want.GetAllState()
 			for k, v := range currentState {
 				wantCopy.State[k] = v
 			}
-
-			// Store by ID to deduplicate (keep latest version)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
-
-
-	// Convert map to slice
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
 	for _, want := range wantsByID {
 		allWants = append(allWants, want)
 	}
-
-	// Create memory dump format response
 	response := map[string]interface{}{
 		"timestamp":    time.Now().Format(time.RFC3339),
 		"execution_id": fmt.Sprintf("api-dump-%d", time.Now().Unix()),
@@ -741,22 +655,17 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 }
-
-// getWant handles GET /api/v1/wants/{id} - gets a specific individual want by its ID
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-
-	// Get query parameters for grouping/filtering agent history
 	groupBy := r.URL.Query().Get("groupBy") // "name" or "type"
 
 	// Search for the want by metadata.id across all executions using universal search
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Create a snapshot copy of the want to avoid concurrent map access
 				wantCopy := &mywant.Want{
 					Metadata: want.Metadata,
 					Spec:     want.Spec,
@@ -764,8 +673,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					History:  want.History,
 					State:    make(map[string]interface{}),
 				}
-
-				// Get current runtime state and copy to the snapshot
 				currentState := want.GetAllState()
 				for k, v := range currentState {
 					wantCopy.State[k] = v
@@ -777,8 +684,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					json.NewEncoder(w).Encode(response)
 					return
 				}
-
-				// Return the snapshot copy
 				json.NewEncoder(w).Encode(wantCopy)
 				return
 			}
@@ -788,7 +693,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	// If not found in executions, also search in global builder (for wants loaded from memory file)
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Create a snapshot copy of the want to avoid concurrent map access
 			wantCopy := &mywant.Want{
 				Metadata: want.Metadata,
 				Spec:     want.Spec,
@@ -796,8 +700,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				History:  want.History,
 				State:    make(map[string]interface{}),
 			}
-
-			// Get current runtime state and copy to the snapshot
 			currentState := want.GetAllState()
 			for k, v := range currentState {
 				wantCopy.State[k] = v
@@ -809,8 +711,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				json.NewEncoder(w).Encode(response)
 				return
 			}
-
-			// Return the snapshot copy
 			json.NewEncoder(w).Encode(wantCopy)
 			return
 		}
@@ -839,7 +739,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[API:UPDATE] Found want in execution %d\n", i)
 				targetExecution = execution
 				foundWant = want
-				// Find the index in the original config for updating
 				for j, configWant := range execution.Config.Wants {
 					if configWant.Metadata.ID == wantID {
 						targetWantIndex = j
@@ -863,12 +762,9 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Cannot update running want", http.StatusConflict)
 		return
 	}
-
-	// Parse updated want object directly
 	var updatedWant *mywant.Want
 
 	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		// Handle YAML want object directly
 		wantYAML := make([]byte, r.ContentLength)
 		r.Body.Read(wantYAML)
 
@@ -877,7 +773,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		// Handle JSON want object directly
 		if err := json.NewDecoder(r.Body).Decode(&updatedWant); err != nil {
 			http.Error(w, fmt.Sprintf("Invalid JSON want: %v", err), http.StatusBadRequest)
 			return
@@ -888,8 +783,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Want object is required", http.StatusBadRequest)
 		return
 	}
-
-	// Validate want type and spec before proceeding
 	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
 	if err := s.validateWantTypes(tempConfig); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
@@ -921,8 +814,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetExecution.Status = "updated"
-
-	// Return the updated want directly (matching createWant response format)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedWant)
 }
@@ -971,8 +862,6 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 		// If want was found, delete it
 		if wantNameToDelete != "" {
-
-			// Remove from config if it exists there
 			if configIndex >= 0 {
 				execution.Config.Wants = append(execution.Config.Wants[:configIndex], execution.Config.Wants[configIndex+1:]...)
 			} else {
@@ -1047,8 +936,6 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
 	http.Error(w, "Want not found", http.StatusNotFound)
 }
-
-// getWantStatus handles GET /api/v1/wants/{id}/status - gets want execution status
 func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1085,8 +972,6 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Want not found", http.StatusNotFound)
 }
-
-// getWantResults handles GET /api/v1/wants/{id}/results - gets want execution results
 func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1138,8 +1023,6 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 // ======= AGENT CRUD HANDLERS =======
-
-// createAgent handles POST /api/v1/agents - creates a new agent
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1154,8 +1037,6 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
 		return
 	}
-
-	// Create agent based on type
 	var agent mywant.Agent
 	baseAgent := mywant.BaseAgent{
 		Name:         agentData.Name,
@@ -1195,11 +1076,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 // listAgents handles GET /api/v1/agents - lists all agents
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Get all agents from registry
 	agents := s.agentRegistry.GetAllAgents()
-
-	// Convert agents to response format
 	agentResponses := make([]map[string]interface{}, len(agents))
 	for i, agent := range agents {
 		agentResponses[i] = map[string]interface{}{
@@ -1216,8 +1093,6 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 }
-
-// getAgent handles GET /api/v1/agents/{name} - gets a specific agent
 func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1244,8 +1119,6 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	agentName := vars["name"]
-
-	// Check if agent exists and delete it
 	if !s.agentRegistry.UnregisterAgent(agentName) {
 		http.Error(w, "Agent not found", http.StatusNotFound)
 		return
@@ -1255,8 +1128,6 @@ func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
 }
 
 // ======= CAPABILITY CRUD HANDLERS =======
-
-// createCapability handles POST /api/v1/capabilities - creates a new capability
 func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1276,8 +1147,6 @@ func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
 // listCapabilities handles GET /api/v1/capabilities - lists all capabilities
 func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Get all capabilities from registry
 	capabilities := s.agentRegistry.GetAllCapabilities()
 
 	response := map[string]interface{}{
@@ -1286,8 +1155,6 @@ func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 }
-
-// getCapability handles GET /api/v1/capabilities/{name} - gets a specific capability
 func (s *Server) getCapability(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1307,8 +1174,6 @@ func (s *Server) getCapability(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	capabilityName := vars["name"]
-
-	// Check if capability exists and delete it
 	if !s.agentRegistry.UnregisterCapability(capabilityName) {
 		http.Error(w, "Capability not found", http.StatusNotFound)
 		return
@@ -1316,8 +1181,6 @@ func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// findAgentsByCapability handles GET /api/v1/capabilities/{name}/agents - finds agents by capability
 func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1328,8 +1191,6 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	if agents == nil {
 		agents = make([]mywant.Agent, 0)
 	}
-
-	// Convert agents to response format
 	agentResponses := make([]map[string]interface{}, len(agents))
 	for i, agent := range agents {
 		agentResponses[i] = map[string]interface{}{
@@ -1368,8 +1229,6 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-
-				// Return success response
 				response := map[string]interface{}{
 					"message":   "Want execution suspended successfully",
 					"wantId":    wantID,
@@ -1393,8 +1252,6 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-
-			// Return success response
 			response := map[string]interface{}{
 				"message":   "Want execution suspended successfully",
 				"wantId":    wantID,
@@ -1433,8 +1290,6 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-
-				// Return success response
 				response := map[string]interface{}{
 					"message":   "Want execution resumed successfully",
 					"wantId":    wantID,
@@ -1458,8 +1313,6 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-
-			// Return success response
 			response := map[string]interface{}{
 				"message":   "Want execution resumed successfully",
 				"wantId":    wantID,
@@ -1498,8 +1351,6 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-
-				// Return success response
 				response := map[string]interface{}{
 					"message":   "Want execution stopped successfully",
 					"wantId":    wantID,
@@ -1523,8 +1374,6 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-
-			// Return success response
 			response := map[string]interface{}{
 				"message":   "Want execution stopped successfully",
 				"wantId":    wantID,
@@ -1563,8 +1412,6 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-
-				// Return success response
 				response := map[string]interface{}{
 					"message":   "Want execution restarted successfully",
 					"wantId":    wantID,
@@ -1588,8 +1435,6 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-
-			// Return success response
 			response := map[string]interface{}{
 				"message":   "Want execution restarted successfully",
 				"wantId":    wantID,
@@ -1607,15 +1452,11 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 		"error": fmt.Sprintf("Want with ID %s not found", wantID),
 	})
 }
-
-// addLabelToWant handles POST /api/v1/wants/{id}/labels - adds a label to a want
 func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-
-	// Parse label request body
 	var labelReq struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
@@ -1625,8 +1466,6 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
 		return
 	}
-
-	// Validate label key and value
 	if labelReq.Key == "" || labelReq.Value == "" {
 		http.Error(w, "Label key and value are required", http.StatusBadRequest)
 		return
@@ -1658,8 +1497,6 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
 		return
 	}
-
-	// Add the label to the want's metadata
 	if targetWant.Metadata.Labels == nil {
 		targetWant.Metadata.Labels = make(map[string]string)
 	}
@@ -1667,8 +1504,6 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":   "Label added successfully",
@@ -1678,8 +1513,6 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
-
-// removeLabelFromWant handles DELETE /api/v1/wants/{id}/labels/{key} - removes a label
 func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1713,16 +1546,12 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
 		return
 	}
-
-	// Remove the label with matching key
 	if targetWant.Metadata.Labels != nil {
 		delete(targetWant.Metadata.Labels, keyToRemove)
 	}
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":   "Label removed successfully",
@@ -1731,15 +1560,11 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
-
-// addUsingDependency handles POST /api/v1/wants/{id}/using - adds a using dependency
 func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-
-	// Parse using dependency request body
 	var usingReq struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
@@ -1749,8 +1574,6 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
 		return
 	}
-
-	// Validate dependency key and value
 	if usingReq.Key == "" || usingReq.Value == "" {
 		http.Error(w, "Using dependency key and value are required", http.StatusBadRequest)
 		return
@@ -1768,7 +1591,6 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 				targetWant = want
 				targetExecution = execution
 				found = true
-				// Find the index in config
 				for i, cfgWant := range execution.Config.Wants {
 					if cfgWant.Metadata.ID == wantID {
 						targetWantIndex = i
@@ -1792,13 +1614,9 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
 		return
 	}
-
-	// Add the using dependency to the want's spec
 	if targetWant.Spec.Using == nil {
 		targetWant.Spec.Using = make([]map[string]string, 0)
 	}
-
-	// Create the new dependency entry
 	newDependency := map[string]string{usingReq.Key: usingReq.Value}
 	targetWant.Spec.Using = append(targetWant.Spec.Using, newDependency)
 
@@ -1809,8 +1627,6 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":   "Using dependency added successfully",
@@ -1820,8 +1636,6 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
-
-// removeUsingDependency handles DELETE /api/v1/wants/{id}/using/{key} - removes a using dependency
 func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1841,7 +1655,6 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 				targetWant = want
 				targetExecution = execution
 				found = true
-				// Find the index in config
 				for i, cfgWant := range execution.Config.Wants {
 					if cfgWant.Metadata.ID == wantID {
 						targetWantIndex = i
@@ -1865,8 +1678,6 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
 		return
 	}
-
-	// Remove the using dependency with matching key
 	if targetWant.Spec.Using != nil {
 		newUsing := make([]map[string]string, 0)
 		for _, dep := range targetWant.Spec.Using {
@@ -1884,8 +1695,6 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":   "Using dependency removed successfully",
@@ -1948,10 +1757,7 @@ func (s *Server) Start() error {
 
 	return http.ListenAndServe(addr, s.router)
 }
-
-// validateWantTypes validates that all want types are known before execution Uses the global builder which has all registries already configured Allows either want.Type or want.Spec.Recipe to be specified
 func (s *Server) validateWantTypes(config mywant.Config) error {
-	// Check each want type by trying to create a minimal want Using globalBuilder ensures we validate against the exact same registries that will be used during actual execution
 	for _, want := range config.Wants {
 		wantType := want.Metadata.Type
 		hasRecipe := want.Spec.Recipe != ""
@@ -1965,8 +1771,6 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 		if hasRecipe && wantType == "" {
 			continue
 		}
-
-		// Create a minimal test want to validate the type
 		testWant := &mywant.Want{
 			Metadata: mywant.Metadata{
 				Name: want.Metadata.Name,
@@ -1986,11 +1790,8 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 
 	return nil
 }
-
-// validateWantSpec validates the WantSpec and Metadata fields for all wants
 func (s *Server) validateWantSpec(config mywant.Config) error {
 	for _, want := range config.Wants {
-		// Validate 'using' selector entries
 		for i, selector := range want.Spec.Using {
 			for key := range selector {
 				if key == "" {
@@ -1998,8 +1799,6 @@ func (s *Server) validateWantSpec(config mywant.Config) error {
 				}
 			}
 		}
-
-		// Validate 'labels' entries (no empty keys allowed)
 		for key := range want.Metadata.Labels {
 			if key == "" {
 				return fmt.Errorf("want '%s': labels has empty key, all label keys must be non-empty", want.Metadata.Name)
@@ -2041,8 +1840,6 @@ func (s *Server) logError(r *http.Request, status int, message, errorType, detai
 func (s *Server) httpErrorWithLogging(w http.ResponseWriter, r *http.Request, status int, message, errorType string, requestData interface{}) {
 	// Log the error to history
 	s.logError(r, status, message, errorType, "", requestData)
-
-	// Send HTTP error response
 	http.Error(w, message, status)
 }
 
@@ -2064,8 +1861,6 @@ func (s *Server) listErrorHistory(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 }
-
-// getErrorHistoryEntry handles GET /api/v1/errors/{id} - gets a specific error entry
 func (s *Server) getErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2122,7 +1917,6 @@ func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 
 	for i, entry := range s.errorHistory {
 		if entry.ID == errorID {
-			// Remove the entry from the slice
 			s.errorHistory = append(s.errorHistory[:i], s.errorHistory[i+1:]...)
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -2144,19 +1938,13 @@ func generateWantID() string {
 	// Generate UUID v4 (random)
 	uuid := make([]byte, 16)
 	rand.Read(uuid)
-
-	// Set version (4) and variant bits
 	uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
 	uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant
-
-	// Format as UUID string: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
 // Recipe API handlers
-
-// createRecipe handles POST /api/v1/recipes - creates a new recipe
 func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2195,8 +1983,6 @@ func (s *Server) listRecipes(w http.ResponseWriter, r *http.Request) {
 	recipes := s.recipeRegistry.ListRecipes()
 	json.NewEncoder(w).Encode(recipes)
 }
-
-// getRecipe handles GET /api/v1/recipes/{id} - gets a specific recipe
 func (s *Server) getRecipe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2255,13 +2041,10 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 
 // loadRecipeFilesIntoRegistry loads recipe YAML files into the recipe registry for the API
 func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTargetTypeRegistry) error {
-	// Check if recipes directory exists
 	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
 		log.Printf("[SERVER] Recipe directory '%s' does not exist, skipping recipe loading\n", recipeDir)
 		return nil
 	}
-
-	// Create a recipe loader
 	loader := mywant.NewGenericRecipeLoader(recipeDir)
 
 	// List all recipe files
@@ -2296,8 +2079,6 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 			recipeID = strings.TrimSuffix(relativePath, ".yaml")
 			recipeID = strings.TrimSuffix(recipeID, ".yml")
 		}
-
-		// Create the recipe in the registry
 		if err := registry.CreateRecipe(recipeID, &recipe); err != nil {
 			log.Printf("[SERVER] Warning: Failed to register recipe %s: %v\n", recipeID, err)
 			continue
@@ -2321,8 +2102,6 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Want type loader not initialized", http.StatusServiceUnavailable)
 		return
 	}
-
-	// Get query parameters for filtering
 	category := r.URL.Query().Get("category")
 	pattern := r.URL.Query().Get("pattern")
 
@@ -2335,8 +2114,6 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	} else {
 		defs = s.wantTypeLoader.GetAll()
 	}
-
-	// Build response with minimal info for listing
 	type WantTypeListItem struct {
 		Name     string `json:"name"`
 		Title    string `json:"title"`
@@ -2361,8 +2138,6 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 		"count":     len(items),
 	})
 }
-
-// getLabels handles GET /api/v1/labels - returns all label keys and values used across wants
 func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2381,7 +2156,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 			}
 			for value := range valueMap {
 				labelValues[key][value] = true
-				// Initialize empty owner list for this label value
 				if labelToWants[key][value] == nil {
 					labelToWants[key][value] = make(map[string]bool)
 				}
@@ -2445,8 +2219,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 
 	// Collect wants that use labels via 'using' selectors (users)
 	labelToUsers := make(map[string]map[string]map[string]bool) // key -> value -> (wantID -> true)
-
-	// Check executions for wants with 'using' selectors
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
@@ -2455,7 +2227,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 				if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
 					continue
 				}
-				// Check if this want uses any labels via 'using' selectors
 				for _, usingSelector := range want.Spec.Using {
 					for key, value := range usingSelector {
 						if labelToUsers[key] == nil {
@@ -2471,8 +2242,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	// Check global builder for wants with 'using' selectors
 	if s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
@@ -2480,7 +2249,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 			if want.Metadata.Name != "" && strings.HasPrefix(want.Metadata.Name, "__") {
 				continue
 			}
-			// Check if this want uses any labels via 'using' selectors
 			for _, usingSelector := range want.Spec.Using {
 				for key, value := range usingSelector {
 					if labelToUsers[key] == nil {
@@ -2495,15 +2263,11 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
-	// Convert keys to sorted slice
 	keys := make([]string, 0, len(labelKeys))
 	for key := range labelKeys {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-
-	// Convert values and owners/users to response format
 	type LabelValueInfo struct {
 		Value  string   `json:"value"`
 		Owners []string `json:"owners"` // Wants that have this label
@@ -2526,8 +2290,6 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		if labelToUsers[key] == nil {
 			labelToUsers[key] = make(map[string]map[string]bool)
 		}
-
-		// Convert to response format with owners and users
 		valueInfos := make([]LabelValueInfo, 0, len(valueSlice))
 		for _, value := range valueSlice {
 			// Ensure the value maps exist
@@ -2558,20 +2320,14 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		}
 		values[key] = valueInfos
 	}
-
-	// Return response
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"labelKeys":   keys,
 		"labelValues": values,
 		"count":       len(keys),
 	})
 }
-
-// addLabel handles POST /api/v1/labels - adds a label to the global label registry This allows registering labels even if they don't exist on any want yet Labels are stored by adding a minimal want to the global builder's state for persistence
 func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Parse request body
 	var labelReq struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
@@ -2581,8 +2337,6 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
-
-	// Validate input
 	labelReq.Key = strings.TrimSpace(labelReq.Key)
 	labelReq.Value = strings.TrimSpace(labelReq.Value)
 
@@ -2590,8 +2344,6 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Label key and value must not be empty", http.StatusBadRequest)
 		return
 	}
-
-	// Add the label to the global label registry (a separate tracking structure) Labels are registered here and displayed in getLabels without creating wants
 	if s.globalLabels == nil {
 		s.globalLabels = make(map[string]map[string]bool) // key -> value -> true
 	}
@@ -2599,8 +2351,6 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		s.globalLabels[labelReq.Key] = make(map[string]bool)
 	}
 	s.globalLabels[labelReq.Key][labelReq.Value] = true
-
-	// Return success response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"key":     labelReq.Key,
@@ -2608,8 +2358,6 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		"message": "Label registered successfully",
 	})
 }
-
-// getWantType handles GET /api/v1/want-types/{name}
 func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2641,8 +2389,6 @@ func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(def)
 }
-
-// getWantTypeExamples handles GET /api/v1/want-types/{name}/examples
 func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -2679,7 +2425,6 @@ func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Create logs directory if it doesn't exist
 	if err := os.MkdirAll("./logs", 0755); err != nil {
 		log.Fatalf("Failed to create logs directory: %v", err)
 	}
@@ -2692,8 +2437,6 @@ func main() {
 	defer logFile.Close()
 	log.SetOutput(logFile)
 	log.SetFlags(log.Ldate | log.Ltime)
-
-	// Parse command line arguments: [port] [host] [debug] Examples: ./server           - port 8080, localhost, no debug ./server 8080      - port 8080, localhost, no debug
 	// ./server 8080 0.0.0.0 - port 8080, 0.0.0.0, no debug ./server 8080 0.0.0.0 debug - port 8080, 0.0.0.0, debug enabled
 	port := 8080
 	host := "localhost"
@@ -2715,12 +2458,8 @@ func main() {
 			debugEnabled = true
 		}
 	}
-
-	// Set global debug flags (both server and engine)
 	GlobalDebugEnabled = debugEnabled
 	mywant.DebugLoggingEnabled = debugEnabled
-
-	// Create server config
 	config := ServerConfig{
 		Port:  port,
 		Host:  host,
@@ -2733,8 +2472,6 @@ func main() {
 	} else {
 		InfoLog("ℹ️  Debug mode disabled - reduced logging (use 'debug' argument to enable)")
 	}
-
-	// Create and start server
 	server := NewServer(config)
 	if err := server.Start(); err != nil {
 		log.Fatal("Server failed to start:", err)

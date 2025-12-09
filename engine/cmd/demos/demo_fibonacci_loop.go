@@ -16,8 +16,6 @@ func main() {
 	fmt.Println("• Merger: Creates feedback loop combining seeds + computed values")
 	fmt.Println("• Sink: Collects and displays the complete sequence")
 	fmt.Println("")
-
-	// Get config file path from command line argument
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run demo_fibonacci_loop.go <config-file-path>")
 		os.Exit(1)
@@ -33,8 +31,6 @@ func main() {
 
 	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
 	fmt.Println("")
-
-	// Create chain builder
 	builder := NewChainBuilder(config)
 
 	// Register fibonacci loop node types
