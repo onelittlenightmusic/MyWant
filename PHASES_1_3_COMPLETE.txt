@@ -1,2 +1,0 @@
-# This content is in PHASES_1_3_COMPLETE.txt
-# See IMPLEMENTATION_PROGRESS.md for complete details
