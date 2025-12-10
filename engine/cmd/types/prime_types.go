@@ -13,7 +13,6 @@ type PrimeNumbersLocals struct {
 // PrimeNumbers creates numbers and sends them downstream
 type PrimeNumbers struct {
 	Want
-	paths Paths
 }
 
 // NewPrimeNumbers creates a new prime numbers want
@@ -68,7 +67,6 @@ type PrimeSequenceLocals struct {
 // PrimeSequence filters out multiples of a prime number
 type PrimeSequence struct {
 	Want
-	paths Paths
 }
 
 // NewPrimeSequence creates a new prime sequence want

@@ -21,7 +21,6 @@ type FlightWantLocals struct {
 // FlightWant creates flight booking reservations
 type FlightWant struct {
 	Want
-	paths Paths
 }
 
 // NewFlightWant creates a new flight booking want

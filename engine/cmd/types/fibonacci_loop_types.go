@@ -20,7 +20,6 @@ type SeedNumbersLocals struct {
 // SeedNumbers provides initial fibonacci seeds (0, 1)
 type SeedNumbers struct {
 	Want
-	paths Paths
 }
 
 // NewSeedNumbers creates a new seed numbers want
@@ -76,7 +75,6 @@ type FibonacciComputerLocals struct {
 // FibonacciComputer computes the next fibonacci number from two using
 type FibonacciComputer struct {
 	Want
-	paths Paths
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
@@ -188,7 +186,6 @@ type FibonacciMergerLocals struct {
 // FibonacciMerger merges seed values with computed values
 type FibonacciMerger struct {
 	Want
-	paths Paths
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
@@ -220,7 +217,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 
 // Exec returns the generalized chain function for the fibonacci merger
 func (m *FibonacciMerger) Exec() bool {
-	if m.paths.GetInCount() < 2 || m.paths.GetOutCount() < 1 {
+	if m.GetInCount() < 2 || m.GetOutCount() < 1 {
 		return true
 	}
 
