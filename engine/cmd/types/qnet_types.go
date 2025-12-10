@@ -221,7 +221,7 @@ func (q *Queue) Exec() bool {
 		q.State = make(map[string]interface{})
 	}
 
-	_, i, ok := q.ReceiveFromAnyInputChannel(100)
+	_, i, ok := q.ReceiveFromAnyInputChannel(0)
 	if !ok {
 		return false
 	}

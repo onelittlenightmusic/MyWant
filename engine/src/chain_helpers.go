@@ -67,12 +67,14 @@ func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interfa
 		return -1, nil, false
 	}
 
-	timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
-	cases = append(cases, reflect.SelectCase{
-		Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
-	})
-	// Default case doesn't map to a channel index, but we track it anyway
-	channelIndexMap = append(channelIndexMap, -1)
+	// Handle 0 timeout as infinite wait (no timeout case)
+	if timeoutMilliseconds > 0 {
+		timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
+		cases = append(cases, reflect.SelectCase{
+			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
+		})
+		channelIndexMap = append(channelIndexMap, -1)
+	}
 
 	chosen, recv, recvOK := reflect.Select(cases)
 
