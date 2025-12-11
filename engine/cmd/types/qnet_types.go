@@ -73,7 +73,6 @@ func ExpRand64() float64 {
 // Numbers creates packets and sends them downstream
 type Numbers struct {
 	mywant.Want
-	paths mywant.Paths
 }
 
 // PacketNumbers creates a new numbers want
@@ -84,7 +83,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		func() mywant.WantLocals { return &NumbersLocals{} },
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  0,
-			RequiredOutputs: 1,
+			RequiredOutputs: 0,
 			MaxInputs:       0,
 			MaxOutputs:      -1,
 			WantType:        "sequence",
@@ -177,7 +176,6 @@ func (g *Numbers) CalculateAchievingPercentage() int {
 // Queue processes packets with a service time
 type Queue struct {
 	mywant.Want
-	paths mywant.Paths
 }
 
 // NewQueue creates a new queue want
@@ -188,7 +186,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 		func() mywant.WantLocals { return &QueueLocals{} },
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  1,
-			RequiredOutputs: 1,
+			RequiredOutputs: 0,
 			MaxInputs:       1,
 			MaxOutputs:      -1,
 			WantType:        "queue",
@@ -221,7 +219,12 @@ func (q *Queue) Exec() bool {
 		q.State = make(map[string]interface{})
 	}
 
-	_, i, ok := q.ReceiveFromAnyInputChannel(0)
+	// Check if input channels are connected before attempting receive
+	if q.GetInCount() == 0 {
+		return true  // No input channels, nothing to process
+	}
+
+	_, i, ok := q.ReceiveFromAnyInputChannel(100)  // Use 100ms timeout instead of forever
 	if !ok {
 		return false
 	}
@@ -322,7 +325,6 @@ func (q *Queue) CalculateAchievingPercentage() int {
 // Combiner merges multiple using streams
 type Combiner struct {
 	mywant.Want
-	paths mywant.Paths
 }
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
@@ -359,14 +361,18 @@ func (c *Combiner) Exec() bool {
 		c.State = make(map[string]interface{})
 	}
 	processed, _ := c.State["processed"].(int)
-	if c.paths.GetInCount() == 0 || c.paths.GetOutCount() == 0 {
+	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
 		return true
 	}
 
 	// Simple combiner: just forward all packets from all inputs
-	for i := 0; i < c.paths.GetInCount(); i++ {
+	for i := 0; i < c.GetInCount(); i++ {
+		inputChan, ok := c.GetInputChannel(i)
+		if !ok {
+			continue
+		}
 		select {
-		case packet, ok := <-c.paths.In[i].Channel:
+		case packet, ok := <-inputChan:
 			if !ok {
 				continue
 			}
@@ -408,7 +414,6 @@ func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 // Sink collects and terminates the packet stream
 type Sink struct {
 	mywant.Want
-	paths mywant.Paths
 }
 
 // Goal creates a new sink want
