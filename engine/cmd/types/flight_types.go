@@ -38,7 +38,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Flight booking scheduling want",
 		},
 		"flight",
-	).(*Want)
+	)
 
 	// Initialize Locals after want is created
 	locals := want.Locals.(*FlightWantLocals)

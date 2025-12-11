@@ -138,7 +138,7 @@ func NewWant(
 	localsFactory LocalsFactory,
 	connectivityMeta ConnectivityMetadata,
 	wantType string,
-) interface{} {
+) *Want {
 	want := &Want{
 		Metadata: metadata,
 		Spec:     spec,
