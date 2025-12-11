@@ -365,34 +365,25 @@ func (c *Combiner) Exec() bool {
 		return true
 	}
 
-	// Simple combiner: just forward all packets from all inputs
-	for i := 0; i < c.GetInCount(); i++ {
-		inputChan, ok := c.GetInputChannel(i)
-		if !ok {
-			continue
-		}
-		select {
-		case packet, ok := <-inputChan:
-			if !ok {
-				continue
-			}
-			qp := packet.(QueuePacket)
-			if qp.IsEnded() {
-				// Trigger OnEnded callback
-				if err := c.OnEnded(&qp, locals); err != nil {
-					c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
-				}
-				// Forward end signal to next want
-				c.SendPacketMulti(qp)
-				return true
-			}
-
-			processed++
-			c.SendPacketMulti(qp)
-		default:
-			// No data available on this channel right now
-		}
+	// Receive from any input channel (wait for data from any source)
+	_, i, ok := c.ReceiveFromAnyInputChannelForever()
+	if !ok {
+		return false
 	}
+
+	packet := i.(QueuePacket)
+	if packet.IsEnded() {
+		// Trigger OnEnded callback
+		if err := c.OnEnded(&packet, locals); err != nil {
+			c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
+		}
+		// Forward end signal to next want
+		c.SendPacketMulti(packet)
+		return true
+	}
+
+	processed++
+	c.SendPacketMulti(packet)
 
 	c.StoreState("processed", processed)
 	return false
