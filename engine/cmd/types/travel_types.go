@@ -56,7 +56,7 @@ type RestaurantWant struct {
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
-func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
+func NewRestaurantWant(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -70,13 +70,13 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Restaurant reservation scheduling want",
 		},
 		"restaurant",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*RestaurantWantLocals)
 	locals.RestaurantType = want.GetStringParam("restaurant_type", "casual")
 	locals.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
 
-	return &RestaurantWant{Want: *want}
+	return want
 }
 
 // Exec creates a restaurant reservation
@@ -405,7 +405,7 @@ type HotelWant struct {
 }
 
 // NewHotelWant creates a new hotel reservation want
-func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
+func NewHotelWant(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -419,14 +419,14 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Hotel reservation scheduling want",
 		},
 		"hotel",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*HotelWantLocals)
 	locals.HotelType = want.GetStringParam("hotel_type", "standard")
 	locals.CheckIn = 22 * time.Hour
 	locals.CheckOut = 8 * time.Hour
 
-	return &HotelWant{Want: *want}
+	return want
 }
 
 func (h *HotelWant) Exec() bool {
@@ -596,7 +596,7 @@ type BuffetWant struct {
 	Want
 }
 
-func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
+func NewBuffetWant(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -610,13 +610,13 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Breakfast buffet scheduling want",
 		},
 		"buffet",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*BuffetWantLocals)
 	locals.BuffetType = want.GetStringParam("buffet_type", "continental")
 	locals.Duration = 1*time.Hour + 30*time.Minute
 
-	return &BuffetWant{Want: *want}
+	return want
 }
 
 func (b *BuffetWant) Exec() bool {
@@ -898,28 +898,28 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
 func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
-	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) interface{} {
-		flight := NewFlightWant(metadata, spec).(*FlightWant)
-		flight.SetAgentRegistry(agentRegistry)
-		return flight
+	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) *Want {
+		want := NewFlightWant(metadata, spec)
+		want.SetAgentRegistry(agentRegistry)
+		return want
 	})
 
-	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
-		restaurant := NewRestaurantWant(metadata, spec).(*RestaurantWant)
-		restaurant.SetAgentRegistry(agentRegistry)
-		return restaurant
+	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) *Want {
+		want := NewRestaurantWant(metadata, spec)
+		want.SetAgentRegistry(agentRegistry)
+		return want
 	})
 
-	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
-		hotel := NewHotelWant(metadata, spec).(*HotelWant)
-		hotel.SetAgentRegistry(agentRegistry)
-		return hotel
+	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) *Want {
+		want := NewHotelWant(metadata, spec)
+		want.SetAgentRegistry(agentRegistry)
+		return want
 	})
 
-	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {
-		buffet := NewBuffetWant(metadata, spec).(*BuffetWant)
-		buffet.SetAgentRegistry(agentRegistry)
-		return buffet
+	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) *Want {
+		want := NewBuffetWant(metadata, spec)
+		want.SetAgentRegistry(agentRegistry)
+		return want
 	})
 
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)

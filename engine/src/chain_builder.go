@@ -287,29 +287,18 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 			wantType, availableTypes, customTypes)
 	}
 
-	wantInstance := factory(want.Metadata, want.Spec)
+	wantPtr := factory(want.Metadata, want.Spec)
 
-	// Extract Want pointer for agent registry and wrapping
-	var wantPtr *Want
-	if w, ok := wantInstance.(*Want); ok {
-		wantPtr = w
-	} else {
-		// For types that embed Want, extract the Want pointer via reflection
-		wantPtr = extractWantViaReflection(wantInstance)
-		if wantPtr != nil {
-		} else {
-		}
-	}
 	if cb.agentRegistry != nil && wantPtr != nil {
 		wantPtr.SetAgentRegistry(cb.agentRegistry)
 	}
 
 	// Automatically wrap with OwnerAwareWant if the want has owner references This enables parent-child coordination via subscription events
 	if len(want.Metadata.OwnerReferences) > 0 {
-		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, wantPtr)
+		return NewOwnerAwareWant(wantPtr, want.Metadata, wantPtr), nil
 	}
 
-	return wantInstance, nil
+	return wantPtr, nil
 }
 
 // TestCreateWantFunction tests want type creation without side effects (exported for validation)

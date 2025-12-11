@@ -269,15 +269,15 @@ func (mw *MonitorWant) ClearAlerts() {
 
 // RegisterMonitorWantTypes registers monitor want types with a ChainBuilder
 func RegisterMonitorWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) *Want {
 		monitor := NewMonitorWant(metadata, spec)
 
 		// Register want for lookup
-		RegisterWant(monitor.Want)
+		RegisterWant(monitor.BaseNotifiableWant.Want)
 
 		// Legacy listener/subscription registration removed - Group A events now use unified subscription system
 
-		return monitor
+		return monitor.BaseNotifiableWant.Want
 	})
 
 	log.Println("📊 Monitor want types registered")

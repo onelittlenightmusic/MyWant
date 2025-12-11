@@ -23,7 +23,7 @@ type SeedNumbers struct {
 }
 
 // NewSeedNumbers creates a new seed numbers want
-func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewSeedNumbers(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -37,7 +37,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci seed generator",
 		},
 		"seed numbers",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*SeedNumbersLocals)
 	locals.MaxCount = want.GetIntParam("max_count", 15)
@@ -78,7 +78,7 @@ type FibonacciComputer struct {
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
-func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciComputer(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -92,7 +92,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number computer",
 		},
 		"fibonacci computer",
-	).(*Want)
+	)
 
 	// Initialize locals with default values
 	locals := want.Locals.(*FibonacciComputerLocals)
@@ -189,7 +189,7 @@ type FibonacciMerger struct {
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
-func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciMerger(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -203,7 +203,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci merger",
 		},
 		"fibonacci merger",
-	).(*Want)
+	)
 
 	// Initialize locals with default values
 	locals := want.Locals.(*FibonacciMergerLocals)

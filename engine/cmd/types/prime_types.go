@@ -16,7 +16,7 @@ type PrimeNumbers struct {
 }
 
 // NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewPrimeNumbers(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -30,7 +30,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number generator",
 		},
 		"prime numbers",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*PrimeNumbersLocals)
 	locals.Start = want.GetIntParam("start", 2)
@@ -70,7 +70,7 @@ type PrimeSequence struct {
 }
 
 // NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
+func NewPrimeSequence(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -84,7 +84,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number sequence",
 		},
 		"prime sequence",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*PrimeSequenceLocals)
 	locals.Prime = want.GetIntParam("prime", 2)

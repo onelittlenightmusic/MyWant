@@ -76,7 +76,7 @@ type Numbers struct {
 }
 
 // PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -90,7 +90,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Packet generator want",
 		},
 		"sequence",
-	).(*mywant.Want)
+	)
 
 	locals := want.Locals.(*NumbersLocals)
 	locals.Rate = want.GetFloatParam("rate", 1.0)
@@ -182,7 +182,7 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue want
-func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -196,7 +196,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Queue processing want",
 		},
 		"queue",
-	).(*mywant.Want)
+	)
 
 	locals := want.Locals.(*QueueLocals)
 	locals.ServiceTime = want.GetFloatParam("service_time", 1.0)
@@ -333,7 +333,7 @@ type Combiner struct {
 	mywant.Want
 }
 
-func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -347,7 +347,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Stream combiner want",
 		},
 		"combiner",
-	).(*mywant.Want)
+	)
 
 	locals := want.Locals.(*CombinerLocals)
 	locals.Operation = want.GetStringParam("operation", "merge")
@@ -414,7 +414,7 @@ type Sink struct {
 }
 
 // Goal creates a new sink want
-func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -428,7 +428,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Data sink/collector want",
 		},
 		"sink",
-	).(*mywant.Want)
+	)
 
 	locals := want.Locals.(*SinkLocals)
 	locals.Received = 0

@@ -15,7 +15,7 @@ type FibonacciNumbers struct {
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciNumbers(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -29,7 +29,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci sequence generator",
 		},
 		"fibonacci numbers",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*FibonacciNumbersLocals)
 	locals.Count = want.GetIntParam("count", 20)
@@ -71,7 +71,7 @@ type FibonacciFilter struct {
 }
 
 // NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciFilter(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -85,7 +85,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number filter (terminal)",
 		},
 		"fibonacci filter",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*FibonacciFilterLocals)
 	locals.MinValue = want.GetIntParam("min_value", 0)

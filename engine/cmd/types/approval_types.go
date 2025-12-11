@@ -35,7 +35,7 @@ type EvidenceWant struct {
 	Want
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
+func NewEvidenceWant(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -49,13 +49,13 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Evidence provider for approval processes",
 		},
 		"evidence",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*EvidenceWantLocals)
 	locals.EvidenceType = want.GetStringParam("evidence_type", "document")
 	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	return &EvidenceWant{Want: *want}
+	return want
 }
 
 func (e *EvidenceWant) Exec() bool {
@@ -112,7 +112,7 @@ type DescriptionWant struct {
 	Want
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
+func NewDescriptionWant(metadata Metadata, spec WantSpec) *Want {
 	want := NewWant(
 		metadata,
 		spec,
@@ -126,13 +126,13 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Description provider for approval processes",
 		},
 		"description",
-	).(*Want)
+	)
 
 	locals := want.Locals.(*DescriptionWantLocals)
 	locals.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
 	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	return &DescriptionWant{Want: *want}
+	return want
 }
 
 func (d *DescriptionWant) Exec() bool {
@@ -189,7 +189,7 @@ type Level1CoordinatorWant struct {
 }
 
 // Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
-func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
+func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Want {
 	coordinator := &Level1CoordinatorWant{
 		Want:            Want{},
 		CoordinatorType: "level1",
@@ -209,7 +209,7 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 		Description:     "Level 1 approval coordinator",
 	}
 
-	return coordinator
+	return &coordinator.Want
 }
 
 func (l *Level1CoordinatorWant) Exec() bool {

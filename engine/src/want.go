@@ -107,7 +107,7 @@ type WantLocals interface {
 }
 
 // WantFactory defines the interface for creating want functions
-type WantFactory func(metadata Metadata, spec WantSpec) interface{}
+type WantFactory func(metadata Metadata, spec WantSpec) *Want
 
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals
