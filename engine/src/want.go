@@ -1081,3 +1081,10 @@ func (w *Want) GetMetadata() *Metadata {
 	return &w.Metadata
 }
 
+// Exec implements the Executable interface for Want
+// Base implementation returns false (no-op for coordinator wants)
+// Derived types override this method to implement their own execution logic
+func (w *Want) Exec() bool {
+	return false
+}
+

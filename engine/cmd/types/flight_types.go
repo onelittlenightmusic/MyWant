@@ -48,9 +48,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	locals.monitoringActive = false
 	locals.monitoringDuration = 30 * time.Second
 
-	// Return FlightWant wrapper to ensure Executable interface is satisfied
-	flight := &FlightWant{Want: *want}
-	return flight
+	return want
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
