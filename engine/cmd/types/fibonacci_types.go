@@ -107,6 +107,7 @@ func (f *FibonacciFilter) Exec() bool {
 		return true
 	}
 
+	// Check if already achieved from previous execution
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {
 		return true
