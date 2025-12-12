@@ -156,9 +156,10 @@ func (f *FibonacciFilter) Exec() bool {
 
 		// Update state for this packet
 		f.StoreStateMulti(map[string]interface{}{
-			"total_processed": totalProcessed,
-			"filtered":        locals.filtered,
-			"count":           len(locals.filtered),
+			"total_processed":       totalProcessed,
+			"filtered":              locals.filtered,
+			"count":                 len(locals.filtered),
+			"last_number_processed": val,
 		})
 	}
 
