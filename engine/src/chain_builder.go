@@ -630,7 +630,6 @@ func (cb *ChainBuilder) connectPhase() error {
 			// Update the want's paths field with the generated paths This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
-			// log.Printf("[RECONCILE:SYNC] Synchronized paths for '%s': In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
 		} else {
 			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}
