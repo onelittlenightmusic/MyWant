@@ -98,6 +98,8 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the filter
+// Processes one packet per call and returns false to yield control
+// Returns true only when end signal (-1) is received
 func (f *FibonacciFilter) Exec() bool {
 	locals, ok := f.Locals.(*FibonacciFilterLocals)
 	if !ok {
@@ -118,34 +120,50 @@ func (f *FibonacciFilter) Exec() bool {
 		}
 	}
 
-	for {
-		_, i, ok := f.ReceiveFromAnyInputChannel(-1)
-		if !ok {
-			break
-		}
-
-		if val, ok := i.(int); ok {
-			// Check for end signal
-			if val == -1 {
-				break
-			}
-
-			totalProcessed++
-			// Filter based on min/max values
-			if val >= locals.MinValue && val <= locals.MaxValue {
-				locals.filtered = append(locals.filtered, val)
-			}
+	// Restore filtered array from persistent state if it exists
+	filteredVal, _ := f.GetState("filtered")
+	if filteredVal != nil {
+		if flt, ok := filteredVal.([]int); ok {
+			locals.filtered = flt
 		}
 	}
 
-	f.StoreStateMulti(map[string]interface{}{
-		"filtered":        locals.filtered,
-		"count":           len(locals.filtered),
-		"total_processed": totalProcessed,
-		"achieved":        true,
-	})
+	// Try to receive one packet with timeout
+	_, i, ok := f.ReceiveFromAnyInputChannel(5000) // 5000ms timeout per packet
+	if !ok {
+		// No packet available, yield control
+		return false
+	}
 
-	return true
+	if val, ok := i.(int); ok {
+		// Check for end signal
+		if val == -1 {
+			// End signal received - finalize and complete
+			f.StoreStateMulti(map[string]interface{}{
+				"filtered":        locals.filtered,
+				"count":           len(locals.filtered),
+				"total_processed": totalProcessed,
+				"achieved":        true,
+			})
+			return true
+		}
+
+		totalProcessed++
+		// Filter based on min/max values
+		if val >= locals.MinValue && val <= locals.MaxValue {
+			locals.filtered = append(locals.filtered, val)
+		}
+
+		// Update state for this packet
+		f.StoreStateMulti(map[string]interface{}{
+			"total_processed": totalProcessed,
+			"filtered":        locals.filtered,
+			"count":           len(locals.filtered),
+		})
+	}
+
+	// Yield control - will be called again for next packet
+	return false
 }
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
