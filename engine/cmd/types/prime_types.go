@@ -97,6 +97,8 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 }
 
 // Exec returns the generalized chain function for the filter
+// Processes one packet per call and returns false to yield control
+// Returns true only when end signal (-1) is received
 func (f *PrimeSequence) Exec() bool {
 	locals, ok := f.Locals.(*PrimeSequenceLocals)
 	if !ok {
@@ -117,58 +119,70 @@ func (f *PrimeSequence) Exec() bool {
 		}
 	}
 
-	for {
-		_, i, ok := f.ReceiveFromAnyInputChannel(-1)
-		if !ok {
-			break
-		}
-
-		if val, ok := i.(int); ok {
-			// Check for end signal
-			if val == -1 {
-				break
-			}
-
-			totalProcessed++
-			isPrime := true
-
-			// Special cases: 1 is not prime, 2 is prime
-			if val < 2 {
-				isPrime = false
-			} else if val == 2 {
-				isPrime = true
-			} else {
-				for _, prime := range locals.foundPrimes {
-					if prime*prime > val {
-						break // No need to check beyond sqrt(val)
-					}
-					if val%prime == 0 {
-						isPrime = false
-						break
-					}
-				}
-			}
-
-			// If it's prime, add to memoized primes and pass through
-			if isPrime {
-				locals.foundPrimes = append(locals.foundPrimes, val)
-				// if f.paths.GetOutCount() > 0 { f.SendPacketMulti(val) } Update live state immediately when prime is found
-				// f.StoreStateMulti(map[string]interface{}{ "foundPrimes":    foundPrimes, "primeCount":     len(foundPrimes), "lastPrimeFound": val,
-				// })
-			}
-			f.StoreStateMulti(map[string]interface{}{
-				"total_processed":       totalProcessed,
-				"last_number_processed": val,
-			})
+	// Restore foundPrimes from persistent state if it exists
+	foundPrimesVal, _ := f.GetState("foundPrimes")
+	if foundPrimesVal != nil {
+		if fp, ok := foundPrimesVal.([]int); ok {
+			locals.foundPrimes = fp
 		}
 	}
-	f.StoreStateMulti(map[string]interface{}{
-		"foundPrimes":    locals.foundPrimes,
-		"primeCount":     len(locals.foundPrimes),
-		"total_processed": totalProcessed,
-	})
 
-	return true
+	// Try to receive one packet with timeout
+	_, i, ok := f.ReceiveFromAnyInputChannel(5000) // 5000ms timeout per packet
+	if !ok {
+		// No packet available, yield control
+		return false
+	}
+
+	if val, ok := i.(int); ok {
+		// Check for end signal
+		if val == -1 {
+			// End signal received - finalize and complete
+			f.StoreStateMulti(map[string]interface{}{
+				"foundPrimes":    locals.foundPrimes,
+				"primeCount":     len(locals.foundPrimes),
+				"total_processed": totalProcessed,
+				"achieved":       true,
+			})
+			return true
+		}
+
+		totalProcessed++
+		isPrime := true
+
+		// Special cases: 1 is not prime, 2 is prime
+		if val < 2 {
+			isPrime = false
+		} else if val == 2 {
+			isPrime = true
+		} else {
+			for _, prime := range locals.foundPrimes {
+				if prime*prime > val {
+					break // No need to check beyond sqrt(val)
+				}
+				if val%prime == 0 {
+					isPrime = false
+					break
+				}
+			}
+		}
+
+		// If it's prime, add to memoized primes
+		if isPrime {
+			locals.foundPrimes = append(locals.foundPrimes, val)
+		}
+
+		// Update state for this packet
+		f.StoreStateMulti(map[string]interface{}{
+			"total_processed":       totalProcessed,
+			"last_number_processed": val,
+			"foundPrimes":           locals.foundPrimes,
+			"primeCount":            len(locals.foundPrimes),
+		})
+	}
+
+	// Yield control - will be called again for next packet
+	return false
 }
 
 // // PrimeSink collects and displays results type PrimeSink struct { Want Received int
