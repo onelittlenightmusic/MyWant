@@ -107,7 +107,8 @@ type WantLocals interface {
 }
 
 // WantFactory defines the interface for creating want functions
-type WantFactory func(metadata Metadata, spec WantSpec) *Want
+// Returns interface{} which can be *Want or a concrete type wrapper that embeds Want
+type WantFactory func(metadata Metadata, spec WantSpec) interface{}
 
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals
@@ -942,27 +943,20 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 		return nil // No outputs to send to
 	}
 
-	sentCount := 0
-	// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] paths.Out has %d outputs", len(paths.Out)))
 	for _, pathInfo := range paths.Out {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
 		}
 		select {
 		case pathInfo.Channel <- packet:
-			sentCount++
-			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d, target: %s", i, pathInfo.TargetWantName))
+			// Sent successfully
 		default:
 			// Channel is full, try blocking send
 			pathInfo.Channel <- packet
-			sentCount++
-			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-DEBUG] Sent to channel %d (blocking), target: %s", i, pathInfo.TargetWantName))
 		}
 	}
 
-	// n.StoreLog(fmt.Sprintf("[SEND:MULTI] Want '%s' sent to %d outputs", n.Metadata.Name, sentCount))
-
-	// Trigger retrigger for each receiver that got the packet This is receiver-centric retrigger: if achieved want receives new packet, it should re-execute
+	// Trigger retrigger for each receiver that got the packet
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		for _, pathInfo := range paths.Out {
@@ -970,11 +964,8 @@ func (n *Want) SendPacketMulti(packet interface{}) error {
 				continue
 			}
 			targetWantName := pathInfo.TargetWantName
-			// n.StoreLog(fmt.Sprintf("[SEND:MULTI-RETRIGGER] Retriggering receiver: %s (channel %d)", targetWantName, i))
 			cb.RetriggerReceiverWant(targetWantName)
 		}
-	} else {
-		// n.StoreLog("[SEND:MULTI-RETRIGGER] WARNING: GetGlobalChainBuilder returned nil!")
 	}
 
 	return nil
@@ -1081,10 +1072,4 @@ func (w *Want) GetMetadata() *Metadata {
 	return &w.Metadata
 }
 
-// Exec implements the Executable interface for Want
-// Base implementation returns false (no-op for coordinator wants)
-// Derived types override this method to implement their own execution logic
-func (w *Want) Exec() bool {
-	return false
-}
 

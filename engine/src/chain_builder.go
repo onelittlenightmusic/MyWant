@@ -10,6 +10,7 @@ import (
 	"mywant/engine/src/chain"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -198,7 +199,7 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					matchCount++
 					// log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
 						// otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
-					ch := make(chain.Chan, 10)
+					ch := make(chain.Chan, 100)
 					inPath := PathInfo{
 						Channel: ch,
 						Name:    fmt.Sprintf("%s_to_%s", otherName, wantName),
@@ -287,7 +288,23 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 			wantType, availableTypes, customTypes)
 	}
 
-	wantPtr := factory(want.Metadata, want.Spec)
+	factoryResult := factory(want.Metadata, want.Spec)
+
+	// Extract *Want from the factory result (can be *Want or concrete type wrapper)
+	var wantPtr *Want
+	if fw, ok := factoryResult.(*Want); ok {
+		wantPtr = fw
+	} else if executable, ok := factoryResult.(Executable); ok {
+		// For concrete types that embed Want, extract the want via reflection
+		// This handles types like *RestaurantWant, *FlightWant, etc.
+		if w, err := extractWantFromExecutable(executable); err == nil {
+			wantPtr = w
+		} else {
+			return nil, fmt.Errorf("factory returned Executable but could not extract Want: %v", err)
+		}
+	} else {
+		return nil, fmt.Errorf("factory returned unsupported type: %T", factoryResult)
+	}
 
 	if cb.agentRegistry != nil && wantPtr != nil {
 		wantPtr.SetAgentRegistry(cb.agentRegistry)
@@ -295,10 +312,10 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 	// Automatically wrap with OwnerAwareWant if the want has owner references This enables parent-child coordination via subscription events
 	if len(want.Metadata.OwnerReferences) > 0 {
-		return NewOwnerAwareWant(wantPtr, want.Metadata, wantPtr), nil
+		return NewOwnerAwareWant(factoryResult, want.Metadata, wantPtr), nil
 	}
 
-	return wantPtr, nil
+	return factoryResult, nil
 }
 
 // TestCreateWantFunction tests want type creation without side effects (exported for validation)
@@ -621,17 +638,16 @@ func (cb *ChainBuilder) connectPhase() error {
 	cb.buildLabelToUsersMapping()
 	cb.validateConnections(cb.pathMap)
 
-	// Rebuild channels based on new topology
+	// Store the constructed channels in cb.channels for potential external access
+	// The channels themselves were created in generatePathsFromConnections() and should NOT be recreated here
 	cb.channelMutex.Lock()
 	cb.channels = make(map[string]chain.Chan)
 
-	channelCount := 0
+	// Map channels by their path names (from pathMap, which contains the original channels)
 	for _, paths := range cb.pathMap {
 		for _, outputPath := range paths.Out {
-			if outputPath.Active {
-				channelKey := outputPath.Name
-				cb.channels[channelKey] = make(chain.Chan, 10)
-				channelCount++
+			if outputPath.Active && outputPath.Channel != nil {
+				cb.channels[outputPath.Name] = outputPath.Channel
 			}
 		}
 	}
@@ -2650,6 +2666,37 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 		InfoLog("[RETRIGGER:SEND] Warning: reconcileTrigger channel full, skipping trigger\n")
 	}
 }
+// extractWantFromExecutable extracts the embedded *Want from an Executable type using reflection
+// This handles concrete types like *RestaurantWant that embed Want
+func extractWantFromExecutable(executable Executable) (*Want, error) {
+	val := reflect.ValueOf(executable)
+	if val.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("executable must be a pointer type")
+	}
+
+	// Get the struct value
+	elem := val.Elem()
+	if elem.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("executable must point to a struct")
+	}
+
+	// Look for an embedded Want field
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.Field(i)
+		fieldType := elem.Type().Field(i)
+
+		// Check if this is an embedded Want field
+		if fieldType.Anonymous && fieldType.Type.Name() == "Want" {
+			// Found the embedded Want field
+			if field.Kind() == reflect.Struct && field.CanAddr() {
+				return field.Addr().Interface().(*Want), nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("could not find embedded Want field in %T", executable)
+}
+
 func SetGlobalChainBuilder(cb *ChainBuilder) {
 	globalChainBuilder = cb
 }

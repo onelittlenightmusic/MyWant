@@ -35,7 +35,7 @@ type EvidenceWant struct {
 	Want
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) *Want {
+func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -55,7 +55,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) *Want {
 	locals.EvidenceType = want.GetStringParam("evidence_type", "document")
 	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	return want
+	return &EvidenceWant{*want}
 }
 
 func (e *EvidenceWant) Exec() bool {
@@ -112,7 +112,7 @@ type DescriptionWant struct {
 	Want
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) *Want {
+func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -132,7 +132,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) *Want {
 	locals.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
 	locals.ApprovalID = want.GetStringParam("approval_id", "")
 
-	return want
+	return &DescriptionWant{*want}
 }
 
 func (d *DescriptionWant) Exec() bool {
@@ -189,7 +189,7 @@ type Level1CoordinatorWant struct {
 }
 
 // Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
-func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Want {
+func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
 	coordinator := &Level1CoordinatorWant{
 		Want:            Want{},
 		CoordinatorType: "level1",
@@ -209,7 +209,7 @@ func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) *Want {
 		Description:     "Level 1 approval coordinator",
 	}
 
-	return &coordinator.Want
+	return coordinator
 }
 
 func (l *Level1CoordinatorWant) Exec() bool {

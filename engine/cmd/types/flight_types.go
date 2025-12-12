@@ -24,7 +24,7 @@ type FlightWant struct {
 }
 
 // NewFlightWant creates a new flight booking want
-func NewFlightWant(metadata Metadata, spec WantSpec) *Want {
+func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -48,7 +48,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) *Want {
 	locals.monitoringActive = false
 	locals.monitoringDuration = 30 * time.Second
 
-	return want
+	return &FlightWant{*want}
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule

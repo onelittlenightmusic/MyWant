@@ -23,7 +23,7 @@ type SeedNumbers struct {
 }
 
 // NewSeedNumbers creates a new seed numbers want
-func NewSeedNumbers(metadata Metadata, spec WantSpec) *Want {
+func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -42,7 +42,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) *Want {
 	locals := want.Locals.(*SeedNumbersLocals)
 	locals.MaxCount = want.GetIntParam("max_count", 15)
 
-	return want
+	return &SeedNumbers{*want}
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
@@ -78,7 +78,7 @@ type FibonacciComputer struct {
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
-func NewFibonacciComputer(metadata Metadata, spec WantSpec) *Want {
+func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -103,7 +103,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) *Want {
 	locals.processed = 0
 	locals.initialized = false
 
-	return want
+	return &FibonacciComputer{*want}
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
@@ -189,7 +189,7 @@ type FibonacciMerger struct {
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
-func NewFibonacciMerger(metadata Metadata, spec WantSpec) *Want {
+func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -212,7 +212,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) *Want {
 	locals.processed = 0
 	locals.maxCountReceived = false
 
-	return want
+	return &FibonacciMerger{*want}
 }
 
 // Exec returns the generalized chain function for the fibonacci merger

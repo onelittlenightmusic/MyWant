@@ -15,7 +15,7 @@ type FibonacciNumbers struct {
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, spec WantSpec) *Want {
+func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -34,7 +34,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) *Want {
 	locals := want.Locals.(*FibonacciNumbersLocals)
 	locals.Count = want.GetIntParam("count", 20)
 
-	return want
+	return &FibonacciNumbers{*want}
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -45,6 +45,8 @@ func (g *FibonacciNumbers) Exec() bool {
 	sentCount, _ := g.GetStateInt("sent_count", 0)
 
 	if sentCount >= count {
+		// Send end signal
+		g.SendPacketMulti(-1)
 		return true
 	}
 
@@ -71,7 +73,7 @@ type FibonacciFilter struct {
 }
 
 // NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, spec WantSpec) *Want {
+func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -108,28 +110,42 @@ func (f *FibonacciFilter) Exec() bool {
 		return true
 	}
 
+	totalProcessedVal, _ := f.GetState("total_processed")
 	totalProcessed := 0
-	_, i, ok := f.ReceiveFromAnyInputChannel(100)
-	if !ok {
-		f.StoreState("achieved", true)
-
-		return true
-	}
-
-	if val, ok := i.(int); ok {
-		totalProcessed++
-		// Filter based on min/max values
-		if val >= locals.MinValue && val <= locals.MaxValue {
-			locals.filtered = append(locals.filtered, val)
+	if totalProcessedVal != nil {
+		if tp, ok := totalProcessedVal.(int); ok {
+			totalProcessed = tp
 		}
 	}
+
+	for {
+		_, i, ok := f.ReceiveFromAnyInputChannel(-1)
+		if !ok {
+			break
+		}
+
+		if val, ok := i.(int); ok {
+			// Check for end signal
+			if val == -1 {
+				break
+			}
+
+			totalProcessed++
+			// Filter based on min/max values
+			if val >= locals.MinValue && val <= locals.MaxValue {
+				locals.filtered = append(locals.filtered, val)
+			}
+		}
+	}
+
 	f.StoreStateMulti(map[string]interface{}{
 		"filtered":        locals.filtered,
 		"count":           len(locals.filtered),
 		"total_processed": totalProcessed,
+		"achieved":        true,
 	})
 
-	return false
+	return true
 }
 
 // RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder

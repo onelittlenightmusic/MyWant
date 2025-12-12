@@ -269,7 +269,7 @@ func (mw *MonitorWant) ClearAlerts() {
 
 // RegisterMonitorWantTypes registers monitor want types with a ChainBuilder
 func RegisterMonitorWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) *Want {
+	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) interface{} {
 		monitor := NewMonitorWant(metadata, spec)
 
 		// Register want for lookup

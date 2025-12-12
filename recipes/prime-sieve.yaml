@@ -11,7 +11,7 @@ recipe:
   parameters:
     prefix: "prime"
     display_name: "Prime Number Sieve"
-    start_number: 1
+    start_number: 2
     end_number: 100
 
   # Parameter descriptions - explain what each parameter does

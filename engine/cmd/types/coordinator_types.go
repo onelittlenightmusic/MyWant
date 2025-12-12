@@ -37,7 +37,7 @@ type CoordinatorWant struct {
 func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
-) *Want {
+) interface{} {
 	coordinator := &CoordinatorWant{
 		Want: Want{},
 	}
@@ -62,7 +62,7 @@ func NewCoordinatorWant(
 		Description:     fmt.Sprintf("Generic coordinator want (%s)", coordinatorType),
 	}
 
-	return &coordinator.Want
+	return coordinator
 }
 // This enables full customization of coordinator behavior through parameters
 func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {

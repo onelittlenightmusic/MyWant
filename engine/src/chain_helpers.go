@@ -91,7 +91,7 @@ func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interfa
 		return -1, nil, false
 	}
 
-	// If we got here, data was received IMPORTANT: Return the ORIGINAL channel index, not the case index!
+	// If we got here, data was received - Return the ORIGINAL channel index, not the case index!
 	if recvOK {
 		originalIndex := channelIndexMap[chosen]
 		return originalIndex, recv.Interface(), true

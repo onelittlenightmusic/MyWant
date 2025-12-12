@@ -16,7 +16,7 @@ type PrimeNumbers struct {
 }
 
 // NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, spec WantSpec) *Want {
+func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -36,7 +36,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) *Want {
 	locals.Start = want.GetIntParam("start", 2)
 	locals.End = want.GetIntParam("end", 100)
 
-	return want
+	return &PrimeNumbers{*want}
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -44,11 +44,14 @@ func (g *PrimeNumbers) Exec() bool {
 	start := g.GetIntParam("start", 2)
 	end := g.GetIntParam("end", 100)
 	currentNumber, exists := g.GetStateInt("current_number", start)
+
 	if !exists {
 		currentNumber = start
 	}
 
 	if currentNumber > end {
+		// Send end signal
+		g.SendPacketMulti(-1)
 		return true
 	}
 
@@ -70,7 +73,7 @@ type PrimeSequence struct {
 }
 
 // NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, spec WantSpec) *Want {
+func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 	want := NewWant(
 		metadata,
 		spec,
@@ -90,7 +93,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) *Want {
 	locals.Prime = want.GetIntParam("prime", 2)
 	locals.foundPrimes = make([]int, 0)
 
-	return want
+	return &PrimeSequence{*want}
 }
 
 // Exec returns the generalized chain function for the filter
@@ -105,7 +108,7 @@ func (f *PrimeSequence) Exec() bool {
 	if achieved {
 		return true
 	}
-	f.StoreState("achieved", true)
+
 	totalProcessedVal, _ := f.GetState("total_processed")
 	totalProcessed := 0
 	if totalProcessedVal != nil {
@@ -115,12 +118,17 @@ func (f *PrimeSequence) Exec() bool {
 	}
 
 	for {
-		_, i, ok := f.ReceiveFromAnyInputChannel(100)
+		_, i, ok := f.ReceiveFromAnyInputChannel(-1)
 		if !ok {
 			break
 		}
 
 		if val, ok := i.(int); ok {
+			// Check for end signal
+			if val == -1 {
+				break
+			}
+
 			totalProcessed++
 			isPrime := true
 

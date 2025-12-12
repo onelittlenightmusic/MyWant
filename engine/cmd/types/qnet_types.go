@@ -76,7 +76,7 @@ type Numbers struct {
 }
 
 // PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
+func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -100,7 +100,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want 
 	locals.currentTime = 0.0
 	locals.currentCount = 0
 
-	return want
+	return &Numbers{*want}
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
@@ -182,7 +182,7 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue want
-func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
+func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -207,7 +207,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	locals.waitTimeSum = 0.0
 	locals.processedCount = 0
 
-	return want
+	return &Queue{*want}
 }
 
 // Exec executes the queue processing directly with batch mechanism
@@ -333,7 +333,7 @@ type Combiner struct {
 	mywant.Want
 }
 
-func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
+func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -352,7 +352,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	locals := want.Locals.(*CombinerLocals)
 	locals.Operation = want.GetStringParam("operation", "merge")
 
-	return want
+	return &Combiner{*want}
 }
 
 // Exec executes the combiner directly
@@ -414,7 +414,7 @@ type Sink struct {
 }
 
 // Goal creates a new sink want
-func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
+func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 	want := mywant.NewWant(
 		metadata,
 		spec,
@@ -433,7 +433,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) *mywant.Want {
 	locals := want.Locals.(*SinkLocals)
 	locals.Received = 0
 
-	return want
+	return &Sink{*want}
 }
 
 // Exec executes the sink directly

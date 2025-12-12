@@ -653,7 +653,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	recipeLoader := NewGenericRecipeLoader("recipes")
 
 	// Register target type with recipe support
-	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) *Want {
+	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
 		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
 		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes
