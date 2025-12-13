@@ -126,6 +126,13 @@ func (f *FlightWant) Exec() bool {
 
 	// === Phase 2: Initial Booking ===
 	case PhaseBooking:
+		// Initialize monitoring duration on first booking transition
+		if locals.monitoringDuration == 0 {
+			completionTimeoutSeconds := f.GetIntParam("completion_timeout", 60)
+			locals.monitoringDuration = time.Duration(completionTimeoutSeconds) * time.Second
+			f.StoreLog(fmt.Sprintf("Monitoring duration initialized: %v seconds", completionTimeoutSeconds))
+		}
+
 		f.StoreLog("Executing initial booking")
 		f.StoreState("attempted", true)
 		f.tryAgentExecution()
