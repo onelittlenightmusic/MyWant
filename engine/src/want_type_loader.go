@@ -269,6 +269,10 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 		}
 	}
 
+	// Validation of require field is handled by OpenAPI spec
+	// The OpenAPI spec defines require.type as required and validates enum values
+	// No need to duplicate validation here
+
 	return nil
 }
 func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {

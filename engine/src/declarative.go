@@ -203,9 +203,9 @@ type ConnectionSpec struct {
 
 // RequireSpec defines structured connectivity requirements
 type RequireSpec struct {
-	Type      string               `json:"type" yaml:"type"`                           // require type: providers, users, providers_and_users, none
-	Providers []ConnectionSpec     `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connections (flattened)
-	Users     []ConnectionSpec     `json:"users,omitempty" yaml:"users,omitempty"`       // Output connections (flattened)
+	Type      string               `json:"type" yaml:"type"`                           // REQUIRED: connectivity policy (none, users, providers, providers_and_users)
+	Providers []ConnectionSpec     `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connection specifications
+	Users     []ConnectionSpec     `json:"users,omitempty" yaml:"users,omitempty"`       // Output connection specifications
 }
 
 // ToConnectivityMetadata converts RequireSpec to ConnectivityMetadata

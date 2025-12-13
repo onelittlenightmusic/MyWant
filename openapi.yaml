@@ -1024,6 +1024,83 @@ components:
       required:
         - recipe
 
+    ConnectionSpec:
+      type: object
+      description: Single connection specification for require field
+      properties:
+        name:
+          type: string
+          description: Connection name (e.g., "schedule", "data_packets")
+          example: "schedule"
+        type:
+          type: string
+          description: Connection type (e.g., "state", "want")
+          example: "state"
+        description:
+          type: string
+          description: Connection description
+          example: "Generated schedule output"
+        required:
+          type: boolean
+          description: Whether this connection is required
+          example: true
+        multiple:
+          type: boolean
+          description: Whether multiple connections of this type are allowed
+          example: false
+      required:
+        - name
+        - type
+
+    RequireSpec:
+      type: object
+      description: |
+        Structured connectivity requirements for a want type.
+        Replaces the old connectivity section and usageLimit block.
+
+        The type field specifies the connectivity policy:
+        - "none": No connectivity requirements (default)
+        - "users": Output connections required
+        - "providers": Input connections required
+        - "providers_and_users": Both input and output required
+
+        The providers array lists input connection specifications.
+        The users array lists output connection specifications.
+      properties:
+        type:
+          type: string
+          description: Require policy type
+          enum:
+            - "none"
+            - "users"
+            - "providers"
+            - "providers_and_users"
+          example: "users"
+        providers:
+          type: array
+          description: Input connection specifications
+          items:
+            $ref: '#/components/schemas/ConnectionSpec'
+          example:
+            - name: "data_packets"
+              type: "want"
+              description: "Input data packets"
+              required: true
+              multiple: true
+        users:
+          type: array
+          description: Output connection specifications
+          items:
+            $ref: '#/components/schemas/ConnectionSpec'
+          example:
+            - name: "schedule"
+              type: "state"
+              description: "Generated schedule"
+              required: true
+              multiple: false
+      required:
+        - type
+
     ErrorResponse:
       type: object
       description: Standard error response
