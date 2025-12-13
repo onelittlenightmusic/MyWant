@@ -21,6 +21,8 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
   const [valueOpen, setValueOpen] = useState(false);
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
   const [filteredValues, setFilteredValues] = useState<string[]>([]);
+  const [keySelectedIndex, setKeySelectedIndex] = useState(-1);
+  const [valueSelectedIndex, setValueSelectedIndex] = useState(-1);
   const keyInputRef = useRef<HTMLInputElement>(null);
   const valueInputRef = useRef<HTMLInputElement>(null);
   const keyContainerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
       setFilteredKeys(labelKeys);
       setKeyOpen(false);
     }
+    setKeySelectedIndex(-1);
   }, [keyValue, labelKeys]);
 
   // Filter values based on input and current key
@@ -63,6 +66,7 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
       setFilteredValues([]);
       setValueOpen(false);
     }
+    setValueSelectedIndex(-1);
   }, [valuValue, keyValue, labelValues]);
 
   // Close dropdowns when clicking outside
@@ -98,11 +102,19 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
     if (keyValue !== key) {
       onValueChange('');
     }
+    // Auto-focus value input after key selection
+    setTimeout(() => {
+      valueInputRef.current?.focus();
+    }, 0);
   };
 
   const handleValueSelect = (value: string) => {
     onValueChange(value);
     setValueOpen(false);
+    // Move focus back to key input after value selection
+    setTimeout(() => {
+      keyInputRef.current?.focus();
+    }, 0);
   };
 
   const handleKeyFocus = () => {
@@ -132,12 +144,30 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
               onChange={(e) => onKeyChange(e.target.value)}
               onFocus={handleKeyFocus}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  valueInputRef.current?.focus();
+                  if (keyOpen && filteredKeys.length > 0) {
+                    setKeySelectedIndex(Math.min(keySelectedIndex + 1, filteredKeys.length - 1));
+                  }
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (keyOpen && keySelectedIndex > 0) {
+                    setKeySelectedIndex(keySelectedIndex - 1);
+                  }
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (keyOpen && keySelectedIndex >= 0 && filteredKeys[keySelectedIndex]) {
+                    handleKeySelect(filteredKeys[keySelectedIndex]);
+                  } else {
+                    valueInputRef.current?.focus();
+                  }
                 } else if (e.key === 'Tab') {
                   e.preventDefault();
-                  valueInputRef.current?.focus();
+                  if (keyOpen && keySelectedIndex >= 0 && filteredKeys[keySelectedIndex]) {
+                    handleKeySelect(filteredKeys[keySelectedIndex]);
+                  } else {
+                    valueInputRef.current?.focus();
+                  }
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
@@ -157,9 +187,13 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
                   key={index}
                   type="button"
                   onClick={() => handleKeySelect(key)}
-                  className="w-full text-left px-3 py-2 hover:bg-blue-50 focus:outline-none focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                  className={`w-full text-left px-3 py-2 focus:outline-none border-b border-gray-100 last:border-b-0 ${
+                    index === keySelectedIndex
+                      ? 'bg-blue-500 text-white'
+                      : 'hover:bg-blue-50'
+                  }`}
                 >
-                  <span className="text-sm text-gray-700 font-medium">{key}</span>
+                  <span className={`text-sm font-medium ${index === keySelectedIndex ? 'text-white' : 'text-gray-700'}`}>{key}</span>
                 </button>
               ))}
             </div>
@@ -176,9 +210,30 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
               onChange={(e) => onValueChange(e.target.value)}
               onFocus={handleValueFocus}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  setValueOpen(false);
+                  if (valueOpen && filteredValues.length > 0) {
+                    setValueSelectedIndex(Math.min(valueSelectedIndex + 1, filteredValues.length - 1));
+                  }
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (valueOpen && valueSelectedIndex > 0) {
+                    setValueSelectedIndex(valueSelectedIndex - 1);
+                  }
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (valueOpen && valueSelectedIndex >= 0 && filteredValues[valueSelectedIndex]) {
+                    handleValueSelect(filteredValues[valueSelectedIndex]);
+                  } else {
+                    setValueOpen(false);
+                  }
+                } else if (e.key === 'Tab') {
+                  e.preventDefault();
+                  if (valueOpen && valueSelectedIndex >= 0 && filteredValues[valueSelectedIndex]) {
+                    handleValueSelect(filteredValues[valueSelectedIndex]);
+                  } else {
+                    setValueOpen(false);
+                  }
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
@@ -199,9 +254,13 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
                   key={index}
                   type="button"
                   onClick={() => handleValueSelect(value)}
-                  className="w-full text-left px-3 py-2 hover:bg-blue-50 focus:outline-none focus:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                  className={`w-full text-left px-3 py-2 focus:outline-none border-b border-gray-100 last:border-b-0 ${
+                    index === valueSelectedIndex
+                      ? 'bg-blue-500 text-white'
+                      : 'hover:bg-blue-50'
+                  }`}
                 >
-                  <span className="text-sm text-gray-700">{value}</span>
+                  <span className={`text-sm ${index === valueSelectedIndex ? 'text-white' : 'text-gray-700'}`}>{value}</span>
                 </button>
               ))}
             </div>
