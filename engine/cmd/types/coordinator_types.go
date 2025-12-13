@@ -64,14 +64,9 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 	coordinatorLevel := want.GetIntParam("coordinator_level", -1)
 	coordinatorTypeParam := want.GetStringParam("coordinator_type", "")
 
-	// Determine handler based on coordinator type and parameters Priority: explicit params > type-specific defaults > generic fallback
-
-	// Determine approval level from coordinator type name (backward compat) or parameter
-	approvalLevel := coordinatorLevel
-	if approvalLevel <= 0 && (coordinatorType == "level2_coordinator") {
-		approvalLevel = 2
-	}
-	if coordinatorTypeParam == "approval" || approvalLevel > 0 || coordinatorType == "level1_coordinator" || coordinatorType == "level2_coordinator" {
+	// Approval coordinator configuration
+	if coordinatorTypeParam == "approval" || coordinatorLevel > 0 {
+		approvalLevel := coordinatorLevel
 		if approvalLevel <= 0 {
 			approvalLevel = 1
 		}
