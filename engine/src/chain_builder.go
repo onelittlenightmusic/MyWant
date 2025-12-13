@@ -290,20 +290,13 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 	factoryResult := factory(want.Metadata, want.Spec)
 
-	// Extract *Want from the factory result (can be *Want or concrete type wrapper)
+	// Extract *Want from the Executable result via reflection
+	// All factories now return Executable implementations that embed Want
 	var wantPtr *Want
-	if fw, ok := factoryResult.(*Want); ok {
-		wantPtr = fw
-	} else if executable, ok := factoryResult.(Executable); ok {
-		// For concrete types that embed Want, extract the want via reflection
-		// This handles types like *RestaurantWant, *FlightWant, etc.
-		if w, err := extractWantFromExecutable(executable); err == nil {
-			wantPtr = w
-		} else {
-			return nil, fmt.Errorf("factory returned Executable but could not extract Want: %v", err)
-		}
+	if w, err := extractWantFromExecutable(factoryResult); err == nil {
+		wantPtr = w
 	} else {
-		return nil, fmt.Errorf("factory returned unsupported type: %T", factoryResult)
+		return nil, fmt.Errorf("factory returned Executable but could not extract Want: %v", err)
 	}
 
 	if cb.agentRegistry != nil && wantPtr != nil {

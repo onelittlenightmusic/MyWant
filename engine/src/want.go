@@ -107,8 +107,8 @@ type WantLocals interface {
 }
 
 // WantFactory defines the interface for creating want functions
-// Returns interface{} which can be *Want or a concrete type wrapper that embeds Want
-type WantFactory func(metadata Metadata, spec WantSpec) interface{}
+// Returns Executable which is implemented by concrete Want types (e.g., FlightWant, RestaurantWant)
+type WantFactory func(metadata Metadata, spec WantSpec) Executable
 
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals

@@ -15,7 +15,7 @@ type FibonacciNumbers struct {
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
 	locals := &FibonacciNumbersLocals{}
 	want := NewWantWithLocals(
 		metadata,
@@ -69,7 +69,7 @@ type FibonacciFilter struct {
 }
 
 // NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
 	return &FibonacciFilter{*NewWantWithLocals(
 		metadata,
 		spec,

@@ -35,7 +35,7 @@ type EvidenceWant struct {
 	Want
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
+func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
 	return &EvidenceWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -106,7 +106,7 @@ type DescriptionWant struct {
 	Want
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
+func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
 	return &DescriptionWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -177,7 +177,7 @@ type Level1CoordinatorWant struct {
 }
 
 // Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
-func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
+func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) Executable {
 	want := NewWant(
 		metadata,
 		spec,

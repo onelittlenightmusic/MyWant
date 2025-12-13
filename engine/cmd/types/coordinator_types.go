@@ -37,7 +37,7 @@ type CoordinatorWant struct {
 func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
-) interface{} {
+) Executable {
 	coordinatorType := metadata.Type
 
 	want := NewWantWithLocals(

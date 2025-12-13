@@ -653,11 +653,11 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	recipeLoader := NewGenericRecipeLoader("recipes")
 
 	// Register target type with recipe support
-	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) Executable {
 		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
 		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes
-		return &target.Want
+		return target
 	})
 
 	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies. 

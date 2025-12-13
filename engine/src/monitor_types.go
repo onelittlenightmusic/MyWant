@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"mywant/engine/src/chain"
 	"strconv"
 	"time"
 )
@@ -68,7 +67,7 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 }
 
 // Exec implements the Executable interface
-func (mw *MonitorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
+func (mw *MonitorWant) Exec() bool {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusReaching)
 	if _, exists := mw.Want.GetState("start_time"); !exists {
@@ -269,7 +268,7 @@ func (mw *MonitorWant) ClearAlerts() {
 
 // RegisterMonitorWantTypes registers monitor want types with a ChainBuilder
 func RegisterMonitorWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) Executable {
 		monitor := NewMonitorWant(metadata, spec)
 
 		// Register want for lookup
@@ -277,7 +276,7 @@ func RegisterMonitorWantTypes(builder *ChainBuilder) {
 
 		// Legacy listener/subscription registration removed - Group A events now use unified subscription system
 
-		return monitor.BaseNotifiableWant.Want
+		return monitor
 	})
 
 	log.Println("📊 Monitor want types registered")

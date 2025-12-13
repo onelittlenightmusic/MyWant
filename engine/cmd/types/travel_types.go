@@ -56,7 +56,7 @@ type RestaurantWant struct {
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
-func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
+func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 	return &RestaurantWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -400,7 +400,7 @@ type HotelWant struct {
 }
 
 // NewHotelWant creates a new hotel reservation want
-func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
+func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 	return &HotelWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -584,7 +584,7 @@ type BuffetWant struct {
 	Want
 }
 
-func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
+func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 	return &BuffetWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -880,63 +880,31 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
 func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
-	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) Executable {
 		result := NewFlightWant(metadata, spec)
-		// Extract the Want pointer from the factory result
-		var want *Want
-		if w, ok := result.(*Want); ok {
-			want = w
-		} else if fw, ok := result.(*FlightWant); ok {
-			want = &fw.Want
-		}
-		if want != nil {
-			want.SetAgentRegistry(agentRegistry)
-		}
+		fw := result.(*FlightWant)
+		fw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) Executable {
 		result := NewRestaurantWant(metadata, spec)
-		// Extract the Want pointer from the factory result
-		var want *Want
-		if w, ok := result.(*Want); ok {
-			want = w
-		} else if rw, ok := result.(*RestaurantWant); ok {
-			want = &rw.Want
-		}
-		if want != nil {
-			want.SetAgentRegistry(agentRegistry)
-		}
+		rw := result.(*RestaurantWant)
+		rw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) Executable {
 		result := NewHotelWant(metadata, spec)
-		// Extract the Want pointer from the factory result
-		var want *Want
-		if w, ok := result.(*Want); ok {
-			want = w
-		} else if hw, ok := result.(*HotelWant); ok {
-			want = &hw.Want
-		}
-		if want != nil {
-			want.SetAgentRegistry(agentRegistry)
-		}
+		hw := result.(*HotelWant)
+		hw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) interface{} {
+	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) Executable {
 		result := NewBuffetWant(metadata, spec)
-		// Extract the Want pointer from the factory result
-		var want *Want
-		if w, ok := result.(*Want); ok {
-			want = w
-		} else if bw, ok := result.(*BuffetWant); ok {
-			want = &bw.Want
-		}
-		if want != nil {
-			want.SetAgentRegistry(agentRegistry)
-		}
+		bw := result.(*BuffetWant)
+		bw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 

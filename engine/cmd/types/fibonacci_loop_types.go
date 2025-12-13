@@ -23,7 +23,7 @@ type SeedNumbers struct {
 }
 
 // NewSeedNumbers creates a new seed numbers want
-func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 	return &SeedNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -73,7 +73,7 @@ type FibonacciComputer struct {
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
-func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 	return &FibonacciComputer{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -173,7 +173,7 @@ type FibonacciMerger struct {
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
-func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
+func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 	return &FibonacciMerger{*NewWantWithLocals(
 		metadata,
 		spec,

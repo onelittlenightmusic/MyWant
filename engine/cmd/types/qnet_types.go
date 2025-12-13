@@ -76,7 +76,7 @@ type Numbers struct {
 }
 
 // PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	return &Numbers{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -175,7 +175,7 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue want
-func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	return &Queue{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -320,7 +320,7 @@ type Combiner struct {
 	mywant.Want
 }
 
-func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	return &Combiner{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -396,7 +396,7 @@ type Sink struct {
 }
 
 // Goal creates a new sink want
-func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
+func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	return &Sink{*mywant.NewWantWithLocals(
 		metadata,
 		spec,

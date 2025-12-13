@@ -24,7 +24,7 @@ type FlightWant struct {
 }
 
 // NewFlightWant creates a new flight booking want
-func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
+func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
 	return &FlightWant{*NewWantWithLocals(
 		metadata,
 		spec,

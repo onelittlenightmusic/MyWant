@@ -16,7 +16,7 @@ type PrimeNumbers struct {
 }
 
 // NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
+func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 	return &PrimeNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -67,7 +67,7 @@ type PrimeSequence struct {
 }
 
 // NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
+func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 	return &PrimeSequence{*NewWantWithLocals(
 		metadata,
 		spec,
