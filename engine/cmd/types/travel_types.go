@@ -403,23 +403,6 @@ func (h *HotelWant) Exec() bool {
 	}
 
 	// Normal hotel execution (only runs if agent execution didn't return a result)
-	var existingSchedule *TravelSchedule
-	if h.GetInCount() > 0 {
-		in, connectionAvailable := h.GetInputChannel(0)
-		if connectionAvailable {
-			select {
-			case schedData := <-in:
-				if schedule, ok := schedData.(*TravelSchedule); ok {
-					existingSchedule = schedule
-				} else {
-					h.StoreLog(fmt.Sprintf("[ERROR] HotelWant.tryAgentExecution: type assertion failed for input schedule. Expected *TravelSchedule, got %T", schedData))
-				}
-			default:
-				// No input data
-			}
-		}
-	}
-
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	checkInTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		20+rand.Intn(4), rand.Intn(60), 0, 0, time.Local) // 8 PM - midnight
@@ -437,30 +420,10 @@ func (h *HotelWant) Exec() bool {
 		Type:  "hotel",
 		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, locals.HotelType),
 	}
-	if existingSchedule != nil {
-		for attempt := 0; attempt < 3; attempt++ {
-			conflict := false
-			for _, event := range existingSchedule.Events {
-				if h.hasTimeConflict(newEvent, event) {
-					conflict = true
-					// Adjust check-in time
-					checkInTime = checkInTime.Add(30 * time.Minute)
-					newEvent.Start = checkInTime
-					break
-				}
-			}
-			if !conflict {
-				break
-			}
-		}
-	}
 
 	newSchedule := &TravelSchedule{
 		Date:   baseDate,
 		Events: []TimeSlot{newEvent},
-	}
-	if existingSchedule != nil {
-		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 	h.StoreStateMulti(map[string]interface{}{
 		"total_processed":      1,
@@ -471,9 +434,7 @@ func (h *HotelWant) Exec() bool {
 		"reservation_name":     newEvent.Name,
 		"achieving_percentage": 100,
 	})
-	if connectionAvailable {
-		h.SendPacketMulti(newSchedule)
-	}
+	h.SendPacketMulti(newSchedule)
 
 	return true
 }
@@ -580,22 +541,6 @@ func (b *BuffetWant) Exec() bool {
 
 	// Normal buffet execution (only runs if agent execution didn't return a result)
 
-	var existingSchedule *TravelSchedule
-	if b.GetInCount() > 0 {
-		in, connectionAvailable := b.GetInputChannel(0)
-		if connectionAvailable {
-			select {
-			case schedData := <-in:
-				if schedule, ok := schedData.(*TravelSchedule); ok {
-					existingSchedule = schedule
-				} else {
-					b.StoreLog(fmt.Sprintf("[ERROR] BuffetWant.tryAgentExecution: type assertion failed for input schedule. Expected *TravelSchedule, got %T", schedData))
-				}
-			default:
-			}
-		}
-	}
-
 	// Next day morning buffet
 	nextDay := time.Now().AddDate(0, 0, 2) // Day after tomorrow
 	buffetStart := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
@@ -611,30 +556,9 @@ func (b *BuffetWant) Exec() bool {
 		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, locals.BuffetType),
 	}
 
-	if existingSchedule != nil {
-		for attempt := 0; attempt < 3; attempt++ {
-			conflict := false
-			for _, event := range existingSchedule.Events {
-				if b.hasTimeConflict(newEvent, event) {
-					conflict = true
-				buffetStart = buffetStart.Add(30 * time.Minute)
-					newEvent.Start = buffetStart
-					newEvent.End = buffetStart.Add(locals.Duration)
-					break
-				}
-			}
-			if !conflict {
-				break
-			}
-		}
-	}
-
 	newSchedule := &TravelSchedule{
 		Date:   nextDay,
 		Events: []TimeSlot{newEvent},
-	}
-	if existingSchedule != nil {
-		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 	b.StoreStateMulti(map[string]interface{}{
 		"total_processed":        1,
@@ -645,10 +569,8 @@ func (b *BuffetWant) Exec() bool {
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})
-	if connectionAvailable {
-		// Use SendPacketMulti to send with retrigger logic for achieved receivers
-		b.SendPacketMulti(newSchedule)
-	}
+	// Use SendPacketMulti to send with retrigger logic for achieved receivers
+	b.SendPacketMulti(newSchedule)
 
 	return true
 }
