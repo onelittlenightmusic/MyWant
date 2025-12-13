@@ -203,23 +203,6 @@ func (r *RestaurantWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-// executeMonitorRestaurant executes the MonitorRestaurant agent to check for existing state
-func (r *RestaurantWant) executeMonitorRestaurant() error {
-	monitorAgent := NewMonitorRestaurant(
-		"restaurant_monitor",
-		[]string{"restaurant_agency"},
-		[]string{"xxx"},
-	)
-
-	// Execute the monitor agent on the want
-	ctx := context.Background()
-	if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // RestaurantSchedule represents a complete restaurant reservation schedule
 type RestaurantSchedule struct {
 	ReservationTime  time.Time `json:"reservation_time"`
@@ -477,15 +460,6 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 	return nil
 }
 
-// Helper function to get state keys for debugging
-func getStateKeys(state map[string]interface{}) []string {
-	keys := make([]string, 0, len(state))
-	for k := range state {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 // BuffetWant creates breakfast buffet reservations
 type BuffetWant struct {
 	Want
@@ -648,14 +622,6 @@ func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
 }
 
 // Helper function to check time conflicts
-func (r *RestaurantWant) hasTimeConflict(event1, event2 TimeSlot) bool {
-	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
-}
-
-func (h *HotelWant) hasTimeConflict(event1, event2 TimeSlot) bool {
-	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
-}
-
 // HotelSchedule represents a complete hotel booking schedule
 type HotelSchedule struct {
 	CheckInTime       time.Time `json:"check_in_time"`
@@ -691,10 +657,6 @@ func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
 	h.Want.StoreStateMulti(stateUpdates)
 
 	// No need to send output here anymore - handled directly in Exec method
-}
-
-func (b *BuffetWant) hasTimeConflict(event1, event2 TimeSlot) bool {
-	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
 }
 
 // generateTravelTimeline creates a human-readable timeline from all events
