@@ -61,7 +61,6 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&RestaurantWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"restaurant",
 	)}
 }
@@ -398,7 +397,6 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&HotelWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"hotel",
 	)}
 }
@@ -575,7 +573,6 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&BuffetWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"buffet",
 	)}
 }

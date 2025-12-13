@@ -44,7 +44,6 @@ func NewCoordinatorWant(
 		metadata,
 		spec,
 		nil,
-		nil, // ConnectivityMetadata loaded from YAML
 		coordinatorType,
 	)
 

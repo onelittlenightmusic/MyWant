@@ -29,7 +29,6 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FlightWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"flight",
 	)}
 }

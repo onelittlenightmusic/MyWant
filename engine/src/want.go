@@ -121,7 +121,6 @@ func NewWantWithLocals(
 	metadata Metadata,
 	spec WantSpec,
 	locals WantLocals,
-	connectivityMeta *ConnectivityMetadata,
 	wantType string,
 ) *Want {
 	want := &Want{
@@ -137,9 +136,7 @@ func NewWantWithLocals(
 
 	// Set type-specific fields
 	want.WantType = wantType
-	if connectivityMeta != nil {
-		want.ConnectivityMetadata = *connectivityMeta
-	}
+	// ConnectivityMetadata is now loaded from YAML via ChainBuilder
 
 	return want
 }

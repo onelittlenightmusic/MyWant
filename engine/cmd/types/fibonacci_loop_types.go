@@ -28,7 +28,6 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&SeedNumbersLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"seed numbers",
 	)}
 }
@@ -71,7 +70,6 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FibonacciComputerLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"fibonacci computer",
 	)}
 }
@@ -164,7 +162,6 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FibonacciMergerLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"fibonacci merger",
 	)}
 }

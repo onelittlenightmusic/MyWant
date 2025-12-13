@@ -21,7 +21,6 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&PrimeNumbersLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"prime numbers",
 	)}
 }
@@ -67,7 +66,6 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 		&PrimeSequenceLocals{
 			foundPrimes: make([]int, 0),
 		},
-		nil, // ConnectivityMetadata loaded from YAML
 		"prime sequence",
 	)}
 }

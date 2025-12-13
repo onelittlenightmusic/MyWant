@@ -40,7 +40,6 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&EvidenceWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"evidence",
 	)}
 }
@@ -104,7 +103,6 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&DescriptionWantLocals{},
-		nil, // ConnectivityMetadata loaded from YAML
 		"description",
 	)}
 }
