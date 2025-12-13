@@ -276,19 +276,13 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 	}
 	f.SendPacketMulti(travelSchedule)
 
-	f.StoreLog(fmt.Sprintf("Sent %s flight schedule: %s from %s to %s",
+	f.StoreLog(fmt.Sprintf("[PACKET-SEND] %s flight: %s (%s to %s) | TravelSchedule: Date=%s, Events=%d",
 		label,
 		schedule.ReservationName,
 		schedule.DepartureTime.Format("15:04 Jan 2"),
-		schedule.ArrivalTime.Format("15:04 Jan 2")))
-
-	f.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight sent %s TravelSchedule: Date=%s, Events=%d (name=%s, start=%s, end=%s)",
-		label,
+		schedule.ArrivalTime.Format("15:04 Jan 2"),
 		travelSchedule.Date.Format("2006-01-02"),
-		len(travelSchedule.Events),
-		flightEvent.Name,
-		flightEvent.Start.Format("15:04:05"),
-		flightEvent.End.Format("15:04:05")))
+		len(travelSchedule.Events)))
 }
 
 // tryAgentExecution attempts to execute flight booking using the agent system Returns the FlightSchedule if successful, nil if no agent execution
