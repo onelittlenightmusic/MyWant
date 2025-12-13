@@ -44,14 +44,7 @@ func NewCoordinatorWant(
 		metadata,
 		spec,
 		nil,
-		ConnectivityMetadata{
-			RequiredInputs:  -1,  // Unified: accept any number of inputs
-			RequiredOutputs: 0,
-			MaxInputs:       -1,  // No maximum
-			MaxOutputs:      0,
-			WantType:        coordinatorType,
-			Description:     fmt.Sprintf("Generic coordinator want (%s)", coordinatorType),
-		},
+		nil, // ConnectivityMetadata loaded from YAML
 		coordinatorType,
 	)
 

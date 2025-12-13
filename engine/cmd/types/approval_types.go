@@ -40,14 +40,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&EvidenceWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "evidence",
-			Description:     "Evidence provider for approval processes",
-		},
+		nil, // ConnectivityMetadata loaded from YAML
 		"evidence",
 	)}
 }
@@ -111,14 +104,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&DescriptionWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "description",
-			Description:     "Description provider for approval processes",
-		},
+		nil, // ConnectivityMetadata loaded from YAML
 		"description",
 	)}
 }

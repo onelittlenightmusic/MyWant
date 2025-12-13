@@ -14,6 +14,11 @@ wantType:
     category: "approval"
     pattern: "independent"
 
+  usageLimit:
+    users:
+      min: 1       # At least one output required
+    description: "Evidence generator with no input requirements"
+
   parameters:
     - name: "evidence_type"
       description: "Classification of evidence (document, report, certification, audit)"

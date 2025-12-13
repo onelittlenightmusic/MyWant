@@ -14,6 +14,11 @@ wantType:
     category: "approval"
     pattern: "independent"
 
+  usageLimit:
+    users:
+      min: 1       # At least one output required
+    description: "Description generator with no input requirements"
+
   parameters:
     - name: "description_format"
       description: "Template string for formatting description (supports %s substitution)"

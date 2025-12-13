@@ -113,51 +113,6 @@ type WantFactory func(metadata Metadata, spec WantSpec) Executable
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals
 
-// NewWant is a generic constructor that creates a Want with type-specific Locals
-// Type-specific initialization should be done in the constructor after calling NewWant().
-// This eliminates the need for individual NewXxxWant functions for simple want types
-// Usage:
-//
-//	func NewMyWant(metadata Metadata, spec WantSpec) interface{} {
-//	    want := NewWant(
-//	        metadata,
-//	        spec,
-//	        func() WantLocals { return &MyWantLocals{} },
-//	        ConnectivityMetadata{RequiredInputs: 1, ...},
-//	        "my_want_type",
-//	    ).(*Want)
-//
-//	    // Initialize Locals fields after want creation
-//	    locals := want.Locals.(*MyWantLocals)
-//	    locals.MyField = want.GetStringParam("my_field", "default")
-//
-//	    return want
-//	}
-func NewWant(
-	metadata Metadata,
-	spec WantSpec,
-	localsFactory LocalsFactory,
-	connectivityMeta ConnectivityMetadata,
-	wantType string,
-) *Want {
-	want := &Want{
-		Metadata: metadata,
-		Spec:     spec,
-	}
-	want.Init(metadata, spec)
-
-	// Create Locals if factory is provided
-	if localsFactory != nil {
-		locals := localsFactory()
-		want.Locals = locals
-	}
-
-	// Set type-specific fields
-	want.WantType = wantType
-	want.ConnectivityMetadata = connectivityMeta
-
-	return want
-}
 
 // NewWantWithLocals is a variant of NewWant that accepts a WantLocals instance directly
 // instead of a factory function. Useful when you have a simple initialization that doesn't
@@ -166,14 +121,14 @@ func NewWantWithLocals(
 	metadata Metadata,
 	spec WantSpec,
 	locals WantLocals,
-	connectivityMeta ConnectivityMetadata,
+	connectivityMeta *ConnectivityMetadata,
 	wantType string,
 ) *Want {
 	want := &Want{
 		Metadata: metadata,
 		Spec:     spec,
 	}
-	want.Init(metadata, spec)
+	want.Init()
 
 	// Assign locals directly
 	if locals != nil {
@@ -182,7 +137,9 @@ func NewWantWithLocals(
 
 	// Set type-specific fields
 	want.WantType = wantType
-	want.ConnectivityMetadata = connectivityMeta
+	if connectivityMeta != nil {
+		want.ConnectivityMetadata = *connectivityMeta
+	}
 
 	return want
 }
@@ -1016,9 +973,7 @@ func (n *Want) GetPaths() *Paths {
 
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
-func (n *Want) Init(metadata Metadata, spec WantSpec) {
-	n.Metadata = metadata
-	n.Spec = spec
+func (n *Want) Init() {
 	n.Status = WantStatusIdle
 	n.State = make(map[string]interface{})
 	n.paths.In = []PathInfo{}

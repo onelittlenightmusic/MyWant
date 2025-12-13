@@ -7,6 +7,12 @@ wantType:
     category: "system"
     pattern: "coordinator"
 
+  usageLimit:
+    providers:
+      min: -1      # Accept any number of inputs
+      max: -1      # No maximum limit
+    description: "Unified coordinator accepts variable number of inputs"
+
   parameters:
     - name: "display_name"
       description: "Display name/title for the coordination result"
