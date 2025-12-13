@@ -272,15 +272,18 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 	level2Authority := want.GetStringParam("level2_authority", "senior_manager")
 
 	stateUpdates := map[string]interface{}{
-		"total_processed":             1,
-		"evidence_provider_complete":  true,
+		"total_processed":              1,
+		"evidence_provider_complete":   true,
 		"description_provider_complete": true,
-		"approval_level":              h.Level,
-		"approval_status":             "approved",
-		"approval_time":               time.Now().Format(time.RFC3339),
+		"approval_level":               h.Level,
+		"approval_status":              "approved",
+		"approval_time":                time.Now().Format(time.RFC3339),
 	}
 
+	// Build approval input details
+	approvalInputs := []string{"evidence", "description"}
 	if h.Level == 2 {
+		approvalInputs = append(approvalInputs, "level 2 authority")
 		stateUpdates["level2_authority"] = level2Authority
 		stateUpdates["approver_id"] = level2Authority
 		stateUpdates["comments"] = "Level 2 final approval granted"
@@ -289,14 +292,17 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 		stateUpdates["comments"] = "Level 1 approval granted"
 	}
 
+	// Build coordinator result with nested structure
+	coordinatorResult := map[string]interface{}{
+		"approval_input": approvalInputs,
+	}
+	stateUpdates["coordinator_result"] = coordinatorResult
+
 	return stateUpdates
 }
 
 func (h *ApprovalDataHandler) GetCompletionKey() string {
-	if h.Level == 2 {
-		return "final_approval_processed"
-	}
-	return "approval_processed"
+	return "coordinator_completed"
 }
 
 func (h *ApprovalDataHandler) GetCompletionTimeout() time.Duration {
@@ -435,14 +441,18 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]in
 		stateUpdates["finalResult"] = timeline
 	}
 
+	// Build travel inputs list
+	travelInputs := []string{"restaurant", "hotel", "buffet"}
+	coordinatorResult := map[string]interface{}{
+		"travel_input": travelInputs,
+	}
+	stateUpdates["coordinator_result"] = coordinatorResult
+
 	return stateUpdates
 }
 
 func (h *TravelDataHandler) GetCompletionKey() string {
-	if h.IsBuffet {
-		return "buffet_schedule_received"
-	}
-	return "travel_itinerary_complete"
+	return "coordinator_completed"
 }
 
 func (h *TravelDataHandler) GetCompletionTimeout() time.Duration {
