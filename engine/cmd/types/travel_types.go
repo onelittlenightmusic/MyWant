@@ -104,21 +104,6 @@ func (r *RestaurantWant) Exec() bool {
 
 		return true
 	}
-	var existingSchedule *TravelSchedule
-	if r.GetInCount() > 0 {
-		in, connectionAvailable := r.GetInputChannel(0)
-		if connectionAvailable {
-			select {
-			case schedData := <-in:
-				if schedule, ok := schedData.(*TravelSchedule); ok {
-					existingSchedule = schedule
-				}
-			default:
-				// No input data available
-			}
-		}
-	}
-
 	// Generate restaurant reservation time (evening dinner)
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
@@ -134,30 +119,9 @@ func (r *RestaurantWant) Exec() bool {
 		Type:  "restaurant",
 		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, locals.RestaurantType),
 	}
-	if existingSchedule != nil {
-		for attempt := 0; attempt < 3; attempt++ {
-			conflict := false
-			for _, event := range existingSchedule.Events {
-				if r.hasTimeConflict(newEvent, event) {
-					conflict = true
-					// Retry with different time
-				dinnerStart = dinnerStart.Add(time.Hour)
-					newEvent.Start = dinnerStart
-					newEvent.End = dinnerStart.Add(locals.Duration)
-					break
-				}
-			}
-			if !conflict {
-				break
-			}
-		}
-	}
 	newSchedule := &TravelSchedule{
 		Date:   baseDate,
 		Events: []TimeSlot{newEvent},
-	}
-	if existingSchedule != nil {
-		newSchedule.Events = append(existingSchedule.Events, newEvent)
 	}
 	r.StoreStateMulti(map[string]interface{}{
 		"total_processed":            1,
@@ -170,10 +134,8 @@ func (r *RestaurantWant) Exec() bool {
 		"achieving_percentage":       100,
 		"finalResult":                newEvent.Name,
 	})
-	if connectionAvailable {
-		// Use SendPacketMulti to send with retrigger logic for achieved receivers
-		r.SendPacketMulti(newSchedule)
-	}
+	// Use SendPacketMulti to send with retrigger logic for achieved receivers
+	r.SendPacketMulti(newSchedule)
 
 	return true
 }
