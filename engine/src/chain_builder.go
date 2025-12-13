@@ -1537,8 +1537,11 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	}
 
 	// Ensure paths exist in pathMap
+	// Thread-safe: Lock protects concurrent pathMap write from want goroutines reading via getActivePaths()
 	if !pathsExist {
+		cb.reconcileMutex.Lock()
 		cb.pathMap[wantName] = Paths{In: []PathInfo{}, Out: []PathInfo{}}
+		cb.reconcileMutex.Unlock()
 	}
 
 	// Start execution if want is Executable
@@ -1565,7 +1568,11 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 // getActivePaths filters paths to only include active connections
 // This represents the preconditions: providers (In) and users (Out)
+// Thread-safe: Uses RLock to protect concurrent access to cb.pathMap from want goroutines
 func (cb *ChainBuilder) getActivePaths(wantName string) Paths {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
 	paths, pathsExist := cb.pathMap[wantName]
 	if !pathsExist {
 		return Paths{In: []PathInfo{}, Out: []PathInfo{}}
