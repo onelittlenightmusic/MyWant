@@ -388,6 +388,82 @@ Memory reconciliation enables:
 - **History**: `ParameterHistory` and `StateHistory` for tracking changes
 - **Status**: Execution state (`idle`, `running`, `completed`, `failed`)
 
+#### Connectivity Requirements (`require` Pattern)
+
+The `require` field in want type definitions specifies connectivity requirements using four distinct policies:
+
+```yaml
+wantType:
+  metadata:
+    name: restaurant
+    type: independent
+  require: users  # Connectivity requirement pattern
+```
+
+**RequirePolicy Values:**
+
+1. **RequireNone** (`none`, default)
+   - No connectivity requirements
+   - Want can execute standalone with no input or output connections
+   - Example: Standalone configuration checks, status endpoints
+   - ConnectivityMetadata: `RequiredInputs: 0, RequiredOutputs: 0`
+
+2. **RequireUsers** (`users`)
+   - Output connections required, input optional
+   - Want must have consumers (downstream wants connected to it)
+   - Applied to: Generators, Sources, Independent wants (Restaurant, Hotel, Buffet, Flight, Evidence, Description)
+   - ConnectivityMetadata: `RequiredInputs: 0, RequiredOutputs: 1`
+   - Example:
+     ```yaml
+     wantType:
+       metadata:
+         name: restaurant
+         type: independent
+       require: users
+     ```
+
+3. **RequireProviders** (`providers`)
+   - Input connections required, output optional
+   - Want must have data sources (upstream wants connected to it)
+   - Applied to: Sinks, Collectors, Terminal stages (Sink, Collector, Prime Sieve, Fibonacci Adder)
+   - ConnectivityMetadata: `RequiredInputs: 1, RequiredOutputs: 0`
+   - Example:
+     ```yaml
+     wantType:
+       metadata:
+         name: sink
+         type: sink
+       require: providers
+     ```
+
+4. **RequireProvidersAndUsers** (`providers_and_users`)
+   - Both input and output connections required
+   - Want must be part of a processing pipeline with sources upstream and consumers downstream
+   - Applied to: Processors, Queue systems, Filters (Queue, Combiner, Fibonacci Loop, Prime Sequence, Fibonacci Sequence)
+   - ConnectivityMetadata: `RequiredInputs: 1, RequiredOutputs: 1`
+   - Example:
+     ```yaml
+     wantType:
+       metadata:
+         name: queue
+         type: processor
+       require: providers_and_users
+     ```
+
+**Backward Compatibility:**
+
+- If `require` field is absent, system defaults to `RequireNone`
+- Legacy `usageLimit` field still supported for backward compatibility
+- During type registration: `require` takes precedence if both fields are present
+- Code: `if def.Require != "" { ... } else if def.UsageLimit != nil { ... }`
+
+**Migration Path:**
+
+All want types have been migrated from verbose `usageLimit` blocks to simple `require` patterns:
+- **Before**: 8-12 lines of YAML per want type
+- **After**: 1 line of YAML (`require: <policy>`)
+- **Savings**: 128 lines removed, cleaner configuration, same functionality
+
 #### Execution Lifecycle
 1. **BeginExecCycle()** - Start batching state changes
 2. **Exec()** - Main execution logic with channel I/O
