@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2, Zap } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
-import { classNames } from '@/utils/helpers';
+import { classNames, truncateText } from '@/utils/helpers';
 import { apiClient } from '@/api/client';
 import { validateYaml } from '@/utils/yaml';
 import {
@@ -426,11 +426,15 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
           <div>
             <h5 className="text-xs font-medium text-gray-700 mb-1">Labels</h5>
             <div className="flex flex-wrap gap-1">
-              {Object.entries(labels as Record<string, any>).map(([key, value]) => (
-                <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded border border-green-300">
-                  {key}={value as any}
-                </span>
-              ))}
+              {Object.entries(labels as Record<string, any>).map(([key, value]) => {
+                const labelText = `${key}=${value}`;
+                const displayText = truncateText(labelText, 20);
+                return (
+                  <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded border border-green-300" title={labelText.length > 20 ? labelText : undefined}>
+                    {displayText}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

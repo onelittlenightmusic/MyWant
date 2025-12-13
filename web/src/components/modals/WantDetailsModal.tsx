@@ -6,7 +6,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
-import { formatDate, formatDuration, classNames } from '@/utils/helpers';
+import { formatDate, formatDuration, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml } from '@/utils/yaml';
 
 interface WantDetailsModalProps {
@@ -359,14 +359,19 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                   <div>
                     <h4 className="text-sm font-medium text-gray-900 mb-2">Labels</h4>
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(wantDetails.metadata.labels).map(([key, value]) => (
-                        <span
-                          key={key}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                        >
-                          {key}: {value}
-                        </span>
-                      ))}
+                      {Object.entries(wantDetails.metadata.labels).map(([key, value]) => {
+                        const labelText = `${key}: ${value}`;
+                        const displayText = truncateText(labelText, 20);
+                        return (
+                          <span
+                            key={key}
+                            title={labelText.length > 20 ? labelText : undefined}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                          >
+                            {displayText}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

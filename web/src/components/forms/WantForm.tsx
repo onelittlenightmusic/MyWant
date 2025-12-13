@@ -12,6 +12,7 @@ import { TypeRecipeSelector } from './TypeRecipeSelector';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
 import { addLabelToRegistry } from '@/utils/labelUtils';
+import { truncateText } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
@@ -650,8 +651,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                               setEditingLabelDraft({ key, value });
                             }}
                             className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
+                            title={`${key}: ${value}`.length > 20 ? `${key}: ${value}` : undefined}
                           >
-                            {key}: {value}
+                            {truncateText(`${key}: ${value}`, 20)}
                             <X
                               className="w-3 h-3 ml-2 hover:text-blue-900"
                               onClick={(e) => {

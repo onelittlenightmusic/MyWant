@@ -9,7 +9,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
-import { formatDate, formatDuration, classNames } from '@/utils/helpers';
+import { formatDate, formatDuration, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import {
@@ -767,17 +767,20 @@ const SettingsTab: React.FC<{
                         if (editingLabelKey === key) return null;
                         // Skip rendering labels with empty keys
                         if (!key.trim()) return null;
+                        const labelText = `${key}: ${value}`;
+                        const displayText = truncateText(labelText, 20);
                         return (
                           <button
                             key={key}
                             type="button"
+                            title={labelText.length > 20 ? labelText : undefined}
                             onClick={() => {
                               setEditingLabelKey(key);
                               setEditingLabelDraft({ key, value });
                             }}
                             className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
                           >
-                            {key}: {value}
+                            {displayText}
                             <X
                               className="w-3 h-3 ml-2 hover:text-blue-900"
                               onClick={(e) => {

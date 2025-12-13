@@ -189,8 +189,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       {/* Custom Type Badge (if available) */}
       {recipe.recipe.metadata.custom_type && (
         <div className="mb-4">
-          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            {recipe.recipe.metadata.custom_type}
+          <span
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800"
+            title={recipe.recipe.metadata.custom_type.length > 20 ? recipe.recipe.metadata.custom_type : undefined}
+          >
+            {truncateText(recipe.recipe.metadata.custom_type, 20)}
           </span>
         </div>
       )}

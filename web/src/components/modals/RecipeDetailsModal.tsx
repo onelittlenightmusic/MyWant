@@ -1,5 +1,6 @@
 import { X, BookOpen, Settings, List } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
+import { truncateText } from '@/utils/helpers';
 
 interface RecipeDetailsModalProps {
   isOpen: boolean;
@@ -165,11 +166,15 @@ export default function RecipeDetailsModal({
                       <div>
                         <h5 className="text-sm font-medium text-gray-500 mb-2">Labels</h5>
                         <div className="flex flex-wrap gap-1">
-                          {Object.entries(want.metadata?.labels || want.labels || {}).map(([key, value]) => (
-                            <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                              {key}={value}
-                            </span>
-                          ))}
+                          {Object.entries(want.metadata?.labels || want.labels || {}).map(([key, value]) => {
+                            const labelText = `${key}=${value}`;
+                            const displayText = truncateText(labelText, 20);
+                            return (
+                              <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded" title={labelText.length > 20 ? labelText : undefined}>
+                                {displayText}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
