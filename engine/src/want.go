@@ -189,6 +189,9 @@ type Want struct {
 
 	// Type-specific local state managed by WantLocals interface
 	Locals WantLocals `json:"-" yaml:"-"`
+
+	// Executable function - concrete want implementation (e.g., RestaurantWant, QueueWant)
+	executable Executable `json:"-" yaml:"-"`
 }
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
@@ -359,6 +362,118 @@ func (n *Want) AggregateChanges() {
 		// Clear pending parameter changes after aggregating
 		n.pendingParameterChanges = make(map[string]interface{})
 	}
+}
+
+// SetExecutable sets the concrete executable implementation for this want
+func (n *Want) SetExecutable(executable Executable) {
+	n.executable = executable
+}
+
+// GetExecutable returns the concrete executable implementation for this want
+func (n *Want) GetExecutable() Executable {
+	return n.executable
+}
+
+// StartExecution starts the want execution loop in a goroutine
+//
+// Parameters (minimal interface):
+//   - paths: Preconditions - providers (In) and users (Out) channels
+//   - waitGroup: Goroutine lifecycle coordination only
+//
+// This method encapsulates the execution lifecycle:
+// - Stop channel monitoring
+// - Control signal handling (suspend/resume/stop/restart)
+// - Path synchronization (from preconditions)
+// - Execution cycle management (BeginExecCycle → Exec → EndExecCycle)
+// - Status transitions
+// Note: Uses self.executable which is set via SetExecutable()
+func (n *Want) StartExecution(
+	paths Paths,
+	waitGroup *sync.WaitGroup,
+) {
+	if n.stopChannel == nil {
+		n.stopChannel = make(chan struct{})
+	}
+
+	waitGroup.Add(1)
+	go func() {
+		defer waitGroup.Done()
+		defer func() {
+			if n.GetStatus() == WantStatusReaching {
+				n.SetStatus(WantStatusAchieved)
+			}
+		}()
+
+		for {
+			// 1. Check stop channel
+			select {
+			case <-n.stopChannel:
+				n.SetStatus(WantStatusTerminated)
+				return
+			default:
+				// Continue execution
+			}
+
+			// 2. Check control signals
+			if cmd, received := n.CheckControlSignal(); received {
+				switch cmd.Trigger {
+				case ControlTriggerSuspend:
+					n.SetSuspended(true)
+					n.SetStatus(WantStatusSuspended)
+				case ControlTriggerResume:
+					n.SetSuspended(false)
+					n.SetStatus(WantStatusReaching)
+				case ControlTriggerStop:
+					n.SetStatus(WantStatusTerminated)
+					return
+				case ControlTriggerRestart:
+					n.SetSuspended(false)
+				}
+			}
+
+			// 3. Skip execution if suspended
+			if n.IsSuspended() {
+				time.Sleep(GlobalExecutionInterval)
+				continue
+			}
+
+			// 4. Synchronize paths before execution (preconditions: providers + users)
+			n.SetPaths(paths.In, paths.Out)
+
+			// 5. Begin execution cycle (batching mode)
+			n.BeginExecCycle()
+
+			// 6. Check stop channel before execution
+			select {
+			case <-n.stopChannel:
+				n.EndExecCycle()
+				n.SetStatus(WantStatusTerminated)
+				return
+			default:
+				// Continue with execution
+			}
+
+			// 7. Execute want logic
+			if n.executable == nil {
+				// No executable set, mark as failed
+				n.SetStatus(WantStatusFailed)
+				return
+			}
+			finished := n.executable.Exec()
+
+			// 8. End execution cycle (commit batched changes)
+			n.EndExecCycle()
+
+			// 9. Check completion
+			if finished {
+				n.SetStatus(WantStatusAchieved)
+				return
+			}
+
+			// 10. Sleep to prevent CPU spinning
+			time.Sleep(GlobalExecutionInterval)
+		}
+	}()
 }
 
 // valuesEqual compares two interface{} values for equality Handles different types properly including strings, numbers, booleans, etc.

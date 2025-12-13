@@ -1509,33 +1509,65 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
+	// Check if already completed
 	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusAchieved {
 		return
 	}
+
+	// Check connectivity satisfaction
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		want.want.SetStatus(WantStatusIdle)
 		return
 	}
-	paths, pathsExist := cb.pathMap[wantName]
-	hasUsingSelectors := len(want.want.Spec.Using) > 0
 
-	// Only require paths if the want has 'using' selectors Entry point wants (like Target) don't need paths
+	// Check paths existence for wants with using selectors
+	hasUsingSelectors := len(want.want.Spec.Using) > 0
+	paths, pathsExist := cb.pathMap[wantName]
 	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
 		return
 	}
+
+	// Double-check connectivity and trigger reconciliation if needed
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		want.want.SetStatus(WantStatusIdle)
-		// Trigger reconciliation to retry path generation and connection
 		if err := cb.TriggerReconcile(); err != nil {
+			// Log error but continue
 		}
 		return
 	}
+
+	// Ensure paths exist in pathMap
 	if !pathsExist {
 		cb.pathMap[wantName] = Paths{In: []PathInfo{}, Out: []PathInfo{}}
-		paths = cb.pathMap[wantName]
 	}
 
-	// Prepare active input and output channels - set them in the want's paths
+	// Get active paths (preconditions: providers + users)
+	activePaths := cb.getActivePaths(wantName)
+
+	// Start execution if want is Executable
+	if executable, ok := want.function.(Executable); ok {
+		want.want.SetStatus(WantStatusReaching)
+		want.want.InitializeControlChannel()
+
+		// Set the concrete executable implementation on the want
+		want.want.SetExecutable(executable)
+
+		// Delegate execution to Want with minimal interface (2 params: paths + waitGroup)
+		want.want.StartExecution(
+			activePaths,
+			cb.waitGroup,
+		)
+	}
+}
+
+// getActivePaths filters paths to only include active connections
+// This represents the preconditions: providers (In) and users (Out)
+func (cb *ChainBuilder) getActivePaths(wantName string) Paths {
+	paths, pathsExist := cb.pathMap[wantName]
+	if !pathsExist {
+		return Paths{In: []PathInfo{}, Out: []PathInfo{}}
+	}
+
 	var activeInputPaths []PathInfo
 	for _, inputPath := range paths.In {
 		if inputPath.Active {
@@ -1550,113 +1582,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		}
 	}
 
-	// Start want execution with direct Exec() calls
-	if executable, ok := want.function.(Executable); ok {
-		want.want.SetStatus(WantStatusReaching)
-		if want.want.stopChannel == nil {
-			want.want.stopChannel = make(chan struct{})
-		}
-		want.want.InitializeControlChannel()
-
-		cb.waitGroup.Add(1)
-		go func() {
-			defer cb.waitGroup.Done()
-			defer func() {
-				if want.want.GetStatus() == WantStatusReaching {
-					want.want.SetStatus(WantStatusAchieved)
-				}
-			}()
-
-			for {
-				select {
-				case <-want.want.stopChannel:
-					// Stop signal received - exit gracefully
-					want.want.SetStatus(WantStatusTerminated)
-					return
-				default:
-					// Continue execution
-				}
-				if cmd, received := want.want.CheckControlSignal(); received {
-					switch cmd.Trigger {
-					case ControlTriggerSuspend:
-						want.want.SetSuspended(true)
-						want.want.SetStatus(WantStatusSuspended)
-						// Continue to next iteration (execution will be skipped while suspended)
-
-					case ControlTriggerResume:
-						// Resume execution and restore running status
-						want.want.SetSuspended(false)
-						want.want.SetStatus(WantStatusReaching)
-
-					case ControlTriggerStop:
-						// Stop execution immediately
-						want.want.SetStatus(WantStatusTerminated)
-						return
-
-					case ControlTriggerRestart:
-						// Restart execution from beginning Reset any execution state if needed
-						want.want.SetSuspended(false)
-					}
-				}
-
-				// Skip execution if want is suspended
-				if want.want.IsSuspended() {
-					// Sleep but don't execute - just check for control signals
-					time.Sleep(GlobalExecutionInterval)
-					continue
-				}
-
-				// Begin execution cycle for batching state changes
-				cb.reconcileMutex.RLock()
-				runtimeWant, exists := cb.wants[wantName]
-				cb.reconcileMutex.RUnlock()
-				if !exists {
-					// Want was deleted from registry - exit gracefully
-					want.want.SetStatus(WantStatusTerminated)
-					return
-				}
-				runtimeWant.want.SetPaths(activeInputPaths, activeOutputPaths)
-				runtimeWant.want.BeginExecCycle()
-				select {
-				case <-want.want.stopChannel:
-					// Stop signal received before execution - abort
-					runtimeWant.want.EndExecCycle()
-					want.want.SetStatus(WantStatusTerminated)
-					return
-				default:
-					// Continue with execution
-				}
-
-				// Direct call - no parameters needed, channels are in want.paths
-				finished := executable.Exec()
-
-				// End execution cycle and commit batched state changes
-				cb.reconcileMutex.RLock()
-				runtimeWant, exists = cb.wants[wantName]
-				cb.reconcileMutex.RUnlock()
-				if exists {
-					runtimeWant.want.EndExecCycle()
-				}
-
-				if finished {
-	
-					// Update want status to completed
-					cb.reconcileMutex.RLock()
-					runtimeWant, exists := cb.wants[wantName]
-					cb.reconcileMutex.RUnlock()
-					if exists {
-						runtimeWant.want.SetStatus(WantStatusAchieved)
-					}
-
-					// Exit the execution loop - execution is complete
-					return
-				}
-
-				// Sleep to prevent CPU spinning in tight execution loops
-				time.Sleep(GlobalExecutionInterval)
-			}
-		}()
-	}
+	return Paths{In: activeInputPaths, Out: activeOutputPaths}
 }
 
 // writeStatsToMemory writes current stats to memory file
