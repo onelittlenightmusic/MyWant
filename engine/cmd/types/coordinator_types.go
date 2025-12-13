@@ -25,7 +25,6 @@ type CompletionChecker interface {
 // CoordinatorWant is a generic coordinator that collects data from multiple input channels and processes it according to customizable handlers
 type CoordinatorWant struct {
 	Want
-	RequiredInputCount int
 	DataHandler        DataHandler
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
@@ -48,24 +47,21 @@ func NewCoordinatorWant(
 	)
 
 	// Determine coordinator configuration based on want type
-	requiredInputs, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, want)
+	_, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, want)
 
 	coordinator := &CoordinatorWant{
-		Want:                *want,
-		RequiredInputCount:  requiredInputs,
-		DataHandler:         dataHandler,
-		CompletionChecker:   completionChecker,
-		CoordinatorType:     coordinatorType,
-		channelsHeard:       make(map[int]bool),
+		Want:               *want,
+		DataHandler:        dataHandler,
+		CompletionChecker:  completionChecker,
+		CoordinatorType:    coordinatorType,
+		channelsHeard:      make(map[int]bool),
 	}
 
 	return coordinator
 }
 // This enables full customization of coordinator behavior through parameters
 func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {
-	requiredInputsParam := want.GetIntParam("required_inputs", -1)
 	coordinatorLevel := want.GetIntParam("coordinator_level", -1)
-	isBuffetParam := want.GetBoolParam("is_buffet", false)
 	coordinatorTypeParam := want.GetStringParam("coordinator_type", "")
 
 	// Determine handler based on coordinator type and parameters Priority: explicit params > type-specific defaults > generic fallback
@@ -79,30 +75,17 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		if approvalLevel <= 0 {
 			approvalLevel = 1
 		}
-		return 2,
+		return 0,
 			&ApprovalDataHandler{Level: approvalLevel},
 			&ApprovalCompletionChecker{Level: approvalLevel}
 	}
-	requiredInputs := requiredInputsParam
-	if requiredInputs <= 0 {
-		switch coordinatorType {
-		case "travel coordinator":
-			requiredInputs = 3
-		case "buffet coordinator":
-			requiredInputs = 1
-		default:
-			// Default based on is_buffet parameter
-			if isBuffetParam {
-				requiredInputs = 1
-			} else {
-				requiredInputs = 3
-			}
-		}
-	}
+
+	// Travel coordinator configuration
+	isBuffetParam := want.GetBoolParam("is_buffet", false)
 	completionTimeoutSeconds := want.GetIntParam("completion_timeout", 0)
 	completionTimeout := time.Duration(completionTimeoutSeconds) * time.Second
 
-	return requiredInputs,
+	return 0,
 		&TravelDataHandler{
 			IsBuffet:          isBuffetParam || coordinatorType == "buffet coordinator",
 			CompletionTimeout: completionTimeout,
