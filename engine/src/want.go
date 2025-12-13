@@ -411,7 +411,7 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 // StartExecution starts the want execution loop in a goroutine
 //
 // Parameters (minimal interface):
-//   - paths: Preconditions - providers (In) and users (Out) channels
+//   - getPathsFunc: Function that returns current paths (called each iteration)
 //   - waitGroup: Goroutine lifecycle coordination only
 //
 // This method encapsulates the execution lifecycle:
@@ -421,8 +421,9 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 // - Execution cycle management (BeginExecCycle → Exec → EndExecCycle)
 // - Status transitions
 // Note: Uses self.executable which is set via SetExecutable()
+// Note: getPathsFunc is called each iteration to get latest paths
 func (n *Want) StartExecution(
-	paths Paths,
+	getPathsFunc func() Paths,
 	waitGroup *sync.WaitGroup,
 ) {
 	if n.stopChannel == nil {
@@ -471,8 +472,11 @@ func (n *Want) StartExecution(
 				continue
 			}
 
-			// 3.5. Check preconditions: verify required providers/users are connected
-			if !n.checkPreconditions(paths) {
+			// 3.5. Get current paths (called each iteration to track topology changes)
+			currentPaths := getPathsFunc()
+
+			// 3.6. Check preconditions: verify required providers/users are connected
+			if !n.checkPreconditions(currentPaths) {
 				// Preconditions not satisfied - mark as suspended and return to loop start
 				n.SetSuspended(true)
 				n.SetStatus(WantStatusSuspended)
@@ -481,7 +485,7 @@ func (n *Want) StartExecution(
 			}
 
 			// 4. Synchronize paths before execution (preconditions: providers + users)
-			n.SetPaths(paths.In, paths.Out)
+			n.SetPaths(currentPaths.In, currentPaths.Out)
 
 			// 5. Begin execution cycle (batching mode)
 			n.BeginExecCycle()

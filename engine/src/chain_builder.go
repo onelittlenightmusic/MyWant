@@ -1541,9 +1541,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		cb.pathMap[wantName] = Paths{In: []PathInfo{}, Out: []PathInfo{}}
 	}
 
-	// Get active paths (preconditions: providers + users)
-	activePaths := cb.getActivePaths(wantName)
-
 	// Start execution if want is Executable
 	if executable, ok := want.function.(Executable); ok {
 		want.want.SetStatus(WantStatusReaching)
@@ -1552,9 +1549,15 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		// Set the concrete executable implementation on the want
 		want.want.SetExecutable(executable)
 
-		// Delegate execution to Want with minimal interface (2 params: paths + waitGroup)
+		// Create closure that captures wantName and returns latest paths
+		// This allows want to track topology changes during execution
+		getPathsFunc := func() Paths {
+			return cb.getActivePaths(wantName)
+		}
+
+		// Delegate execution to Want with minimal interface (2 params: getPathsFunc + waitGroup)
 		want.want.StartExecution(
-			activePaths,
+			getPathsFunc,
 			cb.waitGroup,
 		)
 	}
