@@ -1199,5 +1199,28 @@ git update-index --no-assume-unchanged codebase_rag.db
 ```
 
 **Note:** Not recommended. Keep RAG in sync for best search results.
-- Dependencies (using) label key also supports autocompletion but tab selection and entering is not working.
-- level1_coordinator やtravel coordinatorはほぼ同じ処理をしているはずなので、共通的なCoordinatorというWantに集約したいです。
+
+## Completed Tasks (2025-12-13)
+
+### UI Improvements
+✅ **Fixed LabelSelectorAutocomplete keyboard navigation** (Commit 54e8484)
+- Added arrow key (Up/Down) navigation through dropdown options
+- Tab key now confirms selection and moves to next field
+- Enter key confirms selection from dropdown
+- Visual highlight (blue background) for selected option
+- Auto-focus management for smooth workflow
+- Full keyboard accessibility for dependency selector
+
+### Coordinator System Refactoring
+✅ **Verified Coordinator Unification**
+- Confirmed all recipes use unified `type: coordinator`
+- Generic `CoordinatorWant` handles all variations through handler interfaces
+- Approval and Travel coordinators fully unified in codebase
+
+✅ **Removed Legacy Backward-Compatibility Code** (Commit 3db770d)
+- Removed checks for old type names: `level1_coordinator`, `level2_coordinator`, `buffet_coordinator`
+- Simplified `getCoordinatorConfig()` logic
+- Current implementation relies on parameters: `coordinator_type`, `coordinator_level`, `is_buffet`
+
+## Pending Tasks
+None - all major refactoring complete!
