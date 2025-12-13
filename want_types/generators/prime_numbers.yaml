@@ -141,4 +141,12 @@ wantType:
   - Sieve of Eratosthenes algorithm documentation
   - Generator pattern for data production
   - Prime number mathematical properties
-  require: users
+  require:
+    type: users
+    users:
+      outputs:
+      - name: schedule
+        type: state
+        description: Generated schedule output
+        required: true
+        multiple: false

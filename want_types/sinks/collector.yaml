@@ -113,4 +113,12 @@ wantType:
   - Queue system pipeline documentation
   - Sink vs Collector naming convention
   - Packet collection and statistics
-  require: providers
+  require:
+    type: providers
+    providers:
+      inputs:
+      - name: data_packets
+        type: want
+        description: Input data packets from upstream wants
+        required: true
+        multiple: true

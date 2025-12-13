@@ -173,8 +173,8 @@ func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFa
 	}
 
 	// Use require field if available, otherwise fall back to usageLimit
-	if def.Require != "" {
-		// Convert RequirePolicy to ConnectivityMetadata
+	if def.Require != nil {
+		// Convert RequireSpec to ConnectivityMetadata
 		cb.connectivityRegistry[wantType] = def.Require.ToConnectivityMetadata(wantType)
 	} else if def.UsageLimit != nil {
 		// Legacy support for UsageLimit

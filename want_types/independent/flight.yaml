@@ -188,4 +188,12 @@ wantType:
   - Flight booking API integration
   - Delay monitoring and auto-rebooking
   - Travel coordinator flight integration
-  require: users
+  require:
+    type: users
+    users:
+      outputs:
+      - name: schedule
+        type: state
+        description: Generated schedule output
+        required: true
+        multiple: false

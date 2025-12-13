@@ -192,52 +192,17 @@ type ConnectivityMetadata struct {
 }
 
 // RequirePolicy defines connectivity requirements as an enum
-type RequirePolicy string
+// RequireSpec defines structured connectivity requirements
+type RequireSpec struct {
+	Type      string           `json:"type" yaml:"type"`                           // require type: providers, users, providers_and_users, none
+	Providers *ConnectivityDef `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connection specs
+	Users     *ConnectivityDef `json:"users,omitempty" yaml:"users,omitempty"`       // Output connection specs
+}
 
-const (
-	RequireNone               RequirePolicy = "none"                // No connectivity requirements (default)
-	RequireProviders          RequirePolicy = "providers"           // Must have input connections
-	RequireUsers              RequirePolicy = "users"               // Must have output connections
-	RequireProvidersAndUsers  RequirePolicy = "providers_and_users" // Must have both input and output
-)
-
-// ToConnectivityMetadata converts RequirePolicy to ConnectivityMetadata
-func (r RequirePolicy) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
-	switch r {
-	case RequireProviders:
-		// Input required, output optional
-		return ConnectivityMetadata{
-			RequiredInputs:  1,
-			MaxInputs:       -1,
-			RequiredOutputs: 0,
-			MaxOutputs:      -1,
-			WantType:        wantType,
-			Description:     "Requires input connections",
-		}
-	case RequireUsers:
-		// Output required, input optional
-		return ConnectivityMetadata{
-			RequiredInputs:  0,
-			MaxInputs:       -1,
-			RequiredOutputs: 1,
-			MaxOutputs:      -1,
-			WantType:        wantType,
-			Description:     "Requires output connections",
-		}
-	case RequireProvidersAndUsers:
-		// Both input and output required
-		return ConnectivityMetadata{
-			RequiredInputs:  1,
-			MaxInputs:       -1,
-			RequiredOutputs: 1,
-			MaxOutputs:      -1,
-			WantType:        wantType,
-			Description:     "Requires both input and output connections",
-		}
-	case RequireNone:
-		fallthrough
-	default:
-		// No requirements
+// ToConnectivityMetadata converts RequireSpec to ConnectivityMetadata
+func (r *RequireSpec) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
+	if r == nil {
+		// Default: no requirements
 		return ConnectivityMetadata{
 			RequiredInputs:  0,
 			MaxInputs:       -1,
@@ -246,6 +211,55 @@ func (r RequirePolicy) ToConnectivityMetadata(wantType string) ConnectivityMetad
 			WantType:        wantType,
 			Description:     "No connectivity requirements",
 		}
+	}
+
+	requiredInputs := 0
+	requiredOutputs := 0
+
+	// Check providers (inputs)
+	if r.Providers != nil && len(r.Providers.Inputs) > 0 {
+		// If providers is specified, at least one input is required
+		requiredInputs = 1
+	}
+
+	// Check users (outputs)
+	if r.Users != nil && len(r.Users.Outputs) > 0 {
+		// If users is specified, at least one output is required
+		requiredOutputs = 1
+	}
+
+	// Also check type field for backward compatibility
+	switch r.Type {
+	case "providers":
+		requiredInputs = 1
+		requiredOutputs = 0
+	case "users":
+		requiredInputs = 0
+		requiredOutputs = 1
+	case "providers_and_users":
+		requiredInputs = 1
+		requiredOutputs = 1
+	case "none":
+		requiredInputs = 0
+		requiredOutputs = 0
+	}
+
+	description := "No connectivity requirements"
+	if requiredInputs > 0 && requiredOutputs > 0 {
+		description = "Requires both input and output connections"
+	} else if requiredInputs > 0 {
+		description = "Requires input connections"
+	} else if requiredOutputs > 0 {
+		description = "Requires output connections"
+	}
+
+	return ConnectivityMetadata{
+		RequiredInputs:  requiredInputs,
+		MaxInputs:       -1,
+		RequiredOutputs: requiredOutputs,
+		MaxOutputs:      -1,
+		WantType:        wantType,
+		Description:     description,
 	}
 }
 

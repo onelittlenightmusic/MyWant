@@ -118,4 +118,12 @@ wantType:
   - Alternative flight routing
   - Rebooking strategies
   - Fallback flight options
-  require: users
+  require:
+    type: users
+    users:
+      outputs:
+      - name: schedule
+        type: state
+        description: Generated schedule output
+        required: true
+        multiple: false

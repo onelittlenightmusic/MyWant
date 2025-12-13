@@ -121,4 +121,19 @@ wantType:
   - queue-system recipe
   - qnet-pipeline recipe
   - qnet-using recipe
-  require: providers_and_users
+  require:
+    type: providers_and_users
+    providers:
+      inputs:
+      - name: data_packets
+        type: want
+        description: Input data packets from upstream wants
+        required: true
+        multiple: true
+    users:
+      outputs:
+      - name: processed_data
+        type: state
+        description: Processed data output
+        required: true
+        multiple: false

@@ -217,4 +217,12 @@ wantType:
   - travel domain agents
   - AgentRestaurant implementation
   - MonitorRestaurant implementation
-  require: users
+  require:
+    type: users
+    users:
+      outputs:
+      - name: schedule
+        type: state
+        description: Generated schedule output
+        required: true
+        multiple: false

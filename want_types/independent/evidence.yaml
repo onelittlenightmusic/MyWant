@@ -135,4 +135,12 @@ wantType:
   - Approval process documentation
   - Evidence trail and audit compliance
   - Multi-level coordinator system
-  require: users
+  require:
+    type: users
+    users:
+      outputs:
+      - name: schedule
+        type: state
+        description: Generated schedule output
+        required: true
+        multiple: false

@@ -223,4 +223,12 @@ wantType:
   - queue-system recipe
   - qnet-pipeline recipe
   - Pipeline pattern documentation
-  require: providers
+  require:
+    type: providers
+    providers:
+      inputs:
+      - name: data_packets
+        type: want
+        description: Input data packets from upstream wants
+        required: true
+        multiple: true

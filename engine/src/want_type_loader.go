@@ -16,7 +16,7 @@ type WantTypeDefinition struct {
 	Parameters    []ParameterDef    `json:"parameters" yaml:"parameters"`
 	State         []StateDef        `json:"state" yaml:"state"`
 	Connectivity  ConnectivityDef   `json:"connectivity" yaml:"connectivity"`
-	Require       RequirePolicy     `json:"require,omitempty" yaml:"require,omitempty"` // Connectivity requirement policy
+	Require       *RequireSpec      `json:"require,omitempty" yaml:"require,omitempty"` // Structured connectivity requirement
 	UsageLimit    *UsageLimitSpec   `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use require instead
 	Agents        []AgentDef        `json:"agents" yaml:"agents"`
 	Constraints   []ConstraintDef   `json:"constraints" yaml:"constraints"`

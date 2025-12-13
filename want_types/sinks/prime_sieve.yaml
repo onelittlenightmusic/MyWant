@@ -132,4 +132,12 @@ wantType:
   - Sieve of Eratosthenes algorithm
   - Prime number mathematics
   - Pipeline sink statistics collection
-  require: providers
+  require:
+    type: providers
+    providers:
+      inputs:
+      - name: data_packets
+        type: want
+        description: Input data packets from upstream wants
+        required: true
+        multiple: true
