@@ -93,7 +93,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 		"fibonacci filter",
 	)
 
-	// Set parameter values from spec
+	// Update with actual parameter values from spec
 	locals := want.Locals.(*FibonacciFilterLocals)
 	locals.MinValue = want.GetIntParam("min_value", 0)
 	locals.MaxValue = want.GetIntParam("max_value", 1000000)
