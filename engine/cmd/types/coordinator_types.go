@@ -40,10 +40,10 @@ func NewCoordinatorWant(
 ) interface{} {
 	coordinatorType := metadata.Type
 
-	want := NewWant(
+	want := NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return nil },
+		nil,
 		ConnectivityMetadata{
 			RequiredInputs:  -1,  // Unified: accept any number of inputs
 			RequiredOutputs: 0,

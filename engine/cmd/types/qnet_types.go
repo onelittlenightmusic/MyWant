@@ -77,10 +77,10 @@ type Numbers struct {
 
 // PacketNumbers creates a new numbers want
 func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	return &Numbers{*mywant.NewWant(
+	return &Numbers{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
-		func() mywant.WantLocals { return &NumbersLocals{} },
+		&NumbersLocals{},
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 0,
@@ -176,10 +176,10 @@ type Queue struct {
 
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	return &Queue{*mywant.NewWant(
+	return &Queue{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
-		func() mywant.WantLocals { return &QueueLocals{} },
+		&QueueLocals{},
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -321,10 +321,10 @@ type Combiner struct {
 }
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	return &Combiner{*mywant.NewWant(
+	return &Combiner{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
-		func() mywant.WantLocals { return &CombinerLocals{} },
+		&CombinerLocals{},
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  2,
 			RequiredOutputs: 1,
@@ -397,10 +397,10 @@ type Sink struct {
 
 // Goal creates a new sink want
 func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	want := mywant.NewWant(
+	return &Sink{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
-		func() mywant.WantLocals { return &SinkLocals{} },
+		&SinkLocals{},
 		mywant.ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -410,12 +410,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Data sink/collector want",
 		},
 		"sink",
-	)
-
-	locals := want.Locals.(*SinkLocals)
-	locals.Received = 0
-
-	return &Sink{*want}
+	)}
 }
 
 // Exec executes the sink directly

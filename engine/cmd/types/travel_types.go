@@ -57,10 +57,10 @@ type RestaurantWant struct {
 
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
-	return &RestaurantWant{*NewWant(
+	return &RestaurantWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &RestaurantWantLocals{} },
+		&RestaurantWantLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -401,10 +401,10 @@ type HotelWant struct {
 
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
-	return &HotelWant{*NewWant(
+	return &HotelWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &HotelWantLocals{} },
+		&HotelWantLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -585,10 +585,10 @@ type BuffetWant struct {
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
-	return &BuffetWant{*NewWant(
+	return &BuffetWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &BuffetWantLocals{} },
+		&BuffetWantLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,

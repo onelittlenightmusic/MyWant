@@ -36,10 +36,10 @@ type EvidenceWant struct {
 }
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
-	return &EvidenceWant{*NewWant(
+	return &EvidenceWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &EvidenceWantLocals{} },
+		&EvidenceWantLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -107,10 +107,10 @@ type DescriptionWant struct {
 }
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
-	return &DescriptionWant{*NewWant(
+	return &DescriptionWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &DescriptionWantLocals{} },
+		&DescriptionWantLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,

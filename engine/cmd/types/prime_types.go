@@ -17,10 +17,10 @@ type PrimeNumbers struct {
 
 // NewPrimeNumbers creates a new prime numbers want
 func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
-	return &PrimeNumbers{*NewWant(
+	return &PrimeNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &PrimeNumbersLocals{} },
+		&PrimeNumbersLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,

@@ -16,10 +16,11 @@ type FibonacciNumbers struct {
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
 func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	locals := &FibonacciNumbersLocals{}
+	want := NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &FibonacciNumbersLocals{} },
+		locals,
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -30,10 +31,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 		},
 		"fibonacci numbers",
 	)
-
-	locals := want.Locals.(*FibonacciNumbersLocals)
 	locals.Count = want.GetIntParam("count", 20)
-
 	return &FibonacciNumbers{*want}
 }
 

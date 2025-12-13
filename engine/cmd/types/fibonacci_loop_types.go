@@ -24,10 +24,10 @@ type SeedNumbers struct {
 
 // NewSeedNumbers creates a new seed numbers want
 func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
-	return &SeedNumbers{*NewWant(
+	return &SeedNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &SeedNumbersLocals{} },
+		&SeedNumbersLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  0,
 			RequiredOutputs: 1,
@@ -74,10 +74,10 @@ type FibonacciComputer struct {
 
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
-	return &FibonacciComputer{*NewWant(
+	return &FibonacciComputer{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &FibonacciComputerLocals{} },
+		&FibonacciComputerLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 1,
@@ -174,10 +174,10 @@ type FibonacciMerger struct {
 
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
-	return &FibonacciMerger{*NewWant(
+	return &FibonacciMerger{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &FibonacciMergerLocals{} },
+		&FibonacciMergerLocals{},
 		ConnectivityMetadata{
 			RequiredInputs:  2,
 			RequiredOutputs: 1,
