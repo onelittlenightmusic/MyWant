@@ -473,11 +473,11 @@ func (n *Want) StartExecution(
 
 			// 3.5. Check preconditions: verify required providers/users are connected
 			if !n.checkPreconditions(paths) {
-				// Preconditions not satisfied - treat as suspended
+				// Preconditions not satisfied - mark as suspended and return to loop start
 				n.SetSuspended(true)
 				n.SetStatus(WantStatusSuspended)
 				time.Sleep(GlobalExecutionInterval)
-				continue
+				continue // Go back to step 1: Check stop channel
 			}
 
 			// 4. Synchronize paths before execution (preconditions: providers + users)
