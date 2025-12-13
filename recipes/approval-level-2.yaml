@@ -63,6 +63,9 @@ recipe:
   # Recipe result definition
   result:
     - want_name: "coordinator"
+      stat_name: ".coordinator_result.approval_input"
+      description: "Level 2 approval coordinator inputs"
+    - want_name: "coordinator"
       stat_name: ".approval_status"
       description: "Level 2 approval status"
   # Example deployment - one-click deployment configuration
