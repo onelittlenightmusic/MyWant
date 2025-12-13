@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download } from 'lucide-react';
-import { WantTypeDefinition } from '@/types/wantType';
+import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download, Play } from 'lucide-react';
+import { WantTypeDefinition, ExampleDef } from '@/types/wantType';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 import {
@@ -13,15 +13,18 @@ import {
 interface WantTypeDetailsSidebarProps {
   wantType: WantTypeDefinition | null;
   onDownload?: (wantType: WantTypeDefinition) => void;
+  onDeployExample?: (example: ExampleDef) => void;
 }
 
 type TabType = 'overview' | 'parameters' | 'state' | 'connectivity' | 'agents' | 'examples' | 'constraints';
 
 export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
   wantType,
-  onDownload
+  onDownload,
+  onDeployExample
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [deployingExample, setDeployingExample] = useState<string | null>(null);
 
   if (!wantType) {
     return (
@@ -35,6 +38,17 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
   const handleDownloadClick = () => {
     if (wantType && onDownload) {
       onDownload(wantType);
+    }
+  };
+
+  const handleDeployExample = async (example: ExampleDef) => {
+    if (!onDeployExample) return;
+
+    setDeployingExample(example.name);
+    try {
+      await onDeployExample(example);
+    } finally {
+      setDeployingExample(null);
     }
   };
 
@@ -111,7 +125,13 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
         {activeTab === 'state' && <StateTab wantType={wantType} />}
         {activeTab === 'connectivity' && <ConnectivityTab wantType={wantType} />}
         {activeTab === 'agents' && <AgentsTab wantType={wantType} />}
-        {activeTab === 'examples' && <ExamplesTab wantType={wantType} />}
+        {activeTab === 'examples' && (
+          <ExamplesTab
+            wantType={wantType}
+            onDeployExample={onDeployExample}
+            deployingExample={deployingExample}
+          />
+        )}
         {activeTab === 'constraints' && <ConstraintsTab wantType={wantType} />}
       </div>
       </div>
@@ -368,7 +388,11 @@ const AgentsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => 
   </TabContent>
 );
 
-const ExamplesTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
+const ExamplesTab: React.FC<{
+  wantType: WantTypeDefinition;
+  onDeployExample?: (example: ExampleDef) => Promise<void>;
+  deployingExample?: string | null;
+}> = ({ wantType, onDeployExample, deployingExample }) => (
   <TabContent>
     {wantType.examples.length > 0 ? (
       <div className="space-y-4">
@@ -391,6 +415,24 @@ const ExamplesTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
                   <p className="mt-1 text-gray-700 whitespace-pre-wrap text-xs">
                     {example.expectedBehavior}
                   </p>
+                </div>
+              )}
+              {onDeployExample && (
+                <div className="mt-3 pt-2 border-t border-gray-200">
+                  <button
+                    onClick={() => onDeployExample(example)}
+                    disabled={deployingExample === example.name}
+                    title={`Deploy ${example.name} example`}
+                    className={classNames(
+                      'flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors',
+                      deployingExample === example.name
+                        ? 'bg-gray-200 text-gray-600 cursor-wait'
+                        : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                    )}
+                  >
+                    <Play className="h-3 w-3" />
+                    {deployingExample === example.name ? 'Deploying...' : 'Deploy'}
+                  </button>
                 </div>
               )}
             </div>
