@@ -45,6 +45,20 @@ export interface ConnectivityDef {
   outputs: ChannelDef[];
 }
 
+export interface ConnectionSpec {
+  name: string;
+  type: string;
+  description: string;
+  required?: boolean;
+  multiple?: boolean;
+}
+
+export interface RequireSpec {
+  type: 'none' | 'providers' | 'users' | 'providers_and_users';
+  providers?: ConnectionSpec[];
+  users?: ConnectionSpec[];
+}
+
 export interface AgentDef {
   name: string;
   role: 'monitor' | 'action' | 'validator' | 'transformer';
@@ -57,12 +71,27 @@ export interface ConstraintDef {
   validation: string;
 }
 
+export interface WantMetadata {
+  name: string;
+  type: string;
+  labels: Record<string, string>;
+}
+
+export interface WantSpec {
+  params: Record<string, unknown>;
+  using?: Array<Record<string, string>>;
+}
+
+export interface WantConfiguration {
+  metadata: WantMetadata;
+  spec: WantSpec;
+}
+
 export interface ExampleDef {
   name: string;
   description: string;
-  params: Record<string, unknown>;
+  want: WantConfiguration;
   expectedBehavior: string;
-  connectedTo?: string[];
 }
 
 export interface WantTypeDefinition {
@@ -70,6 +99,7 @@ export interface WantTypeDefinition {
   parameters: ParameterDef[];
   state: StateDef[];
   connectivity: ConnectivityDef;
+  require?: RequireSpec;
   agents: AgentDef[];
   constraints: ConstraintDef[];
   examples: ExampleDef[];
@@ -96,6 +126,7 @@ export interface WantTypeDetailResponse {
   parameters: ParameterDef[];
   state: StateDef[];
   connectivity: ConnectivityDef;
+  require?: RequireSpec;
   agents: AgentDef[];
   constraints: ConstraintDef[];
   examples: ExampleDef[];

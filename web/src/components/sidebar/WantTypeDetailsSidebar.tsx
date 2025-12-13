@@ -140,8 +140,7 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
       <div className="space-y-3">
         <InfoRow label="Parameters" value={wantType.parameters.length} />
         <InfoRow label="State Keys" value={wantType.state.length} />
-        <InfoRow label="Inputs" value={wantType.connectivity.inputs.length} />
-        <InfoRow label="Outputs" value={wantType.connectivity.outputs.length} />
+        <InfoRow label="Require Type" value={wantType.require?.type || 'none'} />
         <InfoRow label="Agents" value={wantType.agents.length} />
         <InfoRow label="Examples" value={wantType.examples.length} />
       </div>
@@ -247,7 +246,58 @@ const StateTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
 
 const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
-    <TabSection title="Inputs">
+    {wantType.require && (
+      <TabSection title="Require">
+        <div className="space-y-3 text-sm">
+          <div>
+            <span className="text-gray-600">Type:</span>
+            <span className="ml-2 font-semibold capitalize">{wantType.require.type}</span>
+          </div>
+
+          {wantType.require.providers && wantType.require.providers.length > 0 && (
+            <div>
+              <span className="text-gray-600">Providers (Input Connections):</span>
+              <div className="mt-2 space-y-2">
+                {wantType.require.providers.map((provider) => (
+                  <div key={provider.name} className="p-2 bg-blue-50 rounded">
+                    <div className="font-semibold text-blue-900">{provider.name}</div>
+                    <div className="text-xs text-blue-700">{provider.type}</div>
+                    {provider.description && (
+                      <p className="text-xs text-blue-800 mt-1">{provider.description}</p>
+                    )}
+                    <div className="text-xs text-blue-700 mt-1">
+                      Required: {provider.required ? 'Yes' : 'No'}, Multiple: {provider.multiple ? 'Yes' : 'No'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {wantType.require.users && wantType.require.users.length > 0 && (
+            <div>
+              <span className="text-gray-600">Users (Output Connections):</span>
+              <div className="mt-2 space-y-2">
+                {wantType.require.users.map((user) => (
+                  <div key={user.name} className="p-2 bg-green-50 rounded">
+                    <div className="font-semibold text-green-900">{user.name}</div>
+                    <div className="text-xs text-green-700">{user.type}</div>
+                    {user.description && (
+                      <p className="text-xs text-green-800 mt-1">{user.description}</p>
+                    )}
+                    <div className="text-xs text-green-700 mt-1">
+                      Required: {user.required ? 'Yes' : 'No'}, Multiple: {user.multiple ? 'Yes' : 'No'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </TabSection>
+    )}
+
+    <TabSection title="Inputs (Legacy)">
       {wantType.connectivity.inputs.length > 0 ? (
         <div className="space-y-3">
           {wantType.connectivity.inputs.map((input) => (
@@ -265,7 +315,7 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
       )}
     </TabSection>
 
-    <TabSection title="Outputs">
+    <TabSection title="Outputs (Legacy)">
       {wantType.connectivity.outputs.length > 0 ? (
         <div className="space-y-3">
           {wantType.connectivity.outputs.map((output) => (
@@ -329,14 +379,12 @@ const ExamplesTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
                 <span className="text-gray-600">Description:</span>
                 <p className="mt-1 text-gray-700">{example.description}</p>
               </div>
-              {example.params && Object.keys(example.params).length > 0 && (
-                <div>
-                  <span className="text-gray-600">Parameters:</span>
-                  <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
-                    {JSON.stringify(example.params, null, 2)}
-                  </pre>
-                </div>
-              )}
+              <div>
+                <span className="text-gray-600">Want Configuration:</span>
+                <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
+                  {JSON.stringify(example.want, null, 2)}
+                </pre>
+              </div>
               {example.expectedBehavior && (
                 <div>
                   <span className="text-gray-600">Expected Behavior:</span>

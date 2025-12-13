@@ -67,28 +67,22 @@ wantType:
       persistent: true
 
   # =====================================================================
-  # CONNECTIVITY - How does this want connect to other wants?
+  # REQUIRE - Connectivity requirements for this want type
   # =====================================================================
-  connectivity:
-    # INPUT CHANNELS - What does this want consume?
-    inputs:
-      - name: "input_name"                # Input channel identifier
-        type: "want"                      # "want" | "agent" | "external"
-        description: "What this input provides"
-        required: true                    # Must be connected?
-
-      # For coordinator pattern (multiple inputs)
-      - name: "items"
-        type: "want"
-        description: "Items to coordinate"
-        required: false
-        multiple: true                    # Can connect multiple wants?
-
-    # OUTPUT CHANNELS - What does this want produce?
-    outputs:
-      - name: "output_name"               # Output channel identifier
-        type: "want"                      # "want" | "state" | "event" | "agent"
-        description: "What this output provides"
+  require:
+    type: "none"                          # Choose: none | providers | users | providers_and_users
+    # providers:                          # Input connections (for sink/processor patterns)
+    #   - name: "input_name"
+    #     type: "want"
+    #     description: "What this input provides"
+    #     required: true
+    #     multiple: false
+    # users:                              # Output connections (for generator/processor patterns)
+    #   - name: "output_name"
+    #     type: "want"
+    #     description: "What this output provides"
+    #     required: false
+    #     multiple: true
 
   # =====================================================================
   # AGENTS - Does this want use agents?
@@ -123,23 +117,33 @@ wantType:
   examples:
     - name: "Basic Usage"
       description: "Simple example with default parameters"
-      params:
-        param_name: "value"
+      want:
+        metadata:
+          name: "example-basic-usage"
+          type: "example_want"
+          labels: {}
+        spec:
+          params:
+            param_name: "value"
       expectedBehavior: |
         1. First step of execution
         2. Second step
         3. Final result
-      connectedTo: ["other_want_type"]
 
     - name: "Advanced Usage"
       description: "More complex scenario with custom parameters"
-      params:
-        param_name: "custom_value"
-        count: 500
+      want:
+        metadata:
+          name: "example-advanced-usage"
+          type: "example_want"
+          labels: {}
+        spec:
+          params:
+            param_name: "custom_value"
+            count: 500
       expectedBehavior: |
         1. Custom behavior based on parameters
         2. Different execution path
-      connectedTo: ["want_type_1", "want_type_2"]
 
   # =====================================================================
   # RELATED TYPES - What other want types work with this one?
@@ -200,7 +204,8 @@ wantType:
 # - Always include at least 2-3 realistic examples
 # - Show different parameter combinations
 # - Describe what happens when want executes
-# - List what other wants this typically connects to
+# - Format: Each example must contain a full 'want' structure that can be deployed via the Want API
+# - Structure: want.metadata.name, want.metadata.type, want.spec.params
 
 # VALIDATION RULES:
 # min/max - For numeric comparisons
