@@ -61,14 +61,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&RestaurantWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       1,
-			MaxOutputs:      1,
-			WantType:        "restaurant",
-			Description:     "Restaurant reservation scheduling want",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"restaurant",
 	)}
 }
@@ -405,14 +398,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&HotelWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       1,
-			MaxOutputs:      1,
-			WantType:        "hotel",
-			Description:     "Hotel reservation scheduling want",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"hotel",
 	)}
 }
@@ -589,14 +575,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&BuffetWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       1,
-			MaxOutputs:      1,
-			WantType:        "buffet",
-			Description:     "Breakfast buffet scheduling want",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"buffet",
 	)}
 }

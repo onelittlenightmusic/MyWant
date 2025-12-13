@@ -29,14 +29,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FlightWantLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       1,
-			MaxOutputs:      1,
-			WantType:        "flight",
-			Description:     "Flight booking scheduling want",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"flight",
 	)}
 }

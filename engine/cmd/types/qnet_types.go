@@ -81,14 +81,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Execut
 		metadata,
 		spec,
 		&NumbersLocals{},
-		mywant.ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 0,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "sequence",
-			Description:     "Packet generator want",
-		},
+		mywant.nil // ConnectivityMetadata loaded from YAML,
 		"sequence",
 	)}
 }
@@ -180,14 +173,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable 
 		metadata,
 		spec,
 		&QueueLocals{},
-		mywant.ConnectivityMetadata{
-			RequiredInputs:  1,
-			RequiredOutputs: 0,
-			MaxInputs:       1,
-			MaxOutputs:      -1,
-			WantType:        "queue",
-			Description:     "Queue processing want",
-		},
+		mywant.nil // ConnectivityMetadata loaded from YAML,
 		"queue",
 	)}
 }
@@ -325,14 +311,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executab
 		metadata,
 		spec,
 		&CombinerLocals{},
-		mywant.ConnectivityMetadata{
-			RequiredInputs:  2,
-			RequiredOutputs: 1,
-			MaxInputs:       -1,
-			MaxOutputs:      -1,
-			WantType:        "combiner",
-			Description:     "Stream combiner want",
-		},
+		mywant.nil // ConnectivityMetadata loaded from YAML,
 		"combiner",
 	)}
 }
@@ -401,14 +380,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 		metadata,
 		spec,
 		&SinkLocals{},
-		mywant.ConnectivityMetadata{
-			RequiredInputs:  1,
-			RequiredOutputs: 0,
-			MaxInputs:       -1,
-			MaxOutputs:      0,
-			WantType:        "sink",
-			Description:     "Data sink/collector want",
-		},
+		mywant.nil // ConnectivityMetadata loaded from YAML,
 		"sink",
 	)}
 }

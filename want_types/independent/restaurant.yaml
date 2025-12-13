@@ -1,208 +1,224 @@
 wantType:
   metadata:
-    name: "restaurant"
-    title: "Restaurant Reservation"
-    description: "Finds and books a restaurant reservation based on type and preferences"
-    version: "1.0"
-    category: "travel"
-    pattern: "independent"
-
+    name: restaurant
+    title: Restaurant Reservation
+    description: Finds and books a restaurant reservation based on type and preferences
+    version: '1.0'
+    category: travel
+    pattern: independent
   parameters:
-    - name: "restaurant_type"
-      description: "Type of restaurant cuisine or service style"
-      type: "string"
-      default: "fine dining"
-      required: false
-      validation:
-        enum: ["fine dining", "casual", "buffet", "fast food", "seafood", "steakhouse", "vegan"]
-      example: "fine dining"
-
-    - name: "party_size"
-      description: "Number of people in the party"
-      type: "int"
-      default: 2
-      required: false
-      validation:
-        min: 1
-        max: 20
-      example: 4
-
-    - name: "preferred_time"
-      description: "Preferred booking time in HH:MM 24-hour format"
-      type: "string"
-      default: "19:00"
-      required: false
-      validation:
-        pattern: "^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
-      example: "19:30"
-
-    - name: "cuisine"
-      description: "Preferred cuisine type"
-      type: "string"
-      default: "international"
-      required: false
-      validation:
-        enum: ["italian", "french", "japanese", "spanish", "thai", "chinese", "indian", "international", "fusion"]
-      example: "french"
-
-    - name: "budget"
-      description: "Budget level for restaurant selection"
-      type: "string"
-      default: "moderate"
-      required: false
-      validation:
-        enum: ["budget", "moderate", "expensive", "luxury"]
-
+  - name: restaurant_type
+    description: Type of restaurant cuisine or service style
+    type: string
+    default: fine dining
+    required: false
+    validation:
+      enum:
+      - fine dining
+      - casual
+      - buffet
+      - fast food
+      - seafood
+      - steakhouse
+      - vegan
+    example: fine dining
+  - name: party_size
+    description: Number of people in the party
+    type: int
+    default: 2
+    required: false
+    validation:
+      min: 1
+      max: 20
+    example: 4
+  - name: preferred_time
+    description: Preferred booking time in HH:MM 24-hour format
+    type: string
+    default: '19:00'
+    required: false
+    validation:
+      pattern: ^([0-1][0-9]|2[0-3]):[0-5][0-9]$
+    example: '19:30'
+  - name: cuisine
+    description: Preferred cuisine type
+    type: string
+    default: international
+    required: false
+    validation:
+      enum:
+      - italian
+      - french
+      - japanese
+      - spanish
+      - thai
+      - chinese
+      - indian
+      - international
+      - fusion
+    example: french
+  - name: budget
+    description: Budget level for restaurant selection
+    type: string
+    default: moderate
+    required: false
+    validation:
+      enum:
+      - budget
+      - moderate
+      - expensive
+      - luxury
   state:
-    - name: "reservation_status"
-      description: "Current reservation status (pending, confirmed, cancelled, completed)"
-      type: "string"
-      persistent: true
-      example: "confirmed"
-
-    - name: "restaurant_name"
-      description: "Name of the reserved restaurant"
-      type: "string"
-      persistent: true
-      example: "The French Laundry"
-
-    - name: "booking_time"
-      description: "Confirmed booking time in HH:MM format"
-      type: "string"
-      persistent: true
-      example: "19:30"
-
-    - name: "reservation_id"
-      description: "Unique reservation identifier from booking system"
-      type: "string"
-      persistent: true
-      example: "RES-2024-001234"
-
-    - name: "confirmation_number"
-      description: "Confirmation number for the reservation"
-      type: "string"
-      persistent: true
-      example: "CONF-ABC123"
-
-    - name: "address"
-      description: "Restaurant address"
-      type: "string"
-      persistent: true
-      example: "123 Main St, San Francisco, CA 94102"
-
-    - name: "contact_number"
-      description: "Restaurant phone number"
-      type: "string"
-      persistent: true
-      example: "+1-415-000-1234"
-
-    - name: "duration_minutes"
-      description: "Expected duration of dining experience"
-      type: "int"
-      persistent: true
-      example: 120
-
-    - name: "estimated_cost_per_person"
-      description: "Estimated cost per person in USD"
-      type: "float64"
-      persistent: true
-      example: 85.50
-
-    - name: "booking_timestamp"
-      description: "When the reservation was made"
-      type: "string"
-      persistent: true
-
+  - name: reservation_status
+    description: Current reservation status (pending, confirmed, cancelled, completed)
+    type: string
+    persistent: true
+    example: confirmed
+  - name: restaurant_name
+    description: Name of the reserved restaurant
+    type: string
+    persistent: true
+    example: The French Laundry
+  - name: booking_time
+    description: Confirmed booking time in HH:MM format
+    type: string
+    persistent: true
+    example: '19:30'
+  - name: reservation_id
+    description: Unique reservation identifier from booking system
+    type: string
+    persistent: true
+    example: RES-2024-001234
+  - name: confirmation_number
+    description: Confirmation number for the reservation
+    type: string
+    persistent: true
+    example: CONF-ABC123
+  - name: address
+    description: Restaurant address
+    type: string
+    persistent: true
+    example: 123 Main St, San Francisco, CA 94102
+  - name: contact_number
+    description: Restaurant phone number
+    type: string
+    persistent: true
+    example: +1-415-000-1234
+  - name: duration_minutes
+    description: Expected duration of dining experience
+    type: int
+    persistent: true
+    example: 120
+  - name: estimated_cost_per_person
+    description: Estimated cost per person in USD
+    type: float64
+    persistent: true
+    example: 85.5
+  - name: booking_timestamp
+    description: When the reservation was made
+    type: string
+    persistent: true
   connectivity:
     inputs: []
     outputs:
-      - name: "schedule"
-        type: "state"
-        description: "Restaurant schedule and reservation details"
-
+    - name: schedule
+      type: state
+      description: Restaurant schedule and reservation details
   agents:
-    - name: "MonitorRestaurant"
-      role: "monitor"
-      description: "Loads existing restaurant data from YAML files (restaurant0.yaml, restaurant1.yaml)"
-      example: "Checks local state files before booking new reservation"
-
-    - name: "AgentRestaurant"
-      role: "action"
-      description: "Finds available restaurants and creates reservation if none exists"
-      example: "Called after MonitorRestaurant if no existing reservation found"
-
+  - name: MonitorRestaurant
+    role: monitor
+    description: Loads existing restaurant data from YAML files (restaurant0.yaml,
+      restaurant1.yaml)
+    example: Checks local state files before booking new reservation
+  - name: AgentRestaurant
+    role: action
+    description: Finds available restaurants and creates reservation if none exists
+    example: Called after MonitorRestaurant if no existing reservation found
   constraints:
-    - description: "Party size within restaurant typical capacity"
-      validation: "party_size >= 1 and party_size <= 20"
-
-    - description: "Preferred time within common dining service hours"
-      validation: "preferred_time >= '06:00' and preferred_time <= '23:00'"
-
-    - description: "Valid restaurant type for selection"
-      validation: "restaurant_type in enum list"
-
+  - description: Party size within restaurant typical capacity
+    validation: party_size >= 1 and party_size <= 20
+  - description: Preferred time within common dining service hours
+    validation: preferred_time >= '06:00' and preferred_time <= '23:00'
+  - description: Valid restaurant type for selection
+    validation: restaurant_type in enum list
   examples:
-    - name: "Fine dining reservation"
-      description: "Books upscale French restaurant for romantic dinner"
-      params:
-        restaurant_type: "fine dining"
-        party_size: 2
-        preferred_time: "19:30"
-        cuisine: "french"
-        budget: "expensive"
-      expectedBehavior: |
-        1. MonitorRestaurant checks for existing reservation in local files
-        2. If none found, AgentRestaurant searches for available fine dining options
-        3. Books restaurant and stores reservation details in state
-      connectedTo: ["travel_coordinator"]
+  - name: Fine dining reservation
+    description: Books upscale French restaurant for romantic dinner
+    params:
+      restaurant_type: fine dining
+      party_size: 2
+      preferred_time: '19:30'
+      cuisine: french
+      budget: expensive
+    expectedBehavior: '1. MonitorRestaurant checks for existing reservation in local
+      files
 
-    - name: "Casual family dinner"
-      description: "Books casual restaurant for family gathering"
-      params:
-        restaurant_type: "casual"
-        party_size: 6
-        preferred_time: "18:00"
-        cuisine: "international"
-        budget: "moderate"
-      expectedBehavior: |
-        1. Checks existing reservations
-        2. Finds casual restaurant with family seating
-        3. Books and confirms reservation
-      connectedTo: ["hotel", "buffet", "travel_coordinator"]
+      2. If none found, AgentRestaurant searches for available fine dining options
 
-    - name: "Business lunch"
-      description: "Quick business meal booking"
-      params:
-        restaurant_type: "casual"
-        party_size: 4
-        preferred_time: "12:30"
-        cuisine: "steakhouse"
-        budget: "moderate"
-      expectedBehavior: |
-        1. Finds nearby steakhouse with lunch availability
-        2. Books a 60-minute table slot
-      connectedTo: []
+      3. Books restaurant and stores reservation details in state
 
-    - name: "Buffet dining"
-      description: "All-you-can-eat buffet booking"
-      params:
-        restaurant_type: "buffet"
-        party_size: 8
-        preferred_time: "19:00"
-        budget: "budget"
-      expectedBehavior: |
-        1. Finds buffet restaurant
-        2. Books for group with flexible timing (buffets less time-sensitive)
-      connectedTo: ["travel_coordinator", "hotel"]
+      '
+    connectedTo:
+    - travel_coordinator
+  - name: Casual family dinner
+    description: Books casual restaurant for family gathering
+    params:
+      restaurant_type: casual
+      party_size: 6
+      preferred_time: '18:00'
+      cuisine: international
+      budget: moderate
+    expectedBehavior: '1. Checks existing reservations
 
+      2. Finds casual restaurant with family seating
+
+      3. Books and confirms reservation
+
+      '
+    connectedTo:
+    - hotel
+    - buffet
+    - travel_coordinator
+  - name: Business lunch
+    description: Quick business meal booking
+    params:
+      restaurant_type: casual
+      party_size: 4
+      preferred_time: '12:30'
+      cuisine: steakhouse
+      budget: moderate
+    expectedBehavior: '1. Finds nearby steakhouse with lunch availability
+
+      2. Books a 60-minute table slot
+
+      '
+    connectedTo: []
+  - name: Buffet dining
+    description: All-you-can-eat buffet booking
+    params:
+      restaurant_type: buffet
+      party_size: 8
+      preferred_time: '19:00'
+      budget: budget
+    expectedBehavior: '1. Finds buffet restaurant
+
+      2. Books for group with flexible timing (buffets less time-sensitive)
+
+      '
+    connectedTo:
+    - travel_coordinator
+    - hotel
   relatedTypes:
-    - "hotel"
-    - "buffet"
-    - "flight"
-    - "travel_coordinator"
-
+  - hotel
+  - buffet
+  - flight
+  - travel_coordinator
   seeAlso:
-    - "travel-itinerary recipe"
-    - "travel domain agents"
-    - "AgentRestaurant implementation"
-    - "MonitorRestaurant implementation"
+  - travel-itinerary recipe
+  - travel domain agents
+  - AgentRestaurant implementation
+  - MonitorRestaurant implementation
+  usageLimit:
+    providers:
+      min: 0
+    users:
+      min: 1

@@ -28,14 +28,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&SeedNumbersLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "seed numbers",
-			Description:     "Fibonacci seed generator",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"seed numbers",
 	)}
 }
@@ -78,14 +71,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FibonacciComputerLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  1,
-			RequiredOutputs: 1,
-			MaxInputs:       1,
-			MaxOutputs:      -1,
-			WantType:        "fibonacci computer",
-			Description:     "Fibonacci number computer",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"fibonacci computer",
 	)}
 }
@@ -178,14 +164,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&FibonacciMergerLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  2,
-			RequiredOutputs: 1,
-			MaxInputs:       2,
-			MaxOutputs:      1,
-			WantType:        "fibonacci merger",
-			Description:     "Fibonacci merger",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"fibonacci merger",
 	)}
 }

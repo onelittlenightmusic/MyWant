@@ -21,14 +21,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		&PrimeNumbersLocals{},
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "prime numbers",
-			Description:     "Prime number generator",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"prime numbers",
 	)}
 }
@@ -74,14 +67,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 		&PrimeSequenceLocals{
 			foundPrimes: make([]int, 0),
 		},
-		ConnectivityMetadata{
-			RequiredInputs:  1,
-			RequiredOutputs: 0,
-			MaxInputs:       1,
-			MaxOutputs:      -1,
-			WantType:        "prime sequence",
-			Description:     "Prime number sequence",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"prime sequence",
 	)}
 }
@@ -183,9 +169,7 @@ func (f *PrimeSequence) Exec() bool {
 
 // // Initialize base Want fields sink.Init(metadata, spec)
 
-// // Set fields for base Want methods sink.WantType = "prime sink" sink.ConnectivityMetadata = ConnectivityMetadata{ RequiredInputs:  1,
-// RequiredOutputs: 0, MaxInputs:       -1, MaxOutputs:      0, WantType:        "prime sink",
-// Description:     "Prime sink/collector", }
+// // Set fields for base Want methods sink.WantType = "prime sink" sink.ConnectivityMetadata = nil // ConnectivityMetadata loaded from YAML
 
 // func (s *PrimeSink) GetWant() interface{} { return &s.Want }
 

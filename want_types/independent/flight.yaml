@@ -1,183 +1,196 @@
 wantType:
   metadata:
-    name: "flight"
-    title: "Flight Booking Reservation"
-    description: |
-      Flight booking want type for travel planning. Books flights with configurable
+    name: flight
+    title: Flight Booking Reservation
+    description: 'Flight booking want type for travel planning. Books flights with
+      configurable
+
       class options (economy, business, first), departure dates, and durations.
 
+
       This independent want monitors flight status for potential delays and
+
       supports automatic rebooking if flights are delayed. Integrates with
+
       agent systems for dynamic flight modification.
 
-    version: "1.0"
-    category: "travel"
-    pattern: "independent"
-
+      '
+    version: '1.0'
+    category: travel
+    pattern: independent
   parameters:
-    - name: "flight_type"
-      description: "Flight class (economy, business, first)"
-      type: "string"
-      default: "economy"
-      required: false
-      validation:
-        enum: ["economy", "business", "first"]
-      example: "business"
-
-    - name: "duration_hours"
-      description: "Estimated flight duration in hours"
-      type: "float64"
-      default: 12.0
-      required: false
-      validation:
-        min: 0.5
-        max: 24
-      example: 8.5
-
-    - name: "departure_date"
-      description: "Departure date in YYYY-MM-DD format"
-      type: "string"
-      default: "2024-01-01"
-      required: false
-      example: "2024-12-25"
-
+  - name: flight_type
+    description: Flight class (economy, business, first)
+    type: string
+    default: economy
+    required: false
+    validation:
+      enum:
+      - economy
+      - business
+      - first
+    example: business
+  - name: duration_hours
+    description: Estimated flight duration in hours
+    type: float64
+    default: 12.0
+    required: false
+    validation:
+      min: 0.5
+      max: 24
+    example: 8.5
+  - name: departure_date
+    description: Departure date in YYYY-MM-DD format
+    type: string
+    default: '2024-01-01'
+    required: false
+    example: '2024-12-25'
   state:
-    - name: "attempted"
-      description: "Whether flight booking has been attempted"
-      type: "bool"
-      persistent: true
-      example: true
-
-    - name: "flight_type"
-      description: "Class of flight booked"
-      type: "string"
-      persistent: true
-      example: "business"
-
-    - name: "departure_date"
-      description: "Departure date of flight"
-      type: "string"
-      persistent: true
-      example: "2024-12-25"
-
-    - name: "duration_hours"
-      description: "Flight duration in hours"
-      type: "float64"
-      persistent: true
-      example: 8.5
-
-    - name: "flight_number"
-      description: "Booked flight number"
-      type: "string"
-      persistent: true
-      example: "AA123"
-
-    - name: "departure_time"
-      description: "Scheduled departure time"
-      type: "string"
-      persistent: true
-
-    - name: "arrival_time"
-      description: "Expected arrival time"
-      type: "string"
-      persistent: true
-
-    - name: "reservation_name"
-      description: "Human-readable reservation identifier"
-      type: "string"
-      persistent: true
-
-    - name: "monitoring_active"
-      description: "Whether monitoring flight for status changes"
-      type: "bool"
-      persistent: false
-      example: false
-
-    - name: "flight_action"
-      description: "Pending flight action (book_flight, cancel_flight, modify_flight)"
-      type: "string"
-      persistent: true
-
+  - name: attempted
+    description: Whether flight booking has been attempted
+    type: bool
+    persistent: true
+    example: true
+  - name: flight_type
+    description: Class of flight booked
+    type: string
+    persistent: true
+    example: business
+  - name: departure_date
+    description: Departure date of flight
+    type: string
+    persistent: true
+    example: '2024-12-25'
+  - name: duration_hours
+    description: Flight duration in hours
+    type: float64
+    persistent: true
+    example: 8.5
+  - name: flight_number
+    description: Booked flight number
+    type: string
+    persistent: true
+    example: AA123
+  - name: departure_time
+    description: Scheduled departure time
+    type: string
+    persistent: true
+  - name: arrival_time
+    description: Expected arrival time
+    type: string
+    persistent: true
+  - name: reservation_name
+    description: Human-readable reservation identifier
+    type: string
+    persistent: true
+  - name: monitoring_active
+    description: Whether monitoring flight for status changes
+    type: bool
+    persistent: false
+    example: false
+  - name: flight_action
+    description: Pending flight action (book_flight, cancel_flight, modify_flight)
+    type: string
+    persistent: true
   connectivity:
     inputs:
-      - name: "existing_schedule"
-        type: "want"
-        description: "Optional existing travel schedule for conflict checking"
-        required: false
-
+    - name: existing_schedule
+      type: want
+      description: Optional existing travel schedule for conflict checking
+      required: false
     outputs:
-      - name: "travel_schedule"
-        type: "want"
-        description: "Flight booking as TravelSchedule"
-
+    - name: travel_schedule
+      type: want
+      description: Flight booking as TravelSchedule
   agents:
-    - name: "AgentFlight"
-      role: "action"
-      description: "Books flights and handles cancellations/modifications"
-      example: "AgentFlight communicates with flight API for bookings"
-
+  - name: AgentFlight
+    role: action
+    description: Books flights and handles cancellations/modifications
+    example: AgentFlight communicates with flight API for bookings
   constraints:
-    - description: "Flight type must be valid"
-      validation: "flight_type in [economy, business, first]"
-
-    - description: "Duration must be positive"
-      validation: "duration_hours > 0"
-
-    - description: "Duration must be realistic"
-      validation: "duration_hours <= 24"
-
+  - description: Flight type must be valid
+    validation: flight_type in [economy, business, first]
+  - description: Duration must be positive
+    validation: duration_hours > 0
+  - description: Duration must be realistic
+    validation: duration_hours <= 24
   examples:
-    - name: "Economy Flight"
-      description: "Book economy class flight"
-      params:
-        flight_type: "economy"
-        duration_hours: 10.0
-        departure_date: "2024-12-25"
-      expectedBehavior: |
-        1. Flight want books economy class
-        2. Schedules departure on specified date
-        3. Estimates 10 hour flight duration
-        4. Assigns flight number and times
-        5. Monitors for status changes
-        6. Can auto-rebook if delayed
-      connectedTo: ["hotel", "restaurant", "travel_coordinator"]
+  - name: Economy Flight
+    description: Book economy class flight
+    params:
+      flight_type: economy
+      duration_hours: 10.0
+      departure_date: '2024-12-25'
+    expectedBehavior: '1. Flight want books economy class
 
-    - name: "Business Class Flight"
-      description: "Premium business class booking"
-      params:
-        flight_type: "business"
-        duration_hours: 8.5
-        departure_date: "2024-12-24"
-      expectedBehavior: |
-        1. Flight want books business class
-        2. Applies premium amenities and services
-        3. Priority boarding included
-        4. Monitors actively for delays
-        5. Auto-rebook to next available if delayed
-      connectedTo: ["hotel", "travel_coordinator"]
+      2. Schedules departure on specified date
 
-    - name: "First Class Long Haul"
-      description: "First class international flight"
-      params:
-        flight_type: "first"
-        duration_hours: 15.0
-        departure_date: "2025-01-01"
-      expectedBehavior: |
-        1. Flight want books first class
-        2. Premium seating and meals included
-        3. Dedicated concierge support
-        4. Monitors with shorter check intervals
-        5. Immediate rebooking on any delay
-      connectedTo: ["hotel", "buffet", "travel_coordinator"]
+      3. Estimates 10 hour flight duration
 
+      4. Assigns flight number and times
+
+      5. Monitors for status changes
+
+      6. Can auto-rebook if delayed
+
+      '
+    connectedTo:
+    - hotel
+    - restaurant
+    - travel_coordinator
+  - name: Business Class Flight
+    description: Premium business class booking
+    params:
+      flight_type: business
+      duration_hours: 8.5
+      departure_date: '2024-12-24'
+    expectedBehavior: '1. Flight want books business class
+
+      2. Applies premium amenities and services
+
+      3. Priority boarding included
+
+      4. Monitors actively for delays
+
+      5. Auto-rebook to next available if delayed
+
+      '
+    connectedTo:
+    - hotel
+    - travel_coordinator
+  - name: First Class Long Haul
+    description: First class international flight
+    params:
+      flight_type: first
+      duration_hours: 15.0
+      departure_date: '2025-01-01'
+    expectedBehavior: '1. Flight want books first class
+
+      2. Premium seating and meals included
+
+      3. Dedicated concierge support
+
+      4. Monitors with shorter check intervals
+
+      5. Immediate rebooking on any delay
+
+      '
+    connectedTo:
+    - hotel
+    - buffet
+    - travel_coordinator
   relatedTypes:
-    - "flight_alt"
-    - "hotel"
-    - "restaurant"
-    - "buffet"
-    - "travel_coordinator"
-
+  - flight_alt
+  - hotel
+  - restaurant
+  - buffet
+  - travel_coordinator
   seeAlso:
-    - "Flight booking API integration"
-    - "Delay monitoring and auto-rebooking"
-    - "Travel coordinator flight integration"
+  - Flight booking API integration
+  - Delay monitoring and auto-rebooking
+  - Travel coordinator flight integration
+  usageLimit:
+    providers:
+      min: 0
+    users:
+      min: 1

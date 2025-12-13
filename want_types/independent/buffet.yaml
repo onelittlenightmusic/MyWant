@@ -1,224 +1,211 @@
 wantType:
-  # =====================================================================
-  # METADATA LAYER - Identity and Classification
-  # =====================================================================
   metadata:
-    name: "buffet"
-    title: "Breakfast Buffet Reservation"
-    description: |
-      Breakfast buffet reservation want type for travel planning. Schedules buffet
+    name: buffet
+    title: Breakfast Buffet Reservation
+    description: 'Breakfast buffet reservation want type for travel planning. Schedules
+      buffet
+
       experiences with configurable types (continental, full, asian, vegetarian).
+
       Typically scheduled for morning hours (8-10 AM) on the day after hotel arrival.
 
+
       This independent want operates in parallel with restaurant and hotel components,
+
       and coordinates with travel_coordinator to resolve any timing conflicts across
+
       the entire travel itinerary.
 
-    version: "1.0"
-    category: "travel"
-    pattern: "independent"
-
-  # =====================================================================
-  # PARAMETERS - What configuration does this buffet accept?
-  # =====================================================================
+      '
+    version: '1.0'
+    category: travel
+    pattern: independent
   parameters:
-    - name: "buffet_type"
-      description: "Type of breakfast buffet (continental, full, asian, vegetarian)"
-      type: "string"
-      default: "continental"
-      required: false
-      validation:
-        enum: ["continental", "full", "asian", "vegetarian"]
-      example: "full"
-
-  # =====================================================================
-  # STATE - What data does this buffet want store and track?
-  # =====================================================================
+  - name: buffet_type
+    description: Type of breakfast buffet (continental, full, asian, vegetarian)
+    type: string
+    default: continental
+    required: false
+    validation:
+      enum:
+      - continental
+      - full
+      - asian
+      - vegetarian
+    example: full
   state:
-    - name: "attempted"
-      description: "Whether buffet reservation attempt has been made"
-      type: "bool"
-      persistent: true
-      example: true
-
-    - name: "total_processed"
-      description: "Count of successful buffet reservations"
-      type: "int"
-      persistent: true
-      example: 1
-
-    - name: "buffet_type"
-      description: "Type of breakfast buffet reserved"
-      type: "string"
-      persistent: true
-      example: "full"
-
-    - name: "buffet_start_time"
-      description: "Buffet start time formatted as HH:MM Jan 2"
-      type: "string"
-      persistent: true
-      example: "08:30 Nov 15"
-
-    - name: "buffet_end_time"
-      description: "Buffet end time formatted as HH:MM Jan 2"
-      type: "string"
-      persistent: true
-      example: "10:00 Nov 15"
-
-    - name: "buffet_duration_hours"
-      description: "Duration of buffet service in hours"
-      type: "float64"
-      persistent: true
-      example: 1.5
-
-    - name: "reservation_name"
-      description: "Human-readable name of the buffet reservation"
-      type: "string"
-      persistent: true
-      example: "traveler full breakfast buffet"
-
-    - name: "premium_processed"
-      description: "Whether premium buffet features were applied"
-      type: "bool"
-      persistent: true
-      example: false
-
-    - name: "premium_level"
-      description: "Premium tier if applicable (bronze, silver, gold)"
-      type: "string"
-      persistent: true
-      example: "gold"
-
-    - name: "service_tier"
-      description: "Service tier selected (self-service, attended, premium)"
-      type: "string"
-      persistent: true
-      example: "attended"
-
-    - name: "premium_amenities"
-      description: "Array of premium buffet amenities (champagne service, private area, chef service)"
-      type: "[]string"
-      persistent: true
-      example: ["champagne service", "private area"]
-
-    - name: "agent_requirements"
-      description: "Requirements passed to agent system"
-      type: "[]string"
-      persistent: false
-
-    - name: "agent_execution_status"
-      description: "Status of agent execution (completed, failed, pending)"
-      type: "string"
-      persistent: true
-      example: "completed"
-
-    - name: "agent_execution_error"
-      description: "Error message if agent execution failed"
-      type: "string"
-      persistent: true
-
-  # =====================================================================
-  # CONNECTIVITY - How does this buffet connect to other wants?
-  # =====================================================================
+  - name: attempted
+    description: Whether buffet reservation attempt has been made
+    type: bool
+    persistent: true
+    example: true
+  - name: total_processed
+    description: Count of successful buffet reservations
+    type: int
+    persistent: true
+    example: 1
+  - name: buffet_type
+    description: Type of breakfast buffet reserved
+    type: string
+    persistent: true
+    example: full
+  - name: buffet_start_time
+    description: Buffet start time formatted as HH:MM Jan 2
+    type: string
+    persistent: true
+    example: 08:30 Nov 15
+  - name: buffet_end_time
+    description: Buffet end time formatted as HH:MM Jan 2
+    type: string
+    persistent: true
+    example: 10:00 Nov 15
+  - name: buffet_duration_hours
+    description: Duration of buffet service in hours
+    type: float64
+    persistent: true
+    example: 1.5
+  - name: reservation_name
+    description: Human-readable name of the buffet reservation
+    type: string
+    persistent: true
+    example: traveler full breakfast buffet
+  - name: premium_processed
+    description: Whether premium buffet features were applied
+    type: bool
+    persistent: true
+    example: false
+  - name: premium_level
+    description: Premium tier if applicable (bronze, silver, gold)
+    type: string
+    persistent: true
+    example: gold
+  - name: service_tier
+    description: Service tier selected (self-service, attended, premium)
+    type: string
+    persistent: true
+    example: attended
+  - name: premium_amenities
+    description: Array of premium buffet amenities (champagne service, private area,
+      chef service)
+    type: '[]string'
+    persistent: true
+    example:
+    - champagne service
+    - private area
+  - name: agent_requirements
+    description: Requirements passed to agent system
+    type: '[]string'
+    persistent: false
+  - name: agent_execution_status
+    description: Status of agent execution (completed, failed, pending)
+    type: string
+    persistent: true
+    example: completed
+  - name: agent_execution_error
+    description: Error message if agent execution failed
+    type: string
+    persistent: true
   connectivity:
     inputs:
-      - name: "existing_schedule"
-        type: "want"
-        description: "Optional existing travel schedule to check for conflicts"
-        required: false
-
+    - name: existing_schedule
+      type: want
+      description: Optional existing travel schedule to check for conflicts
+      required: false
     outputs:
-      - name: "travel_schedule"
-        type: "want"
-        description: "Buffet reservation as TravelSchedule with start/end times"
-
-  # =====================================================================
-  # AGENTS - Does this want use agents?
-  # =====================================================================
+    - name: travel_schedule
+      type: want
+      description: Buffet reservation as TravelSchedule with start/end times
   agents:
-    - name: "MonitorBuffet"
-      role: "monitor"
-      description: "Checks for existing buffet reservations before creating new ones"
-      example: "MonitorBuffet loads existing buffet state from persistent memory"
-
-    - name: "AgentBuffet"
-      role: "action"
-      description: "Creates buffet reservation with selected parameters"
-      example: "AgentBuffet executes booking logic and returns BuffetSchedule"
-
-  # =====================================================================
-  # CONSTRAINTS - What business rules must be satisfied?
-  # =====================================================================
+  - name: MonitorBuffet
+    role: monitor
+    description: Checks for existing buffet reservations before creating new ones
+    example: MonitorBuffet loads existing buffet state from persistent memory
+  - name: AgentBuffet
+    role: action
+    description: Creates buffet reservation with selected parameters
+    example: AgentBuffet executes booking logic and returns BuffetSchedule
   constraints:
-    - description: "Buffet type must be valid"
-      validation: "buffet_type in [continental, full, asian, vegetarian]"
-
-    - description: "Start time cannot be after end time"
-      validation: "buffet_start_time < buffet_end_time"
-
-    - description: "Duration must be positive"
-      validation: "buffet_duration_hours > 0"
-
-    - description: "Buffet must be scheduled during breakfast hours"
-      validation: "buffet_start_time between 6:00 AM and 11:00 AM"
-
-    - description: "No time conflicts with restaurant and hotel events"
-      validation: "buffet_times do not overlap with restaurant and hotel check-in/out"
-
-  # =====================================================================
-  # EXAMPLES - How is this buffet want type used in practice?
-  # =====================================================================
+  - description: Buffet type must be valid
+    validation: buffet_type in [continental, full, asian, vegetarian]
+  - description: Start time cannot be after end time
+    validation: buffet_start_time < buffet_end_time
+  - description: Duration must be positive
+    validation: buffet_duration_hours > 0
+  - description: Buffet must be scheduled during breakfast hours
+    validation: buffet_start_time between 6:00 AM and 11:00 AM
+  - description: No time conflicts with restaurant and hotel events
+    validation: buffet_times do not overlap with restaurant and hotel check-in/out
   examples:
-    - name: "Continental Breakfast"
-      description: "Simple continental breakfast the morning after arrival"
-      params:
-        buffet_type: "continental"
-      expectedBehavior: |
-        1. Buffet want checks existing travel schedule
-        2. Schedules for day after hotel check-in
-        3. Start time: 8-10 AM
-        4. Duration: 1.5 hours (default)
-        5. Sends TravelSchedule with buffet event to coordinator
-        6. Stores reservation details in state
-      connectedTo: ["restaurant", "hotel", "travel_coordinator"]
+  - name: Continental Breakfast
+    description: Simple continental breakfast the morning after arrival
+    params:
+      buffet_type: continental
+    expectedBehavior: '1. Buffet want checks existing travel schedule
 
-    - name: "Full Breakfast with Premium Service"
-      description: "Complete breakfast buffet with attended service and champagne"
-      params:
-        buffet_type: "full"
-      expectedBehavior: |
-        1. Buffet want creates premium breakfast reservation
-        2. Applies attended service tier and premium amenities
-        3. Includes champagne service and private seating area
-        4. Duration extended to 2 hours for leisurely breakfast
-        5. Stores premium tier and amenity information
-      connectedTo: ["restaurant", "hotel", "travel_coordinator"]
+      2. Schedules for day after hotel check-in
 
-    - name: "Buffet with Conflict Resolution"
-      description: "Breakfast buffet that resolves timing conflicts with hotel check-in"
-      params:
-        buffet_type: "full"
-      expectedBehavior: |
-        1. Buffet receives existing schedule with hotel check-out
-        2. Detects no conflicts (buffet is next morning)
-        3. Successfully schedules for morning of check-out
-        4. Can be adjusted if conflicts with other meals detected
-        5. Sends resolved schedule to coordinator
-      connectedTo: ["restaurant", "hotel", "travel_coordinator"]
+      3. Start time: 8-10 AM
 
-  # =====================================================================
-  # RELATED TYPES - What other want types work with this one?
-  # =====================================================================
+      4. Duration: 1.5 hours (default)
+
+      5. Sends TravelSchedule with buffet event to coordinator
+
+      6. Stores reservation details in state
+
+      '
+    connectedTo:
+    - restaurant
+    - hotel
+    - travel_coordinator
+  - name: Full Breakfast with Premium Service
+    description: Complete breakfast buffet with attended service and champagne
+    params:
+      buffet_type: full
+    expectedBehavior: '1. Buffet want creates premium breakfast reservation
+
+      2. Applies attended service tier and premium amenities
+
+      3. Includes champagne service and private seating area
+
+      4. Duration extended to 2 hours for leisurely breakfast
+
+      5. Stores premium tier and amenity information
+
+      '
+    connectedTo:
+    - restaurant
+    - hotel
+    - travel_coordinator
+  - name: Buffet with Conflict Resolution
+    description: Breakfast buffet that resolves timing conflicts with hotel check-in
+    params:
+      buffet_type: full
+    expectedBehavior: '1. Buffet receives existing schedule with hotel check-out
+
+      2. Detects no conflicts (buffet is next morning)
+
+      3. Successfully schedules for morning of check-out
+
+      4. Can be adjusted if conflicts with other meals detected
+
+      5. Sends resolved schedule to coordinator
+
+      '
+    connectedTo:
+    - restaurant
+    - hotel
+    - travel_coordinator
   relatedTypes:
-    - "restaurant"
-    - "hotel"
-    - "travel_coordinator"
-    - "flight"
-
-  # =====================================================================
-  # DOCUMENTATION LINKS
-  # =====================================================================
+  - restaurant
+  - hotel
+  - travel_coordinator
+  - flight
   seeAlso:
-    - "Travel Itinerary recipe documentation"
-    - "Independent wants pattern for parallel execution"
-    - "Travel coordinator for schedule integration"
+  - Travel Itinerary recipe documentation
+  - Independent wants pattern for parallel execution
+  - Travel coordinator for schedule integration
+  usageLimit:
+    providers:
+      min: 0
+    users:
+      min: 1

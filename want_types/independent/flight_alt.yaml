@@ -1,116 +1,126 @@
 wantType:
   metadata:
-    name: "flight_alt"
-    title: "Alternative Flight Option"
-    description: |
-      Alternative flight booking for travel planning. Similar to main flight
+    name: flight_alt
+    title: Alternative Flight Option
+    description: 'Alternative flight booking for travel planning. Similar to main
+      flight
+
       type but optimized for fast rebooking scenarios and alternative routing.
 
+
       Used as a fallback option when primary flights are delayed or cancelled,
+
       providing rapid rerouting capability to maintain travel schedules.
 
-    version: "1.0"
-    category: "travel"
-    pattern: "independent"
-
+      '
+    version: '1.0'
+    category: travel
+    pattern: independent
   parameters:
-    - name: "flight_type"
-      description: "Flight class for alternative booking"
-      type: "string"
-      default: "economy"
-      required: false
-      validation:
-        enum: ["economy", "business", "first"]
-      example: "economy"
-
-    - name: "duration_hours"
-      description: "Expected flight duration in hours"
-      type: "float64"
-      default: 12.0
-      required: false
-      validation:
-        min: 0.5
-        max: 24
-      example: 11.0
-
+  - name: flight_type
+    description: Flight class for alternative booking
+    type: string
+    default: economy
+    required: false
+    validation:
+      enum:
+      - economy
+      - business
+      - first
+    example: economy
+  - name: duration_hours
+    description: Expected flight duration in hours
+    type: float64
+    default: 12.0
+    required: false
+    validation:
+      min: 0.5
+      max: 24
+    example: 11.0
   state:
-    - name: "is_alternative"
-      description: "Flag indicating this is alternative booking"
-      type: "bool"
-      persistent: true
-      example: true
-
-    - name: "flight_number"
-      description: "Alternative flight number"
-      type: "string"
-      persistent: true
-
-    - name: "departure_time"
-      description: "Departure time of alternative"
-      type: "string"
-      persistent: true
-
-    - name: "reason_rebooked"
-      description: "Reason for rebooking to alternative"
-      type: "string"
-      persistent: true
-      example: "original_flight_delayed"
-
-    - name: "total_processed"
-      description: "Count of alternative bookings made"
-      type: "int"
-      persistent: true
-      example: 1
-
+  - name: is_alternative
+    description: Flag indicating this is alternative booking
+    type: bool
+    persistent: true
+    example: true
+  - name: flight_number
+    description: Alternative flight number
+    type: string
+    persistent: true
+  - name: departure_time
+    description: Departure time of alternative
+    type: string
+    persistent: true
+  - name: reason_rebooked
+    description: Reason for rebooking to alternative
+    type: string
+    persistent: true
+    example: original_flight_delayed
+  - name: total_processed
+    description: Count of alternative bookings made
+    type: int
+    persistent: true
+    example: 1
   connectivity:
     inputs:
-      - name: "original_schedule"
-        type: "want"
-        description: "Original flight schedule for reference"
-        required: false
-
+    - name: original_schedule
+      type: want
+      description: Original flight schedule for reference
+      required: false
     outputs:
-      - name: "travel_schedule"
-        type: "want"
-        description: "Alternative flight booking"
-
+    - name: travel_schedule
+      type: want
+      description: Alternative flight booking
   agents: []
-
   constraints:
-    - description: "Must be triggered by delay/cancellation"
-      validation: "used only when original flight unavailable"
-
+  - description: Must be triggered by delay/cancellation
+    validation: used only when original flight unavailable
   examples:
-    - name: "Economy Alternative"
-      description: "Quick economy rebooking"
-      params:
-        flight_type: "economy"
-        duration_hours: 11.0
-      expectedBehavior: |
-        1. Alternative flight want activates on delay
-        2. Books next available economy flight
-        3. Similar route with minimal time difference
-        4. Preserves downstream travel plans
-      connectedTo: ["flight", "hotel", "travel_coordinator"]
+  - name: Economy Alternative
+    description: Quick economy rebooking
+    params:
+      flight_type: economy
+      duration_hours: 11.0
+    expectedBehavior: '1. Alternative flight want activates on delay
 
-    - name: "Business Class Alternative"
-      description: "Premium alternative routing"
-      params:
-        flight_type: "business"
-        duration_hours: 9.0
-      expectedBehavior: |
-        1. Offers business class alternative
-        2. May include brief connection
-        3. Still arrives within acceptable window
-        4. Maintains premium service level
-      connectedTo: ["flight", "travel_coordinator"]
+      2. Books next available economy flight
 
+      3. Similar route with minimal time difference
+
+      4. Preserves downstream travel plans
+
+      '
+    connectedTo:
+    - flight
+    - hotel
+    - travel_coordinator
+  - name: Business Class Alternative
+    description: Premium alternative routing
+    params:
+      flight_type: business
+      duration_hours: 9.0
+    expectedBehavior: '1. Offers business class alternative
+
+      2. May include brief connection
+
+      3. Still arrives within acceptable window
+
+      4. Maintains premium service level
+
+      '
+    connectedTo:
+    - flight
+    - travel_coordinator
   relatedTypes:
-    - "flight"
-    - "hotel"
-    - "travel_coordinator"
-
+  - flight
+  - hotel
+  - travel_coordinator
   seeAlso:
-    - "Alternative flight routing"
-    - "Rebooking strategies"
-    - "Fallback flight options"
+  - Alternative flight routing
+  - Rebooking strategies
+  - Fallback flight options
+  usageLimit:
+    providers:
+      min: 0
+    users:
+      min: 1

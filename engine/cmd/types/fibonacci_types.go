@@ -21,14 +21,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		locals,
-		ConnectivityMetadata{
-			RequiredInputs:  0,
-			RequiredOutputs: 1,
-			MaxInputs:       0,
-			MaxOutputs:      -1,
-			WantType:        "fibonacci numbers",
-			Description:     "Fibonacci sequence generator",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"fibonacci numbers",
 	)
 	locals.Count = want.GetIntParam("count", 20)
@@ -76,14 +69,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
 		&FibonacciFilterLocals{
 			filtered: make([]int, 0),
 		},
-		ConnectivityMetadata{
-			RequiredInputs:  1,
-			RequiredOutputs: 0,
-			MaxInputs:       1,
-			MaxOutputs:      0,
-			WantType:        "fibonacci filter",
-			Description:     "Fibonacci number filter (terminal)",
-		},
+		nil // ConnectivityMetadata loaded from YAML,
 		"fibonacci filter",
 	)}
 }

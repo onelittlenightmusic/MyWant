@@ -1,168 +1,155 @@
 wantType:
-  # =====================================================================
-  # METADATA LAYER - Identity and Classification
-  # =====================================================================
   metadata:
-    name: "fibonacci sequence"
-    title: "Fibonacci Number Sequence Filter"
-    description: |
-      Processor that filters Fibonacci numbers based on value range constraints.
+    name: fibonacci sequence
+    title: Fibonacci Number Sequence Filter
+    description: 'Processor that filters Fibonacci numbers based on value range constraints.
+
       Accepts a stream of Fibonacci numbers and outputs only those that fall
+
       within the specified min_value and max_value range.
 
+
       This is a terminal processor (sink) that consumes input from a generator
+
       and accumulates results without producing further output. Useful for
+
       testing filtering and aggregation patterns in data pipelines.
 
-    version: "1.0"
-    category: "mathematics"
-    pattern: "sink"
-
-  # =====================================================================
-  # PARAMETERS - What configuration does this processor accept?
-  # =====================================================================
+      '
+    version: '1.0'
+    category: mathematics
+    pattern: sink
   parameters:
-    - name: "min_value"
-      description: "Minimum value to include in filtered sequence (inclusive)"
-      type: "int"
-      default: 0
-      required: false
-      validation:
-        min: 0
-        max: 1000000
-      example: 100
-
-    - name: "max_value"
-      description: "Maximum value to include in filtered sequence (inclusive)"
-      type: "int"
-      default: 1000000
-      required: false
-      validation:
-        min: 0
-        max: 1000000
-      example: 10000
-
-  # =====================================================================
-  # STATE - What data does this processor store and track?
-  # =====================================================================
+  - name: min_value
+    description: Minimum value to include in filtered sequence (inclusive)
+    type: int
+    default: 0
+    required: false
+    validation:
+      min: 0
+      max: 1000000
+    example: 100
+  - name: max_value
+    description: Maximum value to include in filtered sequence (inclusive)
+    type: int
+    default: 1000000
+    required: false
+    validation:
+      min: 0
+      max: 1000000
+    example: 10000
   state:
-    - name: "filtered"
-      description: "Array of Fibonacci numbers that passed the filter"
-      type: "[]int"
-      persistent: true
-      example: [89, 144, 233, 377]
-
-    - name: "count"
-      description: "Number of values that passed the filter"
-      type: "int"
-      persistent: true
-      example: 8
-
-    - name: "total_processed"
-      description: "Total number of input values processed"
-      type: "int"
-      persistent: true
-      example: 20
-
-    - name: "min_value_seen"
-      description: "Smallest value that passed the filter"
-      type: "int"
-      persistent: true
-      example: 89
-
-    - name: "max_value_seen"
-      description: "Largest value that passed the filter"
-      type: "int"
-      persistent: true
-      example: 4181
-
-  # =====================================================================
-  # CONNECTIVITY - How does this processor connect to other wants?
-  # =====================================================================
+  - name: filtered
+    description: Array of Fibonacci numbers that passed the filter
+    type: '[]int'
+    persistent: true
+    example:
+    - 89
+    - 144
+    - 233
+    - 377
+  - name: count
+    description: Number of values that passed the filter
+    type: int
+    persistent: true
+    example: 8
+  - name: total_processed
+    description: Total number of input values processed
+    type: int
+    persistent: true
+    example: 20
+  - name: min_value_seen
+    description: Smallest value that passed the filter
+    type: int
+    persistent: true
+    example: 89
+  - name: max_value_seen
+    description: Largest value that passed the filter
+    type: int
+    persistent: true
+    example: 4181
   connectivity:
     inputs:
-      - name: "fibonacci_stream"
-        type: "want"
-        description: "Stream of integer Fibonacci numbers to filter"
-        required: true
-
+    - name: fibonacci_stream
+      type: want
+      description: Stream of integer Fibonacci numbers to filter
+      required: true
     outputs: []
-
-  # =====================================================================
-  # AGENTS - Does this want use agents?
-  # =====================================================================
   agents: []
-
-  # =====================================================================
-  # CONSTRAINTS - What business rules must be satisfied?
-  # =====================================================================
   constraints:
-    - description: "Min value must be less than or equal to max value"
-      validation: "min_value <= max_value"
-
-    - description: "Both boundaries must be non-negative"
-      validation: "min_value >= 0 and max_value >= 0"
-
-    - description: "Only Fibonacci numbers in range are included"
-      validation: "number >= min_value and number <= max_value"
-
-  # =====================================================================
-  # EXAMPLES - How is this processor want type used in practice?
-  # =====================================================================
+  - description: Min value must be less than or equal to max value
+    validation: min_value <= max_value
+  - description: Both boundaries must be non-negative
+    validation: min_value >= 0 and max_value >= 0
+  - description: Only Fibonacci numbers in range are included
+    validation: number >= min_value and number <= max_value
   examples:
-    - name: "Small Fibonacci Filter"
-      description: "Filter Fibonacci numbers between 50 and 500"
-      params:
-        min_value: 50
-        max_value: 500
-      expectedBehavior: |
-        1. Receives stream from fibonacci_numbers generator
-        2. Filters out values < 50 and > 500
-        3. Accumulates: 55, 89, 144, 233, 377
-        4. Stores 5 filtered values in state
-        5. Reports total_processed = 20 (from generator)
-      connectedTo: ["fibonacci numbers"]
+  - name: Small Fibonacci Filter
+    description: Filter Fibonacci numbers between 50 and 500
+    params:
+      min_value: 50
+      max_value: 500
+    expectedBehavior: '1. Receives stream from fibonacci_numbers generator
 
-    - name: "Large Fibonacci Range"
-      description: "Filter Fibonacci numbers over 1000"
-      params:
-        min_value: 1000
-        max_value: 1000000
-      expectedBehavior: |
-        1. Receives Fibonacci stream
-        2. Only accepts values >= 1000
-        3. Accumulates larger numbers: 1597, 2584, 4181, ...
-        4. Useful for testing with 100+ Fibonacci numbers
-        5. Demonstrates filtering effectiveness on large sequences
-      connectedTo: ["fibonacci numbers"]
+      2. Filters out values < 50 and > 500
 
-    - name: "Exact Value Match"
-      description: "Filter single Fibonacci value (Fibonacci golden ratio)"
-      params:
-        min_value: 89
-        max_value: 89
-      expectedBehavior: |
-        1. Receives Fibonacci stream
-        2. Only accepts value 89 (6th Fibonacci number)
-        3. Filters out all other numbers
-        4. Accumulates single value: [89]
-        5. Demonstrates precision filtering
-      connectedTo: ["fibonacci numbers"]
+      3. Accumulates: 55, 89, 144, 233, 377
 
-  # =====================================================================
-  # RELATED TYPES - What other want types work with this one?
-  # =====================================================================
+      4. Stores 5 filtered values in state
+
+      5. Reports total_processed = 20 (from generator)
+
+      '
+    connectedTo:
+    - fibonacci numbers
+  - name: Large Fibonacci Range
+    description: Filter Fibonacci numbers over 1000
+    params:
+      min_value: 1000
+      max_value: 1000000
+    expectedBehavior: '1. Receives Fibonacci stream
+
+      2. Only accepts values >= 1000
+
+      3. Accumulates larger numbers: 1597, 2584, 4181, ...
+
+      4. Useful for testing with 100+ Fibonacci numbers
+
+      5. Demonstrates filtering effectiveness on large sequences
+
+      '
+    connectedTo:
+    - fibonacci numbers
+  - name: Exact Value Match
+    description: Filter single Fibonacci value (Fibonacci golden ratio)
+    params:
+      min_value: 89
+      max_value: 89
+    expectedBehavior: '1. Receives Fibonacci stream
+
+      2. Only accepts value 89 (6th Fibonacci number)
+
+      3. Filters out all other numbers
+
+      4. Accumulates single value: [89]
+
+      5. Demonstrates precision filtering
+
+      '
+    connectedTo:
+    - fibonacci numbers
   relatedTypes:
-    - "fibonacci numbers"
-    - "prime sequence"
-    - "numbers"
-    - "queue"
-    - "sink"
-
-  # =====================================================================
-  # DOCUMENTATION LINKS
-  # =====================================================================
+  - fibonacci numbers
+  - prime sequence
+  - numbers
+  - queue
+  - sink
   seeAlso:
-    - "Sink pattern documentation for terminal processors"
-    - "Pipeline filtering patterns"
-    - "Fibonacci mathematical properties and applications"
+  - Sink pattern documentation for terminal processors
+  - Pipeline filtering patterns
+  - Fibonacci mathematical properties and applications
+  usageLimit:
+    providers:
+      min: 0
+    users:
+      min: 1
