@@ -63,8 +63,8 @@ recipe:
   # Recipe result definition
   result:
     - want_name: "coordinator"
-      stat_name: ".final_approval_status"
-      description: "Level 2 final approval status"
+      stat_name: ".approval_status"
+      description: "Level 2 approval status"
   # Example deployment - one-click deployment configuration
   example:
     wants:
@@ -72,7 +72,7 @@ recipe:
           name: "approval-level-2-demo"
           type: "level 2 approval"
           labels:
-            recipe: "Level 2 Approval"
+            recipe: "Level 2 Approval"
         spec:
           params:
             approval_id: "approval-001"
