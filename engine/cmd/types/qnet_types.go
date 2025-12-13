@@ -104,6 +104,11 @@ func (g *Numbers) Exec() bool {
 	useDeterministic := g.GetBoolParam("deterministic", false)
 	paramCount := g.GetIntParam("count", locals.Count)
 
+	// Initialize batchUpdateInterval if not set
+	if locals.batchUpdateInterval == 0 {
+		locals.batchUpdateInterval = g.GetIntParam("batch_interval", 100)
+	}
+
 	// DEBUG: Log state at start of execution
 	g.StoreLog(fmt.Sprintf("Numbers.Exec() START: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
 
