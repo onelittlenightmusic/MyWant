@@ -6,7 +6,7 @@ import { usePolling } from '@/hooks/usePolling';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { classNames } from '@/utils/helpers';
+import { classNames, truncateText } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 
 // Components
@@ -600,6 +600,7 @@ export const Dashboard: React.FC = () => {
                             setTimeout(() => document.body.removeChild(dragImage), 0);
                           }}
                           onClick={() => handleLabelClick(key, value)}
+                          title={`${key}: ${value}`.length > 20 ? `${key}: ${value}` : undefined}
                           className={classNames(
                             'inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer hover:shadow-md transition-all select-none',
                             selectedLabel?.key === key && selectedLabel?.value === value
@@ -607,7 +608,7 @@ export const Dashboard: React.FC = () => {
                               : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                           )}
                         >
-                          {key}: {value}
+                          {truncateText(`${key}: ${value}`, 20)}
                         </div>
                       ))
                     ))}
