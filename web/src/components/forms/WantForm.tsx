@@ -187,7 +187,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       // Get the first example if available, use parameter examples otherwise
       if (selectedWantType.examples && selectedWantType.examples.length > 0) {
         const firstExample = selectedWantType.examples[0];
-        setParams(firstExample.params || {});
+        setParams(firstExample.want?.spec?.params || {});
       } else if (selectedWantType.parameters && selectedWantType.parameters.length > 0) {
         // Fallback: use parameter examples
         const paramsFromExamples: Record<string, unknown> = {};

@@ -47,6 +47,8 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
     setDeployingExample(example.name);
     try {
       await onDeployExample(example);
+    } catch (error) {
+      console.error('Failed to deploy example:', error);
     } finally {
       setDeployingExample(null);
     }
@@ -80,7 +82,9 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
           {/* Deploy first example */}
           {wantType.examples.length > 0 && (
             <button
-              onClick={() => handleDeployExample(wantType.examples[0])}
+              onClick={() => {
+                handleDeployExample(wantType.examples[0]);
+              }}
               disabled={deployingExample !== null}
               title={`Deploy ${wantType.examples[0].name}`}
               className={classNames(
@@ -407,7 +411,7 @@ const AgentsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => 
 
 const ExamplesTab: React.FC<{
   wantType: WantTypeDefinition;
-  onDeployExample?: (example: ExampleDef) => Promise<void>;
+  onDeployExample?: (example: ExampleDef) => void | Promise<void>;
   deployingExample?: string | null;
 }> = ({ wantType, onDeployExample, deployingExample }) => (
   <TabContent>

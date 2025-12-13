@@ -45,7 +45,7 @@ export const WantTypeControlPanel: React.FC<WantTypeControlPanelProps> = ({
           type: selectedWantType.metadata.name,
         },
         spec: {
-          params: example.params || {},
+          params: example.want?.spec?.params || {},
         },
       };
 
