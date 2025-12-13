@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download, Play } from 'lucide-react';
+import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download, Play, Rocket } from 'lucide-react';
 import { WantTypeDefinition, ExampleDef } from '@/types/wantType';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -77,6 +77,23 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {wantType && (
         <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
+          {/* Deploy first example */}
+          {wantType.examples.length > 0 && (
+            <button
+              onClick={() => handleDeployExample(wantType.examples[0])}
+              disabled={deployingExample !== null}
+              title={`Deploy ${wantType.examples[0].name}`}
+              className={classNames(
+                'p-2 rounded-md transition-colors',
+                deployingExample !== null
+                  ? 'bg-gray-200 text-gray-600 cursor-wait'
+                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              )}
+            >
+              {deployingExample ? <Rocket className="h-4 w-4 animate-bounce" /> : <Rocket className="h-4 w-4" />}
+            </button>
+          )}
+
           {/* Download */}
           <button
             onClick={handleDownloadClick}
