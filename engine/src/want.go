@@ -159,6 +159,34 @@ func NewWant(
 	return want
 }
 
+// NewWantWithLocals is a variant of NewWant that accepts a WantLocals instance directly
+// instead of a factory function. Useful when you have a simple initialization that doesn't
+// require re-instantiation for each want.
+func NewWantWithLocals(
+	metadata Metadata,
+	spec WantSpec,
+	locals WantLocals,
+	connectivityMeta ConnectivityMetadata,
+	wantType string,
+) *Want {
+	want := &Want{
+		Metadata: metadata,
+		Spec:     spec,
+	}
+	want.Init(metadata, spec)
+
+	// Assign locals directly
+	if locals != nil {
+		want.Locals = locals
+	}
+
+	// Set type-specific fields
+	want.WantType = wantType
+	want.ConnectivityMetadata = connectivityMeta
+
+	return want
+}
+
 // Want represents a processing unit in the chain
 type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`
