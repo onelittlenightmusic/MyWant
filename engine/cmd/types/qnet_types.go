@@ -81,7 +81,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Execut
 		metadata,
 		spec,
 		&NumbersLocals{},
-		mywant.nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"sequence",
 	)}
 }
@@ -173,7 +173,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable 
 		metadata,
 		spec,
 		&QueueLocals{},
-		mywant.nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"queue",
 	)}
 }
@@ -311,7 +311,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executab
 		metadata,
 		spec,
 		&CombinerLocals{},
-		mywant.nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"combiner",
 	)}
 }
@@ -380,7 +380,7 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 		metadata,
 		spec,
 		&SinkLocals{},
-		mywant.nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"sink",
 	)}
 }

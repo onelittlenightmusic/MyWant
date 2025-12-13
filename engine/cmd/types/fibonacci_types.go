@@ -21,7 +21,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
 		metadata,
 		spec,
 		locals,
-		nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"fibonacci numbers",
 	)
 	locals.Count = want.GetIntParam("count", 20)
@@ -69,7 +69,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
 		&FibonacciFilterLocals{
 			filtered: make([]int, 0),
 		},
-		nil // ConnectivityMetadata loaded from YAML,
+		nil, // ConnectivityMetadata loaded from YAML
 		"fibonacci filter",
 	)}
 }
