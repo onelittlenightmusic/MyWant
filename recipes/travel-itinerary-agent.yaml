@@ -69,8 +69,8 @@ recipe:
   # Recipe result definition - specifies how to compute travel planning results
   result:
     - want_name: "coordinator"
-      stat_name: ".coordinator_result.travel_input"
-      description: "Travel coordinator inputs (restaurant, hotel, buffet)"
+      stat_name: ".coordinator_result"
+      description: "Travel coordinator result with inputs"
     - want_name: "coordinator"
       stat_name: ".finalResult"
       description: "Travel itinerary summary timeline"
