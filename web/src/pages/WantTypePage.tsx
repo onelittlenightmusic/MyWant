@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
-import { WantTypeListItem } from '@/types/wantType';
+import { WantTypeListItem, ExampleDef, WantConfiguration } from '@/types/wantType';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { WantTypeGrid } from '@/components/dashboard/WantTypeGrid';
@@ -11,6 +11,7 @@ import { RightSidebar } from '@/components/layout/RightSidebar';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { classNames } from '@/utils/helpers';
+import { apiClient } from '@/api/client';
 
 export default function WantTypePage() {
   const {
@@ -54,6 +55,26 @@ export default function WantTypePage() {
   // Handle view details
   const handleViewDetails = async (wantType: WantTypeListItem) => {
     await getWantType(wantType.name);
+  };
+
+  // Handle deploy example
+  const handleDeployExample = async (example: ExampleDef) => {
+    try {
+      await apiClient.createWant({
+        metadata: example.want.metadata,
+        spec: example.want.spec
+      });
+      setNotification({
+        message: `Deployed example: ${example.name}`,
+        type: 'success'
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to deploy example';
+      setNotification({
+        message: errorMessage,
+        type: 'error'
+      });
+    }
   };
 
   // Handle search
@@ -216,6 +237,7 @@ export default function WantTypePage() {
             element.click();
             document.body.removeChild(element);
           }}
+          onDeployExample={handleDeployExample}
         />
       </RightSidebar>
 
