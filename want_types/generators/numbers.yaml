@@ -38,12 +38,6 @@ wantType:
     description: When generation was completed
     type: string
     persistent: true
-  connectivity:
-    inputs: []
-    outputs:
-    - name: numbers
-      type: want
-      description: Stream of generated numbers
   agents: []
   constraints:
   - description: Count must be positive
@@ -87,8 +81,6 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: numbers
+        type: want
+        description: Stream of generated numbers

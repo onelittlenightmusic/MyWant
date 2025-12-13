@@ -117,12 +117,6 @@ wantType:
     description: When the reservation was made
     type: string
     persistent: true
-  connectivity:
-    inputs: []
-    outputs:
-    - name: schedule
-      type: state
-      description: Restaurant schedule and reservation details
   agents:
   - name: MonitorRestaurant
     role: monitor
@@ -223,6 +217,4 @@ wantType:
       outputs:
       - name: schedule
         type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+        description: Restaurant schedule and reservation details

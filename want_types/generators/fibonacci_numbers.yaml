@@ -44,12 +44,6 @@ wantType:
     type: int
     persistent: true
     example: 4181
-  connectivity:
-    inputs: []
-    outputs:
-    - name: fibonacci_stream
-      type: want
-      description: Stream of integer Fibonacci numbers
   agents: []
   constraints:
   - description: Count must be positive
@@ -121,8 +115,6 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: fibonacci_stream
+        type: want
+        description: Stream of integer Fibonacci numbers

@@ -63,13 +63,6 @@ wantType:
     type: int
     persistent: true
     example: 15
-  connectivity:
-    inputs:
-    - name: fibonacci_stream
-      type: want
-      description: Computed Fibonacci numbers from loop processor
-      required: true
-    outputs: []
   agents: []
   constraints:
   - description: Must receive from fibonacci loop
@@ -113,3 +106,10 @@ wantType:
   seeAlso:
   - Fibonacci loop aggregation
   - Sequence collection and statistics
+  require:
+    providers:
+      inputs:
+      - name: fibonacci_stream
+        type: want
+        description: Computed Fibonacci numbers from loop processor
+        required: true

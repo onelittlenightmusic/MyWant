@@ -39,12 +39,6 @@ wantType:
     type: int
     persistent: true
     example: 2
-  connectivity:
-    inputs: []
-    outputs:
-    - name: seed_stream
-      type: want
-      description: FibonacciSeed values with position and end signal
   agents: []
   constraints:
   - description: Max count must be positive
@@ -90,8 +84,6 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: seed_stream
+        type: want
+        description: FibonacciSeed values with position and end signal

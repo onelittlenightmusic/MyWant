@@ -91,16 +91,6 @@ wantType:
     description: Pending flight action (book_flight, cancel_flight, modify_flight)
     type: string
     persistent: true
-  connectivity:
-    inputs:
-    - name: existing_schedule
-      type: want
-      description: Optional existing travel schedule for conflict checking
-      required: false
-    outputs:
-    - name: travel_schedule
-      type: want
-      description: Flight booking as TravelSchedule
   agents:
   - name: AgentFlight
     role: action
@@ -192,8 +182,12 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: travel_schedule
+        type: want
+        description: Flight booking as TravelSchedule
+    providers:
+      inputs:
+      - name: existing_schedule
+        type: want
+        description: Optional existing travel schedule for conflict checking
+        required: false

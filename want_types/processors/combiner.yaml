@@ -50,17 +50,6 @@ wantType:
     type: float64
     persistent: true
     example: 0.0
-  connectivity:
-    inputs:
-    - name: upstream_streams
-      type: want
-      description: Multiple input streams to combine
-      required: true
-      multiple: true
-    outputs:
-    - name: combined_stream
-      type: want
-      description: Single output stream with all packets
   agents: []
   constraints:
   - description: Operation must be valid strategy
@@ -129,15 +118,13 @@ wantType:
     type: providers_and_users
     providers:
       inputs:
-      - name: data_packets
+      - name: upstream_streams
         type: want
-        description: Input data packets from upstream wants
+        description: Multiple input streams to combine
         required: true
         multiple: true
     users:
       outputs:
-      - name: processed_data
-        type: state
-        description: Processed data output
-        required: true
-        multiple: false
+      - name: combined_stream
+        type: want
+        description: Single output stream with all packets

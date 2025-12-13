@@ -60,16 +60,6 @@ wantType:
     type: int
     persistent: true
     example: 1
-  connectivity:
-    inputs:
-    - name: original_schedule
-      type: want
-      description: Original flight schedule for reference
-      required: false
-    outputs:
-    - name: travel_schedule
-      type: want
-      description: Alternative flight booking
   agents: []
   constraints:
   - description: Must be triggered by delay/cancellation
@@ -122,8 +112,12 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: travel_schedule
+        type: want
+        description: Alternative flight booking
+    providers:
+      inputs:
+      - name: original_schedule
+        type: want
+        description: Original flight schedule for reference
+        required: false

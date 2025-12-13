@@ -59,12 +59,6 @@ wantType:
     type: int
     persistent: true
     example: 100
-  connectivity:
-    inputs: []
-    outputs:
-    - name: number_stream
-      type: want
-      description: Stream of integers from start to end
   agents: []
   constraints:
   - description: Start must be at least 2 (smallest prime)
@@ -145,8 +139,6 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: number_stream
+        type: want
+        description: Stream of integers from start to end

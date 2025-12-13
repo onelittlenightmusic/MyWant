@@ -1,134 +1,138 @@
 wantType:
   metadata:
-    name: "custom_target"
-    title: "Custom Target Definition"
-    description: |
-      System want type for defining custom execution targets and goal states.
+    name: custom_target
+    title: Custom Target Definition
+    description: 'System want type for defining custom execution targets and goal
+      states.
+
       Allows defining arbitrary targets that wants should reach or satisfy
+
       during execution.
 
+
       Enables flexible goal definition independent of specific want types,
+
       supporting general-purpose want behavior configuration and custom
+
       execution criteria.
 
-    version: "1.0"
-    category: "system"
-    pattern: "independent"
-
+      '
+    version: '1.0'
+    category: system
+    pattern: independent
   parameters:
-    - name: "target_name"
-      description: "Name/identifier of the custom target"
-      type: "string"
-      required: true
-      example: "travel-itinerary-complete"
-
-    - name: "target_type"
-      description: "Classification of target (goal, constraint, metric, threshold)"
-      type: "string"
-      default: "goal"
-      required: false
-      validation:
-        enum: ["goal", "constraint", "metric", "threshold", "checkpoint"]
-      example: "goal"
-
-    - name: "target_value"
-      description: "Desired value or state for this target"
-      type: "interface{}"
-      required: false
-      example: "all-reservations-confirmed"
-
+  - name: target_name
+    description: Name/identifier of the custom target
+    type: string
+    required: true
+    example: travel-itinerary-complete
+  - name: target_type
+    description: Classification of target (goal, constraint, metric, threshold)
+    type: string
+    default: goal
+    required: false
+    validation:
+      enum:
+      - goal
+      - constraint
+      - metric
+      - threshold
+      - checkpoint
+    example: goal
+  - name: target_value
+    description: Desired value or state for this target
+    type: interface{}
+    required: false
+    example: all-reservations-confirmed
   state:
-    - name: "target_name"
-      description: "Target identifier"
-      type: "string"
-      persistent: true
-      example: "travel-itinerary-complete"
-
-    - name: "target_type"
-      description: "Type of target"
-      type: "string"
-      persistent: true
-      example: "goal"
-
-    - name: "target_value"
-      description: "Current target value"
-      type: "interface{}"
-      persistent: true
-
-    - name: "is_satisfied"
-      description: "Whether target has been satisfied"
-      type: "bool"
-      persistent: true
-      example: true
-
-    - name: "satisfaction_timestamp"
-      description: "When target was satisfied"
-      type: "string"
-      persistent: true
-
-    - name: "satisfaction_metrics"
-      description: "Metrics used to determine satisfaction"
-      type: "map[string]interface{}"
-      persistent: true
-
-  connectivity:
-    inputs: []
-    outputs: []
-
+  - name: target_name
+    description: Target identifier
+    type: string
+    persistent: true
+    example: travel-itinerary-complete
+  - name: target_type
+    description: Type of target
+    type: string
+    persistent: true
+    example: goal
+  - name: target_value
+    description: Current target value
+    type: interface{}
+    persistent: true
+  - name: is_satisfied
+    description: Whether target has been satisfied
+    type: bool
+    persistent: true
+    example: true
+  - name: satisfaction_timestamp
+    description: When target was satisfied
+    type: string
+    persistent: true
+  - name: satisfaction_metrics
+    description: Metrics used to determine satisfaction
+    type: map[string]interface{}
+    persistent: true
   agents: []
-
   constraints:
-    - description: "Target name must be non-empty"
-      validation: "target_name length > 0"
-
-    - description: "Target type must be valid"
-      validation: "target_type in [goal, constraint, metric, threshold, checkpoint]"
-
+  - description: Target name must be non-empty
+    validation: target_name length > 0
+  - description: Target type must be valid
+    validation: target_type in [goal, constraint, metric, threshold, checkpoint]
   examples:
-    - name: "Travel Itinerary Goal"
-      description: "Custom target for complete travel planning"
-      params:
-        target_name: "travel-itinerary-complete"
-        target_type: "goal"
-        target_value: "all-reservations-confirmed"
-      expectedBehavior: |
-        1. Defines custom goal for travel chain
-        2. Restaurant, hotel, buffet must complete
-        3. Coordinator verifies all scheduled
-        4. Marks target satisfied when done
-        5. Records satisfaction timestamp
-      connectedTo: []
+  - name: Travel Itinerary Goal
+    description: Custom target for complete travel planning
+    params:
+      target_name: travel-itinerary-complete
+      target_type: goal
+      target_value: all-reservations-confirmed
+    expectedBehavior: '1. Defines custom goal for travel chain
 
-    - name: "Prime Computation Threshold"
-      description: "Custom metric target for prime computation"
-      params:
-        target_name: "prime-count-threshold"
-        target_type: "threshold"
-        target_value: 100
-      expectedBehavior: |
-        1. Defines threshold of 100 primes to find
-        2. Sieve processor tracks progress
-        3. Target satisfied when 100+ primes found
-        4. Enables exit condition for computation
-      connectedTo: []
+      2. Restaurant, hotel, buffet must complete
 
-    - name: "Fibonacci Sequence Checkpoint"
-      description: "Custom checkpoint in Fibonacci computation"
-      params:
-        target_name: "fibonacci-position-20"
-        target_type: "checkpoint"
-        target_value: 20
-      expectedBehavior: |
-        1. Defines checkpoint at position 20
-        2. Fibonacci loop tracks position
-        3. Records when reaching position 20
-        4. Can trigger secondary actions
-      connectedTo: []
+      3. Coordinator verifies all scheduled
 
+      4. Marks target satisfied when done
+
+      5. Records satisfaction timestamp
+
+      '
+    connectedTo: []
+  - name: Prime Computation Threshold
+    description: Custom metric target for prime computation
+    params:
+      target_name: prime-count-threshold
+      target_type: threshold
+      target_value: 100
+    expectedBehavior: '1. Defines threshold of 100 primes to find
+
+      2. Sieve processor tracks progress
+
+      3. Target satisfied when 100+ primes found
+
+      4. Enables exit condition for computation
+
+      '
+    connectedTo: []
+  - name: Fibonacci Sequence Checkpoint
+    description: Custom checkpoint in Fibonacci computation
+    params:
+      target_name: fibonacci-position-20
+      target_type: checkpoint
+      target_value: 20
+    expectedBehavior: '1. Defines checkpoint at position 20
+
+      2. Fibonacci loop tracks position
+
+      3. Records when reaching position 20
+
+      4. Can trigger secondary actions
+
+      '
+    connectedTo: []
   relatedTypes:
-    - "owner"
-
+  - owner
   seeAlso:
-    - "Custom target evaluation"
-    - "Goal and constraint definition"
-    - "Flexible execution criteria"
+  - Custom target evaluation
+  - Goal and constraint definition
+  - Flexible execution criteria
+  require: {}

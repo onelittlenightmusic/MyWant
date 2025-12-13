@@ -59,16 +59,6 @@ wantType:
     type: int
     persistent: true
     example: 100
-  connectivity:
-    inputs:
-    - name: number_stream
-      type: want
-      description: Stream of numbers to test for primality
-      required: true
-    outputs:
-    - name: prime_stream
-      type: want
-      description: Stream of identified prime numbers
   agents: []
   constraints:
   - description: Sieve algorithm validates correctly
@@ -144,15 +134,12 @@ wantType:
     type: providers_and_users
     providers:
       inputs:
-      - name: data_packets
+      - name: number_stream
         type: want
-        description: Input data packets from upstream wants
+        description: Stream of numbers to test for primality
         required: true
-        multiple: true
     users:
       outputs:
-      - name: processed_data
-        type: state
-        description: Processed data output
-        required: true
-        multiple: false
+      - name: prime_stream
+        type: want
+        description: Stream of identified prime numbers

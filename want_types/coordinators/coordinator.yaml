@@ -104,18 +104,6 @@ wantType:
     description: Error message if coordination failed
     type: string
     persistent: true
-  connectivity:
-    inputs:
-    - name: data_packets
-      type: want
-      description: 'Independent wants providing data for coordination (travel: restaurant/hotel/buffet/flight,
-        approval: evidence/description)'
-      required: false
-      multiple: true
-    outputs:
-    - name: coordinated_result
-      type: state
-      description: Final coordinated data stored in state
   agents: []
   constraints:
   - description: 'For travel coordinator: at least 1 input want should be connected'
@@ -239,3 +227,17 @@ wantType:
   - approval-level-2 recipe
   - Coordinator pattern documentation
   - Independent wants execution
+  require:
+    providers:
+      inputs:
+      - name: data_packets
+        type: want
+        description: 'Independent wants providing data for coordination (travel: restaurant/hotel/buffet/flight,
+          approval: evidence/description)'
+        required: false
+        multiple: true
+    users:
+      outputs:
+      - name: coordinated_result
+        type: state
+        description: Final coordinated data stored in state

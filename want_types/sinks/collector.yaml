@@ -42,14 +42,6 @@ wantType:
     description: Timestamp when collection completed
     type: string
     persistent: true
-  connectivity:
-    inputs:
-    - name: packet_stream
-      type: want
-      description: Incoming packets to collect
-      required: true
-      multiple: true
-    outputs: []
   agents: []
   constraints:
   - description: Must have at least one input
@@ -117,8 +109,8 @@ wantType:
     type: providers
     providers:
       inputs:
-      - name: data_packets
+      - name: packet_stream
         type: want
-        description: Input data packets from upstream wants
+        description: Incoming packets to collect
         required: true
         multiple: true

@@ -67,13 +67,6 @@ wantType:
     type: int
     persistent: true
     example: 4181
-  connectivity:
-    inputs:
-    - name: fibonacci_stream
-      type: want
-      description: Stream of integer Fibonacci numbers to filter
-      required: true
-    outputs: []
   agents: []
   constraints:
   - description: Min value must be less than or equal to max value
@@ -151,11 +144,10 @@ wantType:
     type: providers_and_users
     providers:
       inputs:
-      - name: data_packets
+      - name: fibonacci_stream
         type: want
-        description: Input data packets from upstream wants
+        description: Stream of integer Fibonacci numbers to filter
         required: true
-        multiple: true
     users:
       outputs:
       - name: processed_data

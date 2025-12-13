@@ -104,16 +104,6 @@ wantType:
     description: Error message if agent execution failed
     type: string
     persistent: true
-  connectivity:
-    inputs:
-    - name: existing_schedule
-      type: want
-      description: Optional existing travel schedule to check for conflicts
-      required: false
-    outputs:
-    - name: travel_schedule
-      type: want
-      description: Buffet reservation as TravelSchedule with start/end times
   agents:
   - name: MonitorBuffet
     role: monitor
@@ -207,8 +197,12 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: travel_schedule
+        type: want
+        description: Buffet reservation as TravelSchedule with start/end times
+    providers:
+      inputs:
+      - name: existing_schedule
+        type: want
+        description: Optional existing travel schedule to check for conflicts
+        required: false

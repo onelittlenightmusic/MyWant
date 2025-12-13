@@ -110,13 +110,6 @@ wantType:
     type: int
     persistent: true
     example: 0
-  connectivity:
-    inputs:
-    - name: input
-      type: want
-      description: Items to consume and process
-      required: true
-    outputs: []
   agents: []
   constraints:
   - description: Report interval must be positive
@@ -227,8 +220,7 @@ wantType:
     type: providers
     providers:
       inputs:
-      - name: data_packets
+      - name: input
         type: want
-        description: Input data packets from upstream wants
+        description: Items to consume and process
         required: true
-        multiple: true

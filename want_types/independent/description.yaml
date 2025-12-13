@@ -59,13 +59,6 @@ wantType:
     type: int
     persistent: true
     example: 1
-  connectivity:
-    inputs: []
-    outputs:
-    - name: description_data
-      type: want
-      description: ApprovalData containing description for approval coordinator
-      multiple: true
   agents: []
   constraints:
   - description: Description format must contain template
@@ -137,8 +130,7 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: description_data
+        type: want
+        description: ApprovalData containing description for approval coordinator
+        multiple: true

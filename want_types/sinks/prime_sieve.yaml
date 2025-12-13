@@ -61,13 +61,6 @@ wantType:
     type: int
     persistent: true
     example: 2
-  connectivity:
-    inputs:
-    - name: prime_stream
-      type: want
-      description: Stream of prime numbers from sieve processor
-      required: true
-    outputs: []
   agents: []
   constraints:
   - description: Must receive stream from prime sieve
@@ -136,8 +129,7 @@ wantType:
     type: providers
     providers:
       inputs:
-      - name: data_packets
+      - name: prime_stream
         type: want
-        description: Input data packets from upstream wants
+        description: Stream of prime numbers from sieve processor
         required: true
-        multiple: true

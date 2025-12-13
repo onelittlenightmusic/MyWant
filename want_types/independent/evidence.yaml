@@ -61,13 +61,6 @@ wantType:
     type: int
     persistent: true
     example: 1
-  connectivity:
-    inputs: []
-    outputs:
-    - name: evidence_data
-      type: want
-      description: ApprovalData containing evidence for approval coordinator
-      multiple: true
   agents: []
   constraints:
   - description: Evidence type must be valid
@@ -139,8 +132,7 @@ wantType:
     type: users
     users:
       outputs:
-      - name: schedule
-        type: state
-        description: Generated schedule output
-        required: true
-        multiple: false
+      - name: evidence_data
+        type: want
+        description: ApprovalData containing evidence for approval coordinator
+        multiple: true

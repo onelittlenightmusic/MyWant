@@ -53,16 +53,6 @@ wantType:
     type: int
     persistent: true
     example: 13
-  connectivity:
-    inputs:
-    - name: seed_stream
-      type: want
-      description: Initial seeds and max count from source
-      required: true
-    outputs:
-    - name: number_stream
-      type: want
-      description: Computed Fibonacci numbers
   agents: []
   constraints:
   - description: Must receive seed input
@@ -101,15 +91,12 @@ wantType:
     type: providers_and_users
     providers:
       inputs:
-      - name: data_packets
+      - name: seed_stream
         type: want
-        description: Input data packets from upstream wants
+        description: Initial seeds and max count from source
         required: true
-        multiple: true
     users:
       outputs:
-      - name: processed_data
-        type: state
-        description: Processed data output
-        required: true
-        multiple: false
+      - name: number_stream
+        type: want
+        description: Computed Fibonacci numbers
