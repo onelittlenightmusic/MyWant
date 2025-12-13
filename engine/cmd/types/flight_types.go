@@ -288,13 +288,10 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 // tryAgentExecution attempts to execute flight booking using the agent system Returns the FlightSchedule if successful, nil if no agent execution
 func (f *FlightWant) tryAgentExecution() {
 	if len(f.Spec.Requires) > 0 {
-		f.StoreLog(fmt.Sprintf("Want has agent requirements: %v", f.Spec.Requires))
 		f.StoreState("agent_requirements", f.Spec.Requires)
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
-		f.StoreLog("Executing agents via ExecuteAgents() for proper tracking")
 		if err := f.ExecuteAgents(); err != nil {
-			f.StoreLog(fmt.Sprintf("Dynamic agent execution failed: %v", err))
 			f.StoreStateMulti(map[string]interface{}{
 				"agent_execution_status": "failed",
 				"agent_execution_error":  err.Error(),
@@ -302,10 +299,8 @@ func (f *FlightWant) tryAgentExecution() {
 			return
 		}
 
-		f.StoreLog("Dynamic agent execution completed successfully")
 		f.StoreState("agent_execution_status", "completed")
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
-			f.StoreLog(fmt.Sprintf("Found agent_result in state: %+v", result))
 			f.StoreState("execution_source", "agent")
 
 			// Start continuous monitoring for this flight
@@ -314,11 +309,9 @@ func (f *FlightWant) tryAgentExecution() {
 			return
 		}
 
-		f.StoreLog("Warning: Agent completed but no result found in state")
 		return
 	}
 
-	f.StoreLog("No agent requirements specified")
 }
 
 // FlightSchedule represents a complete flight booking schedule
