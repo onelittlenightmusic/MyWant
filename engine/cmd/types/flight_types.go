@@ -364,11 +364,6 @@ func (f *FlightWant) SetSchedule(schedule FlightSchedule) {
 	f.Want.StoreStateMulti(stateUpdates)
 }
 
-// Helper function to check time conflicts
-func (f *FlightWant) hasTimeConflict(event1, event2 TimeSlot) bool {
-	return event1.Start.Before(event2.End) && event2.Start.Before(event1.End)
-}
-
 // shouldCancelAndRebook checks if the current flight should be cancelled due to delay
 func (f *FlightWant) shouldCancelAndRebook() bool {
 	flightIDVal, exists := f.GetState("flight_id")
