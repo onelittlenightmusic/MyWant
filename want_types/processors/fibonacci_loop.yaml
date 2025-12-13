@@ -62,7 +62,6 @@ wantType:
   examples:
   - name: Compute Loop-Based Fibonacci
     description: Compute Fibonacci using loop closure
-    params: {}
     expectedBehavior: '1. Receives seed 0 at position 0
 
       2. Receives seed 1 at position 1
@@ -76,9 +75,13 @@ wantType:
       6. Sends end signal
 
       '
-    connectedTo:
-    - fibonacci source loop
-    - fibonacci_merger
+    want:
+      metadata:
+        name: compute-loop-based-fibonacci
+        type: fibonacci loop
+        labels: {}
+      spec:
+        params: {}
   relatedTypes:
   - fibonacci source loop
   - fibonacci_merger

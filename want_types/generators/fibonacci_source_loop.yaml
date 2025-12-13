@@ -46,8 +46,6 @@ wantType:
   examples:
   - name: Generate 15 Fibonacci
     description: Seeds for computing 15 Fibonacci numbers
-    params:
-      max_count: 15
     expectedBehavior: '1. Generator sends seed 0 at position 0
 
       2. Sends seed 1 at position 1
@@ -57,13 +55,16 @@ wantType:
       4. Downstream computer uses for loop-based computation
 
       '
-    connectedTo:
-    - fibonacci_computer
-    - fibonacci_merger
+    want:
+      metadata:
+        name: generate-15-fibonacci
+        type: fibonacci source loop
+        labels: {}
+      spec:
+        params:
+          max_count: 15
   - name: Generate 30 Fibonacci
     description: Larger set of Fibonacci computation
-    params:
-      max_count: 30
     expectedBehavior: '1. Sends initial seeds 0, 1
 
       2. Sends max_count signal
@@ -71,8 +72,14 @@ wantType:
       3. Computer loops to generate 30 values
 
       '
-    connectedTo:
-    - fibonacci_computer
+    want:
+      metadata:
+        name: generate-30-fibonacci
+        type: fibonacci source loop
+        labels: {}
+      spec:
+        params:
+          max_count: 30
   relatedTypes:
   - fibonacci_computer
   - fibonacci_merger

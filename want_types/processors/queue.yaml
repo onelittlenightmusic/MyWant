@@ -71,36 +71,51 @@ wantType:
   examples:
   - name: Basic queue processing
     description: Queue with 0.1s service time
-    params:
-      service_time: 0.1
     expectedBehavior: Items flow through queue, each taking 0.1s to process
-    connectedTo:
-    - numbers
+    want:
+      metadata:
+        name: basic-queue-processing
+        type: queue
+        labels: {}
+      spec:
+        params:
+          service_time: 0.1
   - name: Slow queue
     description: Queue with 0.5s service time (simulation of slower processor)
-    params:
-      service_time: 0.5
-      max_queue_size: 500
     expectedBehavior: Items queue up and wait for processing with longer delays
-    connectedTo:
-    - fibonacci sequence
+    want:
+      metadata:
+        name: slow-queue
+        type: queue
+        labels: {}
+      spec:
+        params:
+          service_time: 0.5
+          max_queue_size: 500
   - name: High-throughput queue
     description: Fast queue for quick item processing
-    params:
-      service_time: 0.01
-      max_queue_size: 10000
     expectedBehavior: Items process very quickly with large queue buffer
-    connectedTo:
-    - numbers
-    - combiner
+    want:
+      metadata:
+        name: high-throughput-queue
+        type: queue
+        labels: {}
+      spec:
+        params:
+          service_time: 0.01
+          max_queue_size: 10000
   - name: Queue with strict size limit
     description: Queue that discards items when full
-    params:
-      service_time: 0.2
-      max_queue_size: 100
     expectedBehavior: Items beyond 100 are rejected/discarded
-    connectedTo:
-    - prime sequence
+    want:
+      metadata:
+        name: queue-with-strict-size-limit
+        type: queue
+        labels: {}
+      spec:
+        params:
+          service_time: 0.2
+          max_queue_size: 100
   relatedTypes:
   - numbers
   - combiner

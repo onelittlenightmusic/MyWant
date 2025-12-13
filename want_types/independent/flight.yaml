@@ -106,10 +106,6 @@ wantType:
   examples:
   - name: Economy Flight
     description: Book economy class flight
-    params:
-      flight_type: economy
-      duration_hours: 10.0
-      departure_date: '2024-12-25'
     expectedBehavior: '1. Flight want books economy class
 
       2. Schedules departure on specified date
@@ -123,16 +119,18 @@ wantType:
       6. Can auto-rebook if delayed
 
       '
-    connectedTo:
-    - hotel
-    - restaurant
-    - travel_coordinator
+    want:
+      metadata:
+        name: economy-flight
+        type: flight
+        labels: {}
+      spec:
+        params:
+          flight_type: economy
+          duration_hours: 10.0
+          departure_date: '2024-12-25'
   - name: Business Class Flight
     description: Premium business class booking
-    params:
-      flight_type: business
-      duration_hours: 8.5
-      departure_date: '2024-12-24'
     expectedBehavior: '1. Flight want books business class
 
       2. Applies premium amenities and services
@@ -144,15 +142,18 @@ wantType:
       5. Auto-rebook to next available if delayed
 
       '
-    connectedTo:
-    - hotel
-    - travel_coordinator
+    want:
+      metadata:
+        name: business-class-flight
+        type: flight
+        labels: {}
+      spec:
+        params:
+          flight_type: business
+          duration_hours: 8.5
+          departure_date: '2024-12-24'
   - name: First Class Long Haul
     description: First class international flight
-    params:
-      flight_type: first
-      duration_hours: 15.0
-      departure_date: '2025-01-01'
     expectedBehavior: '1. Flight want books first class
 
       2. Premium seating and meals included
@@ -164,10 +165,16 @@ wantType:
       5. Immediate rebooking on any delay
 
       '
-    connectedTo:
-    - hotel
-    - buffet
-    - travel_coordinator
+    want:
+      metadata:
+        name: first-class-long-haul
+        type: flight
+        labels: {}
+      spec:
+        params:
+          flight_type: first
+          duration_hours: 15.0
+          departure_date: '2025-01-01'
   relatedTypes:
   - flight_alt
   - hotel

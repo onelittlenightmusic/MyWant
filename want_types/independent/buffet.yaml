@@ -127,8 +127,6 @@ wantType:
   examples:
   - name: Continental Breakfast
     description: Simple continental breakfast the morning after arrival
-    params:
-      buffet_type: continental
     expectedBehavior: '1. Buffet want checks existing travel schedule
 
       2. Schedules for day after hotel check-in
@@ -142,14 +140,16 @@ wantType:
       6. Stores reservation details in state
 
       '
-    connectedTo:
-    - restaurant
-    - hotel
-    - travel_coordinator
+    want:
+      metadata:
+        name: continental-breakfast
+        type: buffet
+        labels: {}
+      spec:
+        params:
+          buffet_type: continental
   - name: Full Breakfast with Premium Service
     description: Complete breakfast buffet with attended service and champagne
-    params:
-      buffet_type: full
     expectedBehavior: '1. Buffet want creates premium breakfast reservation
 
       2. Applies attended service tier and premium amenities
@@ -161,14 +161,16 @@ wantType:
       5. Stores premium tier and amenity information
 
       '
-    connectedTo:
-    - restaurant
-    - hotel
-    - travel_coordinator
+    want:
+      metadata:
+        name: full-breakfast-with-premium-service
+        type: buffet
+        labels: {}
+      spec:
+        params:
+          buffet_type: full
   - name: Buffet with Conflict Resolution
     description: Breakfast buffet that resolves timing conflicts with hotel check-in
-    params:
-      buffet_type: full
     expectedBehavior: '1. Buffet receives existing schedule with hotel check-out
 
       2. Detects no conflicts (buffet is next morning)
@@ -180,10 +182,14 @@ wantType:
       5. Sends resolved schedule to coordinator
 
       '
-    connectedTo:
-    - restaurant
-    - hotel
-    - travel_coordinator
+    want:
+      metadata:
+        name: buffet-with-conflict-resolution
+        type: buffet
+        labels: {}
+      spec:
+        params:
+          buffet_type: full
   relatedTypes:
   - restaurant
   - hotel

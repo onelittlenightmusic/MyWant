@@ -51,7 +51,6 @@ wantType:
   examples:
   - name: Collect Queue Output
     description: Collect packets from a single queue processor
-    params: {}
     expectedBehavior: '1. Collector blocks waiting for packets
 
       2. Receives packets from upstream queue
@@ -63,11 +62,15 @@ wantType:
       5. Reports total packets and timing metrics
 
       '
-    connectedTo:
-    - queue
+    want:
+      metadata:
+        name: collect-queue-output
+        type: collector
+        labels: {}
+      spec:
+        params: {}
   - name: Collect from Multiple Combiners
     description: Collect from combined streams of multiple sources
-    params: {}
     expectedBehavior: '1. Collector receives from combiner output
 
       2. Combiner feeds packets from multiple queues
@@ -79,11 +82,15 @@ wantType:
       5. Useful for throughput measurement
 
       '
-    connectedTo:
-    - combiner
+    want:
+      metadata:
+        name: collect-from-multiple-combiners
+        type: collector
+        labels: {}
+      spec:
+        params: {}
   - name: Collect Complex Pipeline Output
     description: Terminal collection from multi-stage pipeline
-    params: {}
     expectedBehavior: '1. Numbers generator feeds queue
 
       2. Queue feeds combiner
@@ -95,8 +102,13 @@ wantType:
       5. Final report shows end-to-end throughput
 
       '
-    connectedTo:
-    - combiner
+    want:
+      metadata:
+        name: collect-complex-pipeline-output
+        type: collector
+        labels: {}
+      spec:
+        params: {}
   relatedTypes:
   - sink
   - combiner

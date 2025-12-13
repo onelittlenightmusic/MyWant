@@ -81,10 +81,6 @@ wantType:
   examples:
   - name: Travel Itinerary Goal
     description: Custom target for complete travel planning
-    params:
-      target_name: travel-itinerary-complete
-      target_type: goal
-      target_value: all-reservations-confirmed
     expectedBehavior: '1. Defines custom goal for travel chain
 
       2. Restaurant, hotel, buffet must complete
@@ -96,13 +92,18 @@ wantType:
       5. Records satisfaction timestamp
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: travel-itinerary-goal
+        type: custom_target
+        labels: {}
+      spec:
+        params:
+          target_name: travel-itinerary-complete
+          target_type: goal
+          target_value: all-reservations-confirmed
   - name: Prime Computation Threshold
     description: Custom metric target for prime computation
-    params:
-      target_name: prime-count-threshold
-      target_type: threshold
-      target_value: 100
     expectedBehavior: '1. Defines threshold of 100 primes to find
 
       2. Sieve processor tracks progress
@@ -112,13 +113,18 @@ wantType:
       4. Enables exit condition for computation
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: prime-computation-threshold
+        type: custom_target
+        labels: {}
+      spec:
+        params:
+          target_name: prime-count-threshold
+          target_type: threshold
+          target_value: 100
   - name: Fibonacci Sequence Checkpoint
     description: Custom checkpoint in Fibonacci computation
-    params:
-      target_name: fibonacci-position-20
-      target_type: checkpoint
-      target_value: 20
     expectedBehavior: '1. Defines checkpoint at position 20
 
       2. Fibonacci loop tracks position
@@ -128,7 +134,16 @@ wantType:
       4. Can trigger secondary actions
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: fibonacci-sequence-checkpoint
+        type: custom_target
+        labels: {}
+      spec:
+        params:
+          target_name: fibonacci-position-20
+          target_type: checkpoint
+          target_value: 20
   relatedTypes:
   - owner
   seeAlso:

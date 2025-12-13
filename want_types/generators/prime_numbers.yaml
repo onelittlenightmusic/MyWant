@@ -70,9 +70,6 @@ wantType:
   examples:
   - name: Small Prime Range
     description: Generate numbers 2-100 for sieving
-    params:
-      start: 2
-      end: 100
     expectedBehavior: '1. Generator produces numbers 2, 3, 4, 5, ..., 100
 
       2. Outputs 99 total numbers
@@ -84,14 +81,17 @@ wantType:
       5. Downstream prime_sequence filters to find: 2, 3, 5, 7, 11, ...
 
       '
-    connectedTo:
-    - prime sequence
-    - prime_sink
+    want:
+      metadata:
+        name: small-prime-range
+        type: prime numbers
+        labels: {}
+      spec:
+        params:
+          start: 2
+          end: 100
   - name: Medium Prime Range
     description: Generate numbers 2-1000 for larger sieve
-    params:
-      start: 2
-      end: 1000
     expectedBehavior: '1. Generator produces numbers 2-1000
 
       2. Outputs 999 numbers
@@ -103,14 +103,17 @@ wantType:
       5. Demonstrates sieve efficiency on larger range
 
       '
-    connectedTo:
-    - prime sequence
-    - prime_sink
+    want:
+      metadata:
+        name: medium-prime-range
+        type: prime numbers
+        labels: {}
+      spec:
+        params:
+          start: 2
+          end: 1000
   - name: Custom Range (Skip to 500)
     description: Generate numbers from 500-600 to find primes in that range
-    params:
-      start: 500
-      end: 600
     expectedBehavior: '1. Generator produces numbers 500-600
 
       2. Outputs 101 numbers
@@ -122,9 +125,15 @@ wantType:
       5. Demonstrates sieve on arbitrary number ranges
 
       '
-    connectedTo:
-    - prime sequence
-    - prime_sink
+    want:
+      metadata:
+        name: custom-range-(skip-to-500)
+        type: prime numbers
+        labels: {}
+      spec:
+        params:
+          start: 500
+          end: 600
   relatedTypes:
   - prime sequence
   - prime sieve

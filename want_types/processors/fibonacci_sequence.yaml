@@ -78,9 +78,6 @@ wantType:
   examples:
   - name: Small Fibonacci Filter
     description: Filter Fibonacci numbers between 50 and 500
-    params:
-      min_value: 50
-      max_value: 500
     expectedBehavior: '1. Receives stream from fibonacci_numbers generator
 
       2. Filters out values < 50 and > 500
@@ -92,13 +89,17 @@ wantType:
       5. Reports total_processed = 20 (from generator)
 
       '
-    connectedTo:
-    - fibonacci numbers
+    want:
+      metadata:
+        name: small-fibonacci-filter
+        type: fibonacci sequence
+        labels: {}
+      spec:
+        params:
+          min_value: 50
+          max_value: 500
   - name: Large Fibonacci Range
     description: Filter Fibonacci numbers over 1000
-    params:
-      min_value: 1000
-      max_value: 1000000
     expectedBehavior: '1. Receives Fibonacci stream
 
       2. Only accepts values >= 1000
@@ -110,13 +111,17 @@ wantType:
       5. Demonstrates filtering effectiveness on large sequences
 
       '
-    connectedTo:
-    - fibonacci numbers
+    want:
+      metadata:
+        name: large-fibonacci-range
+        type: fibonacci sequence
+        labels: {}
+      spec:
+        params:
+          min_value: 1000
+          max_value: 1000000
   - name: Exact Value Match
     description: Filter single Fibonacci value (Fibonacci golden ratio)
-    params:
-      min_value: 89
-      max_value: 89
     expectedBehavior: '1. Receives Fibonacci stream
 
       2. Only accepts value 89 (6th Fibonacci number)
@@ -128,8 +133,15 @@ wantType:
       5. Demonstrates precision filtering
 
       '
-    connectedTo:
-    - fibonacci numbers
+    want:
+      metadata:
+        name: exact-value-match
+        type: fibonacci sequence
+        labels: {}
+      spec:
+        params:
+          min_value: 89
+          max_value: 89
   relatedTypes:
   - fibonacci numbers
   - prime sequence

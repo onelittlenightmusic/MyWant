@@ -47,28 +47,40 @@ wantType:
   examples:
   - name: Generate first 100 numbers
     description: Creates a generator for numbers 0-99
-    params:
-      start: 0
-      count: 100
     expectedBehavior: Outputs integers 0 through 99 on the numbers output
-    connectedTo:
-    - queue
+    want:
+      metadata:
+        name: generate-first-100-numbers
+        type: numbers
+        labels: {}
+      spec:
+        params:
+          start: 0
+          count: 100
   - name: Generate numbers 50-149
     description: Offset number generation
-    params:
-      start: 50
-      count: 100
     expectedBehavior: Outputs integers 50 through 149
-    connectedTo:
-    - queue
-    - combiner
+    want:
+      metadata:
+        name: generate-numbers-50-149
+        type: numbers
+        labels: {}
+      spec:
+        params:
+          start: 50
+          count: 100
   - name: Small number set
     description: Just 10 numbers for testing
-    params:
-      start: 0
-      count: 10
     expectedBehavior: Outputs integers 0 through 9
-    connectedTo: []
+    want:
+      metadata:
+        name: small-number-set
+        type: numbers
+        labels: {}
+      spec:
+        params:
+          start: 0
+          count: 10
   relatedTypes:
   - fibonacci numbers
   - prime numbers

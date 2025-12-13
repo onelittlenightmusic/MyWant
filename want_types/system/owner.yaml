@@ -72,9 +72,6 @@ wantType:
   examples:
   - name: Travel Planner Owner
     description: Owner managing multiple travel wants
-    params:
-      owner_id: owner-travel-planner
-      owner_type: coordinator
     expectedBehavior: '1. Creates owner relationship
 
       2. Manages restaurant, hotel, buffet wants
@@ -84,12 +81,17 @@ wantType:
       4. Enables bulk operations on owned wants
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: travel-planner-owner
+        type: owner
+        labels: {}
+      spec:
+        params:
+          owner_id: owner-travel-planner
+          owner_type: coordinator
   - name: System Owner
     description: System-level want owner
-    params:
-      owner_id: system-owner
-      owner_type: system
     expectedBehavior: '1. Establishes system-level ownership
 
       2. Can own multiple independent want chains
@@ -97,7 +99,15 @@ wantType:
       3. Enables centralized lifecycle management
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: system-owner
+        type: owner
+        labels: {}
+      spec:
+        params:
+          owner_id: system-owner
+          owner_type: system
   relatedTypes:
   - custom_target
   seeAlso:

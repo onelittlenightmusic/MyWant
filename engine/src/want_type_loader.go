@@ -93,12 +93,12 @@ type ConstraintDef struct {
 }
 
 // ExampleDef defines an example usage of a want type
+// The Want field contains the full want configuration that can be deployed via the want API
 type ExampleDef struct {
 	Name             string                 `json:"name" yaml:"name"`
 	Description      string                 `json:"description" yaml:"description"`
-	Params           map[string]interface{} `json:"params" yaml:"params"`
+	Want             map[string]interface{} `json:"want" yaml:"want"`             // Full want configuration (metadata + spec)
 	ExpectedBehavior string                 `json:"expectedBehavior" yaml:"expectedBehavior"`
-	ConnectedTo      []string               `json:"connectedTo" yaml:"connectedTo"`
 }
 
 // WantTypeWrapper is the top-level YAML structure

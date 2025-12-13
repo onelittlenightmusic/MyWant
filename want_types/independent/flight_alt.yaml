@@ -67,9 +67,6 @@ wantType:
   examples:
   - name: Economy Alternative
     description: Quick economy rebooking
-    params:
-      flight_type: economy
-      duration_hours: 11.0
     expectedBehavior: '1. Alternative flight want activates on delay
 
       2. Books next available economy flight
@@ -79,15 +76,17 @@ wantType:
       4. Preserves downstream travel plans
 
       '
-    connectedTo:
-    - flight
-    - hotel
-    - travel_coordinator
+    want:
+      metadata:
+        name: economy-alternative
+        type: flight_alt
+        labels: {}
+      spec:
+        params:
+          flight_type: economy
+          duration_hours: 11.0
   - name: Business Class Alternative
     description: Premium alternative routing
-    params:
-      flight_type: business
-      duration_hours: 9.0
     expectedBehavior: '1. Offers business class alternative
 
       2. May include brief connection
@@ -97,9 +96,15 @@ wantType:
       4. Maintains premium service level
 
       '
-    connectedTo:
-    - flight
-    - travel_coordinator
+    want:
+      metadata:
+        name: business-class-alternative
+        type: flight_alt
+        labels: {}
+      spec:
+        params:
+          flight_type: business
+          duration_hours: 9.0
   relatedTypes:
   - flight
   - hotel

@@ -68,8 +68,6 @@ wantType:
   examples:
   - name: Sieve Range 2-100
     description: Apply sieve to numbers 2-100
-    params:
-      prime: 2
     expectedBehavior: '1. Receives numbers 2, 3, 4, 5, ..., 100
 
       2. Identifies 2 as prime (first)
@@ -83,13 +81,16 @@ wantType:
       6. Outputs: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, ..., 97 (25 total)
 
       '
-    connectedTo:
-    - prime numbers
-    - prime sieve
+    want:
+      metadata:
+        name: sieve-range-2-100
+        type: prime sequence
+        labels: {}
+      spec:
+        params:
+          prime: 2
   - name: Large Range Sieve
     description: Sieve 1000 numbers to find primes
-    params:
-      prime: 2
     expectedBehavior: '1. Processes numbers 2-1000
 
       2. Identifies all 168 primes
@@ -101,13 +102,16 @@ wantType:
       5. Demonstrates sieve algorithm correctness
 
       '
-    connectedTo:
-    - prime numbers
-    - prime sieve
+    want:
+      metadata:
+        name: large-range-sieve
+        type: prime sequence
+        labels: {}
+      spec:
+        params:
+          prime: 2
   - name: Custom Prime Range
     description: Sieve numbers from 100-200
-    params:
-      prime: 2
     expectedBehavior: '1. Receives 100-200 number range
 
       2. Applies sieve algorithm
@@ -119,9 +123,14 @@ wantType:
       5. Useful for analyzing prime distribution
 
       '
-    connectedTo:
-    - prime numbers
-    - prime_sink
+    want:
+      metadata:
+        name: custom-prime-range
+        type: prime sequence
+        labels: {}
+      spec:
+        params:
+          prime: 2
   relatedTypes:
   - prime numbers
   - prime sieve

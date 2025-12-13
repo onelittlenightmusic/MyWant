@@ -123,10 +123,6 @@ wantType:
   examples:
   - name: Count items from queue
     description: Terminal sink that counts all items passing through
-    params:
-      operation: count
-      report_interval: 1.0
-      enable_logging: false
     expectedBehavior: '1. Receives items from connected queue want
 
       2. Increments total_count for each item
@@ -136,14 +132,18 @@ wantType:
       4. Output shows total items processed and throughput
 
       '
-    connectedTo:
-    - queue
+    want:
+      metadata:
+        name: count-items-from-queue
+        type: sink
+        labels: {}
+      spec:
+        params:
+          operation: count
+          report_interval: 1.0
+          enable_logging: false
   - name: Sum and average calculation
     description: Sink that calculates statistics on numeric items
-    params:
-      operation: average
-      report_interval: 2.0
-      enable_logging: false
     expectedBehavior: '1. Receives numeric values
 
       2. Tracks sum and count
@@ -153,17 +153,18 @@ wantType:
       4. Reports min/max values seen
 
       '
-    connectedTo:
-    - numbers
-    - queue
+    want:
+      metadata:
+        name: sum-and-average-calculation
+        type: sink
+        labels: {}
+      spec:
+        params:
+          operation: average
+          report_interval: 2.0
+          enable_logging: false
   - name: Detailed logging sink
     description: Sink with sampling-based logging for debugging
-    params:
-      operation: collect
-      report_interval: 0.5
-      enable_logging: true
-      log_sample_rate: 0.05
-      max_items: 1000
     expectedBehavior: '1. Logs 5% of items to console/file
 
       2. Collects all items up to limit (1000)
@@ -173,14 +174,20 @@ wantType:
       4. Stops after max_items reached
 
       '
-    connectedTo:
-    - queue
+    want:
+      metadata:
+        name: detailed-logging-sink
+        type: sink
+        labels: {}
+      spec:
+        params:
+          operation: collect
+          report_interval: 0.5
+          enable_logging: true
+          log_sample_rate: 0.05
+          max_items: 1000
   - name: Throughput monitor
     description: Sink focused on measuring throughput characteristics
-    params:
-      operation: count
-      report_interval: 0.1
-      enable_logging: false
     expectedBehavior: '1. High-frequency reporting (every 100ms)
 
       2. Tracks throughput metrics
@@ -188,15 +195,18 @@ wantType:
       3. Identifies bottlenecks in pipeline
 
       '
-    connectedTo:
-    - queue
-    - combiner
+    want:
+      metadata:
+        name: throughput-monitor
+        type: sink
+        labels: {}
+      spec:
+        params:
+          operation: count
+          report_interval: 0.1
+          enable_logging: false
   - name: Discarding sink
     description: Sink that discards items without processing (benchmark baseline)
-    params:
-      operation: discard
-      enable_logging: false
-      max_items: 5000
     expectedBehavior: '1. Discards all received items
 
       2. Tracks total count until max_items
@@ -204,8 +214,16 @@ wantType:
       3. Useful for pipeline performance testing
 
       '
-    connectedTo:
-    - fibonacci sequence
+    want:
+      metadata:
+        name: discarding-sink
+        type: sink
+        labels: {}
+      spec:
+        params:
+          operation: discard
+          enable_logging: false
+          max_items: 5000
   relatedTypes:
   - queue
   - combiner

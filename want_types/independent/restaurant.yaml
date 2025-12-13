@@ -137,12 +137,6 @@ wantType:
   examples:
   - name: Fine dining reservation
     description: Books upscale French restaurant for romantic dinner
-    params:
-      restaurant_type: fine dining
-      party_size: 2
-      preferred_time: '19:30'
-      cuisine: french
-      budget: expensive
     expectedBehavior: '1. MonitorRestaurant checks for existing reservation in local
       files
 
@@ -151,16 +145,20 @@ wantType:
       3. Books restaurant and stores reservation details in state
 
       '
-    connectedTo:
-    - travel_coordinator
+    want:
+      metadata:
+        name: fine-dining-reservation
+        type: restaurant
+        labels: {}
+      spec:
+        params:
+          restaurant_type: fine dining
+          party_size: 2
+          preferred_time: '19:30'
+          cuisine: french
+          budget: expensive
   - name: Casual family dinner
     description: Books casual restaurant for family gathering
-    params:
-      restaurant_type: casual
-      party_size: 6
-      preferred_time: '18:00'
-      cuisine: international
-      budget: moderate
     expectedBehavior: '1. Checks existing reservations
 
       2. Finds casual restaurant with family seating
@@ -168,39 +166,55 @@ wantType:
       3. Books and confirms reservation
 
       '
-    connectedTo:
-    - hotel
-    - buffet
-    - travel_coordinator
+    want:
+      metadata:
+        name: casual-family-dinner
+        type: restaurant
+        labels: {}
+      spec:
+        params:
+          restaurant_type: casual
+          party_size: 6
+          preferred_time: '18:00'
+          cuisine: international
+          budget: moderate
   - name: Business lunch
     description: Quick business meal booking
-    params:
-      restaurant_type: casual
-      party_size: 4
-      preferred_time: '12:30'
-      cuisine: steakhouse
-      budget: moderate
     expectedBehavior: '1. Finds nearby steakhouse with lunch availability
 
       2. Books a 60-minute table slot
 
       '
-    connectedTo: []
+    want:
+      metadata:
+        name: business-lunch
+        type: restaurant
+        labels: {}
+      spec:
+        params:
+          restaurant_type: casual
+          party_size: 4
+          preferred_time: '12:30'
+          cuisine: steakhouse
+          budget: moderate
   - name: Buffet dining
     description: All-you-can-eat buffet booking
-    params:
-      restaurant_type: buffet
-      party_size: 8
-      preferred_time: '19:00'
-      budget: budget
     expectedBehavior: '1. Finds buffet restaurant
 
       2. Books for group with flexible timing (buffets less time-sensitive)
 
       '
-    connectedTo:
-    - travel_coordinator
-    - hotel
+    want:
+      metadata:
+        name: buffet-dining
+        type: restaurant
+        labels: {}
+      spec:
+        params:
+          restaurant_type: buffet
+          party_size: 8
+          preferred_time: '19:00'
+          budget: budget
   relatedTypes:
   - hotel
   - buffet

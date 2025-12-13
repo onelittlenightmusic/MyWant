@@ -68,9 +68,6 @@ wantType:
   examples:
   - name: Expense Approval
     description: Request description for expense approval
-    params:
-      description_format: 'Expense approval request: %s'
-      approval_id: EXP-2024-001
     expectedBehavior: '1. Description want generates formatted request
 
       2. Creates ApprovalData with description
@@ -82,14 +79,17 @@ wantType:
       5. Provides context for approval coordinator
 
       '
-    connectedTo:
-    - evidence
-    - coordinator
+    want:
+      metadata:
+        name: expense-approval
+        type: description
+        labels: {}
+      spec:
+        params:
+          description_format: 'Expense approval request: %s'
+          approval_id: EXP-2024-001
   - name: Change Request Approval
     description: Description for change request approval
-    params:
-      description_format: 'Change request approval needed for: %s'
-      approval_id: CHG-2024-042
     expectedBehavior: '1. Description generates change request context
 
       2. Sends alongside supporting evidence
@@ -99,14 +99,17 @@ wantType:
       4. Timestamp recorded for audit trail
 
       '
-    connectedTo:
-    - evidence
-    - coordinator
+    want:
+      metadata:
+        name: change-request-approval
+        type: description
+        labels: {}
+      spec:
+        params:
+          description_format: 'Change request approval needed for: %s'
+          approval_id: CHG-2024-042
   - name: Access Request
     description: Description for access request approval
-    params:
-      description_format: 'Access request approval for: %s'
-      approval_id: ACC-2024-X
     expectedBehavior: '1. Description generates access request context
 
       2. Combined with evidence of need
@@ -116,9 +119,15 @@ wantType:
       4. Used for audit and compliance tracking
 
       '
-    connectedTo:
-    - evidence
-    - coordinator
+    want:
+      metadata:
+        name: access-request
+        type: description
+        labels: {}
+      spec:
+        params:
+          description_format: 'Access request approval for: %s'
+          approval_id: ACC-2024-X
   relatedTypes:
   - evidence
   - coordinator

@@ -124,8 +124,6 @@ wantType:
   examples:
   - name: Standard Hotel Booking
     description: Simple hotel booking with default standard type
-    params:
-      hotel_type: standard
     expectedBehavior: '1. Hotel want checks if existing schedule exists
 
       2. Schedules check-in between 8 PM - midnight
@@ -139,14 +137,16 @@ wantType:
       6. Updates state with reservation details
 
       '
-    connectedTo:
-    - restaurant
-    - buffet
-    - travel_coordinator
+    want:
+      metadata:
+        name: standard-hotel-booking
+        type: hotel
+        labels: {}
+      spec:
+        params:
+          hotel_type: standard
   - name: Luxury Hotel with Premium Service
     description: High-end hotel booking with concierge service
-    params:
-      hotel_type: luxury
     expectedBehavior: '1. Hotel want creates premium reservation
 
       2. Applies concierge service tier and premium amenities
@@ -158,14 +158,16 @@ wantType:
       5. Outputs schedule formatted for premium experience
 
       '
-    connectedTo:
-    - restaurant
-    - buffet
-    - travel_coordinator
+    want:
+      metadata:
+        name: luxury-hotel-with-premium-service
+        type: hotel
+        labels: {}
+      spec:
+        params:
+          hotel_type: luxury
   - name: Budget Hotel with Conflict Resolution
     description: Cost-effective booking that resolves timing conflicts
-    params:
-      hotel_type: budget
     expectedBehavior: '1. Hotel receives existing schedule from coordinator
 
       2. Detects conflict with restaurant reservation
@@ -177,10 +179,14 @@ wantType:
       5. Sends updated schedule with resolved times
 
       '
-    connectedTo:
-    - restaurant
-    - buffet
-    - travel_coordinator
+    want:
+      metadata:
+        name: budget-hotel-with-conflict-resolution
+        type: hotel
+        labels: {}
+      spec:
+        params:
+          hotel_type: budget
   relatedTypes:
   - restaurant
   - buffet

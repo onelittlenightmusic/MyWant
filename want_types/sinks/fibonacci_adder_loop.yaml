@@ -70,7 +70,6 @@ wantType:
   examples:
   - name: Collect Loop Fibonacci
     description: Collect and aggregate fibonacci_loop results
-    params: {}
     expectedBehavior: '1. Receives 0 from position 0
 
       2. Receives 1 from position 1
@@ -84,11 +83,15 @@ wantType:
       6. Stores complete sequence for analysis
 
       '
-    connectedTo:
-    - fibonacci loop
+    want:
+      metadata:
+        name: collect-loop-fibonacci
+        type: fibonacci adder loop
+        labels: {}
+      spec:
+        params: {}
   - name: Aggregate Statistics
     description: Compute statistics on Fibonacci sequence
-    params: {}
     expectedBehavior: '1. Collects all Fibonacci numbers
 
       2. Computes: count, sum, min, max
@@ -98,8 +101,13 @@ wantType:
       4. Can verify correctness of computation
 
       '
-    connectedTo:
-    - fibonacci loop
+    want:
+      metadata:
+        name: aggregate-statistics
+        type: fibonacci adder loop
+        labels: {}
+      spec:
+        params: {}
   relatedTypes:
   - fibonacci loop
   - fibonacci source loop

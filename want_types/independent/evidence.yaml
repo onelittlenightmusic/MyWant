@@ -70,9 +70,6 @@ wantType:
   examples:
   - name: Audit Evidence
     description: Provide audit report as evidence for approval
-    params:
-      evidence_type: audit
-      approval_id: APR-2024-001
     expectedBehavior: '1. Evidence want generates audit report evidence
 
       2. Creates ApprovalData with evidence details
@@ -84,14 +81,17 @@ wantType:
       5. Flags evidence as provided to prevent re-sending
 
       '
-    connectedTo:
-    - description
-    - coordinator
+    want:
+      metadata:
+        name: audit-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: audit
+          approval_id: APR-2024-001
   - name: Document Evidence
     description: Provide supporting document evidence
-    params:
-      evidence_type: document
-      approval_id: REQ-2024-042
     expectedBehavior: '1. Evidence wants generates document evidence
 
       2. Sends alongside description want
@@ -101,14 +101,17 @@ wantType:
       4. Marked as provided in state
 
       '
-    connectedTo:
-    - description
-    - coordinator
+    want:
+      metadata:
+        name: document-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: document
+          approval_id: REQ-2024-042
   - name: Certification Evidence
     description: Provide certification as approval evidence
-    params:
-      evidence_type: certification
-      approval_id: CERT-2024-X
     expectedBehavior: '1. Evidence generates certification evidence
 
       2. Works with description to provide complete context
@@ -118,9 +121,15 @@ wantType:
       4. Persists evidence timestamp in state
 
       '
-    connectedTo:
-    - description
-    - coordinator
+    want:
+      metadata:
+        name: certification-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: certification
+          approval_id: CERT-2024-X
   relatedTypes:
   - description
   - coordinator

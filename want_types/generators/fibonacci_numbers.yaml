@@ -55,8 +55,6 @@ wantType:
   examples:
   - name: Small Fibonacci Sequence
     description: Generate first 10 Fibonacci numbers
-    params:
-      count: 10
     expectedBehavior: '1. Generator starts execution
 
       2. Produces: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
@@ -68,14 +66,16 @@ wantType:
       5. Ready to process results
 
       '
-    connectedTo:
-    - fibonacci sequence
-    - queue
-    - sink
+    want:
+      metadata:
+        name: small-fibonacci-sequence
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 10
   - name: Large Fibonacci Sequence
     description: Generate 100 Fibonacci numbers for testing throughput
-    params:
-      count: 100
     expectedBehavior: '1. Generator produces 100 Fibonacci values
 
       2. Values grow exponentially (up to ~3.5 billion)
@@ -85,13 +85,16 @@ wantType:
       4. Sink can count/aggregate the stream
 
       '
-    connectedTo:
-    - fibonacci sequence
-    - sink
+    want:
+      metadata:
+        name: large-fibonacci-sequence
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 100
   - name: Single Number
     description: Generate just the first Fibonacci number (0)
-    params:
-      count: 1
     expectedBehavior: '1. Generator produces just 0
 
       2. Immediately completes
@@ -99,8 +102,14 @@ wantType:
       3. Useful for testing pipeline initialization
 
       '
-    connectedTo:
-    - sink
+    want:
+      metadata:
+        name: single-number
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 1
   relatedTypes:
   - fibonacci sequence
   - prime numbers

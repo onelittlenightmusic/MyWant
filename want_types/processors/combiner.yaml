@@ -59,8 +59,6 @@ wantType:
   examples:
   - name: Merge Two Queues
     description: Combine packets from two queue processors
-    params:
-      operation: merge
     expectedBehavior: '1. Receives packets from two upstream queues
 
       2. Forwards all packets sequentially
@@ -72,13 +70,16 @@ wantType:
       5. Sends termination signal downstream
 
       '
-    connectedTo:
-    - queue
-    - sink
+    want:
+      metadata:
+        name: merge-two-queues
+        type: combiner
+        labels: {}
+      spec:
+        params:
+          operation: merge
   - name: Interleave Multiple Streams
     description: Alternate packets from multiple sources
-    params:
-      operation: interleave
     expectedBehavior: '1. Receives packets from multiple sources
 
       2. Interleaves packets in round-robin fashion
@@ -88,13 +89,16 @@ wantType:
       4. Useful for load balancing
 
       '
-    connectedTo:
-    - qnet queue
-    - sink
+    want:
+      metadata:
+        name: interleave-multiple-streams
+        type: combiner
+        labels: {}
+      spec:
+        params:
+          operation: interleave
   - name: Round-Robin Combination
     description: Distribute packets in round-robin from 3+ sources
-    params:
-      operation: round-robin
     expectedBehavior: '1. Receives from 3+ parallel sources
 
       2. Combines using round-robin selection
@@ -102,10 +106,14 @@ wantType:
       3. Balances load across multiple streams
 
       '
-    connectedTo:
-    - numbers
-    - queue
-    - sink
+    want:
+      metadata:
+        name: round-robin-combination
+        type: combiner
+        labels: {}
+      spec:
+        params:
+          operation: round-robin
   relatedTypes:
   - queue
   - sink

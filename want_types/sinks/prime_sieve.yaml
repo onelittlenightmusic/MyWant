@@ -70,7 +70,6 @@ wantType:
   examples:
   - name: Collect Primes 2-100
     description: Collect primes from range 2 to 100
-    params: {}
     expectedBehavior: '1. Receives numbers 2-100 from prime_numbers generator
 
       2. prime_sequence filters to identify: 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, ...
@@ -82,11 +81,15 @@ wantType:
       5. Reports: 25 primes, largest=97, smallest=2
 
       '
-    connectedTo:
-    - prime sequence
+    want:
+      metadata:
+        name: collect-primes-2-100
+        type: prime sieve
+        labels: {}
+      spec:
+        params: {}
   - name: Collect Primes 2-1000
     description: Sieve and collect primes from larger range
-    params: {}
     expectedBehavior: '1. Receives 1000 numbers from generator
 
       2. prime_sequence applies sieve algorithm
@@ -98,11 +101,15 @@ wantType:
       5. Statistics: largest_prime=997, count=168
 
       '
-    connectedTo:
-    - prime sequence
+    want:
+      metadata:
+        name: collect-primes-2-1000
+        type: prime sieve
+        labels: {}
+      spec:
+        params: {}
   - name: Large Range Primes 2-10000
     description: Collect 1229 primes from range 2-10000
-    params: {}
     expectedBehavior: '1. Receives 10000 numbers
 
       2. Sieve algorithm efficiently filters
@@ -114,8 +121,13 @@ wantType:
       5. Final statistics for analysis
 
       '
-    connectedTo:
-    - prime sequence
+    want:
+      metadata:
+        name: large-range-primes-2-10000
+        type: prime sieve
+        labels: {}
+      spec:
+        params: {}
   relatedTypes:
   - prime sequence
   - prime numbers

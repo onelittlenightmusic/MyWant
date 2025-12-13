@@ -119,12 +119,6 @@ wantType:
   examples:
   - name: Travel coordinator - full itinerary
     description: Complete trip coordinating flight, hotel, restaurant, and buffet
-    params:
-      coordinator_type: travel
-      display_name: Paris & Lyon 2024
-      required_inputs: 4
-      output_format: detailed
-      timezone: CET
     expectedBehavior: '1. Collects reservation data from all connected wants (flight,
       hotel, restaurant, buffet)
 
@@ -137,18 +131,20 @@ wantType:
       5. Outputs in specified format with all details and pricing
 
       '
-    connectedTo:
-    - flight
-    - hotel
-    - restaurant
-    - buffet
+    want:
+      metadata:
+        name: travel-coordinator---full-itinerary
+        type: coordinator
+        labels: {}
+      spec:
+        params:
+          coordinator_type: travel
+          display_name: Paris & Lyon 2024
+          required_inputs: 4
+          output_format: detailed
+          timezone: CET
   - name: Level 1 approval coordinator
     description: First level approval collecting evidence and description
-    params:
-      coordinator_type: approval
-      coordinator_level: 1
-      display_name: 'Approval Request #001'
-      required_inputs: 2
     expectedBehavior: '1. Receives evidence documents from EvidenceWant
 
       2. Receives description from DescriptionWant
@@ -158,16 +154,19 @@ wantType:
       4. Returns approval decision
 
       '
-    connectedTo:
-    - evidence
-    - description
+    want:
+      metadata:
+        name: level-1-approval-coordinator
+        type: coordinator
+        labels: {}
+      spec:
+        params:
+          coordinator_type: approval
+          coordinator_level: 1
+          display_name: 'Approval Request #001'
+          required_inputs: 2
   - name: Level 2 approval coordinator
     description: Second level approval collecting results from Level 1 coordinators
-    params:
-      coordinator_type: approval
-      coordinator_level: 2
-      display_name: Level 2 Approval
-      required_inputs: 3
     expectedBehavior: '1. Receives approval decisions from Level 1 coordinators
 
       2. Aggregates decisions
@@ -177,16 +176,19 @@ wantType:
       4. Stores in state
 
       '
-    connectedTo:
-    - coordinator
-    - coordinator
-    - coordinator
+    want:
+      metadata:
+        name: level-2-approval-coordinator
+        type: coordinator
+        labels: {}
+      spec:
+        params:
+          coordinator_type: approval
+          coordinator_level: 2
+          display_name: Level 2 Approval
+          required_inputs: 3
   - name: Buffet coordinator - standalone
     description: Minimal coordinator for standalone buffet deployment
-    params:
-      coordinator_type: buffet
-      display_name: Weekend Brunch
-      required_inputs: 1
     expectedBehavior: '1. Receives buffet schedule from BuffetWant
 
       2. Stores schedule in state
@@ -194,16 +196,18 @@ wantType:
       3. Sets completion status
 
       '
-    connectedTo:
-    - buffet
+    want:
+      metadata:
+        name: buffet-coordinator---standalone
+        type: coordinator
+        labels: {}
+      spec:
+        params:
+          coordinator_type: buffet
+          display_name: Weekend Brunch
+          required_inputs: 1
   - name: Travel coordinator - weekend getaway
     description: Short trip with hotel and restaurant
-    params:
-      coordinator_type: travel
-      display_name: NYC Weekend Getaway
-      required_inputs: 2
-      output_format: summary
-      timezone: EST
     expectedBehavior: '1. Coordinates hotel and restaurant reservations
 
       2. Creates compact summary itinerary
@@ -211,9 +215,18 @@ wantType:
       3. Calculates weekend trip budget
 
       '
-    connectedTo:
-    - hotel
-    - restaurant
+    want:
+      metadata:
+        name: travel-coordinator---weekend-getaway
+        type: coordinator
+        labels: {}
+      spec:
+        params:
+          coordinator_type: travel
+          display_name: NYC Weekend Getaway
+          required_inputs: 2
+          output_format: summary
+          timezone: EST
   relatedTypes:
   - restaurant
   - hotel
