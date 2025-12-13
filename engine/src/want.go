@@ -374,6 +374,40 @@ func (n *Want) GetExecutable() Executable {
 	return n.executable
 }
 
+// checkPreconditions verifies that path preconditions are satisfied
+// Returns true if all required providers/users are connected, false otherwise
+func (n *Want) checkPreconditions(paths Paths) bool {
+	// Check minimum required inputs (providers)
+	if n.ConnectivityMetadata.RequiredInputs > 0 {
+		if len(paths.In) < n.ConnectivityMetadata.RequiredInputs {
+			return false
+		}
+	}
+
+	// Check minimum required outputs (users)
+	if n.ConnectivityMetadata.RequiredOutputs > 0 {
+		if len(paths.Out) < n.ConnectivityMetadata.RequiredOutputs {
+			return false
+		}
+	}
+
+	// Check maximum inputs if limited
+	if n.ConnectivityMetadata.MaxInputs > 0 {
+		if len(paths.In) > n.ConnectivityMetadata.MaxInputs {
+			return false
+		}
+	}
+
+	// Check maximum outputs if limited
+	if n.ConnectivityMetadata.MaxOutputs > 0 {
+		if len(paths.Out) > n.ConnectivityMetadata.MaxOutputs {
+			return false
+		}
+	}
+
+	return true
+}
+
 // StartExecution starts the want execution loop in a goroutine
 //
 // Parameters (minimal interface):
@@ -433,6 +467,15 @@ func (n *Want) StartExecution(
 
 			// 3. Skip execution if suspended
 			if n.IsSuspended() {
+				time.Sleep(GlobalExecutionInterval)
+				continue
+			}
+
+			// 3.5. Check preconditions: verify required providers/users are connected
+			if !n.checkPreconditions(paths) {
+				// Preconditions not satisfied - treat as suspended
+				n.SetSuspended(true)
+				n.SetStatus(WantStatusSuspended)
 				time.Sleep(GlobalExecutionInterval)
 				continue
 			}
