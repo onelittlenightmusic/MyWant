@@ -202,6 +202,14 @@ func (q *Queue) Exec() bool {
 		return true
 	}
 
+	// Initialize missing fields if needed
+	if locals.batchUpdateInterval == 0 {
+		locals.batchUpdateInterval = q.GetIntParam("batch_interval", 100)
+	}
+	if locals.ServiceTime == 0 {
+		locals.ServiceTime = q.GetFloatParam("service_time", 1.0)
+	}
+
 	if q.State == nil {
 		q.State = make(map[string]interface{})
 	}
