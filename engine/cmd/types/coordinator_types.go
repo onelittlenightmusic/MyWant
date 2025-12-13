@@ -170,44 +170,6 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 
 	return true
 }
-func (c *CoordinatorWant) checkAllChannelsRepresentedInCache(inCount int) bool {
-	// Common logic for all handlers: check data_by_channel
-	dataByChannelVal, _ := c.GetState("data_by_channel")
-	if dataByChannelVal == nil {
-		return false
-	}
-	var dataCount int
-	switch v := dataByChannelVal.(type) {
-	case map[int]interface{}:
-		dataCount = len(v)
-	case map[string]interface{}:
-		dataCount = len(v)
-	default:
-		c.StoreLog(fmt.Sprintf("[ERROR] CoordinatorWant.checkAllChannelsRepresentedInCache: type assertion failed for data_by_channel. Expected map[int]interface{} or map[string]interface{}, got %T", dataByChannelVal))
-		return false
-	}
-	if dataCount != inCount {
-		return false
-	}
-
-	// All channels have sent at least one packet Now check if enough time has passed since the last packet (allows for delayed packets like Rebook)
-	completionTimeout := c.DataHandler.GetCompletionTimeout()
-	if completionTimeout > 0 {
-		lastPacketTimeVal, _ := c.GetState("last_packet_time")
-		if lastPacketTimeVal != nil {
-			if lastPacketTime, ok := lastPacketTimeVal.(time.Time); ok {
-				timeSinceLastPacket := time.Since(lastPacketTime)
-				if timeSinceLastPacket < completionTimeout {
-					// Waiting for completion timeout - removed verbose debug log
-					return false
-				}
-				// Coordinator completing - removed verbose debug log
-			}
-		}
-	}
-
-	return true
-}
 
 // ============================================================================ Approval-Specific Handlers ============================================================================
 
