@@ -62,8 +62,6 @@ func (g *FibonacciNumbers) Exec() bool {
 
 // FibonacciFilterLocals holds type-specific local state for FibonacciFilter want
 type FibonacciFilterLocals struct {
-	MinValue int
-	MaxValue int
 	filtered []int
 }
 
@@ -78,8 +76,6 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 		metadata,
 		spec,
 		&FibonacciFilterLocals{
-			MinValue: 0,
-			MaxValue: 1000000,
 			filtered: make([]int, 0),
 		},
 		ConnectivityMetadata{
@@ -92,11 +88,6 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 		},
 		"fibonacci filter",
 	)
-
-	// Update with actual parameter values from spec
-	locals := want.Locals.(*FibonacciFilterLocals)
-	locals.MinValue = want.GetIntParam("min_value", 0)
-	locals.MaxValue = want.GetIntParam("max_value", 1000000)
 
 	return &FibonacciFilter{*want}
 }
@@ -154,8 +145,10 @@ func (f *FibonacciFilter) Exec() bool {
 		}
 
 		totalProcessed++
-		// Filter based on min/max values
-		if val >= locals.MinValue && val <= locals.MaxValue {
+		// Filter based on min/max values from parameters
+		minValue := f.GetIntParam("min_value", 0)
+		maxValue := f.GetIntParam("max_value", 1000000)
+		if val >= minValue && val <= maxValue {
 			locals.filtered = append(locals.filtered, val)
 		}
 
