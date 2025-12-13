@@ -214,7 +214,6 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: schedule
-        type: state
-        description: Restaurant schedule and reservation details
+    - name: schedule
+      type: state
+      description: Restaurant schedule and reservation details

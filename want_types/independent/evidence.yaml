@@ -131,8 +131,7 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: evidence_data
-        type: want
-        description: ApprovalData containing evidence for approval coordinator
-        multiple: true
+    - name: evidence_data
+      type: want
+      description: ApprovalData containing evidence for approval coordinator
+      multiple: true

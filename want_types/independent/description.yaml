@@ -129,8 +129,7 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: description_data
-        type: want
-        description: ApprovalData containing description for approval coordinator
-        multiple: true
+    - name: description_data
+      type: want
+      description: ApprovalData containing description for approval coordinator
+      multiple: true

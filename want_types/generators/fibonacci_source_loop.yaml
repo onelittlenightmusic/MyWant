@@ -83,7 +83,6 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: seed_stream
-        type: want
-        description: FibonacciSeed values with position and end signal
+    - name: seed_stream
+      type: want
+      description: FibonacciSeed values with position and end signal

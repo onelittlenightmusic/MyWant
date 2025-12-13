@@ -195,14 +195,12 @@ wantType:
   - Travel coordinator for schedule integration
   require:
     type: users
-    users:
-      outputs:
-      - name: travel_schedule
-        type: want
-        description: Buffet reservation as TravelSchedule with start/end times
     providers:
-      inputs:
-      - name: existing_schedule
-        type: want
-        description: Optional existing travel schedule to check for conflicts
-        required: false
+    - name: existing_schedule
+      type: want
+      description: Optional existing travel schedule to check for conflicts
+      required: false
+    users:
+    - name: travel_schedule
+      type: want
+      description: Buffet reservation as TravelSchedule with start/end times

@@ -128,8 +128,7 @@ wantType:
   require:
     type: providers
     providers:
-      inputs:
-      - name: prime_stream
-        type: want
-        description: Stream of prime numbers from sieve processor
-        required: true
+    - name: prime_stream
+      type: want
+      description: Stream of prime numbers from sieve processor
+      required: true

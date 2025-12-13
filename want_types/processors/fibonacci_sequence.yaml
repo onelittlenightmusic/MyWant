@@ -143,15 +143,13 @@ wantType:
   require:
     type: providers_and_users
     providers:
-      inputs:
-      - name: fibonacci_stream
-        type: want
-        description: Stream of integer Fibonacci numbers to filter
-        required: true
+    - name: fibonacci_stream
+      type: want
+      description: Stream of integer Fibonacci numbers to filter
+      required: true
     users:
-      outputs:
-      - name: processed_data
-        type: state
-        description: Processed data output
-        required: true
-        multiple: false
+    - name: processed_data
+      type: state
+      description: Processed data output
+      required: true
+      multiple: false

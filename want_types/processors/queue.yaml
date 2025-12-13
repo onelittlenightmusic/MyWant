@@ -114,13 +114,11 @@ wantType:
   require:
     type: providers_and_users
     providers:
-      inputs:
-      - name: input
-        type: want
-        description: Items to queue for processing
-        required: true
+    - name: input
+      type: want
+      description: Items to queue for processing
+      required: true
     users:
-      outputs:
-      - name: output
-        type: want
-        description: Processed items (after service_time delay)
+    - name: output
+      type: want
+      description: Processed items (after service_time delay)

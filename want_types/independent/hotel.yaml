@@ -192,14 +192,12 @@ wantType:
   - Agent system documentation for hotel booking
   require:
     type: users
-    users:
-      outputs:
-      - name: travel_schedule
-        type: want
-        description: Hotel reservation as TravelSchedule with check-in/check-out times
     providers:
-      inputs:
-      - name: existing_schedule
-        type: want
-        description: Optional existing travel schedule to check for conflicts
-        required: false
+    - name: existing_schedule
+      type: want
+      description: Optional existing travel schedule to check for conflicts
+      required: false
+    users:
+    - name: travel_schedule
+      type: want
+      description: Hotel reservation as TravelSchedule with check-in/check-out times

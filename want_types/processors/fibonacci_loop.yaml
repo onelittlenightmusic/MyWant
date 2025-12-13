@@ -90,13 +90,11 @@ wantType:
   require:
     type: providers_and_users
     providers:
-      inputs:
-      - name: seed_stream
-        type: want
-        description: Initial seeds and max count from source
-        required: true
+    - name: seed_stream
+      type: want
+      description: Initial seeds and max count from source
+      required: true
     users:
-      outputs:
-      - name: number_stream
-        type: want
-        description: Computed Fibonacci numbers
+    - name: number_stream
+      type: want
+      description: Computed Fibonacci numbers

@@ -219,8 +219,7 @@ wantType:
   require:
     type: providers
     providers:
-      inputs:
-      - name: input
-        type: want
-        description: Items to consume and process
-        required: true
+    - name: input
+      type: want
+      description: Items to consume and process
+      required: true

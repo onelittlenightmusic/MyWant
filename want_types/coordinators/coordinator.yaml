@@ -229,15 +229,13 @@ wantType:
   - Independent wants execution
   require:
     providers:
-      inputs:
-      - name: data_packets
-        type: want
-        description: 'Independent wants providing data for coordination (travel: restaurant/hotel/buffet/flight,
-          approval: evidence/description)'
-        required: false
-        multiple: true
+    - name: data_packets
+      type: want
+      description: 'Independent wants providing data for coordination (travel: restaurant/hotel/buffet/flight,
+        approval: evidence/description)'
+      required: false
+      multiple: true
     users:
-      outputs:
-      - name: coordinated_result
-        type: state
-        description: Final coordinated data stored in state
+    - name: coordinated_result
+      type: state
+      description: Final coordinated data stored in state

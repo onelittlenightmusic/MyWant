@@ -138,7 +138,6 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: number_stream
-        type: want
-        description: Stream of integers from start to end
+    - name: number_stream
+      type: want
+      description: Stream of integers from start to end

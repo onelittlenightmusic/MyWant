@@ -108,8 +108,7 @@ wantType:
   - Sequence collection and statistics
   require:
     providers:
-      inputs:
-      - name: fibonacci_stream
-        type: want
-        description: Computed Fibonacci numbers from loop processor
-        required: true
+    - name: fibonacci_stream
+      type: want
+      description: Computed Fibonacci numbers from loop processor
+      required: true

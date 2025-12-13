@@ -114,7 +114,6 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: fibonacci_stream
-        type: want
-        description: Stream of integer Fibonacci numbers
+    - name: fibonacci_stream
+      type: want
+      description: Stream of integer Fibonacci numbers

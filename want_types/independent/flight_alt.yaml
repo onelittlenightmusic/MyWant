@@ -110,14 +110,12 @@ wantType:
   - Fallback flight options
   require:
     type: users
-    users:
-      outputs:
-      - name: travel_schedule
-        type: want
-        description: Alternative flight booking
     providers:
-      inputs:
-      - name: original_schedule
-        type: want
-        description: Original flight schedule for reference
-        required: false
+    - name: original_schedule
+      type: want
+      description: Original flight schedule for reference
+      required: false
+    users:
+    - name: travel_schedule
+      type: want
+      description: Alternative flight booking

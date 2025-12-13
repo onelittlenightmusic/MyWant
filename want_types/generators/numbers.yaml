@@ -80,7 +80,6 @@ wantType:
   require:
     type: users
     users:
-      outputs:
-      - name: numbers
-        type: want
-        description: Stream of generated numbers
+    - name: numbers
+      type: want
+      description: Stream of generated numbers

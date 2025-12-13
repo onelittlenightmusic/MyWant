@@ -133,13 +133,11 @@ wantType:
   require:
     type: providers_and_users
     providers:
-      inputs:
-      - name: number_stream
-        type: want
-        description: Stream of numbers to test for primality
-        required: true
+    - name: number_stream
+      type: want
+      description: Stream of numbers to test for primality
+      required: true
     users:
-      outputs:
-      - name: prime_stream
-        type: want
-        description: Stream of identified prime numbers
+    - name: prime_stream
+      type: want
+      description: Stream of identified prime numbers

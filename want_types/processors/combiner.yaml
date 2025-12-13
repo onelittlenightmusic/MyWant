@@ -117,14 +117,12 @@ wantType:
   require:
     type: providers_and_users
     providers:
-      inputs:
-      - name: upstream_streams
-        type: want
-        description: Multiple input streams to combine
-        required: true
-        multiple: true
+    - name: upstream_streams
+      type: want
+      description: Multiple input streams to combine
+      required: true
+      multiple: true
     users:
-      outputs:
-      - name: combined_stream
-        type: want
-        description: Single output stream with all packets
+    - name: combined_stream
+      type: want
+      description: Single output stream with all packets

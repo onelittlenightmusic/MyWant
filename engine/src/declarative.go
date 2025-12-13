@@ -192,11 +192,20 @@ type ConnectivityMetadata struct {
 }
 
 // RequirePolicy defines connectivity requirements as an enum
+// ConnectionSpec represents a single connection definition
+type ConnectionSpec struct {
+	Name        string `json:"name" yaml:"name"`
+	Type        string `json:"type" yaml:"type"`
+	Description string `json:"description" yaml:"description"`
+	Required    bool   `json:"required" yaml:"required"`
+	Multiple    bool   `json:"multiple" yaml:"multiple"`
+}
+
 // RequireSpec defines structured connectivity requirements
 type RequireSpec struct {
-	Type      string           `json:"type" yaml:"type"`                           // require type: providers, users, providers_and_users, none
-	Providers *ConnectivityDef `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connection specs
-	Users     *ConnectivityDef `json:"users,omitempty" yaml:"users,omitempty"`       // Output connection specs
+	Type      string               `json:"type" yaml:"type"`                           // require type: providers, users, providers_and_users, none
+	Providers []ConnectionSpec     `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connections (flattened)
+	Users     []ConnectionSpec     `json:"users,omitempty" yaml:"users,omitempty"`       // Output connections (flattened)
 }
 
 // ToConnectivityMetadata converts RequireSpec to ConnectivityMetadata
@@ -217,13 +226,13 @@ func (r *RequireSpec) ToConnectivityMetadata(wantType string) ConnectivityMetada
 	requiredOutputs := 0
 
 	// Check providers (inputs)
-	if r.Providers != nil && len(r.Providers.Inputs) > 0 {
+	if len(r.Providers) > 0 {
 		// If providers is specified, at least one input is required
 		requiredInputs = 1
 	}
 
 	// Check users (outputs)
-	if r.Users != nil && len(r.Users.Outputs) > 0 {
+	if len(r.Users) > 0 {
 		// If users is specified, at least one output is required
 		requiredOutputs = 1
 	}

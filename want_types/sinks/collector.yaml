@@ -108,9 +108,8 @@ wantType:
   require:
     type: providers
     providers:
-      inputs:
-      - name: packet_stream
-        type: want
-        description: Incoming packets to collect
-        required: true
-        multiple: true
+    - name: packet_stream
+      type: want
+      description: Incoming packets to collect
+      required: true
+      multiple: true
