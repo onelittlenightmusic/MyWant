@@ -94,7 +94,7 @@ wantType:
         3. Broadcasts to all output channels
         4. Works alongside evidence want
         5. Provides context for approval coordinator
-      connectedTo: ["evidence", "level1_coordinator"]
+      connectedTo: ["evidence", "coordinator"]
 
     - name: "Change Request Approval"
       description: "Description for change request approval"
@@ -118,11 +118,11 @@ wantType:
         2. Combined with evidence of need
         3. Sent to multi-level approval coordinator
         4. Used for audit and compliance tracking
-      connectedTo: ["evidence", "level1_coordinator"]
+      connectedTo: ["evidence", "coordinator"]
 
   relatedTypes:
     - "evidence"
-    - "level1_coordinator"
+    - "coordinator"
 
   seeAlso:
     - "Approval request formatting"

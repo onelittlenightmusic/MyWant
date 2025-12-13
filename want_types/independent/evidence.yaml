@@ -91,7 +91,7 @@ wantType:
         3. Broadcasts to all output channels
         4. Sends to approval coordinator
         5. Flags evidence as provided to prevent re-sending
-      connectedTo: ["description", "level1_coordinator"]
+      connectedTo: ["description", "coordinator"]
 
     - name: "Document Evidence"
       description: "Provide supporting document evidence"
@@ -115,11 +115,11 @@ wantType:
         2. Works with description to provide complete context
         3. Supports multi-level approval workflow
         4. Persists evidence timestamp in state
-      connectedTo: ["description", "level1_coordinator"]
+      connectedTo: ["description", "coordinator"]
 
   relatedTypes:
     - "description"
-    - "level1_coordinator"
+    - "coordinator"
 
   seeAlso:
     - "Approval process documentation"

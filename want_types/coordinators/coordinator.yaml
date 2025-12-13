@@ -173,7 +173,7 @@ wantType:
         2. Aggregates decisions
         3. Makes final approval/rejection decision
         4. Stores in state
-      connectedTo: ["level1_coordinator", "level1_coordinator", "level1_coordinator"]
+      connectedTo: ["coordinator", "coordinator", "coordinator"]
 
     - name: "Buffet coordinator - standalone"
       description: "Minimal coordinator for standalone buffet deployment"
