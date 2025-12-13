@@ -1,132 +1,143 @@
 wantType:
   metadata:
-    name: "evidence"
-    title: "Approval Evidence Provider"
-    description: |
-      Independent want that provides evidence data for multi-level approval
+    name: evidence
+    title: Approval Evidence Provider
+    description: 'Independent want that provides evidence data for multi-level approval
+
       processes. Generates and outputs evidence artifacts that support
+
       approval decisions, working alongside description wants.
 
+
       This is a generator that produces ApprovalData containing evidence
+
       information, supporting complex approval workflows with evidence trails.
 
-    version: "1.0"
-    category: "approval"
-    pattern: "independent"
-
+      '
+    version: '1.0'
+    category: approval
+    pattern: independent
   usageLimit:
     users:
-      min: 1       # At least one output required
-    description: "Evidence generator with no input requirements"
-
+      min: 1
+    description: Evidence generator with no input requirements
   parameters:
-    - name: "evidence_type"
-      description: "Classification of evidence (document, report, certification, audit)"
-      type: "string"
-      default: "document"
-      required: false
-      validation:
-        enum: ["document", "report", "certification", "audit", "screenshot"]
-      example: "audit"
-
-    - name: "approval_id"
-      description: "ID of the approval process this evidence supports"
-      type: "string"
-      default: ""
-      required: false
-      example: "APR-2024-001"
-
+  - name: evidence_type
+    description: Classification of evidence (document, report, certification, audit)
+    type: string
+    default: document
+    required: false
+    validation:
+      enum:
+      - document
+      - report
+      - certification
+      - audit
+      - screenshot
+    example: audit
+  - name: approval_id
+    description: ID of the approval process this evidence supports
+    type: string
+    default: ''
+    required: false
+    example: APR-2024-001
   state:
-    - name: "evidence_provided"
-      description: "Whether evidence has been generated and sent"
-      type: "bool"
-      persistent: true
-      example: true
-
-    - name: "evidence_type"
-      description: "Type of evidence provided"
-      type: "string"
-      persistent: true
-      example: "audit"
-
-    - name: "approval_id"
-      description: "Associated approval process ID"
-      type: "string"
-      persistent: true
-      example: "APR-2024-001"
-
-    - name: "evidence_provided_at"
-      description: "Timestamp when evidence was generated"
-      type: "string"
-      persistent: true
-
-    - name: "total_processed"
-      description: "Count of evidence packets generated"
-      type: "int"
-      persistent: true
-      example: 1
-
+  - name: evidence_provided
+    description: Whether evidence has been generated and sent
+    type: bool
+    persistent: true
+    example: true
+  - name: evidence_type
+    description: Type of evidence provided
+    type: string
+    persistent: true
+    example: audit
+  - name: approval_id
+    description: Associated approval process ID
+    type: string
+    persistent: true
+    example: APR-2024-001
+  - name: evidence_provided_at
+    description: Timestamp when evidence was generated
+    type: string
+    persistent: true
+  - name: total_processed
+    description: Count of evidence packets generated
+    type: int
+    persistent: true
+    example: 1
   connectivity:
     inputs: []
-
     outputs:
-      - name: "evidence_data"
-        type: "want"
-        description: "ApprovalData containing evidence for approval coordinator"
-        multiple: true
-
+    - name: evidence_data
+      type: want
+      description: ApprovalData containing evidence for approval coordinator
+      multiple: true
   agents: []
-
   constraints:
-    - description: "Evidence type must be valid"
-      validation: "evidence_type in [document, report, certification, audit, screenshot]"
-
-    - description: "Evidence must be provided exactly once per cycle"
-      validation: "evidence_provided flag prevents duplication"
-
+  - description: Evidence type must be valid
+    validation: evidence_type in [document, report, certification, audit, screenshot]
+  - description: Evidence must be provided exactly once per cycle
+    validation: evidence_provided flag prevents duplication
   examples:
-    - name: "Audit Evidence"
-      description: "Provide audit report as evidence for approval"
-      params:
-        evidence_type: "audit"
-        approval_id: "APR-2024-001"
-      expectedBehavior: |
-        1. Evidence want generates audit report evidence
-        2. Creates ApprovalData with evidence details
-        3. Broadcasts to all output channels
-        4. Sends to approval coordinator
-        5. Flags evidence as provided to prevent re-sending
-      connectedTo: ["description", "coordinator"]
+  - name: Audit Evidence
+    description: Provide audit report as evidence for approval
+    params:
+      evidence_type: audit
+      approval_id: APR-2024-001
+    expectedBehavior: '1. Evidence want generates audit report evidence
 
-    - name: "Document Evidence"
-      description: "Provide supporting document evidence"
-      params:
-        evidence_type: "document"
-        approval_id: "REQ-2024-042"
-      expectedBehavior: |
-        1. Evidence wants generates document evidence
-        2. Sends alongside description want
-        3. Provides supporting documentation
-        4. Marked as provided in state
-      connectedTo: ["description", "coordinator"]
+      2. Creates ApprovalData with evidence details
 
-    - name: "Certification Evidence"
-      description: "Provide certification as approval evidence"
-      params:
-        evidence_type: "certification"
-        approval_id: "CERT-2024-X"
-      expectedBehavior: |
-        1. Evidence generates certification evidence
-        2. Works with description to provide complete context
-        3. Supports multi-level approval workflow
-        4. Persists evidence timestamp in state
-      connectedTo: ["description", "coordinator"]
+      3. Broadcasts to all output channels
 
+      4. Sends to approval coordinator
+
+      5. Flags evidence as provided to prevent re-sending
+
+      '
+    connectedTo:
+    - description
+    - coordinator
+  - name: Document Evidence
+    description: Provide supporting document evidence
+    params:
+      evidence_type: document
+      approval_id: REQ-2024-042
+    expectedBehavior: '1. Evidence wants generates document evidence
+
+      2. Sends alongside description want
+
+      3. Provides supporting documentation
+
+      4. Marked as provided in state
+
+      '
+    connectedTo:
+    - description
+    - coordinator
+  - name: Certification Evidence
+    description: Provide certification as approval evidence
+    params:
+      evidence_type: certification
+      approval_id: CERT-2024-X
+    expectedBehavior: '1. Evidence generates certification evidence
+
+      2. Works with description to provide complete context
+
+      3. Supports multi-level approval workflow
+
+      4. Persists evidence timestamp in state
+
+      '
+    connectedTo:
+    - description
+    - coordinator
   relatedTypes:
-    - "description"
-    - "coordinator"
-
+  - description
+  - coordinator
   seeAlso:
-    - "Approval process documentation"
-    - "Evidence trail and audit compliance"
-    - "Multi-level coordinator system"
+  - Approval process documentation
+  - Evidence trail and audit compliance
+  - Multi-level coordinator system
+require: users

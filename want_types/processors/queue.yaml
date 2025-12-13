@@ -126,3 +126,4 @@ wantType:
       min: 1
     users:
       min: 1
+require: providers_and_users

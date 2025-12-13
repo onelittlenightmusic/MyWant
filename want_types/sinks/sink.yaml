@@ -228,3 +228,4 @@ wantType:
       min: 1
     users:
       min: 0
+require: providers

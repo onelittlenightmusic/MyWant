@@ -191,8 +191,67 @@ type ConnectivityMetadata struct {
 	Description     string
 }
 
+// RequirePolicy defines connectivity requirements as an enum
+type RequirePolicy string
+
+const (
+	RequireNone               RequirePolicy = "none"                // No connectivity requirements (default)
+	RequireProviders          RequirePolicy = "providers"           // Must have input connections
+	RequireUsers              RequirePolicy = "users"               // Must have output connections
+	RequireProvidersAndUsers  RequirePolicy = "providers_and_users" // Must have both input and output
+)
+
+// ToConnectivityMetadata converts RequirePolicy to ConnectivityMetadata
+func (r RequirePolicy) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
+	switch r {
+	case RequireProviders:
+		// Input required, output optional
+		return ConnectivityMetadata{
+			RequiredInputs:  1,
+			MaxInputs:       -1,
+			RequiredOutputs: 0,
+			MaxOutputs:      -1,
+			WantType:        wantType,
+			Description:     "Requires input connections",
+		}
+	case RequireUsers:
+		// Output required, input optional
+		return ConnectivityMetadata{
+			RequiredInputs:  0,
+			MaxInputs:       -1,
+			RequiredOutputs: 1,
+			MaxOutputs:      -1,
+			WantType:        wantType,
+			Description:     "Requires output connections",
+		}
+	case RequireProvidersAndUsers:
+		// Both input and output required
+		return ConnectivityMetadata{
+			RequiredInputs:  1,
+			MaxInputs:       -1,
+			RequiredOutputs: 1,
+			MaxOutputs:      -1,
+			WantType:        wantType,
+			Description:     "Requires both input and output connections",
+		}
+	case RequireNone:
+		fallthrough
+	default:
+		// No requirements
+		return ConnectivityMetadata{
+			RequiredInputs:  0,
+			MaxInputs:       -1,
+			RequiredOutputs: 0,
+			MaxOutputs:      -1,
+			WantType:        wantType,
+			Description:     "No connectivity requirements",
+		}
+	}
+}
+
 // UsageLimitSpec defines want usage limits in YAML format
 // Providers = input connections, Users = output connections
+// Deprecated: Use require field instead
 type UsageLimitSpec struct {
 	Providers struct {
 		Min int `json:"min" yaml:"min"`
