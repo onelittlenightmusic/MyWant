@@ -36,7 +36,7 @@ type EvidenceWant struct {
 }
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &EvidenceWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &EvidenceWantLocals{} },
@@ -49,13 +49,7 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Evidence provider for approval processes",
 		},
 		"evidence",
-	)
-
-	locals := want.Locals.(*EvidenceWantLocals)
-	locals.EvidenceType = want.GetStringParam("evidence_type", "document")
-	locals.ApprovalID = want.GetStringParam("approval_id", "")
-
-	return &EvidenceWant{*want}
+	)}
 }
 
 func (e *EvidenceWant) Exec() bool {
@@ -113,7 +107,7 @@ type DescriptionWant struct {
 }
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &DescriptionWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &DescriptionWantLocals{} },
@@ -126,13 +120,7 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Description provider for approval processes",
 		},
 		"description",
-	)
-
-	locals := want.Locals.(*DescriptionWantLocals)
-	locals.DescriptionFormat = want.GetStringParam("description_format", "Request for approval: %s")
-	locals.ApprovalID = want.GetStringParam("approval_id", "")
-
-	return &DescriptionWant{*want}
+	)}
 }
 
 func (d *DescriptionWant) Exec() bool {
@@ -190,23 +178,25 @@ type Level1CoordinatorWant struct {
 
 // Deprecated: Use NewCoordinatorWant with coordinator_level=1 parameter instead
 func NewLevel1CoordinatorWant(metadata Metadata, spec WantSpec) interface{} {
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return nil },
+		ConnectivityMetadata{
+			RequiredInputs:  2,
+			RequiredOutputs: 0,
+			MaxInputs:       2,
+			MaxOutputs:      1,
+			WantType:        "level1_coordinator",
+			Description:     "Level 1 approval coordinator",
+		},
+		"level1_coordinator",
+	)
+
 	coordinator := &Level1CoordinatorWant{
-		Want:            Want{},
-		CoordinatorType: "level1",
-	}
-	coordinator.Init(metadata, spec)
-
-	coordinator.ApprovalID = coordinator.GetStringParam("approval_id", "")
-
-	coordinator.CoordinatorType = coordinator.GetStringParam("coordinator_type", "level1")
-	coordinator.WantType = "level1_coordinator"
-	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  2,
-		RequiredOutputs: 0,
-		MaxInputs:       2,
-		MaxOutputs:      1,
-		WantType:        "level1_coordinator",
-		Description:     "Level 1 approval coordinator",
+		Want:            *want,
+		CoordinatorType: want.GetStringParam("coordinator_type", "level1"),
+		ApprovalID:      want.GetStringParam("approval_id", ""),
 	}
 
 	return coordinator

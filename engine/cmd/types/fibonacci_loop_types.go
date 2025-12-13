@@ -24,7 +24,7 @@ type SeedNumbers struct {
 
 // NewSeedNumbers creates a new seed numbers want
 func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &SeedNumbers{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &SeedNumbersLocals{} },
@@ -37,12 +37,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci seed generator",
 		},
 		"seed numbers",
-	)
-
-	locals := want.Locals.(*SeedNumbersLocals)
-	locals.MaxCount = want.GetIntParam("max_count", 15)
-
-	return &SeedNumbers{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
@@ -79,7 +74,7 @@ type FibonacciComputer struct {
 
 // NewFibonacciComputer creates a new fibonacci computer want
 func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &FibonacciComputer{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &FibonacciComputerLocals{} },
@@ -92,18 +87,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number computer",
 		},
 		"fibonacci computer",
-	)
-
-	// Initialize locals with default values
-	locals := want.Locals.(*FibonacciComputerLocals)
-	locals.prev = 0
-	locals.current = 0
-	locals.position = 0
-	locals.maxCount = 15
-	locals.processed = 0
-	locals.initialized = false
-
-	return &FibonacciComputer{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
@@ -190,7 +174,7 @@ type FibonacciMerger struct {
 
 // NewFibonacciMerger creates a new fibonacci merger want
 func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &FibonacciMerger{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &FibonacciMergerLocals{} },
@@ -203,16 +187,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci merger",
 		},
 		"fibonacci merger",
-	)
-
-	// Initialize locals with default values
-	locals := want.Locals.(*FibonacciMergerLocals)
-	locals.seedUsingClosed = false
-	locals.computedUsingClosed = false
-	locals.processed = 0
-	locals.maxCountReceived = false
-
-	return &FibonacciMerger{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the fibonacci merger

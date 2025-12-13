@@ -176,7 +176,7 @@ test-concurrent-deploy:
 	@echo "  3. Deploy Fibonacci configuration concurrently"
 	@echo "  4. Monitor for goroutine issues or concurrent map access errors"
 	@echo ""
-	go run test_concurrent_deploy.go
+	go run test/test_concurrent_deploy.go
 	@echo ""
 	@echo "✅ Concurrent deployment test completed!"
 
@@ -196,7 +196,7 @@ test-llm-api:
 	@echo ""
 	@echo "🔌 Testing LLM API with simple query..."
 	@echo ""
-	python3 test_llm_api.py
+	python3 test/test_llm_api.py
 	@echo ""
 	@echo "✅ LLM inference API test completed!"
 
@@ -218,7 +218,7 @@ test-recipe-api:
 	@echo ""
 	@echo "🔌 Running recipe API tests..."
 	@echo ""
-	go run test_recipe_api.go
+	go run test/test_recipe_api.go
 	@echo ""
 	@echo "✅ Recipe API test completed!"
 
@@ -281,7 +281,7 @@ test-all: restart-all
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "3️⃣  Running test-recipe-api..."
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@if go run test_recipe_api.go; then \
+	@if go run test/test_recipe_api.go; then \
 		echo "✅ test-recipe-api PASSED"; \
 	else \
 		echo "❌ test-recipe-api FAILED"; \

@@ -72,7 +72,7 @@ type FibonacciFilter struct {
 
 // NewFibonacciFilter creates a new fibonacci filter want
 func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWantWithLocals(
+	return &FibonacciFilter{*NewWantWithLocals(
 		metadata,
 		spec,
 		&FibonacciFilterLocals{
@@ -87,9 +87,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Fibonacci number filter (terminal)",
 		},
 		"fibonacci filter",
-	)
-
-	return &FibonacciFilter{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the filter

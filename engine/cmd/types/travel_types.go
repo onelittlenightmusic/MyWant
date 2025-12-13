@@ -57,7 +57,7 @@ type RestaurantWant struct {
 
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &RestaurantWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &RestaurantWantLocals{} },
@@ -70,13 +70,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Restaurant reservation scheduling want",
 		},
 		"restaurant",
-	)
-
-	locals := want.Locals.(*RestaurantWantLocals)
-	locals.RestaurantType = want.GetStringParam("restaurant_type", "casual")
-	locals.Duration = time.Duration(want.GetFloatParam("duration_hours", 2.0) * float64(time.Hour))
-
-	return &RestaurantWant{*want}
+	)}
 }
 
 // Exec creates a restaurant reservation
@@ -182,6 +176,7 @@ func (r *RestaurantWant) Exec() bool {
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
+		"finalResult":                newEvent.Name,
 	})
 	if connectionAvailable {
 		// Use SendPacketMulti to send with retrigger logic for achieved receivers
@@ -406,7 +401,7 @@ type HotelWant struct {
 
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &HotelWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &HotelWantLocals{} },
@@ -419,14 +414,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Hotel reservation scheduling want",
 		},
 		"hotel",
-	)
-
-	locals := want.Locals.(*HotelWantLocals)
-	locals.HotelType = want.GetStringParam("hotel_type", "standard")
-	locals.CheckIn = 22 * time.Hour
-	locals.CheckOut = 8 * time.Hour
-
-	return &HotelWant{*want}
+	)}
 }
 
 func (h *HotelWant) Exec() bool {
@@ -597,7 +585,7 @@ type BuffetWant struct {
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &BuffetWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &BuffetWantLocals{} },
@@ -610,13 +598,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Breakfast buffet scheduling want",
 		},
 		"buffet",
-	)
-
-	locals := want.Locals.(*BuffetWantLocals)
-	locals.BuffetType = want.GetStringParam("buffet_type", "continental")
-	locals.Duration = 1*time.Hour + 30*time.Minute
-
-	return &BuffetWant{*want}
+	)}
 }
 
 func (b *BuffetWant) Exec() bool {

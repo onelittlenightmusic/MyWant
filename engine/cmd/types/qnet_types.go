@@ -77,7 +77,7 @@ type Numbers struct {
 
 // PacketNumbers creates a new numbers want
 func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	want := mywant.NewWant(
+	return &Numbers{*mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &NumbersLocals{} },
@@ -90,17 +90,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Packet generator want",
 		},
 		"sequence",
-	)
-
-	locals := want.Locals.(*NumbersLocals)
-	locals.Rate = want.GetFloatParam("rate", 1.0)
-	locals.Count = want.GetIntParam("count", 100)
-	locals.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
-	locals.cycleCount = 0
-	locals.currentTime = 0.0
-	locals.currentCount = 0
-
-	return &Numbers{*want}
+	)}
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
@@ -183,7 +173,7 @@ type Queue struct {
 
 // NewQueue creates a new queue want
 func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	want := mywant.NewWant(
+	return &Queue{*mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &QueueLocals{} },
@@ -196,18 +186,7 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Queue processing want",
 		},
 		"queue",
-	)
-
-	locals := want.Locals.(*QueueLocals)
-	locals.ServiceTime = want.GetFloatParam("service_time", 1.0)
-	locals.batchUpdateInterval = want.GetIntParam("batch_interval", 100)
-	locals.lastBatchCount = 0
-	locals.cycleCount = 0
-	locals.serverFreeTime = 0.0
-	locals.waitTimeSum = 0.0
-	locals.processedCount = 0
-
-	return &Queue{*want}
+	)}
 }
 
 // Exec executes the queue processing directly with batch mechanism
@@ -334,7 +313,7 @@ type Combiner struct {
 }
 
 func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
-	want := mywant.NewWant(
+	return &Combiner{*mywant.NewWant(
 		metadata,
 		spec,
 		func() mywant.WantLocals { return &CombinerLocals{} },
@@ -347,12 +326,7 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 			Description:     "Stream combiner want",
 		},
 		"combiner",
-	)
-
-	locals := want.Locals.(*CombinerLocals)
-	locals.Operation = want.GetStringParam("operation", "merge")
-
-	return &Combiner{*want}
+	)}
 }
 
 // Exec executes the combiner directly

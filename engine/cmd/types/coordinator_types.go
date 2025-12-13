@@ -38,28 +38,33 @@ func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
 ) interface{} {
-	coordinator := &CoordinatorWant{
-		Want: Want{},
-	}
-	coordinator.Init(metadata, spec)
+	coordinatorType := metadata.Type
+
+	want := NewWant(
+		metadata,
+		spec,
+		func() WantLocals { return nil },
+		ConnectivityMetadata{
+			RequiredInputs:  -1,  // Unified: accept any number of inputs
+			RequiredOutputs: 0,
+			MaxInputs:       -1,  // No maximum
+			MaxOutputs:      0,
+			WantType:        coordinatorType,
+			Description:     fmt.Sprintf("Generic coordinator want (%s)", coordinatorType),
+		},
+		coordinatorType,
+	)
 
 	// Determine coordinator configuration based on want type
-	coordinatorType := metadata.Type
-	requiredInputs, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, &coordinator.Want)
+	requiredInputs, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, want)
 
-	coordinator.RequiredInputCount = requiredInputs
-	coordinator.DataHandler = dataHandler
-	coordinator.CompletionChecker = completionChecker
-	coordinator.CoordinatorType = coordinatorType
-	coordinator.channelsHeard = make(map[int]bool)
-	coordinator.WantType = coordinatorType
-	coordinator.ConnectivityMetadata = ConnectivityMetadata{
-		RequiredInputs:  -1,  // Unified: accept any number of inputs
-		RequiredOutputs: 0,
-		MaxInputs:       -1,  // No maximum
-		MaxOutputs:      0,
-		WantType:        coordinatorType,
-		Description:     fmt.Sprintf("Generic coordinator want (%s)", coordinatorType),
+	coordinator := &CoordinatorWant{
+		Want:                *want,
+		RequiredInputCount:  requiredInputs,
+		DataHandler:         dataHandler,
+		CompletionChecker:   completionChecker,
+		CoordinatorType:     coordinatorType,
+		channelsHeard:       make(map[int]bool),
 	}
 
 	return coordinator

@@ -17,7 +17,7 @@ type PrimeNumbers struct {
 
 // NewPrimeNumbers creates a new prime numbers want
 func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &PrimeNumbers{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &PrimeNumbersLocals{} },
@@ -30,13 +30,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number generator",
 		},
 		"prime numbers",
-	)
-
-	locals := want.Locals.(*PrimeNumbersLocals)
-	locals.Start = want.GetIntParam("start", 2)
-	locals.End = want.GetIntParam("end", 100)
-
-	return &PrimeNumbers{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the numbers generator
@@ -74,10 +68,12 @@ type PrimeSequence struct {
 
 // NewPrimeSequence creates a new prime sequence want
 func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &PrimeSequence{*NewWantWithLocals(
 		metadata,
 		spec,
-		func() WantLocals { return &PrimeSequenceLocals{} },
+		&PrimeSequenceLocals{
+			foundPrimes: make([]int, 0),
+		},
 		ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -87,13 +83,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Prime number sequence",
 		},
 		"prime sequence",
-	)
-
-	locals := want.Locals.(*PrimeSequenceLocals)
-	locals.Prime = want.GetIntParam("prime", 2)
-	locals.foundPrimes = make([]int, 0)
-
-	return &PrimeSequence{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the filter

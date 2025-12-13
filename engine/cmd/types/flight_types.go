@@ -25,7 +25,7 @@ type FlightWant struct {
 
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
-	want := NewWant(
+	return &FlightWant{*NewWant(
 		metadata,
 		spec,
 		func() WantLocals { return &FlightWantLocals{} },
@@ -38,17 +38,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) interface{} {
 			Description:     "Flight booking scheduling want",
 		},
 		"flight",
-	)
-
-	// Initialize Locals after want is created
-	locals := want.Locals.(*FlightWantLocals)
-	locals.FlightType = want.GetStringParam("flight_type", "economy")
-	locals.Duration = time.Duration(want.GetFloatParam("duration_hours", 12.0) * float64(time.Hour))
-	locals.DepartureDate = want.GetStringParam("departure_date", "2024-01-01")
-	locals.monitoringActive = false
-	locals.monitoringDuration = 30 * time.Second
-
-	return &FlightWant{*want}
+	)}
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
