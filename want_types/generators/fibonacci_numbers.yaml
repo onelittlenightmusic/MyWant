@@ -117,4 +117,4 @@ wantType:
   - Generator pattern documentation
   - Pipeline architecture for data processing
   - Fibonacci sequence mathematical background
-require: users
+  require: users

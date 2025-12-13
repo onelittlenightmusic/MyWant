@@ -7,7 +7,6 @@ wantType:
 
       class options (economy, business, first), departure dates, and durations.
 
-
       This independent want monitors flight status for potential delays and
 
       supports automatic rebooking if flights are delayed. Integrates with
@@ -189,9 +188,4 @@ wantType:
   - Flight booking API integration
   - Delay monitoring and auto-rebooking
   - Travel coordinator flight integration
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

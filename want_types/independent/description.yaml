@@ -9,7 +9,6 @@ wantType:
 
       that accompany evidence data through the approval workflow.
 
-
       Works alongside evidence want to provide complete context for approval
 
       coordinators making decisions on requests.
@@ -18,10 +17,6 @@ wantType:
     version: '1.0'
     category: approval
     pattern: independent
-  usageLimit:
-    users:
-      min: 1
-    description: Description generator with no input requirements
   parameters:
   - name: description_format
     description: Template string for formatting description (supports %s substitution)
@@ -138,4 +133,4 @@ wantType:
   - Approval request formatting
   - Multi-level approval workflows
   - Description-evidence pairing patterns
-require: users
+  require: users

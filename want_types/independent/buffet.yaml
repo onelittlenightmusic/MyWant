@@ -9,7 +9,6 @@ wantType:
 
       Typically scheduled for morning hours (8-10 AM) on the day after hotel arrival.
 
-
       This independent want operates in parallel with restaurant and hotel components,
 
       and coordinates with travel_coordinator to resolve any timing conflicts across
@@ -204,9 +203,4 @@ wantType:
   - Travel Itinerary recipe documentation
   - Independent wants pattern for parallel execution
   - Travel coordinator for schedule integration
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

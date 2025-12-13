@@ -8,7 +8,6 @@ wantType:
 
       using closure/closure pattern for recursive computation.
 
-
       Implements the iterative computation phase of the fibonacci_loop pattern
 
       where computation continues until the specified maximum count is reached.
@@ -98,11 +97,4 @@ wantType:
   - Fibonacci closure pattern
   - Iterative loop computation
   - Feedback-based processing
-  usageLimit:
-    providers:
-      min: 1
-      max: 1
-    users:
-      min: 1
-      max: -1
-require: providers_and_users
+  require: providers_and_users

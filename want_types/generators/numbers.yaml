@@ -83,4 +83,4 @@ wantType:
   seeAlso:
   - queue-system recipe
   - qnet-pipeline recipe
-require: users
+  require: users

@@ -9,7 +9,6 @@ wantType:
 
       callbacks for final statistics and reporting.
 
-
       This is an alternative name for the sink want type, commonly used in
 
       queueing contexts to emphasize its data collection role.
@@ -114,9 +113,4 @@ wantType:
   - Queue system pipeline documentation
   - Sink vs Collector naming convention
   - Packet collection and statistics
-  usageLimit:
-    providers:
-      min: 1
-    users:
-      min: 0
-require: providers
+  require: providers

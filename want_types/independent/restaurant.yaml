@@ -217,9 +217,4 @@ wantType:
   - travel domain agents
   - AgentRestaurant implementation
   - MonitorRestaurant implementation
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

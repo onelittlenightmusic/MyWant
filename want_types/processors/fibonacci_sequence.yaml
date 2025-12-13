@@ -8,7 +8,6 @@ wantType:
 
       within the specified min_value and max_value range.
 
-
       This is a terminal processor (sink) that consumes input from a generator
 
       and accumulates results without producing further output. Useful for
@@ -148,9 +147,4 @@ wantType:
   - Sink pattern documentation for terminal processors
   - Pipeline filtering patterns
   - Fibonacci mathematical properties and applications
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: providers_and_users
+  require: providers_and_users

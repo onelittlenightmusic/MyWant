@@ -223,9 +223,4 @@ wantType:
   - queue-system recipe
   - qnet-pipeline recipe
   - Pipeline pattern documentation
-  usageLimit:
-    providers:
-      min: 1
-    users:
-      min: 0
-require: providers
+  require: providers

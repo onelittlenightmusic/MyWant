@@ -9,7 +9,6 @@ wantType:
 
       timing and supports agent-based booking for persistent state management.
 
-
       This independent want operates in parallel with other travel components
 
       (restaurant, buffet) and outputs scheduling conflicts to be resolved by
@@ -201,9 +200,4 @@ wantType:
   - Travel Itinerary recipe documentation
   - Travel coordinator pattern for independent wants
   - Agent system documentation for hotel booking
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

@@ -8,7 +8,6 @@ wantType:
 
       results from loop-based computation.
 
-
       Can accumulate numbers for statistical analysis or serve as collection
 
       point for the iterative Fibonacci computation pipeline.
@@ -114,10 +113,3 @@ wantType:
   seeAlso:
   - Fibonacci loop aggregation
   - Sequence collection and statistics
-  usageLimit:
-    providers:
-      min: 2
-      max: 2
-    users:
-      min: 1
-      max: 1

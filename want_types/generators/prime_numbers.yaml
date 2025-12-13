@@ -9,7 +9,6 @@ wantType:
 
       numbers are actually prime.
 
-
       This is a pure generator (no inputs) that produces integer output values
 
       sequentially. The actual primality testing is delegated to downstream
@@ -142,9 +141,4 @@ wantType:
   - Sieve of Eratosthenes algorithm documentation
   - Generator pattern for data production
   - Prime number mathematical properties
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

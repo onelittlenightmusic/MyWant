@@ -9,7 +9,6 @@ wantType:
 
       and collect only primes.
 
-
       This sink accumulates prime numbers and computes final statistics on
 
       the sieve output, useful for analyzing prime distribution and
@@ -133,9 +132,4 @@ wantType:
   - Sieve of Eratosthenes algorithm
   - Prime number mathematics
   - Pipeline sink statistics collection
-  usageLimit:
-    providers:
-      min: 1
-    users:
-      min: 0
-require: providers
+  require: providers

@@ -8,7 +8,6 @@ wantType:
 
       approval decisions, working alongside description wants.
 
-
       This is a generator that produces ApprovalData containing evidence
 
       information, supporting complex approval workflows with evidence trails.
@@ -17,10 +16,6 @@ wantType:
     version: '1.0'
     category: approval
     pattern: independent
-  usageLimit:
-    users:
-      min: 1
-    description: Evidence generator with no input requirements
   parameters:
   - name: evidence_type
     description: Classification of evidence (document, report, certification, audit)
@@ -140,4 +135,4 @@ wantType:
   - Approval process documentation
   - Evidence trail and audit compliance
   - Multi-level coordinator system
-require: users
+  require: users

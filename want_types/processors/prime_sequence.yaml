@@ -9,7 +9,6 @@ wantType:
 
       the prime numbers, using previously found primes for efficient checking.
 
-
       This is a key component in prime-finding pipelines, connecting number
 
       generators to prime collectors/sinks.
@@ -141,9 +140,4 @@ wantType:
   - Sieve of Eratosthenes algorithm
   - Prime identification patterns
   - Memoization in sieves
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: providers_and_users
+  require: providers_and_users

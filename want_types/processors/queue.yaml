@@ -121,9 +121,4 @@ wantType:
   - queue-system recipe
   - qnet-pipeline recipe
   - qnet-using recipe
-  usageLimit:
-    providers:
-      min: 1
-    users:
-      min: 1
-require: providers_and_users
+  require: providers_and_users

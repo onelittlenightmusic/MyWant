@@ -7,7 +7,6 @@ wantType:
 
       type but optimized for fast rebooking scenarios and alternative routing.
 
-
       Used as a fallback option when primary flights are delayed or cancelled,
 
       providing rapid rerouting capability to maintain travel schedules.
@@ -119,9 +118,4 @@ wantType:
   - Alternative flight routing
   - Rebooking strategies
   - Fallback flight options
-  usageLimit:
-    providers:
-      min: 0
-    users:
-      min: 1
-require: users
+  require: users

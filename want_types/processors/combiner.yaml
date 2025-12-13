@@ -9,7 +9,6 @@ wantType:
 
       implementing various combination strategies (merge, interleave, etc).
 
-
       Used in complex queueing systems where multiple data sources need to be
 
       unified into a single pipeline for further processing.
@@ -126,11 +125,4 @@ wantType:
   - Queue processor documentation
   - Stream combination patterns
   - Multi-input processor coordination
-  usageLimit:
-    providers:
-      min: 2
-      max: 2
-    users:
-      min: 1
-      max: 1
-require: providers_and_users
+  require: providers_and_users
