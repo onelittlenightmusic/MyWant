@@ -191,4 +191,36 @@ type ConnectivityMetadata struct {
 	Description     string
 }
 
+// UsageLimitSpec defines want usage limits in YAML format
+// Providers = input connections, Users = output connections
+type UsageLimitSpec struct {
+	Providers struct {
+		Min int `json:"min" yaml:"min"`
+		Max int `json:"max" yaml:"max"`
+	} `json:"providers" yaml:"providers"`
+	Users struct {
+		Min int `json:"min" yaml:"min"`
+		Max int `json:"max" yaml:"max"`
+	} `json:"users" yaml:"users"`
+	Description string `json:"description" yaml:"description"`
+}
+
+// ToConnectivityMetadata converts UsageLimitSpec to ConnectivityMetadata
+func (u *UsageLimitSpec) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
+	if u == nil {
+		return ConnectivityMetadata{
+			WantType:    wantType,
+			Description: "",
+		}
+	}
+	return ConnectivityMetadata{
+		RequiredInputs:  u.Providers.Min,
+		MaxInputs:       u.Providers.Max,
+		RequiredOutputs: u.Users.Min,
+		MaxOutputs:      u.Users.Max,
+		WantType:        wantType,
+		Description:     u.Description,
+	}
+}
+
 // ChangeEventType represents the type of change detected

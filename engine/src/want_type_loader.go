@@ -16,6 +16,7 @@ type WantTypeDefinition struct {
 	Parameters    []ParameterDef    `json:"parameters" yaml:"parameters"`
 	State         []StateDef        `json:"state" yaml:"state"`
 	Connectivity  ConnectivityDef   `json:"connectivity" yaml:"connectivity"`
+	UsageLimit    *UsageLimitSpec   `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`
 	Agents        []AgentDef        `json:"agents" yaml:"agents"`
 	Constraints   []ConstraintDef   `json:"constraints" yaml:"constraints"`
 	Examples      []ExampleDef      `json:"examples" yaml:"examples"`
@@ -390,4 +391,39 @@ func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[str
 	}
 
 	return nil
+}
+
+// LoadWantTypeDefinition loads a single want type definition from a YAML file
+func LoadWantTypeDefinition(yamlPath string) (*WantTypeDefinition, error) {
+	content, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %w", yamlPath, err)
+	}
+
+	// Parse the YAML structure
+	var data map[string]interface{}
+	err = yaml.Unmarshal(content, &data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse YAML from %s: %w", yamlPath, err)
+	}
+
+	// Extract wantType root element
+	wantTypeData, exists := data["wantType"]
+	if !exists {
+		return nil, fmt.Errorf("missing 'wantType' root element in %s", yamlPath)
+	}
+
+	// Convert to JSON and back to properly unmarshal into struct
+	jsonBytes, err := yaml.Marshal(wantTypeData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert YAML to JSON in %s: %w", yamlPath, err)
+	}
+
+	var def WantTypeDefinition
+	err = yaml.Unmarshal(jsonBytes, &def)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal want type definition from %s: %w", yamlPath, err)
+	}
+
+	return &def, nil
 }

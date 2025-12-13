@@ -46,14 +46,15 @@ type ChangeEvent struct {
 
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop
 type ChainBuilder struct {
-	configPath     string                    // Path to original config file
-	memoryPath     string                    // Path to memory file (watched for changes)
-	wants          map[string]*runtimeWant   // Runtime want registry
-	registry       map[string]WantFactory    // Want type factories
-	customRegistry *CustomTargetTypeRegistry // Custom target type registry
-	agentRegistry  *AgentRegistry            // Agent registry for agent-enabled wants
-	waitGroup      *sync.WaitGroup           // Execution synchronization
-	config         Config                    // Current configuration
+	configPath               string                    // Path to original config file
+	memoryPath               string                    // Path to memory file (watched for changes)
+	wants                    map[string]*runtimeWant   // Runtime want registry
+	registry                 map[string]WantFactory    // Want type factories
+	connectivityRegistry     map[string]ConnectivityMetadata // Want type connectivity metadata from YAML
+	customRegistry           *CustomTargetTypeRegistry // Custom target type registry
+	agentRegistry            *AgentRegistry            // Agent registry for agent-enabled wants
+	waitGroup                *sync.WaitGroup           // Execution synchronization
+	config                   Config                    // Current configuration
 
 	// Reconcile loop fields
 	reconcileStop    chan bool              // Stop signal for reconcile loop
@@ -154,6 +155,31 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
 	cb.registry[wantType] = factory
 }
+
+// RegisterWantTypeFromYAML registers a want type and loads connectivity metadata from YAML
+func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFactory, yamlDefPath string) error {
+	// Load YAML definition
+	def, err := LoadWantTypeDefinition(yamlDefPath)
+	if err != nil {
+		return fmt.Errorf("failed to load want type definition from %s: %w", yamlDefPath, err)
+	}
+
+	// Register the factory
+	cb.registry[wantType] = factory
+
+	// Store connectivity metadata for later use during want creation
+	if cb.connectivityRegistry == nil {
+		cb.connectivityRegistry = make(map[string]ConnectivityMetadata)
+	}
+
+	// Convert UsageLimit to ConnectivityMetadata
+	if def.UsageLimit != nil {
+		cb.connectivityRegistry[wantType] = def.UsageLimit.ToConnectivityMetadata(wantType)
+	}
+
+	return nil
+}
+
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
