@@ -275,31 +275,19 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 		"total_processed":             1,
 		"evidence_provider_complete":  true,
 		"description_provider_complete": true,
+		"approval_level":              h.Level,
+		"approval_status":             "approved",
+		"approval_time":               time.Now().Format(time.RFC3339),
 	}
-	levelKey := "approval_level"
-	approverIDKey := "approver_id"
-	commentsKey := "comments"
-	statusKey := "approval_status"
-	timeKey := "approval_time"
 
 	if h.Level == 2 {
-		levelKey = "approval_level"
-		statusKey = "final_approval_status"
-		approverIDKey = "approver_id"
-		commentsKey = "comments"
-		timeKey = "approval_time"
-
 		stateUpdates["level2_authority"] = level2Authority
-		stateUpdates[approverIDKey] = level2Authority
-		stateUpdates[commentsKey] = "Level 2 final approval granted"
+		stateUpdates["approver_id"] = level2Authority
+		stateUpdates["comments"] = "Level 2 final approval granted"
 	} else {
-		stateUpdates[approverIDKey] = "level1-manager"
-		stateUpdates[commentsKey] = "Level 1 approval granted"
+		stateUpdates["approver_id"] = "level1-manager"
+		stateUpdates["comments"] = "Level 1 approval granted"
 	}
-
-	stateUpdates[levelKey] = h.Level
-	stateUpdates[statusKey] = "approved"
-	stateUpdates[timeKey] = time.Now().Format(time.RFC3339)
 
 	return stateUpdates
 }
@@ -330,23 +318,15 @@ func (c *ApprovalCompletionChecker) IsComplete(want *CoordinatorWant, requiredIn
 
 func (c *ApprovalCompletionChecker) OnCompletion(want *CoordinatorWant) {
 	approvalID := want.GetStringParam("approval_id", "")
-	statusKey := "approval_status"
-	if c.Level == 2 {
-		statusKey = "final_approval_status"
-	}
 
-	statusVal, _ := want.GetState(statusKey)
+	statusVal, _ := want.GetState("approval_status")
 	status := "approved"
 	if statusVal != nil {
 		status = fmt.Sprintf("%v", statusVal)
 	}
 
-	approverID := want.GetStringParam("level2_authority", "level1-manager")
-	if c.Level == 1 {
-		approverID = "level1-manager"
-	}
-
 	approverVal, _ := want.GetState("approver_id")
+	approverID := "level1-manager"
 	if approverVal != nil {
 		approverID = fmt.Sprintf("%v", approverVal)
 	}
