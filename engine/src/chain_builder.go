@@ -1776,7 +1776,11 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.dumpWantMemoryToYAML()
 }
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
 	states := make(map[string]*Want)
+	// Log the wants found
 	for name, want := range cb.wants {
 		states[name] = want.want
 	}

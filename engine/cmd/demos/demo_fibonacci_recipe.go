@@ -38,13 +38,20 @@ func main() {
 
 	fmt.Println("🏁 Executing recipe-based fibonacci sequence...")
 	builder.Execute()
+
+	// GetAllWantStates should now include child wants created during execution
 	states := builder.GetAllWantStates()
 
-	fmt.Println("\n📊 Final Fibonacci Sequence Results:")
+	fmt.Printf("\n📊 Final Fibonacci Sequence Results (found %d wants):\n", len(states))
+	if len(states) == 0 {
+		fmt.Println("⚠️  No wants found. This may indicate a configuration issue.")
+		return
+	}
+
 	for name, state := range states {
 		if state != nil {
 			// Show stats from fibonacci filter
-			if state.Metadata.Type == "fibonacci_filter" {
+			if state.Metadata.Type == "fibonacci filter" {
 				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  🔢 Filter %s processed %v numbers\n", name, totalProcessed)
 				}
@@ -67,7 +74,7 @@ func main() {
 			}
 
 			// Show stats from fibonacci generator
-			if state.Metadata.Type == "fibonacci_numbers" {
+			if state.Metadata.Type == "fibonacci numbers" {
 				if totalProcessed, exists := state.State["total_processed"]; exists {
 					fmt.Printf("  📈 Generator %s produced %v numbers\n", name, totalProcessed)
 				}

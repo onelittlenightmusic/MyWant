@@ -94,7 +94,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 	locals.MaxValue = want.GetIntParam("max_value", 1000000)
 	locals.filtered = make([]int, 0)
 
-	return want
+	return &FibonacciFilter{*want}
 }
 
 // Exec returns the generalized chain function for the filter
