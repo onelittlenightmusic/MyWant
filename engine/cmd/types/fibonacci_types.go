@@ -74,17 +74,14 @@ type FibonacciFilter struct {
 
 // NewFibonacciFilter creates a new fibonacci filter want
 func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
-	// Create locals instance directly
-	locals := &FibonacciFilterLocals{
-		MinValue: 0,
-		MaxValue: 1000000,
-		filtered: make([]int, 0),
-	}
-
 	want := NewWantWithLocals(
 		metadata,
 		spec,
-		locals,
+		&FibonacciFilterLocals{
+			MinValue: 0,
+			MaxValue: 1000000,
+			filtered: make([]int, 0),
+		},
 		ConnectivityMetadata{
 			RequiredInputs:  1,
 			RequiredOutputs: 0,
@@ -97,6 +94,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) interface{} {
 	)
 
 	// Set parameter values from spec
+	locals := want.Locals.(*FibonacciFilterLocals)
 	locals.MinValue = want.GetIntParam("min_value", 0)
 	locals.MaxValue = want.GetIntParam("max_value", 1000000)
 
