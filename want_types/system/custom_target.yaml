@@ -135,4 +135,5 @@ wantType:
   - Custom target evaluation
   - Goal and constraint definition
   - Flexible execution criteria
-  require: {}
+  require:
+    type: none

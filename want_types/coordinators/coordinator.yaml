@@ -228,6 +228,7 @@ wantType:
   - Coordinator pattern documentation
   - Independent wants execution
   require:
+    type: providers_and_users
     providers:
     - name: data_packets
       type: want

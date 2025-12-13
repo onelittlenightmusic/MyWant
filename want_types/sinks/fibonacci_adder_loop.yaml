@@ -107,6 +107,7 @@ wantType:
   - Fibonacci loop aggregation
   - Sequence collection and statistics
   require:
+    type: providers
     providers:
     - name: fibonacci_stream
       type: want

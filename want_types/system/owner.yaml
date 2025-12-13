@@ -104,4 +104,5 @@ wantType:
   - Owner-based want lifecycle management
   - Hierarchical want organization
   - Parent-child want relationships
-  require: {}
+  require:
+    type: none
