@@ -109,8 +109,6 @@ func (g *Numbers) Exec() bool {
 		locals.batchUpdateInterval = g.GetIntParam("batch_interval", 100)
 	}
 
-	// DEBUG: Log state at start of execution
-	g.StoreLog(fmt.Sprintf("Numbers.Exec() START: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
 
 	paramRate := g.GetFloatParam("rate", locals.Rate)
 	if g.State == nil {
@@ -216,11 +214,8 @@ func (q *Queue) Exec() bool {
 
 	// Check if input channels are connected before attempting receive
 	if q.GetInCount() == 0 {
-		q.StoreLog(fmt.Sprintf("Queue.Exec() - No input channels connected (GetInCount=0)"))
 		return true  // No input channels, nothing to process
 	}
-
-	q.StoreLog(fmt.Sprintf("Queue.Exec() - Has %d input channels, trying to receive...", q.GetInCount()))
 
 	_, i, ok := q.ReceiveFromAnyInputChannel(100)  // Use 100ms timeout instead of forever
 	if !ok {
