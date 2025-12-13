@@ -4,10 +4,6 @@ import (
 	. "mywant/engine/src"
 )
 
-// FibonacciNumbersLocals holds type-specific local state for FibonacciNumbers want
-type FibonacciNumbersLocals struct {
-	Count int
-}
 
 // FibonacciNumbers generates fibonacci sequence numbers
 type FibonacciNumbers struct {
@@ -16,15 +12,12 @@ type FibonacciNumbers struct {
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
 func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
-	locals := &FibonacciNumbersLocals{}
-	want := NewWantWithLocals(
+	return &FibonacciNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
-		locals,
+		nil,
 		"fibonacci numbers",
-	)
-	locals.Count = want.GetIntParam("count", 20)
-	return &FibonacciNumbers{*want}
+	)}
 }
 
 // Exec returns the generalized chain function for the numbers generator
