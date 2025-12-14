@@ -107,7 +107,7 @@ type WantLocals interface {
 }
 
 // WantFactory defines the interface for creating want functions
-// Returns Executable which is implemented by concrete Want types (e.g., FlightWant, RestaurantWant)
+// Returns Progressable which is implemented by concrete Want types (e.g., FlightWant, RestaurantWant)
 type WantFactory func(metadata Metadata, spec WantSpec) Progressable
 
 // LocalsFactory defines a factory function for creating WantLocals instances
@@ -229,7 +229,7 @@ func (n *Want) NotifyCompletion() {
 	// Notify ChainBuilder that this want is now completed using want ID (not name)
 	cb.MarkWantCompleted(n.Metadata.ID, n.Status)
 
-	// Note: Retrigger is triggered by SendPacketMulti(), not here Only wants that send packets should trigger dependent want re-execution
+	// Note: Retrigger is triggered by Provide(), not here Only wants that send packets should trigger dependent want re-execution
 }
 
 // ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety and preventing deadlocks from external callers
@@ -298,8 +298,8 @@ func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
 	sendParameterNotifications(notification)
 }
 
-// BeginExecCycle starts a new execution cycle for batching state changes
-func (n *Want) BeginExecCycle() {
+// BeginProgressCycle starts a new execution cycle for batching state changes
+func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
 	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
@@ -308,8 +308,8 @@ func (n *Want) BeginExecCycle() {
 	n.pendingLogs = make([]string, 0)
 }
 
-// EndExecCycle completes the execution cycle and commits all batched state and parameter changes
-func (n *Want) EndExecCycle() {
+// EndProgressCycle completes the execution cycle and commits all batched state and parameter changes
+func (n *Want) EndProgressCycle() {
 	if !n.inExecCycle {
 		return
 	}
@@ -408,7 +408,7 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 	return true
 }
 
-// StartExecution starts the want execution loop in a goroutine
+// StartProgressionLoop starts the want execution loop in a goroutine
 //
 // Parameters (minimal interface):
 //   - getPathsFunc: Function that returns current paths (called each iteration)
@@ -418,16 +418,16 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 // - Stop channel monitoring
 // - Control signal handling (suspend/resume/stop/restart)
 // - Path synchronization (from preconditions)
-// - Execution cycle management (BeginExecCycle → Exec → EndExecCycle)
+// - Execution cycle management (BeginProgressCycle → Exec → EndProgressCycle)
 // - Status transitions
-// Note: Uses self.executable which is set via SetExecutable()
+// Note: Uses self.progressable which is set via SetProgressable()
 // Note: getPathsFunc is called each iteration to get latest paths
-// StartExecution starts the want execution loop in a goroutine
+// StartProgressionLoop starts the want execution loop in a goroutine
 //
 // Parameters:
 //   - getPathsFunc: Returns current paths (preconditions: providers/users)
 //   - onComplete: Callback invoked when goroutine exits (for synchronization)
-func (n *Want) StartExecution(
+func (n *Want) StartProgressionLoop(
 	getPathsFunc func() Paths,
 	onComplete func(),
 ) {
@@ -498,12 +498,12 @@ func (n *Want) StartExecution(
 			n.SetPaths(currentPaths.In, currentPaths.Out)
 
 			// 5. Begin execution cycle (batching mode)
-			n.BeginExecCycle()
+			n.BeginProgressCycle()
 
 			// 6. Check stop channel before execution
 			select {
 			case <-n.stopChannel:
-				n.EndExecCycle()
+				n.EndProgressCycle()
 				n.SetStatus(WantStatusTerminated)
 				return
 			default:
@@ -518,7 +518,7 @@ func (n *Want) StartExecution(
 			}
 			n.progressable.Progress()
 			// 8. End execution cycle (commit batched changes)
-			n.EndExecCycle()
+			n.EndProgressCycle()
 
 			// 8.5. Check if want is achieved AFTER execution cycle (catch state changes from Progress)
 			if n.progressable != nil && n.progressable.IsAchieved() {
@@ -1090,7 +1090,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-func (n *Want) SendPacketMulti(packet interface{}) error {
+func (n *Want) Provide(packet interface{}) error {
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to

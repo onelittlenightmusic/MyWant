@@ -47,9 +47,9 @@ func (g *SeedNumbers) Progress() {
 		return
 	}
 	g.StoreState("completed", true)
-	g.SendPacketMulti(FibonacciSeed{Value: 0, Position: 0, IsEnd: false})
-	g.SendPacketMulti(FibonacciSeed{Value: 1, Position: 1, IsEnd: false})
-	g.SendPacketMulti(FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true})
+	g.Provide(FibonacciSeed{Value: 0, Position: 0, IsEnd: false})
+	g.Provide(FibonacciSeed{Value: 1, Position: 1, IsEnd: false})
+	g.Provide(FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true})
 	g.StoreState("total_processed", 2)
 	g.StoreLog(fmt.Sprintf("Generated initial seeds: 0, 1 (max_count: %d)", maxCount))
 }
@@ -117,13 +117,13 @@ func (c *FibonacciComputer) Progress() {
 		// After getting max count, start computing all remaining fibonacci numbers
 		for position < maxCount {
 			next := prev + current
-			c.SendPacketMulti(FibonacciSeed{Value: next, Position: position, IsEnd: false})
+			c.Provide(FibonacciSeed{Value: next, Position: position, IsEnd: false})
 			prev = current
 			current = next
 			position++
 			processed++
 		}
-		c.SendPacketMulti(FibonacciSeed{Value: 0, Position: -1, IsEnd: true})
+		c.Provide(FibonacciSeed{Value: 0, Position: -1, IsEnd: true})
 		c.StoreStateMulti(map[string]interface{}{
 			"prev": prev,
 			"current": current,
@@ -205,12 +205,12 @@ func (m *FibonacciMerger) Progress() {
 			m.StoreState("seedUsingClosed", seedUsingClosed)
 			if !maxCountReceived {
 				// Forward end signal to computer to set max count
-				m.SendPacketMulti(fibSeed)
+				m.Provide(fibSeed)
 				maxCountReceived = true
 				m.StoreState("maxCountReceived", maxCountReceived)
 			}
 		} else {
-			m.SendPacketMulti(fibSeed) // Send to computer for processing
+			m.Provide(fibSeed) // Send to computer for processing
 			m.StoreLog(fmt.Sprintf("F(%d) = %d", fibSeed.Position, fibSeed.Value)) // Display directly
 			processed++
 			m.StoreState("processed", processed)

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"time"
 )
+
 // in, connectionAvailable := w.GetInputChannel(0) if !connectionAvailable { return true }
 //   data := (<-in).(DataType)
 func (n *Want) GetInputChannel(index int) (chain.Chan, bool) {
@@ -37,7 +38,7 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 	n.paths.Out = outPaths
 }
 
-// ReceiveFromAnyInputChannel attempts to receive data from any available input channel using non-blocking select. Returns the channel index that had data, the data itself, and whether a successful read occurred.
+// Use attempts to receive data from any available input channel using non-blocking select. Returns the channel index that had data, the data itself, and whether a successful read occurred.
 // This function directly accesses all input channels from paths and constructs a dynamic select statement to watch all channels asynchronously without iterating through GetInputChannel(i).
 //
 // Timeout behavior:
@@ -46,7 +47,7 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 //   - timeoutMilliseconds > 0: wait up to specified milliseconds
 //
 // fmt.Printf("Received data from channel %d: %v\n", index, data) }
-func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interface{}, bool) {
+func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
 	// Access input channels directly from paths structure
 	if len(n.paths.In) == 0 {
 		return -1, nil, false
@@ -100,9 +101,9 @@ func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interfa
 	return channelIndexMap[chosen], nil, false
 }
 
-// ReceiveFromAnyInputChannelForever attempts to receive data from any available input channel,
+// UseForever attempts to receive data from any available input channel,
 // blocking indefinitely until data arrives or all channels are closed.
-// This is a convenience wrapper around ReceiveFromAnyInputChannel(-1) for infinite wait.
+// This is a convenience wrapper around Use(-1) for infinite wait.
 //
 // Returns: (channelIndex, data, ok)
 //   - channelIndex: Index of the channel that provided data (-1 if channels closed)
@@ -110,12 +111,12 @@ func (n *Want) ReceiveFromAnyInputChannel(timeoutMilliseconds int) (int, interfa
 //   - ok: True if data was successfully received, false if all channels are closed
 //
 // Usage:
-//   index, data, ok := w.ReceiveFromAnyInputChannelForever()
+//   index, data, ok := w.UseForever()
 //   if ok {
 //       fmt.Printf("Received data from channel %d: %v\n", index, data)
 //   } else {
 //       // All input channels are closed
 //   }
-func (n *Want) ReceiveFromAnyInputChannelForever() (int, interface{}, bool) {
-	return n.ReceiveFromAnyInputChannel(-1)
+func (n *Want) UseForever() (int, interface{}, bool) {
+	return n.Use(-1)
 }

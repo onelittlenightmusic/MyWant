@@ -45,11 +45,11 @@ func (g *PrimeNumbers) Progress() {
 
 	if currentNumber > end {
 		// Send end signal
-		g.SendPacketMulti(-1)
+		g.Provide(-1)
 		return
 	}
 
-	g.SendPacketMulti(currentNumber)
+	g.Provide(currentNumber)
 	g.StoreState("current_number", currentNumber+1)
 }
 
@@ -114,7 +114,7 @@ func (f *PrimeSequence) Progress() {
 	}
 
 	// Try to receive one packet with timeout
-	_, i, ok := f.ReceiveFromAnyInputChannel(5000) // 5000ms timeout per packet
+	_, i, ok := f.Use(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
 		return

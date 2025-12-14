@@ -98,42 +98,31 @@ func (c *CoordinatorWant) IsAchieved() bool {
 // Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
 // Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Progress() {
-	inCount := c.GetInCount()
-
 	c.StoreLog(fmt.Sprintf("[COORDINATOR] Started"))
-
-	// // CRITICAL: Reset channelsHeard at the start of each execution cycle // This ensures that when a coordinator is retriggered (e.g., to receive a rebooked packet), // it doesn't think it has already received all packets from the previous execution. // Without this reset, a retriggered coordinator would complete immediately.
-	// c.channelsHeard = make(map[int]bool)
 
 	// Track which channels we've received data from in this execution cycle This is a local map - NOT persisted to state, only used for completion detection
 
 	timeout := 2000
-	// loop while receiving data packets
-	for {
-		// time.Sleep(1000*time.Millisecond) Try to receive one data packet from any input channel
-		channelIndex, data, received := c.ReceiveFromAnyInputChannel(timeout)
-		if received {
-			// Data received: mark channel as heard and process it
-			c.channelsHeard[channelIndex] = true
-			c.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received packet from channel %d", channelIndex))
-			c.DataHandler.ProcessData(c, channelIndex, data)
-		} else {
-			// No data available on any channel: exit loop
-			break
-		}
+	// time.Sleep(1000*time.Millisecond) Try to receive one data packet from any input channel
+	channelIndex, data, received := c.Use(timeout)
+	if received {
+		// Data received: mark channel as heard and process it
+		c.channelsHeard[channelIndex] = true
+		c.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received packet from channel %d", channelIndex))
+		c.DataHandler.ProcessData(c, channelIndex, data)
 	}
-	c.tryCompletion(inCount, c.channelsHeard)
+	c.tryCompletion(c.channelsHeard)
 }
 
 // tryCompletion checks if all required data has been received and handles completion Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights) Strategy: 1. When all channels first send data, record the time
 // 2. Wait for the completion timeout to expire (allows delayed packets) 3. Only then mark as completed and reset channelsHeard for potential new packets
-func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) {
+func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	// Apply state updates from data handler
 	stateUpdates := c.DataHandler.GetStateUpdates(c)
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
-	if len(channelsHeard) != inCount {
+	if len(channelsHeard) != c.GetInCount() {
 		return // Still waiting for data from some channels
 	}
 

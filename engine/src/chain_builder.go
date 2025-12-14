@@ -325,13 +325,13 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 	factoryResult := factory(want.Metadata, want.Spec)
 
-	// Extract *Want from the Executable result via reflection
-	// All factories now return Executable implementations that embed Want
+	// Extract *Want from the Progressable result via reflection
+	// All factories now return Progressable implementations that embed Want
 	var wantPtr *Want
-	if w, err := extractWantFromExecutable(factoryResult); err == nil {
+	if w, err := extractWantFromProgressable(factoryResult); err == nil {
 		wantPtr = w
 	} else {
-		return nil, fmt.Errorf("factory returned Executable but could not extract Want: %v", err)
+		return nil, fmt.Errorf("factory returned Progressable but could not extract Want: %v", err)
 	}
 
 	if cb.agentRegistry != nil && wantPtr != nil {
@@ -1549,13 +1549,13 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		cb.reconcileMutex.Unlock()
 	}
 
-	// Start execution if want is Executable
-	if executable, ok := want.function.(Progressable); ok {
+	// Start execution if want is Progressable
+	if progressable, ok := want.function.(Progressable); ok {
 		want.want.SetStatus(WantStatusReaching)
 		want.want.InitializeControlChannel()
 
 		// Set the concrete progressable implementation on the want
-		want.want.SetProgressable(executable)
+		want.want.SetProgressable(progressable)
 
 		// Create closure that captures wantName and returns latest paths
 		// This allows want to track topology changes during execution
@@ -1565,7 +1565,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 		// Manage goroutine lifecycle with waitGroup
 		cb.waitGroup.Add(1)
-		want.want.StartExecution(
+		want.want.StartProgressionLoop(
 			getPathsFunc,
 			func() {
 				cb.waitGroup.Done()  // Signal completion
@@ -2636,18 +2636,18 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 		InfoLog("[RETRIGGER:SEND] Warning: reconcileTrigger channel full, skipping trigger\n")
 	}
 }
-// extractWantFromExecutable extracts the embedded *Want from an Executable type using reflection
+// extractWantFromProgressable extracts the embedded *Want from an Progressable type using reflection
 // This handles concrete types like *RestaurantWant that embed Want
-func extractWantFromExecutable(executable Progressable) (*Want, error) {
-	val := reflect.ValueOf(executable)
+func extractWantFromProgressable(progressable Progressable) (*Want, error) {
+	val := reflect.ValueOf(progressable)
 	if val.Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("executable must be a pointer type")
+		return nil, fmt.Errorf("progressable must be a pointer type")
 	}
 
 	// Get the struct value
 	elem := val.Elem()
 	if elem.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("executable must point to a struct")
+		return nil, fmt.Errorf("progressable must point to a struct")
 	}
 
 	// Look for an embedded Want field
@@ -2664,7 +2664,7 @@ func extractWantFromExecutable(executable Progressable) (*Want, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("could not find embedded Want field in %T", executable)
+	return nil, fmt.Errorf("could not find embedded Want field in %T", progressable)
 }
 
 func SetGlobalChainBuilder(cb *ChainBuilder) {

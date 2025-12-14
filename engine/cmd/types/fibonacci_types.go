@@ -35,11 +35,11 @@ func (g *FibonacciNumbers) Progress() {
 
 	if sentCount >= count {
 		// Send end signal
-		g.SendPacketMulti(-1)
+		g.Provide(-1)
 		return
 	}
 
-	g.SendPacketMulti(a)
+	g.Provide(a)
 	g.StoreStateMulti(map[string]interface{}{
 		"a":          b,
 		"b":          a + b,
@@ -108,7 +108,7 @@ func (f *FibonacciFilter) Progress() {
 	}
 
 	// Try to receive one packet with timeout
-	_, i, ok := f.ReceiveFromAnyInputChannel(5000) // 5000ms timeout per packet
+	_, i, ok := f.Use(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
 		return

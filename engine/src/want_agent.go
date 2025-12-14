@@ -79,10 +79,10 @@ func (n *Want) executeAgent(agent Agent) error {
 	n.RunningAgents = append(n.RunningAgents, agent.GetName())
 	n.CurrentAgent = agent.GetName()
 	{
-		n.BeginExecCycle()
+		n.BeginProgressCycle()
 		n.StoreState("current_agent", agent.GetName())
 		n.StoreState("running_agents", n.RunningAgents)
-		n.EndExecCycle()
+		n.EndProgressCycle()
 	}
 	agentExec := AgentExecution{
 		AgentName: agent.GetName(),
@@ -117,10 +117,10 @@ func (n *Want) executeAgent(agent Agent) error {
 				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 			}
 			{
-				n.BeginExecCycle()
+				n.BeginProgressCycle()
 				n.StoreState("current_agent", n.CurrentAgent)
 				n.StoreState("running_agents", n.RunningAgents)
-				n.EndExecCycle()
+				n.EndProgressCycle()
 			}
 
 			if r := recover(); r != nil {
@@ -139,8 +139,8 @@ func (n *Want) executeAgent(agent Agent) error {
 		}()
 
 		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
-		// Individual agents should NOT call BeginExecCycle/EndExecCycle themselves
-		n.BeginExecCycle()
+		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
+		n.BeginProgressCycle()
 
 		if err := agent.Exec(ctx, n); err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
@@ -164,7 +164,7 @@ func (n *Want) executeAgent(agent Agent) error {
 		}
 
 		// FRAMEWORK-LEVEL: Commit all agent state changes
-		n.EndExecCycle()
+		n.EndProgressCycle()
 	}
 
 	// Execute synchronously for DO agents, asynchronously for MONITOR agents

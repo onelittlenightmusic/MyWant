@@ -125,7 +125,7 @@ func (g *Numbers) Progress() {
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending final end packet", locals.currentCount, paramCount))
 		endPacket := QueuePacket{Num: -1, Time: 0}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
-		g.SendPacketMulti(endPacket)
+		g.Provide(endPacket)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (g *Numbers) Progress() {
 		})
 	}
 
-	g.SendPacketMulti(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
+	g.Provide(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
 
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
@@ -160,7 +160,7 @@ func (g *Numbers) Progress() {
 
 		endPacket := QueuePacket{Num: -1, Time: 0}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
-		g.SendPacketMulti(endPacket)
+		g.Provide(endPacket)
 	}
 }
 
@@ -226,13 +226,7 @@ func (q *Queue) Progress() {
 		q.State = make(map[string]interface{})
 	}
 
-	// Check if input channels are connected before attempting receive
-	if q.GetInCount() == 0 {
-		q.StoreLog("[QUEUE-EXEC] No input channels, waiting for connection")
-		return  // No input channels, nothing to process
-	}
-
-	_, i, ok := q.ReceiveFromAnyInputChannel(100)  // Use 100ms timeout instead of forever
+	_, i, ok := q.Use(100)  // Use 100ms timeout instead of forever
 	if !ok {
 		q.StoreLog("[QUEUE-EXEC] No packet received (timeout)")
 		return
@@ -249,7 +243,7 @@ func (q *Queue) Progress() {
 			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
-		q.SendPacketMulti(packet)
+		q.Provide(packet)
 		q.StoreLog("[QUEUE-EXEC] Setting completed=true")
 		q.StoreState("completed", true)
 		return
@@ -273,7 +267,7 @@ func (q *Queue) Progress() {
 		locals.lastBatchCount = locals.processedCount
 	}
 
-	q.SendPacketMulti(QueuePacket{Num: packet.Num, Time: finishTime})
+	q.Provide(QueuePacket{Num: packet.Num, Time: finishTime})
 }
 
 // flushBatch commits all accumulated statistics to state
@@ -370,7 +364,7 @@ func (c *Combiner) Progress() {
 	}
 
 	// Receive from any input channel (wait for data from any source)
-	_, i, ok := c.ReceiveFromAnyInputChannelForever()
+	_, i, ok := c.UseForever()
 	if !ok {
 		return
 	}
@@ -382,13 +376,13 @@ func (c *Combiner) Progress() {
 			c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
-		c.SendPacketMulti(packet)
+		c.Provide(packet)
 		c.StoreState("completed", true)
 		return
 	}
 
 	processed++
-	c.SendPacketMulti(packet)
+	c.Provide(packet)
 
 	c.StoreState("processed", processed)
 }
@@ -441,10 +435,10 @@ func (s *Sink) Progress() {
 	}
 
 	for {
-		_, i, ok := s.ReceiveFromAnyInputChannel(100)
+		_, i, ok := s.Use(100)
 		if !ok {
 			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
-			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
+			// The timeout in Use helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
 			return
 		}
 

@@ -574,17 +574,17 @@ func (oaw *OwnerAwareWant) Progress() {
 	}
 }
 
-// BeginExecCycle delegates to the stored Want to start batching state changes
-func (oaw *OwnerAwareWant) BeginExecCycle() {
+// BeginProgressCycle delegates to the stored Want to start batching state changes
+func (oaw *OwnerAwareWant) BeginProgressCycle() {
 	if oaw.Want != nil {
-		oaw.Want.BeginExecCycle()
+		oaw.Want.BeginProgressCycle()
 	}
 }
 
-// EndExecCycle delegates to the stored Want to commit batched state changes
-func (oaw *OwnerAwareWant) EndExecCycle() {
+// EndProgressCycle delegates to the stored Want to commit batched state changes
+func (oaw *OwnerAwareWant) EndProgressCycle() {
 	if oaw.Want != nil {
-		oaw.Want.EndExecCycle()
+		oaw.Want.EndProgressCycle()
 	}
 }
 func (oaw *OwnerAwareWant) SetPaths(inPaths []PathInfo, outPaths []PathInfo) {

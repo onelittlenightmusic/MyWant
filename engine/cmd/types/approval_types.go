@@ -79,8 +79,8 @@ func (e *EvidenceWant) Progress() {
 
 	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount()))
 
-	// Broadcast evidence to all output channels using SendPacketMulti
-	e.SendPacketMulti(evidenceData)
+	// Broadcast evidence to all output channels using Provide
+	e.Provide(evidenceData)
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -149,8 +149,8 @@ func (d *DescriptionWant) Progress() {
 
 	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.GetOutCount()))
 
-	// Broadcast description to all output channels using SendPacketMulti
-	d.SendPacketMulti(descriptionData)
+	// Broadcast description to all output channels using Provide
+	d.Provide(descriptionData)
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
