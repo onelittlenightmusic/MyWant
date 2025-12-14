@@ -24,7 +24,7 @@ type FlightWant struct {
 }
 
 // NewFlightWant creates a new flight booking want
-func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
+func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 	return &FlightWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -33,8 +33,8 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if flight booking is complete (all phases finished)
-func (f *FlightWant) IsDone() bool {
+// IsAchieved checks if flight booking is complete (all phases finished)
+func (f *FlightWant) IsAchieved() bool {
 	phaseVal, _ := f.GetState("flight_phase")
 	phase, _ := phaseVal.(string)
 	return phase == PhaseCompleted
@@ -90,9 +90,9 @@ const (
 	PhaseCompleted  = "completed"
 )
 
-// Exec creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
+// Progress creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
 // 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state
-func (f *FlightWant) Exec() {
+func (f *FlightWant) Progress() {
 	locals, ok := f.Locals.(*FlightWantLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")
@@ -409,9 +409,9 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			}
 			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
-			// AGGREGATION: Wrap monitor.Exec() in exec cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState
+			// AGGREGATION: Wrap monitor.Progress() in exec cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState
 			f.BeginExecCycle()
-			monitor.Exec(context.Background(), &f.Want)
+			monitor.Progress(context.Background(), &f.Want)
 			f.EndExecCycle()
 		}
 	}()

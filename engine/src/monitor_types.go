@@ -66,13 +66,13 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 	return monitor
 }
 
-// IsDone checks if monitor is complete (always false for continuous monitoring)
-func (mw *MonitorWant) IsDone() bool {
+// IsAchieved checks if monitor is complete (always false for continuous monitoring)
+func (mw *MonitorWant) IsAchieved() bool {
 	return false  // Never done - continuous monitoring
 }
 
-// Exec implements the Executable interface
-func (mw *MonitorWant) Exec() {
+// Progress implements the Progressable interface
+func (mw *MonitorWant) Progress() {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusReaching)
 	if _, exists := mw.Want.GetState("start_time"); !exists {
@@ -272,7 +272,7 @@ func (mw *MonitorWant) ClearAlerts() {
 
 // RegisterMonitorWantTypes registers monitor want types with a ChainBuilder
 func RegisterMonitorWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("monitor", func(metadata Metadata, spec WantSpec) Progressable {
 		monitor := NewMonitorWant(metadata, spec)
 
 		// Register want for lookup

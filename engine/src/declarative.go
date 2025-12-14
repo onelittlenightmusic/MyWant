@@ -113,10 +113,10 @@ func (p *BasePacket) IsEnded() bool        { return p.ended }
 func (p *BasePacket) SetEnded(ended bool)  { p.ended = ended }
 func (p *BasePacket) GetData() interface{} { return p.data }
 
-// ChainWant represents a want that can execute directly
-type Executable interface {
-	IsDone() bool  // Returns true when want is complete
-	Exec()         // Execute logic (no completion signal)
+// Progressable represents a want that can execute directly
+type Progressable interface {
+	IsAchieved() bool // Returns true when want is complete
+	Progress()        // Execute logic (no completion signal)
 }
 
 // migrateAllWantsAgentHistory runs agent history migration on all wants

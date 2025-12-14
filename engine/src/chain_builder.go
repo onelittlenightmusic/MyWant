@@ -118,6 +118,11 @@ func NewChainBuilder(config Config) *ChainBuilder {
 	return builder
 }
 
+// GetConfig returns the current builder Config (read-only copy)
+func (cb *ChainBuilder) GetConfig() Config {
+	return cb.config
+}
+
 // NewChainBuilderWithPaths creates a new builder with config and memory file paths
 func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
@@ -1545,12 +1550,12 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	}
 
 	// Start execution if want is Executable
-	if executable, ok := want.function.(Executable); ok {
+	if executable, ok := want.function.(Progressable); ok {
 		want.want.SetStatus(WantStatusReaching)
 		want.want.InitializeControlChannel()
 
-		// Set the concrete executable implementation on the want
-		want.want.SetExecutable(executable)
+		// Set the concrete progressable implementation on the want
+		want.want.SetProgressable(executable)
 
 		// Create closure that captures wantName and returns latest paths
 		// This allows want to track topology changes during execution
@@ -2633,7 +2638,7 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 }
 // extractWantFromExecutable extracts the embedded *Want from an Executable type using reflection
 // This handles concrete types like *RestaurantWant that embed Want
-func extractWantFromExecutable(executable Executable) (*Want, error) {
+func extractWantFromExecutable(executable Progressable) (*Want, error) {
 	val := reflect.ValueOf(executable)
 	if val.Kind() != reflect.Ptr {
 		return nil, fmt.Errorf("executable must be a pointer type")

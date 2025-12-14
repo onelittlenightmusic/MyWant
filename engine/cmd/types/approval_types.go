@@ -35,7 +35,7 @@ type EvidenceWant struct {
 	Want
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
+func NewEvidenceWant(metadata Metadata, spec WantSpec) Progressable {
 	return &EvidenceWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -44,13 +44,13 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if evidence has been provided
-func (e *EvidenceWant) IsDone() bool {
+// IsAchieved checks if evidence has been provided
+func (e *EvidenceWant) IsAchieved() bool {
 	provided, _ := e.GetStateBool("evidence_provided", false)
 	return provided
 }
 
-func (e *EvidenceWant) Exec() {
+func (e *EvidenceWant) Progress() {
 	locals, ok := e.Locals.(*EvidenceWantLocals)
 	if !ok {
 		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
@@ -103,7 +103,7 @@ type DescriptionWant struct {
 	Want
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
+func NewDescriptionWant(metadata Metadata, spec WantSpec) Progressable {
 	return &DescriptionWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -112,13 +112,13 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if description has been provided
-func (d *DescriptionWant) IsDone() bool {
+// IsAchieved checks if description has been provided
+func (d *DescriptionWant) IsAchieved() bool {
 	provided, _ := d.GetStateBool("description_provided", false)
 	return provided
 }
 
-func (d *DescriptionWant) Exec() {
+func (d *DescriptionWant) Progress() {
 	locals, ok := d.Locals.(*DescriptionWantLocals)
 	if !ok {
 		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")

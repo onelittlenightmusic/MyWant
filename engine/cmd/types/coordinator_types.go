@@ -36,7 +36,7 @@ type CoordinatorWant struct {
 func NewCoordinatorWant(
 	metadata Metadata,
 	spec WantSpec,
-) Executable {
+) Progressable {
 	coordinatorType := metadata.Type
 
 	want := NewWantWithLocals(
@@ -88,16 +88,16 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
-// IsDone checks if coordinator has collected all required data and timeout has expired
-func (c *CoordinatorWant) IsDone() bool {
+// IsAchieved checks if coordinator has collected all required data and timeout has expired
+func (c *CoordinatorWant) IsAchieved() bool {
 	completionKey := c.DataHandler.GetCompletionKey()
 	completed, _ := c.GetStateBool(completionKey, false)
 	return completed
 }
 
-// Exec executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
+// Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
 // Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
-func (c *CoordinatorWant) Exec() {
+func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 
 	c.StoreLog(fmt.Sprintf("[COORDINATOR] Started"))

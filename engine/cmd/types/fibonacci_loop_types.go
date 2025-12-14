@@ -23,7 +23,7 @@ type SeedNumbers struct {
 }
 
 // NewSeedNumbers creates a new seed numbers want
-func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
+func NewSeedNumbers(metadata Metadata, spec WantSpec) Progressable {
 	return &SeedNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -32,14 +32,14 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if seeds have been generated
-func (g *SeedNumbers) IsDone() bool {
+// IsAchieved checks if seeds have been generated
+func (g *SeedNumbers) IsAchieved() bool {
 	completed, _ := g.GetStateBool("completed", false)
 	return completed
 }
 
-// Exec returns the generalized chain function for the seed numbers generator
-func (g *SeedNumbers) Exec() {
+// Progress returns the generalized chain function for the seed numbers generator
+func (g *SeedNumbers) Progress() {
 	maxCount := g.GetIntParam("max_count", 15)
 	completed, _ := g.GetStateBool("completed", false)
 
@@ -70,7 +70,7 @@ type FibonacciComputer struct {
 }
 
 // NewFibonacciComputer creates a new fibonacci computer want
-func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
+func NewFibonacciComputer(metadata Metadata, spec WantSpec) Progressable {
 	return &FibonacciComputer{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -79,14 +79,14 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if fibonacci computation is complete (end packet received)
-func (c *FibonacciComputer) IsDone() bool {
+// IsAchieved checks if fibonacci computation is complete (end packet received)
+func (c *FibonacciComputer) IsAchieved() bool {
 	completed, _ := c.GetStateBool("completed", false)
 	return completed
 }
 
-// Exec returns the generalized chain function for the fibonacci computer
-func (c *FibonacciComputer) Exec() {
+// Progress returns the generalized chain function for the fibonacci computer
+func (c *FibonacciComputer) Progress() {
 	in, inputUnavailable := c.GetInputChannel(0)
 	if inputUnavailable {
 		return
@@ -167,7 +167,7 @@ type FibonacciMerger struct {
 }
 
 // NewFibonacciMerger creates a new fibonacci merger want
-func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
+func NewFibonacciMerger(metadata Metadata, spec WantSpec) Progressable {
 	return &FibonacciMerger{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -176,15 +176,15 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if fibonacci merger is complete (both input channels closed)
-func (m *FibonacciMerger) IsDone() bool {
+// IsAchieved checks if fibonacci merger is complete (both input channels closed)
+func (m *FibonacciMerger) IsAchieved() bool {
 	seedUsingClosed, _ := m.GetStateBool("seedUsingClosed", false)
 	computedUsingClosed, _ := m.GetStateBool("computedUsingClosed", false)
 	return seedUsingClosed && computedUsingClosed
 }
 
-// Exec returns the generalized chain function for the fibonacci merger
-func (m *FibonacciMerger) Exec() {
+// Progress returns the generalized chain function for the fibonacci merger
+func (m *FibonacciMerger) Progress() {
 	if m.GetInCount() < 2 || m.GetOutCount() < 1 {
 		return
 	}
@@ -229,7 +229,7 @@ func (m *FibonacciMerger) Exec() {
 		}
 	}
 
-	// End when both using are closed (IsDone() will handle completion)
+	// End when both using are closed (IsAchieved() will handle completion)
 	if seedUsingClosed && computedUsingClosed {
 		m.StoreState("total_processed", processed)
 		m.StoreLog(fmt.Sprintf("Merged %d fibonacci values", processed))

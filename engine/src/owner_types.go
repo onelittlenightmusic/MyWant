@@ -238,8 +238,8 @@ func (t *Target) CreateChildWants() []*Want {
 	return t.childWants
 }
 
-// IsDone checks if target is complete (all children created and completed)
-func (t *Target) IsDone() bool {
+// IsAchieved checks if target is complete (all children created and completed)
+func (t *Target) IsAchieved() bool {
 	if !t.childrenCreated {
 		return false
 	}
@@ -251,8 +251,8 @@ func (t *Target) IsDone() bool {
 	return allComplete
 }
 
-// Exec implements the Executable interface for Target with direct execution
-func (t *Target) Exec() {
+// Progress implements the Progressable interface for Target with direct execution
+func (t *Target) Progress() {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
@@ -551,23 +551,23 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 	return nil
 }
 
-// IsDone checks if the wrapped want is complete
-func (oaw *OwnerAwareWant) IsDone() bool {
-	if executable, ok := oaw.BaseWant.(Executable); ok {
-		return executable.IsDone()
+// IsAchieved checks if the wrapped want is complete
+func (oaw *OwnerAwareWant) IsAchieved() bool {
+	if progressable, ok := oaw.BaseWant.(Progressable); ok {
+		return progressable.IsAchieved()
 	}
-	// Fallback for non-Executable types
+	// Fallback for non-Progressable types
 	return true
 }
 
-// Exec wraps the base want's execution to add completion notification
-func (oaw *OwnerAwareWant) Exec() {
-	// Call the original Exec method directly
-	if executable, ok := oaw.BaseWant.(Executable); ok {
-		executable.Exec()
+// Progress wraps the base want's execution to add completion notification
+func (oaw *OwnerAwareWant) Progress() {
+	// Call the original Progress method directly
+	if progressable, ok := oaw.BaseWant.(Progressable); ok {
+		progressable.Progress()
 
-		// If want is now done and we have a target, notify it
-		if executable.IsDone() && oaw.TargetName != "" {
+		// If want is now achieved and we have a target, notify it
+		if progressable.IsAchieved() && oaw.TargetName != "" {
 			// Emit OwnerCompletionEvent through unified subscription system
 			oaw.emitOwnerCompletionEvent()
 		}
@@ -667,7 +667,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	recipeLoader := NewGenericRecipeLoader("recipes")
 
 	// Register target type with recipe support
-	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) Progressable {
 		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
 		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes

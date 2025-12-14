@@ -76,7 +76,7 @@ type Numbers struct {
 }
 
 // PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
+func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 	return &Numbers{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -85,22 +85,22 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Execut
 	)}
 }
 
-// IsDone checks if numbers generator is complete (all packets sent)
-func (g *Numbers) IsDone() bool {
+// IsAchieved checks if numbers generator is complete (all packets sent)
+func (g *Numbers) IsAchieved() bool {
 	locals, ok := g.Locals.(*NumbersLocals)
 	if !ok {
 		return false
 	}
 	paramCount := g.GetIntParam("count", locals.Count)
-	isDone := locals.currentCount >= paramCount
-	if isDone {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-ISDONE] Complete: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
+	isAchieved := locals.currentCount >= paramCount
+	if isAchieved {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-ISACHIEVED] Complete: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
 	}
-	return isDone
+	return isAchieved
 }
 
-// Exec executes the numbers generator directly with dynamic parameter reading
-func (g *Numbers) Exec() {
+// Progress executes the numbers generator directly with dynamic parameter reading
+func (g *Numbers) Progress() {
 	locals, ok := g.Locals.(*NumbersLocals)
 	if !ok {
 		g.StoreLog("ERROR: Failed to access NumbersLocals from Want.Locals")
@@ -188,7 +188,7 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue want
-func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
+func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 	return &Queue{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -197,17 +197,17 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable 
 	)}
 }
 
-// IsDone checks if queue is complete (end signal received)
-func (q *Queue) IsDone() bool {
+// IsAchieved checks if queue is complete (end signal received)
+func (q *Queue) IsAchieved() bool {
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
-		q.StoreLog("[QUEUE-ISDONE] Completed! Shifting to achieved")
+		q.StoreLog("[QUEUE-ISACHIEVED] Completed! Shifting to achieved")
 	}
 	return completed
 }
 
-// Exec executes the queue processing directly with batch mechanism
-func (q *Queue) Exec() {
+// Progress executes the queue processing directly with batch mechanism
+func (q *Queue) Progress() {
 	locals, ok := q.Locals.(*QueueLocals)
 	if !ok {
 		q.StoreLog("ERROR: Failed to access QueueLocals from Want.Locals")
@@ -338,7 +338,7 @@ type Combiner struct {
 	mywant.Want
 }
 
-func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
+func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 	return &Combiner{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -347,14 +347,14 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executab
 	)}
 }
 
-// IsDone checks if combiner is complete (end signal received)
-func (c *Combiner) IsDone() bool {
+// IsAchieved checks if combiner is complete (end signal received)
+func (c *Combiner) IsAchieved() bool {
 	completed, _ := c.GetStateBool("completed", false)
 	return completed
 }
 
-// Exec executes the combiner directly
-func (c *Combiner) Exec() {
+// Progress executes the combiner directly
+func (c *Combiner) Progress() {
 	locals, ok := c.Locals.(*CombinerLocals)
 	if !ok {
 		c.StoreLog("ERROR: Failed to access CombinerLocals from Want.Locals")
@@ -412,7 +412,7 @@ type Sink struct {
 }
 
 // Goal creates a new sink want
-func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
+func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 	return &Sink{*mywant.NewWantWithLocals(
 		metadata,
 		spec,
@@ -421,14 +421,14 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	)}
 }
 
-// IsDone checks if sink is complete (end signal received)
-func (s *Sink) IsDone() bool {
+// IsAchieved checks if sink is complete (end signal received)
+func (s *Sink) IsAchieved() bool {
 	completed, _ := s.GetStateBool("completed", false)
 	return completed
 }
 
-// Exec executes the sink directly
-func (s *Sink) Exec() {
+// Progress executes the sink directly
+func (s *Sink) Progress() {
 	locals, ok := s.Locals.(*SinkLocals)
 	if !ok {
 		s.StoreLog("ERROR: Failed to access SinkLocals from Want.Locals")

@@ -50,8 +50,8 @@ func NewMonitorFlightAPI(name string, capabilities []string, uses []string, serv
 	}
 }
 
-// Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Exec method (FlightWant) Individual agents should NOT implement their own polling loops
-func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
+// Progress polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Progress method (FlightWant) Individual agents should NOT implement their own polling loops
+func (m *MonitorFlightAPI) Progress(ctx context.Context, want *Want) error {
 	flightID, exists := want.GetState("flight_id")
 	if !exists {
 		return fmt.Errorf("no flight_id found in state - flight not created yet")

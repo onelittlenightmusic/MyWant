@@ -56,7 +56,7 @@ type RestaurantWant struct {
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
-func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
+func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 	return &RestaurantWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -65,15 +65,15 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if restaurant has been reserved
-func (r *RestaurantWant) IsDone() bool {
+// IsAchieved checks if restaurant has been reserved
+func (r *RestaurantWant) IsAchieved() bool {
 	attemptedVal, _ := r.GetState("attempted")
 	attempted, _ := attemptedVal.(bool)
 	return attempted
 }
 
-// Exec creates a restaurant reservation
-func (r *RestaurantWant) Exec() {
+// Progress creates a restaurant reservation
+func (r *RestaurantWant) Progress() {
 	locals, ok := r.Locals.(*RestaurantWantLocals)
 	if !ok {
 		r.StoreLog("ERROR: Failed to access RestaurantWantLocals from Want.Locals")
@@ -160,7 +160,7 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		)
 
 		ctx := context.Background()
-		if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
+		if err := monitorAgent.Progress(ctx, &r.Want); err != nil {
 		}
 
 		r.AggregateChanges()
@@ -344,7 +344,7 @@ type HotelWant struct {
 }
 
 // NewHotelWant creates a new hotel reservation want
-func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
+func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 	return &HotelWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -353,14 +353,14 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if hotel has been reserved
-func (h *HotelWant) IsDone() bool {
+// IsAchieved checks if hotel has been reserved
+func (h *HotelWant) IsAchieved() bool {
 	val, _ := h.GetState("attempted")
 	attempted, _ := val.(bool)
 	return attempted
 }
 
-func (h *HotelWant) Exec() {
+func (h *HotelWant) Progress() {
 	locals, ok := h.Locals.(*HotelWantLocals)
 	if !ok {
 		h.StoreLog("ERROR: Failed to access HotelWantLocals from Want.Locals")
@@ -479,7 +479,7 @@ type BuffetWant struct {
 	Want
 }
 
-func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
+func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 	return &BuffetWant{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -488,14 +488,14 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if buffet has been reserved
-func (b *BuffetWant) IsDone() bool {
+// IsAchieved checks if buffet has been reserved
+func (b *BuffetWant) IsAchieved() bool {
 	val, _ := b.GetState("attempted")
 	attempted, _ := val.(bool)
 	return attempted
 }
 
-func (b *BuffetWant) Exec() {
+func (b *BuffetWant) Progress() {
 	locals, ok := b.Locals.(*BuffetWantLocals)
 	if !ok {
 		b.StoreLog("ERROR: Failed to access BuffetWantLocals from Want.Locals")
@@ -723,28 +723,28 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
 func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
-	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewFlightWant(metadata, spec)
 		fw := result.(*FlightWant)
 		fw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewRestaurantWant(metadata, spec)
 		rw := result.(*RestaurantWant)
 		rw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewHotelWant(metadata, spec)
 		hw := result.(*HotelWant)
 		hw.SetAgentRegistry(agentRegistry)
 		return result
 	})
 
-	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) Executable {
+	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewBuffetWant(metadata, spec)
 		bw := result.(*BuffetWant)
 		bw.SetAgentRegistry(agentRegistry)

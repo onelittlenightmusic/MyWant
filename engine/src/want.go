@@ -108,7 +108,7 @@ type WantLocals interface {
 
 // WantFactory defines the interface for creating want functions
 // Returns Executable which is implemented by concrete Want types (e.g., FlightWant, RestaurantWant)
-type WantFactory func(metadata Metadata, spec WantSpec) Executable
+type WantFactory func(metadata Metadata, spec WantSpec) Progressable
 
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals
@@ -190,8 +190,8 @@ type Want struct {
 	// Type-specific local state managed by WantLocals interface
 	Locals WantLocals `json:"-" yaml:"-"`
 
-	// Executable function - concrete want implementation (e.g., RestaurantWant, QueueWant)
-	executable Executable `json:"-" yaml:"-"`
+	// Progressable function - concrete want implementation (e.g., RestaurantWant, QueueWant)
+	progressable Progressable `json:"-" yaml:"-"`
 }
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
@@ -364,14 +364,14 @@ func (n *Want) AggregateChanges() {
 	}
 }
 
-// SetExecutable sets the concrete executable implementation for this want
-func (n *Want) SetExecutable(executable Executable) {
-	n.executable = executable
+// SetProgressable sets the concrete progressable implementation for this want
+func (n *Want) SetProgressable(progressable Progressable) {
+	n.progressable = progressable
 }
 
-// GetExecutable returns the concrete executable implementation for this want
-func (n *Want) GetExecutable() Executable {
-	return n.executable
+// GetProgressable returns the concrete progressable implementation for this want
+func (n *Want) GetProgressable() Progressable {
+	return n.progressable
 }
 
 // checkPreconditions verifies that path preconditions are satisfied
@@ -476,9 +476,9 @@ func (n *Want) StartExecution(
 				continue
 			}
 
-			// 3.1. Check if want is done (before precondition check)
-			if n.executable != nil && n.executable.IsDone() {
-			n.SetStatus(WantStatusAchieved)
+			// 3.1. Check if want is achieved (before precondition check)
+			if n.progressable != nil && n.progressable.IsAchieved() {
+				n.SetStatus(WantStatusAchieved)
 				return
 			}
 			// 3.5. Get current paths (called each iteration to track topology changes)
@@ -511,17 +511,17 @@ func (n *Want) StartExecution(
 			}
 
 			// 7. Execute want logic
-			if n.executable == nil {
-				// No executable set, mark as failed
+			if n.progressable == nil {
+				// No progressable set, mark as failed
 				n.SetStatus(WantStatusFailed)
 				return
 			}
-			n.executable.Exec()
+			n.progressable.Progress()
 			// 8. End execution cycle (commit batched changes)
 			n.EndExecCycle()
 
-			// 8.5. Check if want is done AFTER execution cycle (catch state changes from Exec)
-			if n.executable != nil && n.executable.IsDone() {
+			// 8.5. Check if want is achieved AFTER execution cycle (catch state changes from Progress)
+			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
 				return
 			}

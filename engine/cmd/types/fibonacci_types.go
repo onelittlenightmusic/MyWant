@@ -4,14 +4,13 @@ import (
 	. "mywant/engine/src"
 )
 
-
 // FibonacciNumbers generates fibonacci sequence numbers
 type FibonacciNumbers struct {
 	Want
 }
 
 // NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
+func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Progressable {
 	return &FibonacciNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -20,15 +19,15 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if fibonacci generation is complete
-func (g *FibonacciNumbers) IsDone() bool {
+// IsAchieved checks if fibonacci generation is complete
+func (g *FibonacciNumbers) IsAchieved() bool {
 	sentCount, _ := g.GetStateInt("sent_count", 0)
 	count := g.GetIntParam("count", 20)
 	return sentCount >= count
 }
 
-// Exec returns the generalized chain function for the numbers generator
-func (g *FibonacciNumbers) Exec() {
+// Progress returns the generalized chain function for the numbers generator
+func (g *FibonacciNumbers) Progress() {
 	count := g.GetIntParam("count", 20)
 	a, _ := g.GetStateInt("a", 0)
 	b, _ := g.GetStateInt("b", 1)
@@ -59,7 +58,7 @@ type FibonacciFilter struct {
 }
 
 // NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
+func NewFibonacciFilter(metadata Metadata, spec WantSpec) Progressable {
 	return &FibonacciFilter{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -70,16 +69,16 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if fibonacci filtering is complete
-func (f *FibonacciFilter) IsDone() bool {
+// IsAchieved checks if fibonacci filtering is complete
+func (f *FibonacciFilter) IsAchieved() bool {
 	achieved, _ := f.GetStateBool("achieved", false)
 	return achieved
 }
 
-// Exec returns the generalized chain function for the filter
+// Progress returns the generalized chain function for the filter
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
-func (f *FibonacciFilter) Exec() {
+func (f *FibonacciFilter) Progress() {
 	locals, ok := f.Locals.(*FibonacciFilterLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")

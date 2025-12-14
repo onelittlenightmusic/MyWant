@@ -16,7 +16,7 @@ type PrimeNumbers struct {
 }
 
 // NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
+func NewPrimeNumbers(metadata Metadata, spec WantSpec) Progressable {
 	return &PrimeNumbers{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -25,16 +25,16 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if prime number generation is complete
-func (g *PrimeNumbers) IsDone() bool {
+// IsAchieved checks if prime number generation is complete
+func (g *PrimeNumbers) IsAchieved() bool {
 	start := g.GetIntParam("start", 2)
 	end := g.GetIntParam("end", 100)
 	currentNumber, _ := g.GetStateInt("current_number", start)
 	return currentNumber > end
 }
 
-// Exec returns the generalized chain function for the numbers generator
-func (g *PrimeNumbers) Exec() {
+// Progress returns the generalized chain function for the numbers generator
+func (g *PrimeNumbers) Progress() {
 	start := g.GetIntParam("start", 2)
 	end := g.GetIntParam("end", 100)
 	currentNumber, exists := g.GetStateInt("current_number", start)
@@ -65,7 +65,7 @@ type PrimeSequence struct {
 }
 
 // NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
+func NewPrimeSequence(metadata Metadata, spec WantSpec) Progressable {
 	return &PrimeSequence{*NewWantWithLocals(
 		metadata,
 		spec,
@@ -76,16 +76,16 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-// IsDone checks if prime sequence filtering is complete
-func (f *PrimeSequence) IsDone() bool {
+// IsAchieved checks if prime sequence filtering is complete
+func (f *PrimeSequence) IsAchieved() bool {
 	achieved, _ := f.GetStateBool("achieved", false)
 	return achieved
 }
 
-// Exec returns the generalized chain function for the filter
+// Progress returns the generalized chain function for the filter
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
-func (f *PrimeSequence) Exec() {
+func (f *PrimeSequence) Progress() {
 	locals, ok := f.Locals.(*PrimeSequenceLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access PrimeSequenceLocals from Want.Locals")
