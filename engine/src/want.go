@@ -476,14 +476,14 @@ func (n *Want) StartExecution(
 				continue
 			}
 
+			// 3.1. Check if want is done (before precondition check)
+			if n.executable != nil && n.executable.IsDone() {
+			n.SetStatus(WantStatusAchieved)
+				return
+			}
 			// 3.5. Get current paths (called each iteration to track topology changes)
 			currentPaths := getPathsFunc()
 
-			// 3.7. Check if want is done (before precondition check)
-			if n.executable != nil && n.executable.IsDone() {
-			n.SetStatus(WantStatusAchieved)
-			return
-		}
 
 			// 3.8. Check preconditions: verify required providers/users are connected
 			if !n.checkPreconditions(currentPaths) {

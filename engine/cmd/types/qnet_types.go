@@ -92,7 +92,11 @@ func (g *Numbers) IsDone() bool {
 		return false
 	}
 	paramCount := g.GetIntParam("count", locals.Count)
-	return locals.currentCount >= paramCount
+	isDone := locals.currentCount >= paramCount
+	if isDone {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-ISDONE] Complete: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
+	}
+	return isDone
 }
 
 // Exec executes the numbers generator directly with dynamic parameter reading
@@ -118,6 +122,7 @@ func (g *Numbers) Exec() {
 	}
 
 	if locals.currentCount >= paramCount {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Complete: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
 		g.StoreStateMulti(map[string]interface{}{
 			"total_processed":      locals.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
@@ -127,10 +132,15 @@ func (g *Numbers) Exec() {
 			"achieving_percentage": 100,
 		})
 
-		g.SendPacketMulti(QueuePacket{Num: -1, Time: 0})
+		endPacket := QueuePacket{Num: -1, Time: 0}
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
+		g.SendPacketMulti(endPacket)
 		return
 	}
 	locals.currentCount++
+	if locals.currentCount % 100 == 0 {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
+	}
 
 	if useDeterministic {
 		// Deterministic inter-arrival time (rate = 1/interval)
@@ -188,6 +198,9 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable 
 // IsDone checks if queue is complete (end signal received)
 func (q *Queue) IsDone() bool {
 	completed, _ := q.GetStateBool("completed", false)
+	if completed {
+		q.StoreLog("[QUEUE-ISDONE] Completed! Shifting to achieved")
+	}
 	return completed
 }
 
@@ -213,15 +226,18 @@ func (q *Queue) Exec() {
 
 	// Check if input channels are connected before attempting receive
 	if q.GetInCount() == 0 {
+		q.StoreLog("[QUEUE-EXEC] No input channels, waiting for connection")
 		return  // No input channels, nothing to process
 	}
 
 	_, i, ok := q.ReceiveFromAnyInputChannel(100)  // Use 100ms timeout instead of forever
 	if !ok {
+		q.StoreLog("[QUEUE-EXEC] No packet received (timeout)")
 		return
 	}
 
 	packet := i.(QueuePacket)
+	q.StoreLog(fmt.Sprintf("[QUEUE-EXEC] Received packet: num=%d, ended=%v", packet.Num, packet.IsEnded()))
 	if packet.IsEnded() {
 		// Always flush batch and store final state when terminating
 		q.flushBatch(locals)
@@ -232,6 +248,7 @@ func (q *Queue) Exec() {
 		}
 		// Forward end signal to next want
 		q.SendPacketMulti(packet)
+		q.StoreLog("[QUEUE-EXEC] Setting completed=true")
 		q.StoreState("completed", true)
 		return
 	}
