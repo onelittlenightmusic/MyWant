@@ -1014,13 +1014,13 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 					return true
 				}
 
-				// Also check if upstream has pending packets even if it's achieved
-				// Upstream may have new packets queued after completion (e.g. Flight rebooking)
-				// Check the shared input channel that connects upstream output to downstream input
+				// Also check if downstream has pending packets even if upstream is achieved
+				// Downstream may have new packets queued after completion (e.g. Flight rebooking)
+				// Check the downstream's input channels that connect to this upstream
 				if status == WantStatusAchieved {
-					if upstreamPaths, exists := cb.pathMap[otherName]; exists {
-						for _, outPath := range upstreamPaths.Out {
-							if outPath.Channel != nil && len(outPath.Channel) > 0 {
+					if downstreamPaths, exists := cb.pathMap[wantName]; exists {
+						for _, inPath := range downstreamPaths.In {
+							if inPath.Channel != nil && len(inPath.Channel) > 0 {
 								return true
 							}
 						}
