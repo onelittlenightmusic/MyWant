@@ -92,7 +92,15 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 func (c *CoordinatorWant) IsAchieved() bool {
 	completionKey := c.DataHandler.GetCompletionKey()
 	completed, _ := c.GetStateBool(completionKey, false)
-	return completed
+
+	// Even if completion flag is set, check if there are unused packets remaining
+	// This allows coordinator to retrigger when new packets arrive (e.g., during rebooking)
+	if completed {
+		// Return false if unused packets exist, allowing further processing
+		return !c.UnusedExists()
+	}
+
+	return false
 }
 
 // Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.

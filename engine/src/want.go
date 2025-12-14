@@ -1139,6 +1139,30 @@ func (n *Want) GetPaths() *Paths {
 	return &n.paths
 }
 
+// UnusedExists checks if there are unused packets in any input channel without consuming them
+// Returns true if any input channel has pending packets in its buffer
+func (n *Want) UnusedExists() bool {
+	paths := n.GetPaths()
+	if paths == nil || len(paths.In) == 0 {
+		return false
+	}
+
+	// Check each input channel for pending packets
+	for _, pathInfo := range paths.In {
+		if pathInfo.Channel == nil {
+			continue
+		}
+
+		// For buffered channels, len() returns the number of buffered elements
+		// This doesn't consume the packet, just checks if data is available
+		if len(pathInfo.Channel) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
