@@ -1,48 +1,7 @@
-package main
+// Moved to: demos/debug_simple/main.go
+// This file is kept as a placeholder to avoid duplicate `package main` files
+// in the demos directory root. The progressable demo lives in the subdirectory
+// `engine/cmd/demos/debug_simple`.
 
-import (
-	"fmt"
-	types "mywant/engine/cmd/types"
-	mywant "mywant/engine/src"
-)
+package demos_moved
 
-func main() {
-	// Simple inline config
-	wants := []*mywant.Want{
-		{
-			Metadata: mywant.Metadata{
-				Name: "test_gen",
-				Type: "qnet numbers",
-				Labels: map[string]string{"role": "source"},
-			},
-			Spec: mywant.WantSpec{
-				Params: map[string]interface{}{
-					"count": 5,
-					"rate": 1.0,
-					"deterministic": true,
-				},
-			},
-		},
-	}
-
-	config := &mywant.Config{Wants: wants}
-
-	fmt.Println("Creating ChainBuilder...")
-	builder := mywant.NewChainBuilder(*config)
-	types.RegisterQNetWantTypes(builder)
-
-	fmt.Println("\n=== Before Execute ===")
-	states := builder.GetAllWantStates()
-	for name, state := range states {
-		fmt.Printf("%s: status=%s\n", name, state.Status)
-	}
-
-	fmt.Println("\nCalling builder.Execute()...")
-	builder.Execute()
-
-	fmt.Println("\n=== After Execute ===")
-	states = builder.GetAllWantStates()
-	for name, state := range states {
-		fmt.Printf("%s: status=%s, state=%+v\n", name, state.Status, state.State)
-	}
-}

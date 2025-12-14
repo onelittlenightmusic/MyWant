@@ -238,8 +238,8 @@ type OwnerAwareWant struct {
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 	// Call the original Exec method directly
-	if executable, ok := oaw.BaseWant.(Executable); ok {
-		result := executable.Exec(inputs, outputs)
+	if progressable, ok := oaw.BaseWant.(Progressable); ok {
+		result := progressable.Exec(inputs, outputs)
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {

@@ -70,7 +70,7 @@ Contents:
 
 | Concept | File | Lines | Details |
 |---------|------|-------|---------|
-| Executable Interface | declarative.go | 117-120 | Method signature for Exec() |
+| Progressable Interface | declarative.go | 117-120 | Method signature for Exec() |
 | PathInfo/Paths Types | declarative.go | 149-159 | Data structures for paths |
 | generatePathsFromConnections() | chain_builder.go | 156-288 | Main path generation function |
 | Local using processing | chain_builder.go | 172-230 | Process want.spec.Using |
@@ -78,9 +78,9 @@ Contents:
 | Channel creation | chain_builder.go | 663-686 | Create actual channel objects |
 | startWant() function | chain_builder.go | 1569-1660 | Want execution goroutine |
 | Exec() call site | chain_builder.go | 1630 | Actual Exec() call location |
-| Execution cycle wrapping | chain_builder.go | 1626-1637 | BeginExecCycle/EndExecCycle |
+| Execution cycle wrapping | chain_builder.go | 1626-1637 | BeginProgressCycle/EndProgressCycle |
 | Level 2 coordinator Exec | approval_types.go | 464-540 | How coordinator processes inputs |
-| State batching | want.go | 166-206, 354-422 | BeginExecCycle, StoreState, EndExecCycle |
+| State batching | want.go | 166-206, 354-422 | BeginProgressCycle, StoreState, EndProgressCycle |
 
 ## Data Structures
 
@@ -101,7 +101,7 @@ type Paths struct {
 }
 ```
 
-### Executable Interface
+### Progressable Interface
 ```go
 type ChainWant interface {
     Exec(using []chain.Chan, outputs []chain.Chan) bool
@@ -129,9 +129,9 @@ type ChainWant interface {
    └─ Launch goroutine with Exec() loop
 
 5. Execution Phase
-   ├─ BeginExecCycle() - initialize state batching
+   ├─ BeginProgressCycle() - initialize state batching
    ├─ Exec(usingChans, outputChans) - main logic
-   ├─ EndExecCycle() - commit batched state changes
+   ├─ EndProgressCycle() - commit batched state changes
    └─ Repeat until finished
 
 6. Inside Exec()
@@ -177,9 +177,9 @@ The "_global" suffix is purely informational - the execution treats them identic
 ### State Batching Optimization
 During `Exec()`, state changes are batched for efficiency:
 
-1. **BeginExecCycle()**: Initialize `pendingStateChanges` map, set `inExecCycle = true`
+1. **BeginProgressCycle()**: Initialize `pendingStateChanges` map, set `inExecCycle = true`
 2. **During Exec()**: `StoreState()` calls append to `pendingStateChanges` without locks
-3. **EndExecCycle()**: Apply batched changes to `State`, create history entries
+3. **EndProgressCycle()**: Apply batched changes to `State`, create history entries
 
 This minimizes lock contention during execution.
 

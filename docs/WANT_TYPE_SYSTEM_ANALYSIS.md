@@ -379,11 +379,11 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 
 ## 6. EXECUTION INTERFACES
 
-### 6.1 Executable Interface
+### 6.1 Progressable Interface
 **File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:116`
 
 ```go
-type Executable interface {
+type Progressable interface {
     Exec(using []chain.Chan, outputs []chain.Chan) bool
     GetWant() *Want
 }
@@ -507,9 +507,9 @@ if attempted {
 func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
     // Begin batching state changes
     {
-        t.BeginExecCycle()
+        t.BeginProgressCycle()
         t.StoreState("schedules", schedules)
-        t.EndExecCycle()
+        t.EndProgressCycle()
     }
     // ... more logic ...
 }
@@ -645,8 +645,8 @@ func NewWantType(metadata Metadata, spec WantSpec) interface{} {
 - `GetAllState() map[string]interface{}` - Get entire state map
 
 ### Execution Lifecycle
-- `BeginExecCycle()` - Start batching state changes
-- `EndExecCycle()` - Commit batched changes
+- `BeginProgressCycle()` - Start batching state changes
+- `EndProgressCycle()` - Commit batched changes
 - `AggregateChanges()` - Merge pending changes into state
 
 ### Initialization

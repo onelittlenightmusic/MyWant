@@ -64,44 +64,44 @@ test-build:
 	cd engine && go mod tidy && go build ./src/...
 
 run-fibonacci-loop:
-	go run -C engine cmd/demos/demo_fibonacci_loop.go ../config/config-fibonacci-loop.yaml
+	go run -C engine ./cmd/demos/demo_fibonacci_loop ../config/config-fibonacci-loop.yaml
 
 run-fibonacci-recipe:
-	go run -C engine cmd/demos/demo_fibonacci_recipe.go ../config/config-fibonacci-recipe.yaml
+	go run -C engine ./cmd/demos/demo_fibonacci_recipe ../config/config-fibonacci-recipe.yaml
 
 run-prime:
-	go run -C engine cmd/demos/demo_prime.go ../config/config-prime.yaml
+	go run -C engine ./cmd/demos/demo_prime ../config/config-prime.yaml
 
 run-qnet:
-	go run -C engine cmd/demos/demo_qnet.go ../config/config-qnet.yaml
+	go run -C engine ./cmd/demos/demo_qnet ../config/config-qnet.yaml
 
 run-qnet-recipe:
-	go run -C engine cmd/demos/demo_qnet_owner.go ../config/config-qnet-recipe.yaml
+	go run -C engine ./cmd/demos/demo_qnet_owner ../config/config-qnet-recipe.yaml
 
 run-travel:
-	go run -C engine cmd/demos/demo_travel.go ../config/config-travel.yaml
+	go run -C engine ./cmd/demos/demo_travel ../config/config-travel.yaml
 
 # Recipe-based execution targets
 run-travel-recipe:
-	go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-travel-recipe.yaml
+	go run -C engine ./cmd/demos/demo_travel_recipe ../config/config-travel-recipe.yaml
 
 run-travel-agent:
-	go run -C engine cmd/demos/demo_travel_agent.go ../config/config-travel-agent.yaml
+	go run -C engine ./cmd/demos/demo_travel_agent ../config/config-travel-agent.yaml
 
 run-travel-agent-full:
-	go run -C engine cmd/demos/demo_travel_agent_full.go ../config/config-travel-agent-full.yaml
+	go run -C engine ./cmd/demos/demo_travel_agent_full ../config/config-travel-agent-full.yaml
 
 run-travel-agent-direct:
-	go run -C engine cmd/demos/demo_travel_agent_full.go ../config/config-travel-agent-direct.yaml
+	go run -C engine ./cmd/demos/demo_travel_agent_full ../config/config-travel-agent-direct.yaml
 
 run-hierarchical-approval:
-	go run -C engine cmd/demos/demo_hierarchical_approval.go ../config/config-hierarchical-approval.yaml
+	go run -C engine ./cmd/demos/demo_hierarchical_approval ../config/config-hierarchical-approval.yaml
 
 run-dynamic-travel-change:
-	timeout 140 go run -C engine cmd/demos/demo_travel_recipe.go ../config/config-dynamic-travel-change.yaml 120
+	timeout 140 go run -C engine ./cmd/demos/demo_travel_recipe ../config/config-dynamic-travel-change.yaml 120
 
 run-flight:
-	go run -C engine cmd/demos/demo_flight.go ../config/config-flight.yaml
+	go run -C engine ./cmd/demos/demo_flight ../config/config-flight.yaml
 
 test-monitor-flight-api:
 	@echo "🧪 Testing MonitorFlightAPI..."

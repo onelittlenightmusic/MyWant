@@ -114,7 +114,7 @@ Here are useful searches to understand the codebase:
 ```python
 # Core Want System
 rag.search("Exec", entity_types=['function'])  # Want execution
-rag.search("BeginExecCycle", entity_types=['function'])  # State management
+rag.search("BeginProgressCycle", entity_types=['function'])  # State management
 rag.search("GetState", entity_types=['function'])  # State access
 
 # Channel Communication

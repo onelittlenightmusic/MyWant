@@ -182,3 +182,43 @@ func ClearNotificationHistory() {
 	defer historyMutex.Unlock()
 	notificationHistory = notificationHistory[:0]
 }
+
+// GetRegisteredListeners returns the list of subscriber names currently registered
+// in the global unified subscription system. This is useful for debugging and
+// for demo code to introspect active listeners.
+func GetRegisteredListeners() []string {
+	uss := GetGlobalSubscriptionSystem()
+	uss.mutex.RLock()
+	defer uss.mutex.RUnlock()
+
+	seen := make(map[string]bool)
+	names := make([]string, 0)
+	for _, subs := range uss.subscriptions {
+		for _, s := range subs {
+			name := s.GetSubscriberName()
+			if !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
+	}
+	return names
+}
+
+// GetSubscriptions returns a map of subscriber -> StateSubscriptions declared
+// on each registered want. This is intended for demo and debugging purposes.
+func GetSubscriptions() map[string][]StateSubscription {
+	wantRegistryMutex.RLock()
+	defer wantRegistryMutex.RUnlock()
+
+	result := make(map[string][]StateSubscription)
+	for _, w := range wantRegistry {
+		if len(w.Spec.StateSubscriptions) > 0 {
+			// copy to avoid sharing underlying slice
+			subsCopy := make([]StateSubscription, len(w.Spec.StateSubscriptions))
+			copy(subsCopy, w.Spec.StateSubscriptions)
+			result[w.Metadata.Name] = subsCopy
+		}
+	}
+	return result
+}

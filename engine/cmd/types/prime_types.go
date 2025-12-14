@@ -27,30 +27,27 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Progressable {
 
 // IsAchieved checks if prime number generation is complete
 func (g *PrimeNumbers) IsAchieved() bool {
-	start := g.GetIntParam("start", 2)
+	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
 	currentNumber, _ := g.GetStateInt("current_number", start)
-	return currentNumber > end
+	return currentNumber >= end
 }
 
 // Progress returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Progress() {
-	start := g.GetIntParam("start", 2)
+	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
-	currentNumber, exists := g.GetStateInt("current_number", start)
+	currentNumber, _ := g.GetStateInt("current_number", start)
 
-	if !exists {
-		currentNumber = start
-	}
-
-	if currentNumber > end {
-		// Send end signal
-		g.Provide(-1)
-		return
-	}
+	currentNumber += 1
 
 	g.Provide(currentNumber)
-	g.StoreState("current_number", currentNumber+1)
+	if currentNumber >= end {
+		// Send end signal
+		g.Provide(-1)
+	}
+
+	g.StoreState("current_number", currentNumber)
 }
 
 // PrimeSequenceLocals holds type-specific local state for PrimeSequence want

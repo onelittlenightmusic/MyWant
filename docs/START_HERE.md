@@ -90,7 +90,7 @@ Want Type System
 │   └── System domain (2 types)
 ├── State Management
 │   ├── StoreState/GetState (thread-safe)
-│   ├── Batching (BeginExecCycle/EndExecCycle)
+│   ├── Batching (BeginProgressCycle/EndProgressCycle)
 │   └── History (differential tracking)
 ├── Connectivity
 │   ├── Label-based selectors

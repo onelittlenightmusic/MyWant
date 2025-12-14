@@ -207,8 +207,8 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 // Exec wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 	// Call the original Exec method directly
-	if chainWant, ok := oaw.BaseWant.(Executable); ok {
-		result := executable.Exec(inputs, outputs)
+	if chainWant, ok := oaw.BaseWant.(Progressable); ok {
+		result := progressable.Exec(inputs, outputs)
 
 		// If want completed successfully and we have a target, notify it
 		if result && oaw.TargetName != "" {
@@ -218,7 +218,7 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 
 		return result
 	} else {
-		// Fallback for non-Executable types
+		// Fallback for non-Progressable types
 		InfoLog("[TARGET] ⚠️  Want %s: No Exec method available\n", oaw.WantName)
 		return true
 	}

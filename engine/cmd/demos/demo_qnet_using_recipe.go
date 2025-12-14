@@ -1,4 +1,4 @@
-package main
+package demos_moved
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func main() {
+func RunDemoQnetUsingRecipe() {
 	fmt.Println("🔗 QNet Demo with Using Fields from YAML (Not Hardcoded)")
 	fmt.Println("=========================================================")
 	fmt.Println("This demo shows using field connections defined in YAML:")

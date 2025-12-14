@@ -138,13 +138,13 @@ MyWant uses **dual-layer state management**:
 
 ```go
 // Batched state updates (recommended)
-want.BeginExecCycle()
+want.BeginProgressCycle()
 want.StageStateChange(map[string]interface{}{
     "batch_size": 1000,
     "processed_count": 5000,
     "status": "processing",
 })
-want.EndExecCycle()  // Commits all staged changes atomically
+want.EndProgressCycle()  // Commits all staged changes atomically
 
 // Agent state updates
 want.StageStateChange("reservation_id", "HTL-12345")
@@ -233,7 +233,7 @@ spec:
 
 ```go
 // ✅ Efficient state management
-want.BeginExecCycle()
+want.BeginProgressCycle()
 want.StageStateChange(map[string]interface{}{
     "processed_count": count,
     "status": "active",
@@ -242,7 +242,7 @@ want.StageStateChange(map[string]interface{}{
         "error_rate": errorRate,
     },
 })
-want.EndExecCycle()  // Atomic commit
+want.EndProgressCycle()  // Atomic commit
 ```
 
 MyWant's declarative want system transforms complex distributed processing into simple, readable configuration that expresses **what you want to achieve** rather than **how to achieve it**.

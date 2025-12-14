@@ -465,9 +465,9 @@ All want types have been migrated from verbose `usageLimit` blocks to simple `re
 - **Savings**: 128 lines removed, cleaner configuration, same functionality
 
 #### Execution Lifecycle
-1. **BeginExecCycle()** - Start batching state changes
+1. **BeginProgressCycle()** - Start batching state changes
 2. **Exec()** - Main execution logic with channel I/O
-3. **EndExecCycle()** - Commit batched changes to state and history
+3. **EndProgressCycle()** - Commit batched changes to state and history
 4. **State Persistence** - Survives across executions via memory reconciliation
 
 #### Key Methods
@@ -778,7 +778,7 @@ python3 tools/codebase_rag.py
 #### Understanding Want Execution
 ```python
 results = rag.search("Exec", entity_types=['function'])  # Find Exec implementations
-results = rag.search("BeginExecCycle", entity_types=['function'])  # State management
+results = rag.search("BeginProgressCycle", entity_types=['function'])  # State management
 results = rag.search("GetState", entity_types=['function'])  # State access methods
 ```
 

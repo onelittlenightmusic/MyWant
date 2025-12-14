@@ -84,7 +84,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>" --no-verify || true
 fi
 EOF
 
-# Make the hook executable
+# Make the hook progressable
 chmod +x "$POST_COMMIT_HOOK"
 
 echo "✅ Post-commit hook installed at: $POST_COMMIT_HOOK"

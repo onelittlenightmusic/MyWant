@@ -16,7 +16,7 @@
 
 `engine/cmd/types/coordinator_types.go`:
 ```go
-func NewCoordinatorWant(metadata Metadata, spec WantSpec) Executable {
+func NewCoordinatorWant(metadata Metadata, spec WantSpec) Progressable {
     want := NewWantWithLocals(
         metadata,
         spec,
@@ -212,21 +212,21 @@ func NewWantWithLocals(
 `ChainBuilder.createWant()`またはFactory関数呼び出し時に、登録済みの`ConnectivityMetadata`を適用：
 
 ```go
-func (cb *ChainBuilder) createWant(metadata Metadata, spec WantSpec) (Executable, error) {
+func (cb *ChainBuilder) createWant(metadata Metadata, spec WantSpec) (Progressable, error) {
     factory, exists := cb.wantRegistries[metadata.Type]
     if !exists {
         return nil, fmt.Errorf("want type %s not registered", metadata.Type)
     }
 
     // Factory関数を呼び出す
-    executable := factory.Factory(metadata, spec)
+    progressable := factory.Factory(metadata, spec)
 
     // ConnectivityMetadataをWantに適用
-    if want, ok := executable.(*Want); ok && factory.Connectivity != nil {
+    if want, ok := progressable.(*Want); ok && factory.Connectivity != nil {
         want.ConnectivityMetadata = *factory.Connectivity
     }
 
-    return executable, nil
+    return progressable, nil
 }
 ```
 
@@ -236,7 +236,7 @@ func (cb *ChainBuilder) createWant(metadata Metadata, spec WantSpec) (Executable
 
 **Before:**
 ```go
-func NewCoordinatorWant(metadata Metadata, spec WantSpec) Executable {
+func NewCoordinatorWant(metadata Metadata, spec WantSpec) Progressable {
     want := NewWantWithLocals(
         metadata,
         spec,
@@ -258,7 +258,7 @@ func NewCoordinatorWant(metadata Metadata, spec WantSpec) Executable {
 
 **After:**
 ```go
-func NewCoordinatorWant(metadata Metadata, spec WantSpec) Executable {
+func NewCoordinatorWant(metadata Metadata, spec WantSpec) Progressable {
     want := NewWantWithLocals(
         metadata,
         spec,

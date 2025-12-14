@@ -33,18 +33,18 @@ func (g *FibonacciNumbers) Progress() {
 	b, _ := g.GetStateInt("b", 1)
 	sentCount, _ := g.GetStateInt("sent_count", 0)
 
-	if sentCount >= count {
-		// Send end signal
-		g.Provide(-1)
-		return
-	}
-
+	sentCount += 1
 	g.Provide(a)
 	g.StoreStateMulti(map[string]interface{}{
 		"a":          b,
 		"b":          a + b,
-		"sent_count": sentCount + 1,
+		"sent_count": sentCount,
 	})
+	if sentCount >= count {
+		// Send end signal
+		g.Provide(-1)
+	}
+
 }
 
 // FibonacciFilterLocals holds type-specific local state for FibonacciFilter want
@@ -82,12 +82,6 @@ func (f *FibonacciFilter) Progress() {
 	locals, ok := f.Locals.(*FibonacciFilterLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")
-		return
-	}
-
-	// Check if already achieved from previous execution
-	achieved, _ := f.GetStateBool("achieved", false)
-	if achieved {
 		return
 	}
 

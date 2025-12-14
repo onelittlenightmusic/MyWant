@@ -13,7 +13,7 @@ The main document covering:
 - Want type definition patterns with multiple examples
 - Registration system and type registration process
 - Parameter extraction patterns for all data types
-- Execution interfaces (Executable, PacketHandler)
+- Execution interfaces (Progressable, PacketHandler)
 - Connectivity metadata system
 - State management with thread safety
 - YAML configuration structure
@@ -182,7 +182,7 @@ func NewMyWant(metadata Metadata, spec WantSpec) interface{} {
 
 - **Storage**: `want.StoreState(key, value)` (thread-safe)
 - **Retrieval**: `value, exists := want.GetState(key)` (thread-safe)
-- **Batching**: `BeginExecCycle()` / `EndExecCycle()`
+- **Batching**: `BeginProgressCycle()` / `EndProgressCycle()`
 - **Persistent**: State survives across cycles
 - **Thread-Safe**: Mutex-protected internally
 

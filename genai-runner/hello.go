@@ -1,4 +1,4 @@
-package main // Declares the package as 'main', which is required for executable programs.
+package main // Declares the package as 'main', which is required for progressable programs.
 
 import "fmt" // Imports the "fmt" package, which provides functions for formatted I/O (like printing to the console).
 

@@ -960,10 +960,23 @@ func (cb *ChainBuilder) startPhase() {
 		// Second pass: restart completed wants if their upstream is running/idle
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusAchieved {
-				if cb.shouldRestartCompletedWant(wantName, want) {
+				shouldRestart := cb.shouldRestartCompletedWant(wantName, want)
+				if shouldRestart {
+					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting - upstream has new data\n", wantName, want.GetMetadata().Type)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
+				} else if wantName == "dynamic-travel-change-example-coordinator-5" || want.GetMetadata().Type == "coordinator" {
+					// Debug logging for coordinator
+					InfoLog("[RECONCILE:RETRIGGER] Coordinator '%s' NOT restarting - checking upstream status...\n", wantName)
+					for _, usingSelector := range want.GetSpec().Using {
+						for otherName, otherWant := range cb.wants {
+							if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
+								status := otherWant.want.GetStatus()
+								InfoLog("[RECONCILE:RETRIGGER]   Upstream %s (type=%s): status=%s\n", otherName, otherWant.GetMetadata().Type, status)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -999,6 +1012,28 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 				status := otherWant.want.GetStatus()
 				if status == WantStatusReaching || status == WantStatusIdle {
 					return true
+				}
+
+				// Also check if upstream has pending output packets even if it's achieved
+				// This handles retrigger cases like Flight rebooking after initial completion
+				if status == WantStatusAchieved {
+					// Check upstream want's output channels for pending packets
+					if upstreamPaths, exists := cb.pathMap[otherName]; exists {
+						InfoLog("[RECONCILE:RETRIGGER] Checking upstream '%s' (type=%s) for pending packets: %d output channels\n", otherName, otherWant.GetMetadata().Type, len(upstreamPaths.Out))
+						for i, outPath := range upstreamPaths.Out {
+							lenval := 0
+							if outPath.Channel != nil {
+								lenval = len(outPath.Channel)
+							}
+							InfoLog("[RECONCILE:RETRIGGER]   Channel %d: %d pending packets\n", i, lenval)
+							if outPath.Channel != nil && len(outPath.Channel) > 0 {
+								InfoLog("[RECONCILE:RETRIGGER] Found pending packets in upstream '%s' output (type=%s) - will retrigger downstream\n", otherName, otherWant.GetMetadata().Type)
+								return true
+							}
+						}
+					} else {
+						InfoLog("[RECONCILE:RETRIGGER] No paths found in pathMap for upstream '%s'\n", otherName)
+					}
 				}
 			}
 		}
@@ -2495,10 +2530,15 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		InfoLog("[RETRIGGER-RECEIVER] Successfully reset '%s' to Idle for re-execution\n", wantName)
 		// InfoLog("[RETRIGGER-RECEIVER] Verify status after reset: '%s' now has status %s\n", wantName, want.GetStatus())
 
-		// Queue a reconciliation trigger to let the reconcile loop handle the retry
+		// Immediately restart the want to allow it to receive the new packet
+		// This is important for streaming scenarios where new data arrives after completion
+		InfoLog("[RETRIGGER-RECEIVER] Immediately restarting '%s' to receive rebooked/new packets\n", wantName)
+		cb.startWant(wantName, runtimeWant)
+
+		// Also queue a reconciliation trigger as backup (in case startWant missed anything)
 		select {
 		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
-			InfoLog("[RETRIGGER-RECEIVER] Queued reconciliation trigger for '%s'\n", wantName)
+			InfoLog("[RETRIGGER-RECEIVER] Queued reconciliation trigger for '%s' (backup)\n", wantName)
 		default:
 			// Channel full, ignore (next reconciliation cycle will handle it)
 		}

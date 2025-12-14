@@ -152,7 +152,7 @@ Results:
    📝 Main execution method for want processing
    ⚙️  func (w *Want) Exec() bool { ...
 
-2. BeginExecCycle (function)
+2. BeginProgressCycle (function)
    📁 engine/src/chain.go:89
    📝 Start batching state changes for execution
    ...

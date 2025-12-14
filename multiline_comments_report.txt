@@ -194,7 +194,7 @@ Lines: 34-36 (3 lines)
 ====================================================================================================
 // Exec executes flight agent actions and returns FlightSchedule
 // NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
-// Individual agents should NOT call BeginExecCycle/EndExecCycle
+// Individual agents should NOT call BeginProgressCycle/EndProgressCycle
 
 ====================================================================================================
 #26 - engine/cmd/types/agent_flight.go
@@ -255,7 +255,7 @@ Lines: 233-235 (3 lines)
 ====================================================================================================
 	// Store reservation in want state
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
-	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+	// Individual agents should NOT call BeginProgressCycle/EndProgressCycle
 
 ====================================================================================================
 #33 - engine/cmd/types/agent_flight_api.go
@@ -302,7 +302,7 @@ Lines: 166-168 (3 lines)
 ====================================================================================================
 	// Only update state if state has actually changed (differential history)
 	// NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go
-	// Individual agents should NOT call BeginExecCycle/EndExecCycle
+	// Individual agents should NOT call BeginProgressCycle/EndProgressCycle
 
 ====================================================================================================
 #39 - engine/cmd/types/agent_monitor_flight_api.go
@@ -550,13 +550,13 @@ Lines: 113-120 (8 lines)
 Lines: 296-297 (2 lines)
 ====================================================================================================
 // sendFlightPacket sends a flight schedule packet to the output channel and logs it
-// Uses SendPacketMulti to send with retrigger logic for achieved receivers
+// Uses Provide to send with retrigger logic for achieved receivers
 
 ====================================================================================================
 #70 - engine/cmd/types/flight_types.go
 Lines: 311-312 (2 lines)
 ====================================================================================================
-	// Send via SendPacketMulti which uses paths from want setup
+	// Send via Provide which uses paths from want setup
 	// Paths.Out contains the channels configured during want initialization
 
 ====================================================================================================
@@ -592,7 +592,7 @@ Lines: 93-94 (2 lines)
 Lines: 154-162 (9 lines)
 ====================================================================================================
 				// if f.paths.GetOutCount() > 0 {
-				// 	f.SendPacketMulti(val)
+				// 	f.Provide(val)
 				// }
 				// Update live state immediately when prime is found
 				// f.StoreStateMulti(map[string]interface{}{
@@ -806,7 +806,7 @@ Lines: 463-468 (6 lines)
 			// The sink should wait until a termination packet is received.
 			// We return false to continue the execution loop.
 			// If we return true, the sink will be marked as completed and will not process any more packets.
-			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever.
+			// The timeout in Use helps to not block the execution loop forever.
 			// if the timeout is reached, the loop will continue to the next iteration.
 
 ====================================================================================================
@@ -1640,7 +1640,7 @@ Lines: 67-71 (5 lines)
 #209 - engine/src/chain_helpers.go
 Lines: 77-94 (18 lines)
 ====================================================================================================
-// ReceiveFromAnyInputChannel attempts to receive data from any available input channel
+// Use attempts to receive data from any available input channel
 // using non-blocking select. Returns the channel index that had data, the data itself,
 // and whether a successful read occurred.
 //
@@ -1654,7 +1654,7 @@ Lines: 77-94 (18 lines)
 //   - ok: True if data was successfully received, false otherwise
 //
 // Usage:
-//   index, data, ok := w.ReceiveFromAnyInputChannel()
+//   index, data, ok := w.Use()
 //   if ok {
 //       fmt.Printf("Received data from channel %d: %v\n", index, data)
 //   }
@@ -1880,7 +1880,7 @@ Lines: 185-188 (4 lines)
 #239 - engine/src/want.go
 Lines: 198-199 (2 lines)
 ====================================================================================================
-	// Note: Retrigger is triggered by SendPacketMulti(), not here
+	// Note: Retrigger is triggered by Provide(), not here
 	// Only wants that send packets should trigger dependent want re-execution
 
 ====================================================================================================
@@ -2189,7 +2189,7 @@ Lines: 1080-1081 (2 lines)
 #277 - engine/src/want.go
 Lines: 1101-1103 (3 lines)
 ====================================================================================================
-// SendPacketMulti broadcasts a packet to all output channels
+// Provide broadcasts a packet to all output channels
 // This method sends packets through paths defined in the want's output paths
 // Each output path contains the channel and target want name
 
@@ -2312,7 +2312,7 @@ Lines: 168-170 (3 lines)
 ====================================================================================================
 		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle
 		// This ensures all agent state changes are batched into a single history entry
-		// Individual agents should NOT call BeginExecCycle/EndExecCycle themselves
+		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
 
 ====================================================================================================
 #292 - engine/src/want_agent.go

@@ -68,11 +68,11 @@ func TestWantExecCycle(t *testing.T) {
 	}
 
 	// Test exec cycle batching
-	want.BeginExecCycle()
+	want.BeginProgressCycle()
 	want.StoreState("key1", "value1")
 	want.StoreState("key2", "value2")
 
-	want.EndExecCycle()
+	want.EndProgressCycle()
 
 	// Verify state was stored
 	value1, exists1 := want.GetState("key1")

@@ -161,8 +161,8 @@ func (r *AgentRegistry) hotelReservationMonitor(ctx context.Context, want *Want)
 ```go
 func (hw *HotelWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
     // Begin exec cycle
-    hw.Want.BeginExecCycle()
-    defer hw.Want.EndExecCycle()
+    hw.Want.BeginProgressCycle()
+    defer hw.Want.EndProgressCycle()
 
     // Execute agents based on requirements
     if err := hw.Want.ExecuteAgents(); err != nil {
