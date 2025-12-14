@@ -957,26 +957,18 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		// Second pass: restart completed wants if their upstream is running/idle
+		// Second pass: restart completed wants if they have pending input packets
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusAchieved {
-				shouldRestart := cb.shouldRestartCompletedWant(wantName)
-				if shouldRestart {
-					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting - upstream has new data\n", wantName, want.GetMetadata().Type)
+				// Ask the want itself if it has unused/pending packets
+				// UnusedExists uses want.paths which was synchronized at the beginning of this reconcile loop
+				// This is safe and provides better encapsulation than checking cb.pathMap directly
+				hasUnused := want.want.UnusedExists(100)
+				if hasUnused {
+					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting - has pending input packets\n", wantName, want.GetMetadata().Type)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
-				} else if wantName == "dynamic-travel-change-example-coordinator-5" || want.GetMetadata().Type == "coordinator" {
-					// Debug logging for coordinator
-					InfoLog("[RECONCILE:RETRIGGER] Coordinator '%s' NOT restarting - checking upstream status...\n", wantName)
-					for _, usingSelector := range want.GetSpec().Using {
-						for otherName, otherWant := range cb.wants {
-							if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
-								status := otherWant.want.GetStatus()
-								InfoLog("[RECONCILE:RETRIGGER]   Upstream %s (type=%s): status=%s\n", otherName, otherWant.GetMetadata().Type, status)
-							}
-						}
-					}
 				}
 			}
 		}
@@ -999,23 +991,6 @@ func (cb *ChainBuilder) startPhase() {
 		}
 	} else {
 	}
-}
-
-// shouldRestartCompletedWant checks if a completed want should restart due to pending input packets
-// Simplified approach: only check if there are pending packets in input channels
-// This is sufficient because:
-// - If packets are pending, upstream must exist and have sent them
-// - No need to validate upstream status or selectors - the packets themselves are evidence
-func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string) bool {
-	// Check if this want has any pending packets waiting in input channels
-	if downstreamPaths, exists := cb.pathMap[wantName]; exists {
-		for _, inPath := range downstreamPaths.In {
-			if len(inPath.Channel) > 0 {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // detectConfigChanges compares configs and returns change events
