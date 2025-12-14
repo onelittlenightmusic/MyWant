@@ -963,25 +963,10 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		// Second pass: restart wants with inactive goroutines if they have pending input packets
-		// This is a backup mechanism for retrigger - catches cases where SendPacketMulti's immediate
-		// retrigger might have missed, or packets arrived after goroutine exited
-		for wantName, want := range cb.wants {
-			// Check if goroutine is NOT running
-			want.goroutineActiveMu.RLock()
-			isGoroutineActive := want.goroutineActive
-			want.goroutineActiveMu.RUnlock()
-
-			if !isGoroutineActive {
-				// Goroutine has exited - check for pending packets with timeout
-				if want.want.UnusedExists(100) {
-					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting (goroutine inactive + unused packets)\n", wantName, want.GetMetadata().Type)
-					want.want.SetStatus(WantStatusIdle)
-					cb.startWant(wantName, want)
-					startedCount++
-				}
-			}
-		}
+		// NOTE: Second pass removed - no longer needed
+		// All packet transmission goes through SendPacketMulti() which calls RetriggerReceiverWant()
+		// RetriggerReceiverWant() uses tryRetriggerWithUnusedPackets(100) to detect packets within 100ms
+		// This covers all normal retrigger scenarios - no need for periodic reconcile-based retrigger
 
 		// Third pass: start any idle wants that now have required connections available This allows wants with inputs from just-completed upstream wants to execute
 		additionalStarted := 0
