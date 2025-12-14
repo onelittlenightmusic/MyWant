@@ -45,8 +45,8 @@ func NewMonitorRestaurant(name string, capabilities []string, uses []string) *Mo
 	}
 }
 
-// Progress executes restaurant monitoring by reading state from YAML files
-func (m *MonitorRestaurant) Progress(ctx context.Context, want *Want) error {
+// Exec executes restaurant monitoring by reading state from YAML files
+func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 	want.StoreLog(fmt.Sprintf("Starting monitoring for %s (execution #%d)", want.Metadata.Name, m.ExecutionCount))
 
 	// Determine which YAML file to read based on execution count

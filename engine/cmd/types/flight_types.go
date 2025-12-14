@@ -281,7 +281,7 @@ func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule,
 		Date:   schedule.DepartureTime.Truncate(24 * time.Hour),
 		Events: []TimeSlot{flightEvent},
 	}
-	f.SendPacketMulti(travelSchedule)
+	f.Provide(travelSchedule)
 
 	f.StoreLog(fmt.Sprintf("[PACKET-SEND] %s flight: %s (%s to %s) | TravelSchedule: Date=%s, Events=%d",
 		label,
@@ -409,10 +409,10 @@ func (f *FlightWant) StartContinuousMonitoring() {
 			}
 			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
-			// AGGREGATION: Wrap monitor.Progress() in exec cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState
-			f.BeginExecCycle()
-			monitor.Progress(context.Background(), &f.Want)
-			f.EndExecCycle()
+			// AGGREGATION: Wrap monitor.Exec() in progress cycle to batch all StoreState calls This prevents lock contention when multiple monitoring goroutines call StoreState
+			f.BeginProgressCycle()
+			monitor.Exec(context.Background(), &f.Want)
+			f.EndProgressCycle()
 		}
 	}()
 }

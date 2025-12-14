@@ -106,7 +106,7 @@ func (r *RestaurantWant) Progress() {
 				Events: []TimeSlot{restaurantEvent},
 			}
 
-			r.SendPacketMulti(travelSchedule)
+			r.Provide(travelSchedule)
 		}
 
 		return
@@ -141,8 +141,8 @@ func (r *RestaurantWant) Progress() {
 		"achieving_percentage":       100,
 		"finalResult":                newEvent.Name,
 	})
-	// Use SendPacketMulti to send with retrigger logic for achieved receivers
-	r.SendPacketMulti(newSchedule)
+	// Use Provide to send with retrigger logic for achieved receivers
+	r.Provide(newSchedule)
 
 	return
 }
@@ -160,7 +160,7 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		)
 
 		ctx := context.Background()
-		if err := monitorAgent.Progress(ctx, &r.Want); err != nil {
+		if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
 		}
 
 		r.AggregateChanges()
@@ -393,7 +393,7 @@ func (h *HotelWant) Progress() {
 				Events: []TimeSlot{hotelEvent},
 			}
 
-			h.SendPacketMulti(travelSchedule)
+			h.Provide(travelSchedule)
 		}
 
 		return
@@ -431,7 +431,7 @@ func (h *HotelWant) Progress() {
 		"reservation_name":     newEvent.Name,
 		"achieving_percentage": 100,
 	})
-	h.SendPacketMulti(newSchedule)
+	h.Provide(newSchedule)
 
 	return
 }
@@ -528,7 +528,7 @@ func (b *BuffetWant) Progress() {
 				Events: []TimeSlot{buffetEvent},
 			}
 
-			b.SendPacketMulti(travelSchedule)
+			b.Provide(travelSchedule)
 		}
 
 		return
@@ -564,8 +564,8 @@ func (b *BuffetWant) Progress() {
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})
-	// Use SendPacketMulti to send with retrigger logic for achieved receivers
-	b.SendPacketMulti(newSchedule)
+	// Use Provide to send with retrigger logic for achieved receivers
+	b.Provide(newSchedule)
 
 	return
 }
