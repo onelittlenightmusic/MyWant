@@ -33,6 +33,13 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if flight booking is complete (all phases finished)
+func (f *FlightWant) IsDone() bool {
+	phaseVal, _ := f.GetState("flight_phase")
+	phase, _ := phaseVal.(string)
+	return phase == PhaseCompleted
+}
+
 // extractFlightSchedule converts agent_result from state to FlightSchedule
 func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
 	var schedule FlightSchedule

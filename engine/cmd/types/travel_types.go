@@ -65,12 +65,19 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if restaurant has been reserved
+func (r *RestaurantWant) IsDone() bool {
+	attemptedVal, _ := r.GetState("attempted")
+	attempted, _ := attemptedVal.(bool)
+	return attempted
+}
+
 // Exec creates a restaurant reservation
 func (r *RestaurantWant) Exec() {
 	locals, ok := r.Locals.(*RestaurantWantLocals)
 	if !ok {
 		r.StoreLog("ERROR: Failed to access RestaurantWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	attemptedVal, _ := r.GetState("attempted")
@@ -78,7 +85,7 @@ func (r *RestaurantWant) Exec() {
 	_, connectionAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
-		return true
+		return
 	}
 	r.StoreState("attempted", true)
 
@@ -102,7 +109,7 @@ func (r *RestaurantWant) Exec() {
 			r.SendPacketMulti(travelSchedule)
 		}
 
-		return true
+		return
 	}
 	// Generate restaurant reservation time (evening dinner)
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
@@ -137,7 +144,7 @@ func (r *RestaurantWant) Exec() {
 	// Use SendPacketMulti to send with retrigger logic for achieved receivers
 	r.SendPacketMulti(newSchedule)
 
-	return true
+	return
 }
 
 // tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
@@ -346,11 +353,18 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if hotel has been reserved
+func (h *HotelWant) IsDone() bool {
+	val, _ := h.GetState("attempted")
+	attempted, _ := val.(bool)
+	return attempted
+}
+
 func (h *HotelWant) Exec() {
 	locals, ok := h.Locals.(*HotelWantLocals)
 	if !ok {
 		h.StoreLog("ERROR: Failed to access HotelWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	attemptedVal, _ := h.GetState("attempted")
@@ -358,7 +372,7 @@ func (h *HotelWant) Exec() {
 	_, connectionAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
-		return true
+		return
 	}
 	h.StoreState("attempted", true)
 
@@ -382,7 +396,7 @@ func (h *HotelWant) Exec() {
 			h.SendPacketMulti(travelSchedule)
 		}
 
-		return true
+		return
 	}
 
 	// Normal hotel execution (only runs if agent execution didn't return a result)
@@ -419,7 +433,7 @@ func (h *HotelWant) Exec() {
 	})
 	h.SendPacketMulti(newSchedule)
 
-	return true
+	return
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for HotelWant Returns 100 if the hotel has been attempted/executed, 0 otherwise
@@ -474,11 +488,18 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if buffet has been reserved
+func (b *BuffetWant) IsDone() bool {
+	val, _ := b.GetState("attempted")
+	attempted, _ := val.(bool)
+	return attempted
+}
+
 func (b *BuffetWant) Exec() {
 	locals, ok := b.Locals.(*BuffetWantLocals)
 	if !ok {
 		b.StoreLog("ERROR: Failed to access BuffetWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	attemptedVal, _ := b.GetState("attempted")
@@ -486,7 +507,7 @@ func (b *BuffetWant) Exec() {
 	_, connectionAvailable := b.GetFirstOutputChannel()
 
 	if attempted {
-		return true
+		return
 	}
 	b.StoreState("attempted", true)
 
@@ -510,7 +531,7 @@ func (b *BuffetWant) Exec() {
 			b.SendPacketMulti(travelSchedule)
 		}
 
-		return true
+		return
 	}
 
 	// Normal buffet execution (only runs if agent execution didn't return a result)
@@ -546,7 +567,7 @@ func (b *BuffetWant) Exec() {
 	// Use SendPacketMulti to send with retrigger logic for achieved receivers
 	b.SendPacketMulti(newSchedule)
 
-	return true
+	return
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for BuffetWant Returns 100 if the buffet has been attempted/executed, 0 otherwise
