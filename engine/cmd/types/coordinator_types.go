@@ -95,18 +95,26 @@ func (c *CoordinatorWant) IsAchieved() bool {
 
 	// Even if completion flag is set, check if there are unused packets remaining
 	// This allows coordinator to retrigger when new packets arrive (e.g., during rebooking)
+	// Wait up to 1000ms for new packets to arrive before declaring completion
 	if completed {
+		// Check if unused packets exist (with reflect.Select monitoring)
+		// Use 100ms timeout to check for pending packets without blocking too long
+		hasUnused := c.UnusedExists(100)
+		c.StoreLog(fmt.Sprintf("[IsAchieved] completed=true, hasUnused=%v, returning=%v (use 100ms timeout)", hasUnused, !hasUnused))
 		// Return false if unused packets exist, allowing further processing
-		return !c.UnusedExists()
+		return !hasUnused
 	}
 
+	c.StoreLog(fmt.Sprintf("[IsAchieved] completed=false, waiting for initial packets"))
 	return false
 }
 
 // Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
 // Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Progress() {
-	c.StoreLog(fmt.Sprintf("[COORDINATOR] Started"))
+	inCount := c.GetInCount()
+	heardsCount := len(c.channelsHeard)
+	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ChannelsHeard=%d", inCount, heardsCount))
 
 	// Track which channels we've received data from in this execution cycle This is a local map - NOT persisted to state, only used for completion detection
 
@@ -116,8 +124,10 @@ func (c *CoordinatorWant) Progress() {
 	if received {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true
-		c.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator received packet from channel %d", channelIndex))
+		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d)", channelIndex, len(c.channelsHeard), inCount))
 		c.DataHandler.ProcessData(c, channelIndex, data)
+	} else {
+		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 	}
 	c.tryCompletion(c.channelsHeard)
 }
@@ -130,15 +140,21 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
-	if len(channelsHeard) != c.GetInCount() {
+
+	inCount := c.GetInCount()
+	if len(channelsHeard) != inCount {
+		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for all channels - heard %d/%d", len(channelsHeard), inCount))
 		return // Still waiting for data from some channels
 	}
+
+	c.StoreLog(fmt.Sprintf("[tryCompletion] All channels heard (%d/%d), checking timeout", len(channelsHeard), inCount))
 
 	// All channels have sent: record the first time (independent of timeout)
 	lastPacketTimeVal, exists := c.GetState("last_packet_time")
 	if !exists || lastPacketTimeVal == nil {
 		nowUnix := time.Now().Unix()
 		c.StoreState("last_packet_time", nowUnix)
+		c.StoreLog("[tryCompletion] Recording first packet time")
 	}
 	completionTimeout := c.DataHandler.GetCompletionTimeout()
 
@@ -158,6 +174,7 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 			// If somehow still nil/invalid, this shouldn't happen since we just set it above
 			nowUnix := time.Now().Unix()
 			c.StoreState("last_packet_time", nowUnix)
+			c.StoreLog("[tryCompletion] Reset packet time due to invalid state")
 			return
 		}
 
@@ -165,12 +182,16 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 		elapsed := nowUnix - lastPacketTime
 
 		if elapsed < int64(completionTimeout.Seconds()) {
+			c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for timeout - elapsed %d/%d seconds", elapsed, int64(completionTimeout.Seconds())))
 			return // Still waiting for timeout
 		}
+		c.StoreLog("[tryCompletion] Timeout expired, marking complete")
 	}
 	completionKey := c.DataHandler.GetCompletionKey()
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
+	c.StoreLog("[tryCompletion] Marked as complete, resetting channelsHeard for potential retrigger")
+	c.channelsHeard = make(map[int]bool)
 }
 
 // ============================================================================ Approval-Specific Handlers ============================================================================

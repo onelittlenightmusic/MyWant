@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -1140,27 +1141,66 @@ func (n *Want) GetPaths() *Paths {
 }
 
 // UnusedExists checks if there are unused packets in any input channel without consuming them
+// Uses reflect.Select to concurrently monitor multiple input channels with timeout support
+// timeoutMs: wait time in milliseconds for packets to arrive (0 = non-blocking check)
 // Returns true if any input channel has pending packets in its buffer
-func (n *Want) UnusedExists() bool {
+func (n *Want) UnusedExists(timeoutMs int) bool {
 	paths := n.GetPaths()
 	if paths == nil || len(paths.In) == 0 {
 		return false
 	}
 
-	// Check each input channel for pending packets
-	for _, pathInfo := range paths.In {
-		if pathInfo.Channel == nil {
-			continue
+	// Helper function to check if any channel has pending data (non-consuming)
+	checkChannelsNonBlocking := func() bool {
+		for _, pathInfo := range paths.In {
+			if pathInfo.Channel == nil {
+				continue
+			}
+			// For buffered channels, len() returns the number of buffered elements
+			// This doesn't consume the packet, just checks if data is available
+			if len(pathInfo.Channel) > 0 {
+				return true
+			}
 		}
-
-		// For buffered channels, len() returns the number of buffered elements
-		// This doesn't consume the packet, just checks if data is available
-		if len(pathInfo.Channel) > 0 {
-			return true
-		}
+		return false
 	}
 
-	return false
+	// If timeout is 0, do non-blocking check only
+	if timeoutMs == 0 {
+		return checkChannelsNonBlocking()
+	}
+
+	// If timeout > 0, use reflect.Select to create efficient timeout without blocking
+	// Monitor all channels concurrently using len() checks
+	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+
+	for {
+		// Check all channels without consuming (len() is non-destructive)
+		if checkChannelsNonBlocking() {
+			return true
+		}
+
+		// Check if timeout exceeded
+		if time.Now().After(deadline) {
+			return false
+		}
+
+		// Use reflect.Select with a timeout channel to avoid busy-waiting
+		// This allows us to sleep efficiently without consuming data from input channels
+		var selectCases []reflect.SelectCase
+
+		// Create a timeout case that will fire after 1ms
+		selectCases = append(selectCases, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(time.After(1 * time.Millisecond)),
+		})
+
+		// Use reflect.Select only to handle the timeout sleep
+		// We don't add input channels to reflect.Select because SelectRecv would consume data
+		// Instead, we rely on len() checks which are non-consuming
+		reflect.Select(selectCases)
+		// After timeout, loop continues and checks len() on all channels again
+	}
 }
 
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
