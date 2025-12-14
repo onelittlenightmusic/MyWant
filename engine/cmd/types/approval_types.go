@@ -44,17 +44,23 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-func (e *EvidenceWant) Exec() bool {
+// IsDone checks if evidence has been provided
+func (e *EvidenceWant) IsDone() bool {
+	provided, _ := e.GetStateBool("evidence_provided", false)
+	return provided
+}
+
+func (e *EvidenceWant) Exec() {
 	locals, ok := e.Locals.(*EvidenceWantLocals)
 	if !ok {
 		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	provided, _ := e.GetStateBool("evidence_provided", false)
 
 	if provided {
-		return true
+		return
 	}
 	e.StoreState("evidence_provided", true)
 	evidenceData := &ApprovalData{
@@ -75,7 +81,6 @@ func (e *EvidenceWant) Exec() bool {
 
 	// Broadcast evidence to all output channels using SendPacketMulti
 	e.SendPacketMulti(evidenceData)
-	return true
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -107,17 +112,23 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-func (d *DescriptionWant) Exec() bool {
+// IsDone checks if description has been provided
+func (d *DescriptionWant) IsDone() bool {
+	provided, _ := d.GetStateBool("description_provided", false)
+	return provided
+}
+
+func (d *DescriptionWant) Exec() {
 	locals, ok := d.Locals.(*DescriptionWantLocals)
 	if !ok {
 		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	provided, _ := d.GetStateBool("description_provided", false)
 
 	if provided {
-		return true
+		return
 	}
 	d.StoreState("description_provided", true)
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
@@ -140,7 +151,6 @@ func (d *DescriptionWant) Exec() bool {
 
 	// Broadcast description to all output channels using SendPacketMulti
 	d.SendPacketMulti(descriptionData)
-	return true
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise

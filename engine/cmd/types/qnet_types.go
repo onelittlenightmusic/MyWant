@@ -85,12 +85,22 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Execut
 	)}
 }
 
+// IsDone checks if numbers generator is complete (all packets sent)
+func (g *Numbers) IsDone() bool {
+	locals, ok := g.Locals.(*NumbersLocals)
+	if !ok {
+		return false
+	}
+	paramCount := g.GetIntParam("count", locals.Count)
+	return locals.currentCount >= paramCount
+}
+
 // Exec executes the numbers generator directly with dynamic parameter reading
-func (g *Numbers) Exec() bool {
+func (g *Numbers) Exec() {
 	locals, ok := g.Locals.(*NumbersLocals)
 	if !ok {
 		g.StoreLog("ERROR: Failed to access NumbersLocals from Want.Locals")
-		return true
+		return
 	}
 
 	useDeterministic := g.GetBoolParam("deterministic", false)
@@ -118,7 +128,7 @@ func (g *Numbers) Exec() bool {
 		})
 
 		g.SendPacketMulti(QueuePacket{Num: -1, Time: 0})
-		return true
+		return
 	}
 	locals.currentCount++
 
@@ -140,7 +150,6 @@ func (g *Numbers) Exec() bool {
 	}
 
 	g.SendPacketMulti(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
-	return false
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for Numbers generator Returns (currentCount / targetCount) * 100
@@ -176,12 +185,18 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable 
 	)}
 }
 
+// IsDone checks if queue is complete (end signal received)
+func (q *Queue) IsDone() bool {
+	completed, _ := q.GetStateBool("completed", false)
+	return completed
+}
+
 // Exec executes the queue processing directly with batch mechanism
-func (q *Queue) Exec() bool {
+func (q *Queue) Exec() {
 	locals, ok := q.Locals.(*QueueLocals)
 	if !ok {
 		q.StoreLog("ERROR: Failed to access QueueLocals from Want.Locals")
-		return true
+		return
 	}
 
 	// Initialize missing fields if needed
@@ -198,12 +213,12 @@ func (q *Queue) Exec() bool {
 
 	// Check if input channels are connected before attempting receive
 	if q.GetInCount() == 0 {
-		return true  // No input channels, nothing to process
+		return  // No input channels, nothing to process
 	}
 
 	_, i, ok := q.ReceiveFromAnyInputChannel(100)  // Use 100ms timeout instead of forever
 	if !ok {
-		return false
+		return
 	}
 
 	packet := i.(QueuePacket)
@@ -217,7 +232,8 @@ func (q *Queue) Exec() bool {
 		}
 		// Forward end signal to next want
 		q.SendPacketMulti(packet)
-		return true
+		q.StoreState("completed", true)
+		return
 	}
 	arrivalTime := packet.Time
 	startServiceTime := math.Max(arrivalTime, locals.serverFreeTime)
@@ -239,7 +255,6 @@ func (q *Queue) Exec() bool {
 	}
 
 	q.SendPacketMulti(QueuePacket{Num: packet.Num, Time: finishTime})
-	return false
 }
 
 // flushBatch commits all accumulated statistics to state
@@ -313,12 +328,18 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executab
 	)}
 }
 
+// IsDone checks if combiner is complete (end signal received)
+func (c *Combiner) IsDone() bool {
+	completed, _ := c.GetStateBool("completed", false)
+	return completed
+}
+
 // Exec executes the combiner directly
-func (c *Combiner) Exec() bool {
+func (c *Combiner) Exec() {
 	locals, ok := c.Locals.(*CombinerLocals)
 	if !ok {
 		c.StoreLog("ERROR: Failed to access CombinerLocals from Want.Locals")
-		return true
+		return
 	}
 
 	if c.State == nil {
@@ -326,13 +347,13 @@ func (c *Combiner) Exec() bool {
 	}
 	processed, _ := c.State["processed"].(int)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
-		return true
+		return
 	}
 
 	// Receive from any input channel (wait for data from any source)
 	_, i, ok := c.ReceiveFromAnyInputChannelForever()
 	if !ok {
-		return false
+		return
 	}
 
 	packet := i.(QueuePacket)
@@ -343,14 +364,14 @@ func (c *Combiner) Exec() bool {
 		}
 		// Forward end signal to next want
 		c.SendPacketMulti(packet)
-		return true
+		c.StoreState("completed", true)
+		return
 	}
 
 	processed++
 	c.SendPacketMulti(packet)
 
 	c.StoreState("processed", processed)
-	return false
 }
 
 // OnEnded implements PacketHandler interface for Combiner termination callbacks
@@ -381,25 +402,31 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Executable {
 	)}
 }
 
+// IsDone checks if sink is complete (end signal received)
+func (s *Sink) IsDone() bool {
+	completed, _ := s.GetStateBool("completed", false)
+	return completed
+}
+
 // Exec executes the sink directly
-func (s *Sink) Exec() bool {
+func (s *Sink) Exec() {
 	locals, ok := s.Locals.(*SinkLocals)
 	if !ok {
 		s.StoreLog("ERROR: Failed to access SinkLocals from Want.Locals")
-		return true
+		return
 	}
 
 	completed, _ := s.GetStateBool("completed", false)
 	if completed {
-		return true
+		return
 	}
 
 	for {
 		_, i, ok := s.ReceiveFromAnyInputChannel(100)
 		if !ok {
-			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return false to continue the execution loop. If we return true, the sink will be marked as completed and will not process any more packets.
+			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
 			// The timeout in ReceiveFromAnyInputChannel helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
-			return false
+			return
 		}
 
 		packet := i.(QueuePacket)
@@ -409,7 +436,7 @@ func (s *Sink) Exec() bool {
 			if err := s.OnEnded(&packet, locals); err != nil {
 				s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 			}
-			return true
+			return
 		}
 
 		locals.Received++

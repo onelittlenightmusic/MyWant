@@ -33,7 +33,7 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec returns the generalized chain function for the seed numbers generator
-func (g *SeedNumbers) Exec() bool {
+func (g *SeedNumbers) Exec() {
 	maxCount := g.GetIntParam("max_count", 15)
 	completed, _ := g.GetStateBool("completed", false)
 
@@ -75,7 +75,7 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec returns the generalized chain function for the fibonacci computer
-func (c *FibonacciComputer) Exec() bool {
+func (c *FibonacciComputer) Exec() {
 	in, inputUnavailable := c.GetInputChannel(0)
 	if inputUnavailable {
 		return true
@@ -167,7 +167,7 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec returns the generalized chain function for the fibonacci merger
-func (m *FibonacciMerger) Exec() bool {
+func (m *FibonacciMerger) Exec() {
 	if m.GetInCount() < 2 || m.GetOutCount() < 1 {
 		return true
 	}

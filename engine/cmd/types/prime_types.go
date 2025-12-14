@@ -26,7 +26,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec returns the generalized chain function for the numbers generator
-func (g *PrimeNumbers) Exec() bool {
+func (g *PrimeNumbers) Exec() {
 	start := g.GetIntParam("start", 2)
 	end := g.GetIntParam("end", 100)
 	currentNumber, exists := g.GetStateInt("current_number", start)
@@ -73,7 +73,7 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 // Exec returns the generalized chain function for the filter
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
-func (f *PrimeSequence) Exec() bool {
+func (f *PrimeSequence) Exec() {
 	locals, ok := f.Locals.(*PrimeSequenceLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access PrimeSequenceLocals from Want.Locals")
@@ -171,7 +171,7 @@ func (f *PrimeSequence) Exec() bool {
 
 // func (s *PrimeSink) GetWant() interface{} { return &s.Want }
 
-// // Exec returns the generalized chain function for the sink func (s *PrimeSink) Exec() bool { // Validate input channel is available in, connectionAvailable := s.GetFirstInputChannel()
+// // Exec returns the generalized chain function for the sink func (s *PrimeSink) Exec() { // Validate input channel is available in, connectionAvailable := s.GetFirstInputChannel()
 // if !connectionAvailable { return true }
 
 // // Check if already achieved using persistent state achieved, _ := s.GetStateBool("achieved", false) if achieved { return true

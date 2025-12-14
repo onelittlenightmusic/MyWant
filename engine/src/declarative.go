@@ -115,7 +115,8 @@ func (p *BasePacket) GetData() interface{} { return p.data }
 
 // ChainWant represents a want that can execute directly
 type Executable interface {
-	Exec() bool
+	IsDone() bool  // Returns true when want is complete
+	Exec()         // Execute logic (no completion signal)
 }
 
 // migrateAllWantsAgentHistory runs agent history migration on all wants

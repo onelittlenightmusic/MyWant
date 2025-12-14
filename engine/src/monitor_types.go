@@ -66,8 +66,13 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 	return monitor
 }
 
+// IsDone checks if monitor is complete (always false for continuous monitoring)
+func (mw *MonitorWant) IsDone() bool {
+	return false  // Never done - continuous monitoring
+}
+
 // Exec implements the Executable interface
-func (mw *MonitorWant) Exec() bool {
+func (mw *MonitorWant) Exec() {
 	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
 	mw.Want.SetStatus(WantStatusReaching)
 	if _, exists := mw.Want.GetState("start_time"); !exists {
@@ -83,23 +88,23 @@ func (mw *MonitorWant) Exec() bool {
 			} else {
 				log.Printf("⚠️ Monitor %s agent is not a MonitorAgent type\n", mw.Want.Metadata.Name)
 				mw.Want.SetStatus(WantStatusFailed)
-				return true // Indicate completion (failure)
+				return
 			}
 		} else {
 			log.Printf("⚠️ Monitor %s agent not found in registry\n", mw.Want.Metadata.Name)
 			mw.Want.SetStatus(WantStatusFailed)
-			return true // Indicate completion (failure)
+			return
 		}
 	} else {
 		log.Printf("⚠️ Monitor %s has no AgentRegistry set\n", mw.Want.Metadata.Name)
 		mw.Want.SetStatus(WantStatusFailed)
-		return true // Indicate completion (failure)
+		return
 	}
 
 	if monitorAgent.Monitor == nil {
 		log.Printf("⚠️ Monitor %s agent has no Monitor function set\n", mw.Want.Metadata.Name)
 		mw.Want.SetStatus(WantStatusFailed)
-		return true // Indicate completion (failure)
+		return
 	}
 
 	// Start a goroutine for continuous monitoring
@@ -124,7 +129,6 @@ func (mw *MonitorWant) Exec() bool {
 	}()
 
 	log.Printf("🔍 Monitor %s continuous monitoring started\n", mw.Want.Metadata.Name)
-	return true // Indicate that this Exec call is "finished" (the goroutine is now handling monitoring)
 }
 func (mw *MonitorWant) handleNotification(notification StateNotification) {
 	// Call base implementation first

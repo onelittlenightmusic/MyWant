@@ -85,7 +85,7 @@ const (
 
 // Exec creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
 // 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state, return true to complete want
-func (f *FlightWant) Exec() bool {
+func (f *FlightWant) Exec() {
 	locals, ok := f.Locals.(*FlightWantLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")

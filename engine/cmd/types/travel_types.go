@@ -66,7 +66,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec creates a restaurant reservation
-func (r *RestaurantWant) Exec() bool {
+func (r *RestaurantWant) Exec() {
 	locals, ok := r.Locals.(*RestaurantWantLocals)
 	if !ok {
 		r.StoreLog("ERROR: Failed to access RestaurantWantLocals from Want.Locals")
@@ -346,7 +346,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-func (h *HotelWant) Exec() bool {
+func (h *HotelWant) Exec() {
 	locals, ok := h.Locals.(*HotelWantLocals)
 	if !ok {
 		h.StoreLog("ERROR: Failed to access HotelWantLocals from Want.Locals")
@@ -474,7 +474,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
-func (b *BuffetWant) Exec() bool {
+func (b *BuffetWant) Exec() {
 	locals, ok := b.Locals.(*BuffetWantLocals)
 	if !ok {
 		b.StoreLog("ERROR: Failed to access BuffetWantLocals from Want.Locals")

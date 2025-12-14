@@ -238,19 +238,32 @@ func (t *Target) CreateChildWants() []*Want {
 	return t.childWants
 }
 
+// IsDone checks if target is complete (all children created and completed)
+func (t *Target) IsDone() bool {
+	if !t.childrenCreated {
+		return false
+	}
+
+	t.childCompletionMutex.Lock()
+	allComplete := t.checkAllChildrenComplete()
+	t.childCompletionMutex.Unlock()
+
+	return allComplete
+}
+
 // Exec implements the Executable interface for Target with direct execution
-func (t *Target) Exec() bool {
+func (t *Target) Exec() {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
-			return false
+			return
 		}
 
 		// Mark that we've created children
 		t.childrenCreated = true
-		return false // Not complete yet, waiting for children
+		return // Not complete yet, waiting for children
 	}
 
 	// Phase 2: Check if all children have completed
@@ -268,15 +281,12 @@ func (t *Target) Exec() bool {
 				// Mark the target as completed
 				t.SetStatus(WantStatusAchieved)
 			}
-			return true
+			return
 		}
 
 		// Children not all complete yet
-		return false
+		return
 	}
-
-	// No builder, mark as complete
-	return true
 }
 
 // UpdateParameter updates a parameter and pushes it to child wants
@@ -541,22 +551,26 @@ func extractWantViaReflection(baseWant interface{}) *Want {
 	return nil
 }
 
+// IsDone checks if the wrapped want is complete
+func (oaw *OwnerAwareWant) IsDone() bool {
+	if executable, ok := oaw.BaseWant.(Executable); ok {
+		return executable.IsDone()
+	}
+	// Fallback for non-Executable types
+	return true
+}
+
 // Exec wraps the base want's execution to add completion notification
-func (oaw *OwnerAwareWant) Exec() bool {
+func (oaw *OwnerAwareWant) Exec() {
 	// Call the original Exec method directly
 	if executable, ok := oaw.BaseWant.(Executable); ok {
-		result := executable.Exec()
+		executable.Exec()
 
-		// If want completed successfully and we have a target, notify it
-		if result && oaw.TargetName != "" {
+		// If want is now done and we have a target, notify it
+		if executable.IsDone() && oaw.TargetName != "" {
 			// Emit OwnerCompletionEvent through unified subscription system
 			oaw.emitOwnerCompletionEvent()
 		}
-
-		return result
-	} else {
-		// Fallback for non-Executable types
-		return true
 	}
 }
 

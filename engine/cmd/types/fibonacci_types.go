@@ -21,7 +21,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Executable {
 }
 
 // Exec returns the generalized chain function for the numbers generator
-func (g *FibonacciNumbers) Exec() bool {
+func (g *FibonacciNumbers) Exec() {
 	count := g.GetIntParam("count", 20)
 	a, _ := g.GetStateInt("a", 0)
 	b, _ := g.GetStateInt("b", 1)
@@ -68,7 +68,7 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) Executable {
 // Exec returns the generalized chain function for the filter
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
-func (f *FibonacciFilter) Exec() bool {
+func (f *FibonacciFilter) Exec() {
 	locals, ok := f.Locals.(*FibonacciFilterLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")

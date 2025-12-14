@@ -479,7 +479,13 @@ func (n *Want) StartExecution(
 			// 3.5. Get current paths (called each iteration to track topology changes)
 			currentPaths := getPathsFunc()
 
-			// 3.6. Check preconditions: verify required providers/users are connected
+			// 3.7. Check if want is done (before precondition check)
+			if n.executable != nil && n.executable.IsDone() {
+			n.SetStatus(WantStatusAchieved)
+			return
+		}
+
+			// 3.8. Check preconditions: verify required providers/users are connected
 			if !n.checkPreconditions(currentPaths) {
 				// Preconditions not satisfied - mark as suspended and return to loop start
 				n.SetSuspended(true)
@@ -510,18 +516,12 @@ func (n *Want) StartExecution(
 				n.SetStatus(WantStatusFailed)
 				return
 			}
-			finished := n.executable.Exec()
-
+			n.executable.Exec()
 			// 8. End execution cycle (commit batched changes)
 			n.EndExecCycle()
 
-			// 9. Check completion
-			if finished {
-				n.SetStatus(WantStatusAchieved)
-				return
-			}
 
-			// 10. Sleep to prevent CPU spinning
+			// 9. Sleep to prevent CPU spinning
 			time.Sleep(GlobalExecutionInterval)
 		}
 	}()
