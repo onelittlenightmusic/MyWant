@@ -25,6 +25,14 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if prime number generation is complete
+func (g *PrimeNumbers) IsDone() bool {
+	start := g.GetIntParam("start", 2)
+	end := g.GetIntParam("end", 100)
+	currentNumber, _ := g.GetStateInt("current_number", start)
+	return currentNumber > end
+}
+
 // Exec returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Exec() {
 	start := g.GetIntParam("start", 2)
@@ -38,13 +46,11 @@ func (g *PrimeNumbers) Exec() {
 	if currentNumber > end {
 		// Send end signal
 		g.SendPacketMulti(-1)
-		return true
+		return
 	}
 
 	g.SendPacketMulti(currentNumber)
 	g.StoreState("current_number", currentNumber+1)
-
-	return false
 }
 
 // PrimeSequenceLocals holds type-specific local state for PrimeSequence want
@@ -70,6 +76,12 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if prime sequence filtering is complete
+func (f *PrimeSequence) IsDone() bool {
+	achieved, _ := f.GetStateBool("achieved", false)
+	return achieved
+}
+
 // Exec returns the generalized chain function for the filter
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
@@ -77,12 +89,12 @@ func (f *PrimeSequence) Exec() {
 	locals, ok := f.Locals.(*PrimeSequenceLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access PrimeSequenceLocals from Want.Locals")
-		return true
+		return
 	}
 
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {
-		return true
+		return
 	}
 
 	totalProcessedVal, _ := f.GetState("total_processed")
@@ -105,7 +117,7 @@ func (f *PrimeSequence) Exec() {
 	_, i, ok := f.ReceiveFromAnyInputChannel(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
-		return false
+		return
 	}
 
 	if val, ok := i.(int); ok {
@@ -118,7 +130,7 @@ func (f *PrimeSequence) Exec() {
 				"total_processed": totalProcessed,
 				"achieved":       true,
 			})
-			return true
+			return
 		}
 
 		totalProcessed++
@@ -156,7 +168,6 @@ func (f *PrimeSequence) Exec() {
 	}
 
 	// Yield control - will be called again for next packet
-	return false
 }
 
 // // PrimeSink collects and displays results type PrimeSink struct { Want Received int

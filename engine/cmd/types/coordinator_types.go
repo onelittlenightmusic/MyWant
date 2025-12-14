@@ -88,6 +88,13 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
+// IsDone checks if coordinator has collected all required data and timeout has expired
+func (c *CoordinatorWant) IsDone() bool {
+	completionKey := c.DataHandler.GetCompletionKey()
+	completed, _ := c.GetStateBool(completionKey, false)
+	return completed
+}
+
 // Exec executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
 // Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
 func (c *CoordinatorWant) Exec() {
@@ -115,19 +122,19 @@ func (c *CoordinatorWant) Exec() {
 			break
 		}
 	}
-	return c.tryCompletion(inCount, c.channelsHeard)
+	c.tryCompletion(inCount, c.channelsHeard)
 }
 
 // tryCompletion checks if all required data has been received and handles completion Uses a timeout-based approach to allow late-arriving packets (e.g., Rebook flights) Strategy: 1. When all channels first send data, record the time
 // 2. Wait for the completion timeout to expire (allows delayed packets) 3. Only then mark as completed and reset channelsHeard for potential new packets
-func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) bool {
+func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool) {
 	// Apply state updates from data handler
 	stateUpdates := c.DataHandler.GetStateUpdates(c)
 	if len(stateUpdates) > 0 {
 		c.StoreStateMulti(stateUpdates)
 	}
 	if len(channelsHeard) != inCount {
-		return false // Still waiting for data from some channels
+		return // Still waiting for data from some channels
 	}
 
 	// All channels have sent: record the first time (independent of timeout)
@@ -154,21 +161,19 @@ func (c *CoordinatorWant) tryCompletion(inCount int, channelsHeard map[int]bool)
 			// If somehow still nil/invalid, this shouldn't happen since we just set it above
 			nowUnix := time.Now().Unix()
 			c.StoreState("last_packet_time", nowUnix)
-			return false
+			return
 		}
 
 		nowUnix := time.Now().Unix()
 		elapsed := nowUnix - lastPacketTime
 
 		if elapsed < int64(completionTimeout.Seconds()) {
-			return false // Still waiting for timeout
+			return // Still waiting for timeout
 		}
 	}
 	completionKey := c.DataHandler.GetCompletionKey()
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
-
-	return true
 }
 
 // ============================================================================ Approval-Specific Handlers ============================================================================

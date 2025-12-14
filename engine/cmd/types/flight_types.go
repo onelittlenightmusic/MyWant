@@ -91,18 +91,18 @@ const (
 )
 
 // Exec creates a flight booking reservation using state machine pattern The execution flow follows distinct phases: 1. Initial: Setup phase 2. Booking: Execute initial flight booking via agents
-// 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state, return true to complete want
+// 3. Monitoring: Monitor flight status for 60 seconds 4. Canceling: Wait for cancellation agent to complete 5. Rebooking: Execute rebooking after cancellation 6. Completed: Final state
 func (f *FlightWant) Exec() {
 	locals, ok := f.Locals.(*FlightWantLocals)
 	if !ok {
 		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")
-		return true
+		return
 	}
 
 	out, connectionAvailable := f.GetFirstOutputChannel()
 	if !connectionAvailable {
-		f.StoreLog("[DEBUG-EXEC] NO OUTPUT CHANNELS AVAILABLE - Returning complete (true)")
-		return true
+		f.StoreLog("[DEBUG-EXEC] NO OUTPUT CHANNELS AVAILABLE - Returning complete")
+		return
 	}
 
 	phaseVal, _ := f.GetState("flight_phase")
@@ -121,7 +121,7 @@ func (f *FlightWant) Exec() {
 	case PhaseInitial:
 		f.StoreLog("Phase: Initial booking")
 		f.StoreState("flight_phase", PhaseBooking)
-		return false
+		return
 
 	// === Phase 2: Initial Booking ===
 	case PhaseBooking:
@@ -149,14 +149,14 @@ func (f *FlightWant) Exec() {
 				f.StoreState("flight_phase", PhaseMonitoring)
 				f.StoreLog("Transitioning to monitoring phase")
 
-				return false
+				return
 			}
 		}
 
 		// Booking failed - complete
 		f.StoreLog("Initial booking failed")
 		f.StoreState("flight_phase", PhaseCompleted)
-		return true
+		return
 
 	// === Phase 3: Monitoring ===
 	case PhaseMonitoring:
@@ -169,7 +169,7 @@ func (f *FlightWant) Exec() {
 					"attempted":     false,
 					"flight_phase":  PhaseCanceling,
 				})
-				return false
+				return
 			}
 
 			// Log monitoring progress every 30 seconds
@@ -179,13 +179,13 @@ func (f *FlightWant) Exec() {
 				locals.lastLogTime = now
 			}
 
-			return false
+			return
 
 		} else {
 			// Monitoring period expired - flight stable, complete
 			f.StoreLog("Monitoring completed successfully")
 			f.StoreState("flight_phase", PhaseCompleted)
-			return true
+			return
 		}
 
 	// === Phase 4: Canceling ===
@@ -196,7 +196,7 @@ func (f *FlightWant) Exec() {
 							"flight_phase": PhaseRebooking,
 							"attempted":    false,
 						})
-			return false
+			return
 		}
 
 		flightID, ok := flightIDVal.(string)
@@ -206,7 +206,7 @@ func (f *FlightWant) Exec() {
 				"flight_phase": PhaseRebooking,
 				"attempted":    false,
 			})
-			return false
+			return
 		}
 
 		// Execute cancel flight action
@@ -223,7 +223,7 @@ func (f *FlightWant) Exec() {
 			"flight_phase": PhaseRebooking,
 			"attempted":    false,
 		})
-		return false
+		return
 
 	// === Phase 5: Rebooking ===
 	case PhaseRebooking:
@@ -248,25 +248,25 @@ func (f *FlightWant) Exec() {
 				f.StoreState("flight_phase", PhaseMonitoring)
 				f.StoreLog("Transitioning back to monitoring phase for rebooked flight")
 
-				return false
+				return
 			}
 		}
 
 		// Rebooking failed - complete
 		f.StoreLog("Rebooking failed")
 		f.StoreState("flight_phase", PhaseCompleted)
-		return true
+		return
 
 	// === Phase 6: Completed ===
 	case PhaseCompleted:
 		// Clear agent_result to prevent reuse in next execution cycle
 		f.StoreState("agent_result", nil)
-		return true
+		return
 
 	default:
 		f.StoreLog("Unknown phase: " + phase)
 		f.StoreState("flight_phase", PhaseCompleted)
-		return true
+		return
 	}
 }
 func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {

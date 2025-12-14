@@ -32,13 +32,19 @@ func NewSeedNumbers(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if seeds have been generated
+func (g *SeedNumbers) IsDone() bool {
+	completed, _ := g.GetStateBool("completed", false)
+	return completed
+}
+
 // Exec returns the generalized chain function for the seed numbers generator
 func (g *SeedNumbers) Exec() {
 	maxCount := g.GetIntParam("max_count", 15)
 	completed, _ := g.GetStateBool("completed", false)
 
 	if completed {
-		return true
+		return
 	}
 	g.StoreState("completed", true)
 	g.SendPacketMulti(FibonacciSeed{Value: 0, Position: 0, IsEnd: false})
@@ -46,7 +52,6 @@ func (g *SeedNumbers) Exec() {
 	g.SendPacketMulti(FibonacciSeed{Value: maxCount, Position: -1, IsEnd: true})
 	g.StoreState("total_processed", 2)
 	g.StoreLog(fmt.Sprintf("Generated initial seeds: 0, 1 (max_count: %d)", maxCount))
-	return true
 }
 
 // FibonacciComputerLocals holds type-specific local state for FibonacciComputer want
@@ -74,11 +79,17 @@ func NewFibonacciComputer(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if fibonacci computation is complete (end packet received)
+func (c *FibonacciComputer) IsDone() bool {
+	completed, _ := c.GetStateBool("completed", false)
+	return completed
+}
+
 // Exec returns the generalized chain function for the fibonacci computer
 func (c *FibonacciComputer) Exec() {
 	in, inputUnavailable := c.GetInputChannel(0)
 	if inputUnavailable {
-		return true
+		return
 	}
 	prev, _ := c.GetStateInt("prev", 0)
 	current, _ := c.GetStateInt("current", 0)
@@ -119,16 +130,17 @@ func (c *FibonacciComputer) Exec() {
 			"position": position,
 			"processed": processed,
 			"total_processed": processed,
+			"completed": true,
 		})
 
 		c.StoreLog(fmt.Sprintf("Computed %d fibonacci numbers", processed))
-		return true
+		return
 	}
 	if !initialized {
 		if seed.Position == 0 {
 			prev = seed.Value
 			c.StoreState("prev", prev)
-			return false
+			return
 		} else if seed.Position == 1 {
 			current = seed.Value
 			initialized = true
@@ -136,11 +148,9 @@ func (c *FibonacciComputer) Exec() {
 				"current": current,
 				"initialized": initialized,
 			})
-			return false
+			return
 		}
 	}
-
-	return false
 }
 
 // FibonacciMergerLocals holds type-specific local state for FibonacciMerger want
@@ -166,10 +176,17 @@ func NewFibonacciMerger(metadata Metadata, spec WantSpec) Executable {
 	)}
 }
 
+// IsDone checks if fibonacci merger is complete (both input channels closed)
+func (m *FibonacciMerger) IsDone() bool {
+	seedUsingClosed, _ := m.GetStateBool("seedUsingClosed", false)
+	computedUsingClosed, _ := m.GetStateBool("computedUsingClosed", false)
+	return seedUsingClosed && computedUsingClosed
+}
+
 // Exec returns the generalized chain function for the fibonacci merger
 func (m *FibonacciMerger) Exec() {
 	if m.GetInCount() < 2 || m.GetOutCount() < 1 {
-		return true
+		return
 	}
 
 	// Use persistent state for closure variables
@@ -212,14 +229,11 @@ func (m *FibonacciMerger) Exec() {
 		}
 	}
 
-	// End when both using are closed
+	// End when both using are closed (IsDone() will handle completion)
 	if seedUsingClosed && computedUsingClosed {
 		m.StoreState("total_processed", processed)
 		m.StoreLog(fmt.Sprintf("Merged %d fibonacci values", processed))
-		return true
 	}
-
-	return false
 }
 
 // RegisterFibonacciLoopWantTypes registers the fibonacci loop want types with a ChainBuilder
