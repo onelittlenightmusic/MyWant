@@ -1558,10 +1558,13 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			return cb.getActivePaths(wantName)
 		}
 
-		// Delegate execution to Want with minimal interface (2 params: getPathsFunc + waitGroup)
+		// Manage goroutine lifecycle with waitGroup
+		cb.waitGroup.Add(1)
 		want.want.StartExecution(
 			getPathsFunc,
-			cb.waitGroup,
+			func() {
+				cb.waitGroup.Done()  // Signal completion
+			},
 		)
 	}
 }

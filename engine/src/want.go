@@ -422,17 +422,21 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 // - Status transitions
 // Note: Uses self.executable which is set via SetExecutable()
 // Note: getPathsFunc is called each iteration to get latest paths
+// StartExecution starts the want execution loop in a goroutine
+//
+// Parameters:
+//   - getPathsFunc: Returns current paths (preconditions: providers/users)
+//   - onComplete: Callback invoked when goroutine exits (for synchronization)
 func (n *Want) StartExecution(
 	getPathsFunc func() Paths,
-	waitGroup *sync.WaitGroup,
+	onComplete func(),
 ) {
 	if n.stopChannel == nil {
 		n.stopChannel = make(chan struct{})
 	}
 
-	waitGroup.Add(1)
 	go func() {
-		defer waitGroup.Done()
+		defer onComplete()
 		defer func() {
 			if n.GetStatus() == WantStatusReaching {
 				n.SetStatus(WantStatusAchieved)
