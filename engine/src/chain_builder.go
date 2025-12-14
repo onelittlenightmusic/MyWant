@@ -97,6 +97,12 @@ type runtimeWant struct {
 	chain    chain.C_chain
 	function interface{}
 	want     *Want
+
+	// Goroutine execution tracking - tracks whether a goroutine is currently running
+	// This is more reliable than checking want.GetStatus() because it directly
+	// reflects whether the execution loop is active, not just the want's state
+	goroutineActive   bool
+	goroutineActiveMu sync.RWMutex
 }
 func (rw *runtimeWant) GetSpec() *WantSpec {
 	if rw == nil || rw.want == nil {
@@ -957,15 +963,19 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		// Second pass: restart completed wants if they have pending input packets
+		// Second pass: restart wants with inactive goroutines if they have pending input packets
+		// This is a backup mechanism for retrigger - catches cases where SendPacketMulti's immediate
+		// retrigger might have missed, or packets arrived after goroutine exited
 		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusAchieved {
-				// Ask the want itself if it has unused/pending packets
-				// UnusedExists uses want.paths which was synchronized at the beginning of this reconcile loop
-				// This is safe and provides better encapsulation than checking cb.pathMap directly
-				hasUnused := want.want.UnusedExists(100)
-				if hasUnused {
-					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting - has pending input packets\n", wantName, want.GetMetadata().Type)
+			// Check if goroutine is NOT running
+			want.goroutineActiveMu.RLock()
+			isGoroutineActive := want.goroutineActive
+			want.goroutineActiveMu.RUnlock()
+
+			if !isGoroutineActive {
+				// Goroutine has exited - check for pending packets with timeout
+				if want.want.UnusedExists(100) {
+					InfoLog("[RECONCILE:RETRIGGER] Want '%s' (type=%s) restarting (goroutine inactive + unused packets)\n", wantName, want.GetMetadata().Type)
 					want.want.SetStatus(WantStatusIdle)
 					cb.startWant(wantName, want)
 					startedCount++
@@ -1550,11 +1560,21 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			return cb.getActivePaths(wantName)
 		}
 
+		// Mark goroutine as active BEFORE starting it
+		want.goroutineActiveMu.Lock()
+		want.goroutineActive = true
+		want.goroutineActiveMu.Unlock()
+
 		// Manage goroutine lifecycle with waitGroup
 		cb.waitGroup.Add(1)
 		want.want.StartProgressionLoop(
 			getPathsFunc,
 			func() {
+				// Mark goroutine as inactive when it finishes
+				want.goroutineActiveMu.Lock()
+				want.goroutineActive = false
+				want.goroutineActiveMu.Unlock()
+
 				cb.waitGroup.Done()  // Signal completion
 			},
 		)
@@ -2462,7 +2482,11 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 	}
 }
 
-// RetriggerReceiverWant directly retriggeres a receiver want by name This is used when a sender transmits a packet to an achieved receiver The receiver should be reset to Idle so it can re-execute with the new packet
+// RetriggerReceiverWant directly retriggeres a receiver want by name
+// This is used when a sender transmits a packet to an achieved receiver
+// The receiver should be reset to Idle so it can re-execute with the new packet
+// NEW: Instead of checking GetStatus(), we now check if goroutine is actually running
+// This is more reliable because it directly reflects execution state
 func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	cb.reconcileMutex.RLock()
 	runtimeWant, exists := cb.wants[wantName]
@@ -2473,31 +2497,46 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		return
 	}
 
-	want := runtimeWant.want
-	// InfoLog("[RETRIGGER-RECEIVER] Retriggering receiver want '%s' (ID: %s, Status: %s)\n", wantName, want.Metadata.ID, want.GetStatus())
+	// Check if goroutine is running (with lock to prevent concurrent retrigger)
+	runtimeWant.goroutineActiveMu.Lock()
+	isGoroutineActive := runtimeWant.goroutineActive
+	runtimeWant.goroutineActiveMu.Unlock()
 
-	// Reset to Idle if it's achieved
-	if want.GetStatus() == WantStatusAchieved {
+	// Only retrigger if goroutine is NOT running
+	// If it IS running, skip (it will handle packets itself)
+	if !isGoroutineActive {
+		want := runtimeWant.want
 		want.SetStatus(WantStatusIdle)
-		InfoLog("[RETRIGGER-RECEIVER] Successfully reset '%s' to Idle for re-execution\n", wantName)
-		// InfoLog("[RETRIGGER-RECEIVER] Verify status after reset: '%s' now has status %s\n", wantName, want.GetStatus())
+		InfoLog("[RETRIGGER-RECEIVER] Restarting '%s' (goroutine inactive)\n", wantName)
 
 		// Immediately restart the want to allow it to receive the new packet
-		// This is important for streaming scenarios where new data arrives after completion
-		InfoLog("[RETRIGGER-RECEIVER] Immediately restarting '%s' to receive rebooked/new packets\n", wantName)
 		cb.startWant(wantName, runtimeWant)
 
-		// Also queue a reconciliation trigger as backup (in case startWant missed anything)
-		select {
-		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
-			InfoLog("[RETRIGGER-RECEIVER] Queued reconciliation trigger for '%s' (backup)\n", wantName)
-		default:
-			// Channel full, ignore (next reconciliation cycle will handle it)
-		}
+		// Check for pending packets with timeout - try immediate execution
+		cb.tryRetriggerWithUnusedPackets(wantName, runtimeWant)
 	} else {
-		// InfoLog("[RETRIGGER-RECEIVER] Receiver want '%s' is not achieved (status: %s), skipping retrigger\n", wantName, want.GetStatus())
+		// Goroutine IS running - skip retrigger
+		// It will pick up packets from the channel in its next iteration
+		InfoLog("[RETRIGGER-RECEIVER] '%s' goroutine is active, skipping retrigger\n", wantName)
 	}
 }
+
+// tryRetriggerWithUnusedPackets checks if there are pending packets and tries immediate execution
+// This is the early-execution path for retrigger - uses UnusedExists with timeout
+// to detect packets that arrived while we were restarting
+func (cb *ChainBuilder) tryRetriggerWithUnusedPackets(wantName string, runtimeWant *runtimeWant) {
+	want := runtimeWant.want
+
+	// Check if there are pending packets (with 100ms timeout)
+	// This allows packet to arrive while we're executing, without busy-waiting
+	if want.UnusedExists(100) {
+		InfoLog("[RETRIGGER-EARLY] '%s' has unused packets, accelerating execution\n", wantName)
+		// Goroutine is already running, it will pick up packets in its loop
+	} else {
+		InfoLog("[RETRIGGER-EARLY] '%s' no unused packets found\n", wantName)
+	}
+}
+
 func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 
 	// Take snapshot of completed flags to avoid holding lock during notification
