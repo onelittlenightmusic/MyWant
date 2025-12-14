@@ -520,6 +520,11 @@ func (n *Want) StartExecution(
 			// 8. End execution cycle (commit batched changes)
 			n.EndExecCycle()
 
+			// 8.5. Check if want is done AFTER execution cycle (catch state changes from Exec)
+			if n.executable != nil && n.executable.IsDone() {
+				n.SetStatus(WantStatusAchieved)
+				return
+			}
 
 			// 9. Sleep to prevent CPU spinning
 			time.Sleep(GlobalExecutionInterval)

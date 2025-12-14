@@ -115,32 +115,21 @@ func (g *Numbers) Exec() {
 		locals.batchUpdateInterval = g.GetIntParam("batch_interval", 100)
 	}
 
-
 	paramRate := g.GetFloatParam("rate", locals.Rate)
 	if g.State == nil {
 		g.State = make(map[string]interface{})
 	}
 
+	// Check if we're already done before generating more packets
 	if locals.currentCount >= paramCount {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Complete: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
-		g.StoreStateMulti(map[string]interface{}{
-			"total_processed":      locals.currentCount,
-			"average_wait_time":    0.0, // Generators don't have wait time
-			"total_wait_time":      0.0,
-			"current_time":         locals.currentTime,
-			"current_count":        locals.currentCount,
-			"achieving_percentage": 100,
-		})
-
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending final end packet", locals.currentCount, paramCount))
 		endPacket := QueuePacket{Num: -1, Time: 0}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
 		g.SendPacketMulti(endPacket)
 		return
 	}
+
 	locals.currentCount++
-	if locals.currentCount % 100 == 0 {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
-	}
 
 	if useDeterministic {
 		// Deterministic inter-arrival time (rate = 1/interval)
@@ -153,13 +142,26 @@ func (g *Numbers) Exec() {
 
 	// Batch mechanism: only update state history every N packets to reduce history entries
 	if locals.currentCount%locals.batchUpdateInterval == 0 {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
 		g.StoreStateMulti(map[string]interface{}{
-			"current_time":  locals.currentTime,
-			"current_count": locals.currentCount,
+			"total_processed":      locals.currentCount,
+			"average_wait_time":    0.0, // Generators don't have wait time
+			"total_wait_time":      0.0,
+			"current_time":         locals.currentTime,
+			"current_count":        locals.currentCount,
 		})
 	}
 
 	g.SendPacketMulti(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
+
+	// Check if this was the last packet
+	if locals.currentCount >= paramCount {
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
+
+		endPacket := QueuePacket{Num: -1, Time: 0}
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
+		g.SendPacketMulti(endPacket)
+	}
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for Numbers generator Returns (currentCount / targetCount) * 100
