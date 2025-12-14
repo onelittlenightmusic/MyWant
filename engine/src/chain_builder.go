@@ -1014,25 +1014,16 @@ func (cb *ChainBuilder) shouldRestartCompletedWant(wantName string, want *runtim
 					return true
 				}
 
-				// Also check if upstream has pending output packets even if it's achieved
-				// This handles retrigger cases like Flight rebooking after initial completion
+				// Also check if upstream has pending packets even if it's achieved
+				// Upstream may have new packets queued after completion (e.g. Flight rebooking)
+				// Check the shared input channel that connects upstream output to downstream input
 				if status == WantStatusAchieved {
-					// Check upstream want's output channels for pending packets
 					if upstreamPaths, exists := cb.pathMap[otherName]; exists {
-						InfoLog("[RECONCILE:RETRIGGER] Checking upstream '%s' (type=%s) for pending packets: %d output channels\n", otherName, otherWant.GetMetadata().Type, len(upstreamPaths.Out))
-						for i, outPath := range upstreamPaths.Out {
-							lenval := 0
-							if outPath.Channel != nil {
-								lenval = len(outPath.Channel)
-							}
-							InfoLog("[RECONCILE:RETRIGGER]   Channel %d: %d pending packets\n", i, lenval)
+						for _, outPath := range upstreamPaths.Out {
 							if outPath.Channel != nil && len(outPath.Channel) > 0 {
-								InfoLog("[RECONCILE:RETRIGGER] Found pending packets in upstream '%s' output (type=%s) - will retrigger downstream\n", otherName, otherWant.GetMetadata().Type)
 								return true
 							}
 						}
-					} else {
-						InfoLog("[RECONCILE:RETRIGGER] No paths found in pathMap for upstream '%s'\n", otherName)
 					}
 				}
 			}
