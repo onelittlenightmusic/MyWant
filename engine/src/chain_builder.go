@@ -1547,6 +1547,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		// Mark goroutine as active BEFORE starting it
 		// Want owns the goroutine state via SetGoroutineActive()
 		want.want.SetGoroutineActive(true)
+		InfoLog("[START-WANT] '%s' goroutine marked as active, starting progression loop\n", wantName)
 
 		// Manage goroutine lifecycle with waitGroup
 		cb.waitGroup.Add(1)
