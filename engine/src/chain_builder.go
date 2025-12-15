@@ -97,12 +97,6 @@ type runtimeWant struct {
 	chain    chain.C_chain
 	function interface{}
 	want     *Want
-
-	// Goroutine execution tracking - tracks whether a goroutine is currently running
-	// This is more reliable than checking want.GetStatus() because it directly
-	// reflects whether the execution loop is active, not just the want's state
-	goroutineActive   bool
-	goroutineActiveMu sync.RWMutex
 }
 func (rw *runtimeWant) GetSpec() *WantSpec {
 	if rw == nil || rw.want == nil {
@@ -1546,9 +1540,8 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		}
 
 		// Mark goroutine as active BEFORE starting it
-		want.goroutineActiveMu.Lock()
-		want.goroutineActive = true
-		want.goroutineActiveMu.Unlock()
+		// Want owns the goroutine state via SetGoroutineActive()
+		want.want.SetGoroutineActive(true)
 
 		// Manage goroutine lifecycle with waitGroup
 		cb.waitGroup.Add(1)
@@ -1556,9 +1549,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 			getPathsFunc,
 			func() {
 				// Mark goroutine as inactive when it finishes
-				want.goroutineActiveMu.Lock()
-				want.goroutineActive = false
-				want.goroutineActiveMu.Unlock()
+				want.want.SetGoroutineActive(false)
 
 				cb.waitGroup.Done()  // Signal completion
 			},
@@ -2482,46 +2473,26 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		return
 	}
 
-	// Check if goroutine is running (with lock to prevent concurrent retrigger)
-	runtimeWant.goroutineActiveMu.Lock()
-	isGoroutineActive := runtimeWant.goroutineActive
-	runtimeWant.goroutineActiveMu.Unlock()
-
-	// Only retrigger if goroutine is NOT running
-	// If it IS running, skip (it will handle packets itself)
-	if !isGoroutineActive {
-		want := runtimeWant.want
-		want.SetStatus(WantStatusIdle)
-		InfoLog("[RETRIGGER-RECEIVER] Restarting '%s' (goroutine inactive)\n", wantName)
-
-		// Immediately restart the want to allow it to receive the new packet
-		cb.startWant(wantName, runtimeWant)
-
-		// Check for pending packets with timeout - try immediate execution
-		cb.tryRetriggerWithUnusedPackets(wantName, runtimeWant)
-	} else {
-		// Goroutine IS running - skip retrigger
-		// It will pick up packets from the channel in its next iteration
-		InfoLog("[RETRIGGER-RECEIVER] '%s' goroutine is active, skipping retrigger\n", wantName)
-	}
-}
-
-// tryRetriggerWithUnusedPackets checks if there are pending packets and tries immediate execution
-// This is the early-execution path for retrigger - uses UnusedExists with timeout
-// to detect packets that arrived while we were restarting
-func (cb *ChainBuilder) tryRetriggerWithUnusedPackets(wantName string, runtimeWant *runtimeWant) {
 	want := runtimeWant.want
 
-	// Check if there are pending packets (with 100ms timeout)
-	// This allows packet to arrive while we're executing, without busy-waiting
-	if want.UnusedExists(100) {
-		InfoLog("[RETRIGGER-EARLY] '%s' has unused packets, accelerating execution\n", wantName)
-		// Goroutine is already running, it will pick up packets in its loop
+	// Use want's retrigger decision function to determine if retrigger is needed
+	// This encapsulates the logic: check goroutine state and pending packets
+	if want.ShouldRetrigger() {
+		InfoLog("[RETRIGGER-RECEIVER] '%s' should retrigger (decision function returned true)\n", wantName)
+
+		// Set status to Idle and trigger reconcile loop
+		// The reconcile loop's startPhase() will detect the Idle status and restart the want
+		// This avoids duplicate execution and keeps retrigger logic in one place
+		want.SetStatus(WantStatusIdle)
+		if err := cb.TriggerReconcile(); err != nil {
+			InfoLog("[RETRIGGER-RECEIVER] WARNING: failed to trigger reconcile for '%s': %v\n", wantName, err)
+		}
 	} else {
-		InfoLog("[RETRIGGER-EARLY] '%s' no unused packets found\n", wantName)
+		// Retrigger not needed (either goroutine is running or no pending packets)
+		// It will pick up packets from the channel in its next iteration
+		InfoLog("[RETRIGGER-RECEIVER] '%s' retrigger not needed\n", wantName)
 	}
 }
-
 func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 
 	// Take snapshot of completed flags to avoid holding lock during notification

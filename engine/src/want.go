@@ -193,6 +193,11 @@ type Want struct {
 
 	// Progressable function - concrete want implementation (e.g., RestaurantWant, QueueWant)
 	progressable Progressable `json:"-" yaml:"-"`
+
+	// Goroutine execution tracking - Want owns this state for proper encapsulation
+	// ChainBuilder sets this via SetGoroutineActive() to inform Want when goroutine starts/stops
+	goroutineActive   bool       `json:"-" yaml:"-"`
+	goroutineActiveMu sync.RWMutex `json:"-" yaml:"-"`
 }
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
@@ -373,6 +378,31 @@ func (n *Want) SetProgressable(progressable Progressable) {
 // GetProgressable returns the concrete progressable implementation for this want
 func (n *Want) GetProgressable() Progressable {
 	return n.progressable
+}
+
+// SetGoroutineActive informs Want whether its execution goroutine is running
+// Called by ChainBuilder when goroutine starts (true) or stops (false)
+// This allows Want to own the goroutine state for proper encapsulation
+func (n *Want) SetGoroutineActive(active bool) {
+	n.goroutineActiveMu.Lock()
+	defer n.goroutineActiveMu.Unlock()
+	n.goroutineActive = active
+}
+
+// ShouldRetrigger determines if retrigger should happen when a packet arrives
+// Returns true if goroutine is NOT running AND there are pending packets
+// This encapsulates the retrigger decision logic within Want itself
+func (n *Want) ShouldRetrigger() bool {
+	n.goroutineActiveMu.RLock()
+	isGoroutineActive := n.goroutineActive
+	n.goroutineActiveMu.RUnlock()
+
+	// Only retrigger if goroutine is NOT running
+	if !isGoroutineActive {
+		// Check for pending packets with 100ms timeout
+		return n.UnusedExists(100)
+	}
+	return false
 }
 
 // checkPreconditions verifies that path preconditions are satisfied
