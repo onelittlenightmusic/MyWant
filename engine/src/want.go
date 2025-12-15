@@ -399,8 +399,9 @@ func (n *Want) ShouldRetrigger() bool {
 
 	// Only retrigger if goroutine is NOT running
 	if !isGoroutineActive {
-		// Check for pending packets with 100ms timeout
-		return n.UnusedExists(100)
+		// Check for pending packets (non-blocking)
+		// Use 0 timeout since packet should already be in channel if we're called after Provide()
+		return n.UnusedExists(0)
 	}
 	return false
 }

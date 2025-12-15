@@ -1490,8 +1490,12 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
+	currentStatus := want.want.GetStatus()
+	InfoLog("[START-WANT] '%s' called, current status: %s\n", wantName, currentStatus)
+
 	// Check if already completed
-	if want.want.GetStatus() == WantStatusReaching || want.want.GetStatus() == WantStatusAchieved {
+	if currentStatus == WantStatusReaching || currentStatus == WantStatusAchieved {
+		InfoLog("[START-WANT] '%s' already in terminal state (%s), skipping\n", wantName, currentStatus)
 		return
 	}
 
@@ -1528,6 +1532,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Start execution if want is Progressable
 	if progressable, ok := want.function.(Progressable); ok {
 		want.want.SetStatus(WantStatusReaching)
+		InfoLog("[START-WANT] '%s' transitioned to Reaching status\n", wantName)
 		want.want.InitializeControlChannel()
 
 		// Set the concrete progressable implementation on the want
@@ -2479,13 +2484,18 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	// This encapsulates the logic: check goroutine state and pending packets
 	if want.ShouldRetrigger() {
 		InfoLog("[RETRIGGER-RECEIVER] '%s' should retrigger (decision function returned true)\n", wantName)
+		InfoLog("[RETRIGGER-RECEIVER] '%s' current status: %s\n", wantName, want.GetStatus())
 
 		// Set status to Idle and trigger reconcile loop
 		// The reconcile loop's startPhase() will detect the Idle status and restart the want
 		// This avoids duplicate execution and keeps retrigger logic in one place
 		want.SetStatus(WantStatusIdle)
+		InfoLog("[RETRIGGER-RECEIVER] '%s' status set to Idle\n", wantName)
+
 		if err := cb.TriggerReconcile(); err != nil {
 			InfoLog("[RETRIGGER-RECEIVER] WARNING: failed to trigger reconcile for '%s': %v\n", wantName, err)
+		} else {
+			InfoLog("[RETRIGGER-RECEIVER] '%s' reconcile triggered\n", wantName)
 		}
 	} else {
 		// Retrigger not needed (either goroutine is running or no pending packets)
