@@ -95,12 +95,13 @@ func (c *CoordinatorWant) IsAchieved() bool {
 
 	// Even if completion flag is set, check if there are unused packets remaining
 	// This allows coordinator to retrigger when new packets arrive (e.g., during rebooking)
-	// Wait up to 1000ms for new packets to arrive before declaring completion
+	// Wait up to 5000ms for new packets to arrive before declaring completion
 	if completed {
 		// Check if unused packets exist (with reflect.Select monitoring)
-		// Use 100ms timeout to check for pending packets without blocking too long
-		hasUnused := c.UnusedExists(100)
-		c.StoreLog(fmt.Sprintf("[IsAchieved] completed=true, hasUnused=%v, returning=%v (use 100ms timeout)", hasUnused, !hasUnused))
+		// Wait up to 5000ms for rebooked packets to arrive (e.g., when Flight sends rebooked packet after delay detection)
+		// This gives the packet time to traverse the channel after retrigger
+		hasUnused := c.UnusedExists(5000)
+		c.StoreLog(fmt.Sprintf("[IsAchieved] completed=true, hasUnused=%v, returning=%v (use 5000ms timeout for retrigger detection)", hasUnused, !hasUnused))
 		// Return false if unused packets exist, allowing further processing
 		return !hasUnused
 	}
