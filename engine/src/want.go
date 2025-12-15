@@ -1207,17 +1207,24 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 	// If timeout > 0, use reflect.Select to create efficient timeout without blocking
 	// Monitor all channels concurrently using len() checks
 	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	startTime := time.Now()
+	checkCount := 0
 
 	for {
 		// Check all channels without consuming (len() is non-destructive)
 		if checkChannelsNonBlocking() {
+			elapsed := time.Now().Sub(startTime).Milliseconds()
+			InfoLog("[UnusedExists] FOUND packet after %dms (checks: %d)\n", elapsed, checkCount)
 			return true
 		}
 
 		// Check if timeout exceeded
 		if time.Now().After(deadline) {
+			InfoLog("[UnusedExists] TIMEOUT after %dms (checks: %d, no packets found)\n", timeoutMs, checkCount)
 			return false
 		}
+
+		checkCount++
 
 		// Use reflect.Select with a timeout channel to avoid busy-waiting
 		// This allows us to sleep efficiently without consuming data from input channels
