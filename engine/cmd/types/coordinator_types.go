@@ -98,10 +98,10 @@ func (c *CoordinatorWant) IsAchieved() bool {
 	// Wait up to 5000ms for new packets to arrive before declaring completion
 	if completed {
 		// Check if unused packets exist (with reflect.Select monitoring)
-		// Use short timeout (100ms) for fast retrigger detection
-		// The retry loop in reconcile will keep checking if IsAchieved()
+		// Wait up to 5000ms for rebooked packets to arrive (e.g., when Flight sends rebooked packet after delay detection)
+		// This gives the packet time to traverse the channel after retrigger
 		beforeCheck := time.Now()
-		hasUnused := c.UnusedExists(100)
+		hasUnused := c.UnusedExists(1000)
 		afterCheck := time.Now()
 		elapsed := afterCheck.Sub(beforeCheck).Milliseconds()
 		c.StoreLog(fmt.Sprintf("[IsAchieved] completed=true, hasUnused=%v, returning=%v (waited %dms for packet detection)", hasUnused, !hasUnused, elapsed))

@@ -38,8 +38,9 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 	n.paths.Out = outPaths
 }
 
-// Use attempts to receive data from any available input channel using non-blocking select. Returns the channel index that had data, the data itself, and whether a successful read occurred.
-// This function directly accesses all input channels from paths and constructs a dynamic select statement to watch all channels asynchronously without iterating through GetInputChannel(i).
+// Use attempts to receive data from any available input channel.
+// It first checks an internal cache (filled by UnusedExists) before attempting
+// to receive from the channels directly.
 //
 // Timeout behavior:
 //   - timeoutMilliseconds < 0: infinite wait (blocks until data arrives or channels close)
@@ -48,7 +49,18 @@ func (n *Want) SetPaths(inPaths, outPaths []PathInfo) {
 //
 // fmt.Printf("Received data from channel %d: %v\n", index, data) }
 func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
-	// Access input channels directly from paths structure
+	// 1. Check internal cache first (filled by UnusedExists)
+	n.cacheMutex.Lock()
+	if n.cachedPacket != nil {
+		cached := n.cachedPacket
+		n.cachedPacket = nil // Consume from cache
+		n.cacheMutex.Unlock()
+		// Return the original index and packet from the cache
+		return cached.OriginalIndex, cached.Packet, true
+	}
+	n.cacheMutex.Unlock()
+
+	// Proceed with existing channel receive logic if cache is empty
 	if len(n.paths.In) == 0 {
 		return -1, nil, false
 	}
@@ -82,23 +94,26 @@ func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
 		cases = append(cases, reflect.SelectCase{
 			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
 		})
-		channelIndexMap = append(channelIndexMap, -1)
+		channelIndexMap = append(channelIndexMap, -1) // -1 for timeout case
 	}
 
 	chosen, recv, recvOK := reflect.Select(cases)
 
-	// If timeout case was chosen (last index), no data available
-	if chosen == len(cases)-1 {
+	// If timeout case was chosen (last index in cases), no data available
+	if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
 		return -1, nil, false
 	}
 
-	// If we got here, data was received - Return the ORIGINAL channel index, not the case index!
+	// If we got here, data was received or a channel was closed.
 	if recvOK {
 		originalIndex := channelIndexMap[chosen]
 		return originalIndex, recv.Interface(), true
 	}
 
-	return channelIndexMap[chosen], nil, false
+	// Channel was closed (recvOK is false)
+	// The original code returned channelIndexMap[chosen], nil, false
+	// Let's refine this to return -1 when channel is closed, to avoid confusion with valid channel index
+	return -1, nil, false // Indicates channel closed or error
 }
 
 // UseForever attempts to receive data from any available input channel,

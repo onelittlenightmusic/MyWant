@@ -31,10 +31,10 @@ const (
 	ChangeEventDelete ChangeEventType = "DELETE"
 
 	// GlobalExecutionInterval defines the sleep interval between goroutine execution cycles This prevents CPU spinning in tight execution loops for want execution goroutines Set to 100ms to reduce CPU usage during concurrent want execution
-	GlobalExecutionInterval = 100 * time.Millisecond
+	GlobalExecutionInterval = 10 * time.Millisecond
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations This controls how often the system checks for memory file changes and writes statistics
-	GlobalReconcileInterval = 100 * time.Millisecond
+	GlobalReconcileInterval = 30 * time.Millisecond
 )
 
 // ChangeEvent represents a configuration change

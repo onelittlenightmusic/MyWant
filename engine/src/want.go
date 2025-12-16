@@ -198,6 +198,16 @@ type Want struct {
 	// ChainBuilder sets this via SetGoroutineActive() to inform Want when goroutine starts/stops
 	goroutineActive   bool       `json:"-" yaml:"-"`
 	goroutineActiveMu sync.RWMutex `json:"-" yaml:"-"`
+
+	// Packet cache for non-consuming checks
+	cachedPacket *CachedPacket `json:"-" yaml:"-"`
+	cacheMutex   sync.Mutex   `json:"-" yaml:"-"`
+}
+
+// CachedPacket holds a packet and its original channel index for the caching mechanism.
+type CachedPacket struct {
+	Packet        interface{}
+	OriginalIndex int
 }
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
@@ -1174,75 +1184,94 @@ func (n *Want) GetPaths() *Paths {
 	return &n.paths
 }
 
-// UnusedExists checks if there are unused packets in any input channel without consuming them
-// Uses reflect.Select to concurrently monitor multiple input channels with timeout support
-// timeoutMs: wait time in milliseconds for packets to arrive (0 = non-blocking check)
-// Returns true if any input channel has pending packets in its buffer
+// UnusedExists checks if there are unused packets in the cache or any input channel.
+// It uses a single, blocking `reflect.Select` call to wait for a packet, which is
+// then cached internally with its original channel index. This avoids polling loops.
+// timeoutMs: wait time in milliseconds. If 0, performs a non-blocking check.
+// Returns true if a packet is in the cache or received from a channel.
 func (n *Want) UnusedExists(timeoutMs int) bool {
+	n.cacheMutex.Lock()
+	// 1. Check if a packet is already cached.
+	if n.cachedPacket != nil {
+		n.cacheMutex.Unlock()
+		return true
+	}
+	n.cacheMutex.Unlock()
+
 	paths := n.GetPaths()
 	if paths == nil || len(paths.In) == 0 {
 		return false
 	}
 
-	// Helper function to check if any channel has pending data (non-consuming)
-	checkChannelsNonBlocking := func() bool {
-		for _, pathInfo := range paths.In {
-			if pathInfo.Channel == nil {
-				continue
-			}
-			// For buffered channels, len() returns the number of buffered elements
-			// This doesn't consume the packet, just checks if data is available
-			if len(pathInfo.Channel) > 0 {
-				return true
-			}
+	// 2. Create select cases and map to original channel indices.
+	cases := make([]reflect.SelectCase, 0, len(paths.In)+1)
+	channelIndexMap := make([]int, 0, len(paths.In)+1)
+
+	for i, pathInfo := range paths.In {
+		if pathInfo.Channel != nil {
+			cases = append(cases, reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(pathInfo.Channel),
+			})
+			channelIndexMap = append(channelIndexMap, i) // Map case index to original path index
+		}
+	}
+
+	// If no valid channels, we can't select.
+	if len(cases) == 0 {
+		return false
+	}
+
+	// 3. Add a timeout or default case.
+	if timeoutMs > 0 {
+		timeoutChan := time.After(time.Duration(timeoutMs) * time.Millisecond)
+		timeoutCase := reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(timeoutChan),
+		}
+		cases = append(cases, timeoutCase)
+	} else {
+		defaultCase := reflect.SelectCase{Dir: reflect.SelectDefault}
+		cases = append(cases, defaultCase)
+	}
+
+	startTime := time.Now()
+
+	// 4. Perform the select.
+	chosen, recv, ok := reflect.Select(cases)
+
+	// 5. Process the result.
+	isTimeout := (timeoutMs > 0 && chosen == len(cases)-1)
+	isDefault := (timeoutMs <= 0 && chosen == len(cases)-1)
+
+	if isTimeout || isDefault {
+		if isTimeout {
+			InfoLog("[UnusedExists] TIMEOUT after %dms (no packets found).\n", timeoutMs)
 		}
 		return false
 	}
 
-	// If timeout is 0, do non-blocking check only
-	if timeoutMs == 0 {
-		return checkChannelsNonBlocking()
+	if !ok {
+		InfoLog("[UnusedExists] A channel was closed (index: %d).\n", chosen)
+		return false
 	}
 
-	// If timeout > 0, use reflect.Select to create efficient timeout without blocking
-	// Monitor all channels concurrently using len() checks
-	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
-	startTime := time.Now()
-	checkCount := 0
-
-	for {
-		// Check all channels without consuming (len() is non-destructive)
-		if checkChannelsNonBlocking() {
-			elapsed := time.Now().Sub(startTime).Milliseconds()
-			InfoLog("[UnusedExists] FOUND packet after %dms (checks: %d)\n", elapsed, checkCount)
-			return true
-		}
-
-		// Check if timeout exceeded
-		if time.Now().After(deadline) {
-			InfoLog("[UnusedExists] TIMEOUT after %dms (checks: %d, no packets found)\n", timeoutMs, checkCount)
-			return false
-		}
-
-		checkCount++
-
-		// Use reflect.Select with a timeout channel to avoid busy-waiting
-		// This allows us to sleep efficiently without consuming data from input channels
-		var selectCases []reflect.SelectCase
-
-		// Create a timeout case that will fire after 1ms
-		selectCases = append(selectCases, reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(time.After(1 * time.Millisecond)),
-		})
-
-		// Use reflect.Select only to handle the timeout sleep
-		// We don't add input channels to reflect.Select because SelectRecv would consume data
-		// Instead, we rely on len() checks which are non-consuming
-		reflect.Select(selectCases)
-		// After timeout, loop continues and checks len() on all channels again
+	// 6. A packet was received. Get its original index and cache it.
+	originalIndex := channelIndexMap[chosen]
+	n.cacheMutex.Lock()
+	n.cachedPacket = &CachedPacket{
+		Packet:        recv.Interface(),
+		OriginalIndex: originalIndex,
 	}
+	n.cacheMutex.Unlock()
+
+	elapsed := time.Now().Sub(startTime).Milliseconds()
+	InfoLog("[UnusedExists] FOUND and CACHED packet from channel index %d in %dms\n", originalIndex, elapsed)
+
+	return true
 }
+
+
 
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
