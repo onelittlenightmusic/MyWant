@@ -77,7 +77,9 @@ func (e *EvidenceWant) Progress() {
 		"achieving_percentage": 100,
 	})
 
-	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount()))
+	outCount := e.GetOutCount()
+	e.StoreLog(fmt.Sprintf("[EVI-DEBUG] OutCount=%d, Paths=%v", outCount, e.GetPaths()))
+	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
@@ -147,7 +149,9 @@ func (d *DescriptionWant) Progress() {
 		"achieving_percentage":    100,
 	})
 
-	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, d.GetOutCount()))
+	outCount := d.GetOutCount()
+	d.StoreLog(fmt.Sprintf("[DESC-DEBUG] OutCount=%d, Paths=%v", outCount, d.GetPaths()))
+	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, outCount))
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)

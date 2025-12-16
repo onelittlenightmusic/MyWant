@@ -118,6 +118,21 @@ func (c *CoordinatorWant) IsAchieved() bool {
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 	heardsCount := len(c.channelsHeard)
+
+	// Log input channels info
+	paths := c.GetPaths()
+	if paths != nil && len(paths.In) > 0 {
+		channelAddrs := make([]string, len(paths.In))
+		for i, p := range paths.In {
+			if p.Channel != nil {
+				channelAddrs[i] = fmt.Sprintf("%d:0x%p(%s)", i, p.Channel, p.Name)
+			} else {
+				channelAddrs[i] = fmt.Sprintf("%d:nil(%s)", i, p.Name)
+			}
+		}
+		c.StoreLog(fmt.Sprintf("[Progress] Input channels: %v", channelAddrs))
+	}
+
 	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ChannelsHeard=%d", inCount, heardsCount))
 
 	// Track which channels we've received data from in this execution cycle This is a local map - NOT persisted to state, only used for completion detection

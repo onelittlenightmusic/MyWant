@@ -213,6 +213,7 @@ func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector m
 }
 
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements
+// OPTIMIZATION: Reuses existing channels instead of creating new ones on every reconciliation cycle
 func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	pathMap := make(map[string]*Paths)
 	for wantName := range cb.wants {
@@ -221,6 +222,17 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 			Out: []PathInfo{},
 		}
 	}
+
+	// Create a lookup map for existing paths by connection name for channel reuse
+	existingChannels := make(map[string]chain.Chan)
+	for _, oldPaths := range cb.pathMap {
+		for _, outPath := range oldPaths.Out {
+			if outPath.Channel != nil {
+				existingChannels[outPath.Name] = outPath.Channel
+			}
+		}
+	}
+
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
 		// }
@@ -234,10 +246,22 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					matchCount++
 					// log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
 						// otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
-					ch := make(chain.Chan, 100)
+
+					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
+
+					// Reuse existing channel if it exists, otherwise create a new one
+					var ch chain.Chan
+					if existingCh, exists := existingChannels[pathName]; exists {
+						ch = existingCh
+						log.Printf("[RECONCILE:PATHS] Reusing existing channel for '%s'\n", pathName)
+					} else {
+						ch = make(chain.Chan, 100)
+						log.Printf("[RECONCILE:PATHS] Created NEW channel for '%s'\n", pathName)
+					}
+
 					inPath := PathInfo{
 						Channel: ch,
-						Name:    fmt.Sprintf("%s_to_%s", otherName, wantName),
+						Name:    pathName,
 						Active:  true,
 					}
 					paths.In = append(paths.In, inPath)
@@ -648,7 +672,24 @@ func (cb *ChainBuilder) connectPhase() error {
 	}
 
 	// Generate new paths based on current wants
+	oldPathMap := cb.pathMap
 	cb.pathMap = cb.generatePathsFromConnections()
+
+	// Check if paths actually changed
+	pathsChanged := len(oldPathMap) != len(cb.pathMap)
+	if !pathsChanged {
+		for wantName, oldPaths := range oldPathMap {
+			newPaths, exists := cb.pathMap[wantName]
+			if !exists || len(oldPaths.In) != len(newPaths.In) || len(oldPaths.Out) != len(newPaths.Out) {
+				pathsChanged = true
+				break
+			}
+		}
+	}
+
+	if pathsChanged {
+		log.Printf("[RECONCILE:CONNECT] Paths regenerated - updating %d wants\n", len(cb.pathMap))
+	}
 
 	// log.Printf("[RECONCILE:SYNC] Path generation complete. Synchronizing %d wants with their paths\n", len(cb.pathMap))
 
@@ -656,6 +697,9 @@ func (cb *ChainBuilder) connectPhase() error {
 	for wantName, paths := range cb.pathMap {
 		if runtimeWant, exists := cb.wants[wantName]; exists {
 			// Update the want's paths field with the generated paths This makes output/input channels available to the want during execution
+			if pathsChanged {
+				log.Printf("[RECONCILE:CONNECT] Updating paths for want '%s': In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
+			}
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
 		} else {

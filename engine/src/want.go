@@ -1138,19 +1138,27 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 func (n *Want) Provide(packet interface{}) error {
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
+		n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] No output paths - paths=%v", paths))
 		return nil // No outputs to send to
 	}
 
-	for _, pathInfo := range paths.Out {
+	n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Providing to %d output channels", len(paths.Out)))
+
+	for i, pathInfo := range paths.Out {
 		if pathInfo.Channel == nil {
+			n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Channel %d is nil, skipping", i))
 			continue // Skip nil channels
 		}
+		n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Sending packet to channel %d (%s)", i, pathInfo.Name))
 		select {
 		case pathInfo.Channel <- packet:
 			// Sent successfully
+			n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Packet sent successfully to channel %d", i))
 		default:
 			// Channel is full, try blocking send
+			n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Channel %d is full, blocking send", i))
 			pathInfo.Channel <- packet
+			n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Blocked packet sent to channel %d", i))
 		}
 	}
 
@@ -1162,6 +1170,7 @@ func (n *Want) Provide(packet interface{}) error {
 				continue
 			}
 			targetWantName := pathInfo.TargetWantName
+			n.StoreLog(fmt.Sprintf("[PROVIDE-DEBUG] Retriggering receiver: %s", targetWantName))
 			cb.RetriggerReceiverWant(targetWantName)
 		}
 	}
