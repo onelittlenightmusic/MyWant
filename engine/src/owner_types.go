@@ -272,6 +272,8 @@ func (t *Target) Progress() {
 		allComplete := t.checkAllChildrenComplete()
 		t.childCompletionMutex.Unlock()
 
+		t.StoreLog(fmt.Sprintf("[TARGET] Progress() check - childrenCreated=true, allComplete=%v, status=%s", allComplete, t.Status))
+
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
@@ -280,6 +282,15 @@ func (t *Target) Progress() {
 
 				// Mark the target as completed
 				t.SetStatus(WantStatusAchieved)
+
+				// Send completion packet to parent/upstream wants
+				t.StoreLog(fmt.Sprintf("[TARGET] Sending completion packet from %s", t.Metadata.Name))
+				t.Provide(map[string]interface{}{
+					"status":   "completed",
+					"name":     t.Metadata.Name,
+					"type":     t.Metadata.Type,
+					"childCount": t.childCount,
+				})
 			}
 			return
 		}
