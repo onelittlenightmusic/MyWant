@@ -59,21 +59,6 @@ recipe:
           - role: evidence-provider
           - role: description-provider
 
-    # Level 2 Approval as child - created after Level 1 completes
-    # This is a custom target type that will load approval-level-2.yaml recipe
-    - metadata:
-        type: "level 2 approval"  # Matches custom_type in approval-level-2.yaml
-        labels:
-          role: approval-target
-          approval_level: "2"
-          parent_approval_level: "1"
-      spec:
-        params:
-          approval_id: approval_id
-          coordinator_type: "approval"
-          coordinator_level: 2
-          level2_authority: level2_authority
-
   # Recipe result definition
   result:
     - want_name: "coordinator"
@@ -82,12 +67,6 @@ recipe:
     - want_name: "coordinator"
       stat_name: ".approval_status"
       description: "Level 1 approval status"
-    - want_name: "level2_approval"
-      stat_name: ".coordinator_result"
-      description: "Level 2 approval coordinator result with inputs"
-    - want_name: "level2_approval"
-      stat_name: ".approval_status"
-      description: "Level 2 approval status"
   # Example deployment - one-click deployment configuration
   example:
     wants:
