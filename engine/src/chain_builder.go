@@ -253,10 +253,8 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					var ch chain.Chan
 					if existingCh, exists := existingChannels[pathName]; exists {
 						ch = existingCh
-						log.Printf("[RECONCILE:PATHS] Reusing existing channel for '%s'\n", pathName)
 					} else {
 						ch = make(chain.Chan, 100)
-						log.Printf("[RECONCILE:PATHS] Created NEW channel for '%s'\n", pathName)
 					}
 
 					inPath := PathInfo{
@@ -672,38 +670,14 @@ func (cb *ChainBuilder) connectPhase() error {
 	}
 
 	// Generate new paths based on current wants
-	oldPathMap := cb.pathMap
 	cb.pathMap = cb.generatePathsFromConnections()
-
-	// Check if paths actually changed
-	pathsChanged := len(oldPathMap) != len(cb.pathMap)
-	if !pathsChanged {
-		for wantName, oldPaths := range oldPathMap {
-			newPaths, exists := cb.pathMap[wantName]
-			if !exists || len(oldPaths.In) != len(newPaths.In) || len(oldPaths.Out) != len(newPaths.Out) {
-				pathsChanged = true
-				break
-			}
-		}
-	}
-
-	if pathsChanged {
-		log.Printf("[RECONCILE:CONNECT] Paths regenerated - updating %d wants\n", len(cb.pathMap))
-	}
-
-	// log.Printf("[RECONCILE:SYNC] Path generation complete. Synchronizing %d wants with their paths\n", len(cb.pathMap))
 
 	// CRITICAL FIX: Synchronize generated paths to individual Want structs This ensures child wants can access their output channels when they execute NOTE: Caller (reconcileWants) already holds reconcileMutex, so we don't lock here
 	for wantName, paths := range cb.pathMap {
 		if runtimeWant, exists := cb.wants[wantName]; exists {
 			// Update the want's paths field with the generated paths This makes output/input channels available to the want during execution
-			if pathsChanged {
-				log.Printf("[RECONCILE:CONNECT] Updating paths for want '%s': In=%d, Out=%d\n", wantName, len(paths.In), len(paths.Out))
-			}
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
-		} else {
-			log.Printf("[RECONCILE:SYNC] WARN: Runtime want '%s' not found in cb.wants!\n", wantName)
 		}
 	}
 	cb.buildLabelToUsersMapping()
