@@ -198,6 +198,43 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	c.channelsHeard = make(map[int]bool)
 }
 
+// ============================================================================ Common Handler Utilities ============================================================================
+
+// processDefaultMapData is a default handler for map[string]interface{} data
+// This should be the fallback for any DataHandler that receives generic map data
+func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap map[string]interface{}) bool {
+	dataByChannelVal, _ := want.GetState("data_by_channel")
+	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
+	if !ok {
+		if dataByChannelVal == nil {
+			dataByChannel = make(map[int]interface{})
+		}
+	}
+
+	dataByChannel[channelIndex] = packetMap
+	stateUpdates := make(map[string]interface{})
+	stateUpdates["data_by_channel"] = dataByChannel
+
+	// Track total packets received
+	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
+	stateUpdates["total_packets_received"] = totalPacketsVal + 1
+	stateUpdates["last_packet_time"] = time.Now()
+
+	// Extract common fields if present
+	if status, exists := packetMap["status"]; exists {
+		stateUpdates["status"] = status
+	}
+	if name, exists := packetMap["name"]; exists {
+		stateUpdates["name"] = name
+	}
+	if typeVal, exists := packetMap["type"]; exists {
+		stateUpdates["type"] = typeVal
+	}
+
+	want.StoreStateMulti(stateUpdates)
+	return true
+}
+
 // ============================================================================ Approval-Specific Handlers ============================================================================
 
 // ApprovalDataHandler handles approval-specific data processing
@@ -254,23 +291,23 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 
 	// Handle map format (from nested Target wants)
 	if packetMap, ok := data.(map[string]interface{}); ok {
-		dataByChannel[channelIndex] = packetMap
-		stateUpdates["data_by_channel"] = dataByChannel
+		// Use default map handler for generic data
+		if !processDefaultMapData(want, channelIndex, packetMap) {
+			return false
+		}
 
-		// Track total packets received
-		totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-		stateUpdates["total_packets_received"] = totalPacketsVal + 1
-		stateUpdates["last_packet_time"] = time.Now()
-
-		// Mark nested target received
+		// ApprovalDataHandler-specific processing for nested target packets
+		stateUpdatesApproval := make(map[string]interface{})
 		if status, exists := packetMap["status"]; exists && status == "completed" {
 			if name, ok := packetMap["name"].(string); ok {
-				stateUpdates["nested_target_received"] = true
-				stateUpdates["nested_target_name"] = name
+				stateUpdatesApproval["nested_target_received"] = true
+				stateUpdatesApproval["nested_target_name"] = name
 			}
 		}
 
-		want.StoreStateMulti(stateUpdates)
+		if len(stateUpdatesApproval) > 0 {
+			want.StoreStateMulti(stateUpdatesApproval)
+		}
 		return true
 	}
 
@@ -361,7 +398,12 @@ type TravelDataHandler struct {
 func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
 	schedule, ok := data.(*TravelSchedule)
 	if !ok {
+		// If not a TravelSchedule, try generic map handler
+		if packetMap, ok := data.(map[string]interface{}); ok {
+			return processDefaultMapData(want, channelIndex, packetMap)
+		}
 		want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.ProcessData: type assertion failed for data. Expected *TravelSchedule, got %T", data))
+		return false
 	}
 	// Log packet reception with content details
 	eventDetails := ""
