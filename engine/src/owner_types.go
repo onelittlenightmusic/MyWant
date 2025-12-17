@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 )
 
 // extractIntParam extracts an integer parameter with type conversion and default fallback
@@ -657,31 +656,8 @@ func (oaw *OwnerAwareWant) Progress() {
 	// Call the original Progress method directly
 	if progressable, ok := oaw.BaseWant.(Progressable); ok {
 		progressable.Progress()
-
-		// If want is now achieved and we have a target, notify it
-		isAchieved := progressable.IsAchieved()
-		hasTarget := oaw.TargetName != ""
-
-		// DEBUG: Log completion check for nested wants
-		if strings.Contains(oaw.WantName, "level 2 approval") || strings.Contains(oaw.WantName, "coordinator") {
-			log.Printf("[OWNER-AWARE] %s: isAchieved=%v, hasTarget=%v, targetName=%s\n",
-				oaw.WantName, isAchieved, hasTarget, oaw.TargetName)
-		}
-
-		if isAchieved && hasTarget {
-			// Store diagnostic info
-			if oaw.Want != nil {
-				oaw.Want.StoreState("parent_target_name", oaw.TargetName)
-				oaw.Want.StoreState("emitting_completion_event", true)
-				oaw.Want.StoreState("my_name", oaw.WantName)
-			}
-			// DEBUG: Log emission
-			if strings.Contains(oaw.WantName, "level 2 approval") || strings.Contains(oaw.WantName, "coordinator") {
-				log.Printf("[OWNER-AWARE] %s: EMITTING event to target %s\n", oaw.WantName, oaw.TargetName)
-			}
-			// Emit OwnerCompletionEvent through unified subscription system
-			oaw.emitOwnerCompletionEvent()
-		}
+		// OwnerCompletionEvent is now emitted automatically by SetStatus() in the base Want
+		// when it reaches ACHIEVED status, so no need to emit here
 	}
 }
 
@@ -742,30 +718,6 @@ func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
 	return nil
 }
 
-// emitOwnerCompletionEvent emits an owner completion event through the unified subscription system
-func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
-	// Use the Want pointer stored at creation time
-	if oaw.Want == nil {
-		// Only log warnings if we actually have a target (not a standalone want)
-		if oaw.TargetName != "" {
-			InfoLog("[TARGET] ⚠️  OwnerAwareWant %s: Want pointer is nil, cannot emit completion event\n", oaw.WantName)
-		}
-		return
-	}
-	event := &OwnerCompletionEvent{
-		BaseEvent: BaseEvent{
-			EventType:  EventTypeOwnerCompletion,
-			SourceName: oaw.WantName,
-			TargetName: oaw.TargetName,
-			Timestamp:  time.Now(),
-			Priority:   10, // High priority for completion events
-		},
-		ChildName: oaw.WantName,
-	}
-
-	// Emit through subscription system (blocking mode)
-	oaw.Want.GetSubscriptionSystem().Emit(context.Background(), event)
-}
 func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
 	if oaw.Want == nil {
 		oaw.Want = want
