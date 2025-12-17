@@ -244,8 +244,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 				}
 				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
 					matchCount++
-					// log.Printf("[RECONCILE:PATHS] Matched: '%s' (type: %s, labels: %v) matches selector %v for '%s'\n",
-						// otherName, otherWant.GetMetadata().Type, otherWant.GetMetadata().Labels, usingSelector, wantName)
 
 					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
 
@@ -273,12 +271,14 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						TargetWantName: wantName, // Set target want name for output path
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
-					// log.Printf("[RECONCILE:PATHS] Created output path for '%s': %s\n", otherName, outPath.Name)
 
-					// Log output connections from other wants to Flight if strings.Contains(otherName, "flight") { InfoLog("[FLIGHT-CONNECT] Want '%s' sending output to '%s' via channel: %s\n", otherName, wantName, outPath.Name) }
+					// DEBUG: Log when creating output paths for coordinator wants
+					if strings.Contains(wantName, "coordinator") || strings.Contains(otherName, "approval") {
+						log.Printf("[RECONCILE:PATHS] Output path created: '%s' (labels: %v) -> '%s' via %s\n",
+							otherName, otherWant.GetMetadata().Labels, wantName, pathName)
+					}
 				}
 			}
-			// if matchCount == 0 { log.Printf("[RECONCILE:PATHS] WARN: Want '%s' selector %v matched 0 wants!\n", wantName, usingSelector) }
 		}
 	}
 	result := make(map[string]Paths)
@@ -678,6 +678,12 @@ func (cb *ChainBuilder) connectPhase() error {
 			// Update the want's paths field with the generated paths This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
+
+			// DEBUG: Log path synchronization
+			if len(paths.Out) > 0 || len(paths.In) > 0 {
+				log.Printf("[RECONCILE:CONNECT] Synchronized paths for '%s': In=%d, Out=%d\n",
+					wantName, len(paths.In), len(paths.Out))
+			}
 		}
 	}
 	cb.buildLabelToUsersMapping()
@@ -954,6 +960,12 @@ func (cb *ChainBuilder) startPhase() {
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
 
+					// DEBUG: Log nested want startup
+					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+						log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
+							wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+					}
+
 					// Log for coordinator startup
 					if wantName == "dynamic-travel-coordinator-5" {
 						InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
@@ -963,6 +975,10 @@ func (cb *ChainBuilder) startPhase() {
 					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
 						if wantName == "dynamic-travel-coordinator-5" {
 							InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
+						}
+						// DEBUG: Log why nested wants are skipped
+						if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+							log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
 						}
 						continue
 					}
@@ -1515,6 +1531,14 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	if currentStatus == WantStatusReaching || currentStatus == WantStatusAchieved {
 		InfoLog("[START-WANT] '%s' already in terminal state (%s), skipping\n", wantName, currentStatus)
 		return
+	}
+
+	// DEBUG: Log nested wants status
+	if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+		log.Printf("[START-WANT-DEBUG] %s: Checking connectivity requirements (RequiredInputs=%d, RequiredOutputs=%d)\n",
+			wantName,
+			want.want.GetConnectivityMetadata().RequiredInputs,
+			want.want.GetConnectivityMetadata().RequiredOutputs)
 	}
 
 	// Check connectivity satisfaction

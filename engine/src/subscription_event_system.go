@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -211,9 +212,16 @@ func (uss *UnifiedSubscriptionSystem) Subscribe(
 
 	uss.subscriptions[eventType] = append(uss.subscriptions[eventType], subscription)
 
+	// DEBUG: Always log OwnerCompletion subscriptions
+	subscriberName := subscription.GetSubscriberName()
+	if eventType == EventTypeOwnerCompletion {
+		log.Printf("[SUBSCRIPTION] REGISTERED: %s subscribed to %s events (now %d subscribers)\n",
+			subscriberName, eventType, len(uss.subscriptions[eventType]))
+	}
+
 	if uss.enableLogging {
-		fmt.Printf("[SUBSCRIPTION] %s subscribed to %s events\n",
-			subscription.GetSubscriberName(), eventType)
+		log.Printf("[SUBSCRIPTION] %s subscribed to %s events\n",
+			subscriberName, eventType)
 	}
 }
 
@@ -245,7 +253,21 @@ func (uss *UnifiedSubscriptionSystem) Emit(ctx context.Context, event WantEvent)
 	uss.mutex.RUnlock()
 
 	if len(subscribers) == 0 {
+		// DEBUG: Log missing subscribers for owner completion events
+		if eventType == EventTypeOwnerCompletion {
+			log.Printf("[SUBSCRIPTION] WARNING: No subscribers for %s event from %s to %s\n",
+				eventType, event.GetSourceName(), event.GetTargetName())
+		}
 		return nil
+	}
+
+	// DEBUG: Log emitting OwnerCompletion events
+	if eventType == EventTypeOwnerCompletion {
+		log.Printf("[SUBSCRIPTION] EMITTING %s to %d subscribers (from %s to %s, mode=%v)\n",
+			eventType, len(subscribers), event.GetSourceName(), event.GetTargetName(), mode)
+		for i, sub := range subscribers {
+			log.Printf("  [%d] %s\n", i, sub.GetSubscriberName())
+		}
 	}
 
 	switch mode {

@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
 	"mywant/engine/src/chain"
 	"reflect"
 	"strings"
@@ -83,6 +84,11 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	// Subscribe to OwnerCompletionEvents
 	target.subscribeToChildCompletion()
 
+	// DEBUG
+	if strings.Contains(target.Metadata.Name, "approval") {
+		log.Printf("[TARGET-INIT] Target %s created and subscribed to completion events\n", target.Metadata.Name)
+	}
+
 	return target
 }
 
@@ -112,24 +118,97 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
+	// Store debug info
+	tcs.target.StoreState("received_event_child", completionEvent.ChildName)
+	tcs.target.StoreState("received_event_target", completionEvent.TargetName)
+	tcs.target.StoreState("my_name", tcs.target.Metadata.Name)
+	tcs.target.StoreState("event_matches_target", completionEvent.TargetName == tcs.target.Metadata.Name)
+
+	// DEBUG: Log event reception
+	if strings.Contains(tcs.target.Metadata.Name, "approval") {
+		log.Printf("[ON-EVENT] Target %s received completion event for child %s (targetName=%s)\n",
+			tcs.target.Metadata.Name, completionEvent.ChildName, completionEvent.TargetName)
+	}
+
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
+		if strings.Contains(tcs.target.Metadata.Name, "approval") {
+			log.Printf("[ON-EVENT] Target %s IGNORING event - targetName %s doesn't match my name %s\n",
+				tcs.target.Metadata.Name, completionEvent.TargetName, tcs.target.Metadata.Name)
+		}
 		return EventResponse{Handled: false}
 	}
 
 	// Track child completion
 	tcs.target.childCompletionMutex.Lock()
+
+	// DEBUG: Log before adding to completed
+	if strings.Contains(tcs.target.Metadata.Name, "approval") {
+		log.Printf("[ON-EVENT] Target %s: completedChildren before adding child=%v\n",
+			tcs.target.Metadata.Name, len(tcs.target.completedChildren))
+	}
+
 	tcs.target.completedChildren[completionEvent.ChildName] = true
+	tcs.target.StoreState("added_to_completed", completionEvent.ChildName)
+
+	// DEBUG: Log after adding
+	if strings.Contains(tcs.target.Metadata.Name, "approval") {
+		log.Printf("[ON-EVENT] Target %s: completedChildren after adding child=%v\n",
+			tcs.target.Metadata.Name, len(tcs.target.completedChildren))
+		log.Printf("[ON-EVENT] Target %s: childWants count=%v\n",
+			tcs.target.Metadata.Name, len(tcs.target.childWants))
+		// Log all completed children names
+		completedNames := make([]string, 0)
+		for name := range tcs.target.completedChildren {
+			completedNames = append(completedNames, name)
+		}
+		log.Printf("[ON-EVENT] Target %s: completed children: %v\n",
+			tcs.target.Metadata.Name, completedNames)
+		// Log all expected children names
+		expectedNames := make([]string, 0)
+		for _, child := range tcs.target.childWants {
+			expectedNames = append(expectedNames, child.Metadata.Name)
+		}
+		log.Printf("[ON-EVENT] Target %s: expected children: %v\n",
+			tcs.target.Metadata.Name, expectedNames)
+	}
+
 	allComplete := tcs.target.checkAllChildrenComplete()
+	tcs.target.StoreState("all_complete_check_result", allComplete)
+
+	if strings.Contains(tcs.target.Metadata.Name, "approval") {
+		log.Printf("[ON-EVENT] Target %s: checkAllChildrenComplete() returned %v\n",
+			tcs.target.Metadata.Name, allComplete)
+	}
+
 	tcs.target.childCompletionMutex.Unlock()
 
-	// If all children are complete, signal the target via channel (only for old-style blocking) Note: New implementation uses polling in Exec(), not channel-based signaling
+	// CRITICAL: If all children are now complete, trigger the target want to send packet
+	// The target's Progress() method checks allComplete and sends the packet
 	if allComplete {
+		if strings.Contains(tcs.target.Metadata.Name, "approval") {
+			log.Printf("[ON-EVENT] Target %s: ALL CHILDREN COMPLETE! Calling Progress() to send packet\n",
+				tcs.target.Metadata.Name)
+		}
+
+		tcs.target.StoreState("retrigger_requested", true)
+
+		// Call Progress() directly to send the packet immediately
+		// This ensures the packet reaches the coordinator before it times out
+		tcs.target.Progress()
+		tcs.target.StoreState("progress_called_from_event", true)
+
+		// Also signal the target via channel (legacy support)
 		select {
 		case tcs.target.childrenDone <- true:
 			// Signal sent (legacy support)
 		default:
 			// Channel already has signal, ignore
+		}
+	} else {
+		if strings.Contains(tcs.target.Metadata.Name, "approval") {
+			log.Printf("[ON-EVENT] Target %s: Not all children complete yet, waiting for more events\n",
+				tcs.target.Metadata.Name)
 		}
 	}
 
@@ -255,6 +334,7 @@ func (t *Target) IsAchieved() bool {
 func (t *Target) Progress() {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
+		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Creating child wants", t.Metadata.Name))
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
@@ -263,6 +343,7 @@ func (t *Target) Progress() {
 
 		// Mark that we've created children
 		t.childrenCreated = true
+		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Children created: %d", t.Metadata.Name, len(childWants)))
 		return // Not complete yet, waiting for children
 	}
 
@@ -272,25 +353,56 @@ func (t *Target) Progress() {
 		allComplete := t.checkAllChildrenComplete()
 		t.childCompletionMutex.Unlock()
 
-		t.StoreLog(fmt.Sprintf("[TARGET] Progress() check - childrenCreated=true, allComplete=%v, status=%s", allComplete, t.Status))
+		// Store detailed diagnostic state
+		t.StoreState("phase", "checking_completion")
+		t.StoreState("allComplete", allComplete)
+		t.StoreState("childWantsCount", len(t.childWants))
+		t.StoreState("completedChildrenCount", len(t.completedChildren))
+		t.StoreState("pathsOutCount", len(t.paths.Out))
+
+		// Store list of child want names
+		childNames := make([]string, 0, len(t.childWants))
+		for _, child := range t.childWants {
+			childNames = append(childNames, child.Metadata.Name)
+		}
+		t.StoreState("childWantNames", childNames)
+
+		// Store list of completed child names
+		completedNames := make([]string, 0)
+		for name := range t.completedChildren {
+			completedNames = append(completedNames, name)
+		}
+		t.StoreState("completedChildNames", completedNames)
+
+		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Progress check: allComplete=%v, status=%s, paths.Out=%d",
+			t.Metadata.Name, allComplete, t.Status, len(t.paths.Out)))
 
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
+				t.StoreLog(fmt.Sprintf("[TARGET] %s - All children completed, sending packet", t.Metadata.Name))
+				t.StoreState("before_provide_called", true)
+				t.StoreState("provide_paths_out", len(t.paths.Out))
+
+				// Send completion packet to parent/upstream wants BEFORE marking as achieved
+				packet := map[string]interface{}{
+					"status":   "completed",
+					"name":     t.Metadata.Name,
+					"type":     t.Metadata.Type,
+					"childCount": t.childCount,
+				}
+				t.Provide(packet)
+				t.StoreState("provide_called", true)
+				t.StoreState("packet_content", packet)
+
+				t.StoreLog(fmt.Sprintf("[TARGET] %s - Packet sent via Provide(), now marking as achieved", t.Metadata.Name))
+
 				// Compute and store recipe result
 				t.computeTemplateResult()
 
 				// Mark the target as completed
 				t.SetStatus(WantStatusAchieved)
-
-				// Send completion packet to parent/upstream wants
-				t.StoreLog(fmt.Sprintf("[TARGET] Sending completion packet from %s", t.Metadata.Name))
-				t.Provide(map[string]interface{}{
-					"status":   "completed",
-					"name":     t.Metadata.Name,
-					"type":     t.Metadata.Type,
-					"childCount": t.childCount,
-				})
+				t.StoreLog(fmt.Sprintf("[TARGET] %s - Status set to ACHIEVED", t.Metadata.Name))
 			}
 			return
 		}
@@ -578,7 +690,26 @@ func (oaw *OwnerAwareWant) Progress() {
 		progressable.Progress()
 
 		// If want is now achieved and we have a target, notify it
-		if progressable.IsAchieved() && oaw.TargetName != "" {
+		isAchieved := progressable.IsAchieved()
+		hasTarget := oaw.TargetName != ""
+
+		// DEBUG: Log completion check for nested wants
+		if strings.Contains(oaw.WantName, "level 2 approval") || strings.Contains(oaw.WantName, "coordinator") {
+			log.Printf("[OWNER-AWARE] %s: isAchieved=%v, hasTarget=%v, targetName=%s\n",
+				oaw.WantName, isAchieved, hasTarget, oaw.TargetName)
+		}
+
+		if isAchieved && hasTarget {
+			// Store diagnostic info
+			if oaw.Want != nil {
+				oaw.Want.StoreState("parent_target_name", oaw.TargetName)
+				oaw.Want.StoreState("emitting_completion_event", true)
+				oaw.Want.StoreState("my_name", oaw.WantName)
+			}
+			// DEBUG: Log emission
+			if strings.Contains(oaw.WantName, "level 2 approval") || strings.Contains(oaw.WantName, "coordinator") {
+				log.Printf("[OWNER-AWARE] %s: EMITTING event to target %s\n", oaw.WantName, oaw.TargetName)
+			}
 			// Emit OwnerCompletionEvent through unified subscription system
 			oaw.emitOwnerCompletionEvent()
 		}

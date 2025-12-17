@@ -5,6 +5,7 @@ import (
     "mywant/engine/cmd/types"
     mywant "mywant/engine/src"
     "os"
+    "path/filepath"
     "time"
 )
 
@@ -25,7 +26,38 @@ func main() {
     }
     builder := mywant.NewChainBuilder(config)
 
-    // Custom target types are auto-registered during builder creation
+    // Scan and register custom target types from recipes directory
+    customRegistry := mywant.NewCustomTargetTypeRegistry()
+
+    // Determine absolute path to recipes directory
+    // When running from demo: go run -C engine ../cmd/demos/demo_hierarchical_approval ../config/...
+    // Current directory is engine/, so recipes should be at ../recipes
+    recipePaths := []string{"../recipes", "recipes", "../../recipes"}
+
+    // Also try absolute paths based on config path directory
+    configDir := filepath.Dir(configPath)
+    if !filepath.IsAbs(configDir) {
+        wd, _ := os.Getwd()
+        configDir = filepath.Join(wd, configDir)
+    }
+    recipePathFromConfig := filepath.Join(filepath.Dir(configDir), "recipes")
+    recipePaths = append(recipePaths, recipePathFromConfig)
+
+    var recipeErr error
+    for _, path := range recipePaths {
+        abs, _ := filepath.Abs(path)
+        fmt.Printf("  Trying recipes path: %s (abs: %s)\n", path, abs)
+        recipeErr = mywant.ScanAndRegisterCustomTypes(path, customRegistry)
+        if recipeErr == nil {
+            fmt.Printf("  ✅ Successfully loaded recipes from: %s\n", path)
+            builder.SetCustomTargetRegistry(customRegistry)
+            break
+        }
+    }
+    if recipeErr != nil {
+        fmt.Printf("Warning: Could not scan custom types from any recipes path: %v\n", recipeErr)
+        // Don't exit - recipes directory might not be accessible
+    }
 
     // Register approval want types
     types.RegisterApprovalWantTypes(builder)
