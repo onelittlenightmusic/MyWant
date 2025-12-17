@@ -372,7 +372,8 @@ func (t *Target) Progress() {
 				t.SetStatus(WantStatusAchieved)
 
 				// Emit OwnerCompletionEvent to parent target (if this target has an owner)
-				// This ensures the parent target is notified when all children complete
+				// This must be done AFTER SetStatus() because Status field is used by parent OnEvent handler
+				// which checks IsAchieved() to determine if child is complete
 				if len(t.Metadata.OwnerReferences) > 0 {
 					for _, ownerRef := range t.Metadata.OwnerReferences {
 						if ownerRef.Controller && ownerRef.Kind == "Want" {
