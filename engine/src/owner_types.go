@@ -370,6 +370,27 @@ func (t *Target) Progress() {
 
 				// Mark the target as completed
 				t.SetStatus(WantStatusAchieved)
+
+				// Emit OwnerCompletionEvent to parent target (if this target has an owner)
+				// This ensures the parent target is notified when all children complete
+				if len(t.Metadata.OwnerReferences) > 0 {
+					for _, ownerRef := range t.Metadata.OwnerReferences {
+						if ownerRef.Controller && ownerRef.Kind == "Want" {
+							event := &OwnerCompletionEvent{
+								BaseEvent: BaseEvent{
+									EventType:  EventTypeOwnerCompletion,
+									SourceName: t.Metadata.Name,
+									TargetName: ownerRef.Name,
+									Timestamp:  time.Now(),
+									Priority:   10,
+								},
+								ChildName: t.Metadata.Name,
+							}
+							t.GetSubscriptionSystem().Emit(context.Background(), event)
+							break
+						}
+					}
+				}
 			}
 			return
 		}
