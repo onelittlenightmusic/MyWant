@@ -369,29 +369,9 @@ func (t *Target) Progress() {
 				t.computeTemplateResult()
 
 				// Mark the target as completed
+				// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
+				// This is part of the standard progression cycle completion pattern
 				t.SetStatus(WantStatusAchieved)
-
-				// Emit OwnerCompletionEvent to parent target (if this target has an owner)
-				// This must be done AFTER SetStatus() because Status field is used by parent OnEvent handler
-				// which checks IsAchieved() to determine if child is complete
-				if len(t.Metadata.OwnerReferences) > 0 {
-					for _, ownerRef := range t.Metadata.OwnerReferences {
-						if ownerRef.Controller && ownerRef.Kind == "Want" {
-							event := &OwnerCompletionEvent{
-								BaseEvent: BaseEvent{
-									EventType:  EventTypeOwnerCompletion,
-									SourceName: t.Metadata.Name,
-									TargetName: ownerRef.Name,
-									Timestamp:  time.Now(),
-									Priority:   10,
-								},
-								ChildName: t.Metadata.Name,
-							}
-							t.GetSubscriptionSystem().Emit(context.Background(), event)
-							break
-						}
-					}
-				}
 			}
 			return
 		}

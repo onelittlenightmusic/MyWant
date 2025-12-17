@@ -231,6 +231,9 @@ func (n *Want) SetStatus(status WantStatus) {
 		// Automatically notify ChainBuilder when want reaches achieved status This enables receiver wants (like Coordinators) to self-notify completion
 		if status == WantStatusAchieved {
 			n.NotifyCompletion()
+			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
+			// This is part of the standard progression cycle completion pattern
+			n.emitOwnerCompletionEventIfOwned()
 		}
 	}
 }
@@ -1365,4 +1368,29 @@ func (w *Want) GetMetadata() *Metadata {
 	return &w.Metadata
 }
 
+// emitOwnerCompletionEventIfOwned emits an OwnerCompletionEvent if this want has an owner
+// This is called automatically by SetStatus() when want reaches ACHIEVED
+// It's part of the standard progression cycle completion pattern
+func (n *Want) emitOwnerCompletionEventIfOwned() {
+	if len(n.Metadata.OwnerReferences) == 0 {
+		return
+	}
+
+	for _, ownerRef := range n.Metadata.OwnerReferences {
+		if ownerRef.Controller && ownerRef.Kind == "Want" {
+			event := &OwnerCompletionEvent{
+				BaseEvent: BaseEvent{
+					EventType:  EventTypeOwnerCompletion,
+					SourceName: n.Metadata.Name,
+					TargetName: ownerRef.Name,
+					Timestamp:  time.Now(),
+					Priority:   10,
+				},
+				ChildName: n.Metadata.Name,
+			}
+			n.GetSubscriptionSystem().Emit(context.Background(), event)
+			break
+		}
+	}
+}
 
