@@ -84,11 +84,6 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	// Subscribe to OwnerCompletionEvents
 	target.subscribeToChildCompletion()
 
-	// DEBUG
-	if strings.Contains(target.Metadata.Name, "approval") {
-		log.Printf("[TARGET-INIT] Target %s created and subscribed to completion events\n", target.Metadata.Name)
-	}
-
 	return target
 }
 
@@ -341,7 +336,6 @@ func (t *Target) IsAchieved() bool {
 func (t *Target) Progress() {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
-		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Creating child wants", t.Metadata.Name))
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
 			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
@@ -350,7 +344,6 @@ func (t *Target) Progress() {
 
 		// Mark that we've created children
 		t.childrenCreated = true
-		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Children created: %d", t.Metadata.Name, len(childWants)))
 		return // Not complete yet, waiting for children
 	}
 
@@ -360,43 +353,10 @@ func (t *Target) Progress() {
 		allComplete := t.checkAllChildrenComplete()
 		t.childCompletionMutex.Unlock()
 
-		// Store detailed diagnostic state
-		t.StoreState("phase", "checking_completion")
-		t.StoreState("allComplete", allComplete)
-		t.StoreState("childWantsCount", len(t.childWants))
-		t.StoreState("completedChildrenCount", len(t.completedChildren))
-		t.StoreState("pathsOutCount", len(t.paths.Out))
-
-		// Store list of child want names
-		childNames := make([]string, 0, len(t.childWants))
-		for _, child := range t.childWants {
-			childNames = append(childNames, child.Metadata.Name)
-		}
-		t.StoreState("childWantNames", childNames)
-
-		// Store list of completed child names
-		completedNames := make([]string, 0)
-		for name := range t.completedChildren {
-			completedNames = append(completedNames, name)
-		}
-		t.StoreState("completedChildNames", completedNames)
-
-		t.StoreLog(fmt.Sprintf("[TARGET-DEBUG] %s - Progress check: allComplete=%v, status=%s, paths.Out=%d",
-			t.Metadata.Name, allComplete, t.Status, len(t.paths.Out)))
-
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
-				t.StoreLog(fmt.Sprintf("[TARGET] %s - All children completed, sending packet", t.Metadata.Name))
-				t.StoreState("before_provide_called", true)
-				t.StoreState("provide_paths_out", len(t.paths.Out))
-
-				// DEBUG: Log for nested targets
-				if strings.Contains(t.Metadata.Name, "approval") {
-					log.Printf("[TARGET-PROVIDE] %s - About to call Provide() with %d output paths\n", t.Metadata.Name, len(t.paths.Out))
-				}
-
-				// Send completion packet to parent/upstream wants BEFORE marking as achieved
+				// Send completion packet to parent/upstream wants
 				packet := map[string]interface{}{
 					"status":   "completed",
 					"name":     t.Metadata.Name,
@@ -404,21 +364,12 @@ func (t *Target) Progress() {
 					"childCount": t.childCount,
 				}
 				t.Provide(packet)
-				t.StoreState("provide_called", true)
-				t.StoreState("packet_content", packet)
-
-				if strings.Contains(t.Metadata.Name, "approval") {
-					log.Printf("[TARGET-PROVIDE] %s - Provide() called, packet sent\n", t.Metadata.Name)
-				}
-
-				t.StoreLog(fmt.Sprintf("[TARGET] %s - Packet sent via Provide(), now marking as achieved", t.Metadata.Name))
 
 				// Compute and store recipe result
 				t.computeTemplateResult()
 
 				// Mark the target as completed
 				t.SetStatus(WantStatusAchieved)
-				t.StoreLog(fmt.Sprintf("[TARGET] %s - Status set to ACHIEVED", t.Metadata.Name))
 			}
 			return
 		}

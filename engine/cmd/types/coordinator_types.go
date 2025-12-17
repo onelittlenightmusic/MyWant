@@ -249,7 +249,6 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		}
 
 		want.StoreStateMulti(stateUpdates)
-		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Channel %d received ApprovalData: Evidence=%v, Description=%s", channelIndex, approvalData.Evidence != nil, approvalData.Description))
 		return true
 	}
 
@@ -272,12 +271,9 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		}
 
 		want.StoreStateMulti(stateUpdates)
-		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Channel %d received nested Target packet: status=%v, name=%v, type=%v",
-			channelIndex, packetMap["status"], packetMap["name"], packetMap["type"]))
 		return true
 	}
 
-	want.StoreLog(fmt.Sprintf("[PACKET-RECV-ERROR] Channel %d received unknown data type: %T (expected *ApprovalData or map[string]interface{})", channelIndex, data))
 	return false
 }
 

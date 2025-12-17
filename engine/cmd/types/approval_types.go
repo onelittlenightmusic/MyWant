@@ -80,11 +80,7 @@ func (e *EvidenceWant) Progress() {
 	}
 	e.StoreState("evidence_provided", true)
 
-	e.StoreLog(fmt.Sprintf("[EVIDENCE] EvidenceType='%s', ApprovalID='%s'", locals.EvidenceType, locals.ApprovalID))
-
 	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
-
-	e.StoreLog(fmt.Sprintf("[EVIDENCE] Formatted evidence='%s'", evidence))
 
 	evidenceData := &ApprovalData{
 		ApprovalID:  locals.ApprovalID,
@@ -101,12 +97,10 @@ func (e *EvidenceWant) Progress() {
 	})
 
 	outCount := e.GetOutCount()
-	e.StoreLog(fmt.Sprintf("[EVIDENCE] About to send via Provide: evidence='%s', approvalID='%s', outCount=%d", evidence, locals.ApprovalID, outCount))
+	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
-
-	e.StoreLog(fmt.Sprintf("[EVIDENCE] Provide() completed for approval %s", locals.ApprovalID))
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -174,11 +168,7 @@ func (d *DescriptionWant) Progress() {
 	}
 	d.StoreState("description_provided", true)
 
-	d.StoreLog(fmt.Sprintf("[DESCRIPTION] DescriptionFormat='%s', ApprovalID='%s'", locals.DescriptionFormat, locals.ApprovalID))
-
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
-
-	d.StoreLog(fmt.Sprintf("[DESCRIPTION] Formatted description='%s'", description))
 
 	descriptionData := &ApprovalData{
 		ApprovalID:  locals.ApprovalID,
@@ -196,12 +186,10 @@ func (d *DescriptionWant) Progress() {
 	})
 
 	outCount := d.GetOutCount()
-	d.StoreLog(fmt.Sprintf("[DESCRIPTION] About to send via Provide: description='%s', approvalID='%s', outCount=%d", description, locals.ApprovalID, outCount))
+	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, outCount))
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)
-
-	d.StoreLog(fmt.Sprintf("[DESCRIPTION] Provide() completed for approval %s", locals.ApprovalID))
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
