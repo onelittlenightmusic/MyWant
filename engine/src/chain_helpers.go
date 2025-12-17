@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"fmt"
 	"mywant/engine/src/chain"
 	"reflect"
 	"time"
@@ -107,6 +108,11 @@ func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
 	// If we got here, data was received or a channel was closed.
 	if recvOK {
 		originalIndex := channelIndexMap[chosen]
+
+		// Store packet receive info for debugging
+		n.StoreState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
+		n.StoreState("last_packet_received_timestamp", getCurrentTimestamp())
+
 		return originalIndex, recv.Interface(), true
 	}
 

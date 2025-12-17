@@ -1141,6 +1141,7 @@ func (n *Want) Provide(packet interface{}) error {
 		return nil // No outputs to send to
 	}
 
+	sentCount := 0
 	for _, pathInfo := range paths.Out {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
@@ -1148,11 +1149,18 @@ func (n *Want) Provide(packet interface{}) error {
 		select {
 		case pathInfo.Channel <- packet:
 			// Sent successfully
+			sentCount++
 		default:
 			// Channel is full, try blocking send
 			pathInfo.Channel <- packet
+			sentCount++
 		}
 	}
+
+	// Store packet send info for debugging
+	n.StoreState("last_provide_sent_count", sentCount)
+	n.StoreState("last_provide_paths_out_count", len(paths.Out))
+	n.StoreState("provide_packet_sent_timestamp", getCurrentTimestamp())
 
 	// Trigger retrigger for each receiver that got the packet
 	cb := GetGlobalChainBuilder()

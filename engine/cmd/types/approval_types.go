@@ -36,10 +36,26 @@ type EvidenceWant struct {
 }
 
 func NewEvidenceWant(metadata Metadata, spec WantSpec) Progressable {
+	// Populate locals from parameters
+	var evidenceType, approvalID string
+	if spec.Params != nil {
+		if v, ok := spec.Params["evidence_type"].(string); ok {
+			evidenceType = v
+		}
+		if v, ok := spec.Params["approval_id"].(string); ok {
+			approvalID = v
+		}
+	}
+
+	locals := &EvidenceWantLocals{
+		EvidenceType: evidenceType,
+		ApprovalID:   approvalID,
+	}
+
 	return &EvidenceWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		&EvidenceWantLocals{},
+		locals,
 		"evidence",
 	)}
 }
@@ -63,9 +79,16 @@ func (e *EvidenceWant) Progress() {
 		return
 	}
 	e.StoreState("evidence_provided", true)
+
+	e.StoreLog(fmt.Sprintf("[EVIDENCE] EvidenceType='%s', ApprovalID='%s'", locals.EvidenceType, locals.ApprovalID))
+
+	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
+
+	e.StoreLog(fmt.Sprintf("[EVIDENCE] Formatted evidence='%s'", evidence))
+
 	evidenceData := &ApprovalData{
 		ApprovalID:  locals.ApprovalID,
-		Evidence:    fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID),
+		Evidence:    evidence,
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
@@ -78,10 +101,12 @@ func (e *EvidenceWant) Progress() {
 	})
 
 	outCount := e.GetOutCount()
-	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
+	e.StoreLog(fmt.Sprintf("[EVIDENCE] About to send via Provide: evidence='%s', approvalID='%s', outCount=%d", evidence, locals.ApprovalID, outCount))
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
+
+	e.StoreLog(fmt.Sprintf("[EVIDENCE] Provide() completed for approval %s", locals.ApprovalID))
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -105,10 +130,26 @@ type DescriptionWant struct {
 }
 
 func NewDescriptionWant(metadata Metadata, spec WantSpec) Progressable {
+	// Populate locals from parameters
+	var descriptionFormat, approvalID string
+	if spec.Params != nil {
+		if v, ok := spec.Params["description_format"].(string); ok {
+			descriptionFormat = v
+		}
+		if v, ok := spec.Params["approval_id"].(string); ok {
+			approvalID = v
+		}
+	}
+
+	locals := &DescriptionWantLocals{
+		DescriptionFormat: descriptionFormat,
+		ApprovalID:        approvalID,
+	}
+
 	return &DescriptionWant{*NewWantWithLocals(
 		metadata,
 		spec,
-		&DescriptionWantLocals{},
+		locals,
 		"description",
 	)}
 }
@@ -132,7 +173,13 @@ func (d *DescriptionWant) Progress() {
 		return
 	}
 	d.StoreState("description_provided", true)
+
+	d.StoreLog(fmt.Sprintf("[DESCRIPTION] DescriptionFormat='%s', ApprovalID='%s'", locals.DescriptionFormat, locals.ApprovalID))
+
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
+
+	d.StoreLog(fmt.Sprintf("[DESCRIPTION] Formatted description='%s'", description))
+
 	descriptionData := &ApprovalData{
 		ApprovalID:  locals.ApprovalID,
 		Evidence:    nil,
@@ -149,10 +196,12 @@ func (d *DescriptionWant) Progress() {
 	})
 
 	outCount := d.GetOutCount()
-	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, outCount))
+	d.StoreLog(fmt.Sprintf("[DESCRIPTION] About to send via Provide: description='%s', approvalID='%s', outCount=%d", description, locals.ApprovalID, outCount))
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)
+
+	d.StoreLog(fmt.Sprintf("[DESCRIPTION] Provide() completed for approval %s", locals.ApprovalID))
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise

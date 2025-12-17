@@ -319,6 +319,13 @@ func (t *Target) CreateChildWants() []*Want {
 
 // IsAchieved checks if target is complete (all children created and completed)
 func (t *Target) IsAchieved() bool {
+	// Check the Status field which was set by Progress() when all children completed
+	// This is more reliable than re-checking children completion, which can be slow or racy
+	if t.Status == WantStatusAchieved {
+		return true
+	}
+
+	// During normal execution, check if children are complete
 	if !t.childrenCreated {
 		return false
 	}
@@ -384,6 +391,11 @@ func (t *Target) Progress() {
 				t.StoreState("before_provide_called", true)
 				t.StoreState("provide_paths_out", len(t.paths.Out))
 
+				// DEBUG: Log for nested targets
+				if strings.Contains(t.Metadata.Name, "approval") {
+					log.Printf("[TARGET-PROVIDE] %s - About to call Provide() with %d output paths\n", t.Metadata.Name, len(t.paths.Out))
+				}
+
 				// Send completion packet to parent/upstream wants BEFORE marking as achieved
 				packet := map[string]interface{}{
 					"status":   "completed",
@@ -394,6 +406,10 @@ func (t *Target) Progress() {
 				t.Provide(packet)
 				t.StoreState("provide_called", true)
 				t.StoreState("packet_content", packet)
+
+				if strings.Contains(t.Metadata.Name, "approval") {
+					log.Printf("[TARGET-PROVIDE] %s - Provide() called, packet sent\n", t.Metadata.Name)
+				}
 
 				t.StoreLog(fmt.Sprintf("[TARGET] %s - Packet sent via Provide(), now marking as achieved", t.Metadata.Name))
 

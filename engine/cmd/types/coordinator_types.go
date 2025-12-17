@@ -206,18 +206,20 @@ type ApprovalDataHandler struct {
 }
 
 func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
-	if approvalData, ok := data.(*ApprovalData); ok {
-		dataByChannelVal, _ := want.GetState("data_by_channel")
-		dataByChannel, ok := dataByChannelVal.(map[int]interface{})
-		if !ok {
-			if dataByChannelVal == nil {
-				dataByChannel = make(map[int]interface{})
-			}
+	dataByChannelVal, _ := want.GetState("data_by_channel")
+	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
+	if !ok {
+		if dataByChannelVal == nil {
+			dataByChannel = make(map[int]interface{})
 		}
-		dataByChannel[channelIndex] = approvalData
+	}
 
-		// Prepare state updates (includes legacy keys for backward compatibility)
-		stateUpdates := make(map[string]interface{})
+	// Prepare state updates (includes legacy keys for backward compatibility)
+	stateUpdates := make(map[string]interface{})
+
+	// Handle ApprovalData (from Evidence/Description wants)
+	if approvalData, ok := data.(*ApprovalData); ok {
+		dataByChannel[channelIndex] = approvalData
 		stateUpdates["data_by_channel"] = dataByChannel
 
 		// Track total packets received
@@ -247,8 +249,35 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		}
 
 		want.StoreStateMulti(stateUpdates)
+		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Channel %d received ApprovalData: Evidence=%v, Description=%s", channelIndex, approvalData.Evidence != nil, approvalData.Description))
 		return true
 	}
+
+	// Handle map format (from nested Target wants)
+	if packetMap, ok := data.(map[string]interface{}); ok {
+		dataByChannel[channelIndex] = packetMap
+		stateUpdates["data_by_channel"] = dataByChannel
+
+		// Track total packets received
+		totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
+		stateUpdates["total_packets_received"] = totalPacketsVal + 1
+		stateUpdates["last_packet_time"] = time.Now()
+
+		// Mark nested target received
+		if status, exists := packetMap["status"]; exists && status == "completed" {
+			if name, ok := packetMap["name"].(string); ok {
+				stateUpdates["nested_target_received"] = true
+				stateUpdates["nested_target_name"] = name
+			}
+		}
+
+		want.StoreStateMulti(stateUpdates)
+		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Channel %d received nested Target packet: status=%v, name=%v, type=%v",
+			channelIndex, packetMap["status"], packetMap["name"], packetMap["type"]))
+		return true
+	}
+
+	want.StoreLog(fmt.Sprintf("[PACKET-RECV-ERROR] Channel %d received unknown data type: %T (expected *ApprovalData or map[string]interface{})", channelIndex, data))
 	return false
 }
 
