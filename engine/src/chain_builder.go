@@ -646,36 +646,44 @@ func (cb *ChainBuilder) compilePhase() error {
 // connectPhase handles want topology establishment and validation
 func (cb *ChainBuilder) connectPhase() error {
 	cb.processAutoConnections()
-	targetCount := 0
-	for _, runtimeWant := range cb.wants {
-		if target, ok := runtimeWant.function.(*Target); ok {
-			targetCount++
-			childCount := 0
-			ownerID := runtimeWant.want.Metadata.ID
-			for _, childRuntime := range cb.wants {
-				for _, ownerRef := range childRuntime.want.Metadata.OwnerReferences {
-					// Compare with owner's ID for proper unique identification
-					if ownerRef.ID == ownerID {
-						childCount++
-						break
-					}
-				}
-			}
-
-			if target.RecipePath != "" && target.recipeLoader != nil {
-				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
-				}
-			}
-		}
-	}
+	cb.processTargets()
 
 	// Generate new paths based on current wants
 	cb.pathMap = cb.generatePathsFromConnections()
 
-	// CRITICAL FIX: Synchronize generated paths to individual Want structs This ensures child wants can access their output channels when they execute NOTE: Caller (reconcileWants) already holds reconcileMutex, so we don't lock here
+	// Synchronize generated paths to individual Want structs
+	cb.synchronizePathsToWants()
+
+	cb.buildLabelToUsersMapping()
+	cb.validateConnections(cb.pathMap)
+
+	// Store constructed channels for potential external access
+	cb.storeChannelsByPath()
+
+	return nil
+}
+
+// processTargets processes all Target wants and builds their parameter subscriptions
+func (cb *ChainBuilder) processTargets() {
+	for _, runtimeWant := range cb.wants {
+		if target, ok := runtimeWant.function.(*Target); ok {
+			if target.RecipePath != "" && target.recipeLoader != nil {
+				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
+					log.Printf("[ERROR] Failed to build target parameter subscriptions: %v\n", err)
+				}
+			}
+		}
+	}
+}
+
+// synchronizePathsToWants synchronizes generated paths to individual Want structs
+// This ensures child wants can access their output channels when they execute
+// NOTE: Caller (reconcileWants) already holds reconcileMutex, so we don't lock here
+func (cb *ChainBuilder) synchronizePathsToWants() {
 	for wantName, paths := range cb.pathMap {
 		if runtimeWant, exists := cb.wants[wantName]; exists {
-			// Update the want's paths field with the generated paths This makes output/input channels available to the want during execution
+			// Update the want's paths field with the generated paths
+			// This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
 
@@ -686,12 +694,14 @@ func (cb *ChainBuilder) connectPhase() error {
 			}
 		}
 	}
-	cb.buildLabelToUsersMapping()
-	cb.validateConnections(cb.pathMap)
+}
 
-	// Store the constructed channels in cb.channels for potential external access
-	// The channels themselves were created in generatePathsFromConnections() and should NOT be recreated here
+// storeChannelsByPath stores constructed channels for potential external access
+// The channels themselves were created in generatePathsFromConnections() and should NOT be recreated here
+func (cb *ChainBuilder) storeChannelsByPath() {
 	cb.channelMutex.Lock()
+	defer cb.channelMutex.Unlock()
+
 	cb.channels = make(map[string]chain.Chan)
 
 	// Map channels by their path names (from pathMap, which contains the original channels)
@@ -702,9 +712,6 @@ func (cb *ChainBuilder) connectPhase() error {
 			}
 		}
 	}
-	cb.channelMutex.Unlock()
-
-	return nil
 }
 func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error {
 	// Read and parse the recipe file
@@ -808,96 +815,127 @@ func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
 
 // autoConnectWant connects a RecipeAgent want to all compatible wants with matching approval_id
 func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
-	approvalID := ""
-	if want.Spec.Params != nil {
-		if approvalVal, ok := want.Spec.Params["approval_id"]; ok {
-			if approvalStr, ok := approvalVal.(string); ok {
-				approvalID = approvalStr
-			}
-		}
-	}
-	if approvalID == "" && want.Metadata.Labels != nil {
-		if approvalVal, ok := want.Metadata.Labels["approval_id"]; ok {
-			approvalID = approvalVal
-		}
-	}
-
+	approvalID := cb.extractApprovalID(want)
 	if approvalID == "" {
 		return
 	}
+
 	if want.Spec.Using == nil {
 		want.Spec.Using = make([]map[string]string, 0)
 	}
 
-	connectionsAdded := 0
 	for _, otherRuntimeWant := range allWants {
-		otherWant := otherRuntimeWant.want
+		cb.tryAutoConnectToWant(want, otherRuntimeWant.want)
+	}
+}
 
-		// Skip self
-		if otherWant.Metadata.Name == want.Metadata.Name {
-			continue
-		}
-		otherApprovalID := ""
-		if otherWant.Spec.Params != nil {
-			if approvalVal, ok := otherWant.Spec.Params["approval_id"]; ok {
-				if approvalStr, ok := approvalVal.(string); ok {
-					otherApprovalID = approvalStr
-				}
-			}
-		}
-
-		if otherApprovalID == "" && otherWant.Metadata.Labels != nil {
-			if approvalVal, ok := otherWant.Metadata.Labels["approval_id"]; ok {
-				otherApprovalID = approvalVal
-			}
-		}
-
-		// Auto-connect to wants with matching approval_id
-		if otherApprovalID == approvalID {
-			// Only auto-connect to data provider wants (evidence, description) Skip coordinators and target wants
-			if otherWant.Metadata.Labels != nil {
-				role := otherWant.Metadata.Labels["role"]
-				if role == "evidence-provider" || role == "description-provider" {
-					connectionKey := cb.generateConnectionKey(want)
-					cb.addConnectionLabel(otherWant, want)
-					selector := make(map[string]string)
-					if connectionKey != "" {
-						labelKey := fmt.Sprintf("used_by_%s", connectionKey)
-						selector[labelKey] = want.Metadata.Name
-					} else {
-						// Fallback to role-based selector if no unique key generated
-						selector["role"] = role
-					}
-					duplicate := false
-					for _, existingSelector := range want.Spec.Using {
-						if len(existingSelector) == len(selector) {
-							match := true
-							for k, v := range selector {
-								if existingSelector[k] != v {
-									match = false
-									break
-								}
-							}
-							if match {
-								duplicate = true
-								break
-							}
-						}
-					}
-
-					if !duplicate {
-						want.Spec.Using = append(want.Spec.Using, selector)
-						connectionsAdded++
-
-					} else {
-
-					}
-				} else {
-				}
-			}
+// extractApprovalID extracts approval_id from want params or labels
+func (cb *ChainBuilder) extractApprovalID(want *Want) string {
+	// Try params first
+	if want.Spec.Params != nil {
+		approvalID := ExtractMapString(want.Spec.Params, "approval_id")
+		if approvalID != "" {
+			return approvalID
 		}
 	}
 
+	// Fall back to labels
+	if want.Metadata.Labels != nil {
+		if approvalID, ok := want.Metadata.Labels["approval_id"]; ok && approvalID != "" {
+			return approvalID
+		}
+	}
+
+	return ""
+}
+
+// tryAutoConnectToWant attempts to auto-connect a want to another want
+func (cb *ChainBuilder) tryAutoConnectToWant(want *Want, otherWant *Want) {
+	// Skip self
+	if otherWant.Metadata.Name == want.Metadata.Name {
+		return
+	}
+
+	approvalID := cb.extractApprovalID(want)
+	otherApprovalID := cb.extractApprovalID(otherWant)
+
+	// Must have matching approval_id
+	if approvalID == "" || otherApprovalID != approvalID {
+		return
+	}
+
+	// Must be a data provider want
+	if !cb.isDataProviderWant(otherWant) {
+		return
+	}
+
+	cb.addAutoConnection(want, otherWant)
+}
+
+// isDataProviderWant checks if a want is a data provider (evidence or description)
+func (cb *ChainBuilder) isDataProviderWant(want *Want) bool {
+	if want.Metadata.Labels == nil {
+		return false
+	}
+
+	role := want.Metadata.Labels["role"]
+	return role == "evidence-provider" || role == "description-provider"
+}
+
+// addAutoConnection adds an auto-connection from otherWant to want if not duplicate
+func (cb *ChainBuilder) addAutoConnection(want *Want, otherWant *Want) {
+	connectionKey := cb.generateConnectionKey(want)
+	cb.addConnectionLabel(otherWant, want)
+
+	selector := cb.buildConnectionSelector(want, otherWant, connectionKey)
+
+	// Check for duplicate selector
+	if cb.hasDuplicateSelector(want, selector) {
+		return
+	}
+
+	want.Spec.Using = append(want.Spec.Using, selector)
+}
+
+// buildConnectionSelector builds a connection selector map
+func (cb *ChainBuilder) buildConnectionSelector(want *Want, otherWant *Want, connectionKey string) map[string]string {
+	selector := make(map[string]string)
+
+	if connectionKey != "" {
+		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
+		selector[labelKey] = want.Metadata.Name
+	} else {
+		// Fallback to role-based selector
+		role := otherWant.Metadata.Labels["role"]
+		selector["role"] = role
+	}
+
+	return selector
+}
+
+// hasDuplicateSelector checks if a selector already exists in want's using list
+func (cb *ChainBuilder) hasDuplicateSelector(want *Want, selector map[string]string) bool {
+	for _, existingSelector := range want.Spec.Using {
+		if cb.selectorsMatch(existingSelector, selector) {
+			return true
+		}
+	}
+	return false
+}
+
+// selectorsMatch checks if two selectors are equal
+func (cb *ChainBuilder) selectorsMatch(selector1, selector2 map[string]string) bool {
+	if len(selector1) != len(selector2) {
+		return false
+	}
+
+	for k, v := range selector2 {
+		if selector1[k] != v {
+			return false
+		}
+	}
+
+	return true
 }
 func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want) {
 	if sourceWant.Metadata.Labels == nil {

@@ -68,7 +68,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 // IsAchieved checks if restaurant has been reserved
 func (r *RestaurantWant) IsAchieved() bool {
 	attemptedVal, _ := r.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
+	attempted, _ := AsBool(attemptedVal)
 	return attempted
 }
 
@@ -81,7 +81,7 @@ func (r *RestaurantWant) Progress() {
 	}
 
 	attemptedVal, _ := r.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
+	attempted, _ := AsBool(attemptedVal)
 	_, connectionAvailable := r.GetFirstOutputChannel()
 
 	if attempted {
@@ -356,7 +356,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 // IsAchieved checks if hotel has been reserved
 func (h *HotelWant) IsAchieved() bool {
 	val, _ := h.GetState("attempted")
-	attempted, _ := val.(bool)
+	attempted, _ := AsBool(val)
 	return attempted
 }
 
@@ -368,7 +368,7 @@ func (h *HotelWant) Progress() {
 	}
 
 	attemptedVal, _ := h.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
+	attempted, _ := AsBool(attemptedVal)
 	_, connectionAvailable := h.GetFirstOutputChannel()
 
 	if attempted {
@@ -491,7 +491,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 // IsAchieved checks if buffet has been reserved
 func (b *BuffetWant) IsAchieved() bool {
 	val, _ := b.GetState("attempted")
-	attempted, _ := val.(bool)
+	attempted, _ := AsBool(val)
 	return attempted
 }
 
@@ -503,7 +503,7 @@ func (b *BuffetWant) Progress() {
 	}
 
 	attemptedVal, _ := b.GetState("attempted")
-	attempted, _ := attemptedVal.(bool)
+	attempted, _ := AsBool(attemptedVal)
 	_, connectionAvailable := b.GetFirstOutputChannel()
 
 	if attempted {

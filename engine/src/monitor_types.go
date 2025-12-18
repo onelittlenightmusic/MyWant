@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 )
 
@@ -47,16 +46,16 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 
 	// Extract alert thresholds from params
 	if thresholds, exists := spec.Params["alert_thresholds"]; exists {
-		if threshMap, ok := thresholds.(map[string]interface{}); ok {
+		if threshMap, ok := AsMap(thresholds); ok {
 			monitor.AlertThresholds = threshMap
 		}
 	}
 
 	// Extract alert actions from params
 	if actions, exists := spec.Params["alert_actions"]; exists {
-		if actionList, ok := actions.([]interface{}); ok {
+		if actionList, ok := AsArray(actions); ok {
 			for _, action := range actionList {
-				if actionStr, ok := action.(string); ok {
+				if actionStr, ok := AsString(action); ok {
 					monitor.AlertActions = append(monitor.AlertActions, actionStr)
 				}
 			}
@@ -145,8 +144,8 @@ func (mw *MonitorWant) handleNotification(notification StateNotification) {
 
 // shouldAlert determines if an alert should be triggered
 func (mw *MonitorWant) shouldAlert(value interface{}, threshold interface{}) bool {
-	valueFloat, valueOk := mw.toFloat64(value)
-	thresholdFloat, thresholdOk := mw.toFloat64(threshold)
+	valueFloat, valueOk := AsFloat(value)
+	thresholdFloat, thresholdOk := AsFloat(threshold)
 
 	if valueOk && thresholdOk {
 		return valueFloat > thresholdFloat
@@ -154,25 +153,6 @@ func (mw *MonitorWant) shouldAlert(value interface{}, threshold interface{}) boo
 
 	// For string comparison, use direct equality
 	return fmt.Sprintf("%v", value) == fmt.Sprintf("%v", threshold)
-}
-
-// toFloat64 attempts to convert interface{} to float64
-func (mw *MonitorWant) toFloat64(value interface{}) (float64, bool) {
-	switch v := value.(type) {
-	case float64:
-		return v, true
-	case float32:
-		return float64(v), true
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case string:
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f, true
-		}
-	}
-	return 0, false
 }
 
 // triggerAlert creates and stores an alert
@@ -194,7 +174,7 @@ func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold in
 
 	// Update alert count
 	if count, exists := mw.Want.GetState("alerts_triggered"); exists {
-		if c, ok := count.(int); ok {
+		if c, ok := AsInt(count); ok {
 			mw.Want.StoreState("alerts_triggered", c+1)
 		} else {
 			mw.Want.StoreState("alerts_triggered", 1)
@@ -229,7 +209,7 @@ func (mw *MonitorWant) updateMonitoringStats(notification StateNotification) {
 	// Track notifications per source
 	sourceKey := fmt.Sprintf("notifications_from_%s", notification.SourceWantName)
 	if count, exists := mw.Want.GetState(sourceKey); exists {
-		if c, ok := count.(int); ok {
+		if c, ok := AsInt(count); ok {
 			mw.Want.StoreState(sourceKey, c+1)
 		} else {
 			mw.Want.StoreState(sourceKey, 1)

@@ -84,7 +84,7 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	return nil
 }
 func validateCapabilityStructure(content interface{}) error {
-	contentObj, ok := content.(map[string]interface{})
+	contentObj, ok := AsMap(content)
 	if !ok {
 		return fmt.Errorf("capability content must be an object")
 	}
@@ -93,7 +93,7 @@ func validateCapabilityStructure(content interface{}) error {
 		return fmt.Errorf("missing required 'capabilities' field")
 	}
 
-	capabilitiesArray, ok := capabilities.([]interface{})
+	capabilitiesArray, ok := AsArray(capabilities)
 	if !ok {
 		return fmt.Errorf("capabilities must be an array")
 	}
@@ -102,7 +102,7 @@ func validateCapabilityStructure(content interface{}) error {
 		return fmt.Errorf("capabilities array cannot be empty")
 	}
 	for i, cap := range capabilitiesArray {
-		capObj, ok := cap.(map[string]interface{})
+		capObj, ok := AsMap(cap)
 		if !ok {
 			return fmt.Errorf("capability at index %d must be an object", i)
 		}
@@ -114,7 +114,7 @@ func validateCapabilityStructure(content interface{}) error {
 		if !ok {
 			return fmt.Errorf("capability at index %d missing required 'gives' field", i)
 		}
-		givesArray, ok := gives.([]interface{})
+		givesArray, ok := AsArray(gives)
 		if !ok {
 			return fmt.Errorf("capability at index %d 'gives' must be an array", i)
 		}
@@ -124,7 +124,7 @@ func validateCapabilityStructure(content interface{}) error {
 		}
 
 		for j, give := range givesArray {
-			if giveStr, ok := give.(string); !ok || giveStr == "" {
+			if giveStr, ok := AsString(give); !ok || giveStr == "" {
 				return fmt.Errorf("capability at index %d, gives at index %d must be a non-empty string", i, j)
 			}
 		}
@@ -198,7 +198,7 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 	return nil
 }
 func validateAgentStructure(content interface{}) error {
-	contentObj, ok := content.(map[string]interface{})
+	contentObj, ok := AsMap(content)
 	if !ok {
 		return fmt.Errorf("agent content must be an object")
 	}
@@ -207,7 +207,7 @@ func validateAgentStructure(content interface{}) error {
 		return fmt.Errorf("missing required 'agents' field")
 	}
 
-	agentsArray, ok := agents.([]interface{})
+	agentsArray, ok := AsArray(agents)
 	if !ok {
 		return fmt.Errorf("agents must be an array")
 	}
@@ -216,7 +216,7 @@ func validateAgentStructure(content interface{}) error {
 		return fmt.Errorf("agents array cannot be empty")
 	}
 	for i, agent := range agentsArray {
-		agentObj, ok := agent.(map[string]interface{})
+		agentObj, ok := AsMap(agent)
 		if !ok {
 			return fmt.Errorf("agent at index %d must be an object", i)
 		}
@@ -227,7 +227,7 @@ func validateAgentStructure(content interface{}) error {
 		if agentType, ok := agentObj["type"]; !ok {
 			return fmt.Errorf("agent at index %d missing required 'type' field", i)
 		} else {
-			typeStr, ok := agentType.(string)
+			typeStr, ok := AsString(agentType)
 			if !ok {
 				return fmt.Errorf("agent at index %d 'type' must be a string", i)
 			}
@@ -239,7 +239,7 @@ func validateAgentStructure(content interface{}) error {
 		if capabilities, ok := agentObj["capabilities"]; !ok {
 			return fmt.Errorf("agent at index %d missing required 'capabilities' field", i)
 		} else {
-			capabilitiesArray, ok := capabilities.([]interface{})
+			capabilitiesArray, ok := AsArray(capabilities)
 			if !ok {
 				return fmt.Errorf("agent at index %d 'capabilities' must be an array", i)
 			}
@@ -249,19 +249,19 @@ func validateAgentStructure(content interface{}) error {
 			}
 
 			for j, cap := range capabilitiesArray {
-				if capStr, ok := cap.(string); !ok || capStr == "" {
+				if capStr, ok := AsString(cap); !ok || capStr == "" {
 					return fmt.Errorf("agent at index %d, capability at index %d must be a non-empty string", i, j)
 				}
 			}
 		}
 		if uses, ok := agentObj["uses"]; ok {
-			usesArray, ok := uses.([]interface{})
+			usesArray, ok := AsArray(uses)
 			if !ok {
 				return fmt.Errorf("agent at index %d 'uses' must be an array", i)
 			}
 
 			for j, use := range usesArray {
-				if useStr, ok := use.(string); !ok || useStr == "" {
+				if useStr, ok := AsString(use); !ok || useStr == "" {
 					return fmt.Errorf("agent at index %d, uses at index %d must be a non-empty string", i, j)
 				}
 			}

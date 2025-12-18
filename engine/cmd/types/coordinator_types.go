@@ -7,11 +7,55 @@ import (
 )
 
 // DataHandler defines the interface for processing received coordinator data
+// Each handler processes only its specific data type, no type-checking logic
 type DataHandler interface {
 	ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool
 	GetStateUpdates(want *CoordinatorWant) map[string]interface{}
 	GetCompletionKey() string
 	GetCompletionTimeout() time.Duration
+}
+
+// DataHandlerDispatcher routes received data to the appropriate handler based on data type
+// This centralizes type-based routing logic using a handler registry instead of hardcoded switch statements
+// Handlers are registered by type name, making it easy to add new types without modifying the dispatcher
+type DataHandlerDispatcher struct {
+	handlers       map[string]DataHandler // Maps type name to handler
+	defaultHandler DataHandler             // Fallback handler for unknown types
+}
+
+// NewDataHandlerDispatcher creates a new dispatcher with the appropriate handlers
+func NewDataHandlerDispatcher(approvalHandler *ApprovalDataHandler, travelHandler *TravelDataHandler) *DataHandlerDispatcher {
+	handlers := make(map[string]DataHandler)
+
+	// Register handlers by their data type names
+	handlers["*types.ApprovalData"] = approvalHandler
+	handlers["*types.TravelSchedule"] = travelHandler
+
+	return &DataHandlerDispatcher{
+		handlers:       handlers,
+		defaultHandler: &DefaultDataHandler{},
+	}
+}
+
+// RegisterHandler adds or updates a handler for a specific data type
+// typeName should be the fully qualified type name (e.g., "*types.CustomData")
+func (d *DataHandlerDispatcher) RegisterHandler(typeName string, handler DataHandler) {
+	d.handlers[typeName] = handler
+}
+
+// SelectHandler returns the appropriate handler for the given data type
+// First checks the type registry, then falls back to the default handler
+func (d *DataHandlerDispatcher) SelectHandler(data interface{}) DataHandler {
+	// Get the fully qualified type name
+	typeName := fmt.Sprintf("%T", data)
+
+	// Check if we have a registered handler for this type
+	if handler, exists := d.handlers[typeName]; exists {
+		return handler
+	}
+
+	// Fall back to default handler
+	return d.defaultHandler
 }
 
 // CompletionChecker defines the interface for determining when coordinator work is complete
@@ -25,7 +69,8 @@ type CompletionChecker interface {
 // CoordinatorWant is a generic coordinator that collects data from multiple input channels and processes it according to customizable handlers
 type CoordinatorWant struct {
 	Want
-	DataHandler        DataHandler
+	DataHandler        DataHandler // The primary data handler (delegated to dispatcher)
+	DataHandlerDispatcher *DataHandlerDispatcher // Dispatcher for routing to type-specific handlers
 	CompletionChecker  CompletionChecker
 	CoordinatorType    string
 	paths              Paths
@@ -49,12 +94,18 @@ func NewCoordinatorWant(
 	// Determine coordinator configuration based on want type
 	_, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, want)
 
+	// Create dispatcher with approval and travel handlers
+	approvalHandler := &ApprovalDataHandler{Level: 1}
+	travelHandler := &TravelDataHandler{IsBuffet: false, CompletionTimeout: 0}
+	dispatcher := NewDataHandlerDispatcher(approvalHandler, travelHandler)
+
 	coordinator := &CoordinatorWant{
-		Want:               *want,
-		DataHandler:        dataHandler,
-		CompletionChecker:  completionChecker,
-		CoordinatorType:    coordinatorType,
-		channelsHeard:      make(map[int]bool),
+		Want:                  *want,
+		DataHandler:           dataHandler,
+		DataHandlerDispatcher: dispatcher,
+		CompletionChecker:     completionChecker,
+		CoordinatorType:       coordinatorType,
+		channelsHeard:         make(map[int]bool),
 	}
 
 	return coordinator
@@ -115,6 +166,7 @@ func (c *CoordinatorWant) IsAchieved() bool {
 
 // Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
 // Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
+// Uses dispatcher to route data to the appropriate handler based on data type.
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 	heardsCount := len(c.channelsHeard)
@@ -128,8 +180,12 @@ func (c *CoordinatorWant) Progress() {
 	if received {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true
-		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d)", channelIndex, len(c.channelsHeard), inCount))
-		c.DataHandler.ProcessData(c, channelIndex, data)
+		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data))
+
+		// Use dispatcher to select appropriate handler based on data type
+		handler := c.DataHandlerDispatcher.SelectHandler(data)
+		c.StoreLog(fmt.Sprintf("[Progress] Selected handler: %T for data type %T", handler, data))
+		handler.ProcessData(c, channelIndex, data)
 	} else {
 		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 	}
@@ -198,10 +254,37 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	c.channelsHeard = make(map[int]bool)
 }
 
+// ============================================================================ Default Handler for Generic Map Data ============================================================================
+
+// DefaultDataHandler processes generic map[string]interface{} data
+// This is the fallback handler for any data type that doesn't have a specialized handler
+type DefaultDataHandler struct{}
+
+func (h *DefaultDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
+	packetMap, ok := data.(map[string]interface{})
+	if !ok {
+		want.StoreLog(fmt.Sprintf("[DefaultDataHandler] Expected map[string]interface{}, got %T", data))
+		return false
+	}
+	return processDefaultMapData(want, channelIndex, packetMap)
+}
+
+func (h *DefaultDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]interface{} {
+	// Default handler returns empty state updates - no special processing needed
+	return make(map[string]interface{})
+}
+
+func (h *DefaultDataHandler) GetCompletionKey() string {
+	return "coordinator_completed"
+}
+
+func (h *DefaultDataHandler) GetCompletionTimeout() time.Duration {
+	return 0
+}
+
 // ============================================================================ Common Handler Utilities ============================================================================
 
-// processDefaultMapData is a default handler for map[string]interface{} data
-// This should be the fallback for any DataHandler that receives generic map data
+// processDefaultMapData is a helper function for processing generic map[string]interface{} data
 func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap map[string]interface{}) bool {
 	dataByChannelVal, _ := want.GetState("data_by_channel")
 	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
@@ -212,26 +295,31 @@ func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap ma
 	}
 
 	dataByChannel[channelIndex] = packetMap
-	stateUpdates := make(map[string]interface{})
-	stateUpdates["data_by_channel"] = dataByChannel
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-	stateUpdates["total_packets_received"] = totalPacketsVal + 1
-	stateUpdates["last_packet_time"] = time.Now()
+	want.StoreStateMulti(map[string]interface{}{
+		"data_by_channel":        dataByChannel,
+		"total_packets_received": totalPacketsVal + 1,
+		"last_packet_time":       time.Now(),
+	})
 
-	// Extract common fields if present
+	// Extract and store common fields if present
+	commonFields := make(map[string]interface{})
 	if status, exists := packetMap["status"]; exists {
-		stateUpdates["status"] = status
+		commonFields["status"] = status
 	}
 	if name, exists := packetMap["name"]; exists {
-		stateUpdates["name"] = name
+		commonFields["name"] = name
 	}
 	if typeVal, exists := packetMap["type"]; exists {
-		stateUpdates["type"] = typeVal
+		commonFields["type"] = typeVal
 	}
 
-	want.StoreStateMulti(stateUpdates)
+	if len(commonFields) > 0 {
+		want.StoreStateMulti(commonFields)
+	}
+
 	return true
 }
 
@@ -243,6 +331,14 @@ type ApprovalDataHandler struct {
 }
 
 func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
+	// ApprovalDataHandler only processes *ApprovalData
+	// Type-checking and routing to other handlers is handled by the dispatcher
+	approvalData, ok := data.(*ApprovalData)
+	if !ok {
+		want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] Expected *ApprovalData, got %T. Dispatcher should have routed to appropriate handler.", data))
+		return false
+	}
+
 	dataByChannelVal, _ := want.GetState("data_by_channel")
 	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
 	if !ok {
@@ -251,67 +347,43 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		}
 	}
 
-	// Prepare state updates (includes legacy keys for backward compatibility)
-	stateUpdates := make(map[string]interface{})
+	dataByChannel[channelIndex] = approvalData
 
-	// Handle ApprovalData (from Evidence/Description wants)
-	if approvalData, ok := data.(*ApprovalData); ok {
-		dataByChannel[channelIndex] = approvalData
-		stateUpdates["data_by_channel"] = dataByChannel
+	// Store packet data and tracking
+	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
+	want.StoreStateMulti(map[string]interface{}{
+		"data_by_channel":        dataByChannel,
+		"total_packets_received": totalPacketsVal + 1,
+		"last_packet_time":       time.Now(),
+	})
 
-		// Track total packets received
-		totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-		stateUpdates["total_packets_received"] = totalPacketsVal + 1
-		stateUpdates["last_packet_time"] = time.Now()
-
-		// Legacy state keys (for backward compatibility)
-		if approvalData.Evidence != nil {
-			stateUpdates["evidence_received"] = true
-			stateUpdates["evidence_type"] = approvalData.Evidence
-			stateUpdates["evidence_provided"] = true
-			stateUpdates["evidence_provided_at"] = approvalData.Timestamp.Format(time.RFC3339)
-			if !approvalData.Timestamp.IsZero() {
-				stateUpdates["evidence_received_at"] = approvalData.Timestamp.Format(time.RFC3339)
-			}
+	// Store evidence data if present
+	if approvalData.Evidence != nil {
+		want.StoreStateMulti(map[string]interface{}{
+			"evidence_received":   true,
+			"evidence_type":       approvalData.Evidence,
+			"evidence_provided":   true,
+			"evidence_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+		})
+		if !approvalData.Timestamp.IsZero() {
+			want.StoreState("evidence_received_at", approvalData.Timestamp.Format(time.RFC3339))
 		}
-
-		if approvalData.Description != "" {
-			stateUpdates["description_received"] = true
-			stateUpdates["description_text"] = approvalData.Description
-			stateUpdates["description_provided"] = true
-			stateUpdates["description_provided_at"] = approvalData.Timestamp.Format(time.RFC3339)
-			if !approvalData.Timestamp.IsZero() {
-				stateUpdates["description_received_at"] = approvalData.Timestamp.Format(time.RFC3339)
-			}
-		}
-
-		want.StoreStateMulti(stateUpdates)
-		return true
 	}
 
-	// Handle map format (from nested Target wants)
-	if packetMap, ok := data.(map[string]interface{}); ok {
-		// Use default map handler for generic data
-		if !processDefaultMapData(want, channelIndex, packetMap) {
-			return false
+	// Store description data if present
+	if approvalData.Description != "" {
+		want.StoreStateMulti(map[string]interface{}{
+			"description_received":   true,
+			"description_text":       approvalData.Description,
+			"description_provided":   true,
+			"description_provided_at": approvalData.Timestamp.Format(time.RFC3339),
+		})
+		if !approvalData.Timestamp.IsZero() {
+			want.StoreState("description_received_at", approvalData.Timestamp.Format(time.RFC3339))
 		}
-
-		// ApprovalDataHandler-specific processing for nested target packets
-		stateUpdatesApproval := make(map[string]interface{})
-		if status, exists := packetMap["status"]; exists && status == "completed" {
-			if name, ok := packetMap["name"].(string); ok {
-				stateUpdatesApproval["nested_target_received"] = true
-				stateUpdatesApproval["nested_target_name"] = name
-			}
-		}
-
-		if len(stateUpdatesApproval) > 0 {
-			want.StoreStateMulti(stateUpdatesApproval)
-		}
-		return true
 	}
 
-	return false
+	return true
 }
 
 func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]interface{} {
@@ -396,15 +468,14 @@ type TravelDataHandler struct {
 }
 
 func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int, data interface{}) bool {
+	// TravelDataHandler only processes *TravelSchedule
+	// Type-checking and routing to other handlers is handled by the dispatcher
 	schedule, ok := data.(*TravelSchedule)
 	if !ok {
-		// If not a TravelSchedule, try generic map handler
-		if packetMap, ok := data.(map[string]interface{}); ok {
-			return processDefaultMapData(want, channelIndex, packetMap)
-		}
-		want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.ProcessData: type assertion failed for data. Expected *TravelSchedule, got %T", data))
+		want.StoreLog(fmt.Sprintf("[TravelDataHandler] Expected *TravelSchedule, got %T. Dispatcher should have routed to appropriate handler.", data))
 		return false
 	}
+
 	// Log packet reception with content details
 	eventDetails := ""
 	if len(schedule.Events) > 0 {
@@ -418,6 +489,7 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 		schedule.Date.Format("2006-01-02"),
 		len(schedule.Events),
 		eventDetails))
+
 	dataByChannelVal, _ := want.GetState("data_by_channel")
 	dataByChannel, ok := dataByChannelVal.(map[int]interface{})
 	if !ok {
@@ -430,17 +502,16 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	totalPackets := totalPacketsVal + 1
-	stateUpdates := map[string]interface{}{
+
+	want.StoreStateMulti(map[string]interface{}{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
-	}
+	})
 
 	// Only set last_packet_time if it hasn't been set yet
 	if lastPacketTimeVal, exists := want.GetState("last_packet_time"); !exists || lastPacketTimeVal == nil {
-		stateUpdates["last_packet_time"] = time.Now().Unix()
+		want.StoreState("last_packet_time", time.Now().Unix())
 	}
-
-	want.StoreStateMulti(stateUpdates)
 
 	return true
 }

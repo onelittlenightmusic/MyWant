@@ -1394,3 +1394,216 @@ func (n *Want) emitOwnerCompletionEventIfOwned() {
 	}
 }
 
+// Use attempts to receive data from any available input channel.
+// It first checks an internal cache (filled by UnusedExists) before attempting
+// to receive from the channels directly.
+//
+// Timeout behavior:
+//   - timeoutMilliseconds < 0: infinite wait (blocks until data arrives or channels close)
+//   - timeoutMilliseconds == 0: non-blocking (returns immediately if no data available)
+//   - timeoutMilliseconds > 0: wait up to specified milliseconds
+//
+// Returns: (channelIndex, data, ok)
+//   - channelIndex: Index of the channel that provided data (-1 if no data available)
+//   - data: The data received (nil if ok is false)
+//   - ok: True if data was successfully received, false if timeout or no channels
+//
+// Usage:
+//   index, data, ok := w.Use(1000)  // Wait up to 1 second
+//   if ok {
+//       fmt.Printf("Received data from channel %d: %v\n", index, data)
+//   }
+func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
+	// 1. Check internal cache first (filled by UnusedExists)
+	n.cacheMutex.Lock()
+	if n.cachedPacket != nil {
+		cached := n.cachedPacket
+		n.cachedPacket = nil // Consume from cache
+		n.cacheMutex.Unlock()
+		// Return the original index and packet from the cache
+		return cached.OriginalIndex, cached.Packet, true
+	}
+	n.cacheMutex.Unlock()
+
+	// Proceed with existing channel receive logic if cache is empty
+	if len(n.paths.In) == 0 {
+		return -1, nil, false
+	}
+
+	inCount := len(n.paths.In)
+	cases := make([]reflect.SelectCase, 0, inCount+1)
+	channelIndexMap := make([]int, 0, inCount+1) // Maps case index -> original channel index
+
+	for i := 0; i < inCount; i++ {
+		pathInfo := n.paths.In[i]
+		if pathInfo.Channel != nil {
+			cases = append(cases, reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(pathInfo.Channel),
+			})
+			channelIndexMap = append(channelIndexMap, i) // Track which channel index this case corresponds to
+		}
+	}
+
+	// If no valid channels found, return immediately
+	if len(cases) == 0 {
+		return -1, nil, false
+	}
+
+	// Handle timeout:
+	// - Negative timeout: infinite wait (no timeout case added)
+	// - Zero timeout: non-blocking (add immediate timeout)
+	// - Positive timeout: wait up to specified milliseconds
+	if timeoutMilliseconds >= 0 {
+		timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
+		cases = append(cases, reflect.SelectCase{
+			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
+		})
+		channelIndexMap = append(channelIndexMap, -1) // -1 for timeout case
+	}
+
+	chosen, recv, recvOK := reflect.Select(cases)
+
+	// If timeout case was chosen (last index in cases), no data available
+	if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
+		return -1, nil, false
+	}
+
+	// If we got here, data was received or a channel was closed.
+	if recvOK {
+		originalIndex := channelIndexMap[chosen]
+
+		// Store packet receive info for debugging
+		n.StoreState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
+		n.StoreState("last_packet_received_timestamp", getCurrentTimestamp())
+
+		return originalIndex, recv.Interface(), true
+	}
+
+	// Channel was closed (recvOK is false)
+	// The original code returned channelIndexMap[chosen], nil, false
+	// Let's refine this to return -1 when channel is closed, to avoid confusion with valid channel index
+	return -1, nil, false // Indicates channel closed or error
+}
+
+// UseForever attempts to receive data from any available input channel,
+// blocking indefinitely until data arrives or all channels are closed.
+// This is a convenience wrapper around Use(-1) for infinite wait.
+//
+// Returns: (channelIndex, data, ok)
+//   - channelIndex: Index of the channel that provided data (-1 if channels closed)
+//   - data: The data received (nil if ok is false)
+//   - ok: True if data was successfully received, false if all channels are closed
+//
+// Usage:
+//   index, data, ok := w.UseForever()
+//   if ok {
+//       fmt.Printf("Received data from channel %d: %v\n", index, data)
+//   } else {
+//       // All input channels are closed
+//   }
+func (n *Want) UseForever() (int, interface{}, bool) {
+	return n.Use(-1)
+}
+
+// IncrementIntStateValue safely increments an integer state value
+// If the state doesn't exist, starts from defaultStart value
+// Returns the new value after increment
+func (n *Want) IncrementIntStateValue(key string, defaultStart int) int {
+	val, exists := n.GetState(key)
+	if !exists {
+		n.StoreState(key, defaultStart+1)
+		return defaultStart + 1
+	}
+
+	currentVal, ok := AsInt(val)
+	if !ok {
+		// If not an int, reset to default and increment
+		n.StoreState(key, defaultStart+1)
+		return defaultStart + 1
+	}
+
+	newValue := currentVal + 1
+	n.StoreState(key, newValue)
+	return newValue
+}
+
+// AppendToStateArray safely appends a value to a state array
+// If the state doesn't exist, creates a new array
+func (n *Want) AppendToStateArray(key string, value interface{}) error {
+	stateVal, exists := n.GetState(key)
+	var array []interface{}
+
+	if exists {
+		if arr, ok := AsArray(stateVal); ok {
+			array = arr
+		} else {
+			// State exists but is not an array, create new array
+			array = []interface{}{}
+		}
+	} else {
+		// State doesn't exist, create new array
+		array = []interface{}{}
+	}
+
+	array = append(array, value)
+	n.StoreState(key, array)
+	return nil
+}
+
+// SafeAppendToStateHistory safely appends a state history entry
+// Initializes StateHistory slice if nil
+func (n *Want) SafeAppendToStateHistory(entry StateHistoryEntry) error {
+	if n.History.StateHistory == nil {
+		n.History.StateHistory = make([]StateHistoryEntry, 0)
+	}
+	n.History.StateHistory = append(n.History.StateHistory, entry)
+	return nil
+}
+
+// SafeAppendToLogHistory safely appends a log history entry
+// Initializes LogHistory slice if nil
+func (n *Want) SafeAppendToLogHistory(entry LogHistoryEntry) error {
+	if n.History.LogHistory == nil {
+		n.History.LogHistory = make([]LogHistoryEntry, 0)
+	}
+	n.History.LogHistory = append(n.History.LogHistory, entry)
+	return nil
+}
+
+// FindRunningAgentHistory finds a running agent in the history by name
+// Returns the agent execution entry, index, or error if not found
+func (n *Want) FindRunningAgentHistory(agentName string) (*AgentExecution, int, bool) {
+	if n.History.AgentHistory == nil {
+		return nil, -1, false
+	}
+
+	for i, agentExec := range n.History.AgentHistory {
+		if agentExec.AgentName == agentName && agentExec.Status == "running" {
+			return &agentExec, i, true
+		}
+	}
+
+	return nil, -1, false
+}
+
+// GetStateArrayElement safely gets an array element from state
+// Returns the element or nil if not found or state is not an array
+func (n *Want) GetStateArrayElement(key string, index int) interface{} {
+	stateVal, exists := n.GetState(key)
+	if !exists {
+		return nil
+	}
+
+	array, ok := AsArray(stateVal)
+	if !ok {
+		return nil
+	}
+
+	if index < 0 || index >= len(array) {
+		return nil
+	}
+
+	return array[index]
+}
+

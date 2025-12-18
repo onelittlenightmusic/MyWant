@@ -438,7 +438,7 @@ func validateRecipeWithSpec(yamlData []byte) error {
 	return nil
 }
 func validateRecipeContentStructure(recipeContent interface{}) error {
-	recipeObj, ok := recipeContent.(map[string]interface{})
+	recipeObj, ok := AsMap(recipeContent)
 	if !ok {
 		return fmt.Errorf("recipe must be an object")
 	}
@@ -449,7 +449,7 @@ func validateRecipeContentStructure(recipeContent interface{}) error {
 		}
 	}
 	if params, ok := recipeObj["parameters"]; ok {
-		if _, ok := params.(map[string]interface{}); !ok {
+		if _, ok := AsMap(params); !ok {
 			return fmt.Errorf("parameters must be an object")
 		}
 	}
@@ -463,13 +463,13 @@ func validateRecipeContentStructure(recipeContent interface{}) error {
 	return nil
 }
 func validateRecipeWantsStructure(wants interface{}) error {
-	wantsArray, ok := wants.([]interface{})
+	wantsArray, ok := AsArray(wants)
 	if !ok {
 		return fmt.Errorf("wants must be an array")
 	}
 
 	for i, want := range wantsArray {
-		wantObj, ok := want.(map[string]interface{})
+		wantObj, ok := AsMap(want)
 		if !ok {
 			return fmt.Errorf("want at index %d must be an object", i)
 		}
@@ -479,7 +479,7 @@ func validateRecipeWantsStructure(wants interface{}) error {
 			hasLegacyType = true
 		}
 		if metadata, ok := wantObj["metadata"]; ok {
-			if metadataObj, ok := metadata.(map[string]interface{}); ok {
+			if metadataObj, ok := AsMap(metadata); ok {
 				if wantType, ok := metadataObj["type"]; ok && wantType != "" {
 					hasStructuredType = true
 				}
@@ -491,22 +491,22 @@ func validateRecipeWantsStructure(wants interface{}) error {
 			return fmt.Errorf("want at index %d missing required 'type' field (either top-level 'type' or 'metadata.type')", i)
 		}
 		if labels, ok := wantObj["labels"]; ok {
-			if _, ok := labels.(map[string]interface{}); !ok {
+			if _, ok := AsMap(labels); !ok {
 				return fmt.Errorf("want at index %d 'labels' must be an object", i)
 			}
 		}
 		if params, ok := wantObj["params"]; ok {
-			if _, ok := params.(map[string]interface{}); !ok {
+			if _, ok := AsMap(params); !ok {
 				return fmt.Errorf("want at index %d 'params' must be an object", i)
 			}
 		}
 		if using, ok := wantObj["using"]; ok {
-			usingArray, ok := using.([]interface{})
+			usingArray, ok := AsArray(using)
 			if !ok {
 				return fmt.Errorf("want at index %d 'using' must be an array", i)
 			}
 			for j, selector := range usingArray {
-				if _, ok := selector.(map[string]interface{}); !ok {
+				if _, ok := AsMap(selector); !ok {
 					return fmt.Errorf("want at index %d using selector at index %d must be an object", i, j)
 				}
 			}
@@ -517,7 +517,7 @@ func validateRecipeWantsStructure(wants interface{}) error {
 }
 func validateRecipeResultStructure(result interface{}) error {
 	// Try new format first (flat array)
-	if resultArray, ok := result.([]interface{}); ok {
+	if resultArray, ok := AsArray(result); ok {
 		// New format: validate as array of result specs
 		if len(resultArray) == 0 {
 			return fmt.Errorf("result array cannot be empty")
@@ -532,7 +532,7 @@ func validateRecipeResultStructure(result interface{}) error {
 	}
 
 	// Fall back to legacy format (object with primary/metrics)
-	resultObj, ok := result.(map[string]interface{})
+	resultObj, ok := AsMap(result)
 	if !ok {
 		return fmt.Errorf("result must be either an array (new format) or an object (legacy format)")
 	}
@@ -545,7 +545,7 @@ func validateRecipeResultStructure(result interface{}) error {
 		}
 	}
 	if metrics, ok := resultObj["metrics"]; ok {
-		metricsArray, ok := metrics.([]interface{})
+		metricsArray, ok := AsArray(metrics)
 		if !ok {
 			return fmt.Errorf("result 'metrics' must be an array")
 		}
@@ -560,7 +560,7 @@ func validateRecipeResultStructure(result interface{}) error {
 	return nil
 }
 func validateRecipeResultSpec(spec interface{}, fieldName string) error {
-	specObj, ok := spec.(map[string]interface{})
+	specObj, ok := AsMap(spec)
 	if !ok {
 		return fmt.Errorf("%s must be an object", fieldName)
 	}
