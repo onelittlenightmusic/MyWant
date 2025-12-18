@@ -67,8 +67,8 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 
 // IsAchieved checks if restaurant has been reserved
 func (r *RestaurantWant) IsAchieved() bool {
-	attempted, _ := r.GetStateBool("attempted", false)
-	return attempted
+	helper := &TravelProgressHelper{Want: &r.Want}
+	return helper.IsAchievedBase()
 }
 
 // Progress creates a restaurant reservation
@@ -79,70 +79,22 @@ func (r *RestaurantWant) Progress() {
 		return
 	}
 
-	attempted, _ := r.GetStateBool("attempted", false)
-	_, connectionAvailable := r.GetFirstOutputChannel()
-
-	if attempted {
-		return
-	}
-	r.StoreState("attempted", true)
-
-	// Try to use agent system if available - agent completely overrides normal execution
-	if agentSchedule := r.tryAgentExecution(); agentSchedule != nil {
-		// Use the agent's schedule result
-		r.SetSchedule(*agentSchedule)
-		if connectionAvailable {
-			restaurantEvent := TimeSlot{
-				Start: agentSchedule.ReservationTime,
-				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
-				Type:  "restaurant",
-				Name:  agentSchedule.ReservationName,
+	helper := &TravelProgressHelper{
+		Want: &r.Want,
+		TryAgentExecutionFn: func() any {
+			return r.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(RestaurantSchedule); ok {
+				r.SetSchedule(s)
 			}
-
-			travelSchedule := &TravelSchedule{
-				Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
-				Events: []TimeSlot{restaurantEvent},
-			}
-
-			r.Provide(travelSchedule)
-		}
-
-		return
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return r.generateRestaurantSchedule(locals)
+		},
+		ServiceType: "restaurant",
 	}
-	// Generate restaurant reservation time (evening dinner)
-	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
-	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
-		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 6-9 PM
-
-	// Generate realistic restaurant name for the summary
-	restaurantName := generateRealisticRestaurantNameForTravel(locals.RestaurantType)
-	partySize := r.GetIntParam("party_size", 2)
-
-	newEvent := TimeSlot{
-		Start: dinnerStart,
-		End:   dinnerStart.Add(locals.Duration),
-		Type:  "restaurant",
-		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, locals.RestaurantType),
-	}
-	newSchedule := &TravelSchedule{
-		Date:   baseDate,
-		Events: []TimeSlot{newEvent},
-	}
-	r.StoreStateMulti(map[string]interface{}{
-		"total_processed":            1,
-		"reservation_type":           locals.RestaurantType,
-		"reservation_start_time":     newEvent.Start.Format("15:04"),
-		"reservation_end_time":       newEvent.End.Format("15:04"),
-		"reservation_duration_hours": locals.Duration.Hours(),
-		"reservation_name":           newEvent.Name,
-		"schedule_date":              baseDate.Format("2006-01-02"),
-		"achieving_percentage":       100,
-		"finalResult":                newEvent.Name,
-	})
-	// Use Provide to send with retrigger logic for achieved receivers
-	r.Provide(newSchedule)
-
-	return
+	helper.ProgressBase()
 }
 
 // tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
@@ -191,13 +143,45 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	return nil
 }
 
+// generateRestaurantSchedule generates a new restaurant reservation schedule
+func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals) *TravelSchedule {
+	// Generate restaurant reservation time (evening dinner)
+	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
+	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
+		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 6-9 PM
+
+	// Generate realistic restaurant name for the summary
+	restaurantName := generateRealisticRestaurantNameForTravel(locals.RestaurantType)
+	partySize := r.GetIntParam("party_size", 2)
+
+	newEvent := TimeSlot{
+		Start: dinnerStart,
+		End:   dinnerStart.Add(locals.Duration),
+		Type:  "restaurant",
+		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, locals.RestaurantType),
+	}
+	newSchedule := &TravelSchedule{
+		Date:   baseDate,
+		Events: []TimeSlot{newEvent},
+	}
+	r.StoreStateMulti(map[string]interface{}{
+		"total_processed":            1,
+		"reservation_type":           locals.RestaurantType,
+		"reservation_start_time":     newEvent.Start.Format("15:04"),
+		"reservation_end_time":       newEvent.End.Format("15:04"),
+		"reservation_duration_hours": locals.Duration.Hours(),
+		"reservation_name":           newEvent.Name,
+		"schedule_date":              baseDate.Format("2006-01-02"),
+		"achieving_percentage":       100,
+		"finalResult":                newEvent.Name,
+	})
+	return newSchedule
+}
+
 // CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant Returns 100 if the restaurant has been attempted/executed, 0 otherwise
 func (r *RestaurantWant) CalculateAchievingPercentage() int {
-	attempted, _ := r.GetStateBool("attempted", false)
-	if attempted {
-		return 100
-	}
-	return 0
+	helper := &TravelProgressHelper{Want: &r.Want}
+	return helper.CalculateAchievingPercentageBase()
 }
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
@@ -345,8 +329,8 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 
 // IsAchieved checks if hotel has been reserved
 func (h *HotelWant) IsAchieved() bool {
-	attempted, _ := h.GetStateBool("attempted", false)
-	return attempted
+	helper := &TravelProgressHelper{Want: &h.Want}
+	return helper.IsAchievedBase()
 }
 
 func (h *HotelWant) Progress() {
@@ -356,38 +340,26 @@ func (h *HotelWant) Progress() {
 		return
 	}
 
-	attempted, _ := h.GetStateBool("attempted", false)
-	_, connectionAvailable := h.GetFirstOutputChannel()
-
-	if attempted {
-		return
-	}
-	h.StoreState("attempted", true)
-
-	// Try to use agent system if available - agent completely overrides normal execution
-	if agentSchedule := h.tryAgentExecution(); agentSchedule != nil {
-		// Use the agent's schedule result
-		h.SetSchedule(*agentSchedule)
-		if connectionAvailable {
-			hotelEvent := TimeSlot{
-				Start: agentSchedule.CheckInTime,
-				End:   agentSchedule.CheckOutTime,
-				Type:  "hotel",
-				Name:  agentSchedule.ReservationName,
+	helper := &TravelProgressHelper{
+		Want: &h.Want,
+		TryAgentExecutionFn: func() any {
+			return h.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(HotelSchedule); ok {
+				h.SetSchedule(s)
 			}
-
-			travelSchedule := &TravelSchedule{
-				Date:   agentSchedule.CheckInTime.Truncate(24 * time.Hour),
-				Events: []TimeSlot{hotelEvent},
-			}
-
-			h.Provide(travelSchedule)
-		}
-
-		return
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return h.generateHotelSchedule(locals)
+		},
+		ServiceType: "hotel",
 	}
+	helper.ProgressBase()
+}
 
-	// Normal hotel execution (only runs if agent execution didn't return a result)
+// generateHotelSchedule generates a new hotel reservation schedule
+func (h *HotelWant) generateHotelSchedule(locals *HotelWantLocals) *TravelSchedule {
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	checkInTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		20+rand.Intn(4), rand.Intn(60), 0, 0, time.Local) // 8 PM - midnight
@@ -419,18 +391,13 @@ func (h *HotelWant) Progress() {
 		"reservation_name":     newEvent.Name,
 		"achieving_percentage": 100,
 	})
-	h.Provide(newSchedule)
-
-	return
+	return newSchedule
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for HotelWant Returns 100 if the hotel has been attempted/executed, 0 otherwise
 func (h *HotelWant) CalculateAchievingPercentage() int {
-	attempted, _ := h.GetStateBool("attempted", false)
-	if attempted {
-		return 100
-	}
-	return 0
+	helper := &TravelProgressHelper{Want: &h.Want}
+	return helper.CalculateAchievingPercentageBase()
 }
 
 // tryAgentExecution attempts to execute hotel reservation using the agent system Returns the HotelSchedule if successful, nil if no agent execution
@@ -474,8 +441,8 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 
 // IsAchieved checks if buffet has been reserved
 func (b *BuffetWant) IsAchieved() bool {
-	attempted, _ := b.GetStateBool("attempted", false)
-	return attempted
+	helper := &TravelProgressHelper{Want: &b.Want}
+	return helper.IsAchievedBase()
 }
 
 func (b *BuffetWant) Progress() {
@@ -485,39 +452,26 @@ func (b *BuffetWant) Progress() {
 		return
 	}
 
-	attempted, _ := b.GetStateBool("attempted", false)
-	_, connectionAvailable := b.GetFirstOutputChannel()
-
-	if attempted {
-		return
-	}
-	b.StoreState("attempted", true)
-
-	// Try to use agent system if available - agent completely overrides normal execution
-	if agentSchedule := b.tryAgentExecution(); agentSchedule != nil {
-		// Use the agent's schedule result
-		b.SetSchedule(*agentSchedule)
-		if connectionAvailable {
-			buffetEvent := TimeSlot{
-				Start: agentSchedule.ReservationTime,
-				End:   agentSchedule.ReservationTime.Add(time.Duration(agentSchedule.DurationHours * float64(time.Hour))),
-				Type:  "buffet",
-				Name:  agentSchedule.ReservationName,
+	helper := &TravelProgressHelper{
+		Want: &b.Want,
+		TryAgentExecutionFn: func() any {
+			return b.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(BuffetSchedule); ok {
+				b.SetSchedule(s)
 			}
-
-			travelSchedule := &TravelSchedule{
-				Date:   agentSchedule.ReservationTime.Truncate(24 * time.Hour),
-				Events: []TimeSlot{buffetEvent},
-			}
-
-			b.Provide(travelSchedule)
-		}
-
-		return
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return b.generateBuffetSchedule(locals)
+		},
+		ServiceType: "buffet",
 	}
+	helper.ProgressBase()
+}
 
-	// Normal buffet execution (only runs if agent execution didn't return a result)
-
+// generateBuffetSchedule generates a new buffet reservation schedule
+func (b *BuffetWant) generateBuffetSchedule(locals *BuffetWantLocals) *TravelSchedule {
 	// Next day morning buffet
 	nextDay := time.Now().AddDate(0, 0, 2) // Day after tomorrow
 	buffetStart := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
@@ -546,19 +500,13 @@ func (b *BuffetWant) Progress() {
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})
-	// Use Provide to send with retrigger logic for achieved receivers
-	b.Provide(newSchedule)
-
-	return
+	return newSchedule
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for BuffetWant Returns 100 if the buffet has been attempted/executed, 0 otherwise
 func (b *BuffetWant) CalculateAchievingPercentage() int {
-	attempted, _ := b.GetStateBool("attempted", false)
-	if attempted {
-		return 100
-	}
-	return 0
+	helper := &TravelProgressHelper{Want: &b.Want}
+	return helper.CalculateAchievingPercentageBase()
 }
 
 // tryAgentExecution attempts to execute buffet reservation using the agent system Returns the BuffetSchedule if successful, nil if no agent execution
