@@ -162,16 +162,12 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		}
 
 		r.AggregateChanges()
-		if result, exists := r.GetState("agent_result"); exists && result != nil {
-			if schedule, ok := result.(RestaurantSchedule); ok {
-				r.StoreState("execution_source", "monitor")
+		if schedule, ok := GetStateAs[RestaurantSchedule](&r.Want, "agent_result"); ok {
+			r.StoreState("execution_source", "monitor")
 
-				// Immediately set the schedule and complete the cycle
+			// Immediately set the schedule and complete the cycle
 			r.SetSchedule(schedule)
-				return &schedule
-		} else {
-			r.StoreLog(fmt.Sprintf("[ERROR] RestaurantWant.tryAgentExecution: type assertion failed for agent_result from monitor. Expected RestaurantSchedule, got %T", result))
-		}
+			return &schedule
 		}
 
 		// Step 2: No existing schedule found, execute AgentRestaurant
@@ -185,12 +181,8 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 		r.StoreState("execution_source", "agent")
 
 		// Wait for agent to complete and retrieve result Check for agent_result in state
-		if result, exists := r.GetState("agent_result"); exists && result != nil {
-			if schedule, ok := result.(RestaurantSchedule); ok {
-				return &schedule
-		} else {
-			r.StoreLog(fmt.Sprintf("[ERROR] RestaurantWant.tryAgentExecution: type assertion failed for agent_result from agent. Expected RestaurantSchedule, got %T", result))
-		}
+		if schedule, ok := GetStateAs[RestaurantSchedule](&r.Want, "agent_result"); ok {
+			return &schedule
 		}
 
 		return nil
@@ -456,12 +448,8 @@ func (h *HotelWant) tryAgentExecution() *HotelSchedule {
 		h.StoreState("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result Check for agent_result in state
-		if result, exists := h.GetState("agent_result"); exists {
-			if schedule, ok := result.(HotelSchedule); ok {
-				return &schedule
-			} else {
-				h.StoreLog(fmt.Sprintf("[ERROR] HotelWant.tryAgentExecution: type assertion failed for agent_result. Expected HotelSchedule, got %T", result))
-			}
+		if schedule, ok := GetStateAs[HotelSchedule](&h.Want, "agent_result"); ok {
+			return &schedule
 		}
 
 		return nil
@@ -588,12 +576,8 @@ func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
 		b.StoreState("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result Check for agent_result in state
-		if result, exists := b.GetState("agent_result"); exists {
-			if schedule, ok := result.(BuffetSchedule); ok {
-				return &schedule
-			} else {
-				b.StoreLog(fmt.Sprintf("[ERROR] BuffetWant.tryAgentExecution: type assertion failed for agent_result. Expected BuffetSchedule, got %T", result))
-			}
+		if schedule, ok := GetStateAs[BuffetSchedule](&b.Want, "agent_result"); ok {
+			return &schedule
 		}
 
 		return nil

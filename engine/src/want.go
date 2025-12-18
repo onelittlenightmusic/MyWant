@@ -840,6 +840,18 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	return defaultValue, false
 }
 
+// GetStateAs safely extracts and casts a state value to a specific type using generics
+// Example: schedule, ok := GetStateAs[RestaurantSchedule](want, "agent_result")
+func GetStateAs[T any](n *Want, key string) (T, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		var zero T
+		return zero, false
+	}
+	typedVal, ok := value.(T)
+	return typedVal, ok
+}
+
 // CalculateAchievingPercentage computes the progress percentage toward completion. This is a virtual method that want type implementations should override to provide type-specific completion percentage calculation. Default implementation returns 0 unless the want has reached completion status,
 // in which case it returns 100. Want types should override this to provide meaningful progress indicators: - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%) - QueueWant: Calculate based on processedCount / total capacity
 // - Numbers generator: Calculate based on currentCount / target count - Coordinator: Calculate based on channels heard / total required channels - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
