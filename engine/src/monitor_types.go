@@ -173,12 +173,8 @@ func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold in
 	mw.Want.StoreState("last_alert_time", alert.Timestamp)
 
 	// Update alert count
-	if count, exists := mw.Want.GetState("alerts_triggered"); exists {
-		if c, ok := AsInt(count); ok {
-			mw.Want.StoreState("alerts_triggered", c+1)
-		} else {
-			mw.Want.StoreState("alerts_triggered", 1)
-		}
+	if count, ok := mw.Want.GetStateInt("alerts_triggered", 0); ok {
+		mw.Want.StoreState("alerts_triggered", count+1)
 	} else {
 		mw.Want.StoreState("alerts_triggered", 1)
 	}
@@ -208,12 +204,8 @@ func (mw *MonitorWant) executeAlertActions(alert AlertRecord) {
 func (mw *MonitorWant) updateMonitoringStats(notification StateNotification) {
 	// Track notifications per source
 	sourceKey := fmt.Sprintf("notifications_from_%s", notification.SourceWantName)
-	if count, exists := mw.Want.GetState(sourceKey); exists {
-		if c, ok := AsInt(count); ok {
-			mw.Want.StoreState(sourceKey, c+1)
-		} else {
-			mw.Want.StoreState(sourceKey, 1)
-		}
+	if count, ok := mw.Want.GetStateInt(sourceKey, 0); ok {
+		mw.Want.StoreState(sourceKey, count+1)
 	} else {
 		mw.Want.StoreState(sourceKey, 1)
 	}
