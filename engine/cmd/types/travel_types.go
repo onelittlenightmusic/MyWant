@@ -1016,7 +1016,7 @@ func (f *FlightWant) StartContinuousMonitoring() {
 	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
 	// Get the monitoring done channel from locals
-	locals := f.BaseTravelWant.Want.Locals.(*FlightWantLocals)
+	locals, _ := GetLocals[*FlightWantLocals](&f.BaseTravelWant.Want)
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -1040,7 +1040,10 @@ func (f *FlightWant) StartContinuousMonitoring() {
 
 // StopContinuousMonitoring signals the monitoring goroutine to stop
 func (f *FlightWant) StopContinuousMonitoring() {
-	locals := f.BaseTravelWant.Want.Locals.(*FlightWantLocals)
+	locals, ok := GetLocals[*FlightWantLocals](&f.BaseTravelWant.Want)
+	if !ok {
+		return
+	}
 	select {
 	case locals.monitoringDone <- struct{}{}:
 		// Signal sent successfully
