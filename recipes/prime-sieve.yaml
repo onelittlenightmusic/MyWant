@@ -43,10 +43,10 @@ recipe:
   # Recipe result definition - specifies how to compute prime sieve results
   result:
     - want_name: "prime sequence"
-      stat_name: ".foundPrimes"
+      state_field: "foundPrimes"
       description: "List of prime numbers found"
     - want_name: "prime sequence"
-      stat_name: ".primeCount"
+      state_field: "primeCount"
       description: "Count of prime numbers found"
   # Example deployment - one-click deployment configuration
   example:

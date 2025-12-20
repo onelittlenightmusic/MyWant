@@ -64,13 +64,13 @@ recipe:
         using:
           - role: processor         # Connect to queue via recipe-defined label
 
-  # Recipe result definition - specifies which want and stat to use for result
+  # Recipe result definition - specifies which want and state field to use for result
   result:
     - want_name: "queue"
-      stat_name: ".average_wait_time"
+      state_field: "avg_wait_time"
       description: "Average wait time in the queue system"
     - want_name: "numbers"
-      stat_name: ".total_processed"
+      state_field: "generated_count"
       description: "Items generated"
     - want_name: "queue"
       stat_name: "."
