@@ -72,16 +72,9 @@ func (b *BaseTravelWant) IsAchieved() bool {
 	return attempted
 }
 
-// Progress implements Progressable for all travel wants (RestaurantWant, HotelWant, BuffetWant)
-func (b *BaseTravelWant) Progress() {
+// progressImpl contains the shared progress logic for all travel wants
+func (b *BaseTravelWant) progressImpl(executor TravelWantInterface) {
 	b.StoreState("attempted", true)
-
-	// Get the executor - which should be the concrete type that embeds this
-	executor, ok := any(b).(TravelWantInterface)
-	if !ok {
-		b.StoreLog("ERROR: Failed to cast to TravelWantInterface")
-		return
-	}
 
 	// Try agent execution
 	if schedule := executor.tryAgentExecution(); schedule != nil {
@@ -152,6 +145,11 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 		BaseTravelWant: BaseTravelWant{Want: *want},
 	}
 	return restaurantWant
+}
+
+// Progress implements Progressable for RestaurantWant
+func (r *RestaurantWant) Progress() {
+	r.BaseTravelWant.progressImpl(r)
 }
 
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
@@ -389,6 +387,11 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 	return hotelWant
 }
 
+// Progress implements Progressable for HotelWant
+func (h *HotelWant) Progress() {
+	h.BaseTravelWant.progressImpl(h)
+}
+
 // tryAgentExecution implements TravelWantInterface for HotelWant
 func (h *HotelWant) tryAgentExecution() any {
 	if len(h.Spec.Requires) > 0 {
@@ -472,6 +475,11 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 		BaseTravelWant: BaseTravelWant{Want: *want},
 	}
 	return buffetWant
+}
+
+// Progress implements Progressable for BuffetWant
+func (b *BuffetWant) Progress() {
+	b.BaseTravelWant.progressImpl(b)
 }
 
 // tryAgentExecution implements TravelWantInterface for BuffetWant
