@@ -51,7 +51,7 @@ type ScheduleConflict struct {
 }
 
 // TravelWantLocalsInterface is a marker interface for all travel want locals
-type TravelWantLocalsInterface interface{}
+type TravelWantLocalsInterface any
 
 // TravelWantInterface defines methods that specific travel wants must implement
 type TravelWantInterface interface {

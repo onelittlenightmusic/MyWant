@@ -194,7 +194,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-	want.StoreStateMulti(map[string]interface{}{
+	want.StoreStateMulti(map[string]any{
 		"flight_id":      reservation.ID,
 		"flight_status":  "created",
 		"flight_number":  reservation.FlightNumber,
@@ -253,7 +253,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-	want.StoreStateMulti(map[string]interface{}{
+	want.StoreStateMulti(map[string]any{
 		"flight_status":          "canceled",
 		"status_message":         "Flight canceled by agent",
 		"canceled_at":            time.Now().Format(time.RFC3339),

@@ -11,7 +11,7 @@ import (
 type RecipeParameter struct {
 	Name        string      `yaml:"name"`
 	Type        string      `yaml:"type"`
-	Default     interface{} `yaml:"default"`
+	Default     any `yaml:"default"`
 	Description string      `yaml:"description"`
 }
 
@@ -23,7 +23,7 @@ type WantRecipe struct {
 		Labels map[string]string `yaml:"labels"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Params map[string]interface{} `yaml:"params"`
+		Params map[string]any `yaml:"params"`
 		Using  []map[string]string    `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
@@ -34,7 +34,7 @@ type DRYWantSpec struct {
 	Name   string                 `yaml:"name"`
 	Type   string                 `yaml:"type"`
 	Labels map[string]string      `yaml:"labels,omitempty"`
-	Params map[string]interface{} `yaml:"params,omitempty"`
+	Params map[string]any `yaml:"params,omitempty"`
 	Using  []map[string]string    `yaml:"using,omitempty"`
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
@@ -45,7 +45,7 @@ type DRYRecipeDefaults struct {
 		Labels map[string]string `yaml:"labels,omitempty"`
 	} `yaml:"metadata,omitempty"`
 	Spec struct {
-		Params map[string]interface{} `yaml:"params,omitempty"`
+		Params map[string]any `yaml:"params,omitempty"`
 	} `yaml:"spec,omitempty"`
 }
 
@@ -63,7 +63,7 @@ type ChildRecipe struct {
 	Parameters []RecipeParameter `yaml:"parameters,omitempty"`
 
 	// New minimized parameter format support
-	Params map[string]interface{} `yaml:"params,omitempty"`
+	Params map[string]any `yaml:"params,omitempty"`
 
 	Result *LegacyRecipeResult `yaml:"result,omitempty"` // Optional result fetching configuration
 
@@ -154,7 +154,7 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 
 // RecipeFile represents the new simplified recipe file format
 type RecipeFile struct {
-	Parameters map[string]interface{} `yaml:"parameters"`
+	Parameters map[string]any `yaml:"parameters"`
 	Wants      []DRYWantSpec          `yaml:"wants"`
 }
 
@@ -183,14 +183,14 @@ func (rl *RecipeLoader) ListRecipes() []string {
 }
 
 // InstantiateRecipe creates actual Want instances from a recipe
-func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, params map[string]interface{}) ([]*Want, error) {
+func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, params map[string]any) ([]*Want, error) {
 	childRecipe, err := rl.GetRecipe(recipeName)
 	if err != nil {
 		return nil, err
 	}
 
 	// Merge default parameters with provided parameters
-	recipeParams := make(map[string]interface{})
+	recipeParams := make(map[string]any)
 	recipeParams["prefix"] = prefix
 	if childRecipe.Params != nil {
 		// New format: params map
@@ -229,7 +229,7 @@ func (rl *RecipeLoader) InstantiateRecipe(recipeName string, prefix string, para
 }
 
 // instantiateDRYWant creates a single Want from a DRY want spec with automatic naming and labeling
-func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRecipeDefaults, params map[string]interface{}, prefix string, wantIndex int) (*Want, error) {
+func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRecipeDefaults, params map[string]any, prefix string, wantIndex int) (*Want, error) {
 	// Generate automatic name: prefix-type-index
 	generatedName := fmt.Sprintf("%s-%s-%d", prefix, dryWant.Type, wantIndex)
 
@@ -272,7 +272,7 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 			Using:  dryWant.Using,
 		},
 		Status: WantStatusIdle,
-		State:  make(map[string]interface{}),
+		State:  make(map[string]any),
 	}
 
 	return want, nil
@@ -286,8 +286,8 @@ func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]st
 }
 
 // resolveParams resolves parameter values by looking them up in the recipe parameters
-func (rl *RecipeLoader) resolveParams(wantParams map[string]interface{}, recipeParams map[string]interface{}) map[string]interface{} {
-	resolvedParams := make(map[string]interface{})
+func (rl *RecipeLoader) resolveParams(wantParams map[string]any, recipeParams map[string]any) map[string]any {
+	resolvedParams := make(map[string]any)
 
 	for paramName, paramValue := range wantParams {
 		if paramKey, ok := paramValue.(string); ok {
@@ -319,10 +319,10 @@ func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecip
 			Labels: make(map[string]string),
 		},
 		Spec: struct {
-			Params map[string]interface{} `yaml:"params"`
+			Params map[string]any `yaml:"params"`
 			Using  []map[string]string    `yaml:"using,omitempty"`
 		}{
-			Params: make(map[string]interface{}),
+			Params: make(map[string]any),
 			Using:  dryWant.Using, // Copy using directly
 		},
 		TypeHints: make(map[string]string),
@@ -369,7 +369,7 @@ func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecip
 }
 
 // instantiateWantFromTemplate creates a single Want from a WantRecipe (simplified, no templating)
-func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, params map[string]interface{}, targetName string) (*Want, error) {
+func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, params map[string]any, targetName string) (*Want, error) {
 	// Resolve parameter values directly
 	resolvedParams := rl.resolveParams(wantRecipe.Spec.Params, params)
 	want := &Want{
@@ -392,12 +392,12 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 			Using:  wantRecipe.Spec.Using,
 		},
 		Status: WantStatusIdle,
-		State:  make(map[string]interface{}),
+		State:  make(map[string]any),
 	}
 
 	return want, nil
 }
-func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName string, wants []*Want) (interface{}, error) {
+func (rl *RecipeLoader) GetLegacyRecipeResult(recipeName string, targetName string, wants []*Want) (any, error) {
 	childRecipe, err := rl.GetRecipe(recipeName)
 	if err != nil {
 		return nil, err
@@ -442,7 +442,7 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 }
 
 // extractWantStat extracts a specific statistic from a want
-func (rl *RecipeLoader) extractWantStat(want *Want, statName string) (interface{}, error) {
+func (rl *RecipeLoader) extractWantStat(want *Want, statName string) (any, error) {
 	switch statName {
 	case "AverageWaitTime", "averagewaittime":
 		value, _ := want.GetState("average_wait_time")

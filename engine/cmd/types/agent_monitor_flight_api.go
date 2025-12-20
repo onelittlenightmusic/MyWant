@@ -87,7 +87,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	// Restore status history from want state for persistence Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
-		if historyStrs, ok := historyI.([]interface{}); ok {
+		if historyStrs, ok := historyI.([]any); ok {
 			for _, entryI := range historyStrs {
 				if entry, ok := entryI.(string); ok {
 					if parsed, ok := parseStatusHistoryEntry(entry); ok {
@@ -147,7 +147,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	// Only update state if state has actually changed (differential history) NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go Individual agents should NOT call BeginExecCycle/EndExecCycle
 	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
-		updates := map[string]interface{}{
+		updates := map[string]any{
 			"flight_id":      reservation.ID,
 			"flight_number":  reservation.FlightNumber,
 			"from":           reservation.From,

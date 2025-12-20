@@ -8,7 +8,7 @@ import (
 var DebugLoggingEnabled bool
 
 // DebugLog logs a message only if debug mode is enabled
-func DebugLog(format string, v ...interface{}) {
+func DebugLog(format string, v ...any) {
 	if DebugLoggingEnabled {
 		log.Printf("[DEBUG] "+format, v...)
 	}

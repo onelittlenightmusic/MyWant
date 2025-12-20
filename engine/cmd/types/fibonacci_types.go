@@ -35,7 +35,7 @@ func (g *FibonacciNumbers) Progress() {
 
 	sentCount += 1
 	g.Provide(a)
-	g.StoreStateMulti(map[string]interface{}{
+	g.StoreStateMulti(map[string]any{
 		"a":          b,
 		"b":          a + b,
 		"sent_count": sentCount,
@@ -112,7 +112,7 @@ func (f *FibonacciFilter) Progress() {
 		// Check for end signal
 		if val == -1 {
 			// End signal received - finalize and complete
-			f.StoreStateMulti(map[string]interface{}{
+			f.StoreStateMulti(map[string]any{
 				"filtered":        locals.filtered,
 				"count":           len(locals.filtered),
 				"total_processed": totalProcessed,
@@ -130,7 +130,7 @@ func (f *FibonacciFilter) Progress() {
 		}
 
 		// Update state for this packet
-		f.StoreStateMulti(map[string]interface{}{
+		f.StoreStateMulti(map[string]any{
 			"total_processed":       totalProcessed,
 			"filtered":              locals.filtered,
 			"count":                 len(locals.filtered),

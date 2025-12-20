@@ -16,7 +16,7 @@ func main() {
                     Labels: map[string]string{"role": "source"},
                 },
                 Spec: mywant.WantSpec{
-                    Params: map[string]interface{}{
+                    Params: map[string]any{
                         "count": 5,
                         "rate": 1.0,
                         "deterministic": true,
@@ -30,7 +30,7 @@ func main() {
                     Labels: map[string]string{"role": "processor"},
                 },
                 Spec: mywant.WantSpec{
-                    Params: map[string]interface{}{"service_time": 0.1},
+                    Params: map[string]any{"service_time": 0.1},
                     Using: []map[string]string{{"role": "source"}},
                 },
             },

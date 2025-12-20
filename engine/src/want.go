@@ -31,7 +31,7 @@ type Metadata struct {
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Params              map[string]interface{} `json:"params" yaml:"params"`
+	Params              map[string]any `json:"params" yaml:"params"`
 	Using               []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
 	Recipe              string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
 	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
@@ -96,7 +96,7 @@ type TriggerCommand struct {
 }
 
 // WantStats is deprecated - use State field instead Keeping type alias for backward compatibility during transition
-type WantStats = map[string]interface{}
+type WantStats = map[string]any
 func getCurrentTimestamp() int64 {
 	return time.Now().Unix()
 }
@@ -147,7 +147,7 @@ type Want struct {
 	Metadata Metadata               `json:"metadata" yaml:"metadata"`
 	Spec     WantSpec               `json:"spec" yaml:"spec"`
 	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
-	State    map[string]interface{} `json:"state,omitempty" yaml:"state,omitempty"`
+	State    map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
 	History  WantHistory            `json:"history" yaml:"history"`
 
 	// Agent execution information
@@ -155,8 +155,8 @@ type Want struct {
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
-	pendingStateChanges     map[string]interface{} `json:"-" yaml:"-"`
-	pendingParameterChanges map[string]interface{} `json:"-" yaml:"-"`
+	pendingStateChanges     map[string]any `json:"-" yaml:"-"`
+	pendingParameterChanges map[string]any `json:"-" yaml:"-"`
 	execCycleCount          int                    `json:"-" yaml:"-"`
 	inExecCycle             bool                   `json:"-" yaml:"-"`
 	pendingLogs             []string               `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
@@ -164,7 +164,7 @@ type Want struct {
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
-	agentStateChanges map[string]interface{}        `json:"-" yaml:"-"`
+	agentStateChanges map[string]any        `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
 
 	// Unified subscription event system
@@ -206,7 +206,7 @@ type Want struct {
 
 // CachedPacket holds a packet and its original channel index for the caching mechanism.
 type CachedPacket struct {
-	Packet        interface{}
+	Packet        any
 	OriginalIndex int
 }
 func (n *Want) SetStatus(status WantStatus) {
@@ -252,7 +252,7 @@ func (n *Want) NotifyCompletion() {
 }
 
 // ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety and preventing deadlocks from external callers
-func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
+func (n *Want) ReconcileStateFromConfig(sourceState map[string]any) {
 	if sourceState == nil {
 		return
 	}
@@ -261,7 +261,7 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
 	if n.State == nil {
-		n.State = make(map[string]interface{})
+		n.State = make(map[string]any)
 	}
 
 	// Copy all state data atomically
@@ -269,7 +269,7 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]interface{}) {
 		n.State[k] = v
 	}
 }
-func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
+func (n *Want) SetStateAtomic(stateData map[string]any) {
 	if stateData == nil {
 		return
 	}
@@ -278,7 +278,7 @@ func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
 	if n.State == nil {
-		n.State = make(map[string]interface{})
+		n.State = make(map[string]any)
 	}
 	for k, v := range stateData {
 		n.State[k] = v
@@ -286,22 +286,22 @@ func (n *Want) SetStateAtomic(stateData map[string]interface{}) {
 }
 
 // UpdateParameter updates a parameter and propagates the change to children
-func (n *Want) UpdateParameter(paramName string, paramValue interface{}) {
-	var previousValue interface{}
+func (n *Want) UpdateParameter(paramName string, paramValue any) {
+	var previousValue any
 	if n.Spec.Params != nil {
 		previousValue = n.Spec.Params[paramName]
 	}
 
 	// Update the parameter in spec
 	if n.Spec.Params == nil {
-		n.Spec.Params = make(map[string]interface{})
+		n.Spec.Params = make(map[string]any)
 	}
 	n.Spec.Params[paramName] = paramValue
 
 	// Batch parameter changes during Exec cycles (like state changes)
 	if n.inExecCycle {
 		if n.pendingParameterChanges == nil {
-			n.pendingParameterChanges = make(map[string]interface{})
+			n.pendingParameterChanges = make(map[string]any)
 		}
 		n.pendingParameterChanges[paramName] = paramValue
 	} else {
@@ -322,8 +322,8 @@ func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
 	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
-	n.pendingStateChanges = make(map[string]interface{})
-	n.pendingParameterChanges = make(map[string]interface{})
+	n.pendingStateChanges = make(map[string]any)
+	n.pendingParameterChanges = make(map[string]any)
 	n.pendingLogs = make([]string, 0)
 }
 
@@ -350,20 +350,20 @@ func (n *Want) EndProgressCycle() {
 func (n *Want) AggregateChanges() {
 	// Lock to safely copy and clear pending changes
 	n.stateMutex.Lock()
-	changesCopy := make(map[string]interface{})
+	changesCopy := make(map[string]any)
 	if len(n.pendingStateChanges) > 0 {
 		// Copy pending changes before releasing lock
 		for key, value := range n.pendingStateChanges {
 			changesCopy[key] = value
 		}
 		// Clear pending changes after copying to prevent re-recording on next cycle
-		n.pendingStateChanges = make(map[string]interface{})
+		n.pendingStateChanges = make(map[string]any)
 	}
 
 	// Apply changes INSIDE the lock to prevent concurrent map read/write
 	if len(changesCopy) > 0 {
 		if n.State == nil {
-			n.State = make(map[string]interface{})
+			n.State = make(map[string]any)
 		}
 
 		// Apply all pending changes to actual state (CRITICAL: must hold lock!)
@@ -379,7 +379,7 @@ func (n *Want) AggregateChanges() {
 		n.addAggregatedParameterHistory()
 
 		// Clear pending parameter changes after aggregating
-		n.pendingParameterChanges = make(map[string]interface{})
+		n.pendingParameterChanges = make(map[string]any)
 	}
 }
 
@@ -580,8 +580,8 @@ func (n *Want) StartProgressionLoop(
 	}()
 }
 
-// valuesEqual compares two interface{} values for equality Handles different types properly including strings, numbers, booleans, etc.
-func (n *Want) valuesEqual(val1, val2 interface{}) bool {
+// valuesEqual compares two any values for equality Handles different types properly including strings, numbers, booleans, etc.
+func (n *Want) valuesEqual(val1, val2 any) bool {
 	if val1 == nil && val2 == nil {
 		return true
 	}
@@ -594,7 +594,7 @@ func (n *Want) valuesEqual(val1, val2 interface{}) bool {
 }
 
 // stateSnapshotsEqual compares two state snapshots (maps) for deep equality Returns true if both maps have identical keys and values
-func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) bool {
+func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]any) bool {
 	if len(snapshot1) != len(snapshot2) {
 		return false
 	}
@@ -614,7 +614,7 @@ func (n *Want) stateSnapshotsEqual(snapshot1, snapshot2 map[string]interface{}) 
 }
 
 // isSignificantStateFields checks if only minor/metadata fields have changed Returns true if ONLY status-like fields have changed (fields ending with "_status") Returns false if significant functional fields have changed
-func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) bool {
+func (n *Want) isOnlyStatusChange(oldState, newState map[string]any) bool {
 	changedKeys := make(map[string]bool)
 	for key, oldVal := range oldState {
 		newVal, exists := newState[key]
@@ -648,8 +648,8 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]interface{}) boo
 	// All changed fields are status-like
 	return true
 }
-func (n *Want) getSignificantStateChanges(oldState, newState map[string]interface{}) map[string]interface{} {
-	significantChanges := make(map[string]interface{})
+func (n *Want) getSignificantStateChanges(oldState, newState map[string]any) map[string]any {
+	significantChanges := make(map[string]any)
 	for key, newVal := range newState {
 		// Skip status-like fields
 		isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
@@ -712,7 +712,7 @@ func (n *Want) SetSuspended(suspended bool) {
 	defer n.controlMu.Unlock()
 	n.suspended = suspended
 }
-func (n *Want) StoreState(key string, value interface{}) {
+func (n *Want) StoreState(key string, value any) {
 	// CRITICAL: Always use mutex to protect both State and pendingStateChanges Agent goroutines can call StoreState concurrently, so we must synchronize access
 	n.stateMutex.Lock()
 	previousValue, exists := n.getStateUnsafe(key)
@@ -724,13 +724,13 @@ func (n *Want) StoreState(key string, value interface{}) {
 
 	// Value has changed, store it Store the state - preserve existing State to maintain parameterHistory
 	if n.State == nil {
-		n.State = make(map[string]interface{})
+		n.State = make(map[string]any)
 	}
 	n.State[key] = value
 
 	// Stage the change in pending state changes This allows us to batch related changes and create minimal history entries
 	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]interface{})
+		n.pendingStateChanges = make(map[string]any)
 	}
 	n.pendingStateChanges[key] = value
 	n.stateMutex.Unlock()
@@ -744,7 +744,7 @@ func (n *Want) StoreState(key string, value interface{}) {
 	sendStateNotifications(notification)
 }
 // "description_received": true, "description_text": "some text", "description_provided": true, })
-func (n *Want) StoreStateMulti(updates map[string]interface{}) {
+func (n *Want) StoreStateMulti(updates map[string]any) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
 	n.stateMutex.Lock()
 
@@ -759,13 +759,13 @@ func (n *Want) StoreStateMulti(updates map[string]interface{}) {
 
 		// Value has changed, store it Store the state - preserve existing State to maintain history
 		if n.State == nil {
-			n.State = make(map[string]interface{})
+			n.State = make(map[string]any)
 		}
 		n.State[key] = value
 
 		// Stage the change in pending state changes
 		if n.pendingStateChanges == nil {
-			n.pendingStateChanges = make(map[string]interface{})
+			n.pendingStateChanges = make(map[string]any)
 		}
 		n.pendingStateChanges[key] = value
 
@@ -793,7 +793,7 @@ func (n *Want) StoreLog(message string) {
 	}
 	n.pendingLogs = append(n.pendingLogs, message)
 }
-func (n *Want) GetState(key string) (interface{}, bool) {
+func (n *Want) GetState(key string) (any, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
 
@@ -873,9 +873,9 @@ func (n *Want) addAggregatedStateHistory() {
 	defer n.stateMutex.Unlock()
 
 	if n.State == nil {
-		n.State = make(map[string]interface{})
+		n.State = make(map[string]any)
 	}
-	stateSnapshot := make(map[string]interface{})
+	stateSnapshot := make(map[string]any)
 	for key, value := range n.State {
 		// Skip agent metadata fields - they cause false history duplicates since they change multiple times during agent execution but don't represent actual want state changes
 		if key == "current_agent" || key == "running_agents" {
@@ -887,10 +887,10 @@ func (n *Want) addAggregatedStateHistory() {
 	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
 	if len(n.History.StateHistory) > 0 {
 		lastEntry := n.History.StateHistory[len(n.History.StateHistory)-1]
-		lastState, ok := lastEntry.StateValue.(map[string]interface{})
+		lastState, ok := lastEntry.StateValue.(map[string]any)
 		if !ok {
 			// If lastState is not the expected type, proceed with recording This handles initialization or type changes
-			lastState = make(map[string]interface{})
+			lastState = make(map[string]any)
 		}
 
 		// Compare current state with last recorded state
@@ -901,7 +901,7 @@ func (n *Want) addAggregatedStateHistory() {
 
 		// SMART MERGING: If only status fields changed, merge into the previous entry This prevents duplicate history entries when only status_* fields are updated
 		if n.isOnlyStatusChange(lastState, stateSnapshot) {
-			if lastStateMap, ok := n.History.StateHistory[len(n.History.StateHistory)-1].StateValue.(map[string]interface{}); ok {
+			if lastStateMap, ok := n.History.StateHistory[len(n.History.StateHistory)-1].StateValue.(map[string]any); ok {
 				// Copy status and metadata fields from the new snapshot to the last entry
 				for key, newVal := range stateSnapshot {
 					// Copy status-like fields and metadata
@@ -1002,18 +1002,18 @@ func (n *Want) addAggregatedLogHistory() {
 }
 
 // copyCurrentState creates a copy of the current state
-func (n *Want) copyCurrentState() map[string]interface{} {
+func (n *Want) copyCurrentState() map[string]any {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
 
-	stateCopy := make(map[string]interface{})
+	stateCopy := make(map[string]any)
 	for key, value := range n.State {
 		stateCopy[key] = value
 	}
 	return stateCopy
 }
-func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, previousValue interface{}) {
-	paramMap := map[string]interface{}{
+func (n *Want) addToParameterHistory(paramName string, paramValue any, previousValue any) {
+	paramMap := map[string]any{
 		paramName: paramValue,
 	}
 
@@ -1037,7 +1037,7 @@ func (n *Want) addToParameterHistory(paramName string, paramValue interface{}, p
 	fmt.Printf("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
 		n.Metadata.Name, paramName, previousValue, paramValue)
 }
-func (n *Want) GetParameter(paramName string) (interface{}, bool) {
+func (n *Want) GetParameter(paramName string) (any, bool) {
 	if n.Spec.Params == nil {
 		return nil, false
 	}
@@ -1065,21 +1065,21 @@ func (n *Want) migrateAgentHistoryFromState() {
 		}
 	}
 }
-func (n *Want) getStateUnsafe(key string) (interface{}, bool) {
+func (n *Want) getStateUnsafe(key string) (any, bool) {
 	if n.State == nil {
 		return nil, false
 	}
 	value, exists := n.State[key]
 	return value, exists
 }
-func (n *Want) GetAllState() map[string]interface{} {
+func (n *Want) GetAllState() map[string]any {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
 
 	if n.State == nil {
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
-	stateCopy := make(map[string]interface{})
+	stateCopy := make(map[string]any)
 	for k, v := range n.State {
 		stateCopy[k] = v
 	}
@@ -1093,7 +1093,7 @@ func (n *Want) GetStopChannel() chan struct{} {
 }
 
 // OnProcessEnd handles state storage when the want process ends
-func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
+func (n *Want) OnProcessEnd(finalState map[string]any) {
 	n.SetStatus(WantStatusAchieved)
 	for key, value := range finalState {
 		n.StoreState(key, value)
@@ -1122,7 +1122,7 @@ func (n *Want) OnProcessEnd(finalState map[string]interface{}) {
 }
 
 // OnProcessFail handles state storage when the want process fails
-func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
+func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	n.SetStatus(WantStatusFailed)
 	for key, value := range errorState {
 		n.StoreState(key, value)
@@ -1150,7 +1150,7 @@ func (n *Want) OnProcessFail(errorState map[string]interface{}, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
-func (n *Want) Provide(packet interface{}) error {
+func (n *Want) Provide(packet any) error {
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
@@ -1300,7 +1300,7 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
 	n.Status = WantStatusIdle
-	n.State = make(map[string]interface{})
+	n.State = make(map[string]any)
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 }
@@ -1345,7 +1345,7 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 //   count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
 	if n.State == nil {
-		n.State = make(map[string]interface{})
+		n.State = make(map[string]any)
 	}
 
 	var newValue int
@@ -1361,7 +1361,7 @@ func (n *Want) IncrementIntState(key string) int {
 
 	n.State[key] = newValue
 	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]interface{})
+		n.pendingStateChanges = make(map[string]any)
 	}
 	n.pendingStateChanges[key] = newValue
 
@@ -1425,7 +1425,7 @@ func (n *Want) emitOwnerCompletionEventIfOwned() {
 //   if ok {
 //       fmt.Printf("Received data from channel %d: %v\n", index, data)
 //   }
-func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
+func (n *Want) Use(timeoutMilliseconds int) (int, any, bool) {
 	// 1. Check internal cache first (filled by UnusedExists)
 	n.cacheMutex.Lock()
 	if n.cachedPacket != nil {
@@ -1514,7 +1514,7 @@ func (n *Want) Use(timeoutMilliseconds int) (int, interface{}, bool) {
 //   } else {
 //       // All input channels are closed
 //   }
-func (n *Want) UseForever() (int, interface{}, bool) {
+func (n *Want) UseForever() (int, any, bool) {
 	return n.Use(-1)
 }
 
@@ -1542,20 +1542,20 @@ func (n *Want) IncrementIntStateValue(key string, defaultStart int) int {
 
 // AppendToStateArray safely appends a value to a state array
 // If the state doesn't exist, creates a new array
-func (n *Want) AppendToStateArray(key string, value interface{}) error {
+func (n *Want) AppendToStateArray(key string, value any) error {
 	stateVal, exists := n.GetState(key)
-	var array []interface{}
+	var array []any
 
 	if exists {
 		if arr, ok := AsArray(stateVal); ok {
 			array = arr
 		} else {
 			// State exists but is not an array, create new array
-			array = []interface{}{}
+			array = []any{}
 		}
 	} else {
 		// State doesn't exist, create new array
-		array = []interface{}{}
+		array = []any{}
 	}
 
 	array = append(array, value)
@@ -1601,7 +1601,7 @@ func (n *Want) FindRunningAgentHistory(agentName string) (*AgentExecution, int, 
 
 // GetStateArrayElement safely gets an array element from state
 // Returns the element or nil if not found or state is not an array
-func (n *Want) GetStateArrayElement(key string, index int) interface{} {
+func (n *Want) GetStateArrayElement(key string, index int) any {
 	stateVal, exists := n.GetState(key)
 	if !exists {
 		return nil

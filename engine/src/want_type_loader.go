@@ -39,11 +39,11 @@ type WantTypeMetadata struct {
 type ParameterDef struct {
 	Name        string           `json:"name" yaml:"name"`
 	Description string           `json:"description" yaml:"description"`
-	Type        string           `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]interface{}
-	Default     interface{}      `json:"default,omitempty" yaml:"default,omitempty"`
+	Type        string           `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
+	Default     any      `json:"default,omitempty" yaml:"default,omitempty"`
 	Required    bool             `json:"required" yaml:"required"`
 	Validation  ValidationRules  `json:"validation,omitempty" yaml:"validation,omitempty"`
-	Example     interface{}      `json:"example,omitempty" yaml:"example,omitempty"`
+	Example     any      `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ValidationRules defines validation constraints for parameters
@@ -51,7 +51,7 @@ type ValidationRules struct {
 	Min     *float64      `json:"min,omitempty" yaml:"min,omitempty"`
 	Max     *float64      `json:"max,omitempty" yaml:"max,omitempty"`
 	Pattern string        `json:"pattern,omitempty" yaml:"pattern,omitempty"`
-	Enum    []interface{} `json:"enum,omitempty" yaml:"enum,omitempty"`
+	Enum    []any `json:"enum,omitempty" yaml:"enum,omitempty"`
 }
 
 // StateDef defines a state key for a want type
@@ -60,7 +60,7 @@ type StateDef struct {
 	Description string      `json:"description" yaml:"description"`
 	Type        string      `json:"type" yaml:"type"`
 	Persistent  bool        `json:"persistent" yaml:"persistent"`
-	Example     interface{} `json:"example,omitempty" yaml:"example,omitempty"`
+	Example     any `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ConnectivityDef defines input/output patterns for a want type
@@ -97,7 +97,7 @@ type ConstraintDef struct {
 type ExampleDef struct {
 	Name             string                 `json:"name" yaml:"name"`
 	Description      string                 `json:"description" yaml:"description"`
-	Want             map[string]interface{} `json:"want" yaml:"want"`             // Full want configuration (metadata + spec)
+	Want             map[string]any `json:"want" yaml:"want"`             // Full want configuration (metadata + spec)
 	ExpectedBehavior string                 `json:"expectedBehavior" yaml:"expectedBehavior"`
 }
 
@@ -342,11 +342,11 @@ func (w *WantTypeLoader) GetPatterns() []string {
 
 	return w.validPatterns
 }
-func (w *WantTypeLoader) GetStats() map[string]interface{} {
+func (w *WantTypeLoader) GetStats() map[string]any {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	stats := map[string]interface{}{
+	stats := map[string]any{
 		"total":            len(w.definitions),
 		"categories":       len(w.validCategories),
 		"patterns":         len(w.validPatterns),
@@ -368,7 +368,7 @@ func (w *WantTypeLoader) GetStats() map[string]interface{} {
 
 	return stats
 }
-func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[string]interface{}) error {
+func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[string]any) error {
 	def := w.GetDefinition(typeName)
 	if def == nil {
 		return fmt.Errorf("unknown want type: %s", typeName)
@@ -406,7 +406,7 @@ func LoadWantTypeDefinition(yamlPath string) (*WantTypeDefinition, error) {
 	}
 
 	// Parse the YAML structure
-	var data map[string]interface{}
+	var data map[string]any
 	err = yaml.Unmarshal(content, &data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse YAML from %s: %w", yamlPath, err)

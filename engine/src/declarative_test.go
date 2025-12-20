@@ -8,8 +8,8 @@ import (
 func TestWantStateManagement(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
-		Spec:     WantSpec{Params: make(map[string]interface{})},
-		State:    make(map[string]interface{}),
+		Spec:     WantSpec{Params: make(map[string]any)},
+		State:    make(map[string]any),
 	}
 
 	// Test storing state
@@ -27,7 +27,7 @@ func TestWantStateManagement(t *testing.T) {
 func TestWantParameterManagement(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
-		Spec:     WantSpec{Params: make(map[string]interface{})},
+		Spec:     WantSpec{Params: make(map[string]any)},
 	}
 
 	// Test updating parameters
@@ -45,7 +45,7 @@ func TestWantParameterManagement(t *testing.T) {
 func TestWantStatus(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
-		Spec:     WantSpec{Params: make(map[string]interface{})},
+		Spec:     WantSpec{Params: make(map[string]any)},
 	}
 
 	// Test initial status
@@ -63,8 +63,8 @@ func TestWantStatus(t *testing.T) {
 func TestWantExecCycle(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
-		Spec:     WantSpec{Params: make(map[string]interface{})},
-		State:    make(map[string]interface{}),
+		Spec:     WantSpec{Params: make(map[string]any)},
+		State:    make(map[string]any),
 	}
 
 	// Test exec cycle batching
@@ -103,7 +103,7 @@ func TestConfigValidation(t *testing.T) {
 				Wants: []*Want{
 					{
 						Metadata: Metadata{Name: "test", Type: "test"},
-						Spec:     WantSpec{Params: make(map[string]interface{})},
+						Spec:     WantSpec{Params: make(map[string]any)},
 					},
 				},
 			},
@@ -133,7 +133,7 @@ func TestChainBuilderCreation(t *testing.T) {
 		Wants: []*Want{
 			{
 				Metadata: Metadata{Name: "test", Type: "test"},
-				Spec:     WantSpec{Params: make(map[string]interface{})},
+				Spec:     WantSpec{Params: make(map[string]any)},
 			},
 		},
 	}
@@ -158,7 +158,7 @@ func TestWantLabels(t *testing.T) {
 				"category": "queue",
 			},
 		},
-		Spec: WantSpec{Params: make(map[string]interface{})},
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 
 	// Test label access
@@ -177,7 +177,7 @@ func TestMemoryDumpStructure(t *testing.T) {
 		Wants: []*Want{
 			{
 				Metadata: Metadata{Name: "test", Type: "test"},
-				Spec:     WantSpec{Params: make(map[string]interface{})},
+				Spec:     WantSpec{Params: make(map[string]any)},
 			},
 		},
 	}

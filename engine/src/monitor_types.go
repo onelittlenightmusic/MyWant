@@ -10,7 +10,7 @@ import (
 // MonitorWant - Example of a want that processes notifications and provides alerting
 type MonitorWant struct {
 	*BaseNotifiableWant
-	AlertThresholds map[string]interface{}
+	AlertThresholds map[string]any
 	AlertActions    []string
 	Alerts          []AlertRecord
 }
@@ -20,8 +20,8 @@ type AlertRecord struct {
 	Timestamp  time.Time   `json:"timestamp"`
 	SourceWant string      `json:"sourceWant"`
 	StateKey   string      `json:"stateKey"`
-	Value      interface{} `json:"value"`
-	Threshold  interface{} `json:"threshold"`
+	Value      any `json:"value"`
+	Threshold  any `json:"threshold"`
 	AlertType  string      `json:"alertType"`
 	Message    string      `json:"message"`
 }
@@ -32,14 +32,14 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 		Metadata: metadata,
 		Spec:     spec,
 		Status:   WantStatusIdle,
-		State:    make(map[string]interface{}),
+		State:    make(map[string]any),
 	}
 
 	baseWant := NewBaseNotifiableWant(want, 200) // Larger buffer for monitor
 
 	monitor := &MonitorWant{
 		BaseNotifiableWant: baseWant,
-		AlertThresholds:    make(map[string]interface{}),
+		AlertThresholds:    make(map[string]any),
 		AlertActions:       make([]string, 0),
 		Alerts:             make([]AlertRecord, 0),
 	}
@@ -143,7 +143,7 @@ func (mw *MonitorWant) handleNotification(notification StateNotification) {
 }
 
 // shouldAlert determines if an alert should be triggered
-func (mw *MonitorWant) shouldAlert(value interface{}, threshold interface{}) bool {
+func (mw *MonitorWant) shouldAlert(value any, threshold any) bool {
 	valueFloat, valueOk := AsFloat(value)
 	thresholdFloat, thresholdOk := AsFloat(threshold)
 
@@ -156,7 +156,7 @@ func (mw *MonitorWant) shouldAlert(value interface{}, threshold interface{}) boo
 }
 
 // triggerAlert creates and stores an alert
-func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold interface{}) {
+func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold any) {
 	alert := AlertRecord{
 		Timestamp:  time.Now(),
 		SourceWant: notification.SourceWantName,

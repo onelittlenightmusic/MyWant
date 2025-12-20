@@ -37,7 +37,7 @@ type ErrorHistoryEntry struct {
 	Details     string      `json:"details,omitempty"`
 	Endpoint    string      `json:"endpoint"`
 	Method      string      `json:"method"`
-	RequestData interface{} `json:"request_data,omitempty"`
+	RequestData any `json:"request_data,omitempty"`
 	UserAgent   string      `json:"user_agent,omitempty"`
 	Resolved    bool        `json:"resolved"`
 	Notes       string      `json:"notes,omitempty"`
@@ -61,7 +61,7 @@ type WantExecution struct {
 	ID      string                 `json:"id"`
 	Config  mywant.Config          `json:"config"` // Changed from pointer
 	Status  string                 `json:"status"` // "running", "completed", "failed"
-	Results map[string]interface{} `json:"results,omitempty"`
+	Results map[string]any `json:"results,omitempty"`
 	Builder *mywant.ChainBuilder   `json:"-"` // Don't serialize builder
 }
 
@@ -71,7 +71,7 @@ type WantResponseWithGroupedAgents struct {
 	Spec     mywant.WantSpec        `json:"spec"`
 	Status   mywant.WantStatus      `json:"status"`
 	History  mywant.WantHistory     `json:"history"`
-	State    map[string]interface{} `json:"state"`
+	State    map[string]any `json:"state"`
 }
 
 // LLMRequest represents a request to the LLM inference API
@@ -109,7 +109,7 @@ type OllamaResponse struct {
 	EvalCount          int    `json:"eval_count,omitempty"`
 	EvalDuration       int64  `json:"eval_duration,omitempty"`
 }
-func buildWantResponse(want *mywant.Want, groupBy string) interface{} {
+func buildWantResponse(want *mywant.Want, groupBy string) any {
 	response := &WantResponseWithGroupedAgents{
 		Metadata: want.Metadata,
 		Spec:     want.Spec,
@@ -402,7 +402,7 @@ func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	s.wants[configID] = execution
 	w.WriteHeader(http.StatusCreated)
-	response := map[string]interface{}{
+	response := map[string]any{
 		"id":      configID,
 		"status":  "completed",
 		"wants":   len(config.Wants),
@@ -589,7 +589,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"id":       executionID,
 		"status":   execution.Status,
 		"wants":    wantCount,
@@ -615,7 +615,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				Spec:     want.Spec,
 				Status:   want.GetStatus(),
 				History:  want.History,
-				State:    make(map[string]interface{}),
+				State:    make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
@@ -634,7 +634,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				Spec:     want.Spec,
 				Status:   want.GetStatus(),
 				History:  want.History,
-				State:    make(map[string]interface{}),
+				State:    make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
@@ -647,7 +647,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	for _, want := range wantsByID {
 		allWants = append(allWants, want)
 	}
-	response := map[string]interface{}{
+	response := map[string]any{
 		"timestamp":    time.Now().Format(time.RFC3339),
 		"execution_id": fmt.Sprintf("api-dump-%d", time.Now().Unix()),
 		"wants":        allWants,
@@ -671,7 +671,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					Spec:     want.Spec,
 					Status:   want.GetStatus(),
 					History:  want.History,
-					State:    make(map[string]interface{}),
+					State:    make(map[string]any),
 				}
 				currentState := want.GetAllState()
 				for k, v := range currentState {
@@ -698,7 +698,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				Spec:     want.Spec,
 				Status:   want.GetStatus(),
 				History:  want.History,
-				State:    make(map[string]interface{}),
+				State:    make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
@@ -947,7 +947,7 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Found the want, return its status
-				status := map[string]interface{}{
+				status := map[string]any{
 					"id":     want.Metadata.ID,
 					"status": string(want.GetStatus()),
 				}
@@ -961,7 +961,7 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Found the want, return its status
-			status := map[string]interface{}{
+			status := map[string]any{
 				"id":     want.Metadata.ID,
 				"status": string(want.GetStatus()),
 			}
@@ -984,9 +984,9 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Found the want, return its results (stored in State)
 				if want.State == nil {
-					want.State = make(map[string]interface{})
+					want.State = make(map[string]any)
 				}
-				results := map[string]interface{}{
+				results := map[string]any{
 					"data": want.GetAllState(),
 				}
 				json.NewEncoder(w).Encode(results)
@@ -999,7 +999,7 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Found the want, return its results (stored in State)
-			results := map[string]interface{}{
+			results := map[string]any{
 				"data": want.GetAllState(),
 			}
 			json.NewEncoder(w).Encode(results)
@@ -1013,7 +1013,7 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 // healthCheck handles GET /health - server health check
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	health := map[string]interface{}{
+	health := map[string]any{
 		"status":  "healthy",
 		"wants":   len(s.wants),
 		"version": "1.0.0",
@@ -1065,7 +1065,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	s.agentRegistry.RegisterAgent(agent)
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"name":         agent.GetName(),
 		"type":         agent.GetType(),
 		"capabilities": agent.GetCapabilities(),
@@ -1077,9 +1077,9 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	agents := s.agentRegistry.GetAllAgents()
-	agentResponses := make([]map[string]interface{}, len(agents))
+	agentResponses := make([]map[string]any, len(agents))
 	for i, agent := range agents {
-		agentResponses[i] = map[string]interface{}{
+		agentResponses[i] = map[string]any{
 			"name":         agent.GetName(),
 			"type":         agent.GetType(),
 			"capabilities": agent.GetCapabilities(),
@@ -1087,7 +1087,7 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"agents": agentResponses,
 	}
 
@@ -1105,7 +1105,7 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"name":         agent.GetName(),
 		"type":         agent.GetType(),
 		"capabilities": agent.GetCapabilities(),
@@ -1149,7 +1149,7 @@ func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	capabilities := s.agentRegistry.GetAllCapabilities()
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"capabilities": capabilities,
 	}
 
@@ -1191,9 +1191,9 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	if agents == nil {
 		agents = make([]mywant.Agent, 0)
 	}
-	agentResponses := make([]map[string]interface{}, len(agents))
+	agentResponses := make([]map[string]any, len(agents))
 	for i, agent := range agents {
-		agentResponses[i] = map[string]interface{}{
+		agentResponses[i] = map[string]any{
 			"name":         agent.GetName(),
 			"type":         agent.GetType(),
 			"capabilities": agent.GetCapabilities(),
@@ -1201,7 +1201,7 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"capability": capabilityName,
 		"agents":     agentResponses,
 	}
@@ -1229,7 +1229,7 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-				response := map[string]interface{}{
+				response := map[string]any{
 					"message":   "Want execution suspended successfully",
 					"wantId":    wantID,
 					"suspended": true,
@@ -1252,7 +1252,7 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			response := map[string]interface{}{
+			response := map[string]any{
 				"message":   "Want execution suspended successfully",
 				"wantId":    wantID,
 				"suspended": true,
@@ -1290,7 +1290,7 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-				response := map[string]interface{}{
+				response := map[string]any{
 					"message":   "Want execution resumed successfully",
 					"wantId":    wantID,
 					"suspended": false,
@@ -1313,7 +1313,7 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			response := map[string]interface{}{
+			response := map[string]any{
 				"message":   "Want execution resumed successfully",
 				"wantId":    wantID,
 				"suspended": false,
@@ -1351,7 +1351,7 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-				response := map[string]interface{}{
+				response := map[string]any{
 					"message":   "Want execution stopped successfully",
 					"wantId":    wantID,
 					"status":    "stopped",
@@ -1374,7 +1374,7 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			response := map[string]interface{}{
+			response := map[string]any{
 				"message":   "Want execution stopped successfully",
 				"wantId":    wantID,
 				"status":    "stopped",
@@ -1412,7 +1412,7 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 					})
 					return
 				}
-				response := map[string]interface{}{
+				response := map[string]any{
 					"message":   "Want execution restarted successfully",
 					"wantId":    wantID,
 					"status":    "running",
@@ -1435,7 +1435,7 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 				})
 				return
 			}
-			response := map[string]interface{}{
+			response := map[string]any{
 				"message":   "Want execution restarted successfully",
 				"wantId":    wantID,
 				"status":    "running",
@@ -1505,7 +1505,7 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Label added successfully",
 		"wantId":    wantID,
 		"key":       labelReq.Key,
@@ -1553,7 +1553,7 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Label removed successfully",
 		"wantId":    wantID,
 		"key":       keyToRemove,
@@ -1628,7 +1628,7 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Using dependency added successfully",
 		"wantId":    wantID,
 		"key":       usingReq.Key,
@@ -1696,7 +1696,7 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Using dependency removed successfully",
 		"wantId":    wantID,
 		"key":       keyToRemove,
@@ -1777,7 +1777,7 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 				Type: wantType,
 			},
 			Spec: mywant.WantSpec{
-				Params: make(map[string]interface{}),
+				Params: make(map[string]any),
 			},
 		}
 
@@ -1811,7 +1811,7 @@ func (s *Server) validateWantSpec(config mywant.Config) error {
 // ======= ERROR HISTORY HANDLERS =======
 
 // logError adds an error to the error history
-func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData interface{}) {
+func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData any) {
 	errorID := generateErrorID()
 
 	entry := ErrorHistoryEntry{
@@ -1837,7 +1837,7 @@ func (s *Server) logError(r *http.Request, status int, message, errorType, detai
 }
 
 // httpErrorWithLogging handles HTTP errors and logs them to error history
-func (s *Server) httpErrorWithLogging(w http.ResponseWriter, r *http.Request, status int, message, errorType string, requestData interface{}) {
+func (s *Server) httpErrorWithLogging(w http.ResponseWriter, r *http.Request, status int, message, errorType string, requestData any) {
 	// Log the error to history
 	s.logError(r, status, message, errorType, "", requestData)
 	http.Error(w, message, status)
@@ -1854,7 +1854,7 @@ func (s *Server) listErrorHistory(w http.ResponseWriter, r *http.Request) {
 		return sortedErrors[i].Timestamp > sortedErrors[j].Timestamp
 	})
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"errors": sortedErrors,
 		"total":  len(sortedErrors),
 	}
@@ -2133,7 +2133,7 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"wantTypes": items,
 		"count":     len(items),
 	})
@@ -2320,7 +2320,7 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		}
 		values[key] = valueInfos
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"labelKeys":   keys,
 		"labelValues": values,
 		"count":       len(keys),
@@ -2352,7 +2352,7 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	}
 	s.globalLabels[labelReq.Key][labelReq.Value] = true
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"key":     labelReq.Key,
 		"value":   labelReq.Value,
 		"message": "Label registered successfully",
@@ -2418,7 +2418,7 @@ func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"name":     name,
 		"examples": def.Examples,
 	})

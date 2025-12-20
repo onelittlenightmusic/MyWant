@@ -24,8 +24,8 @@ type StateNotification struct {
 	SourceWantName   string           `json:"sourceWantName"`
 	TargetWantName   string           `json:"targetWantName"`
 	StateKey         string           `json:"stateKey"`
-	StateValue       interface{}      `json:"stateValue"`
-	PreviousValue    interface{}      `json:"previousValue,omitempty"`
+	StateValue       any      `json:"stateValue"`
+	PreviousValue    any      `json:"previousValue,omitempty"`
 	Timestamp        time.Time        `json:"timestamp"`
 	NotificationType NotificationType `json:"notificationType"`
 }
@@ -58,7 +58,7 @@ type NotificationFilter struct {
 // StateHistoryEntry represents a state change entry in the generic history system
 type StateHistoryEntry struct {
 	WantName   string      `json:"wantName" yaml:"want_name"`
-	StateValue interface{} `json:"stateValue" yaml:"state_value"`
+	StateValue any `json:"stateValue" yaml:"state_value"`
 	Timestamp  time.Time   `json:"timestamp" yaml:"timestamp"`
 }
 
@@ -66,7 +66,7 @@ type StateHistoryEntry struct {
 type ParameterUpdate struct {
 	WantName   string      `json:"want_name"`
 	ParamName  string      `json:"param_name"`
-	ParamValue interface{} `json:"param_value"`
+	ParamValue any `json:"param_value"`
 	Timestamp  time.Time   `json:"timestamp"`
 }
 
@@ -94,7 +94,7 @@ type ChainFunction interface {
 // Packet interface for all packet types in the system
 type Packet interface {
 	IsEnded() bool
-	GetData() interface{}
+	GetData() any
 	SetEnded(bool)
 }
 
@@ -106,12 +106,12 @@ type PacketHandler interface {
 // BasePacket provides common packet functionality
 type BasePacket struct {
 	ended bool
-	data  interface{}
+	data  any
 }
 
 func (p *BasePacket) IsEnded() bool        { return p.ended }
 func (p *BasePacket) SetEnded(ended bool)  { p.ended = ended }
-func (p *BasePacket) GetData() interface{} { return p.data }
+func (p *BasePacket) GetData() any { return p.data }
 
 // Progressable represents a want that can execute directly
 type Progressable interface {

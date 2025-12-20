@@ -70,7 +70,7 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	if capabilitySchemaRef == nil {
 		return fmt.Errorf("CapabilityConfig schema not found in agent OpenAPI spec")
 	}
-	var yamlContent interface{}
+	var yamlContent any
 	if err := yaml.Unmarshal(yamlData, &yamlContent); err != nil {
 		return fmt.Errorf("failed to parse capability YAML: %w", err)
 	}
@@ -83,7 +83,7 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	InfoLog("[VALIDATION] Capability '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
-func validateCapabilityStructure(content interface{}) error {
+func validateCapabilityStructure(content any) error {
 	contentObj, ok := AsMap(content)
 	if !ok {
 		return fmt.Errorf("capability content must be an object")
@@ -184,7 +184,7 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 	if agentSchemaRef == nil {
 		return fmt.Errorf("AgentConfig schema not found in agent OpenAPI spec")
 	}
-	var yamlContent interface{}
+	var yamlContent any
 	if err := yaml.Unmarshal(yamlData, &yamlContent); err != nil {
 		return fmt.Errorf("failed to parse agent YAML: %w", err)
 	}
@@ -197,7 +197,7 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 	InfoLog("[VALIDATION] Agent '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
-func validateAgentStructure(content interface{}) error {
+func validateAgentStructure(content any) error {
 	contentObj, ok := AsMap(content)
 	if !ok {
 		return fmt.Errorf("agent content must be an object")

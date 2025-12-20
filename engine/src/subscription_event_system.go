@@ -98,23 +98,23 @@ func (e *BaseEvent) GetPriority() int        { return e.Priority }
 type StateChangeEvent struct {
 	BaseEvent
 	StateKey      string
-	StateValue    interface{}
-	PreviousValue interface{}
+	StateValue    any
+	PreviousValue any
 }
 
 // ParameterChangeEvent represents a parameter change notification (Group A)
 type ParameterChangeEvent struct {
 	BaseEvent
 	ParamName     string
-	ParamValue    interface{}
-	PreviousValue interface{}
+	ParamValue    any
+	PreviousValue any
 }
 
 // OwnerChildStateEvent represents child->parent state notification (Group A)
 type OwnerChildStateEvent struct {
 	BaseEvent
 	StateKey   string
-	StateValue interface{}
+	StateValue any
 }
 
 // OwnerCompletionEvent represents child completion notification to parent (Group C)
@@ -126,18 +126,18 @@ type OwnerCompletionEvent struct {
 // PreExecutionEvent represents pre-execution control event (Group B)
 type PreExecutionEvent struct {
 	BaseEvent
-	ExecutionContext map[string]interface{}
+	ExecutionContext map[string]any
 }
 
 // MonitorAgentEvent represents agent monitoring event (Group B)
 type MonitorAgentEvent struct {
 	BaseEvent
 	AgentName   string
-	MonitorData map[string]interface{}
+	MonitorData map[string]any
 }
 type ProcessEndEvent struct {
 	BaseEvent
-	FinalState map[string]interface{}
+	FinalState map[string]any
 	Success    bool
 }
 

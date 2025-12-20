@@ -245,23 +245,23 @@ func (n *Want) StopAgent(agentName string) {
 }
 
 // StageStateChange stages state changes for later commit (used by agents) Can be called with either:
-// 1. Single key-value: StageStateChange("key", "value") 2. Object with multiple pairs: StageStateChange(map[string]interface{}{"key1": "value1", "key2": "value2"})
-func (n *Want) StageStateChange(keyOrObject interface{}, value ...interface{}) error {
+// 1. Single key-value: StageStateChange("key", "value") 2. Object with multiple pairs: StageStateChange(map[string]any{"key1": "value1", "key2": "value2"})
+func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
 	n.agentStateMutex.Lock()
 	defer n.agentStateMutex.Unlock()
 
 	if n.agentStateChanges == nil {
-		n.agentStateChanges = make(map[string]interface{})
+		n.agentStateChanges = make(map[string]any)
 	}
 	if len(value) == 0 {
-		if stateObject, ok := keyOrObject.(map[string]interface{}); ok {
+		if stateObject, ok := keyOrObject.(map[string]any); ok {
 			for k, v := range stateObject {
 				n.agentStateChanges[k] = v
 			}
 			return nil
 		}
 		// Invalid usage - no value provided and not a map
-		return fmt.Errorf("StageStateChange: when called with single argument, it must be map[string]interface{}")
+		return fmt.Errorf("StageStateChange: when called with single argument, it must be map[string]any")
 	}
 	if len(value) == 1 {
 		if key, ok := keyOrObject.(string); ok {
@@ -284,14 +284,14 @@ func (n *Want) CommitStateChanges() {
 		n.agentStateMutex.Unlock()
 		return
 	}
-	changesCopy := make(map[string]interface{})
+	changesCopy := make(map[string]any)
 	for k, v := range n.agentStateChanges {
 		changesCopy[k] = v
 	}
 	changeCount := len(n.agentStateChanges)
 
 	// Clear staged changes while holding the lock
-	n.agentStateChanges = make(map[string]interface{})
+	n.agentStateChanges = make(map[string]any)
 	n.agentStateMutex.Unlock()
 
 	// Step 2: Apply changes to State using encapsulated method
@@ -314,15 +314,15 @@ func (n *Want) CommitStateChanges() {
 	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
 		changeCount, n.Metadata.Name)
 }
-func (n *Want) GetStagedChanges() map[string]interface{} {
+func (n *Want) GetStagedChanges() map[string]any {
 	n.agentStateMutex.RLock()
 	defer n.agentStateMutex.Unlock()
 
 	if n.agentStateChanges == nil {
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
 
-	staged := make(map[string]interface{})
+	staged := make(map[string]any)
 	for k, v := range n.agentStateChanges {
 		staged[k] = v
 	}

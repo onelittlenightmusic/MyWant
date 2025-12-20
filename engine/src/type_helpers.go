@@ -3,9 +3,9 @@ package mywant
 // Type conversion helper functions to reduce code duplication
 // These functions provide safe type assertions with fallback logic
 
-// AsInt safely converts interface{} to int
+// AsInt safely converts any to int
 // Handles int and float64 types, returns (value, ok)
-func AsInt(value interface{}) (int, bool) {
+func AsInt(value any) (int, bool) {
 	if intVal, ok := value.(int); ok {
 		return intVal, true
 	}
@@ -15,9 +15,9 @@ func AsInt(value interface{}) (int, bool) {
 	return 0, false
 }
 
-// AsFloat safely converts interface{} to float64
+// AsFloat safely converts any to float64
 // Handles float64 and int types, returns (value, ok)
-func AsFloat(value interface{}) (float64, bool) {
+func AsFloat(value any) (float64, bool) {
 	if floatVal, ok := value.(float64); ok {
 		return floatVal, true
 	}
@@ -27,72 +27,72 @@ func AsFloat(value interface{}) (float64, bool) {
 	return 0, false
 }
 
-// AsString safely converts interface{} to string
+// AsString safely converts any to string
 // Handles string type only, returns (value, ok)
-func AsString(value interface{}) (string, bool) {
+func AsString(value any) (string, bool) {
 	if strVal, ok := value.(string); ok {
 		return strVal, true
 	}
 	return "", false
 }
 
-// AsBool safely converts interface{} to bool
+// AsBool safely converts any to bool
 // Handles bool type only, returns (value, ok)
-func AsBool(value interface{}) (bool, bool) {
+func AsBool(value any) (bool, bool) {
 	if boolVal, ok := value.(bool); ok {
 		return boolVal, true
 	}
 	return false, false
 }
 
-// AsMap safely converts interface{} to map[string]interface{}
+// AsMap safely converts any to map[string]any
 // Returns (value, ok)
-func AsMap(value interface{}) (map[string]interface{}, bool) {
-	if mapVal, ok := value.(map[string]interface{}); ok {
+func AsMap(value any) (map[string]any, bool) {
+	if mapVal, ok := value.(map[string]any); ok {
 		return mapVal, true
 	}
 	return nil, false
 }
 
-// AsArray safely converts interface{} to []interface{}
+// AsArray safely converts any to []any
 // Returns (value, ok)
-func AsArray(value interface{}) ([]interface{}, bool) {
-	if arrayVal, ok := value.([]interface{}); ok {
+func AsArray(value any) ([]any, bool) {
+	if arrayVal, ok := value.([]any); ok {
 		return arrayVal, true
 	}
 	return nil, false
 }
 
-// AsIntWithDefault safely converts interface{} to int with a default value
+// AsIntWithDefault safely converts any to int with a default value
 // Returns the converted value or the default if conversion fails
-func AsIntWithDefault(value interface{}, defaultValue int) int {
+func AsIntWithDefault(value any, defaultValue int) int {
 	if intVal, ok := AsInt(value); ok {
 		return intVal
 	}
 	return defaultValue
 }
 
-// AsFloatWithDefault safely converts interface{} to float64 with a default value
+// AsFloatWithDefault safely converts any to float64 with a default value
 // Returns the converted value or the default if conversion fails
-func AsFloatWithDefault(value interface{}, defaultValue float64) float64 {
+func AsFloatWithDefault(value any, defaultValue float64) float64 {
 	if floatVal, ok := AsFloat(value); ok {
 		return floatVal
 	}
 	return defaultValue
 }
 
-// AsStringWithDefault safely converts interface{} to string with a default value
+// AsStringWithDefault safely converts any to string with a default value
 // Returns the converted value or the default if conversion fails
-func AsStringWithDefault(value interface{}, defaultValue string) string {
+func AsStringWithDefault(value any, defaultValue string) string {
 	if strVal, ok := AsString(value); ok {
 		return strVal
 	}
 	return defaultValue
 }
 
-// AsBoolWithDefault safely converts interface{} to bool with a default value
+// AsBoolWithDefault safely converts any to bool with a default value
 // Returns the converted value or the default if conversion fails
-func AsBoolWithDefault(value interface{}, defaultValue bool) bool {
+func AsBoolWithDefault(value any, defaultValue bool) bool {
 	if boolVal, ok := AsBool(value); ok {
 		return boolVal
 	}

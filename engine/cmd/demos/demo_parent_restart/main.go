@@ -22,7 +22,7 @@ func main() {
                     },
                 },
                 Spec: mywant.WantSpec{
-                    Params: map[string]interface{}{
+                    Params: map[string]any{
                         "max_display":  100,
                         "count":        50,
                         "rate":         10.0,
@@ -30,7 +30,7 @@ func main() {
                     },
                 },
                 Status: mywant.WantStatusIdle,
-                State:  make(map[string]interface{}),
+                State:  make(map[string]any),
             },
         },
     }

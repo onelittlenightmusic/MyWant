@@ -17,7 +17,7 @@ type CustomTargetTypeConfig struct {
 	Name             string                 // "wait time in queue system"
 	Description      string                 // Human description
 	DefaultRecipe    string                 // Default recipe path
-	DefaultParams    map[string]interface{} // Default parameters
+	DefaultParams    map[string]any // Default parameters
 	CreateTargetFunc func(metadata Metadata, spec WantSpec) *Target
 }
 
@@ -170,7 +170,7 @@ func NewQueueSystemTarget(metadata Metadata, spec WantSpec) *Target {
 
 	// Merge with queue system defaults
 	if baseSpec.Params == nil {
-		baseSpec.Params = make(map[string]interface{})
+		baseSpec.Params = make(map[string]any)
 	}
 	setDefaultParam(baseSpec.Params, "max_display", 200)
 	setDefaultParam(baseSpec.Params, "service_time", 0.1)
@@ -184,14 +184,14 @@ func NewQueueSystemTarget(metadata Metadata, spec WantSpec) *Target {
 }
 
 // Helper function to set default parameters
-func setDefaultParam(params map[string]interface{}, key string, defaultValue interface{}) {
+func setDefaultParam(params map[string]any, key string, defaultValue any) {
 	if _, exists := params[key]; !exists {
 		params[key] = defaultValue
 	}
 }
 
 // RegisterCustomTargetType dynamically registers a single custom target type
-func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, description, recipePath string, defaultParams map[string]interface{}) {
+func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, description, recipePath string, defaultParams map[string]any) {
 	registry.Register(CustomTargetTypeConfig{
 		Name:          typeName,
 		Description:   description,
@@ -200,7 +200,7 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 		CreateTargetFunc: func(metadata Metadata, spec WantSpec) *Target {
 			// Merge default params with provided params
 			if spec.Params == nil {
-				spec.Params = make(map[string]interface{})
+				spec.Params = make(map[string]any)
 			}
 			for key, value := range defaultParams {
 				setDefaultParam(spec.Params, key, value)

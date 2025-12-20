@@ -7,13 +7,13 @@ import (
 func TestRecipeParameterSubstitution(t *testing.T) {
 	loader := &RecipeLoader{}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"count": 100,
 		"rate":  10.5,
 		"name":  "test-prefix",
 	}
 
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"count":       "count",
 		"rate":        "rate",
 		"custom_name": "name",
@@ -44,13 +44,13 @@ func TestDRYWantInstantiation(t *testing.T) {
 		Labels: map[string]string{
 			"role": "generator",
 		},
-		Params: map[string]interface{}{
+		Params: map[string]any{
 			"count": "count",
 			"rate":  "rate",
 		},
 	}
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		"count": 1000,
 		"rate":  5.0,
 	}
@@ -105,17 +105,17 @@ func TestRecipeWantCreation(t *testing.T) {
 			Labels: map[string]string{"category": "processor"},
 		},
 		Spec: struct {
-			Params map[string]interface{} `yaml:"params"`
+			Params map[string]any `yaml:"params"`
 			Using  []map[string]string    `yaml:"using,omitempty"`
 		}{
-			Params: map[string]interface{}{
+			Params: map[string]any{
 				"service_time": "service_time",
 			},
 		},
 	}
 
 	loader := &RecipeLoader{}
-	params := map[string]interface{}{
+	params := map[string]any{
 		"service_time": 0.1,
 	}
 
@@ -140,7 +140,7 @@ func TestRecipeDefaults(t *testing.T) {
 
 	dryWant := DRYWantSpec{
 		Type:   "queue",
-		Params: map[string]interface{}{},
+		Params: map[string]any{},
 	}
 
 	defaults := &DRYRecipeDefaults{
@@ -152,15 +152,15 @@ func TestRecipeDefaults(t *testing.T) {
 			},
 		},
 		Spec: struct {
-			Params map[string]interface{} `yaml:"params,omitempty"`
+			Params map[string]any `yaml:"params,omitempty"`
 		}{
-			Params: map[string]interface{}{
+			Params: map[string]any{
 				"default_param": 42,
 			},
 		},
 	}
 
-	params := map[string]interface{}{}
+	params := map[string]any{}
 
 	want, err := loader.instantiateDRYWant(dryWant, defaults, params, "test", 1)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestEmptyRecipeHandling(t *testing.T) {
 	loader := &RecipeLoader{}
 
 	// Test with empty wants list
-	wants, err := loader.InstantiateRecipe("nonexistent", "test", map[string]interface{}{})
+	wants, err := loader.InstantiateRecipe("nonexistent", "test", map[string]any{})
 	if err == nil {
 		t.Error("Expected error for nonexistent recipe")
 	}
@@ -221,13 +221,13 @@ func TestParameterValidation(t *testing.T) {
 	loader := &RecipeLoader{}
 
 	// Test nil parameters map
-	resolved := loader.resolveParams(nil, map[string]interface{}{})
+	resolved := loader.resolveParams(nil, map[string]any{})
 	if resolved == nil {
 		t.Error("Should return empty map for nil input")
 	}
 
 	// Test empty parameters
-	resolved = loader.resolveParams(map[string]interface{}{}, map[string]interface{}{})
+	resolved = loader.resolveParams(map[string]any{}, map[string]any{})
 	if len(resolved) != 0 {
 		t.Error("Should return empty map for empty input")
 	}
@@ -240,7 +240,7 @@ func TestOwnerReferenceGeneration(t *testing.T) {
 		Type: "test",
 	}
 
-	want, err := loader.instantiateDRYWant(dryWant, nil, map[string]interface{}{}, "parent", 1)
+	want, err := loader.instantiateDRYWant(dryWant, nil, map[string]any{}, "parent", 1)
 	if err != nil {
 		t.Fatalf("Failed to instantiate want: %v", err)
 	}

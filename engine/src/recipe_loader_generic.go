@@ -19,7 +19,7 @@ type RecipeWant struct {
 	Name        string                 `yaml:"name,omitempty" json:"name,omitempty"`
 	Type        string                 `yaml:"type,omitempty" json:"type,omitempty"`
 	Labels      map[string]string      `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Params      map[string]interface{} `yaml:"params,omitempty" json:"params,omitempty"`
+	Params      map[string]any `yaml:"params,omitempty" json:"params,omitempty"`
 	Using       []map[string]string    `yaml:"using,omitempty" json:"using,omitempty"`
 	Requires    []string               `yaml:"requires,omitempty" json:"requires,omitempty"`
 	RecipeAgent bool                   `yaml:"recipeAgent,omitempty" json:"recipeAgent,omitempty"`
@@ -49,7 +49,7 @@ type RecipeExample struct {
 type RecipeContent struct {
 	Metadata   GenericRecipeMetadata  `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	Wants      []RecipeWant           `yaml:"wants,omitempty" json:"wants,omitempty"`
-	Parameters map[string]interface{} `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	Parameters map[string]any `yaml:"parameters,omitempty" json:"parameters,omitempty"`
 	Result     *RecipeResult          `yaml:"result,omitempty" json:"result,omitempty"`
 	Example    *RecipeExample         `yaml:"example,omitempty" json:"example,omitempty"`
 }
@@ -100,7 +100,7 @@ type GenericRecipeMetadata struct {
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
 	Config     Config
-	Parameters map[string]interface{}
+	Parameters map[string]any
 	Metadata   GenericRecipeMetadata
 	Result     *RecipeResult
 }
@@ -126,7 +126,7 @@ func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 }
 
 // LoadRecipe loads and processes a recipe file with OpenAPI spec validation
-func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]interface{}) (*GenericRecipeConfig, error) {
+func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig, error) {
 	// Read recipe file
 	data, err := ioutil.ReadFile(recipePath)
 	if err != nil {
@@ -145,7 +145,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	recipeContent := processedRecipe.Recipe
 
 	// Merge provided params with recipe defaults
-	mergedParams := make(map[string]interface{})
+	mergedParams := make(map[string]any)
 	for k, v := range recipeContent.Parameters {
 		mergedParams[k] = v
 	}
@@ -202,7 +202,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 }
 
 // LoadConfigFromRecipe loads configuration from any recipe type
-func (grl *GenericRecipeLoader) LoadConfigFromRecipe(recipePath string, params map[string]interface{}) (Config, error) {
+func (grl *GenericRecipeLoader) LoadConfigFromRecipe(recipePath string, params map[string]any) (Config, error) {
 	recipeConfig, err := grl.LoadRecipe(recipePath, params)
 	if err != nil {
 		return Config{}, err
@@ -216,10 +216,10 @@ func (grl *GenericRecipeLoader) ValidateRecipe(recipePath string) error {
 	}
 
 	// Try to load with empty parameters to validate structure
-	_, err := grl.LoadRecipe(recipePath, map[string]interface{}{})
+	_, err := grl.LoadRecipe(recipePath, map[string]any{})
 	return err
 }
-func (grl *GenericRecipeLoader) GetRecipeParameters(recipePath string) (map[string]interface{}, error) {
+func (grl *GenericRecipeLoader) GetRecipeParameters(recipePath string) (map[string]any, error) {
 	data, err := ioutil.ReadFile(recipePath)
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func (grl *GenericRecipeLoader) GetRecipeMetadata(recipePath string) (GenericRec
 }
 
 // LoadRecipeWithConfig loads a recipe using a config file that references the recipe
-func LoadRecipeWithConfig(configPath string) (Config, map[string]interface{}, error) {
+func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 	// Read config file
 	configData, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -282,7 +282,7 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]interface{}, er
 	var configFile struct {
 		Recipe struct {
 			Path       string                 `yaml:"path"`
-			Parameters map[string]interface{} `yaml:"parameters"`
+			Parameters map[string]any `yaml:"parameters"`
 		} `yaml:"recipe"`
 	}
 
@@ -323,18 +323,18 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 		}
 	}
 }
-func (grl *GenericRecipeLoader) ProcessRecipeString(recipeStr string, params map[string]interface{}) (string, error) {
+func (grl *GenericRecipeLoader) ProcessRecipeString(recipeStr string, params map[string]any) (string, error) {
 	// Simple parameter substitution - no longer uses Go templating
 	return recipeStr, nil
 }
 
 // New recipe functions with cleaner naming
-func LoadRecipe(recipePath string, params map[string]interface{}) (*GenericRecipeConfig, error) {
+func LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.LoadRecipe(recipePath, params)
 }
 
-func LoadConfigFromRecipe(recipePath string, params map[string]interface{}) (Config, error) {
+func LoadConfigFromRecipe(recipePath string, params map[string]any) (Config, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.LoadConfigFromRecipe(recipePath, params)
 }
@@ -344,7 +344,7 @@ func ValidateRecipe(recipePath string) error {
 	return loader.ValidateRecipe(recipePath)
 }
 
-func GetRecipeParameters(recipePath string) (map[string]interface{}, error) {
+func GetRecipeParameters(recipePath string) (map[string]any, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.GetRecipeParameters(recipePath)
 }
@@ -367,12 +367,12 @@ func GetRecipeResult(recipePath string) (*RecipeResult, error) {
 }
 
 // substituteParams performs parameter substitution in want params
-func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, mergedParams map[string]interface{}) map[string]interface{} {
+func (grl *GenericRecipeLoader) substituteParams(params map[string]any, mergedParams map[string]any) map[string]any {
 	if params == nil {
 		return nil
 	}
 
-	substituted := make(map[string]interface{})
+	substituted := make(map[string]any)
 	for key, value := range params {
 		if strValue, ok := value.(string); ok {
 			if paramValue, exists := mergedParams[strValue]; exists {
@@ -388,7 +388,7 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]interface{}, 
 }
 
 // autoConnect implements auto-connection logic for RecipeAgent wants NOTE: This is legacy recipe-level auto-connection. The real auto-connection happens system-wide during the connection phase in declarative.go
-func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, params map[string]interface{}) *Want {
+func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, params map[string]any) *Want {
 	// Recipe-level auto-connection is limited because it can only see wants within the same recipe System-wide auto-connection in declarative.go handles the full implementation
 	return want
 }
@@ -409,7 +409,7 @@ func validateRecipeWithSpec(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("recipe OpenAPI spec is invalid: %w", err)
 	}
-	var yamlObj interface{}
+	var yamlObj any
 	err = yaml.Unmarshal(yamlData, &yamlObj)
 	if err != nil {
 		return fmt.Errorf("failed to parse recipe YAML for validation: %w", err)
@@ -420,7 +420,7 @@ func validateRecipeWithSpec(yamlData []byte) error {
 	}
 
 	// Basic structural validation - ensure the YAML contains required 'recipe' field
-	var recipeObj map[string]interface{}
+	var recipeObj map[string]any
 	err = yaml.Unmarshal(yamlData, &recipeObj)
 	if err != nil {
 		return fmt.Errorf("invalid recipe YAML structure: %w", err)
@@ -437,7 +437,7 @@ func validateRecipeWithSpec(yamlData []byte) error {
 	InfoLog("[VALIDATION] Recipe validated successfully against OpenAPI spec\n")
 	return nil
 }
-func validateRecipeContentStructure(recipeContent interface{}) error {
+func validateRecipeContentStructure(recipeContent any) error {
 	recipeObj, ok := AsMap(recipeContent)
 	if !ok {
 		return fmt.Errorf("recipe must be an object")
@@ -462,7 +462,7 @@ func validateRecipeContentStructure(recipeContent interface{}) error {
 
 	return nil
 }
-func validateRecipeWantsStructure(wants interface{}) error {
+func validateRecipeWantsStructure(wants any) error {
 	wantsArray, ok := AsArray(wants)
 	if !ok {
 		return fmt.Errorf("wants must be an array")
@@ -515,7 +515,7 @@ func validateRecipeWantsStructure(wants interface{}) error {
 
 	return nil
 }
-func validateRecipeResultStructure(result interface{}) error {
+func validateRecipeResultStructure(result any) error {
 	// Try new format first (flat array)
 	if resultArray, ok := AsArray(result); ok {
 		// New format: validate as array of result specs
@@ -559,7 +559,7 @@ func validateRecipeResultStructure(result interface{}) error {
 
 	return nil
 }
-func validateRecipeResultSpec(spec interface{}, fieldName string) error {
+func validateRecipeResultSpec(spec any, fieldName string) error {
 	specObj, ok := AsMap(spec)
 	if !ok {
 		return fmt.Errorf("%s must be an object", fieldName)
@@ -600,7 +600,7 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 			defaultParams, err := grl.GetRecipeParameters(fullPath)
 			if err != nil {
 				InfoLog("[RECIPE] ⚠️  Warning: failed to get parameters for %s: %v\n", relativePath, err)
-				defaultParams = make(map[string]interface{})
+				defaultParams = make(map[string]any)
 			}
 
 			// Register the custom type with full path

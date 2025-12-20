@@ -49,7 +49,7 @@ type QueuePacket struct {
 func (p *QueuePacket) IsEnded() bool {
 	return p.Num < 0 || p.BasePacket.IsEnded()
 }
-func (p *QueuePacket) GetData() interface{} {
+func (p *QueuePacket) GetData() any {
 	return struct {
 		Num  int
 		Time float64
@@ -117,7 +117,7 @@ func (g *Numbers) Progress() {
 
 	paramRate := g.GetFloatParam("rate", locals.Rate)
 	if g.State == nil {
-		g.State = make(map[string]interface{})
+		g.State = make(map[string]any)
 	}
 
 	// Check if we're already done before generating more packets
@@ -143,7 +143,7 @@ func (g *Numbers) Progress() {
 	// Batch mechanism: only update state history every N packets to reduce history entries
 	if locals.currentCount%locals.batchUpdateInterval == 0 {
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
-		g.StoreStateMulti(map[string]interface{}{
+		g.StoreStateMulti(map[string]any{
 			"total_processed":      locals.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
 			"total_wait_time":      0.0,
@@ -223,7 +223,7 @@ func (q *Queue) Progress() {
 	}
 
 	if q.State == nil {
-		q.State = make(map[string]interface{})
+		q.State = make(map[string]any)
 	}
 
 	_, i, ok := q.Use(100)  // Use 100ms timeout instead of forever
@@ -279,7 +279,7 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 	}
 
 	// Batch update all statistics at once
-	q.StoreStateMulti(map[string]interface{}{
+	q.StoreStateMulti(map[string]any{
 		"serverFreeTime":           locals.serverFreeTime,
 		"waitTimeSum":              locals.waitTimeSum,
 		"processedCount":           locals.processedCount,
@@ -297,7 +297,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	if locals.processedCount > 0 {
 		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
-	q.StoreStateMulti(map[string]interface{}{
+	q.StoreStateMulti(map[string]any{
 		"average_wait_time":        avgWaitTime,
 		"total_processed":          locals.processedCount,
 		"total_wait_time":          locals.waitTimeSum,
@@ -356,7 +356,7 @@ func (c *Combiner) Progress() {
 	}
 
 	if c.State == nil {
-		c.State = make(map[string]interface{})
+		c.State = make(map[string]any)
 	}
 	processed, _ := c.State["processed"].(int)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
@@ -391,7 +391,7 @@ func (c *Combiner) Progress() {
 func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
 	processed, _ := c.State["processed"].(int)
-	c.StoreStateMulti(map[string]interface{}{
+	c.StoreStateMulti(map[string]any{
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time
 		"total_wait_time":   0.0,
@@ -458,7 +458,7 @@ func (s *Sink) Progress() {
 
 // OnEnded implements PacketHandler interface for Sink termination callbacks
 func (s *Sink) OnEnded(packet mywant.Packet, locals *SinkLocals) error {
-	s.StoreStateMulti(map[string]interface{}{
+	s.StoreStateMulti(map[string]any{
 		"total_processed":      locals.Received,
 		"average_wait_time":    0.0, // Sinks don't add wait time
 		"total_wait_time":      0.0,

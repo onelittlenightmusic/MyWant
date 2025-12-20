@@ -124,7 +124,7 @@ func (c *FibonacciComputer) Progress() {
 			processed++
 		}
 		c.Provide(FibonacciSeed{Value: 0, Position: -1, IsEnd: true})
-		c.StoreStateMulti(map[string]interface{}{
+		c.StoreStateMulti(map[string]any{
 			"prev": prev,
 			"current": current,
 			"position": position,
@@ -144,7 +144,7 @@ func (c *FibonacciComputer) Progress() {
 		} else if seed.Position == 1 {
 			current = seed.Value
 			initialized = true
-			c.StoreStateMulti(map[string]interface{}{
+			c.StoreStateMulti(map[string]any{
 				"current": current,
 				"initialized": initialized,
 			})

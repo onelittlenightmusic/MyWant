@@ -88,7 +88,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 		}
 
 		want.StoreLog(fmt.Sprintf("DEBUG: About to store agent_result: %+v", schedule))
-		want.StoreStateMulti(map[string]interface{}{
+		want.StoreStateMulti(map[string]any{
 			"agent_result":            schedule,
 			"monitor_execution_count": m.ExecutionCount,
 			"monitor_source_file":     filename,
@@ -101,7 +101,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 			restaurantState.State.End.Format("15:04 Jan 2")))
 	} else {
 		// No existing schedule found - store explicit first record
-		want.StoreStateMulti(map[string]interface{}{
+		want.StoreStateMulti(map[string]any{
 			"agent_result":            nil,
 			"monitor_execution_count": m.ExecutionCount,
 			"monitor_source_file":     filename,

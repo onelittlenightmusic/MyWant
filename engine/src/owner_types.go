@@ -11,7 +11,7 @@ import (
 )
 
 // extractIntParam extracts an integer parameter with type conversion and default fallback
-func extractIntParam(params map[string]interface{}, key string, defaultValue int) int {
+func extractIntParam(params map[string]any, key string, defaultValue int) int {
 	if value, ok := params[key]; ok {
 		if intVal, ok := value.(int); ok {
 			return intVal
@@ -28,7 +28,7 @@ type Target struct {
 	MaxDisplay             int
 	Description            string                 // Human-readable description of this target
 	RecipePath             string                 // Path to the recipe file to use for child creation
-	RecipeParams           map[string]interface{} // Parameters to pass to recipe (derived from spec.params)
+	RecipeParams           map[string]any // Parameters to pass to recipe (derived from spec.params)
 	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
 	childWants             []*Want
 	completedChildren      map[string]bool      // Track which children have completed
@@ -48,11 +48,11 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Metadata: metadata,
 			Spec:     spec,
 			Status:   WantStatusIdle,
-			State:    make(map[string]interface{}),
+			State:    make(map[string]any),
 		},
 		MaxDisplay:             1000,
 		RecipePath:             "../recipes/queue-system.yaml", // Default recipe path
-		RecipeParams:           make(map[string]interface{}),
+		RecipeParams:           make(map[string]any),
 		parameterSubscriptions: make(map[string][]string),
 		childWants:             make([]*Want, 0),
 		completedChildren:      make(map[string]bool),
@@ -70,7 +70,7 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	}
 
 	// Collect recipe parameters (excluding target-specific ones)
-	target.RecipeParams = make(map[string]interface{})
+	target.RecipeParams = make(map[string]any)
 	for key, value := range spec.Params {
 		if !targetSpecificParams[key] {
 			target.RecipeParams[key] = value
@@ -247,7 +247,7 @@ func (t *Target) resolveRecipeParameters() {
 	if err != nil {
 		return
 	}
-	resolvedParams := make(map[string]interface{})
+	resolvedParams := make(map[string]any)
 	for key, value := range recipeParams {
 		resolvedParams[key] = value
 	}
@@ -356,7 +356,7 @@ func (t *Target) Progress() {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
 				// Send completion packet to parent/upstream wants
-				packet := map[string]interface{}{
+				packet := map[string]any{
 					"status":   "completed",
 					"name":     t.Metadata.Name,
 					"type":     t.Metadata.Type,
@@ -381,7 +381,7 @@ func (t *Target) Progress() {
 }
 
 // UpdateParameter updates a parameter and pushes it to child wants
-func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
+func (t *Target) UpdateParameter(paramName string, paramValue any) {
 	// Update our own parameter first
 	t.Want.UpdateParameter(paramName, paramValue)
 
@@ -398,12 +398,12 @@ func (t *Target) UpdateParameter(paramName string, paramValue interface{}) {
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
-func (t *Target) ChangeParameter(paramName string, paramValue interface{}) {
+func (t *Target) ChangeParameter(paramName string, paramValue any) {
 	t.StoreLog(fmt.Sprintf("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
 		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue))
 	t.UpdateParameter(paramName, paramValue)
 }
-func (t *Target) GetParameterValue(paramName string) interface{} {
+func (t *Target) GetParameterValue(paramName string) any {
 	if value, ok := t.Spec.Params[paramName]; ok {
 		return value
 	}
@@ -411,7 +411,7 @@ func (t *Target) GetParameterValue(paramName string) interface{} {
 }
 
 // PushParameterToChildren propagates parameter changes to all child wants
-func (t *Target) PushParameterToChildren(paramName string, paramValue interface{}) {
+func (t *Target) PushParameterToChildren(paramName string, paramValue any) {
 	if t.builder == nil {
 		return
 	}
@@ -526,8 +526,8 @@ func (t *Target) computeTemplateResult() {
 	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames))
 
 	// Stats are now stored in State - no separate initialization needed
-	var primaryResult interface{}
-	metrics := make(map[string]interface{})
+	var primaryResult any
+	metrics := make(map[string]any)
 
 	for i, resultSpec := range *recipeResult {
 		resultValue := t.getResultFromSpec(resultSpec, childWantsByName)
@@ -573,14 +573,14 @@ func (t *Target) addChildWantsToMemory() error {
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
-	BaseWant   interface{} // The original want (Generator, Queue, Sink, etc.)
+	BaseWant   any // The original want (Generator, Queue, Sink, etc.)
 	Want       *Want       // Direct reference to Want (extracted at creation time)
 	TargetName string
 	WantName   string
 }
 
 // NewOwnerAwareWant creates a wrapper that adds parent notification to any want wantPtr is the Want pointer extracted from baseWant (can be nil for some types)
-func NewOwnerAwareWant(baseWant interface{}, metadata Metadata, wantPtr *Want) *OwnerAwareWant {
+func NewOwnerAwareWant(baseWant any, metadata Metadata, wantPtr *Want) *OwnerAwareWant {
 	targetName := ""
 	for _, ownerRef := range metadata.OwnerReferences {
 		if ownerRef.Controller && ownerRef.Kind == "Want" {
@@ -603,7 +603,7 @@ func NewOwnerAwareWant(baseWant interface{}, metadata Metadata, wantPtr *Want) *
 }
 
 // extractWantViaReflection extracts Want pointer from custom types with embedded Want field
-func extractWantViaReflection(baseWant interface{}) *Want {
+func extractWantViaReflection(baseWant any) *Want {
 	if baseWant == nil {
 		return nil
 	}
@@ -740,7 +740,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies. 
 	// This means: 1. Domain types can be registered in any order (QNet, Travel, etc.) 2. No need for separate "NoOwner" builder variants 3. Wrapping happens at runtime based on actual metadata, not factory registration
 }
-func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) interface{} {
+func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) any {
 	want, exists := childWants[spec.WantName]
 	if !exists {
 		// Log available want names to help with debugging
@@ -790,7 +790,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 }
 
 // extractValueByPath extracts values using JSON path-like syntax
-func (t *Target) extractValueByPath(data map[string]interface{}, path string) interface{} {
+func (t *Target) extractValueByPath(data map[string]any, path string) any {
 	if path == "." {
 		return data
 	}
@@ -885,7 +885,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 		}
 	}
 	if t.State == nil {
-		t.State = make(map[string]interface{})
+		t.State = make(map[string]any)
 	}
 	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)

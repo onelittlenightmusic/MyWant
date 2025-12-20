@@ -25,12 +25,12 @@ func main() {
                     },
                 },
                 Spec: mywant.WantSpec{
-                    Params: map[string]interface{}{
+                    Params: map[string]any{
                         "count": 100,
                         "rate":  1.0,
                     },
                 },
-                State: map[string]interface{}{
+                State: map[string]any{
                     "initial_state": "initialized",
                 },
             },

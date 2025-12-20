@@ -121,7 +121,7 @@ func (f *PrimeSequence) Progress() {
 		// Check for end signal
 		if val == -1 {
 			// End signal received - finalize and complete
-			f.StoreStateMulti(map[string]interface{}{
+			f.StoreStateMulti(map[string]any{
 				"foundPrimes":    locals.foundPrimes,
 				"primeCount":     len(locals.foundPrimes),
 				"total_processed": totalProcessed,
@@ -156,7 +156,7 @@ func (f *PrimeSequence) Progress() {
 		}
 
 		// Update state for this packet
-		f.StoreStateMulti(map[string]interface{}{
+		f.StoreStateMulti(map[string]any{
 			"total_processed":       totalProcessed,
 			"last_number_processed": val,
 			"foundPrimes":           locals.foundPrimes,
@@ -170,14 +170,14 @@ func (f *PrimeSequence) Progress() {
 // // PrimeSink collects and displays results type PrimeSink struct { Want Received int
 // paths    Paths }
 
-// // NewPrimeSink creates a new prime sink want func NewPrimeSink(metadata Metadata, spec WantSpec) interface{} { sink := &PrimeSink{ Want:     Want{},
+// // NewPrimeSink creates a new prime sink want func NewPrimeSink(metadata Metadata, spec WantSpec) any { sink := &PrimeSink{ Want:     Want{},
 // Received: 0, }
 
 // // Initialize base Want fields sink.Init(metadata, spec)
 
 // // Set fields for base Want methods sink.WantType = "prime sink" sink.ConnectivityMetadata = nil // ConnectivityMetadata loaded from YAML
 
-// func (s *PrimeSink) GetWant() interface{} { return &s.Want }
+// func (s *PrimeSink) GetWant() any { return &s.Want }
 
 // // Exec returns the generalized chain function for the sink func (s *PrimeSink) Exec() { // Validate input channel is available in, connectionAvailable := s.GetFirstInputChannel()
 // if !connectionAvailable { return true }
@@ -194,10 +194,10 @@ func (f *PrimeSequence) Progress() {
 
 // // Update persistent state s.State["received"] = received
 
-// // Store collected primes in state s.StoreStateMulti(map[string]interface{}{ "primes":         primes, "total_received": received,
+// // Store collected primes in state s.StoreStateMulti(map[string]any{ "primes":         primes, "total_received": received,
 // 	})
 
-// if s.State == nil { s.State = make(map[string]interface{}) } s.State["total_processed"] = received
+// if s.State == nil { s.State = make(map[string]any) } s.State["total_processed"] = received
 
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {

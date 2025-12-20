@@ -9,7 +9,7 @@ import (
 // ApprovalData represents shared evidence and description data
 type ApprovalData struct {
 	ApprovalID  string
-	Evidence    interface{}
+	Evidence    any
 	Description string
 	Timestamp   time.Time
 }
@@ -88,7 +88,7 @@ func (e *EvidenceWant) Progress() {
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
-	e.StoreStateMulti(map[string]interface{}{
+	e.StoreStateMulti(map[string]any{
 		"evidence_type":        locals.EvidenceType,
 		"approval_id":          locals.ApprovalID,
 		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
@@ -176,7 +176,7 @@ func (d *DescriptionWant) Progress() {
 		Description: description,
 		Timestamp:   time.Now(),
 	}
-	d.StoreStateMulti(map[string]interface{}{
+	d.StoreStateMulti(map[string]any{
 		"description_format":      locals.DescriptionFormat,
 		"approval_id":             locals.ApprovalID,
 		"description":             description,

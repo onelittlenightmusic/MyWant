@@ -8,7 +8,7 @@ type Tuple struct {
 }
 */
 //Tuple Interface is the object type which Chain module can deal with
-type Tuple interface{}
+type Tuple any
 
 // Chan is the channel type which Chain module can deal with
 type Chan chan Tuple

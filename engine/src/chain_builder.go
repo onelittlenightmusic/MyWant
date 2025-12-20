@@ -95,7 +95,7 @@ type ChainBuilder struct {
 // runtimeWant holds the runtime state of a want
 type runtimeWant struct {
 	chain    chain.C_chain
-	function interface{}
+	function any
 	want     *Want
 }
 func (rw *runtimeWant) GetSpec() *WantSpec {
@@ -325,7 +325,7 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 
 	return true
 }
-func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
+func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 	wantType := want.Metadata.Type
 	if cb.customRegistry.IsCustomType(wantType) {
 		return cb.createCustomTargetWant(want)
@@ -369,10 +369,10 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 }
 
 // TestCreateWantFunction tests want type creation without side effects (exported for validation)
-func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (interface{}, error) {
+func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (any, error) {
 	return cb.createWantFunction(want)
 }
-func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) {
+func (cb *ChainBuilder) createCustomTargetWant(want *Want) (any, error) {
 	config, exists := cb.customRegistry.Get(want.Metadata.Type)
 	if !exists {
 		return nil, fmt.Errorf("custom type '%s' not found in registry", want.Metadata.Type)
@@ -388,7 +388,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 	target.SetRecipeLoader(recipeLoader)
 
 	// Automatically wrap with OwnerAwareWant if the custom target has owner references This enables parent-child coordination via subscription events (critical for nested targets)
-	var wantInstance interface{} = target
+	var wantInstance any = target
 	if len(want.Metadata.OwnerReferences) > 0 {
 		wantInstance = NewOwnerAwareWant(wantInstance, want.Metadata, &target.Want)
 	}
@@ -400,7 +400,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 func (cb *ChainBuilder) mergeWithCustomDefaults(spec WantSpec, config CustomTargetTypeConfig) WantSpec {
 	merged := spec
 	if merged.Params == nil {
-		merged.Params = make(map[string]interface{})
+		merged.Params = make(map[string]any)
 	}
 
 	// Merge default parameters (user params take precedence)
@@ -722,14 +722,14 @@ func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error 
 
 	var recipeDoc struct {
 		Recipe struct {
-			Parameters map[string]interface{} `yaml:"parameters"`
+			Parameters map[string]any `yaml:"parameters"`
 			Wants      []struct {
 				Metadata struct {
 					Name string `yaml:"name"`
 					Type string `yaml:"type"`
 				} `yaml:"metadata"`
 				Spec struct {
-					Params map[string]interface{} `yaml:"params"`
+					Params map[string]any `yaml:"params"`
 				} `yaml:"spec"`
 			} `yaml:"wants"`
 		} `yaml:"recipe"`
@@ -1176,11 +1176,11 @@ func copyStringMap(src map[string]string) map[string]string {
 	return dst
 }
 
-func copyInterfaceMap(src map[string]interface{}) map[string]interface{} {
+func copyInterfaceMap(src map[string]any) map[string]any {
 	if src == nil {
 		return nil
 	}
-	dst := make(map[string]interface{}, len(src))
+	dst := make(map[string]any, len(src))
 	for k, v := range src {
 		dst[k] = v
 	}
@@ -1399,7 +1399,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
 			Status:   WantStatusFailed,
-			State: map[string]interface{}{
+			State: map[string]any{
 				"error": err.Error(),
 			},
 			History: wantConfig.History,
@@ -1429,7 +1429,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	// If no Want was found in the want function, create a new one (This handles want types that don't embed or return a Want)
 	if wantPtr == nil {
-		stateMap := make(map[string]interface{})
+		stateMap := make(map[string]any)
 		if wantConfig.State != nil {
 			// Copy all state data
 			for k, v := range wantConfig.State {
@@ -1464,7 +1464,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		// Merge state data if provided
 		if wantConfig.State != nil {
 			if wantPtr.State == nil {
-				wantPtr.State = make(map[string]interface{})
+				wantPtr.State = make(map[string]any)
 			}
 			for k, v := range wantConfig.State {
 				wantPtr.State[k] = v
@@ -1555,7 +1555,7 @@ func (cb *ChainBuilder) deleteWant(wantName string) {
 }
 
 // registerWantForNotifications registers a want with the notification system
-func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunction interface{}, wantPtr *Want) {
+func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunction any, wantPtr *Want) {
 	// Register want in global registry for lookup
 	RegisterWant(wantPtr)
 }
@@ -1693,7 +1693,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 			// Lock state when copying to prevent concurrent map access
 			runtimeWant.want.stateMutex.RLock()
-			stateCopy := make(map[string]interface{})
+			stateCopy := make(map[string]any)
 			for k, v := range runtimeWant.want.State {
 				stateCopy[k] = v
 			}
@@ -1712,7 +1712,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 			// Lock state when copying to prevent concurrent map access
 			runtimeWant.want.stateMutex.RLock()
-			stateCopy := make(map[string]interface{})
+			stateCopy := make(map[string]any)
 			for k, v := range runtimeWant.want.State {
 				stateCopy[k] = v
 			}
@@ -2025,7 +2025,7 @@ func validateConfigWithSpec(yamlData []byte) error {
 	if err != nil {
 		return fmt.Errorf("OpenAPI spec is invalid: %w", err)
 	}
-	var yamlObj interface{}
+	var yamlObj any
 	err = yaml.Unmarshal(yamlData, &yamlObj)
 	if err != nil {
 		return fmt.Errorf("failed to parse YAML for validation: %w", err)
@@ -2040,7 +2040,7 @@ func validateConfigWithSpec(yamlData []byte) error {
 	// For now, do basic validation by checking that we can load and parse both spec and data A full OpenAPI->JSON Schema conversion would be more complex and is beyond current scope
 
 	// Basic structural validation - ensure the YAML contains expected top-level keys
-	var configObj map[string]interface{}
+	var configObj map[string]any
 	err = yaml.Unmarshal(yamlData, &configObj)
 	if err != nil {
 		return fmt.Errorf("invalid YAML structure: %w", err)
@@ -2049,13 +2049,13 @@ func validateConfigWithSpec(yamlData []byte) error {
 	hasRecipe := false
 
 	if wants, ok := configObj["wants"]; ok {
-		if wantsArray, ok := wants.([]interface{}); ok && len(wantsArray) > 0 {
+		if wantsArray, ok := wants.([]any); ok && len(wantsArray) > 0 {
 			hasWants = true
 		}
 	}
 
 	if recipe, ok := configObj["recipe"]; ok {
-		if recipeObj, ok := recipe.(map[string]interface{}); ok {
+		if recipeObj, ok := recipe.(map[string]any); ok {
 			if path, ok := recipeObj["path"]; ok {
 				if pathStr, ok := path.(string); ok && pathStr != "" {
 					hasRecipe = true
@@ -2082,14 +2082,14 @@ func validateConfigWithSpec(yamlData []byte) error {
 
 	return nil
 }
-func validateWantsStructure(wants interface{}) error {
-	wantsArray, ok := wants.([]interface{})
+func validateWantsStructure(wants any) error {
+	wantsArray, ok := wants.([]any)
 	if !ok {
 		return fmt.Errorf("wants must be an array")
 	}
 
 	for i, want := range wantsArray {
-		wantObj, ok := want.(map[string]interface{})
+		wantObj, ok := want.(map[string]any)
 		if !ok {
 			return fmt.Errorf("want at index %d must be an object", i)
 		}
@@ -2098,7 +2098,7 @@ func validateWantsStructure(wants interface{}) error {
 			return fmt.Errorf("want at index %d missing required 'metadata' field", i)
 		}
 
-		metadataObj, ok := metadata.(map[string]interface{})
+		metadataObj, ok := metadata.(map[string]any)
 		if !ok {
 			return fmt.Errorf("want at index %d 'metadata' must be an object", i)
 		}
@@ -2114,14 +2114,14 @@ func validateWantsStructure(wants interface{}) error {
 			return fmt.Errorf("want at index %d missing required 'spec' field", i)
 		}
 
-		specObj, ok := spec.(map[string]interface{})
+		specObj, ok := spec.(map[string]any)
 		if !ok {
 			return fmt.Errorf("want at index %d 'spec' must be an object", i)
 		}
 		if params, ok := specObj["params"]; !ok {
 			return fmt.Errorf("want at index %d missing required 'spec.params' field", i)
 		} else {
-			if _, ok := params.(map[string]interface{}); !ok {
+			if _, ok := params.(map[string]any); !ok {
 				return fmt.Errorf("want at index %d 'spec.params' must be an object", i)
 			}
 		}
