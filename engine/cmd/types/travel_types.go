@@ -959,7 +959,6 @@ const (
 	PhaseBooking    = "booking"
 	PhaseMonitoring = "monitoring"
 	PhaseCanceling  = "canceling"
-	PhaseRebooking  = "rebooking"
 	PhaseCompleted  = "completed"
 )
 
@@ -1034,12 +1033,12 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 }
 
 // Progress creates a flight booking reservation using state machine pattern
-// The execution flow follows distinct phases: 1. Initial: Setup phase
+// The execution flow follows distinct phases:
+// 1. Initial: Setup phase, transitions immediately to Booking
 // 2. Booking: Execute initial flight booking via agents
-// 3. Monitoring: Monitor flight status for 60 seconds
-// 4. Canceling: Wait for cancellation agent to complete
-// 5. Rebooking: Execute rebooking after cancellation
-// 6. Completed: Final state
+// 3. Monitoring: Monitor flight status, cancel and rebook if delayed
+// 4. Canceling: Cancel the flight, reset state, return to Booking for rebooking
+// 5. Completed: Final state after successful completion
 func (f *FlightWant) Progress() {
 	locals := f.GetLocals()
 	if locals == nil {
@@ -1140,8 +1139,10 @@ func (f *FlightWant) Progress() {
 	case PhaseCanceling:
 		flightIDVal, flightIDExists := f.GetState("flight_id")
 		if !flightIDExists || flightIDVal == "" {
+			f.StoreLog("No flight_id to cancel, resetting to booking phase")
+			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
-				"flight_phase": PhaseRebooking,
+				"flight_phase": PhaseBooking,
 				"attempted":    false,
 			})
 			return
@@ -1149,9 +1150,10 @@ func (f *FlightWant) Progress() {
 
 		flightID, ok := flightIDVal.(string)
 		if !ok {
-			f.StoreLog("Invalid flight_id type, transitioning to rebooking")
+			f.StoreLog("Invalid flight_id type, resetting to booking phase")
+			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
-				"flight_phase": PhaseRebooking,
+				"flight_phase": PhaseBooking,
 				"attempted":    false,
 			})
 			return
@@ -1161,56 +1163,18 @@ func (f *FlightWant) Progress() {
 		f.StoreLog(fmt.Sprintf("Executing cancel_flight action for flight %s", flightID))
 		f.tryAgentExecution()
 
-		// Clear flight_id after cancellation to indicate rebooking is next
-		f.StoreState("flight_id", "")
 		f.StoreLog("Cancelled flight: " + flightID)
 
-		// Transition to rebooking phase
-		f.StoreLog("Cancellation completed, transitioning to rebooking phase")
+		// Reset flight state and transition back to booking phase for rebooking
+		f.StoreLog("Cancellation completed, resetting state and returning to booking phase")
+		f.ResetFlightState()
 		f.StoreStateMulti(map[string]any{
-			"flight_phase": PhaseRebooking,
+			"flight_phase": PhaseBooking,
 			"attempted":    false,
 		})
 		return
 
-	// === Phase 5: Rebooking ===
-	case PhaseRebooking:
-		f.StoreLog("Executing rebooking")
-		f.tryAgentExecution()
-
-		agentResult, hasResult := f.GetState("agent_result")
-		f.StoreLog(fmt.Sprintf("[REBOOK-DEBUG] hasResult=%v, agentResult=%v (type=%T)", hasResult, agentResult, agentResult))
-
-		if hasResult && agentResult != nil {
-			f.StoreLog("Rebooking succeeded")
-			agentSchedule := f.extractFlightSchedule(agentResult)
-			f.StoreLog(fmt.Sprintf("[REBOOK-DEBUG] Extracted schedule: %+v", agentSchedule))
-
-			if agentSchedule != nil {
-				f.SetSchedule(*agentSchedule)
-				f.StoreLog("[REBOOK-DEBUG] About to send rebooked packet")
-				f.sendFlightPacket(out, agentSchedule, "Rebooked")
-
-				// Restart monitoring for new flight
-				locals.monitoringStartTime = time.Now()
-				// Batch all phase transition state changes together
-				f.StoreStateMulti(map[string]any{
-					"flight_phase": PhaseMonitoring,
-				})
-				f.StoreLog("Transitioning back to monitoring phase for rebooked flight")
-
-				return
-			}
-		}
-
-		// Rebooking failed - complete
-		f.StoreLog("Rebooking failed")
-		f.StoreStateMulti(map[string]any{
-			"flight_phase": PhaseCompleted,
-		})
-		return
-
-	// === Phase 6: Completed ===
+	// === Phase 5: Completed ===
 	case PhaseCompleted:
 		// Clear agent_result to prevent reuse in next execution cycle
 		f.StoreState("agent_result", nil)
@@ -1343,6 +1307,43 @@ func (f *FlightWant) SetSchedule(schedule any) {
 	}
 
 	f.StoreStateMulti(stateUpdates)
+}
+
+// ResetFlightState clears all flight-specific state information
+// Used after cancellation to prepare for rebooking attempt
+func (f *FlightWant) ResetFlightState() {
+	resetKeys := []string{
+		"flight_id",
+		"flight_status",
+		"flight_number",
+		"from",
+		"to",
+		"departure_time",
+		"arrival_time",
+		"status_message",
+		"updated_at",
+		"status_changed",
+		"status_changed_at",
+		"status_change_history_count",
+		"status_history",
+		"agent_result",
+		"agent_execution_status",
+		"agent_execution_error",
+		"execution_source",
+		"premium_level",
+		"service_tier",
+		"premium_amenities",
+		"premium_processed",
+		"flight_duration_hours",
+		"total_processed",
+		"schedule_date",
+	}
+
+	for _, key := range resetKeys {
+		f.StoreState(key, nil)
+	}
+
+	f.StoreLog("Flight state reset for rebooking attempt")
 }
 
 // shouldCancelAndRebook checks if the current flight should be cancelled due to delay
