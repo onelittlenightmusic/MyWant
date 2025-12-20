@@ -56,11 +56,12 @@ type ValidationRules struct {
 
 // StateDef defines a state key for a want type
 type StateDef struct {
-	Name        string      `json:"name" yaml:"name"`
-	Description string      `json:"description" yaml:"description"`
-	Type        string      `json:"type" yaml:"type"`
-	Persistent  bool        `json:"persistent" yaml:"persistent"`
-	Example     any `json:"example,omitempty" yaml:"example,omitempty"`
+	Name         string      `json:"name" yaml:"name"`
+	Description  string      `json:"description" yaml:"description"`
+	Type         string      `json:"type" yaml:"type"`
+	Persistent   bool        `json:"persistent" yaml:"persistent"`
+	InitialValue any         `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
+	Example      any         `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ConnectivityDef defines input/output patterns for a want type

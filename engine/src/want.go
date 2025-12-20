@@ -211,6 +211,10 @@ type Want struct {
 	paths                Paths                `json:"-" yaml:"-"`
 	ConnectivityMetadata ConnectivityMetadata `json:"-" yaml:"-"`
 
+	// Want type definition and state field management
+	WantTypeDefinition  *WantTypeDefinition `json:"-" yaml:"-"`
+	ProvidedStateFields []string            `json:"-" yaml:"-"` // State field names defined in want type
+
 	// Type-specific local state managed by WantLocals interface
 	Locals WantLocals `json:"-" yaml:"-"`
 
@@ -911,6 +915,10 @@ func (n *Want) addAggregatedStateHistory() {
 		if strings.HasPrefix(key, "_") {
 			continue
 		}
+		// If ProvidedStateFields is defined, only include those fields in history
+		if len(n.ProvidedStateFields) > 0 && !contains(n.ProvidedStateFields, key) {
+			continue
+		}
 		stateSnapshot[key] = value
 	}
 
@@ -1345,6 +1353,29 @@ func (n *Want) Init() {
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 }
+
+// SetWantTypeDefinition sets the want type definition and initializes provided state fields
+func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
+	if typeDef == nil {
+		return
+	}
+	n.WantTypeDefinition = typeDef
+
+	// Extract provided state field names and initialize with default values
+	n.ProvidedStateFields = make([]string, 0, len(typeDef.State))
+	for _, stateDef := range typeDef.State {
+		n.ProvidedStateFields = append(n.ProvidedStateFields, stateDef.Name)
+
+		// Initialize state field with initial value if provided
+		if stateDef.InitialValue != nil {
+			if n.State == nil {
+				n.State = make(map[string]any)
+			}
+			n.State[stateDef.Name] = stateDef.InitialValue
+		}
+	}
+}
+
 func (n *Want) GetIntParam(key string, defaultValue int) int {
 	if value, ok := n.Spec.Params[key]; ok {
 		if intVal, ok := value.(int); ok {
@@ -1666,3 +1697,12 @@ func (w *Want) GetLocals() WantLocals {
 	return w.Locals
 }
 
+// contains checks if a string slice contains a specific string value
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}

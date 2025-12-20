@@ -33,10 +33,11 @@ type GenericRecipe struct {
 // RecipeResult defines how to compute results from recipe execution Supports both legacy format (primary/metrics) and new flat array format
 type RecipeResult []RecipeResultSpec
 
-// RecipeResultSpec specifies which want and stat to use for result computation
+// RecipeResultSpec specifies which want and state field to use for result computation
 type RecipeResultSpec struct {
-	WantName    string `yaml:"want_name" json:"want_name"`
-	StatName    string `yaml:"stat_name" json:"stat_name"`
+	WantName   string `yaml:"want_name" json:"want_name"`
+	StateField string `yaml:"state_field,omitempty" json:"state_field,omitempty"`   // New: want type state field name (preferred)
+	StatName   string `yaml:"stat_name,omitempty" json:"stat_name,omitempty"`       // Deprecated: use state_field instead
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 }
 
@@ -617,5 +618,53 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 	}
 
 	InfoLog("[RECIPE] ✅ Registered %d custom types from recipes\n", customTypeCount)
+	return nil
+}
+
+// ValidateRecipeResults validates that state_field values match want type state definitions
+// Returns validation errors if any state_field is not defined in the corresponding want type
+func (grl *GenericRecipeLoader) ValidateRecipeResults(recipeResults *RecipeResult, wantTypeDefs map[string]*WantTypeDefinition) error {
+	if recipeResults == nil || len(*recipeResults) == 0 {
+		return nil
+	}
+
+	for _, resultSpec := range *recipeResults {
+		// If state_field is not specified, fall back to stat_name (backward compatibility)
+		stateField := resultSpec.StateField
+		if stateField == "" {
+			// Skip validation if neither is specified
+			if resultSpec.StatName == "" {
+				continue
+			}
+			// If using stat_name, issue deprecation warning but don't fail
+			DebugLog("[RECIPE] Warning: stat_name is deprecated, use state_field instead in result.want_name=%s\n", resultSpec.WantName)
+			continue
+		}
+
+		// Find the want type definition
+		wantTypeDef, exists := wantTypeDefs[resultSpec.WantName]
+		if !exists {
+			return fmt.Errorf("validation error: result references unknown want type '%s'", resultSpec.WantName)
+		}
+
+		// Check if state_field exists in want type's state definition
+		fieldFound := false
+		for _, stateDef := range wantTypeDef.State {
+			if stateDef.Name == stateField {
+				fieldFound = true
+				break
+			}
+		}
+
+		if !fieldFound {
+			availableFields := make([]string, len(wantTypeDef.State))
+			for i, sd := range wantTypeDef.State {
+				availableFields[i] = sd.Name
+			}
+			return fmt.Errorf("validation error: state_field '%s' not found in want type '%s'. Available fields: %v",
+				stateField, resultSpec.WantName, availableFields)
+		}
+	}
+
 	return nil
 }
