@@ -994,11 +994,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 	return false
 }
 
-func (f *FlightWant) GetStateValue(key string) any {
-	val, _ := f.GetState(key)
-	return val
-}
-
 // StartContinuousMonitoring starts a background goroutine to continuously poll flight status
 // This is called after the flight is successfully booked via agents
 func (f *FlightWant) StartContinuousMonitoring() {
