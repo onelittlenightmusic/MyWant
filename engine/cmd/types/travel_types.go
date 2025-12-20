@@ -60,24 +60,20 @@ type RestaurantWant struct {
 
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
+	locals := &RestaurantWantLocals{}
 	want := NewWantWithLocals(
 		metadata,
 		spec,
-		&RestaurantWantLocals{},
+		locals,
 		"restaurant",
 	)
 	restaurantWant := &RestaurantWant{*want}
-	initRestaurantHelper(restaurantWant)
+	initRestaurantHelper(restaurantWant, locals)
 	return restaurantWant
 }
 
 // initRestaurantHelper sets up the TravelProgressHelper for RestaurantWant
-func initRestaurantHelper(r *RestaurantWant) {
-	locals, ok := r.Locals.(*RestaurantWantLocals)
-	if !ok {
-		return
-	}
-
+func initRestaurantHelper(r *RestaurantWant, locals *RestaurantWantLocals) {
 	locals.Helper = &TravelProgressHelper{
 		Want: &r.Want,
 		TryAgentExecutionFn: func() any {
@@ -337,24 +333,20 @@ type HotelWant struct {
 
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
+	locals := &HotelWantLocals{}
 	want := NewWantWithLocals(
 		metadata,
 		spec,
-		&HotelWantLocals{},
+		locals,
 		"hotel",
 	)
 	hotelWant := &HotelWant{*want}
-	initHotelHelper(hotelWant)
+	initHotelHelper(hotelWant, locals)
 	return hotelWant
 }
 
 // initHotelHelper sets up the TravelProgressHelper for HotelWant
-func initHotelHelper(h *HotelWant) {
-	locals, ok := h.Locals.(*HotelWantLocals)
-	if !ok {
-		return
-	}
-
+func initHotelHelper(h *HotelWant, locals *HotelWantLocals) {
 	locals.Helper = &TravelProgressHelper{
 		Want: &h.Want,
 		TryAgentExecutionFn: func() any {
@@ -464,24 +456,20 @@ type BuffetWant struct {
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
+	locals := &BuffetWantLocals{}
 	want := NewWantWithLocals(
 		metadata,
 		spec,
-		&BuffetWantLocals{},
+		locals,
 		"buffet",
 	)
 	buffetWant := &BuffetWant{*want}
-	initBuffetHelper(buffetWant)
+	initBuffetHelper(buffetWant, locals)
 	return buffetWant
 }
 
 // initBuffetHelper sets up the TravelProgressHelper for BuffetWant
-func initBuffetHelper(b *BuffetWant) {
-	locals, ok := b.Locals.(*BuffetWantLocals)
-	if !ok {
-		return
-	}
-
+func initBuffetHelper(b *BuffetWant, locals *BuffetWantLocals) {
 	locals.Helper = &TravelProgressHelper{
 		Want: &b.Want,
 		TryAgentExecutionFn: func() any {
