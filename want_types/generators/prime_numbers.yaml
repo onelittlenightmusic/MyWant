@@ -44,21 +44,25 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: generated_count
     description: Total number of values generated (end - start + 1)
     type: int
     persistent: true
     example: 100
+    initialValue: 0
   - name: start_value
     description: Starting value used for generation
     type: int
     persistent: true
     example: 2
+    initialValue: 0
   - name: end_value
     description: Ending value used for generation
     type: int
     persistent: true
     example: 100
+    initialValue: 0
   agents: []
   constraints:
   - description: Start must be at least 2 (smallest prime)

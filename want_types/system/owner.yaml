@@ -41,6 +41,7 @@ wantType:
     type: string
     persistent: true
     example: owner-travel-planner
+    initialValue: ''
   - name: owned_wants
     description: Array of want IDs owned by this owner
     type: '[]string'
@@ -49,20 +50,24 @@ wantType:
     - restaurant
     - hotel
     - buffet
+    initialValue: []
   - name: lifecycle_state
     description: Lifecycle state (active, inactive, archived)
     type: string
     persistent: true
     example: active
+    initialValue: ''
   - name: created_at
     description: Timestamp when owner relationship created
     type: string
     persistent: true
+    initialValue: ''
   - name: total_owned
     description: Count of wants owned
     type: int
     persistent: true
     example: 3
+    initialValue: 0
   agents: []
   constraints:
   - description: Owner ID must be non-empty

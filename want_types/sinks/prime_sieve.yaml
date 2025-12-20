@@ -36,31 +36,37 @@ wantType:
     - 19
     - 23
     - 29
+    initialValue: []
   - name: received
     description: Count of prime values received
     type: int
     persistent: true
     example: 168
+    initialValue: 0
   - name: total_received
     description: Total count of primes in collected set
     type: int
     persistent: true
     example: 168
+    initialValue: 0
   - name: total_processed
     description: Final count of all primes collected
     type: int
     persistent: true
     example: 168
+    initialValue: 0
   - name: largest_prime
     description: Largest prime number in the collected set
     type: int
     persistent: true
     example: 997
+    initialValue: 0
   - name: smallest_prime
     description: Smallest prime number (typically 2)
     type: int
     persistent: true
     example: 2
+    initialValue: 0
   agents: []
   constraints:
   - description: Must receive stream from prime sieve

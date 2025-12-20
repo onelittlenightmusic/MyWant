@@ -24,24 +24,29 @@ wantType:
     type: int
     persistent: true
     example: 1000
+    initialValue: 0
   - name: average_wait_time
     description: Average wait time for packets reaching collector
     type: float64
     persistent: true
     example: 0.05
+    initialValue: 0.0
   - name: total_wait_time
     description: Total accumulated wait time across all packets
     type: float64
     persistent: true
     example: 50.0
+    initialValue: 0.0
   - name: collection_started_at
     description: Timestamp when collection began
     type: string
     persistent: true
+    initialValue: ''
   - name: collection_ended_at
     description: Timestamp when collection completed
     type: string
     persistent: true
+    initialValue: ''
   agents: []
   constraints:
   - description: Must have at least one input

@@ -50,47 +50,57 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: flight_type
     description: Class of flight booked
     type: string
     persistent: true
     example: business
+    initialValue: ''
   - name: departure_date
     description: Departure date of flight
     type: string
     persistent: true
     example: '2024-12-25'
+    initialValue: ''
   - name: duration_hours
     description: Flight duration in hours
     type: float64
     persistent: true
     example: 8.5
+    initialValue: 0.0
   - name: flight_number
     description: Booked flight number
     type: string
     persistent: true
     example: AA123
+    initialValue: ''
   - name: departure_time
     description: Scheduled departure time
     type: string
     persistent: true
+    initialValue: ''
   - name: arrival_time
     description: Expected arrival time
     type: string
     persistent: true
+    initialValue: ''
   - name: reservation_name
     description: Human-readable reservation identifier
     type: string
     persistent: true
+    initialValue: ''
   - name: monitoring_active
     description: Whether monitoring flight for status changes
     type: bool
     persistent: false
     example: false
+    initialValue: false
   - name: flight_action
     description: Pending flight action (book_flight, cancel_flight, modify_flight)
     type: string
     persistent: true
+    initialValue: ''
   agents:
   - name: AgentFlight
     role: action

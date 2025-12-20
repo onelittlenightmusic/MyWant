@@ -38,31 +38,37 @@ wantType:
     - 144
     - 233
     - 377
+    initialValue: []
   - name: count
     description: Total count of numbers collected
     type: int
     persistent: true
     example: 15
+    initialValue: 0
   - name: sum
     description: Sum of all collected Fibonacci numbers
     type: int
     persistent: true
     example: 986
+    initialValue: 0
   - name: largest
     description: Largest Fibonacci number collected
     type: int
     persistent: true
     example: 377
+    initialValue: 0
   - name: smallest
     description: Smallest Fibonacci number collected
     type: int
     persistent: true
     example: 0
+    initialValue: 0
   - name: total_processed
     description: Final count of numbers processed
     type: int
     persistent: true
     example: 15
+    initialValue: 0
   agents: []
   constraints:
   - description: Must receive from fibonacci loop

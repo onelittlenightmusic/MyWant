@@ -47,26 +47,31 @@ wantType:
     - 144
     - 233
     - 377
+    initialValue: []
   - name: count
     description: Number of values that passed the filter
     type: int
     persistent: true
     example: 8
+    initialValue: 0
   - name: total_processed
     description: Total number of input values processed
     type: int
     persistent: true
     example: 20
+    initialValue: 0
   - name: min_value_seen
     description: Smallest value that passed the filter
     type: int
     persistent: true
     example: 89
+    initialValue: 0
   - name: max_value_seen
     description: Largest value that passed the filter
     type: int
     persistent: true
     example: 4181
+    initialValue: 0
   agents: []
   constraints:
   - description: Min value must be less than or equal to max value

@@ -34,16 +34,19 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: generated_count
     description: Number of values generated in this cycle
     type: int
     persistent: true
     example: 20
+    initialValue: 0
   - name: max_value_generated
     description: Largest Fibonacci number generated
     type: int
     persistent: true
     example: 4181
+    initialValue: 0
   agents: []
   constraints:
   - description: Count must be positive

@@ -42,24 +42,29 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: flight_number
     description: Alternative flight number
     type: string
     persistent: true
+    initialValue: ''
   - name: departure_time
     description: Departure time of alternative
     type: string
     persistent: true
+    initialValue: ''
   - name: reason_rebooked
     description: Reason for rebooking to alternative
     type: string
     persistent: true
     example: original_flight_delayed
+    initialValue: ''
   - name: total_processed
     description: Count of alternative bookings made
     type: int
     persistent: true
     example: 1
+    initialValue: 0
   agents: []
   constraints:
   - description: Must be triggered by delay/cancellation

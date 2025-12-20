@@ -50,28 +50,34 @@ wantType:
     type: string
     persistent: true
     example: travel-itinerary-complete
+    initialValue: ''
   - name: target_type
     description: Type of target
     type: string
     persistent: true
     example: goal
+    initialValue: ''
   - name: target_value
     description: Current target value
     type: interface{}
     persistent: true
+    initialValue: null
   - name: is_satisfied
     description: Whether target has been satisfied
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: satisfaction_timestamp
     description: When target was satisfied
     type: string
     persistent: true
+    initialValue: ''
   - name: satisfaction_metrics
     description: Metrics used to determine satisfaction
     type: map[string]interface{}
     persistent: true
+    initialValue: {}
   agents: []
   constraints:
   - description: Target name must be non-empty

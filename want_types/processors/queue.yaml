@@ -38,30 +38,36 @@ wantType:
     description: Current number of items waiting in queue
     type: int
     persistent: true
+    initialValue: 0
     example: 42
   - name: processed_count
     description: Total items processed since startup
     type: int
     persistent: true
+    initialValue: 0
     example: 1000
   - name: discarded_count
     description: Items discarded due to max_queue_size limit
     type: int
     persistent: true
+    initialValue: 0
     example: 0
   - name: current_item
     description: Item currently being processed
     type: interface{}
     persistent: false
+    initialValue: null
   - name: avg_wait_time
     description: Average time items wait in queue
     type: float64
     persistent: true
+    initialValue: 0.0
     example: 0.5
   - name: queue_start_time
     description: When queue processing started
     type: string
     persistent: true
+    initialValue: ""
   agents: []
   constraints:
   - description: Service time must be positive

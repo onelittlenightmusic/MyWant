@@ -38,51 +38,61 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: total_processed
     description: Count of successful buffet reservations
     type: int
     persistent: true
     example: 1
+    initialValue: 0
   - name: buffet_type
     description: Type of breakfast buffet reserved
     type: string
     persistent: true
     example: full
+    initialValue: ''
   - name: buffet_start_time
     description: Buffet start time formatted as HH:MM Jan 2
     type: string
     persistent: true
     example: 08:30 Nov 15
+    initialValue: ''
   - name: buffet_end_time
     description: Buffet end time formatted as HH:MM Jan 2
     type: string
     persistent: true
     example: 10:00 Nov 15
+    initialValue: ''
   - name: buffet_duration_hours
     description: Duration of buffet service in hours
     type: float64
     persistent: true
     example: 1.5
+    initialValue: 0.0
   - name: reservation_name
     description: Human-readable name of the buffet reservation
     type: string
     persistent: true
     example: traveler full breakfast buffet
+    initialValue: ''
   - name: premium_processed
     description: Whether premium buffet features were applied
     type: bool
     persistent: true
     example: false
+    initialValue: false
   - name: premium_level
     description: Premium tier if applicable (bronze, silver, gold)
     type: string
     persistent: true
     example: gold
+    initialValue: ''
   - name: service_tier
     description: Service tier selected (self-service, attended, premium)
     type: string
     persistent: true
     example: attended
+    initialValue: ''
   - name: premium_amenities
     description: Array of premium buffet amenities (champagne service, private area,
       chef service)
@@ -91,19 +101,23 @@ wantType:
     example:
     - champagne service
     - private area
+    initialValue: &id001 []
   - name: agent_requirements
     description: Requirements passed to agent system
     type: '[]string'
     persistent: false
+    initialValue: *id001
   - name: agent_execution_status
     description: Status of agent execution (completed, failed, pending)
     type: string
     persistent: true
     example: completed
+    initialValue: ''
   - name: agent_execution_error
     description: Error message if agent execution failed
     type: string
     persistent: true
+    initialValue: ''
   agents:
   - name: MonitorBuffet
     role: monitor

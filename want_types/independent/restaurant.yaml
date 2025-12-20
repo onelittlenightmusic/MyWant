@@ -73,50 +73,60 @@ wantType:
     type: string
     persistent: true
     example: confirmed
+    initialValue: ''
   - name: restaurant_name
     description: Name of the reserved restaurant
     type: string
     persistent: true
     example: The French Laundry
+    initialValue: ''
   - name: booking_time
     description: Confirmed booking time in HH:MM format
     type: string
     persistent: true
     example: '19:30'
+    initialValue: ''
   - name: reservation_id
     description: Unique reservation identifier from booking system
     type: string
     persistent: true
     example: RES-2024-001234
+    initialValue: ''
   - name: confirmation_number
     description: Confirmation number for the reservation
     type: string
     persistent: true
     example: CONF-ABC123
+    initialValue: ''
   - name: address
     description: Restaurant address
     type: string
     persistent: true
     example: 123 Main St, San Francisco, CA 94102
+    initialValue: ''
   - name: contact_number
     description: Restaurant phone number
     type: string
     persistent: true
     example: +1-415-000-1234
+    initialValue: ''
   - name: duration_minutes
     description: Expected duration of dining experience
     type: int
     persistent: true
     example: 120
+    initialValue: 0
   - name: estimated_cost_per_person
     description: Estimated cost per person in USD
     type: float64
     persistent: true
     example: 85.5
+    initialValue: 0.0
   - name: booking_timestamp
     description: When the reservation was made
     type: string
     persistent: true
+    initialValue: ''
   agents:
   - name: MonitorRestaurant
     role: monitor

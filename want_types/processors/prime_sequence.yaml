@@ -39,26 +39,31 @@ wantType:
     - 7
     - 11
     - 13
+    initialValue: []
   - name: primeCount
     description: Total count of primes identified
     type: int
     persistent: true
     example: 25
+    initialValue: 0
   - name: lastPrimeFound
     description: Most recent prime identified
     type: int
     persistent: true
     example: 97
+    initialValue: 0
   - name: total_processed
     description: Total numbers processed through sieve
     type: int
     persistent: true
     example: 100
+    initialValue: 0
   - name: last_number_processed
     description: Last number examined
     type: int
     persistent: true
     example: 100
+    initialValue: 0
   agents: []
   constraints:
   - description: Sieve algorithm validates correctly

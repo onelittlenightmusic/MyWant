@@ -28,16 +28,19 @@ wantType:
     description: Current number being generated
     type: int
     persistent: true
+    initialValue: 0
     example: 42
   - name: generated_count
     description: Total numbers generated so far
     type: int
     persistent: true
+    initialValue: 0
     example: 50
   - name: completion_time
     description: When generation was completed
     type: string
     persistent: true
+    initialValue: ""
   agents: []
   constraints:
   - description: Count must be positive

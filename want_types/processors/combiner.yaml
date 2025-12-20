@@ -35,21 +35,25 @@ wantType:
     type: int
     persistent: true
     example: 150
+    initialValue: 0
   - name: total_processed
     description: Final count of all packets combined
     type: int
     persistent: true
     example: 150
+    initialValue: 0
   - name: average_wait_time
     description: Average wait time for packets (typically 0 for combiners)
     type: float64
     persistent: true
     example: 0.0
+    initialValue: 0.0
   - name: total_wait_time
     description: Total accumulated wait time
     type: float64
     persistent: true
     example: 0.0
+    initialValue: 0.0
   agents: []
   constraints:
   - description: Operation must be valid strategy

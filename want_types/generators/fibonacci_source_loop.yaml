@@ -33,12 +33,20 @@ wantType:
     description: Whether seeds have been generated
     type: bool
     persistent: true
+    initialValue: false
     example: true
   - name: total_processed
     description: Count of seed values sent
     type: int
     persistent: true
+    initialValue: 0
     example: 2
+  - name: seeds_generated
+    description: Array of seed values generated
+    type: '[]int'
+    persistent: true
+    initialValue: []
+    example: [0, 1]
   agents: []
   constraints:
   - description: Max count must be positive

@@ -42,25 +42,30 @@ wantType:
     type: bool
     persistent: true
     example: true
+    initialValue: false
   - name: evidence_type
     description: Type of evidence provided
     type: string
     persistent: true
     example: audit
+    initialValue: ''
   - name: approval_id
     description: Associated approval process ID
     type: string
     persistent: true
     example: APR-2024-001
+    initialValue: ''
   - name: evidence_provided_at
     description: Timestamp when evidence was generated
     type: string
     persistent: true
+    initialValue: ''
   - name: total_processed
     description: Count of evidence packets generated
     type: int
     persistent: true
     example: 1
+    initialValue: 0
   agents: []
   constraints:
   - description: Evidence type must be valid

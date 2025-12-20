@@ -81,29 +81,35 @@ wantType:
     persistent: true
     example: "{\n  \"type\": \"travel_itinerary\",\n  \"items\": [...],\n  \"summary\"\
       : \"...\"\n}\n"
+    initialValue: {}
   - name: coordination_status
     description: Overall status of coordination (pending, running, completed, failed,
       approved, rejected)
     type: string
     persistent: true
     example: completed
+    initialValue: ''
   - name: inputs_received
     description: Number of input packets received from connected wants
     type: int
     persistent: true
     example: 3
+    initialValue: 0
   - name: completion_time
     description: ISO8601 timestamp when coordination completed
     type: string
     persistent: true
+    initialValue: ''
   - name: last_updated
     description: ISO8601 timestamp of last coordination update
     type: string
     persistent: true
+    initialValue: ''
   - name: error_message
     description: Error message if coordination failed
     type: string
     persistent: true
+    initialValue: ''
   agents: []
   constraints:
   - description: 'For travel coordinator: at least 1 input want should be connected'

@@ -58,58 +58,70 @@ wantType:
     type: int
     persistent: true
     example: 1000
+    initialValue: 0
   - name: sum
     description: Sum of all numeric items (if operation is sum)
     type: float64
     persistent: true
     example: 50500
+    initialValue: 0.0
   - name: average
     description: Average value of numeric items (if operation is average)
     type: float64
     persistent: true
     example: 50.5
+    initialValue: 0.0
   - name: min_value
     description: Minimum value seen (if operation is min)
     type: float64
     persistent: true
     example: 1
+    initialValue: 0.0
   - name: max_value
     description: Maximum value seen (if operation is max)
     type: float64
     persistent: true
     example: 100
+    initialValue: 0.0
   - name: collected_items
     description: Array of collected items (if operation is collect)
     type: '[]interface{}'
     persistent: true
     example: '[1, 2, 3, 4, 5, ...]'
+    initialValue: []
   - name: start_time
     description: ISO8601 timestamp when sink started receiving items
     type: string
     persistent: true
+    initialValue: ''
   - name: end_time
     description: ISO8601 timestamp when sink finished processing
     type: string
     persistent: true
+    initialValue: ''
   - name: processing_time_seconds
     description: Total time spent processing all items
     type: float64
     persistent: true
     example: 10.5
+    initialValue: 0.0
   - name: throughput_items_per_second
     description: Average throughput (items / processing time)
     type: float64
     persistent: true
     example: 95.2
+    initialValue: 0.0
   - name: last_item
     description: The most recently received item
     type: interface{}
     persistent: false
+    initialValue: null
   - name: items_discarded
     description: Count of items rejected when max_items reached
     type: int
     persistent: true
     example: 0
+    initialValue: 0
   agents: []
   constraints:
   - description: Report interval must be positive
