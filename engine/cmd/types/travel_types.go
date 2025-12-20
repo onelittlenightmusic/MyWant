@@ -593,6 +593,7 @@ type FlightWantLocals struct {
 	monitoringDuration  time.Duration // How long to monitor for status changes
 	monitoringActive    bool          // Whether monitoring is currently active
 	lastLogTime         time.Time     // Track last monitoring log time to reduce spam
+	monitoringDone      chan struct{} // Signal to stop monitoring goroutine
 }
 
 // Flight execution phases (state machine)
@@ -612,7 +613,9 @@ type FlightWant struct {
 
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
-	locals := &FlightWantLocals{}
+	locals := &FlightWantLocals{
+		monitoringDone: make(chan struct{}),
+	}
 	want := NewWantWithLocals(metadata, spec, locals, "flight")
 	flightWant := &FlightWant{
 		BaseTravelWant: BaseTravelWant{Want: *want},
@@ -625,7 +628,12 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 func (f *FlightWant) IsAchieved() bool {
 	phaseVal, _ := f.GetState("flight_phase")
 	phase, _ := phaseVal.(string)
-	return phase == PhaseCompleted
+	if phase == PhaseCompleted {
+		// Stop continuous monitoring before returning achieved
+		f.StopContinuousMonitoring()
+		return true
+	}
+	return false
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
@@ -1012,18 +1020,38 @@ func (f *FlightWant) StartContinuousMonitoring() {
 	}
 	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
+	// Get the monitoring done channel from locals
+	locals := f.BaseTravelWant.Want.Locals.(*FlightWantLocals)
+
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			// AGGREGATION: Wrap monitor.Exec() in progress cycle to batch all StoreState calls
-			// This prevents lock contention when multiple monitoring goroutines call StoreState
-			f.BeginProgressCycle()
-			monitor.Exec(context.Background(), &f.BaseTravelWant.Want)
-			f.EndProgressCycle()
+		for {
+			select {
+			case <-locals.monitoringDone:
+				// Goroutine stopped by StopContinuousMonitoring()
+				return
+			case <-ticker.C:
+				// AGGREGATION: Wrap monitor.Exec() in progress cycle to batch all StoreState calls
+				// This prevents lock contention when multiple monitoring goroutines call StoreState
+				f.BeginProgressCycle()
+				monitor.Exec(context.Background(), &f.BaseTravelWant.Want)
+				f.EndProgressCycle()
+			}
 		}
 	}()
+}
+
+// StopContinuousMonitoring signals the monitoring goroutine to stop
+func (f *FlightWant) StopContinuousMonitoring() {
+	locals := f.BaseTravelWant.Want.Locals.(*FlightWantLocals)
+	select {
+	case locals.monitoringDone <- struct{}{}:
+		// Signal sent successfully
+	default:
+		// Channel already closed or signal not received, do nothing
+	}
 }
 
 // Helper function to check time conflicts
