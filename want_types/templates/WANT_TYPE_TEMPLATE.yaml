@@ -54,17 +54,20 @@ wantType:
       type: "int"                         # Go type
       persistent: true                    # Survives execution cycles?
       example: 42
+      initialValue: 0                     # Default value for state initialization
 
     - name: "counter"
       description: "Total count of items processed"
       type: "int"
       persistent: true
       example: 100
+      initialValue: 0
 
     - name: "completion_time"
       description: "When processing finished"
       type: "string"
       persistent: true
+      initialValue: ""
 
   # =====================================================================
   # REQUIRE - Connectivity requirements for this want type
@@ -187,6 +190,16 @@ wantType:
 # STATE PERSISTENCE:
 # persistent: true  - State saved to file, survives restarts
 # persistent: false - State is temporary, discarded on exit
+#
+# INITIAL VALUES:
+# initialValue - Default value used when want is first created
+#   int       → 0
+#   float64   → 0.0
+#   string    → ""
+#   bool      → false
+#   []type    → []
+#   map/object → {}
+#   interface{} → null
 
 # CONNECTIVITY TYPES:
 # type: "want"      - Input/output to other wants (default)
@@ -247,17 +260,20 @@ wantType:
 #       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
 #     example: "user@example.com"
 
-# Example 4: Multiple State Keys
+# Example 4: Multiple State Keys with Initial Values
 # state:
 #   - name: "pending_items"
 #     type: "int"
 #     persistent: true
+#     initialValue: 0
 #   - name: "processed_items"
 #     type: "int"
 #     persistent: true
+#     initialValue: 0
 #   - name: "current_processing"
 #     type: "map[string]interface{}"
 #     persistent: false
+#     initialValue: {}
 
 # Example 5: Multiple Inputs
 # connectivity:
