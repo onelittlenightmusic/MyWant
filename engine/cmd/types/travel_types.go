@@ -658,10 +658,26 @@ func (f *FlightMonitoringAgent) EndProgressCycle() {
 }
 
 // NewFlightMonitoringAgent creates a new flight monitoring background agent
+// Initializes MonitorFlightAPI internally with proper configuration
 func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent {
-	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
+	agentID := "flight-monitor-" + flightID
+	// Initialize MonitorFlightAPI with agent configuration
+	monitor := &MonitorFlightAPI{
+		MonitorAgent: MonitorAgent{
+			BaseAgent: BaseAgent{
+				Name:         agentID,
+				Capabilities: []string{},
+				Uses:         []string{},
+				Type:         MonitorAgentType,
+			},
+		},
+		ServerURL:           serverURL,
+		PollInterval:        10 * time.Second,
+		StatusChangeHistory: make([]StatusChange, 0),
+	}
+
 	return &FlightMonitoringAgent{
-		id:      "flight-monitor-" + flightID,
+		id:      agentID,
 		monitor: monitor,
 	}
 }
