@@ -584,6 +584,88 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 // FlightWant Implementation (migrated from flight_types.go)
 // ============================================================================
 
+// FlightMonitoringAgent implements BackgroundAgent for continuous flight status monitoring
+type FlightMonitoringAgent struct {
+	id       string
+	monitor  *MonitorFlightAPI
+	ticker   *time.Ticker
+	done     chan struct{}
+	ctx      context.Context
+	cancel   context.CancelFunc
+	want     *Want
+}
+
+// ID returns the agent's unique identifier
+func (f *FlightMonitoringAgent) ID() string {
+	return f.id
+}
+
+// Start begins the flight monitoring goroutine
+func (f *FlightMonitoringAgent) Start(ctx context.Context, w *Want) error {
+	f.want = w
+	f.ctx, f.cancel = context.WithCancel(ctx)
+	f.ticker = time.NewTicker(10 * time.Second)
+	f.done = make(chan struct{})
+
+	go func() {
+		defer f.ticker.Stop()
+		defer close(f.done)
+
+		for {
+			select {
+			case <-f.ctx.Done():
+				return
+			case <-f.ticker.C:
+				// Monitor flight status
+				f.BeginProgressCycle()
+				f.monitor.Exec(f.ctx, f.want)
+				f.EndProgressCycle()
+			}
+		}
+	}()
+
+	return nil
+}
+
+// Stop gracefully stops the flight monitoring
+func (f *FlightMonitoringAgent) Stop() error {
+	if f.cancel != nil {
+		f.cancel()
+	}
+	if f.done != nil {
+		select {
+		case <-f.done:
+			// Already done
+		case <-time.After(1 * time.Second):
+			// Timeout waiting for goroutine to stop
+		}
+	}
+	return nil
+}
+
+// BeginProgressCycle wraps want execution for proper state management
+func (f *FlightMonitoringAgent) BeginProgressCycle() {
+	if f.want != nil {
+		f.want.BeginProgressCycle()
+	}
+}
+
+// EndProgressCycle completes the progress cycle
+func (f *FlightMonitoringAgent) EndProgressCycle() {
+	if f.want != nil {
+		f.want.EndProgressCycle()
+	}
+}
+
+// NewFlightMonitoringAgent creates a new flight monitoring background agent
+func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent {
+	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
+	return &FlightMonitoringAgent{
+		id:      "flight-monitor-" + flightID,
+		monitor: monitor,
+	}
+}
+
 // FlightWantLocals holds type-specific local state for FlightWant
 type FlightWantLocals struct {
 	FlightType          string
@@ -629,8 +711,10 @@ func (f *FlightWant) IsAchieved() bool {
 	phaseVal, _ := f.GetState("flight_phase")
 	phase, _ := phaseVal.(string)
 	if phase == PhaseCompleted {
-		// Stop continuous monitoring before returning achieved
-		f.StopContinuousMonitoring()
+		// Stop all background agents before returning achieved
+		if err := f.StopAllBackgroundAgents(); err != nil {
+			f.StoreLog(fmt.Sprintf("ERROR: Failed to stop background agents: %v", err))
+		}
 		return true
 	}
 	return false
@@ -908,8 +992,21 @@ func (f *FlightWant) tryAgentExecution() any {
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			f.StoreState("execution_source", "agent")
 
-			// Start continuous monitoring for this flight
-			f.StartContinuousMonitoring()
+			// Start background monitoring for this flight
+			flightIDVal, _ := f.GetState("flight_id")
+			flightID, _ := flightIDVal.(string)
+
+			params := f.Spec.Params
+			serverURL, ok := params["server_url"].(string)
+			if !ok || serverURL == "" {
+				serverURL = "http://localhost:8081"
+			}
+
+			// Create and add background monitoring agent
+			monitorAgent := NewFlightMonitoringAgent(flightID, serverURL)
+			if err := f.AddBackgroundAgent(monitorAgent); err != nil {
+				f.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
+			}
 
 			// Extract and return FlightSchedule
 			return f.extractFlightSchedule(result)
@@ -997,64 +1094,6 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 	}
 
 	return false
-}
-
-// StartContinuousMonitoring starts a background goroutine to continuously poll flight status
-// This is called after the flight is successfully booked via agents
-func (f *FlightWant) StartContinuousMonitoring() {
-	// Get flight ID and initialize monitor before starting goroutine
-	flightIDVal, exists := f.GetState("flight_id")
-	if !exists || flightIDVal == "" {
-		return
-	}
-
-	flightID, ok := flightIDVal.(string)
-	if !ok || flightID == "" {
-		return
-	}
-
-	params := f.Spec.Params
-	serverURL, ok := params["server_url"].(string)
-	if !ok || serverURL == "" {
-		serverURL = "http://localhost:8081"
-	}
-	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
-
-	// Get the monitoring done channel from locals
-	locals := f.GetLocals()
-
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-locals.monitoringDone:
-				// Goroutine stopped by StopContinuousMonitoring()
-				return
-			case <-ticker.C:
-				// AGGREGATION: Wrap monitor.Exec() in progress cycle to batch all StoreState calls
-				// This prevents lock contention when multiple monitoring goroutines call StoreState
-				f.BeginProgressCycle()
-				monitor.Exec(context.Background(), &f.BaseTravelWant.Want)
-				f.EndProgressCycle()
-			}
-		}
-	}()
-}
-
-// StopContinuousMonitoring signals the monitoring goroutine to stop
-func (f *FlightWant) StopContinuousMonitoring() {
-	locals := f.GetLocals()
-	if locals == nil {
-		return
-	}
-	select {
-	case locals.monitoringDone <- struct{}{}:
-		// Signal sent successfully
-	default:
-		// Channel already closed or signal not received, do nothing
-	}
 }
 
 // Helper function to check time conflicts
