@@ -429,6 +429,14 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
 	builder.SetConfigInternal(config)
 
+	// Transfer want type definitions to this builder for state initialization
+	if s.wantTypeLoader != nil {
+		allDefs := s.wantTypeLoader.GetAll()
+		for _, def := range allDefs {
+			builder.StoreWantTypeDefinition(def)
+		}
+	}
+
 	// Step 3: Create and configure agent registry (same as demo_travel_agent_full.go:40-50)
 	agentRegistry := mywant.NewAgentRegistry()
 
@@ -1702,6 +1710,18 @@ func (s *Server) Start() error {
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
+
+	// Transfer loaded want type definitions to global builder for state initialization
+	// This ensures that SetWantTypeDefinition can be called during want creation
+	if s.wantTypeLoader != nil {
+		allDefs := s.wantTypeLoader.GetAll()
+		for _, def := range allDefs {
+			// Store definition in builder's wantTypeDefinitions map
+			// This populates the definitions without re-registering factories
+			s.globalBuilder.StoreWantTypeDefinition(def)
+		}
+		log.Printf("[SERVER] ✅ Transferred %d want type definitions to global builder\n", len(allDefs))
+	}
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	log.Println("[SERVER] Starting global reconcile loop for server mode...")

@@ -197,6 +197,68 @@ func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFa
 	return nil
 }
 
+// StoreWantTypeDefinition stores a want type definition without registering a factory
+// Used when definitions are already registered separately and we just need to make them available for state initialization
+// Also registers aliases for special naming patterns (e.g., "queue" -> "qnet queue")
+func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
+	if def == nil {
+		return
+	}
+
+	// Store want type definition for later use during want creation
+	if cb.wantTypeDefinitions == nil {
+		cb.wantTypeDefinitions = make(map[string]*WantTypeDefinition)
+	}
+
+	wantType := def.Metadata.Name
+	cb.wantTypeDefinitions[wantType] = def
+
+	// Store connectivity metadata for later use during want creation
+	if cb.connectivityRegistry == nil {
+		cb.connectivityRegistry = make(map[string]ConnectivityMetadata)
+	}
+
+	// Use require field if available, otherwise fall back to usageLimit
+	metadata := func() ConnectivityMetadata {
+		if def.Require != nil {
+			// Convert RequireSpec to ConnectivityMetadata
+			return def.Require.ToConnectivityMetadata(wantType)
+		} else if def.UsageLimit != nil {
+			// Legacy support for UsageLimit
+			return def.UsageLimit.ToConnectivityMetadata(wantType)
+		}
+		return ConnectivityMetadata{}
+	}()
+	cb.connectivityRegistry[wantType] = metadata
+
+	// Register aliases for special naming patterns
+	// This handles naming mismatches between YAML definitions and code registrations
+	var aliases []string
+	switch wantType {
+	case "queue":
+		// Queue type can be referenced as "qnet queue" in code
+		aliases = []string{"qnet queue"}
+	case "sink":
+		// Sink type can be referenced as "qnet sink" in code
+		aliases = []string{"qnet sink"}
+	case "combiner":
+		// Combiner type can be referenced as "qnet combiner" in code
+		aliases = []string{"qnet combiner"}
+	case "numbers":
+		// Numbers type can be referenced as "qnet numbers" in code
+		aliases = []string{"qnet numbers"}
+	case "collector":
+		// Collector type can be referenced as "qnet collector" in code
+		aliases = []string{"qnet collector"}
+	}
+
+	// Store definitions and metadata under all aliases
+	for _, alias := range aliases {
+		cb.wantTypeDefinitions[alias] = def
+		cb.connectivityRegistry[alias] = metadata
+	}
+}
+
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
@@ -366,9 +428,27 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 
 	// Automatically set want type definition if available
 	// This initializes ProvidedStateFields and sets initial state values
+	InfoLog("[CREATE-WANT] wantType=%s, wantPtr=%v, cb.wantTypeDefinitions=%v, definitionsCount=%d\n",
+		wantType, (wantPtr != nil), (cb.wantTypeDefinitions != nil),
+		func() int {
+			if cb.wantTypeDefinitions == nil {
+				return 0
+			}
+			return len(cb.wantTypeDefinitions)
+		}())
 	if wantPtr != nil && cb.wantTypeDefinitions != nil {
 		if typeDef, exists := cb.wantTypeDefinitions[wantType]; exists {
+			InfoLog("[CREATE-WANT] Setting type definition for '%s'\n", wantType)
 			wantPtr.SetWantTypeDefinition(typeDef)
+		} else {
+			InfoLog("[CREATE-WANT] Type definition not found for '%s' (available: %v)\n",
+				wantType, func() []string {
+					keys := make([]string, 0, len(cb.wantTypeDefinitions))
+					for k := range cb.wantTypeDefinitions {
+						keys = append(keys, k)
+					}
+					return keys
+				}())
 		}
 	}
 
