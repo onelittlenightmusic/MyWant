@@ -1621,7 +1621,13 @@ func (n *Want) GetStateArrayElement(key string, index int) any {
 
 // GetLocals returns type-specific local state for a Want, with type safety
 // Returns the locals cast to the specified type, or zero value and false if cast fails
-func GetLocals[T WantLocals](w *Want) (T, bool) {
+func (w *Want) GetLocals() WantLocals {
+	return w.Locals
+}
+
+// GetLocalsAs returns type-specific local state cast to the specified type
+// Returns zero value and false if cast fails
+func GetLocalsAs[T WantLocals](w *Want) (T, bool) {
 	if w.Locals == nil {
 		var zero T
 		return zero, false
