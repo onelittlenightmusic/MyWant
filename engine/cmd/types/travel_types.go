@@ -1338,8 +1338,8 @@ func (f *FlightWant) ResetFlightState() {
 		"total_processed",
 		"schedule_date",
 		"canceled_at",
-		"previous_flight_id",
-		"previous_flight_status",
+		"_previous_flight_status",
+		// NOTE: _previous_flight_id is NOT reset - it's used to detect rebooking state
 	}
 
 	for _, key := range resetKeys {

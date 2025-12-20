@@ -86,11 +86,11 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	return a.CreateFlight(ctx, want)
 }
 // 2. "created" - after successful API response 3. "confirmed" - when monitor api checks the status Supports two date parameter formats: 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
-// 2. departure_time: RFC3339 format - used directly When rebooking (previous_flight_id exists), generates new flight number and adjusted departure time
+// 2. departure_time: RFC3339 format - used directly When rebooking (_previous_flight_id exists), generates new flight number and adjusted departure time
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	params := want.Spec.Params
 	want.StoreStateForAgent("flight_status", "in process")
-	prevFlightID, hasPrevFlight := want.GetState("previous_flight_id")
+	prevFlightID, hasPrevFlight := want.GetState("_previous_flight_id")
 	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
 
 	flightNumber, _ := params["flight_number"].(string)
@@ -254,13 +254,13 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
 	want.StoreStateMultiForAgent(map[string]any{
-		"flight_status":          "canceled",
-		"status_message":         "Flight canceled by agent",
-		"canceled_at":            time.Now().Format(time.RFC3339),
-		"previous_flight_id":     flightIDStr,
-		"previous_flight_status": "canceled",
-		"flight_id":              "",
-		"attempted":              false,
+		"flight_status":           "canceled",
+		"status_message":          "Flight canceled by agent",
+		"canceled_at":             time.Now().Format(time.RFC3339),
+		"_previous_flight_id":     flightIDStr,
+		"_previous_flight_status": "canceled",
+		"flight_id":               "",
+		"attempted":               false,
 		// DO NOT SET agent_result: nil here!
 	})
 
