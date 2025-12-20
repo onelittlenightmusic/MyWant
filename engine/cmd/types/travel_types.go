@@ -629,14 +629,14 @@ func (f *FlightWant) IsAchieved() bool {
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
-func (f *FlightWant) extractFlightSchedule(result interface{}) *FlightSchedule {
+func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 	var schedule FlightSchedule
 	switch v := result.(type) {
 	case FlightSchedule:
 		return &v
 	case *FlightSchedule:
 		return v
-	case map[string]interface{}:
+	case map[string]any:
 		if dt, ok := v["departure_time"].(time.Time); ok {
 			schedule.DepartureTime = dt
 		}
@@ -747,7 +747,7 @@ func (f *FlightWant) Progress() {
 			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
-				f.StoreStateMulti(map[string]interface{}{
+				f.StoreStateMulti(map[string]any{
 					"flight_action": "cancel_flight",
 					"attempted":     false,
 					"flight_phase":  PhaseCanceling,
@@ -775,7 +775,7 @@ func (f *FlightWant) Progress() {
 	case PhaseCanceling:
 		flightIDVal, flightIDExists := f.GetState("flight_id")
 		if !flightIDExists || flightIDVal == "" {
-			f.StoreStateMulti(map[string]interface{}{
+			f.StoreStateMulti(map[string]any{
 				"flight_phase": PhaseRebooking,
 				"attempted":    false,
 			})
@@ -785,7 +785,7 @@ func (f *FlightWant) Progress() {
 		flightID, ok := flightIDVal.(string)
 		if !ok {
 			f.StoreLog("Invalid flight_id type, transitioning to rebooking")
-			f.StoreStateMulti(map[string]interface{}{
+			f.StoreStateMulti(map[string]any{
 				"flight_phase": PhaseRebooking,
 				"attempted":    false,
 			})
@@ -802,7 +802,7 @@ func (f *FlightWant) Progress() {
 
 		// Transition to rebooking phase
 		f.StoreLog("Cancellation completed, transitioning to rebooking phase")
-		f.StoreStateMulti(map[string]interface{}{
+		f.StoreStateMulti(map[string]any{
 			"flight_phase": PhaseRebooking,
 			"attempted":    false,
 		})
@@ -853,7 +853,7 @@ func (f *FlightWant) Progress() {
 	}
 }
 
-func (f *FlightWant) sendFlightPacket(out interface{}, schedule *FlightSchedule, label string) {
+func (f *FlightWant) sendFlightPacket(out any, schedule *FlightSchedule, label string) {
 	flightEvent := TimeSlot{
 		Start: schedule.DepartureTime,
 		End:   schedule.ArrivalTime,
@@ -884,7 +884,7 @@ func (f *FlightWant) tryAgentExecution() any {
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
 		if err := f.ExecuteAgents(); err != nil {
-			f.StoreStateMulti(map[string]interface{}{
+			f.StoreStateMulti(map[string]any{
 				"agent_execution_status": "failed",
 				"agent_execution_error":  err.Error(),
 			})
@@ -937,7 +937,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := map[string]interface{}{
+	stateUpdates := map[string]any{
 		"attempted":             true,
 		"departure_time":        s.DepartureTime.Format("15:04 Jan 2"),
 		"arrival_time":          s.ArrivalTime.Format("15:04 Jan 2"),
@@ -986,7 +986,7 @@ func (f *FlightWant) shouldCancelAndRebook() bool {
 	return false
 }
 
-func (f *FlightWant) GetStateValue(key string) interface{} {
+func (f *FlightWant) GetStateValue(key string) any {
 	val, _ := f.GetState(key)
 	return val
 }
