@@ -464,7 +464,6 @@ func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
 
 	// Override the generic implementations with specific ones for special agents
 	setupFlightAPIAgents(agentRegistry)
-	setupMonitorFlightAgents(agentRegistry)
 
 }
 func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
@@ -477,19 +476,6 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 				"http://localhost:8081",
 			)
 			doAgent.Action = flightAgent.Exec
-		}
-	}
-}
-func setupMonitorFlightAgents(agentRegistry *mywant.AgentRegistry) {
-	if agent, exists := agentRegistry.GetAgent("monitor_flight_api"); exists {
-		if monitorAgent, ok := agent.(*mywant.MonitorAgent); ok {
-			flightMonitor := types.NewMonitorFlightAPI(
-				"monitor_flight_api",
-				[]string{},
-				[]string{},
-				"http://localhost:8081",
-			)
-			monitorAgent.Monitor = flightMonitor.Exec
 		}
 	}
 }
