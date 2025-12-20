@@ -1337,6 +1337,9 @@ func (f *FlightWant) ResetFlightState() {
 		"flight_duration_hours",
 		"total_processed",
 		"schedule_date",
+		"canceled_at",
+		"previous_flight_id",
+		"previous_flight_status",
 	}
 
 	for _, key := range resetKeys {
