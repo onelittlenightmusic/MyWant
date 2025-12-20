@@ -689,8 +689,8 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 // 5. Rebooking: Execute rebooking after cancellation
 // 6. Completed: Final state
 func (f *FlightWant) Progress() {
-	locals, ok := f.Locals.(*FlightWantLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")
 		return
 	}
