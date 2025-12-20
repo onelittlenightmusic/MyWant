@@ -982,7 +982,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 
 // IsAchieved checks if flight booking is complete (all phases finished)
 func (f *FlightWant) IsAchieved() bool {
-	phaseVal, _ := f.GetState("flight_phase")
+	phaseVal, _ := f.GetState("_flight_phase")
 	phase, _ := phaseVal.(string)
 	return phase == PhaseCompleted
 }
@@ -1052,7 +1052,7 @@ func (f *FlightWant) Progress() {
 		return
 	}
 
-	phaseVal, _ := f.GetState("flight_phase")
+	phaseVal, _ := f.GetState("_flight_phase")
 	phase := ""
 	if phaseVal != nil {
 		phase, _ = phaseVal.(string)
@@ -1067,7 +1067,7 @@ func (f *FlightWant) Progress() {
 	// === Phase 1: Initial Setup ===
 	case PhaseInitial:
 		f.StoreLog("Phase: Initial booking")
-		f.StoreState("flight_phase", PhaseBooking)
+		f.StoreState("_flight_phase", PhaseBooking)
 		return
 
 	// === Phase 2: Initial Booking ===
@@ -1093,7 +1093,7 @@ func (f *FlightWant) Progress() {
 
 				// Transition to monitoring phase
 				locals.monitoringStartTime = time.Now()
-				f.StoreState("flight_phase", PhaseMonitoring)
+				f.StoreState("_flight_phase", PhaseMonitoring)
 				f.StoreLog("Transitioning to monitoring phase")
 
 				return
@@ -1102,7 +1102,7 @@ func (f *FlightWant) Progress() {
 
 		// Booking failed - complete
 		f.StoreLog("Initial booking failed")
-		f.StoreState("flight_phase", PhaseCompleted)
+		f.StoreState("_flight_phase", PhaseCompleted)
 		return
 
 	// === Phase 3: Monitoring ===
@@ -1114,7 +1114,7 @@ func (f *FlightWant) Progress() {
 				f.StoreStateMulti(map[string]any{
 					"flight_action": "cancel_flight",
 					"attempted":     false,
-					"flight_phase":  PhaseCanceling,
+					"_flight_phase":  PhaseCanceling,
 				})
 				return
 			}
@@ -1131,7 +1131,7 @@ func (f *FlightWant) Progress() {
 		} else {
 			// Monitoring period expired - flight stable, complete
 			f.StoreLog("Monitoring completed successfully")
-			f.StoreState("flight_phase", PhaseCompleted)
+			f.StoreState("_flight_phase", PhaseCompleted)
 			return
 		}
 
@@ -1142,7 +1142,7 @@ func (f *FlightWant) Progress() {
 			f.StoreLog("No flight_id to cancel, resetting to booking phase")
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
-				"flight_phase": PhaseBooking,
+				"_flight_phase": PhaseBooking,
 				"attempted":    false,
 			})
 			return
@@ -1153,7 +1153,7 @@ func (f *FlightWant) Progress() {
 			f.StoreLog("Invalid flight_id type, resetting to booking phase")
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
-				"flight_phase": PhaseBooking,
+				"_flight_phase": PhaseBooking,
 				"attempted":    false,
 			})
 			return
@@ -1169,7 +1169,7 @@ func (f *FlightWant) Progress() {
 		f.StoreLog("Cancellation completed, resetting state and returning to booking phase")
 		f.ResetFlightState()
 		f.StoreStateMulti(map[string]any{
-			"flight_phase": PhaseBooking,
+			"_flight_phase": PhaseBooking,
 			"attempted":    false,
 		})
 		return
@@ -1182,7 +1182,7 @@ func (f *FlightWant) Progress() {
 
 	default:
 		f.StoreLog("Unknown phase: " + phase)
-		f.StoreState("flight_phase", PhaseCompleted)
+		f.StoreState("_flight_phase", PhaseCompleted)
 		return
 	}
 }
