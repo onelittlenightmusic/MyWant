@@ -840,8 +840,6 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	return defaultValue, false
 }
 
-// GetStateAs safely extracts and casts a state value to a specific type using generics
-// Example: schedule, ok := GetStateAs[RestaurantSchedule](want, "agent_result")
 func GetStateAs[T any](n *Want, key string) (T, bool) {
 	value, exists := n.GetState(key)
 	if !exists {

@@ -636,6 +636,11 @@ func (f *FlightWant) IsAchieved() bool {
 	return false
 }
 
+// GetLocals returns the FlightWantLocals from this want
+func (f *FlightWant) GetLocals() *FlightWantLocals {
+	return f.BaseTravelWant.Want.GetLocals().(*FlightWantLocals)
+}
+
 // extractFlightSchedule converts agent_result from state to FlightSchedule
 func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 	var schedule FlightSchedule
@@ -1016,7 +1021,7 @@ func (f *FlightWant) StartContinuousMonitoring() {
 	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
 
 	// Get the monitoring done channel from locals
-	locals := f.BaseTravelWant.Want.GetLocals().(*FlightWantLocals)
+	locals := f.GetLocals()
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -1040,8 +1045,8 @@ func (f *FlightWant) StartContinuousMonitoring() {
 
 // StopContinuousMonitoring signals the monitoring goroutine to stop
 func (f *FlightWant) StopContinuousMonitoring() {
-	locals, ok := f.BaseTravelWant.Want.GetLocals().(*FlightWantLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		return
 	}
 	select {
