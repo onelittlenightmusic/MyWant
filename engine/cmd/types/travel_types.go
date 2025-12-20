@@ -55,9 +55,9 @@ type TravelWantLocalsInterface interface{}
 
 // TravelWantInterface defines methods that specific travel wants must implement
 type TravelWantInterface interface {
-	tryAgentExecution() interface{} // Returns *RestaurantSchedule, *HotelSchedule, or *BuffetSchedule
+	tryAgentExecution() any // Returns *RestaurantSchedule, *HotelSchedule, or *BuffetSchedule
 	generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule
-	setSchedule(schedule interface{})
+	setSchedule(schedule any)
 }
 
 // BaseTravelWant provides shared functionality for all travel-related wants
@@ -82,7 +82,7 @@ func (b *BaseTravelWant) Progress() {
 	b.StoreState("attempted", true)
 
 	// Get the executor - which should be the concrete type that embeds this
-	executor, ok := interface{}(b).(TravelWantInterface)
+	executor, ok := any(b).(TravelWantInterface)
 	if !ok {
 		// The concrete type embedding this must implement TravelWantInterface
 		return
@@ -115,6 +115,25 @@ func (b *BaseTravelWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
+// setSchedule implements TravelWantInterface - delegates to concrete type's SetSchedule method
+func (b *BaseTravelWant) setSchedule(schedule any) {
+	// Try each schedule type and call the corresponding SetSchedule method
+	switch s := schedule.(type) {
+	case *RestaurantSchedule:
+		if r, ok := any(b).(*RestaurantWant); ok {
+			r.SetSchedule(*s)
+		}
+	case *HotelSchedule:
+		if h, ok := any(b).(*HotelWant); ok {
+			h.SetSchedule(*s)
+		}
+	case *BuffetSchedule:
+		if buf, ok := any(b).(*BuffetWant); ok {
+			buf.SetSchedule(*s)
+		}
+	}
+}
+
 // RestaurantWant creates dinner restaurant reservations
 type RestaurantWant struct {
 	BaseTravelWant
@@ -136,7 +155,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 }
 
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
-func (r *RestaurantWant) tryAgentExecution() interface{} {
+func (r *RestaurantWant) tryAgentExecution() any {
 	if len(r.Spec.Requires) > 0 {
 		r.StoreState("agent_requirements", r.Spec.Requires)
 
@@ -187,43 +206,32 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 	if !ok {
 		return nil
 	}
-	return r.generateRestaurantSchedule(restaurantLocals)
-}
 
-// setSchedule implements TravelWantInterface for RestaurantWant
-func (r *RestaurantWant) setSchedule(schedule interface{}) {
-	if s, ok := schedule.(*RestaurantSchedule); ok {
-		r.SetSchedule(*s)
-	}
-}
-
-// generateRestaurantSchedule generates a new restaurant reservation schedule
-func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals) *TravelSchedule {
 	// Generate restaurant reservation time (evening dinner)
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 6-9 PM
 
 	// Generate realistic restaurant name for the summary
-	restaurantName := generateRealisticRestaurantNameForTravel(locals.RestaurantType)
+	restaurantName := generateRealisticRestaurantNameForTravel(restaurantLocals.RestaurantType)
 	partySize := r.GetIntParam("party_size", 2)
 
 	newEvent := TimeSlot{
 		Start: dinnerStart,
-		End:   dinnerStart.Add(locals.Duration),
+		End:   dinnerStart.Add(restaurantLocals.Duration),
 		Type:  "restaurant",
-		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, locals.RestaurantType),
+		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, restaurantLocals.RestaurantType),
 	}
 	newSchedule := &TravelSchedule{
 		Date:   baseDate,
 		Events: []TimeSlot{newEvent},
 	}
-	r.StoreStateMulti(map[string]interface{}{
+	r.StoreStateMulti(map[string]any{
 		"total_processed":            1,
-		"reservation_type":           locals.RestaurantType,
+		"reservation_type":           restaurantLocals.RestaurantType,
 		"reservation_start_time":     newEvent.Start.Format("15:04"),
 		"reservation_end_time":       newEvent.End.Format("15:04"),
-		"reservation_duration_hours": locals.Duration.Hours(),
+		"reservation_duration_hours": restaurantLocals.Duration.Hours(),
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
@@ -234,6 +242,7 @@ func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
 type RestaurantSchedule struct {
+	TravelSchedule
 	ReservationTime  time.Time `json:"reservation_time"`
 	DurationHours    float64   `json:"duration_hours"`
 	RestaurantType   string    `json:"restaurant_type"`
@@ -243,7 +252,7 @@ type RestaurantSchedule struct {
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
 func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
-	stateUpdates := map[string]interface{}{
+	stateUpdates := map[string]any{
 		"attempted":                  true,
 		"reservation_start_time":     schedule.ReservationTime.Format("15:04"),
 		"reservation_end_time":       schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04"),
@@ -381,7 +390,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 }
 
 // tryAgentExecution implements TravelWantInterface for HotelWant
-func (h *HotelWant) tryAgentExecution() interface{} {
+func (h *HotelWant) tryAgentExecution() any {
 	if len(h.Spec.Requires) > 0 {
 	h.StoreState("agent_requirements", h.Spec.Requires)
 
@@ -411,18 +420,7 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 	if !ok {
 		return nil
 	}
-	return h.generateHotelSchedule(hotelLocals)
-}
 
-// setSchedule implements TravelWantInterface for HotelWant
-func (h *HotelWant) setSchedule(schedule interface{}) {
-	if s, ok := schedule.(*HotelSchedule); ok {
-		h.SetSchedule(*s)
-	}
-}
-
-// generateHotelSchedule generates a new hotel reservation schedule
-func (h *HotelWant) generateHotelSchedule(locals *HotelWantLocals) *TravelSchedule {
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	checkInTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		20+rand.Intn(4), rand.Intn(60), 0, 0, time.Local) // 8 PM - midnight
@@ -432,22 +430,22 @@ func (h *HotelWant) generateHotelSchedule(locals *HotelWantLocals) *TravelSchedu
 		7+rand.Intn(3), rand.Intn(60), 0, 0, time.Local) // 7-10 AM next day
 
 	// Generate realistic hotel name for the summary
-	hotelName := generateRealisticHotelNameForTravel(locals.HotelType)
+	hotelName := generateRealisticHotelNameForTravel(hotelLocals.HotelType)
 
 	newEvent := TimeSlot{
 		Start: checkInTime,
 		End:   checkOutTime,
 		Type:  "hotel",
-		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, locals.HotelType),
+		Name:  fmt.Sprintf("%s (%s hotel)", hotelName, hotelLocals.HotelType),
 	}
 
 	newSchedule := &TravelSchedule{
 		Date:   baseDate,
 		Events: []TimeSlot{newEvent},
 	}
-	h.StoreStateMulti(map[string]interface{}{
+	h.StoreStateMulti(map[string]any{
 		"total_processed":      1,
-		"hotel_type":           locals.HotelType,
+		"hotel_type":           hotelLocals.HotelType,
 		"check_in_time":        newEvent.Start.Format("15:04 Jan 2"),
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
@@ -477,7 +475,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 }
 
 // tryAgentExecution implements TravelWantInterface for BuffetWant
-func (b *BuffetWant) tryAgentExecution() interface{} {
+func (b *BuffetWant) tryAgentExecution() any {
 	if len(b.Spec.Requires) > 0 {
 	b.StoreState("agent_requirements", b.Spec.Requires)
 
@@ -507,43 +505,32 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 	if !ok {
 		return nil
 	}
-	return b.generateBuffetSchedule(buffetLocals)
-}
 
-// setSchedule implements TravelWantInterface for BuffetWant
-func (b *BuffetWant) setSchedule(schedule interface{}) {
-	if s, ok := schedule.(*BuffetSchedule); ok {
-		b.SetSchedule(*s)
-	}
-}
-
-// generateBuffetSchedule generates a new buffet reservation schedule
-func (b *BuffetWant) generateBuffetSchedule(locals *BuffetWantLocals) *TravelSchedule {
 	// Next day morning buffet
 	nextDay := time.Now().AddDate(0, 0, 2) // Day after tomorrow
 	buffetStart := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
 		8+rand.Intn(2), rand.Intn(30), 0, 0, time.Local) // 8-10 AM
 
 	// Generate realistic buffet name for the summary
-	buffetName := generateRealisticBuffetNameForTravel(locals.BuffetType)
+	buffetName := generateRealisticBuffetNameForTravel(buffetLocals.BuffetType)
 
 	newEvent := TimeSlot{
 		Start: buffetStart,
-		End:   buffetStart.Add(locals.Duration),
+		End:   buffetStart.Add(buffetLocals.Duration),
 		Type:  "buffet",
-		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, locals.BuffetType),
+		Name:  fmt.Sprintf("%s (%s buffet)", buffetName, buffetLocals.BuffetType),
 	}
 
 	newSchedule := &TravelSchedule{
 		Date:   nextDay,
 		Events: []TimeSlot{newEvent},
 	}
-	b.StoreStateMulti(map[string]interface{}{
+	b.StoreStateMulti(map[string]any{
 		"total_processed":        1,
-		"buffet_type":            locals.BuffetType,
+		"buffet_type":            buffetLocals.BuffetType,
 		"buffet_start_time":      newEvent.Start.Format("15:04 Jan 2"),
 		"buffet_end_time":        newEvent.End.Format("15:04 Jan 2"),
-		"buffet_duration_hours":  locals.Duration.Hours(),
+		"buffet_duration_hours":  buffetLocals.Duration.Hours(),
 		"reservation_name":       newEvent.Name,
 		"achieving_percentage":   100,
 	})
@@ -552,6 +539,7 @@ func (b *BuffetWant) generateBuffetSchedule(locals *BuffetWantLocals) *TravelSch
 
 // BuffetSchedule represents a complete buffet reservation schedule
 type BuffetSchedule struct {
+	TravelSchedule
 	ReservationTime  time.Time `json:"reservation_time"`
 	DurationHours    float64   `json:"duration_hours"`
 	BuffetType       string    `json:"buffet_type"`
@@ -561,7 +549,7 @@ type BuffetSchedule struct {
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
 func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
-	stateUpdates := map[string]interface{}{
+	stateUpdates := map[string]any{
 		"attempted":               true,
 		"buffet_start_time":       schedule.ReservationTime.Format("15:04 Jan 2"),
 		"buffet_end_time":         schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
@@ -587,6 +575,7 @@ func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
 // Helper function to check time conflicts
 // HotelSchedule represents a complete hotel booking schedule
 type HotelSchedule struct {
+	TravelSchedule
 	CheckInTime       time.Time `json:"check_in_time"`
 	CheckOutTime      time.Time `json:"check_out_time"`
 	HotelType         string    `json:"hotel_type"`
@@ -597,7 +586,7 @@ type HotelSchedule struct {
 	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
 }
 func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
-	stateUpdates := map[string]interface{}{
+	stateUpdates := map[string]any{
 		"attempted":           true,
 		"check_in_time":       schedule.CheckInTime.Format("15:04 Jan 2"),
 		"check_out_time":      schedule.CheckOutTime.Format("15:04 Jan 2"),
