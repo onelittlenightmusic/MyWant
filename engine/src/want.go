@@ -186,6 +186,10 @@ type Want struct {
 	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
 	backgroundMutex  sync.RWMutex               `json:"-" yaml:"-"`
 
+	// Agent state management (separate from Want progress cycle)
+	pendingAgentStateChanges map[string]any `json:"-" yaml:"-"`
+	agentStateChangesMutex   sync.RWMutex   `json:"-" yaml:"-"`
+
 	// Unified subscription event system
 	subscriptionSystem *UnifiedSubscriptionSystem `json:"-" yaml:"-"`
 
@@ -597,7 +601,12 @@ func (n *Want) StartProgressionLoop(
 				return
 			}
 
-			// 9. Sleep to prevent CPU spinning
+			// 9. Check for pending agent state changes and dump them
+			if n.HasPendingAgentStateChanges() {
+				n.DumpStateForAgent()
+			}
+
+			// 10. Sleep to prevent CPU spinning
 			time.Sleep(GlobalExecutionInterval)
 		}
 	}()

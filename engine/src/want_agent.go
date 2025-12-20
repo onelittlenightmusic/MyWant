@@ -475,3 +475,74 @@ func (w *Want) GetBackgroundAgentCount() int {
 
 	return len(w.backgroundAgents)
 }
+
+// StoreStateForAgent stores state changes from background agents in a separate queue
+// These changes are tracked independently from the Want's Progress cycle
+func (w *Want) StoreStateForAgent(key string, value any) {
+	w.agentStateChangesMutex.Lock()
+	defer w.agentStateChangesMutex.Unlock()
+
+	if w.pendingAgentStateChanges == nil {
+		w.pendingAgentStateChanges = make(map[string]any)
+	}
+	w.pendingAgentStateChanges[key] = value
+}
+
+// DumpStateForAgent commits pending agent state changes to the Want's state and history
+// Called independently from Progress loop to create separate history entries for agent work
+func (w *Want) DumpStateForAgent() {
+	w.agentStateChangesMutex.Lock()
+	if len(w.pendingAgentStateChanges) == 0 {
+		w.agentStateChangesMutex.Unlock()
+		return
+	}
+
+	// Copy pending changes
+	changesCopy := make(map[string]any)
+	for k, v := range w.pendingAgentStateChanges {
+		changesCopy[k] = v
+	}
+
+	// Clear pending changes
+	w.pendingAgentStateChanges = make(map[string]any)
+	w.agentStateChangesMutex.Unlock()
+
+	// Apply changes to actual state
+	w.stateMutex.Lock()
+	if w.State == nil {
+		w.State = make(map[string]any)
+	}
+	for key, value := range changesCopy {
+		w.State[key] = value
+	}
+	w.stateMutex.Unlock()
+
+	// Create history entry for agent state changes
+	stateSnapshot := make(map[string]any)
+	for key, value := range changesCopy {
+		stateSnapshot[key] = value
+	}
+
+	historyEntry := StateHistoryEntry{
+		WantName:   w.Metadata.Name,
+		StateValue: stateSnapshot,
+		Timestamp:  time.Now(),
+	}
+
+	w.stateMutex.Lock()
+	if w.History.StateHistory == nil {
+		w.History.StateHistory = make([]StateHistoryEntry, 0)
+	}
+	w.History.StateHistory = append(w.History.StateHistory, historyEntry)
+	w.stateMutex.Unlock()
+
+	fmt.Printf("💾 Agent state dumped for %s: %d changes\n", w.Metadata.Name, len(changesCopy))
+}
+
+// HasPendingAgentStateChanges returns true if there are pending agent state changes to dump
+func (w *Want) HasPendingAgentStateChanges() bool {
+	w.agentStateChangesMutex.RLock()
+	defer w.agentStateChangesMutex.RUnlock()
+
+	return len(w.pendingAgentStateChanges) > 0
+}

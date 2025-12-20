@@ -879,7 +879,10 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			// No status change - don't create history entry, but still update other flight details Removed verbose log: "Flight details changed but status is still: ..."
 			m.LastRecordedStateHash = currentStateHash
 		}
-		want.StoreStateMulti(updates)
+		// Use StoreStateForAgent for background agent updates (separate from Want progress cycle)
+		for key, value := range updates {
+			want.StoreStateForAgent(key, value)
+		}
 	}
 
 	return nil
