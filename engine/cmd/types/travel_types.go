@@ -654,10 +654,10 @@ func (f *FlightMonitoringAgent) BeginProgressCycle() {
 	}
 }
 
-// EndProgressCycle completes the progress cycle
+// EndProgressCycle dumps agent state changes to the want
 func (f *FlightMonitoringAgent) EndProgressCycle() {
 	if f.want != nil {
-		f.want.EndProgressCycle()
+		f.want.DumpStateForAgent()
 	}
 }
 
