@@ -982,14 +982,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 func (f *FlightWant) IsAchieved() bool {
 	phaseVal, _ := f.GetState("flight_phase")
 	phase, _ := phaseVal.(string)
-	if phase == PhaseCompleted {
-		// Stop all background agents before returning achieved
-		if err := f.StopAllBackgroundAgents(); err != nil {
-			f.StoreLog(fmt.Sprintf("ERROR: Failed to stop background agents: %v", err))
-		}
-		return true
-	}
-	return false
+	return phase == PhaseCompleted
 }
 
 // GetLocals returns the FlightWantLocals from this want
