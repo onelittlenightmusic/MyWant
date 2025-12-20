@@ -202,7 +202,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		"to":             reservation.To,
 		"departure_time": reservation.DepartureTime.Format(time.RFC3339),
 		"arrival_time":   reservation.ArrivalTime.Format(time.RFC3339),
-		"status_message": reservation.StatusMessage,
+		"status_message": "Flight reservation created and awaiting confirmation",
 		"created_at":     reservation.CreatedAt.Format(time.RFC3339),
 		"updated_at":     reservation.UpdatedAt.Format(time.RFC3339),
 		"agent_result": FlightSchedule{
