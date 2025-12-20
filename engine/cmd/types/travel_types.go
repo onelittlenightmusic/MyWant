@@ -9,26 +9,32 @@ import (
 	"time"
 )
 
+// TravelWantLocals is the base struct for all travel-related wants
+// It contains the shared TravelProgressHelper that is initialized once during want creation
+type TravelWantLocals struct {
+	Helper *TravelProgressHelper
+}
+
 // RestaurantWantLocals holds type-specific local state for RestaurantWant
 type RestaurantWantLocals struct {
+	TravelWantLocals
 	RestaurantType string
 	Duration       time.Duration
-	Helper         *TravelProgressHelper
 }
 
 // HotelWantLocals holds type-specific local state for HotelWant
 type HotelWantLocals struct {
+	TravelWantLocals
 	HotelType string
 	CheckIn   time.Duration
 	CheckOut  time.Duration
-	Helper    *TravelProgressHelper
 }
 
 // BuffetWantLocals holds type-specific local state for BuffetWant
 type BuffetWantLocals struct {
+	TravelWantLocals
 	BuffetType string
 	Duration   time.Duration
-	Helper     *TravelProgressHelper
 }
 
 // TimeSlot represents a time period with start and end times
