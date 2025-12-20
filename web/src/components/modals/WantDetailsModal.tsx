@@ -577,20 +577,34 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
                       <div className="space-y-3">
                         {(wantDetails?.history?.stateHistory || want.history?.stateHistory || []).map((entry: any, index: number) => {
                           const stateValue = entry.state_value || entry;
+                          const actionByAgent = entry.action_by_agent || entry.actionByAgent;
                           const hasAgentInfo = stateValue && (
                             stateValue.current_agent ||
                             stateValue.running_agents ||
                             stateValue.agent_history
                           );
 
+                          // Determine agent type color and icon
+                          const isDoAgent = actionByAgent === 'DoAgent';
+                          const isMonitorAgent = actionByAgent === 'MonitorAgent';
+                          const agentBgColor = isDoAgent ? 'bg-red-100' : isMonitorAgent ? 'bg-green-100' : 'bg-gray-100';
+                          const agentTextColor = isDoAgent ? 'text-red-800' : isMonitorAgent ? 'text-green-800' : 'text-gray-800';
+                          const agentBorderColor = isDoAgent ? 'border-red-300' : isMonitorAgent ? 'border-green-300' : 'border-gray-300';
+
                           return (
-                            <div key={index} className={`rounded-md p-3 border ${hasAgentInfo ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}>
+                            <div key={index} className={`rounded-md p-3 border ${hasAgentInfo || actionByAgent ? agentBgColor + ' ' + agentBorderColor : 'bg-gray-50 border-gray-200'}`}>
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center space-x-2">
                                   <span className="text-sm font-medium text-gray-700">
                                     {entry.want_name || 'State Entry'}
                                   </span>
-                                  {hasAgentInfo && (
+                                  {actionByAgent && (
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${agentBgColor} ${agentTextColor}`}>
+                                      <Bot className="h-3 w-3 mr-1" />
+                                      {actionByAgent}
+                                    </span>
+                                  )}
+                                  {hasAgentInfo && !actionByAgent && (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                       <User className="h-3 w-3 mr-1" />
                                       Agent State
