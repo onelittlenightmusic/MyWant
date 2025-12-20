@@ -29,7 +29,7 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Progressable {
 func (g *PrimeNumbers) IsAchieved() bool {
 	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
-	currentNumber, _ := g.GetStateInt("current_number", start)
+	currentNumber, _ := g.GetStateInt("current_number", start-1)
 	return currentNumber >= end
 }
 
@@ -37,7 +37,7 @@ func (g *PrimeNumbers) IsAchieved() bool {
 func (g *PrimeNumbers) Progress() {
 	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
-	currentNumber, _ := g.GetStateInt("current_number", start)
+	currentNumber, _ := g.GetStateInt("current_number", start-1) // Start from start-1 so first iteration sends start
 
 	currentNumber += 1
 
@@ -105,8 +105,20 @@ func (f *PrimeSequence) Progress() {
 	// Restore foundPrimes from persistent state if it exists
 	foundPrimesVal, _ := f.GetState("foundPrimes")
 	if foundPrimesVal != nil {
-		if fp, ok := foundPrimesVal.([]int); ok {
-			locals.foundPrimes = fp
+		// Handle both direct []int and interface{} from JSON deserialization
+		switch v := foundPrimesVal.(type) {
+		case []int:
+			locals.foundPrimes = v
+		case []interface{}:
+			// Convert []interface{} to []int (from JSON deserialization)
+			locals.foundPrimes = make([]int, 0, len(v))
+			for _, item := range v {
+				if num, ok := item.(float64); ok {
+					locals.foundPrimes = append(locals.foundPrimes, int(num))
+				} else if num, ok := item.(int); ok {
+					locals.foundPrimes = append(locals.foundPrimes, num)
+				}
+			}
 		}
 	}
 
