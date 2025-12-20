@@ -30,7 +30,7 @@ func NewAgentBuffet(name string, capabilities []string, uses []string, premiumLe
 func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
 	// Generate buffet reservation schedule
 	schedule := a.generateBuffetSchedule(want)
-	want.StoreState("agent_result", schedule)
+	want.StoreStateForAgent("agent_result", schedule)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Buffet reservation has been confirmed for %s buffet at %s for %.1f hours",

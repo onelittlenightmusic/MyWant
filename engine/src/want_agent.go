@@ -117,10 +117,9 @@ func (n *Want) executeAgent(agent Agent) error {
 				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 			}
 			{
-				n.BeginProgressCycle()
-				n.StoreState("_current_agent", n.CurrentAgent)
-				n.StoreState("_running_agents", n.RunningAgents)
-				n.EndProgressCycle()
+				n.StoreStateForAgent("_current_agent", n.CurrentAgent)
+				n.StoreStateForAgent("_running_agents", n.RunningAgents)
+				n.DumpStateForAgent("DoAgent") // Mark as AgentExecution for history tracking
 			}
 
 			if r := recover(); r != nil {
@@ -140,7 +139,6 @@ func (n *Want) executeAgent(agent Agent) error {
 
 		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
 		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
-		n.BeginProgressCycle()
 
 		if err := agent.Exec(ctx, n); err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
@@ -164,7 +162,7 @@ func (n *Want) executeAgent(agent Agent) error {
 		}
 
 		// FRAMEWORK-LEVEL: Commit all agent state changes
-		n.EndProgressCycle()
+		n.DumpStateForAgent("DoAgent")
 	}
 
 	// Execute synchronously for DO agents, asynchronously for MONITOR agents
@@ -486,6 +484,20 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 		w.pendingAgentStateChanges = make(map[string]any)
 	}
 	w.pendingAgentStateChanges[key] = value
+}
+
+// StoreStateMultiForAgent stores multiple state changes from background agents in a separate queue
+// This is a convenience method for storing multiple key-value pairs at once
+func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
+	w.agentStateChangesMutex.Lock()
+	defer w.agentStateChangesMutex.Unlock()
+
+	if w.pendingAgentStateChanges == nil {
+		w.pendingAgentStateChanges = make(map[string]any)
+	}
+	for key, value := range updates {
+		w.pendingAgentStateChanges[key] = value
+	}
 }
 
 // DumpStateForAgent commits pending agent state changes to the Want's state

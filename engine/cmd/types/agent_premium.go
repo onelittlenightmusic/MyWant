@@ -30,7 +30,7 @@ func NewAgentPremium(name string, capabilities []string, uses []string, premiumL
 func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 	// Generate premium hotel booking schedule
 	schedule := a.generateHotelSchedule(want)
-	want.StoreState("agent_result", schedule)
+	want.StoreStateForAgent("agent_result", schedule)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",

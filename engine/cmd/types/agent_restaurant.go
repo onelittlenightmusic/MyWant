@@ -30,7 +30,7 @@ func NewAgentRestaurant(name string, capabilities []string, uses []string, premi
 func (a *AgentRestaurant) Exec(ctx context.Context, want *Want) error {
 	// Generate restaurant reservation schedule
 	schedule := a.generateRestaurantSchedule(want)
-	want.StoreState("agent_result", schedule)
+	want.StoreStateForAgent("agent_result", schedule)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Restaurant reservation has been booked at %s %s for %.1f hours",

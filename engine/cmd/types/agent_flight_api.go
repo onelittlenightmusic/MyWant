@@ -68,7 +68,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 					return err
 				}
 				// Clear the action after completion
-				want.StoreState("flight_action", "")
+				want.StoreStateForAgent("flight_action", "")
 				return nil
 			case "create_flight":
 				want.StoreLog("Executing create_flight action")
@@ -76,7 +76,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 					return err
 				}
 				// Clear the action after completion
-				want.StoreState("flight_action", "")
+				want.StoreStateForAgent("flight_action", "")
 				return nil
 			}
 		}
@@ -89,7 +89,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 // 2. departure_time: RFC3339 format - used directly When rebooking (previous_flight_id exists), generates new flight number and adjusted departure time
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	params := want.Spec.Params
-	want.StoreState("flight_status", "in process")
+	want.StoreStateForAgent("flight_status", "in process")
 	prevFlightID, hasPrevFlight := want.GetState("previous_flight_id")
 	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
 
@@ -194,7 +194,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-	want.StoreStateMulti(map[string]any{
+	want.StoreStateMultiForAgent(map[string]any{
 		"flight_id":      reservation.ID,
 		"flight_status":  "created",
 		"flight_number":  reservation.FlightNumber,
@@ -253,7 +253,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-	want.StoreStateMulti(map[string]any{
+	want.StoreStateMultiForAgent(map[string]any{
 		"flight_status":          "canceled",
 		"status_message":         "Flight canceled by agent",
 		"canceled_at":            time.Now().Format(time.RFC3339),
