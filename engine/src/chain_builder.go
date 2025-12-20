@@ -2715,7 +2715,8 @@ func (cb *ChainBuilder) TriggerCompletedWantRetriggerCheck() {
 	}
 }
 // extractWantFromProgressable extracts the embedded *Want from an Progressable type using reflection
-// This handles concrete types like *RestaurantWant that embed Want
+// This handles concrete types like *RestaurantWant that embed Want, including nested embeddings
+// (e.g., RestaurantWant -> BaseTravelWant -> Want)
 func extractWantFromProgressable(progressable Progressable) (*Want, error) {
 	val := reflect.ValueOf(progressable)
 	if val.Kind() != reflect.Ptr {
@@ -2728,16 +2729,17 @@ func extractWantFromProgressable(progressable Progressable) (*Want, error) {
 		return nil, fmt.Errorf("progressable must point to a struct")
 	}
 
-	// Look for an embedded Want field
-	for i := 0; i < elem.NumField(); i++ {
-		field := elem.Field(i)
-		fieldType := elem.Type().Field(i)
-
+	// Use VisibleFields to find embedded Want field, including nested embeddings
+	visibleFields := reflect.VisibleFields(elem.Type())
+	for _, fieldType := range visibleFields {
 		// Check if this is an embedded Want field
 		if fieldType.Anonymous && fieldType.Type.Name() == "Want" {
+			// Get the field value by navigating through the struct hierarchy
+			fieldVal := elem.FieldByIndex(fieldType.Index)
+
 			// Found the embedded Want field
-			if field.Kind() == reflect.Struct && field.CanAddr() {
-				return field.Addr().Interface().(*Want), nil
+			if fieldVal.Kind() == reflect.Struct && fieldVal.CanAddr() {
+				return fieldVal.Addr().Interface().(*Want), nil
 			}
 		}
 	}
