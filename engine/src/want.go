@@ -1375,19 +1375,6 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 		}
 	}
 
-	// Debug logging
-	InfoLog("[STATE-INIT] Want '%s' (%s): initialized %d state fields (provided: %v, state keys: %v)\n",
-		n.Metadata.Name, n.Metadata.Type, len(n.ProvidedStateFields), n.ProvidedStateFields,
-		func() []string {
-			if n.State == nil {
-				return []string{}
-			}
-			keys := make([]string, 0, len(n.State))
-			for k := range n.State {
-				keys = append(keys, k)
-			}
-			return keys
-		}())
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {

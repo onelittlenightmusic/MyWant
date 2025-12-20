@@ -428,27 +428,9 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 
 	// Automatically set want type definition if available
 	// This initializes ProvidedStateFields and sets initial state values
-	InfoLog("[CREATE-WANT] wantType=%s, wantPtr=%v, cb.wantTypeDefinitions=%v, definitionsCount=%d\n",
-		wantType, (wantPtr != nil), (cb.wantTypeDefinitions != nil),
-		func() int {
-			if cb.wantTypeDefinitions == nil {
-				return 0
-			}
-			return len(cb.wantTypeDefinitions)
-		}())
 	if wantPtr != nil && cb.wantTypeDefinitions != nil {
 		if typeDef, exists := cb.wantTypeDefinitions[wantType]; exists {
-			InfoLog("[CREATE-WANT] Setting type definition for '%s'\n", wantType)
 			wantPtr.SetWantTypeDefinition(typeDef)
-		} else {
-			InfoLog("[CREATE-WANT] Type definition not found for '%s' (available: %v)\n",
-				wantType, func() []string {
-					keys := make([]string, 0, len(cb.wantTypeDefinitions))
-					for k := range cb.wantTypeDefinitions {
-						keys = append(keys, k)
-					}
-					return keys
-				}())
 		}
 	}
 
