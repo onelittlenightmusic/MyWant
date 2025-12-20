@@ -93,8 +93,11 @@ func initRestaurantHelper(r *RestaurantWant, locals *RestaurantWantLocals) {
 
 // IsAchieved checks if restaurant has been reserved
 func (r *RestaurantWant) IsAchieved() bool {
-	helper := &TravelProgressHelper{Want: &r.Want}
-	return helper.IsAchievedBase()
+	locals, ok := r.Locals.(*RestaurantWantLocals)
+	if !ok || locals.Helper == nil {
+		return false
+	}
+	return locals.Helper.IsAchievedBase()
 }
 
 // Progress creates a restaurant reservation
@@ -194,8 +197,11 @@ func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals
 
 // CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant Returns 100 if the restaurant has been attempted/executed, 0 otherwise
 func (r *RestaurantWant) CalculateAchievingPercentage() int {
-	helper := &TravelProgressHelper{Want: &r.Want}
-	return helper.CalculateAchievingPercentageBase()
+	locals, ok := r.Locals.(*RestaurantWantLocals)
+	if !ok || locals.Helper == nil {
+		return 0
+	}
+	return locals.Helper.CalculateAchievingPercentageBase()
 }
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
@@ -366,8 +372,11 @@ func initHotelHelper(h *HotelWant, locals *HotelWantLocals) {
 
 // IsAchieved checks if hotel has been reserved
 func (h *HotelWant) IsAchieved() bool {
-	helper := &TravelProgressHelper{Want: &h.Want}
-	return helper.IsAchievedBase()
+	locals, ok := h.Locals.(*HotelWantLocals)
+	if !ok || locals.Helper == nil {
+		return false
+	}
+	return locals.Helper.IsAchievedBase()
 }
 
 func (h *HotelWant) Progress() {
@@ -421,8 +430,11 @@ func (h *HotelWant) generateHotelSchedule(locals *HotelWantLocals) *TravelSchedu
 
 // CalculateAchievingPercentage calculates the progress toward completion for HotelWant Returns 100 if the hotel has been attempted/executed, 0 otherwise
 func (h *HotelWant) CalculateAchievingPercentage() int {
-	helper := &TravelProgressHelper{Want: &h.Want}
-	return helper.CalculateAchievingPercentageBase()
+	locals, ok := h.Locals.(*HotelWantLocals)
+	if !ok || locals.Helper == nil {
+		return 0
+	}
+	return locals.Helper.CalculateAchievingPercentageBase()
 }
 
 // tryAgentExecution attempts to execute hotel reservation using the agent system Returns the HotelSchedule if successful, nil if no agent execution
@@ -489,8 +501,11 @@ func initBuffetHelper(b *BuffetWant, locals *BuffetWantLocals) {
 
 // IsAchieved checks if buffet has been reserved
 func (b *BuffetWant) IsAchieved() bool {
-	helper := &TravelProgressHelper{Want: &b.Want}
-	return helper.IsAchievedBase()
+	locals, ok := b.Locals.(*BuffetWantLocals)
+	if !ok || locals.Helper == nil {
+		return false
+	}
+	return locals.Helper.IsAchievedBase()
 }
 
 func (b *BuffetWant) Progress() {
@@ -541,8 +556,11 @@ func (b *BuffetWant) generateBuffetSchedule(locals *BuffetWantLocals) *TravelSch
 
 // CalculateAchievingPercentage calculates the progress toward completion for BuffetWant Returns 100 if the buffet has been attempted/executed, 0 otherwise
 func (b *BuffetWant) CalculateAchievingPercentage() int {
-	helper := &TravelProgressHelper{Want: &b.Want}
-	return helper.CalculateAchievingPercentageBase()
+	locals, ok := b.Locals.(*BuffetWantLocals)
+	if !ok || locals.Helper == nil {
+		return 0
+	}
+	return locals.Helper.CalculateAchievingPercentageBase()
 }
 
 // tryAgentExecution attempts to execute buffet reservation using the agent system Returns the BuffetSchedule if successful, nil if no agent execution
