@@ -994,27 +994,29 @@ func (f *FlightWant) GetStateValue(key string) any {
 // StartContinuousMonitoring starts a background goroutine to continuously poll flight status
 // This is called after the flight is successfully booked via agents
 func (f *FlightWant) StartContinuousMonitoring() {
+	// Get flight ID and initialize monitor before starting goroutine
+	flightIDVal, exists := f.GetState("flight_id")
+	if !exists || flightIDVal == "" {
+		return
+	}
+
+	flightID, ok := flightIDVal.(string)
+	if !ok || flightID == "" {
+		return
+	}
+
+	params := f.Spec.Params
+	serverURL, ok := params["server_url"].(string)
+	if !ok || serverURL == "" {
+		serverURL = "http://localhost:8081"
+	}
+	monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
+
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
-			flightIDVal, exists := f.GetState("flight_id")
-			if !exists || flightIDVal == "" {
-				return
-			}
-
-			flightID, ok := flightIDVal.(string)
-			if !ok || flightID == "" {
-				return
-			}
-			params := f.Spec.Params
-			serverURL, ok := params["server_url"].(string)
-			if !ok || serverURL == "" {
-				serverURL = "http://localhost:8081"
-			}
-			monitor := NewMonitorFlightAPI("flight-monitor-"+flightID, []string{}, []string{}, serverURL)
-
 			// AGGREGATION: Wrap monitor.Exec() in progress cycle to batch all StoreState calls
 			// This prevents lock contention when multiple monitoring goroutines call StoreState
 			f.BeginProgressCycle()
