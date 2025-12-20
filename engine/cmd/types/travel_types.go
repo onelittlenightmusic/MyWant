@@ -57,7 +57,7 @@ type TravelWantLocalsInterface interface{}
 type TravelWantInterface interface {
 	tryAgentExecution() any // Returns *RestaurantSchedule, *HotelSchedule, or *BuffetSchedule
 	generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule
-	setSchedule(schedule any)
+	SetSchedule(schedule any)
 }
 
 // BaseTravelWant provides shared functionality for all travel-related wants
@@ -84,7 +84,7 @@ func (b *BaseTravelWant) Progress() {
 
 	// Try agent execution
 	if schedule := b.executor.tryAgentExecution(); schedule != nil {
-		b.executor.setSchedule(schedule)
+		b.executor.SetSchedule(schedule)
 		return
 	}
 
@@ -112,25 +112,6 @@ func (b *BaseTravelWant) CalculateAchievingPercentage() int {
 		return 100
 	}
 	return 0
-}
-
-// setSchedule implements TravelWantInterface - delegates to concrete type's SetSchedule method
-func (b *BaseTravelWant) setSchedule(schedule any) {
-	// Try each schedule type and call the corresponding SetSchedule method
-	switch s := schedule.(type) {
-	case *RestaurantSchedule:
-		if r, ok := any(b).(*RestaurantWant); ok {
-			r.SetSchedule(*s)
-		}
-	case *HotelSchedule:
-		if h, ok := any(b).(*HotelWant); ok {
-			h.SetSchedule(*s)
-		}
-	case *BuffetSchedule:
-		if buf, ok := any(b).(*BuffetWant); ok {
-			buf.SetSchedule(*s)
-		}
-	}
 }
 
 // RestaurantWant creates dinner restaurant reservations
@@ -252,26 +233,37 @@ type RestaurantSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
-func (r *RestaurantWant) SetSchedule(schedule RestaurantSchedule) {
+// SetSchedule implements TravelWantInterface for RestaurantWant
+func (r *RestaurantWant) SetSchedule(schedule any) {
+	s, ok := schedule.(RestaurantSchedule)
+	if !ok {
+		if sPtr, ok := schedule.(*RestaurantSchedule); ok {
+			s = *sPtr
+		} else {
+			r.StoreLog("ERROR: Failed to cast schedule to RestaurantSchedule")
+			return
+		}
+	}
+
 	stateUpdates := map[string]any{
 		"attempted":                  true,
-		"reservation_start_time":     schedule.ReservationTime.Format("15:04"),
-		"reservation_end_time":       schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04"),
-		"restaurant_type":            schedule.RestaurantType,
-		"reservation_duration_hours": schedule.DurationHours,
-		"reservation_name":           schedule.ReservationName,
+		"reservation_start_time":     s.ReservationTime.Format("15:04"),
+		"reservation_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04"),
+		"restaurant_type":            s.RestaurantType,
+		"reservation_duration_hours": s.DurationHours,
+		"reservation_name":           s.ReservationName,
 		"total_processed":            1,
-		"schedule_date":              schedule.ReservationTime.Format("2006-01-02"),
+		"schedule_date":              s.ReservationTime.Format("2006-01-02"),
 	}
-	if schedule.PremiumLevel != "" {
+	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = schedule.PremiumLevel
+		stateUpdates["premium_level"] = s.PremiumLevel
 	}
-	if schedule.ServiceTier != "" {
-		stateUpdates["service_tier"] = schedule.ServiceTier
+	if s.ServiceTier != "" {
+		stateUpdates["service_tier"] = s.ServiceTier
 	}
-	if len(schedule.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
+	if len(s.PremiumAmenities) > 0 {
+		stateUpdates["premium_amenities"] = s.PremiumAmenities
 	}
 
 	r.Want.StoreStateMulti(stateUpdates)
@@ -553,25 +545,36 @@ type BuffetSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
-func (b *BuffetWant) SetSchedule(schedule BuffetSchedule) {
+// SetSchedule implements TravelWantInterface for BuffetWant
+func (b *BuffetWant) SetSchedule(schedule any) {
+	s, ok := schedule.(BuffetSchedule)
+	if !ok {
+		if sPtr, ok := schedule.(*BuffetSchedule); ok {
+			s = *sPtr
+		} else {
+			b.StoreLog("ERROR: Failed to cast schedule to BuffetSchedule")
+			return
+		}
+	}
+
 	stateUpdates := map[string]any{
 		"attempted":               true,
-		"buffet_start_time":       schedule.ReservationTime.Format("15:04 Jan 2"),
-		"buffet_end_time":         schedule.ReservationTime.Add(time.Duration(schedule.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
-		"buffet_type":             schedule.BuffetType,
-		"buffet_duration_hours":   schedule.DurationHours,
-		"reservation_name":        schedule.ReservationName,
+		"buffet_start_time":       s.ReservationTime.Format("15:04 Jan 2"),
+		"buffet_end_time":         s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
+		"buffet_type":             s.BuffetType,
+		"buffet_duration_hours":   s.DurationHours,
+		"reservation_name":        s.ReservationName,
 		"total_processed":         1,
 	}
-	if schedule.PremiumLevel != "" {
+	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = schedule.PremiumLevel
+		stateUpdates["premium_level"] = s.PremiumLevel
 	}
-	if schedule.ServiceTier != "" {
-		stateUpdates["service_tier"] = schedule.ServiceTier
+	if s.ServiceTier != "" {
+		stateUpdates["service_tier"] = s.ServiceTier
 	}
-	if len(schedule.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
+	if len(s.PremiumAmenities) > 0 {
+		stateUpdates["premium_amenities"] = s.PremiumAmenities
 	}
 
 	b.Want.StoreStateMulti(stateUpdates)
@@ -590,25 +593,36 @@ type HotelSchedule struct {
 	ServiceTier       string    `json:"service_tier,omitempty"`
 	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
 }
-func (h *HotelWant) SetSchedule(schedule HotelSchedule) {
+// SetSchedule implements TravelWantInterface for HotelWant
+func (h *HotelWant) SetSchedule(schedule any) {
+	s, ok := schedule.(HotelSchedule)
+	if !ok {
+		if sPtr, ok := schedule.(*HotelSchedule); ok {
+			s = *sPtr
+		} else {
+			h.StoreLog("ERROR: Failed to cast schedule to HotelSchedule")
+			return
+		}
+	}
+
 	stateUpdates := map[string]any{
 		"attempted":           true,
-		"check_in_time":       schedule.CheckInTime.Format("15:04 Jan 2"),
-		"check_out_time":      schedule.CheckOutTime.Format("15:04 Jan 2"),
-		"hotel_type":          schedule.HotelType,
-		"stay_duration_hours": schedule.StayDurationHours,
-		"reservation_name":    schedule.ReservationName,
+		"check_in_time":       s.CheckInTime.Format("15:04 Jan 2"),
+		"check_out_time":      s.CheckOutTime.Format("15:04 Jan 2"),
+		"hotel_type":          s.HotelType,
+		"stay_duration_hours": s.StayDurationHours,
+		"reservation_name":    s.ReservationName,
 		"total_processed":     1,
 	}
-	if schedule.PremiumLevel != "" {
+	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = schedule.PremiumLevel
+		stateUpdates["premium_level"] = s.PremiumLevel
 	}
-	if schedule.ServiceTier != "" {
-		stateUpdates["service_tier"] = schedule.ServiceTier
+	if s.ServiceTier != "" {
+		stateUpdates["service_tier"] = s.ServiceTier
 	}
-	if len(schedule.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = schedule.PremiumAmenities
+	if len(s.PremiumAmenities) > 0 {
+		stateUpdates["premium_amenities"] = s.PremiumAmenities
 	}
 
 	h.Want.StoreStateMulti(stateUpdates)
