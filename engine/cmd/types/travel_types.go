@@ -1190,7 +1190,10 @@ func (f *FlightWant) Progress() {
 
 				// Restart monitoring for new flight
 				locals.monitoringStartTime = time.Now()
-				f.StoreState("flight_phase", PhaseMonitoring)
+				// Batch all phase transition state changes together
+				f.StoreStateMulti(map[string]any{
+					"flight_phase": PhaseMonitoring,
+				})
 				f.StoreLog("Transitioning back to monitoring phase for rebooked flight")
 
 				return
@@ -1199,7 +1202,9 @@ func (f *FlightWant) Progress() {
 
 		// Rebooking failed - complete
 		f.StoreLog("Rebooking failed")
-		f.StoreState("flight_phase", PhaseCompleted)
+		f.StoreStateMulti(map[string]any{
+			"flight_phase": PhaseCompleted,
+		})
 		return
 
 	// === Phase 6: Completed ===
