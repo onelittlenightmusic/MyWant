@@ -9,22 +9,14 @@ import (
 	"time"
 )
 
-// TravelWantLocals is the base struct for all travel-related wants
-// It contains the shared TravelProgressHelper that is initialized once during want creation
-type TravelWantLocals struct {
-	Helper *TravelProgressHelper
-}
-
 // RestaurantWantLocals holds type-specific local state for RestaurantWant
 type RestaurantWantLocals struct {
-	TravelWantLocals
 	RestaurantType string
 	Duration       time.Duration
 }
 
 // HotelWantLocals holds type-specific local state for HotelWant
 type HotelWantLocals struct {
-	TravelWantLocals
 	HotelType string
 	CheckIn   time.Duration
 	CheckOut  time.Duration
@@ -32,7 +24,6 @@ type HotelWantLocals struct {
 
 // BuffetWantLocals holds type-specific local state for BuffetWant
 type BuffetWantLocals struct {
-	TravelWantLocals
 	BuffetType string
 	Duration   time.Duration
 }
@@ -59,9 +50,74 @@ type ScheduleConflict struct {
 	Attempts int
 }
 
+// TravelWantLocalsInterface is a marker interface for all travel want locals
+type TravelWantLocalsInterface interface{}
+
+// TravelWantInterface defines methods that specific travel wants must implement
+type TravelWantInterface interface {
+	tryAgentExecution() interface{} // Returns *RestaurantSchedule, *HotelSchedule, or *BuffetSchedule
+	generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule
+	setSchedule(schedule interface{})
+}
+
+// BaseTravelWant provides shared functionality for all travel-related wants
+// RestaurantWant, HotelWant, and BuffetWant all embed this base type
+type BaseTravelWant struct {
+	Want
+}
+
+// IsAchieved checks if the travel want has been achieved
+func (b *BaseTravelWant) IsAchieved() bool {
+	attempted, _ := b.GetStateBool("attempted", false)
+	return attempted
+}
+
+// Progress executes the travel want's main logic
+// This is implemented once in BaseTravelWant and works for all travel types
+func (b *BaseTravelWant) Progress() {
+	attempted, _ := b.GetStateBool("attempted", false)
+	if attempted {
+		return
+	}
+	b.StoreState("attempted", true)
+
+	// Get the executor - which should be the concrete type that embeds this
+	executor, ok := interface{}(b).(TravelWantInterface)
+	if !ok {
+		// The concrete type embedding this must implement TravelWantInterface
+		return
+	}
+
+	// Try agent execution
+	if schedule := executor.tryAgentExecution(); schedule != nil {
+		executor.setSchedule(schedule)
+		return
+	}
+
+	// Generate and provide schedule
+	locals, ok := b.Locals.(TravelWantLocalsInterface)
+	if !ok {
+		return
+	}
+	_, connectionAvailable := b.GetFirstOutputChannel()
+	schedule := executor.generateSchedule(locals)
+	if schedule != nil && connectionAvailable {
+		b.Provide(schedule)
+	}
+}
+
+// CalculateAchievingPercentage returns progress percentage
+func (b *BaseTravelWant) CalculateAchievingPercentage() int {
+	attempted, _ := b.GetStateBool("attempted", false)
+	if attempted {
+		return 100
+	}
+	return 0
+}
+
 // RestaurantWant creates dinner restaurant reservations
 type RestaurantWant struct {
-	Want
+	BaseTravelWant
 }
 
 // NewRestaurantWant creates a new restaurant reservation want
@@ -73,55 +129,14 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 		locals,
 		"restaurant",
 	)
-	restaurantWant := &RestaurantWant{*want}
-	initRestaurantHelper(restaurantWant, locals)
+	restaurantWant := &RestaurantWant{
+		BaseTravelWant: BaseTravelWant{Want: *want},
+	}
 	return restaurantWant
 }
 
-// initRestaurantHelper sets up the TravelProgressHelper for RestaurantWant
-func initRestaurantHelper(r *RestaurantWant, locals *RestaurantWantLocals) {
-	locals.Helper = &TravelProgressHelper{
-		Want: &r.Want,
-		TryAgentExecutionFn: func() any {
-			return r.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(RestaurantSchedule); ok {
-				r.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return r.generateRestaurantSchedule(locals)
-		},
-		ServiceType: "restaurant",
-	}
-}
-
-// IsAchieved checks if restaurant has been reserved
-func (r *RestaurantWant) IsAchieved() bool {
-	locals, ok := r.Locals.(*RestaurantWantLocals)
-	if !ok || locals.Helper == nil {
-		return false
-	}
-	return locals.Helper.IsAchievedBase()
-}
-
-// Progress creates a restaurant reservation
-func (r *RestaurantWant) Progress() {
-	locals, ok := r.Locals.(*RestaurantWantLocals)
-	if !ok {
-		r.StoreLog("ERROR: Failed to access RestaurantWantLocals from Want.Locals")
-		return
-	}
-
-	// Use the cached helper initialized at construction time
-	if locals.Helper != nil {
-		locals.Helper.ProgressBase()
-	}
-}
-
-// tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
-func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
+// tryAgentExecution implements TravelWantInterface for RestaurantWant
+func (r *RestaurantWant) tryAgentExecution() interface{} {
 	if len(r.Spec.Requires) > 0 {
 		r.StoreState("agent_requirements", r.Spec.Requires)
 
@@ -166,6 +181,22 @@ func (r *RestaurantWant) tryAgentExecution() *RestaurantSchedule {
 	return nil
 }
 
+// generateSchedule implements TravelWantInterface for RestaurantWant
+func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule {
+	restaurantLocals, ok := locals.(*RestaurantWantLocals)
+	if !ok {
+		return nil
+	}
+	return r.generateRestaurantSchedule(restaurantLocals)
+}
+
+// setSchedule implements TravelWantInterface for RestaurantWant
+func (r *RestaurantWant) setSchedule(schedule interface{}) {
+	if s, ok := schedule.(*RestaurantSchedule); ok {
+		r.SetSchedule(*s)
+	}
+}
+
 // generateRestaurantSchedule generates a new restaurant reservation schedule
 func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals) *TravelSchedule {
 	// Generate restaurant reservation time (evening dinner)
@@ -199,15 +230,6 @@ func (r *RestaurantWant) generateRestaurantSchedule(locals *RestaurantWantLocals
 		"finalResult":                newEvent.Name,
 	})
 	return newSchedule
-}
-
-// CalculateAchievingPercentage calculates the progress toward completion for RestaurantWant Returns 100 if the restaurant has been attempted/executed, 0 otherwise
-func (r *RestaurantWant) CalculateAchievingPercentage() int {
-	locals, ok := r.Locals.(*RestaurantWantLocals)
-	if !ok || locals.Helper == nil {
-		return 0
-	}
-	return locals.Helper.CalculateAchievingPercentageBase()
 }
 
 // RestaurantSchedule represents a complete restaurant reservation schedule
@@ -340,7 +362,7 @@ func generateRealisticBuffetNameForTravel(buffetType string) string {
 
 // HotelWant creates hotel stay reservations
 type HotelWant struct {
-	Want
+	BaseTravelWant
 }
 
 // NewHotelWant creates a new hotel reservation want
@@ -352,49 +374,50 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 		locals,
 		"hotel",
 	)
-	hotelWant := &HotelWant{*want}
-	initHotelHelper(hotelWant, locals)
+	hotelWant := &HotelWant{
+		BaseTravelWant: BaseTravelWant{Want: *want},
+	}
 	return hotelWant
 }
 
-// initHotelHelper sets up the TravelProgressHelper for HotelWant
-func initHotelHelper(h *HotelWant, locals *HotelWantLocals) {
-	locals.Helper = &TravelProgressHelper{
-		Want: &h.Want,
-		TryAgentExecutionFn: func() any {
-			return h.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(HotelSchedule); ok {
-				h.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return h.generateHotelSchedule(locals)
-		},
-		ServiceType: "hotel",
+// tryAgentExecution implements TravelWantInterface for HotelWant
+func (h *HotelWant) tryAgentExecution() interface{} {
+	if len(h.Spec.Requires) > 0 {
+	h.StoreState("agent_requirements", h.Spec.Requires)
+
+		// Use dynamic agent execution based on requirements
+		if err := h.ExecuteAgents(); err != nil {
+			h.StoreState("agent_execution_status", "failed")
+			h.StoreState("agent_execution_error", err.Error())
+			return nil
+		}
+
+		h.StoreState("agent_execution_status", "completed")
+
+		// Wait for agent to complete and retrieve result Check for agent_result in state
+		if schedule, ok := GetStateAs[HotelSchedule](&h.Want, "agent_result"); ok {
+			return &schedule
+		}
+
+		return nil
 	}
+
+	return nil
 }
 
-// IsAchieved checks if hotel has been reserved
-func (h *HotelWant) IsAchieved() bool {
-	locals, ok := h.Locals.(*HotelWantLocals)
-	if !ok || locals.Helper == nil {
-		return false
-	}
-	return locals.Helper.IsAchievedBase()
-}
-
-func (h *HotelWant) Progress() {
-	locals, ok := h.Locals.(*HotelWantLocals)
+// generateSchedule implements TravelWantInterface for HotelWant
+func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule {
+	hotelLocals, ok := locals.(*HotelWantLocals)
 	if !ok {
-		h.StoreLog("ERROR: Failed to access HotelWantLocals from Want.Locals")
-		return
+		return nil
 	}
+	return h.generateHotelSchedule(hotelLocals)
+}
 
-	// Use the cached helper initialized at construction time
-	if locals.Helper != nil {
-		locals.Helper.ProgressBase()
+// setSchedule implements TravelWantInterface for HotelWant
+func (h *HotelWant) setSchedule(schedule interface{}) {
+	if s, ok := schedule.(*HotelSchedule); ok {
+		h.SetSchedule(*s)
 	}
 }
 
@@ -434,43 +457,9 @@ func (h *HotelWant) generateHotelSchedule(locals *HotelWantLocals) *TravelSchedu
 	return newSchedule
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for HotelWant Returns 100 if the hotel has been attempted/executed, 0 otherwise
-func (h *HotelWant) CalculateAchievingPercentage() int {
-	locals, ok := h.Locals.(*HotelWantLocals)
-	if !ok || locals.Helper == nil {
-		return 0
-	}
-	return locals.Helper.CalculateAchievingPercentageBase()
-}
-
-// tryAgentExecution attempts to execute hotel reservation using the agent system Returns the HotelSchedule if successful, nil if no agent execution
-func (h *HotelWant) tryAgentExecution() *HotelSchedule {
-	if len(h.Spec.Requires) > 0 {
-	h.StoreState("agent_requirements", h.Spec.Requires)
-
-		// Use dynamic agent execution based on requirements
-		if err := h.ExecuteAgents(); err != nil {
-			h.StoreState("agent_execution_status", "failed")
-			h.StoreState("agent_execution_error", err.Error())
-			return nil
-		}
-
-		h.StoreState("agent_execution_status", "completed")
-
-		// Wait for agent to complete and retrieve result Check for agent_result in state
-		if schedule, ok := GetStateAs[HotelSchedule](&h.Want, "agent_result"); ok {
-			return &schedule
-		}
-
-		return nil
-	}
-
-	return nil
-}
-
 // BuffetWant creates breakfast buffet reservations
 type BuffetWant struct {
-	Want
+	BaseTravelWant
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
@@ -481,49 +470,50 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 		locals,
 		"buffet",
 	)
-	buffetWant := &BuffetWant{*want}
-	initBuffetHelper(buffetWant, locals)
+	buffetWant := &BuffetWant{
+		BaseTravelWant: BaseTravelWant{Want: *want},
+	}
 	return buffetWant
 }
 
-// initBuffetHelper sets up the TravelProgressHelper for BuffetWant
-func initBuffetHelper(b *BuffetWant, locals *BuffetWantLocals) {
-	locals.Helper = &TravelProgressHelper{
-		Want: &b.Want,
-		TryAgentExecutionFn: func() any {
-			return b.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(BuffetSchedule); ok {
-				b.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return b.generateBuffetSchedule(locals)
-		},
-		ServiceType: "buffet",
+// tryAgentExecution implements TravelWantInterface for BuffetWant
+func (b *BuffetWant) tryAgentExecution() interface{} {
+	if len(b.Spec.Requires) > 0 {
+	b.StoreState("agent_requirements", b.Spec.Requires)
+
+		// Use dynamic agent execution based on requirements
+		if err := b.ExecuteAgents(); err != nil {
+			b.StoreState("agent_execution_status", "failed")
+			b.StoreState("agent_execution_error", err.Error())
+			return nil
+		}
+
+		b.StoreState("agent_execution_status", "completed")
+
+		// Wait for agent to complete and retrieve result Check for agent_result in state
+		if schedule, ok := GetStateAs[BuffetSchedule](&b.Want, "agent_result"); ok {
+			return &schedule
+		}
+
+		return nil
 	}
+
+	return nil
 }
 
-// IsAchieved checks if buffet has been reserved
-func (b *BuffetWant) IsAchieved() bool {
-	locals, ok := b.Locals.(*BuffetWantLocals)
-	if !ok || locals.Helper == nil {
-		return false
-	}
-	return locals.Helper.IsAchievedBase()
-}
-
-func (b *BuffetWant) Progress() {
-	locals, ok := b.Locals.(*BuffetWantLocals)
+// generateSchedule implements TravelWantInterface for BuffetWant
+func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule {
+	buffetLocals, ok := locals.(*BuffetWantLocals)
 	if !ok {
-		b.StoreLog("ERROR: Failed to access BuffetWantLocals from Want.Locals")
-		return
+		return nil
 	}
+	return b.generateBuffetSchedule(buffetLocals)
+}
 
-	// Use the cached helper initialized at construction time
-	if locals.Helper != nil {
-		locals.Helper.ProgressBase()
+// setSchedule implements TravelWantInterface for BuffetWant
+func (b *BuffetWant) setSchedule(schedule interface{}) {
+	if s, ok := schedule.(*BuffetSchedule); ok {
+		b.SetSchedule(*s)
 	}
 }
 
@@ -558,40 +548,6 @@ func (b *BuffetWant) generateBuffetSchedule(locals *BuffetWantLocals) *TravelSch
 		"achieving_percentage":   100,
 	})
 	return newSchedule
-}
-
-// CalculateAchievingPercentage calculates the progress toward completion for BuffetWant Returns 100 if the buffet has been attempted/executed, 0 otherwise
-func (b *BuffetWant) CalculateAchievingPercentage() int {
-	locals, ok := b.Locals.(*BuffetWantLocals)
-	if !ok || locals.Helper == nil {
-		return 0
-	}
-	return locals.Helper.CalculateAchievingPercentageBase()
-}
-
-// tryAgentExecution attempts to execute buffet reservation using the agent system Returns the BuffetSchedule if successful, nil if no agent execution
-func (b *BuffetWant) tryAgentExecution() *BuffetSchedule {
-	if len(b.Spec.Requires) > 0 {
-	b.StoreState("agent_requirements", b.Spec.Requires)
-
-		// Use dynamic agent execution based on requirements
-		if err := b.ExecuteAgents(); err != nil {
-			b.StoreState("agent_execution_status", "failed")
-			b.StoreState("agent_execution_error", err.Error())
-			return nil
-		}
-
-		b.StoreState("agent_execution_status", "completed")
-
-		// Wait for agent to complete and retrieve result Check for agent_result in state
-		if schedule, ok := GetStateAs[BuffetSchedule](&b.Want, "agent_result"); ok {
-			return &schedule
-		}
-
-		return nil
-	}
-
-	return nil
 }
 
 // BuffetSchedule represents a complete buffet reservation schedule
