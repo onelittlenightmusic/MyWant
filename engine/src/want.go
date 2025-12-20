@@ -9,6 +9,21 @@ import (
 	"time"
 )
 
+// BackgroundAgent is an interface for long-running background operations
+// Implementations should handle their own goroutine lifecycle
+type BackgroundAgent interface {
+	// ID returns a unique identifier for this background agent
+	ID() string
+
+	// Start starts the background agent operation
+	// Called once when agent is added to a want
+	Start(ctx context.Context, w *Want) error
+
+	// Stop gracefully stops the background agent
+	// Called when want is completed or agent is explicitly deleted
+	Stop() error
+}
+
 // OwnerReference represents a reference to an owner object
 type OwnerReference struct {
 	APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
@@ -166,6 +181,10 @@ type Want struct {
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
 	agentStateChanges map[string]any        `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
+
+	// Background agents for long-running operations
+	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
+	backgroundMutex  sync.RWMutex               `json:"-" yaml:"-"`
 
 	// Unified subscription event system
 	subscriptionSystem *UnifiedSubscriptionSystem `json:"-" yaml:"-"`

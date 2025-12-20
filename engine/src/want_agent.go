@@ -376,3 +376,102 @@ func (n *Want) GetAgentHistoryGroupedByType() map[string][]AgentExecution {
 	}
 	return grouped
 }
+
+// ============================================================================
+// Background Agent Management
+// ============================================================================
+
+// AddBackgroundAgent registers and starts a background agent
+// The agent's Start() method is called immediately
+func (w *Want) AddBackgroundAgent(agent BackgroundAgent) error {
+	if agent == nil {
+		return fmt.Errorf("background agent cannot be nil")
+	}
+
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	// Initialize background agents map if needed
+	if w.backgroundAgents == nil {
+		w.backgroundAgents = make(map[string]BackgroundAgent)
+	}
+
+	agentID := agent.ID()
+
+	// Check if agent already exists
+	if _, exists := w.backgroundAgents[agentID]; exists {
+		return fmt.Errorf("background agent with ID %q already exists", agentID)
+	}
+
+	// Start the agent with background context
+	if err := agent.Start(context.Background(), w); err != nil {
+		return fmt.Errorf("failed to start background agent %q: %w", agentID, err)
+	}
+
+	// Store the agent
+	w.backgroundAgents[agentID] = agent
+
+	return nil
+}
+
+// DeleteBackgroundAgent stops and removes a background agent by ID
+func (w *Want) DeleteBackgroundAgent(agentID string) error {
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	agent, exists := w.backgroundAgents[agentID]
+	if !exists {
+		return fmt.Errorf("background agent with ID %q not found", agentID)
+	}
+
+	// Stop the agent
+	if err := agent.Stop(); err != nil {
+		return fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
+	}
+
+	// Remove from map
+	delete(w.backgroundAgents, agentID)
+
+	return nil
+}
+
+// StopAllBackgroundAgents stops all running background agents
+// Called automatically when a want completes
+func (w *Want) StopAllBackgroundAgents() error {
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	if w.backgroundAgents == nil || len(w.backgroundAgents) == 0 {
+		return nil
+	}
+
+	var lastErr error
+	for agentID, agent := range w.backgroundAgents {
+		if err := agent.Stop(); err != nil {
+			lastErr = fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
+			w.StoreLog(fmt.Sprintf("ERROR: %v", lastErr))
+		}
+	}
+
+	// Clear all agents
+	w.backgroundAgents = make(map[string]BackgroundAgent)
+
+	return lastErr
+}
+
+// GetBackgroundAgent returns a specific background agent by ID
+func (w *Want) GetBackgroundAgent(agentID string) (BackgroundAgent, bool) {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	agent, exists := w.backgroundAgents[agentID]
+	return agent, exists
+}
+
+// GetBackgroundAgentCount returns the number of active background agents
+func (w *Want) GetBackgroundAgentCount() int {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	return len(w.backgroundAgents)
+}
