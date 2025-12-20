@@ -657,7 +657,7 @@ func (f *FlightMonitoringAgent) BeginProgressCycle() {
 // EndProgressCycle dumps agent state changes to the want
 func (f *FlightMonitoringAgent) EndProgressCycle() {
 	if f.want != nil {
-		f.want.DumpStateForAgent()
+		f.want.DumpStateForAgent("MonitorAgent")
 	}
 }
 
@@ -880,6 +880,8 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 			m.LastRecordedStateHash = currentStateHash
 		}
 		// Use StoreStateForAgent for background agent updates (separate from Want progress cycle)
+		// Mark this as MonitorAgent for history tracking
+		want.StoreStateForAgent("action_by_agent", "MonitorAgent")
 		for key, value := range updates {
 			want.StoreStateForAgent(key, value)
 		}

@@ -603,7 +603,7 @@ func (n *Want) StartProgressionLoop(
 
 			// 9. Check for pending agent state changes and dump them
 			if n.HasPendingAgentStateChanges() {
-				n.DumpStateForAgent()
+				n.DumpStateForAgent("DoAgent")
 			}
 
 			// 10. Sleep to prevent CPU spinning
@@ -907,11 +907,17 @@ func (n *Want) addAggregatedStateHistory() {
 	}
 	stateSnapshot := make(map[string]any)
 	for key, value := range n.State {
-		// Skip agent metadata fields - they cause false history duplicates since they change multiple times during agent execution but don't represent actual want state changes
-		if key == "current_agent" || key == "running_agents" {
+		// Skip internal fields starting with underscore - they are internal markers only
+		if strings.HasPrefix(key, "_") {
 			continue
 		}
 		stateSnapshot[key] = value
+	}
+
+	// Extract action_by_agent from state snapshot for StateHistoryEntry
+	var actionByAgent string
+	if agentType, ok := stateSnapshot["action_by_agent"].(string); ok {
+		actionByAgent = agentType
 	}
 
 	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
@@ -946,15 +952,20 @@ func (n *Want) addAggregatedStateHistory() {
 				}
 				// Update timestamp to reflect the latest status change
 				n.History.StateHistory[len(n.History.StateHistory)-1].Timestamp = time.Now()
+				// Update ActionByAgent if it changed
+				if actionByAgent != "" {
+					n.History.StateHistory[len(n.History.StateHistory)-1].ActionByAgent = actionByAgent
+				}
 			}
 			return
 		}
 	}
 
 	entry := StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: stateSnapshot,
-		Timestamp:  time.Now(),
+		WantName:      n.Metadata.Name,
+		StateValue:    stateSnapshot,
+		Timestamp:     time.Now(),
+		ActionByAgent: actionByAgent,
 	}
 	if n.History.StateHistory == nil {
 		n.History.StateHistory = make([]StateHistoryEntry, 0)

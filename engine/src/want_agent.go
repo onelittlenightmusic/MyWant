@@ -80,8 +80,8 @@ func (n *Want) executeAgent(agent Agent) error {
 	n.CurrentAgent = agent.GetName()
 	{
 		n.BeginProgressCycle()
-		n.StoreState("current_agent", agent.GetName())
-		n.StoreState("running_agents", n.RunningAgents)
+		n.StoreState("_current_agent", agent.GetName())
+		n.StoreState("_running_agents", n.RunningAgents)
 		n.EndProgressCycle()
 	}
 	agentExec := AgentExecution{
@@ -118,8 +118,8 @@ func (n *Want) executeAgent(agent Agent) error {
 			}
 			{
 				n.BeginProgressCycle()
-				n.StoreState("current_agent", n.CurrentAgent)
-				n.StoreState("running_agents", n.RunningAgents)
+				n.StoreState("_current_agent", n.CurrentAgent)
+				n.StoreState("_running_agents", n.RunningAgents)
 				n.EndProgressCycle()
 			}
 
@@ -492,7 +492,9 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 // Agent state changes are applied to State and will be recorded in StateHistory
 // by the next Progress cycle's addAggregatedStateHistory() call
 // This consolidates all state history recording through addAggregatedStateHistory()
-func (w *Want) DumpStateForAgent() {
+// DumpStateForAgent applies pending agent state changes and stores the agent type
+// The agentType parameter identifies which agent (e.g., "MonitorAgent", "DoAgent") made the changes
+func (w *Want) DumpStateForAgent(agentType string) {
 	w.agentStateChangesMutex.Lock()
 	if len(w.pendingAgentStateChanges) == 0 {
 		w.agentStateChangesMutex.Unlock()
@@ -509,17 +511,19 @@ func (w *Want) DumpStateForAgent() {
 	w.pendingAgentStateChanges = make(map[string]any)
 	w.agentStateChangesMutex.Unlock()
 
-	// Apply changes to actual state (will be recorded in next Progress cycle)
+	// Store the agent type for use in StateHistory recording
 	w.stateMutex.Lock()
 	if w.State == nil {
 		w.State = make(map[string]any)
 	}
+	// Store agent type for tracking in history
+	w.State["action_by_agent"] = agentType
 	for key, value := range changesCopy {
 		w.State[key] = value
 	}
 	w.stateMutex.Unlock()
 
-	fmt.Printf("💾 Agent state dumped for %s: %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, len(changesCopy))
+	fmt.Printf("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
 }
 
 // HasPendingAgentStateChanges returns true if there are pending agent state changes to dump

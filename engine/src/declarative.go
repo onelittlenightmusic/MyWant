@@ -57,9 +57,10 @@ type NotificationFilter struct {
 
 // StateHistoryEntry represents a state change entry in the generic history system
 type StateHistoryEntry struct {
-	WantName   string      `json:"wantName" yaml:"want_name"`
-	StateValue any `json:"stateValue" yaml:"state_value"`
-	Timestamp  time.Time   `json:"timestamp" yaml:"timestamp"`
+	WantName       string      `json:"wantName" yaml:"want_name"`
+	StateValue     any         `json:"stateValue" yaml:"state_value"`
+	Timestamp      time.Time   `json:"timestamp" yaml:"timestamp"`
+	ActionByAgent  string      `json:"actionByAgent,omitempty" yaml:"action_by_agent,omitempty"`
 }
 
 // ParameterUpdate represents a parameter change notification
