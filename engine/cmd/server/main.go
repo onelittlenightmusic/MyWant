@@ -143,31 +143,14 @@ func NewServer(config ServerConfig) *Server {
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
 	// Load recipes from recipes/ directory as custom types
-	if err := mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry); err != nil {
-		log.Printf("[SERVER] ❌ Failed to load recipes as custom types: %v\n", err)
-	} else {
-		log.Printf("[SERVER] ✅ Successfully loaded recipes as custom types\n")
-	}
+	_ = mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry)
 
 	// Also load the recipe files themselves into the recipe registry
-	if err := loadRecipeFilesIntoRegistry("recipes", recipeRegistry); err != nil {
-		log.Printf("[SERVER] ❌ Failed to load recipe files: %v\n", err)
-	} else {
-		log.Printf("[SERVER] ✅ Successfully loaded recipe files into registry\n")
-	}
-
-	// Debug: List registered custom types
-	customTypesList := recipeRegistry.ListTypes()
-	log.Printf("[SERVER] 📋 Registered custom types: %v (total: %d)\n", customTypesList, len(customTypesList))
+	_ = loadRecipeFilesIntoRegistry("recipes", recipeRegistry)
 
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
-	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load want type definitions: %v\n", err)
-	} else {
-		stats := wantTypeLoader.GetStats()
-		log.Printf("[SERVER] Loaded want type definitions: %v\n", stats)
-	}
+	_ = wantTypeLoader.LoadAllWantTypes()
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
@@ -427,33 +410,21 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
 	}
 
-	log.Printf("[CONFIG-LOAD] 📂 Loaded config from %s: %d wants\n", configPath, len(config.Wants))
-	for i, want := range config.Wants {
-		log.Printf("[CONFIG-LOAD]   [%d] name=%s, type=%s, recipe=%v\n", i, want.Metadata.Name, want.Metadata.Type, want.Spec.Recipe)
-		if len(want.Spec.Requires) > 0 {
-		}
-	}
-
 	// Step 2: Create chain builder (same as demo_travel_agent_full.go:38)
 	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", configID)
 	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
 	builder.SetConfigInternal(config)
-	log.Printf("[CONFIG-EXEC] ✅ Created chain builder for config ID: %s\n", configID)
 
 	// Transfer want type definitions to this builder for state initialization
 	if s.wantTypeLoader != nil {
 		allDefs := s.wantTypeLoader.GetAll()
-		log.Printf("[CONFIG-EXEC] 📋 Transferring %d want type definitions to builder\n", len(allDefs))
 		for _, def := range allDefs {
 			builder.StoreWantTypeDefinition(def)
 		}
 	}
 
 	// Set custom target registry (CRITICAL for recipe-based custom types like prime sieve)
-	log.Printf("[CONFIG-EXEC] 🎯 Setting custom target registry on builder\n")
 	builder.SetCustomTargetRegistry(s.recipeRegistry)
-	customTypes := s.recipeRegistry.ListTypes()
-	log.Printf("[CONFIG-EXEC] 📋 Available custom types in recipeRegistry: %v (total: %d)\n", customTypes, len(customTypes))
 
 	// Step 3: Create and configure agent registry (same as demo_travel_agent_full.go:40-50)
 	agentRegistry := mywant.NewAgentRegistry()
@@ -1738,11 +1709,9 @@ func (s *Server) Start() error {
 			// This populates the definitions without re-registering factories
 			s.globalBuilder.StoreWantTypeDefinition(def)
 		}
-		log.Printf("[SERVER] ✅ Transferred %d want type definitions to global builder\n", len(allDefs))
 	}
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
-	log.Println("[SERVER] Starting global reconcile loop for server mode...")
 	go s.globalBuilder.ExecuteWithMode(true)
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
