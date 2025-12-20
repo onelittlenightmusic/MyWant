@@ -581,8 +581,18 @@ func validateRecipeResultSpec(spec any, fieldName string) error {
 	if wantName, ok := specObj["want_name"]; !ok || wantName == "" {
 		return fmt.Errorf("%s missing required 'want_name' field", fieldName)
 	}
-	if statName, ok := specObj["stat_name"]; !ok || statName == "" {
-		return fmt.Errorf("%s missing required 'stat_name' field", fieldName)
+
+	// Accept either 'state_field' or 'stat_name' for backward compatibility
+	hasStateField := false
+	if stateField, ok := specObj["state_field"]; ok && stateField != "" {
+		hasStateField = true
+	}
+	if statName, ok := specObj["stat_name"]; ok && statName != "" {
+		hasStateField = true
+	}
+
+	if !hasStateField {
+		return fmt.Errorf("%s missing required 'state_field' or 'stat_name' field", fieldName)
 	}
 
 	return nil

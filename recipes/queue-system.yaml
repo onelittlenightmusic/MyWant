@@ -73,7 +73,7 @@ recipe:
       state_field: "generated_count"
       description: "Items generated"
     - want_name: "queue"
-      stat_name: "."
+      state_field: "."
       description: "All metrics from queue system"
 
   # Example deployment - one-click deployment configuration

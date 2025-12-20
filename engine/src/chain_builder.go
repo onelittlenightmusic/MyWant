@@ -397,7 +397,11 @@ func (cb *ChainBuilder) isConnectivitySatisfied(wantName string, want *runtimeWa
 }
 func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 	wantType := want.Metadata.Type
-	if cb.customRegistry.IsCustomType(wantType) {
+	InfoLog("[WANT-CREATE] Creating want '%s' (type: %s)\n", want.Metadata.Name, wantType)
+
+	// Check if it's a custom type first
+	if cb.customRegistry != nil && cb.customRegistry.IsCustomType(wantType) {
+		InfoLog("[WANT-CREATE] ✅ Type '%s' is a CUSTOM TYPE\n", wantType)
 		return cb.createCustomTargetWant(want)
 	}
 
@@ -409,12 +413,18 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 		for typeName := range cb.registry {
 			availableTypes = append(availableTypes, typeName)
 		}
-		customTypes := cb.customRegistry.ListTypes()
+		customTypes := make([]string, 0)
+		if cb.customRegistry != nil {
+			customTypes = cb.customRegistry.ListTypes()
+		}
 
+		InfoLog("[WANT-CREATE] ❌ Type '%s' NOT FOUND. Standard types: %v, Custom types: %v\n",
+			wantType, availableTypes, customTypes)
 		return nil, fmt.Errorf("Unknown want type: '%s'. Available standard types: %v. Available custom types: %v",
 			wantType, availableTypes, customTypes)
 	}
 
+	InfoLog("[WANT-CREATE] ✅ Type '%s' is a STANDARD TYPE, calling factory\n", wantType)
 	factoryResult := factory(want.Metadata, want.Spec)
 
 	// Extract *Want from the Progressable result via reflection
@@ -428,10 +438,22 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 
 	// Automatically set want type definition if available
 	// This initializes ProvidedStateFields and sets initial state values
+	InfoLog("[WANT-CREATE] 🔍 Looking for type definition: wantTypeDefinitions=%v, count=%d\n",
+		(cb.wantTypeDefinitions != nil),
+		func() int { if cb.wantTypeDefinitions == nil { return 0 }; return len(cb.wantTypeDefinitions) }())
+
 	if wantPtr != nil && cb.wantTypeDefinitions != nil {
 		if typeDef, exists := cb.wantTypeDefinitions[wantType]; exists {
+			InfoLog("[WANT-CREATE] ✅ Found type definition for '%s', initializing state (%d fields)\n",
+				wantType, len(typeDef.State))
 			wantPtr.SetWantTypeDefinition(typeDef)
+			InfoLog("[WANT-CREATE] ✅ State initialized with %d provided fields\n", len(wantPtr.ProvidedStateFields))
+		} else {
+			InfoLog("[WANT-CREATE] ⚠️  Type definition NOT FOUND for '%s'\n", wantType)
 		}
+	} else {
+		InfoLog("[WANT-CREATE] ⚠️  Cannot set type definition: wantPtr=%v, wantTypeDefinitions=%v\n",
+			(wantPtr != nil), (cb.wantTypeDefinitions != nil))
 	}
 
 	if cb.agentRegistry != nil && wantPtr != nil {
@@ -451,17 +473,23 @@ func (cb *ChainBuilder) TestCreateWantFunction(want *Want) (any, error) {
 	return cb.createWantFunction(want)
 }
 func (cb *ChainBuilder) createCustomTargetWant(want *Want) (any, error) {
+	InfoLog("[CUSTOM-TYPE] 🔍 Looking up custom type: '%s' (name: '%s')\n", want.Metadata.Type, want.Metadata.Name)
 	config, exists := cb.customRegistry.Get(want.Metadata.Type)
 	if !exists {
+		availableTypes := cb.customRegistry.ListTypes()
+		InfoLog("[CUSTOM-TYPE] ❌ Custom type '%s' NOT FOUND. Available: %v\n", want.Metadata.Type, availableTypes)
 		return nil, fmt.Errorf("custom type '%s' not found in registry", want.Metadata.Type)
 	}
 
-	InfoLog("🎯 Creating custom target type: '%s' - %s\n", config.Name, config.Description)
+	InfoLog("[CUSTOM-TYPE] ✅ Found custom type config: '%s' (recipe: %s)\n", config.Name, config.DefaultRecipe)
+	InfoLog("[CUSTOM-TYPE] 🎯 Creating custom target: %s\n", config.Description)
+	InfoLog("[CUSTOM-TYPE] 📋 Default params: %v\n", config.DefaultParams)
 
 	// Merge custom type defaults with user-provided spec
 	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
 	target := config.CreateTargetFunc(want.Metadata, mergedSpec)
 	target.SetBuilder(cb)
+	InfoLog("[CUSTOM-TYPE] 🔌 Creating recipe loader for custom type expansion\n")
 	recipeLoader := NewGenericRecipeLoader("recipes")
 	target.SetRecipeLoader(recipeLoader)
 
@@ -2019,6 +2047,8 @@ func LoadConfigFromYAMLBytes(data []byte) (Config, error) {
 func loadConfigFromYAML(filename string) (Config, error) {
 	var config Config
 
+	InfoLog("[CONFIG-YAML] 📖 Loading config from: %s\n", filename)
+
 	// Read the YAML config file
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -2031,6 +2061,15 @@ func loadConfigFromYAML(filename string) (Config, error) {
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
 		return config, fmt.Errorf("failed to parse YAML config: %w", err)
+	}
+
+	InfoLog("[CONFIG-YAML] ✅ Loaded %d wants from config\n", len(config.Wants))
+	for i, want := range config.Wants {
+		recipe := ""
+		if want.Spec.Recipe != "" {
+			recipe = fmt.Sprintf(", recipe=%s", want.Spec.Recipe)
+		}
+		InfoLog("[CONFIG-YAML]   [%d] %s (type=%s%s)\n", i, want.Metadata.Name, want.Metadata.Type, recipe)
 	}
 
 	// Assign individual IDs to each want if not already set

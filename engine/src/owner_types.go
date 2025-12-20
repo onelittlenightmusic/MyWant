@@ -269,27 +269,36 @@ func (t *Target) resolveRecipeParameters() {
 }
 func (t *Target) CreateChildWants() []*Want {
 	// Recipe loader is required for target wants
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] 🎯 CreateChildWants() called for '%s' (type=%s)\n", t.Metadata.Name, t.Metadata.Type))
+
 	if t.recipeLoader == nil {
+		t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ❌ ERROR: recipeLoader is nil for '%s'\n", t.Metadata.Name))
 		return []*Want{}
 	}
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ✅ recipeLoader is available\n"))
 
 	// Load child wants from recipe
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] 📖 Loading recipe from: '%s' with params: %v\n", t.RecipePath, t.RecipeParams))
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
 	if err != nil {
+		t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ❌ ERROR: Failed to load recipe '%s': %v\n", t.RecipePath, err))
 		return []*Want{}
 	}
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ✅ Successfully loaded recipe with %d child wants\n", len(config.Wants)))
 
 	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
 	for _, childWant := range config.Wants {
 		if childWant.Metadata.Type == parentType {
-			t.StoreLog(fmt.Sprintf("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
+			t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
 				t.Metadata.Name, parentType, t.RecipePath))
-			t.StoreLog(fmt.Sprintf("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
+			t.StoreLog(fmt.Sprintf("[TARGET-CHILD] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
 				childWant.Metadata.Type, parentType))
 			return []*Want{}
 		}
 	}
+
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] 🔗 Setting owner references and labels for %d child wants\n", len(config.Wants)))
 	for i := range config.Wants {
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
 			{
@@ -305,9 +314,11 @@ func (t *Target) CreateChildWants() []*Want {
 			config.Wants[i].Metadata.Labels = make(map[string]string)
 		}
 		config.Wants[i].Metadata.Labels["owner"] = "child"
+		t.StoreLog(fmt.Sprintf("[TARGET-CHILD]   [%d] Child: name='%s', type='%s'\n", i, config.Wants[i].Metadata.Name, config.Wants[i].Metadata.Type))
 	}
 
 	t.childWants = config.Wants
+	t.StoreLog(fmt.Sprintf("[TARGET-CHILD] ✅ Created %d child wants successfully\n", len(t.childWants)))
 	return t.childWants
 }
 
@@ -335,10 +346,19 @@ func (t *Target) IsAchieved() bool {
 func (t *Target) Progress() {
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
+		t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] 🎬 Phase 1: Creating child wants for '%s' (type=%s)\n", t.Metadata.Name, t.Metadata.Type))
 		childWants := t.CreateChildWants()
-		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
-			return
+		t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] 📦 CreateChildWants() returned %d wants\n", len(childWants)))
+
+		if len(childWants) > 0 {
+			t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] 🚀 Sending %d child wants to builder via AddWantsAsync\n", len(childWants)))
+			if err := t.builder.AddWantsAsync(childWants); err != nil {
+				t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] ❌ ERROR: Failed to send child wants: %v\n", err))
+				return
+			}
+			t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] ✅ Successfully sent child wants to builder\n"))
+		} else {
+			t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] ⚠️  WARNING: No child wants returned from CreateChildWants()\n"))
 		}
 
 		// Mark that we've created children
@@ -355,6 +375,7 @@ func (t *Target) Progress() {
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
+				t.StoreLog(fmt.Sprintf("[TARGET-PROGRESS] ✅ Phase 2: All children completed for '%s'\n", t.Metadata.Name))
 				// Send completion packet to parent/upstream wants
 				packet := map[string]any{
 					"status":   "completed",

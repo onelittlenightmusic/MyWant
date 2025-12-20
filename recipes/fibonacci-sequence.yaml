@@ -50,10 +50,10 @@ recipe:
   # Recipe result definition - specifies how to compute fibonacci results
   result:
     - want_name: "fibonacci filter"
-      stat_name: ".filtered"
+      state_field: ".filtered"
       description: "Filtered fibonacci numbers in range"
     - want_name: "fibonacci filter"
-      stat_name: ".count"
+      state_field: ".count"
       description: "Count of filtered fibonacci numbers"
   # Example deployment - one-click deployment configuration
   example:
@@ -62,7 +62,8 @@ recipe:
           name: "fibonacci-sequence-demo"
           type: "fibonacci sequence"
           labels:
-            recipe: "Fibonacci Sequence"
+            recipe: "Fibonacci Sequence
+"
         spec:
           params:
             prefix: "fibonacci"

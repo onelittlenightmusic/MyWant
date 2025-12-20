@@ -79,16 +79,16 @@ recipe:
   # Recipe result definition
   result:
     - want_name: "coordinator"
-      stat_name: ".coordinator_result"
+      state_field: ".coordinator_result"
       description: "Level 1 approval coordinator result with inputs"
     - want_name: "coordinator"
-      stat_name: ".approval_status"
+      state_field: ".approval_status"
       description: "Level 1 approval status"
     - want_name: "level2_approval"
-      stat_name: ".coordinator_result"
+      state_field: ".coordinator_result"
       description: "Level 2 approval coordinator result with inputs"
     - want_name: "level2_approval"
-      stat_name: ".approval_status"
+      state_field: ".approval_status"
       description: "Level 2 approval status"
   # Example deployment - one-click deployment configuration
   example:

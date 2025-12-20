@@ -144,13 +144,21 @@ func NewServer(config ServerConfig) *Server {
 
 	// Load recipes from recipes/ directory as custom types
 	if err := mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load recipes as custom types: %v\n", err)
+		log.Printf("[SERVER] ❌ Failed to load recipes as custom types: %v\n", err)
+	} else {
+		log.Printf("[SERVER] ✅ Successfully loaded recipes as custom types\n")
 	}
 
 	// Also load the recipe files themselves into the recipe registry
 	if err := loadRecipeFilesIntoRegistry("recipes", recipeRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load recipe files: %v\n", err)
+		log.Printf("[SERVER] ❌ Failed to load recipe files: %v\n", err)
+	} else {
+		log.Printf("[SERVER] ✅ Successfully loaded recipe files into registry\n")
 	}
+
+	// Debug: List registered custom types
+	customTypesList := recipeRegistry.ListTypes()
+	log.Printf("[SERVER] 📋 Registered custom types: %v (total: %d)\n", customTypesList, len(customTypesList))
 
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
@@ -419,7 +427,9 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
 	}
 
-	for _, want := range config.Wants {
+	log.Printf("[CONFIG-LOAD] 📂 Loaded config from %s: %d wants\n", configPath, len(config.Wants))
+	for i, want := range config.Wants {
+		log.Printf("[CONFIG-LOAD]   [%d] name=%s, type=%s, recipe=%v\n", i, want.Metadata.Name, want.Metadata.Type, want.Spec.Recipe)
 		if len(want.Spec.Requires) > 0 {
 		}
 	}
@@ -428,14 +438,22 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", configID)
 	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
 	builder.SetConfigInternal(config)
+	log.Printf("[CONFIG-EXEC] ✅ Created chain builder for config ID: %s\n", configID)
 
 	// Transfer want type definitions to this builder for state initialization
 	if s.wantTypeLoader != nil {
 		allDefs := s.wantTypeLoader.GetAll()
+		log.Printf("[CONFIG-EXEC] 📋 Transferring %d want type definitions to builder\n", len(allDefs))
 		for _, def := range allDefs {
 			builder.StoreWantTypeDefinition(def)
 		}
 	}
+
+	// Set custom target registry (CRITICAL for recipe-based custom types like prime sieve)
+	log.Printf("[CONFIG-EXEC] 🎯 Setting custom target registry on builder\n")
+	builder.SetCustomTargetRegistry(s.recipeRegistry)
+	customTypes := s.recipeRegistry.ListTypes()
+	log.Printf("[CONFIG-EXEC] 📋 Available custom types in recipeRegistry: %v (total: %d)\n", customTypes, len(customTypes))
 
 	// Step 3: Create and configure agent registry (same as demo_travel_agent_full.go:40-50)
 	agentRegistry := mywant.NewAgentRegistry()

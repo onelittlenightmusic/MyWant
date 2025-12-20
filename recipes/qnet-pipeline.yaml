@@ -134,13 +134,13 @@ recipe:
   # Recipe result definition - specifies which want and stat to use for final result
   result:
       - want_name: "queue-primary"
-        stat_name: ".average_wait_time"
+        state_field: ".average_wait_time"
         description: "Average wait time in primary stream queue"
       - want_name: "queue-secondary"
-        stat_name: ".average_wait_time"
+        state_field: ".average_wait_time"
         description: "Average wait time in secondary stream queue"
       - want_name: "queue-final"
-        stat_name: "."
+        state_field: "."
         description: "All metrics in final queue"
   # Example deployment - one-click deployment configuration
   example:
