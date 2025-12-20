@@ -64,6 +64,7 @@ type TravelWantInterface interface {
 // RestaurantWant, HotelWant, and BuffetWant all embed this base type
 type BaseTravelWant struct {
 	Want
+	executor TravelWantInterface // Reference to concrete type for interface method dispatch
 }
 
 // IsAchieved checks if the travel want has been achieved
@@ -72,13 +73,18 @@ func (b *BaseTravelWant) IsAchieved() bool {
 	return attempted
 }
 
-// progressImpl contains the shared progress logic for all travel wants
-func (b *BaseTravelWant) progressImpl(executor TravelWantInterface) {
+// Progress implements Progressable for all travel wants
+func (b *BaseTravelWant) Progress() {
 	b.StoreState("attempted", true)
 
+	if b.executor == nil {
+		b.StoreLog("ERROR: executor not initialized")
+		return
+	}
+
 	// Try agent execution
-	if schedule := executor.tryAgentExecution(); schedule != nil {
-		executor.setSchedule(schedule)
+	if schedule := b.executor.tryAgentExecution(); schedule != nil {
+		b.executor.setSchedule(schedule)
 		return
 	}
 
@@ -89,7 +95,7 @@ func (b *BaseTravelWant) progressImpl(executor TravelWantInterface) {
 		return
 	}
 	_, connectionAvailable := b.GetFirstOutputChannel()
-	schedule := executor.generateSchedule(locals)
+	schedule := b.executor.generateSchedule(locals)
 	if schedule != nil && connectionAvailable {
 		b.Provide(schedule)
 	} else if schedule == nil {
@@ -144,12 +150,9 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
 	restaurantWant := &RestaurantWant{
 		BaseTravelWant: BaseTravelWant{Want: *want},
 	}
+	// Set executor to self for interface method dispatch
+	restaurantWant.BaseTravelWant.executor = restaurantWant
 	return restaurantWant
-}
-
-// Progress implements Progressable for RestaurantWant
-func (r *RestaurantWant) Progress() {
-	r.BaseTravelWant.progressImpl(r)
 }
 
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
@@ -384,12 +387,9 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 	hotelWant := &HotelWant{
 		BaseTravelWant: BaseTravelWant{Want: *want},
 	}
+	// Set executor to self for interface method dispatch
+	hotelWant.BaseTravelWant.executor = hotelWant
 	return hotelWant
-}
-
-// Progress implements Progressable for HotelWant
-func (h *HotelWant) Progress() {
-	h.BaseTravelWant.progressImpl(h)
 }
 
 // tryAgentExecution implements TravelWantInterface for HotelWant
@@ -474,12 +474,9 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 	buffetWant := &BuffetWant{
 		BaseTravelWant: BaseTravelWant{Want: *want},
 	}
+	// Set executor to self for interface method dispatch
+	buffetWant.BaseTravelWant.executor = buffetWant
 	return buffetWant
-}
-
-// Progress implements Progressable for BuffetWant
-func (b *BuffetWant) Progress() {
-	b.BaseTravelWant.progressImpl(b)
 }
 
 // tryAgentExecution implements TravelWantInterface for BuffetWant
