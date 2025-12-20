@@ -13,6 +13,7 @@ import (
 type RestaurantWantLocals struct {
 	RestaurantType string
 	Duration       time.Duration
+	Helper         *TravelProgressHelper
 }
 
 // HotelWantLocals holds type-specific local state for HotelWant
@@ -20,12 +21,14 @@ type HotelWantLocals struct {
 	HotelType string
 	CheckIn   time.Duration
 	CheckOut  time.Duration
+	Helper    *TravelProgressHelper
 }
 
 // BuffetWantLocals holds type-specific local state for BuffetWant
 type BuffetWantLocals struct {
 	BuffetType string
 	Duration   time.Duration
+	Helper     *TravelProgressHelper
 }
 
 // TimeSlot represents a time period with start and end times
@@ -57,12 +60,39 @@ type RestaurantWant struct {
 
 // NewRestaurantWant creates a new restaurant reservation want
 func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
-	return &RestaurantWant{*NewWantWithLocals(
+	want := NewWantWithLocals(
 		metadata,
 		spec,
 		&RestaurantWantLocals{},
 		"restaurant",
-	)}
+	)
+	restaurantWant := &RestaurantWant{*want}
+	initRestaurantHelper(restaurantWant)
+	return restaurantWant
+}
+
+// initRestaurantHelper sets up the TravelProgressHelper for RestaurantWant
+func initRestaurantHelper(r *RestaurantWant) {
+	locals, ok := r.Locals.(*RestaurantWantLocals)
+	if !ok {
+		return
+	}
+
+	locals.Helper = &TravelProgressHelper{
+		Want: &r.Want,
+		TryAgentExecutionFn: func() any {
+			return r.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(RestaurantSchedule); ok {
+				r.SetSchedule(s)
+			}
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return r.generateRestaurantSchedule(locals)
+		},
+		ServiceType: "restaurant",
+	}
 }
 
 // IsAchieved checks if restaurant has been reserved
@@ -79,22 +109,10 @@ func (r *RestaurantWant) Progress() {
 		return
 	}
 
-	helper := &TravelProgressHelper{
-		Want: &r.Want,
-		TryAgentExecutionFn: func() any {
-			return r.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(RestaurantSchedule); ok {
-				r.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return r.generateRestaurantSchedule(locals)
-		},
-		ServiceType: "restaurant",
+	// Use the cached helper initialized at construction time
+	if locals.Helper != nil {
+		locals.Helper.ProgressBase()
 	}
-	helper.ProgressBase()
 }
 
 // tryAgentExecution attempts to execute restaurant reservation using the agent system Returns the RestaurantSchedule if successful, nil if no agent execution
@@ -319,12 +337,39 @@ type HotelWant struct {
 
 // NewHotelWant creates a new hotel reservation want
 func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
-	return &HotelWant{*NewWantWithLocals(
+	want := NewWantWithLocals(
 		metadata,
 		spec,
 		&HotelWantLocals{},
 		"hotel",
-	)}
+	)
+	hotelWant := &HotelWant{*want}
+	initHotelHelper(hotelWant)
+	return hotelWant
+}
+
+// initHotelHelper sets up the TravelProgressHelper for HotelWant
+func initHotelHelper(h *HotelWant) {
+	locals, ok := h.Locals.(*HotelWantLocals)
+	if !ok {
+		return
+	}
+
+	locals.Helper = &TravelProgressHelper{
+		Want: &h.Want,
+		TryAgentExecutionFn: func() any {
+			return h.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(HotelSchedule); ok {
+				h.SetSchedule(s)
+			}
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return h.generateHotelSchedule(locals)
+		},
+		ServiceType: "hotel",
+	}
 }
 
 // IsAchieved checks if hotel has been reserved
@@ -340,22 +385,10 @@ func (h *HotelWant) Progress() {
 		return
 	}
 
-	helper := &TravelProgressHelper{
-		Want: &h.Want,
-		TryAgentExecutionFn: func() any {
-			return h.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(HotelSchedule); ok {
-				h.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return h.generateHotelSchedule(locals)
-		},
-		ServiceType: "hotel",
+	// Use the cached helper initialized at construction time
+	if locals.Helper != nil {
+		locals.Helper.ProgressBase()
 	}
-	helper.ProgressBase()
 }
 
 // generateHotelSchedule generates a new hotel reservation schedule
@@ -431,12 +464,39 @@ type BuffetWant struct {
 }
 
 func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
-	return &BuffetWant{*NewWantWithLocals(
+	want := NewWantWithLocals(
 		metadata,
 		spec,
 		&BuffetWantLocals{},
 		"buffet",
-	)}
+	)
+	buffetWant := &BuffetWant{*want}
+	initBuffetHelper(buffetWant)
+	return buffetWant
+}
+
+// initBuffetHelper sets up the TravelProgressHelper for BuffetWant
+func initBuffetHelper(b *BuffetWant) {
+	locals, ok := b.Locals.(*BuffetWantLocals)
+	if !ok {
+		return
+	}
+
+	locals.Helper = &TravelProgressHelper{
+		Want: &b.Want,
+		TryAgentExecutionFn: func() any {
+			return b.tryAgentExecution()
+		},
+		SetScheduleFn: func(schedule any) {
+			if s, ok := schedule.(BuffetSchedule); ok {
+				b.SetSchedule(s)
+			}
+		},
+		GenerateScheduleFn: func() *TravelSchedule {
+			return b.generateBuffetSchedule(locals)
+		},
+		ServiceType: "buffet",
+	}
 }
 
 // IsAchieved checks if buffet has been reserved
@@ -452,22 +512,10 @@ func (b *BuffetWant) Progress() {
 		return
 	}
 
-	helper := &TravelProgressHelper{
-		Want: &b.Want,
-		TryAgentExecutionFn: func() any {
-			return b.tryAgentExecution()
-		},
-		SetScheduleFn: func(schedule any) {
-			if s, ok := schedule.(BuffetSchedule); ok {
-				b.SetSchedule(s)
-			}
-		},
-		GenerateScheduleFn: func() *TravelSchedule {
-			return b.generateBuffetSchedule(locals)
-		},
-		ServiceType: "buffet",
+	// Use the cached helper initialized at construction time
+	if locals.Helper != nil {
+		locals.Helper.ProgressBase()
 	}
-	helper.ProgressBase()
 }
 
 // generateBuffetSchedule generates a new buffet reservation schedule
