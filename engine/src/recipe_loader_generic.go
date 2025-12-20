@@ -194,6 +194,19 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		}
 	}
 
+	// Validate recipe results if present
+	// Note: Full validation requires want type definitions which may not be available at this point
+	// We perform basic validation (non-blocking) and log warnings
+	if recipeContent.Result != nil && len(*recipeContent.Result) > 0 {
+		for _, resultSpec := range *recipeContent.Result {
+			if resultSpec.StateField != "" {
+				DebugLog("[RECIPE] Result will use state_field '%s' from want '%s'\n", resultSpec.StateField, resultSpec.WantName)
+			} else if resultSpec.StatName != "" {
+				DebugLog("[RECIPE] Warning: result for want '%s' uses deprecated stat_name '%s' (use state_field instead)\n", resultSpec.WantName, resultSpec.StatName)
+			}
+		}
+	}
+
 	return &GenericRecipeConfig{
 		Config:     config,
 		Parameters: mergedParams,

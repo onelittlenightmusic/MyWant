@@ -46,14 +46,15 @@ type ChangeEvent struct {
 
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop
 type ChainBuilder struct {
-	configPath               string                    // Path to original config file
-	memoryPath               string                    // Path to memory file (watched for changes)
-	wants                    map[string]*runtimeWant   // Runtime want registry
-	registry                 map[string]WantFactory    // Want type factories
-	connectivityRegistry     map[string]ConnectivityMetadata // Want type connectivity metadata from YAML
-	customRegistry           *CustomTargetTypeRegistry // Custom target type registry
-	agentRegistry            *AgentRegistry            // Agent registry for agent-enabled wants
-	waitGroup                *sync.WaitGroup           // Execution synchronization
+	configPath               string                              // Path to original config file
+	memoryPath               string                              // Path to memory file (watched for changes)
+	wants                    map[string]*runtimeWant             // Runtime want registry
+	registry                 map[string]WantFactory              // Want type factories
+	connectivityRegistry     map[string]ConnectivityMetadata     // Want type connectivity metadata from YAML
+	wantTypeDefinitions      map[string]*WantTypeDefinition      // Want type definitions (state fields, etc.)
+	customRegistry           *CustomTargetTypeRegistry           // Custom target type registry
+	agentRegistry            *AgentRegistry                      // Agent registry for agent-enabled wants
+	waitGroup                *sync.WaitGroup                     // Execution synchronization
 	config                   Config                    // Current configuration
 
 	// Reconcile loop fields
@@ -126,26 +127,27 @@ func (cb *ChainBuilder) GetConfig() Config {
 // NewChainBuilderWithPaths creates a new builder with config and memory file paths
 func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
-		configPath:       configPath,
-		memoryPath:       memoryPath,
-		wants:            make(map[string]*runtimeWant),
-		registry:         make(map[string]WantFactory),
-		customRegistry:   NewCustomTargetTypeRegistry(),
-		reconcileStop:    make(chan bool),
-		reconcileTrigger: make(chan *TriggerCommand, 20), // Unified channel for reconciliation and control triggers
-		addWantsChan:     make(chan []*Want, 10), // Buffered to allow concurrent submissions
-		deleteWantsChan:  make(chan []string, 10), // Buffered to allow concurrent deletion requests
-		pathMap:          make(map[string]Paths),
-		channels:         make(map[string]chain.Chan),
-		running:          false,
-		warnedConnectionIssues: make(map[string]bool), // Track logged connectivity warnings
-		labelToUsers:       make(map[string][]string),
-		wantCompletedFlags: make(map[string]bool),
-		waitGroup:        &sync.WaitGroup{},
-		suspended:   false,
-		suspendChan: make(chan bool),
-		resumeChan:  make(chan bool),
-		controlStop: make(chan bool),
+		configPath:              configPath,
+		memoryPath:              memoryPath,
+		wants:                   make(map[string]*runtimeWant),
+		registry:                make(map[string]WantFactory),
+		wantTypeDefinitions:     make(map[string]*WantTypeDefinition),
+		customRegistry:          NewCustomTargetTypeRegistry(),
+		reconcileStop:           make(chan bool),
+		reconcileTrigger:        make(chan *TriggerCommand, 20), // Unified channel for reconciliation and control triggers
+		addWantsChan:            make(chan []*Want, 10), // Buffered to allow concurrent submissions
+		deleteWantsChan:         make(chan []string, 10), // Buffered to allow concurrent deletion requests
+		pathMap:                 make(map[string]Paths),
+		channels:                make(map[string]chain.Chan),
+		running:                 false,
+		warnedConnectionIssues:  make(map[string]bool), // Track logged connectivity warnings
+		labelToUsers:            make(map[string][]string),
+		wantCompletedFlags:      make(map[string]bool),
+		waitGroup:               &sync.WaitGroup{},
+		suspended:               false,
+		suspendChan:             make(chan bool),
+		resumeChan:              make(chan bool),
+		controlStop:             make(chan bool),
 	}
 
 	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes() This avoids duplicate scanning logs when multiple ChainBuilder instances are created Recipe registry is passed via the environment during server initialization
@@ -171,6 +173,12 @@ func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFa
 
 	// Register the factory
 	cb.registry[wantType] = factory
+
+	// Store want type definition for later use during want creation
+	if cb.wantTypeDefinitions == nil {
+		cb.wantTypeDefinitions = make(map[string]*WantTypeDefinition)
+	}
+	cb.wantTypeDefinitions[wantType] = def
 
 	// Store connectivity metadata for later use during want creation
 	if cb.connectivityRegistry == nil {
@@ -354,6 +362,14 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (any, error) {
 		wantPtr = w
 	} else {
 		return nil, fmt.Errorf("factory returned Progressable but could not extract Want: %v", err)
+	}
+
+	// Automatically set want type definition if available
+	// This initializes ProvidedStateFields and sets initial state values
+	if wantPtr != nil && cb.wantTypeDefinitions != nil {
+		if typeDef, exists := cb.wantTypeDefinitions[wantType]; exists {
+			wantPtr.SetWantTypeDefinition(typeDef)
+		}
 	}
 
 	if cb.agentRegistry != nil && wantPtr != nil {
