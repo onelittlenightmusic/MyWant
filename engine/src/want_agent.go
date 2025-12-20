@@ -488,8 +488,10 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 	w.pendingAgentStateChanges[key] = value
 }
 
-// DumpStateForAgent commits pending agent state changes to the Want's state and history
-// Called independently from Progress loop to create separate history entries for agent work
+// DumpStateForAgent commits pending agent state changes to the Want's state
+// Agent state changes are applied to State and will be recorded in StateHistory
+// by the next Progress cycle's addAggregatedStateHistory() call
+// This consolidates all state history recording through addAggregatedStateHistory()
 func (w *Want) DumpStateForAgent() {
 	w.agentStateChangesMutex.Lock()
 	if len(w.pendingAgentStateChanges) == 0 {
@@ -507,7 +509,7 @@ func (w *Want) DumpStateForAgent() {
 	w.pendingAgentStateChanges = make(map[string]any)
 	w.agentStateChangesMutex.Unlock()
 
-	// Apply changes to actual state
+	// Apply changes to actual state (will be recorded in next Progress cycle)
 	w.stateMutex.Lock()
 	if w.State == nil {
 		w.State = make(map[string]any)
@@ -517,26 +519,7 @@ func (w *Want) DumpStateForAgent() {
 	}
 	w.stateMutex.Unlock()
 
-	// Create history entry for agent state changes
-	stateSnapshot := make(map[string]any)
-	for key, value := range changesCopy {
-		stateSnapshot[key] = value
-	}
-
-	historyEntry := StateHistoryEntry{
-		WantName:   w.Metadata.Name,
-		StateValue: stateSnapshot,
-		Timestamp:  time.Now(),
-	}
-
-	w.stateMutex.Lock()
-	if w.History.StateHistory == nil {
-		w.History.StateHistory = make([]StateHistoryEntry, 0)
-	}
-	w.History.StateHistory = append(w.History.StateHistory, historyEntry)
-	w.stateMutex.Unlock()
-
-	fmt.Printf("💾 Agent state dumped for %s: %d changes\n", w.Metadata.Name, len(changesCopy))
+	fmt.Printf("💾 Agent state dumped for %s: %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, len(changesCopy))
 }
 
 // HasPendingAgentStateChanges returns true if there are pending agent state changes to dump
