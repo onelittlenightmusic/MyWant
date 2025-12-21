@@ -190,10 +190,19 @@ func (c *CoordinatorWant) Progress() {
 		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 	}
 
-	// Calculate and store achieving_percentage based on received inputs
+	// Calculate and store achieving_percentage based on actual received data
+	// Use data_by_channel to get the actual count of received packets
+	dataByChannelVal, _ := c.GetState("data_by_channel")
+	receivedCount := 0
+	if dataByChannel, ok := dataByChannelVal.(map[int]any); ok {
+		receivedCount = len(dataByChannel)
+	} else if dataByChannel, ok := dataByChannelVal.(map[string]any); ok {
+		receivedCount = len(dataByChannel)
+	}
+
 	achievingPercentage := 0
 	if inCount > 0 {
-		achievingPercentage = (len(c.channelsHeard) * 100) / inCount
+		achievingPercentage = (receivedCount * 100) / inCount
 		if achievingPercentage > 100 {
 			achievingPercentage = 100
 		}
