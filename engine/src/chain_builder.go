@@ -773,12 +773,6 @@ func (cb *ChainBuilder) synchronizePathsToWants() {
 			// This makes output/input channels available to the want during execution
 			runtimeWant.want.paths.In = paths.In
 			runtimeWant.want.paths.Out = paths.Out
-
-			// DEBUG: Log path synchronization
-			if len(paths.Out) > 0 || len(paths.In) > 0 {
-				log.Printf("[RECONCILE:CONNECT] Synchronized paths for '%s': In=%d, Out=%d\n",
-					wantName, len(paths.In), len(paths.Out))
-			}
 		}
 	}
 }
