@@ -594,15 +594,25 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		currentStates := execution.Builder.GetAllWantStates()
 		for _, want := range currentStates {
 			wantCopy := &mywant.Want{
-				Metadata: want.Metadata,
-				Spec:     want.Spec,
-				Status:   want.GetStatus(),
-				History:  want.History,
-				State:    make(map[string]any),
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.History,
+				State:       make(map[string]any),
+				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
-				wantCopy.State[k] = v
+				// Skip internal framework fields
+				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Split based on ProvidedStateFields
+				if len(want.ProvidedStateFields) > 0 && !mywant.Contains(want.ProvidedStateFields, k) {
+					wantCopy.HiddenState[k] = v
+				} else {
+					wantCopy.State[k] = v
+				}
 			}
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
@@ -613,15 +623,25 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
 			wantCopy := &mywant.Want{
-				Metadata: want.Metadata,
-				Spec:     want.Spec,
-				Status:   want.GetStatus(),
-				History:  want.History,
-				State:    make(map[string]any),
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.History,
+				State:       make(map[string]any),
+				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
-				wantCopy.State[k] = v
+				// Skip internal framework fields
+				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Split based on ProvidedStateFields
+				if len(want.ProvidedStateFields) > 0 && !mywant.Contains(want.ProvidedStateFields, k) {
+					wantCopy.HiddenState[k] = v
+				} else {
+					wantCopy.State[k] = v
+				}
 			}
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
@@ -650,15 +670,25 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				wantCopy := &mywant.Want{
-					Metadata: want.Metadata,
-					Spec:     want.Spec,
-					Status:   want.GetStatus(),
-					History:  want.History,
-					State:    make(map[string]any),
+					Metadata:    want.Metadata,
+					Spec:        want.Spec,
+					Status:      want.GetStatus(),
+					History:     want.History,
+					State:       make(map[string]any),
+					HiddenState: make(map[string]any),
 				}
 				currentState := want.GetAllState()
 				for k, v := range currentState {
-					wantCopy.State[k] = v
+					// Skip internal framework fields
+					if strings.HasPrefix(k, "_") {
+						continue
+					}
+					// Split based on ProvidedStateFields
+					if len(want.ProvidedStateFields) > 0 && !mywant.Contains(want.ProvidedStateFields, k) {
+						wantCopy.HiddenState[k] = v
+					} else {
+						wantCopy.State[k] = v
+					}
 				}
 
 				// If groupBy is specified, return response with grouped agent history
@@ -677,15 +707,25 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			wantCopy := &mywant.Want{
-				Metadata: want.Metadata,
-				Spec:     want.Spec,
-				Status:   want.GetStatus(),
-				History:  want.History,
-				State:    make(map[string]any),
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.History,
+				State:       make(map[string]any),
+				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
 			for k, v := range currentState {
-				wantCopy.State[k] = v
+				// Skip internal framework fields
+				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Split based on ProvidedStateFields
+				if len(want.ProvidedStateFields) > 0 && !mywant.Contains(want.ProvidedStateFields, k) {
+					wantCopy.HiddenState[k] = v
+				} else {
+					wantCopy.State[k] = v
+				}
 			}
 
 			// If groupBy is specified, return response with grouped agent history

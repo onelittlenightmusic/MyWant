@@ -159,11 +159,12 @@ func NewWantWithLocals(
 
 // Want represents a processing unit in the chain
 type Want struct {
-	Metadata Metadata               `json:"metadata" yaml:"metadata"`
-	Spec     WantSpec               `json:"spec" yaml:"spec"`
-	Status   WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
-	State    map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
-	History  WantHistory            `json:"history" yaml:"history"`
+	Metadata    Metadata               `json:"metadata" yaml:"metadata"`
+	Spec        WantSpec               `json:"spec" yaml:"spec"`
+	Status      WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
+	State       map[string]any         `json:"state,omitempty" yaml:"state,omitempty"`
+	HiddenState map[string]any         `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
+	History     WantHistory            `json:"history" yaml:"history"`
 
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
@@ -916,7 +917,7 @@ func (n *Want) addAggregatedStateHistory() {
 			continue
 		}
 		// If ProvidedStateFields is defined, only include those fields in history
-		if len(n.ProvidedStateFields) > 0 && !contains(n.ProvidedStateFields, key) {
+		if len(n.ProvidedStateFields) > 0 && !Contains(n.ProvidedStateFields, key) {
 			continue
 		}
 		stateSnapshot[key] = value
@@ -1698,8 +1699,8 @@ func (w *Want) GetLocals() WantLocals {
 	return w.Locals
 }
 
-// contains checks if a string slice contains a specific string value
-func contains(slice []string, item string) bool {
+// Contains checks if a string slice contains a specific string value
+func Contains(slice []string, item string) bool {
 	for _, v := range slice {
 		if v == item {
 			return true
