@@ -237,12 +237,12 @@ func (q *Queue) Progress() {
 
 	_, i, ok := q.Use(100)  // Use 100ms timeout instead of forever
 	if !ok {
-		q.StoreLog("[QUEUE-EXEC] No packet received (timeout)")
+		// No packet received (timeout) - skip this cycle
 		return
 	}
 
 	packet := i.(QueuePacket)
-	q.StoreLog(fmt.Sprintf("[QUEUE-EXEC] Received packet: num=%d, ended=%v", packet.Num, packet.IsEnded()))
+	// Packet received - process it
 	if packet.IsEnded() {
 		// Always flush batch and store final state when terminating
 		q.flushBatch(locals)
