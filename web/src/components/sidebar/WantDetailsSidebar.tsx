@@ -91,6 +91,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       } else if (canStart && onStart) {
         onStart(want);
       }
+      // Immediately fetch updated details after starting execution
+      if (wantId) {
+        setTimeout(() => {
+          fetchWantDetails(wantId);
+          fetchWantResults(wantId);
+        }, 100);
+      }
     }
   };
 
@@ -132,7 +139,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       // Auto-disable when want stops running
       setAutoRefresh(false);
     }
-  }, [want, selectedWantDetails?.status]);
+  }, [want, selectedWantDetails?.status, wantId]);
 
   // Auto refresh setup (only refresh specific want details, not the whole list)
   useEffect(() => {
