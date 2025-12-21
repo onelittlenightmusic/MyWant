@@ -1631,9 +1631,14 @@ const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, 
 const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, index }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Extract flight_status if it exists in stateValue
+  // Extract flight_status and action_by_agent from stateValue
   const flightStatus = state.stateValue?.flight_status;
+  const actionByAgent = state.stateValue?.action_by_agent;
   const stateTimestamp = state.timestamp;
+
+  // Determine agent icon color based on action_by_agent type
+  const isMonitorAgent = actionByAgent?.includes('Monitor');
+  const agentIconColor = isMonitorAgent ? 'text-green-600' : 'text-blue-600';
 
   return (
     <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
@@ -1652,11 +1657,16 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
             <div className="text-sm font-medium text-gray-900">
               #{index + 1}
             </div>
-            {stateTimestamp && (
-              <div className="text-xs text-gray-500 mt-1">
-                {formatDate(stateTimestamp)}
-              </div>
-            )}
+            <div className="flex items-center space-x-2 mt-1">
+              {actionByAgent && (
+                <Bot className={`h-3 w-3 ${agentIconColor} flex-shrink-0`} />
+              )}
+              {stateTimestamp && (
+                <div className="text-xs text-gray-500">
+                  {formatDate(stateTimestamp)}
+                </div>
+              )}
+            </div>
           </div>
           {/* Flight Status Highlight in Shrink Mode */}
           {!isExpanded && flightStatus && (

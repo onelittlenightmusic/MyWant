@@ -107,6 +107,12 @@ wantType:
     persistent: true
     example: created
     initialValue: ''
+  - name: action_by_agent
+    description: Agent type that performed last action (MonitorAgent, DoAgent)
+    type: string
+    persistent: true
+    example: DoAgent
+    initialValue: ''
   agents:
   - name: AgentFlight
     role: action
