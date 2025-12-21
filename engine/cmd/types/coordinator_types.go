@@ -189,6 +189,17 @@ func (c *CoordinatorWant) Progress() {
 	} else {
 		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 	}
+
+	// Calculate and store achieving_percentage based on received inputs
+	achievingPercentage := 0
+	if inCount > 0 {
+		achievingPercentage = (len(c.channelsHeard) * 100) / inCount
+		if achievingPercentage > 100 {
+			achievingPercentage = 100
+		}
+	}
+	c.StoreState("achieving_percentage", achievingPercentage)
+
 	c.tryCompletion(c.channelsHeard)
 }
 
@@ -250,6 +261,7 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	completionKey := c.DataHandler.GetCompletionKey()
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
+	c.StoreState("achieving_percentage", 100)
 	c.StoreLog("[tryCompletion] Marked as complete, resetting channelsHeard for potential retrigger")
 	c.channelsHeard = make(map[int]bool)
 }

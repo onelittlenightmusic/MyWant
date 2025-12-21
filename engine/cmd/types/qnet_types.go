@@ -476,6 +476,10 @@ func (s *Sink) Progress() {
 		if !ok {
 			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
 			// The timeout in Use helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
+			// Show progress while streaming
+			if locals.Received > 0 {
+				s.StoreState("achieving_percentage", 50)
+			}
 			return
 		}
 
@@ -490,6 +494,8 @@ func (s *Sink) Progress() {
 		}
 
 		locals.Received++
+		// Show partial progress while receiving
+		s.StoreState("achieving_percentage", 50)
 	}
 }
 
