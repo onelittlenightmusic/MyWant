@@ -194,7 +194,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     height: '100%',
     width: `${achievingPercentage}%`,
     background: 'rgba(255, 255, 255, 0.5)',
-    transition: 'width 0.7s ease-out',
+    transition: 'width 0.3s ease-out',
     zIndex: 0,
     pointerEvents: 'none' as const
   };
@@ -207,7 +207,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     height: '100%',
     width: `${100 - achievingPercentage}%`,
     background: 'rgba(0, 0, 0, 0.2)',
-    transition: 'width 0.7s ease-out, left 0.7s ease-out',
+    transition: 'width 0.3s ease-out, left 0.3s ease-out',
     zIndex: 0,
     pointerEvents: 'none' as const
   };
@@ -332,10 +332,9 @@ export const WantCard: React.FC<WantCardProps> = ({
                 height: '100%',
                 width: `${childAchievingPercentage}%`,
                 background: 'rgba(255, 255, 255, 0.5)',
-                transition: 'width 0.7s ease-out',
+                transition: 'width 0.3s ease-out',
                 zIndex: 0,
-                pointerEvents: 'none' as const,
-                borderRadius: '0.375rem'
+                pointerEvents: 'none' as const
               };
 
               // Create black overlay style for child - covers remaining right portion
@@ -346,10 +345,9 @@ export const WantCard: React.FC<WantCardProps> = ({
                 height: '100%',
                 width: `${100 - childAchievingPercentage}%`,
                 background: 'rgba(0, 0, 0, 0.2)',
-                transition: 'width 0.7s ease-out, left 0.7s ease-out',
+                transition: 'width 0.3s ease-out, left 0.3s ease-out',
                 zIndex: 0,
-                pointerEvents: 'none' as const,
-                borderRadius: '0.375rem'
+                pointerEvents: 'none' as const
               };
 
               // Handle drag over for child card
