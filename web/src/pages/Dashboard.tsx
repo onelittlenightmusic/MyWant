@@ -125,7 +125,7 @@ export const Dashboard: React.FC = () => {
     fetchLabels();
   }, [fetchWants]);
 
-  // Auto-refresh wants every 5 seconds
+  // Auto-refresh wants every 1 second
   usePolling(
     () => {
       if (wants.length > 0) {
@@ -135,7 +135,7 @@ export const Dashboard: React.FC = () => {
       fetchLabels();
     },
     {
-      interval: 5000,
+      interval: 1000,
       enabled: true,
       immediate: false
     }
