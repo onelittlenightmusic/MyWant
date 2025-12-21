@@ -65,6 +65,12 @@ wantType:
     persistent: true
     example: 1
     initialValue: 0
+  - name: flight_status
+    description: Current flight status (pending, created, confirmed, booked, completed, cancelled)
+    type: string
+    persistent: true
+    example: created
+    initialValue: ''
   agents: []
   constraints:
   - description: Must be triggered by delay/cancellation

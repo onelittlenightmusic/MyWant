@@ -101,6 +101,12 @@ wantType:
     type: string
     persistent: true
     initialValue: ''
+  - name: flight_status
+    description: Current flight status (pending, created, confirmed, booked, completed, cancelled)
+    type: string
+    persistent: true
+    example: created
+    initialValue: ''
   agents:
   - name: AgentFlight
     role: action
