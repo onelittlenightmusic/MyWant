@@ -1664,19 +1664,18 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
               </div>
             )}
           </div>
-          {/* Agent Icon and Flight Status on Right */}
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            {actionByAgent && (
-              <div className={`inline-flex items-center px-2 py-0.5 rounded-full ${agentBgColor} ${agentTextColor}`}>
-                <Bot className="h-3 w-3 flex-shrink-0" />
-              </div>
-            )}
-            {!isExpanded && flightStatus && (
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                {flightStatus}
-              </span>
-            )}
-          </div>
+          {/* Agent Icon and Flight Status - Unified Badge */}
+          {actionByAgent && !isExpanded && flightStatus && (
+            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${agentBgColor} ${agentTextColor}`}>
+              <Bot className="h-3 w-3 flex-shrink-0" />
+              <span className="text-xs font-medium">{flightStatus}</span>
+            </div>
+          )}
+          {actionByAgent && !isExpanded && !flightStatus && (
+            <div className={`inline-flex items-center px-2 py-0.5 rounded-full ${agentBgColor} ${agentTextColor}`}>
+              <Bot className="h-3 w-3 flex-shrink-0" />
+            </div>
+          )}
         </div>
       </button>
 
