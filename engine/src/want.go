@@ -9,6 +9,23 @@ import (
 	"time"
 )
 
+// System-reserved state field names - automatically initialized and managed by the framework
+// These fields don't need to be explicitly defined in want type YAML specifications
+const (
+	StateFieldActionByAgent    = "action_by_agent"     // Agent type that performed last action (MonitorAgent, DoAgent)
+	StateFieldAchievingPercent = "achieving_percentage" // Progress percentage of want execution (0-100)
+	StateFieldCompleted        = "completed"            // Whether the want has reached achieved status
+)
+
+// SystemReservedStateFields returns the list of state fields automatically managed by the framework
+func SystemReservedStateFields() []string {
+	return []string{
+		StateFieldActionByAgent,
+		StateFieldAchievingPercent,
+		StateFieldCompleted,
+	}
+}
+
 // BackgroundAgent is an interface for long-running background operations
 // Implementations should handle their own goroutine lifecycle
 type BackgroundAgent interface {
@@ -1353,6 +1370,11 @@ func (n *Want) Init() {
 	n.State = make(map[string]any)
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
+
+	// Initialize system-reserved state fields
+	n.State[StateFieldActionByAgent] = ""
+	n.State[StateFieldAchievingPercent] = 0
+	n.State[StateFieldCompleted] = false
 }
 
 // SetWantTypeDefinition sets the want type definition and initializes provided state fields
