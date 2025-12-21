@@ -47,7 +47,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     iconSize: 'h-3 w-3',
     statusSize: 'xs' as const,
     agentDotSize: 'w-1.5 h-1.5',
-    progressHeight: 'h-1',
     errorIconSize: 'h-3 w-3',
     errorTextSize: 'text-xs',
     textTruncate: 25
@@ -58,7 +57,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     iconSize: 'h-4 w-4',
     statusSize: 'sm' as const,
     agentDotSize: 'w-2 h-2',
-    progressHeight: 'h-1',
     errorIconSize: 'h-4 w-4',
     errorTextSize: 'text-sm',
     textTruncate: 30
@@ -147,35 +145,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           )}
         </div>
       )}
-
-      {/* Progress indicator for reaching wants */}
-      {isRunning && (
-        <div className="mt-4">
-          <div className={`flex items-center justify-between ${sizes.errorTextSize} text-gray-600 mb-1`}>
-            <span>{isSuspended ? 'Suspended' : 'Reaching...'}</span>
-            <div className={classNames(
-              `${sizes.agentDotSize} rounded-full`,
-              isSuspended ? 'bg-orange-500' : 'bg-blue-500 animate-pulse'
-            )} />
-          </div>
-          <div className={`w-full bg-gray-200 rounded-full ${sizes.progressHeight}`}>
-            <div
-              className={classNames(
-                `${sizes.progressHeight} rounded-full`,
-                isSuspended ? 'bg-orange-500' : 'bg-blue-500 animate-pulse-slow'
-              )}
-              style={{ width: isSuspended ? '50%' : '70%' }}
-            />
-          </div>
-          {isSuspended && (
-            <div className="flex items-center mt-2 text-xs text-orange-600">
-              <Pause className="h-3 w-3 mr-1" />
-              Execution paused
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Error indicator */}
       {hasError && (
         <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-md">
