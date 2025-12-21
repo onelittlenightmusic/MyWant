@@ -33,8 +33,11 @@ const (
 	// GlobalExecutionInterval defines the sleep interval between goroutine execution cycles This prevents CPU spinning in tight execution loops for want execution goroutines Set to 100ms to reduce CPU usage during concurrent want execution
 	GlobalExecutionInterval = 10 * time.Millisecond
 
-	// GlobalReconcileInterval defines the frequency of reconcile loop operations This controls how often the system checks for memory file changes and writes statistics
-	GlobalReconcileInterval = 30 * time.Millisecond
+	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
+	GlobalReconcileInterval = 50 * time.Millisecond
+
+	// GlobalStatsInterval defines the frequency of stats writing to memory file (YAML serialization and file I/O)
+	GlobalStatsInterval = 1 * time.Second
 )
 
 // ChangeEvent represents a configuration change
@@ -68,6 +71,7 @@ type ChainBuilder struct {
 	lastConfig         Config                 // Last known config state
 	lastConfigHash     string                 // Hash of last config for change detection
 	lastConfigFileHash string                 // Hash of config file for change detection (batch mode)
+	lastStatsHash      string                 // Hash of last written stats for change detection
 
 	// Path and channel management
 	pathMap      map[string]Paths      // Want path mapping
@@ -587,9 +591,10 @@ func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
 	cb.reconcileWants()
 
-	// Use GlobalReconcileInterval (100ms) for memory file checks and statistics This is separate from GlobalExecutionInterval (20ms) which is used for want execution
+	// Use GlobalReconcileInterval (50ms) for config file change detection and reconciliation
+	// Use GlobalStatsInterval (1 second) for stats writing to reduce I/O overhead
 	ticker := time.NewTicker(GlobalReconcileInterval)
-	statsTicker := time.NewTicker(GlobalReconcileInterval)
+	statsTicker := time.NewTicker(GlobalStatsInterval)
 	defer ticker.Stop()
 	defer statsTicker.Stop()
 
@@ -1818,9 +1823,18 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 
+	// Calculate hash of stats data for change detection
+	statsHash := fmt.Sprintf("%x", md5.Sum(data))
+
+	// Skip write if stats haven't changed
+	if statsHash == cb.lastStatsHash {
+		return
+	}
+
 	os.WriteFile(cb.memoryPath, data, 0644)
 
-	// Update lastConfigHash to prevent stats updates from triggering reconciliation
+	// Update stats hash and config hash to prevent stats updates from triggering reconciliation
+	cb.lastStatsHash = statsHash
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 }
 
