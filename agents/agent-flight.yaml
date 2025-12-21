@@ -1,40 +1,148 @@
 agents:
-  - name: agent_flight
-    type: do
-    capabilities:
-      - flight_agency
-    uses:
-      - xxx
-    logic:
-      type: generate_schedule
-      schedule_type: flight
-      premium_level: "premium"
-      amenities: ["priority_boarding", "lounge_access", "extra_baggage"]
-
-  - name: monitor_flight
-    type: monitor
-    capabilities:
-      - flight_agency
-    uses:
-      - xxx
-    logic:
-      type: monitor_file
-      test_data_path: "/Users/hiroyukiosaki/work/MyWant/test/initial"
-
+  # AgentFlightAPI - Creates and manages flight reservations via REST API
   - name: agent_flight_api
     type: do
+    description: Creates and manages flight reservations via mock flight server API
+    version: '1.0'
     capabilities:
       - flight_api_agency
     uses: []
-    logic:
-      type: api_reservation
-      server_url: "http://localhost:8081"
+    role: action
+    configuration:
+      server_url: http://localhost:8081
+      default_from: New York
+      default_to: Los Angeles
+      default_flight_number: AA123
+      default_duration_hours: 12.0
+    actions:
+      - name: create_flight
+        description: Creates a new flight reservation
+        parameters:
+          flight_number:
+            type: string
+            description: Flight number identifier
+            example: AA123
+          from:
+            type: string
+            description: Departure city
+            example: New York
+          to:
+            type: string
+            description: Destination city
+            example: Los Angeles
+          departure_date:
+            type: string
+            format: date
+            description: Departure date in YYYY-MM-DD format
+            example: 2026-12-20
+          departure_time:
+            type: string
+            format: date-time
+            description: Departure time in RFC3339 format (alternative to departure_date)
+            example: 2026-12-20T08:00:00Z
+          arrival_time:
+            type: string
+            format: date-time
+            description: Expected arrival time in RFC3339 format
+            example: 2026-12-20T11:30:00Z
+        state_updates:
+          - name: flight_id
+            type: string
+            description: Unique identifier for the flight reservation
+          - name: flight_status
+            type: string
+            description: Current status (in process, created)
+          - name: flight_number
+            type: string
+            description: Booked flight number
+          - name: from
+            type: string
+            description: Departure city
+          - name: to
+            type: string
+            description: Destination city
+          - name: departure_time
+            type: string
+            description: Scheduled departure time (RFC3339)
+          - name: arrival_time
+            type: string
+            description: Expected arrival time (RFC3339)
+          - name: status_message
+            type: string
+            description: Human-readable status message
+          - name: created_at
+            type: string
+            description: Reservation creation timestamp (RFC3339)
+          - name: updated_at
+            type: string
+            description: Last update timestamp (RFC3339)
+      - name: cancel_flight
+        description: Cancels an existing flight reservation
+        prerequisites:
+          - flight_id must be set in want state
+        state_updates:
+          - name: flight_status
+            type: string
+            description: Updated to 'canceled'
+          - name: canceled_at
+            type: string
+            description: Cancellation timestamp (RFC3339)
+          - name: status_message
+            type: string
+            description: Cancellation reason or message
+          - name: _previous_flight_id
+            type: string
+            description: ID of the canceled flight (for rebooking reference)
+          - name: _previous_flight_status
+            type: string
+            description: Previous status before cancellation
+    output:
+      agent_result:
+        type: FlightSchedule
+        fields:
+          - departure_time: timestamp of departure
+          - arrival_time: timestamp of arrival
+          - flight_type: classification (e.g., "api")
+          - flight_number: the flight number
+          - reservation_name: human-readable name
 
+  # MonitorFlightAPI - Monitors flight status from mock server
   - name: monitor_flight_api
     type: monitor
+    description: Monitors flight status changes from mock flight server API
+    version: '1.0'
     capabilities:
       - flight_api_agency
     uses: []
-    logic:
-      type: api_polling
-      poll_interval: 10s
+    role: monitor
+    configuration:
+      server_url: http://localhost:8081
+      default_poll_interval: 10s
+      timeout: 30s
+    monitoring:
+      target: flight_id (from want state)
+      check_interval: 10 seconds
+      endpoints:
+        - GET /api/flights/{flight_id}
+    tracked_fields:
+      - name: status
+        type: string
+        description: Current flight status from server
+      - name: status_message
+        type: string
+        description: Status details from server
+      - name: updated_at
+        type: string
+        description: Last update timestamp from server
+    state_management:
+      last_known_status:
+        description: Cached flight status for change detection
+        persistent: false
+      status_history:
+        description: Historical record of all status changes
+        persistent: true
+        format: "timestamp|old_status->new_status|details"
+    error_handling:
+      missing_flight_id: Returns error - flight not created yet
+      empty_flight_id: Skips monitoring - flight in cancellation/rebooking state
+      poll_interval_not_elapsed: Skips this cycle - waits for interval to complete
