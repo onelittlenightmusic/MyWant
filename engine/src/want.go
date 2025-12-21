@@ -1734,6 +1734,77 @@ func (w *Want) GetLocals() WantLocals {
 	return w.Locals
 }
 
+// GetExplicitState returns the explicitly defined state fields
+// This includes system-reserved fields and fields defined in ProvidedStateFields
+func (w *Want) GetExplicitState() map[string]any {
+	explicitState := make(map[string]any)
+	currentState := w.GetAllState()
+	reservedFields := SystemReservedStateFields()
+
+	for k, v := range currentState {
+		// Skip internal framework fields
+		if strings.HasPrefix(k, "_") {
+			continue
+		}
+
+		// Always include system-reserved fields
+		isReservedField := false
+		for _, reserved := range reservedFields {
+			if k == reserved {
+				isReservedField = true
+				break
+			}
+		}
+
+		if isReservedField {
+			explicitState[k] = v
+			continue
+		}
+
+		// Include fields defined in ProvidedStateFields
+		if len(w.ProvidedStateFields) > 0 && Contains(w.ProvidedStateFields, k) {
+			explicitState[k] = v
+		}
+	}
+
+	return explicitState
+}
+
+// GetHiddenState returns the implicitly defined state fields
+// These are fields that weren't explicitly defined in the want type spec
+func (w *Want) GetHiddenState() map[string]any {
+	hiddenState := make(map[string]any)
+	currentState := w.GetAllState()
+	reservedFields := SystemReservedStateFields()
+
+	for k, v := range currentState {
+		// Skip internal framework fields
+		if strings.HasPrefix(k, "_") {
+			continue
+		}
+
+		// Skip system-reserved fields (they're always explicit)
+		isReservedField := false
+		for _, reserved := range reservedFields {
+			if k == reserved {
+				isReservedField = true
+				break
+			}
+		}
+
+		if isReservedField {
+			continue
+		}
+
+		// Include fields NOT in ProvidedStateFields
+		if len(w.ProvidedStateFields) > 0 && !Contains(w.ProvidedStateFields, k) {
+			hiddenState[k] = v
+		}
+	}
+
+	return hiddenState
+}
+
 // Contains checks if a string slice contains a specific string value
 func Contains(slice []string, item string) bool {
 	for _, v := range slice {
