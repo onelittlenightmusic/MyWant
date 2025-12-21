@@ -1636,9 +1636,9 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
   const actionByAgent = state.stateValue?.action_by_agent;
   const stateTimestamp = state.timestamp;
 
-  // Determine agent icon color based on action_by_agent type
+  // Determine agent badge color based on action_by_agent type
   const isMonitorAgent = actionByAgent?.includes('Monitor');
-  const agentIconColor = isMonitorAgent ? 'text-green-600' : 'text-blue-600';
+  const agentBgColor = isMonitorAgent ? 'bg-green-600' : 'bg-blue-600';
 
   return (
     <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
@@ -1659,7 +1659,7 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
             </div>
             <div className="flex items-center space-x-2 mt-1">
               {actionByAgent && (
-                <Bot className={`h-3 w-3 ${agentIconColor} flex-shrink-0`} />
+                <div className={`w-3 h-3 rounded ${agentBgColor} flex-shrink-0`} />
               )}
               {stateTimestamp && (
                 <div className="text-xs text-gray-500">
