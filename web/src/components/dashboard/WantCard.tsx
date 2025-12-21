@@ -183,6 +183,18 @@ export const WantCard: React.FC<WantCardProps> = ({
   // Get background style for parent want (isParentWant = true)
   const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, true);
 
+  // Get achieving percentage for progress bar
+  const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
+
+  // Create linear gradient for progress bar effect
+  const progressBarStyle = {
+    background: `linear-gradient(to right,
+      rgba(255, 255, 255, 0.5) 0%,
+      rgba(255, 255, 255, 0.5) ${achievingPercentage}%,
+      rgba(0, 0, 0, 0.2) ${achievingPercentage}%,
+      rgba(0, 0, 0, 0.2) 100%)`
+  };
+
   return (
     <div
       onClick={handleCardClick}
@@ -196,7 +208,10 @@ export const WantCard: React.FC<WantCardProps> = ({
         isDragOver && 'border-green-500 border-2 bg-green-50',
         className || ''
       )}
-      style={parentBackgroundStyle.style}
+      style={{
+        ...parentBackgroundStyle.style,
+        ...progressBarStyle
+      }}
     >
       {/* Overlay - always apply semi-transparent background to entire card */}
       <div className={getBackgroundOverlayClass()}></div>
@@ -288,6 +303,18 @@ export const WantCard: React.FC<WantCardProps> = ({
               // Get background style for child want (isParentWant = false)
               const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
 
+              // Get achieving percentage for child card progress bar
+              const childAchievingPercentage = (child.state?.achieving_percentage as number) ?? 0;
+
+              // Create linear gradient for child card progress bar effect
+              const childProgressBarStyle = {
+                background: `linear-gradient(to right,
+                  rgba(255, 255, 255, 0.5) 0%,
+                  rgba(255, 255, 255, 0.5) ${childAchievingPercentage}%,
+                  rgba(0, 0, 0, 0.2) ${childAchievingPercentage}%,
+                  rgba(0, 0, 0, 0.2) 100%)`
+              };
+
               // Handle drag over for child card
               const handleChildDragOver = (e: React.DragEvent) => {
                 e.preventDefault();
@@ -350,7 +377,10 @@ export const WantCard: React.FC<WantCardProps> = ({
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
                     isDragOver && 'border-green-500 border-2 bg-green-50'
                   )}
-                  style={childBackgroundStyle.style}
+                  style={{
+                    ...childBackgroundStyle.style,
+                    ...childProgressBarStyle
+                  }}
                   onClick={handleChildCardClick(child)}
                   onDragOver={handleChildDragOver}
                   onDragLeave={handleChildDragLeave}
