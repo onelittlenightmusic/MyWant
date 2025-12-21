@@ -206,6 +206,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         isDragOver && 'border-green-500 border-2 bg-green-50',
+        parentBackgroundStyle.className,
         className || ''
       )}
       style={parentBackgroundStyle.style}
@@ -375,7 +376,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
-                    isDragOver && 'border-green-500 border-2 bg-green-50'
+                    isDragOver && 'border-green-500 border-2 bg-green-50',
+                    childBackgroundStyle.className
                   )}
                   style={childBackgroundStyle.style}
                   onClick={handleChildCardClick(child)}
