@@ -1704,21 +1704,21 @@ const LogHistoryItem: React.FC<{ logEntry: any; index: number }> = ({ logEntry, 
       {/* Collapsed/Header View */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center space-x-3 flex-1 text-left">
+        <div className="flex items-center space-x-2 flex-1 text-left">
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
           ) : (
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
           )}
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900">
+          <div className="flex items-center space-x-1 min-w-0">
+            <div className="text-xs font-medium text-gray-900">
               #{index + 1} - {logLines.length} line{logLines.length !== 1 ? 's' : ''}
             </div>
             {logTimestamp && (
-              <div className="text-xs text-gray-500 mt-1">
-                {formatDate(logTimestamp)}
+              <div className="text-xs text-gray-500">
+                {formatRelativeTime(logTimestamp)}
               </div>
             )}
           </div>
@@ -1790,7 +1790,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       {hasLogHistory && (
         <div className="bg-gray-50 rounded-lg p-6">
           <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
-          <div className="space-y-3">
+          <div className="space-y-0">
             {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
               <LogHistoryItem key={index} logEntry={logEntry} index={want.history!.logHistory!.length - index - 1} />
             ))}
