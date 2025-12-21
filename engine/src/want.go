@@ -928,9 +928,22 @@ func (n *Want) addAggregatedStateHistory() {
 		n.State = make(map[string]any)
 	}
 	stateSnapshot := make(map[string]any)
+	reservedFields := SystemReservedStateFields()
 	for key, value := range n.State {
 		// Skip internal fields starting with underscore - they are internal markers only
 		if strings.HasPrefix(key, "_") {
+			continue
+		}
+		// Always include system-reserved fields in history
+		isReservedField := false
+		for _, reserved := range reservedFields {
+			if key == reserved {
+				isReservedField = true
+				break
+			}
+		}
+		if isReservedField {
+			stateSnapshot[key] = value
 			continue
 		}
 		// If ProvidedStateFields is defined, only include those fields in history
