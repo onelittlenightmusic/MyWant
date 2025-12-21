@@ -186,8 +186,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   // Get achieving percentage for progress bar
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
 
-  // Create linear gradient for progress bar effect
-  const progressBarStyle = {
+  // Create linear gradient for progress bar effect - this replaces the standard overlay
+  const progressBarOverlayStyle = {
     background: `linear-gradient(to right,
       rgba(255, 255, 255, 0.5) 0%,
       rgba(255, 255, 255, 0.5) ${achievingPercentage}%,
@@ -208,13 +208,13 @@ export const WantCard: React.FC<WantCardProps> = ({
         isDragOver && 'border-green-500 border-2 bg-green-50',
         className || ''
       )}
-      style={{
-        ...parentBackgroundStyle.style,
-        ...progressBarStyle
-      }}
+      style={parentBackgroundStyle.style}
     >
-      {/* Overlay - always apply semi-transparent background to entire card */}
-      <div className={getBackgroundOverlayClass()}></div>
+      {/* Progress bar overlay - shows achieving percentage as left-to-right gradient */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={progressBarOverlayStyle}
+      ></div>
 
       {/* Parent want content using reusable component */}
       <div className="relative z-10">
@@ -307,7 +307,7 @@ export const WantCard: React.FC<WantCardProps> = ({
               const childAchievingPercentage = (child.state?.achieving_percentage as number) ?? 0;
 
               // Create linear gradient for child card progress bar effect
-              const childProgressBarStyle = {
+              const childProgressBarOverlayStyle = {
                 background: `linear-gradient(to right,
                   rgba(255, 255, 255, 0.5) 0%,
                   rgba(255, 255, 255, 0.5) ${childAchievingPercentage}%,
@@ -377,17 +377,20 @@ export const WantCard: React.FC<WantCardProps> = ({
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
                     isDragOver && 'border-green-500 border-2 bg-green-50'
                   )}
-                  style={{
-                    ...childBackgroundStyle.style,
-                    ...childProgressBarStyle
-                  }}
+                  style={childBackgroundStyle.style}
                   onClick={handleChildCardClick(child)}
                   onDragOver={handleChildDragOver}
                   onDragLeave={handleChildDragLeave}
                   onDrop={handleChildDrop}
                 >
+                  {/* Progress bar overlay for child card */}
+                  <div
+                    className="absolute inset-0 z-0 rounded-md pointer-events-none"
+                    style={childProgressBarOverlayStyle}
+                  ></div>
+
                   {/* Child want content using reusable component */}
-                  <div className={classNames('p-4 w-full h-full', childBackgroundStyle.className, getBackgroundContentContainerClass(childBackgroundStyle.hasBackgroundImage))}>
+                  <div className={classNames('p-4 w-full h-full relative z-10', childBackgroundStyle.className, getBackgroundContentContainerClass(childBackgroundStyle.hasBackgroundImage))}>
                     <WantCardContent
                       want={child}
                       isChild={true}
