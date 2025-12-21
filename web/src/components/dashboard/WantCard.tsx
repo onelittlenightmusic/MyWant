@@ -392,7 +392,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   ></div>
 
                   {/* Child want content using reusable component */}
-                  <div className={classNames('p-4 w-full h-full relative z-10', childBackgroundStyle.className, getBackgroundContentContainerClass(childBackgroundStyle.hasBackgroundImage))}>
+                  <div className="p-4 w-full h-full relative z-10">
                     <WantCardContent
                       want={child}
                       isChild={true}
