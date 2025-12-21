@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"sort"
 	"strconv"
@@ -1678,6 +1679,17 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.setupRoutes()
+
+	// Start pprof profiling server only in debug mode
+	if s.config.Debug {
+		go func() {
+			pprofAddr := "localhost:6060"
+			log.Printf("📊 pprof profiling server starting on http://%s/debug/pprof/\n", pprofAddr)
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				log.Printf("⚠️  pprof server error: %v\n", err)
+			}
+		}()
+	}
 
 	// Register all want types on global builder before starting reconcile loop Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	types.RegisterQNetWantTypes(s.globalBuilder)
