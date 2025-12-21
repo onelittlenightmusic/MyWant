@@ -140,7 +140,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       const interval = setInterval(() => {
         fetchWantDetails(wantId);
         fetchWantResults(wantId);
-      }, 5000);
+      }, 1000);
 
       return () => clearInterval(interval);
     }
