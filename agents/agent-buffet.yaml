@@ -5,9 +5,18 @@ agents:
       - buffet_agency
     uses:
       - xxx
+    tracked_status_fields:
+      - name: agent_result
+        type: BuffetSchedule
+        description: Buffet reservation schedule with meal timing details
+
   - name: buffet_monitor
     type: monitor
     capabilities:
       - buffet_agency
     uses:
       - xxx
+    tracked_status_fields:
+      - name: agent_result
+        type: BuffetSchedule
+        description: Buffet schedule loaded from YAML files

@@ -5,9 +5,18 @@ agents:
       - hotel_agency
     uses:
       - xxx
+    tracked_status_fields:
+      - name: agent_result
+        type: HotelSchedule
+        description: Hotel reservation schedule with check-in/check-out times
+
   - name: hotel_monitor
     type: monitor
     capabilities:
       - hotel_agency
     uses:
       - xxx
+    tracked_status_fields:
+      - name: agent_result
+        type: HotelSchedule
+        description: Hotel schedule loaded from YAML files

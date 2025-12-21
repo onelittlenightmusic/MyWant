@@ -15,12 +15,19 @@ type CapabilityYAML struct {
 	Capabilities []Capability `yaml:"capabilities"`
 }
 
+type TrackedStatusField struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
+}
+
 type AgentYAML struct {
 	Agents []struct {
-		Name         string   `yaml:"name"`
-		Capabilities []string `yaml:"capabilities"`
-		Uses         []string `yaml:"uses"`
-		Type         string   `yaml:"type"`
+		Name                string               `yaml:"name"`
+		Capabilities        []string             `yaml:"capabilities"`
+		Uses                []string             `yaml:"uses"`
+		Type                string               `yaml:"type"`
+		TrackedStatusFields []TrackedStatusField `yaml:"tracked_status_fields,omitempty"`
 	} `yaml:"agents"`
 }
 
@@ -311,6 +318,9 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 		}
 
 		r.RegisterAgent(agent)
+
+		// NEW: Register agent specification (Strict mode - register even if empty)
+		r.RegisterAgentSpec(agentDef.Name, agentDef.TrackedStatusFields)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -474,9 +475,61 @@ func (w *Want) GetBackgroundAgentCount() int {
 	return len(w.backgroundAgents)
 }
 
+// validateAgentStateKey validates a state key against the agent's specification
+// Returns true if validation passes, false otherwise
+// Logs warnings for invalid keys but does not reject them (backward compatibility)
+func (w *Want) validateAgentStateKey(key string) bool {
+	// Skip validation for internal framework fields (underscore prefix)
+	if strings.HasPrefix(key, "_") {
+		return true
+	}
+
+	// Get current agent name
+	agentName := w.CurrentAgent
+	if agentName == "" {
+		// No agent context - allow write (backward compatibility)
+		return true
+	}
+
+	// Check if agent registry is available
+	if w.agentRegistry == nil {
+		// No registry - allow write (backward compatibility)
+		return true
+	}
+
+	// Get agent specification
+	spec, exists := w.agentRegistry.GetAgentSpec(agentName)
+	if !exists || spec == nil {
+		// STRICT MODE: Agent has no specification - warn on all writes
+		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' has no tracked_status_fields specification, writing to field '%s'",
+			agentName, key))
+		return false
+	}
+
+	// Check if key is in allowed list
+	if spec.AllowedStateKeys[key] {
+		return true
+	}
+
+	// Key not allowed - log warning but allow write
+	description := spec.KeyDescriptions[key]
+	if description != "" {
+		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (%s)",
+			agentName, key, description))
+	} else {
+		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (not in tracked_status_fields)",
+			agentName, key))
+	}
+
+	return false // Validation failed, but write still allowed
+}
+
 // StoreStateForAgent stores state changes from background agents in a separate queue
 // These changes are tracked independently from the Want's Progress cycle
 func (w *Want) StoreStateForAgent(key string, value any) {
+	// Validate key against agent specification
+	w.validateAgentStateKey(key)
+
 	w.agentStateChangesMutex.Lock()
 	defer w.agentStateChangesMutex.Unlock()
 
@@ -489,6 +542,11 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 // StoreStateMultiForAgent stores multiple state changes from background agents in a separate queue
 // This is a convenience method for storing multiple key-value pairs at once
 func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
+	// Validate all keys against agent specification
+	for key := range updates {
+		w.validateAgentStateKey(key)
+	}
+
 	w.agentStateChangesMutex.Lock()
 	defer w.agentStateChangesMutex.Unlock()
 

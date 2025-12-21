@@ -103,11 +103,19 @@ func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
 	return fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
 }
 
+// AgentSpec holds specification for state field validation
+type AgentSpec struct {
+	Name             string
+	AllowedStateKeys map[string]bool   // O(1) lookup: key -> allowed
+	KeyDescriptions  map[string]string // For logging: key -> description
+}
+
 // AgentRegistry manages agent registration and capability mapping.
 type AgentRegistry struct {
 	capabilities       map[string]Capability
 	agents             map[string]Agent
 	capabilityToAgents map[string][]string
+	agentSpecs         map[string]*AgentSpec // NEW: agent specs for validation
 	mutex              sync.RWMutex
 }
 
@@ -117,6 +125,7 @@ func NewAgentRegistry() *AgentRegistry {
 		capabilities:       make(map[string]Capability),
 		agents:             make(map[string]Agent),
 		capabilityToAgents: make(map[string][]string),
+		agentSpecs:         make(map[string]*AgentSpec), // NEW
 	}
 }
 
@@ -183,6 +192,40 @@ func (r *AgentRegistry) GetCapability(name string) (Capability, bool) {
 	cap, exists := r.capabilities[name]
 	return cap, exists
 }
+
+// RegisterAgentSpec registers an agent's specification for state validation
+func (r *AgentRegistry) RegisterAgentSpec(agentName string, trackedFields []TrackedStatusField) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	spec := &AgentSpec{
+		Name:             agentName,
+		AllowedStateKeys: make(map[string]bool),
+		KeyDescriptions:  make(map[string]string),
+	}
+
+	for _, field := range trackedFields {
+		spec.AllowedStateKeys[field.Name] = true
+		spec.KeyDescriptions[field.Name] = field.Description
+	}
+
+	r.agentSpecs[agentName] = spec
+
+	if len(trackedFields) > 0 {
+		InfoLog("[AGENT SPEC] Registered %d tracked fields for agent '%s'\n",
+			len(trackedFields), agentName)
+	}
+}
+
+// GetAgentSpec retrieves an agent's specification
+func (r *AgentRegistry) GetAgentSpec(agentName string) (*AgentSpec, bool) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	spec, exists := r.agentSpecs[agentName]
+	return spec, exists
+}
+
 func (r *AgentRegistry) GetAllAgents() []Agent {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
