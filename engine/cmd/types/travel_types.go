@@ -42,8 +42,9 @@ type TimeSlot struct {
 
 // TravelSchedule represents a complete travel schedule with multiple events
 type TravelSchedule struct {
-	Events []TimeSlot
-	Date   time.Time
+	Events    []TimeSlot
+	Date      time.Time
+	Completed bool
 }
 
 // ScheduleConflict represents a scheduling conflict that needs resolution
@@ -73,13 +74,13 @@ type BaseTravelWant struct {
 
 // IsAchieved checks if the travel want has been achieved
 func (b *BaseTravelWant) IsAchieved() bool {
-	attempted, _ := b.GetStateBool("attempted", false)
-	return attempted
+	completed, _ := b.GetStateBool("completed", false)
+	return completed
 }
 
 // Progress implements Progressable for all travel wants
 func (b *BaseTravelWant) Progress() {
-	b.StoreState("attempted", true)
+	b.StoreState("completed", true)
 
 	if b.executor == nil {
 		b.StoreLog("ERROR: executor not initialized")
@@ -111,8 +112,8 @@ func (b *BaseTravelWant) Progress() {
 
 // CalculateAchievingPercentage returns progress percentage
 func (b *BaseTravelWant) CalculateAchievingPercentage() int {
-	attempted, _ := b.GetStateBool("attempted", false)
-	if attempted {
+	completed, _ := b.GetStateBool("completed", false)
+	if completed {
 		return 100
 	}
 	return 0
@@ -209,8 +210,9 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		Name:  fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, restaurantLocals.RestaurantType),
 	}
 	newSchedule := &TravelSchedule{
-		Date:   baseDate,
-		Events: []TimeSlot{newEvent},
+		Date:      baseDate,
+		Events:    []TimeSlot{newEvent},
+		Completed: true,
 	}
 	r.StoreStateMulti(map[string]any{
 		"total_processed":            1,
@@ -250,7 +252,7 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 	}
 
 	stateUpdates := map[string]any{
-		"attempted":                  true,
+		"completed":                  true,
 		"reservation_start_time":     s.ReservationTime.Format("15:04"),
 		"reservation_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04"),
 		"restaurant_type":            s.RestaurantType,
@@ -439,8 +441,9 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 	}
 
 	newSchedule := &TravelSchedule{
-		Date:   baseDate,
-		Events: []TimeSlot{newEvent},
+		Date:      baseDate,
+		Events:    []TimeSlot{newEvent},
+		Completed: true,
 	}
 	h.StoreStateMulti(map[string]any{
 		"total_processed":      1,
@@ -523,8 +526,9 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 	}
 
 	newSchedule := &TravelSchedule{
-		Date:   nextDay,
-		Events: []TimeSlot{newEvent},
+		Date:      nextDay,
+		Events:    []TimeSlot{newEvent},
+		Completed: true,
 	}
 	b.StoreStateMulti(map[string]any{
 		"total_processed":        1,
@@ -562,7 +566,7 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 	}
 
 	stateUpdates := map[string]any{
-		"attempted":               true,
+		"completed":               true,
 		"buffet_start_time":       s.ReservationTime.Format("15:04 Jan 2"),
 		"buffet_end_time":         s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
 		"buffet_type":             s.BuffetType,
@@ -1080,7 +1084,7 @@ func (f *FlightWant) Progress() {
 		}
 
 		f.StoreLog("Executing initial booking")
-		f.StoreState("attempted", true)
+		f.StoreState("completed", true)
 		f.tryAgentExecution()
 
 		agentResult, hasResult := f.GetState("agent_result")
@@ -1113,7 +1117,7 @@ func (f *FlightWant) Progress() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
 				f.StoreStateMulti(map[string]any{
 					"flight_action": "cancel_flight",
-					"attempted":     false,
+					"completed":     false,
 					"_flight_phase":  PhaseCanceling,
 				})
 				return
@@ -1143,7 +1147,7 @@ func (f *FlightWant) Progress() {
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
 				"_flight_phase": PhaseBooking,
-				"attempted":    false,
+				"completed":    false,
 			})
 			return
 		}
@@ -1154,7 +1158,7 @@ func (f *FlightWant) Progress() {
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
 				"_flight_phase": PhaseBooking,
-				"attempted":    false,
+				"completed":    false,
 			})
 			return
 		}
@@ -1170,7 +1174,7 @@ func (f *FlightWant) Progress() {
 		f.ResetFlightState()
 		f.StoreStateMulti(map[string]any{
 			"_flight_phase": PhaseBooking,
-			"attempted":    false,
+			"completed":    false,
 		})
 		return
 
@@ -1196,8 +1200,9 @@ func (f *FlightWant) sendFlightPacket(out any, schedule *FlightSchedule, label s
 	}
 
 	travelSchedule := &TravelSchedule{
-		Date:   schedule.DepartureTime.Truncate(24 * time.Hour),
-		Events: []TimeSlot{flightEvent},
+		Date:      schedule.DepartureTime.Truncate(24 * time.Hour),
+		Events:    []TimeSlot{flightEvent},
+		Completed: true,
 	}
 	f.Provide(travelSchedule)
 
@@ -1285,7 +1290,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 	}
 
 	stateUpdates := map[string]any{
-		"attempted":             true,
+		"completed":             true,
 		"departure_time":        s.DepartureTime.Format("15:04 Jan 2"),
 		"arrival_time":          s.ArrivalTime.Format("15:04 Jan 2"),
 		"flight_type":           s.FlightType,
@@ -1399,7 +1404,7 @@ func (h *HotelWant) SetSchedule(schedule any) {
 	}
 
 	stateUpdates := map[string]any{
-		"attempted":           true,
+		"completed":           true,
 		"check_in_time":       s.CheckInTime.Format("15:04 Jan 2"),
 		"check_out_time":      s.CheckOutTime.Format("15:04 Jan 2"),
 		"hotel_type":          s.HotelType,
