@@ -602,9 +602,22 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
+			reservedFields := mywant.SystemReservedStateFields()
 			for k, v := range currentState {
 				// Skip internal framework fields
 				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Always include system-reserved fields in State
+				isReservedField := false
+				for _, reserved := range reservedFields {
+					if k == reserved {
+						isReservedField = true
+						break
+					}
+				}
+				if isReservedField {
+					wantCopy.State[k] = v
 					continue
 				}
 				// Split based on ProvidedStateFields
@@ -631,9 +644,22 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
+			reservedFields := mywant.SystemReservedStateFields()
 			for k, v := range currentState {
 				// Skip internal framework fields
 				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Always include system-reserved fields in State
+				isReservedField := false
+				for _, reserved := range reservedFields {
+					if k == reserved {
+						isReservedField = true
+						break
+					}
+				}
+				if isReservedField {
+					wantCopy.State[k] = v
 					continue
 				}
 				// Split based on ProvidedStateFields
@@ -715,9 +741,22 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				HiddenState: make(map[string]any),
 			}
 			currentState := want.GetAllState()
+			reservedFields := mywant.SystemReservedStateFields()
 			for k, v := range currentState {
 				// Skip internal framework fields
 				if strings.HasPrefix(k, "_") {
+					continue
+				}
+				// Always include system-reserved fields in State
+				isReservedField := false
+				for _, reserved := range reservedFields {
+					if k == reserved {
+						isReservedField = true
+						break
+					}
+				}
+				if isReservedField {
+					wantCopy.State[k] = v
 					continue
 				}
 				// Split based on ProvidedStateFields
