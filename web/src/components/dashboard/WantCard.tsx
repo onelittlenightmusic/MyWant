@@ -192,7 +192,8 @@ export const WantCard: React.FC<WantCardProps> = ({
       rgba(255, 255, 255, 0.5) 0%,
       rgba(255, 255, 255, 0.5) ${achievingPercentage}%,
       rgba(0, 0, 0, 0.2) ${achievingPercentage}%,
-      rgba(0, 0, 0, 0.2) 100%)`
+      rgba(0, 0, 0, 0.2) 100%)`,
+    transition: 'background 0.5s ease-in-out'
   };
 
   return (
@@ -313,7 +314,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                   rgba(255, 255, 255, 0.5) 0%,
                   rgba(255, 255, 255, 0.5) ${childAchievingPercentage}%,
                   rgba(0, 0, 0, 0.2) ${childAchievingPercentage}%,
-                  rgba(0, 0, 0, 0.2) 100%)`
+                  rgba(0, 0, 0, 0.2) 100%)`,
+                transition: 'background 0.5s ease-in-out'
               };
 
               // Handle drag over for child card

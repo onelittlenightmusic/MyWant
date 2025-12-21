@@ -352,9 +352,24 @@ func (t *Target) Progress() {
 		allComplete := t.checkAllChildrenComplete()
 		t.childCompletionMutex.Unlock()
 
+		// Calculate achieving_percentage based on achieved children count
+		if len(t.childWants) > 0 {
+			achievedCount := 0
+			for _, child := range t.childWants {
+				if t.completedChildren[child.Metadata.Name] {
+					achievedCount++
+				}
+			}
+			achievingPercentage := (achievedCount * 100) / len(t.childWants)
+			t.StoreState("achieving_percentage", achievingPercentage)
+		}
+
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
+				// Set achieving_percentage to 100 when all children are complete
+				t.StoreState("achieving_percentage", 100)
+
 				// Send completion packet to parent/upstream wants
 				packet := map[string]any{
 					"status":   "completed",
