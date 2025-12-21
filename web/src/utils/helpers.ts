@@ -32,6 +32,34 @@ export const formatDuration = (startTime?: string, endTime?: string): string => 
   }
 };
 
+export const formatRelativeTime = (dateString?: string): string => {
+  if (!dateString) return 'N/A';
+
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+      return `${diffDays}日前`;
+    } else if (diffHours > 0) {
+      return `${diffHours}時間前`;
+    } else if (diffMins > 0) {
+      return `${diffMins}分前`;
+    } else if (diffSecs > 0) {
+      return `${diffSecs}秒前`;
+    } else {
+      return 'たった今';
+    }
+  } catch {
+    return dateString;
+  }
+};
+
 export const getStatusColor = (status: WantExecutionStatus | WantPhase): string => {
   switch (status) {
     case 'created':

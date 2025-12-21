@@ -9,7 +9,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
-import { formatDate, formatDuration, classNames, truncateText } from '@/utils/helpers';
+import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import {
@@ -1658,27 +1658,25 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
             <div className="text-sm font-medium text-gray-900">
               #{index + 1}
             </div>
-            <div className="flex items-center space-x-2 mt-1">
-              {actionByAgent && (
-                <div className={`inline-flex items-center px-2 py-0.5 rounded-full ${agentBgColor} ${agentTextColor}`}>
-                  <Bot className="h-3 w-3 flex-shrink-0" />
-                </div>
-              )}
-              {stateTimestamp && (
-                <div className="text-xs text-gray-500">
-                  {formatDate(stateTimestamp)}
-                </div>
-              )}
-            </div>
+            {stateTimestamp && (
+              <div className="text-xs text-gray-500 mt-1">
+                {formatRelativeTime(stateTimestamp)}
+              </div>
+            )}
           </div>
-          {/* Flight Status Highlight in Shrink Mode */}
-          {!isExpanded && flightStatus && (
-            <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
+          {/* Agent Icon and Flight Status on Right */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            {actionByAgent && (
+              <div className={`inline-flex items-center px-2 py-0.5 rounded-full ${agentBgColor} ${agentTextColor}`}>
+                <Bot className="h-3 w-3 flex-shrink-0" />
+              </div>
+            )}
+            {!isExpanded && flightStatus && (
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                 {flightStatus}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </button>
 
