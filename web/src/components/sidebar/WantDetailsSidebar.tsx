@@ -1646,20 +1646,20 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
       {/* Collapsed/Header View */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
-        <div className="flex items-center space-x-3 flex-1 text-left">
+        <div className="flex items-center space-x-2 flex-1 text-left">
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
           ) : (
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
           )}
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900">
+          <div className="flex items-center space-x-1 min-w-0">
+            <div className="text-xs font-medium text-gray-900">
               #{index + 1}
             </div>
             {stateTimestamp && (
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-xs text-gray-500">
                 {formatRelativeTime(stateTimestamp)}
               </div>
             )}
