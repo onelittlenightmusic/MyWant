@@ -186,14 +186,30 @@ export const WantCard: React.FC<WantCardProps> = ({
   // Get achieving percentage for progress bar
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
 
-  // Create linear gradient for progress bar effect - this replaces the standard overlay
-  const progressBarOverlayStyle = {
-    background: `linear-gradient(to right,
-      rgba(255, 255, 255, 0.5) 0%,
-      rgba(255, 255, 255, 0.5) ${achievingPercentage}%,
-      rgba(0, 0, 0, 0.2) ${achievingPercentage}%,
-      rgba(0, 0, 0, 0.2) 100%)`,
-    transition: 'background 0.5s ease-in-out'
+  // Create white progress bar style - animates from left to right
+  const whiteProgressBarStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    height: '100%',
+    width: `${achievingPercentage}%`,
+    background: 'rgba(255, 255, 255, 0.5)',
+    transition: 'width 0.7s ease-out',
+    zIndex: 0,
+    pointerEvents: 'none' as const
+  };
+
+  // Create black overlay style - covers the remaining right portion
+  const blackOverlayStyle = {
+    position: 'absolute' as const,
+    top: 0,
+    left: `${achievingPercentage}%`,
+    height: '100%',
+    width: `${100 - achievingPercentage}%`,
+    background: 'rgba(0, 0, 0, 0.2)',
+    transition: 'width 0.7s ease-out, left 0.7s ease-out',
+    zIndex: 0,
+    pointerEvents: 'none' as const
   };
 
   return (
@@ -212,11 +228,11 @@ export const WantCard: React.FC<WantCardProps> = ({
       )}
       style={parentBackgroundStyle.style}
     >
-      {/* Progress bar overlay - shows achieving percentage as left-to-right gradient */}
-      <div
-        className="absolute inset-0 z-0 pointer-events-none"
-        style={progressBarOverlayStyle}
-      ></div>
+      {/* White progress bar - animates from left to right */}
+      <div style={whiteProgressBarStyle}></div>
+
+      {/* Black overlay - covers remaining right portion */}
+      <div style={blackOverlayStyle}></div>
 
       {/* Parent want content using reusable component */}
       <div className="relative z-10">
@@ -308,14 +324,32 @@ export const WantCard: React.FC<WantCardProps> = ({
               // Get achieving percentage for child card progress bar
               const childAchievingPercentage = (child.state?.achieving_percentage as number) ?? 0;
 
-              // Create linear gradient for child card progress bar effect
-              const childProgressBarOverlayStyle = {
-                background: `linear-gradient(to right,
-                  rgba(255, 255, 255, 0.5) 0%,
-                  rgba(255, 255, 255, 0.5) ${childAchievingPercentage}%,
-                  rgba(0, 0, 0, 0.2) ${childAchievingPercentage}%,
-                  rgba(0, 0, 0, 0.2) 100%)`,
-                transition: 'background 0.5s ease-in-out'
+              // Create white progress bar style for child - animates from left to right
+              const childWhiteProgressBarStyle = {
+                position: 'absolute' as const,
+                top: 0,
+                left: 0,
+                height: '100%',
+                width: `${childAchievingPercentage}%`,
+                background: 'rgba(255, 255, 255, 0.5)',
+                transition: 'width 0.7s ease-out',
+                zIndex: 0,
+                pointerEvents: 'none' as const,
+                borderRadius: '0.375rem'
+              };
+
+              // Create black overlay style for child - covers remaining right portion
+              const childBlackOverlayStyle = {
+                position: 'absolute' as const,
+                top: 0,
+                left: `${childAchievingPercentage}%`,
+                height: '100%',
+                width: `${100 - childAchievingPercentage}%`,
+                background: 'rgba(0, 0, 0, 0.2)',
+                transition: 'width 0.7s ease-out, left 0.7s ease-out',
+                zIndex: 0,
+                pointerEvents: 'none' as const,
+                borderRadius: '0.375rem'
               };
 
               // Handle drag over for child card
@@ -387,11 +421,11 @@ export const WantCard: React.FC<WantCardProps> = ({
                   onDragLeave={handleChildDragLeave}
                   onDrop={handleChildDrop}
                 >
-                  {/* Progress bar overlay for child card */}
-                  <div
-                    className="absolute inset-0 z-0 rounded-md pointer-events-none"
-                    style={childProgressBarOverlayStyle}
-                  ></div>
+                  {/* White progress bar for child - animates from left to right */}
+                  <div style={childWhiteProgressBarStyle}></div>
+
+                  {/* Black overlay for child - covers remaining right portion */}
+                  <div style={childBlackOverlayStyle}></div>
 
                   {/* Child want content using reusable component */}
                   <div className="p-4 w-full h-full relative z-10">
