@@ -2685,11 +2685,8 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		} else {
 			InfoLog("[RETRIGGER-RECEIVER] '%s' reconcile triggered\n", wantName)
 		}
-	} else {
-		// Retrigger not needed (either goroutine is running or no pending packets)
-		// It will pick up packets from the channel in its next iteration
-		InfoLog("[RETRIGGER-RECEIVER] '%s' retrigger not needed\n", wantName)
 	}
+	// No retrigger needed - goroutine is active or will process pending packets on next iteration
 }
 func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 

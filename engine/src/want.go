@@ -460,10 +460,12 @@ func (n *Want) ShouldRetrigger() bool {
 		// Check for pending packets (non-blocking)
 		// Use 0 timeout since packet should already be in channel if we're called after Provide()
 		hasUnused := n.UnusedExists(0)
-		InfoLog("[SHOULD-RETRIGGER] '%s' - goroutine inactive, unused packets available: %v\n", n.Metadata.Name, hasUnused)
+		if hasUnused {
+			InfoLog("[SHOULD-RETRIGGER] '%s' - goroutine inactive, will retrigger (unused packets available)\n", n.Metadata.Name)
+		}
 		return hasUnused
 	}
-	InfoLog("[SHOULD-RETRIGGER] '%s' - goroutine is active, skipping retrigger\n", n.Metadata.Name)
+	// Goroutine is active - no need to log, it will handle packets in next iteration
 	return false
 }
 
