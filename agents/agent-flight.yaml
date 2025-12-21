@@ -124,7 +124,7 @@ agents:
       check_interval: 10 seconds
       endpoints:
         - GET /api/flights/{flight_id}
-    tracked_fields:
+    tracked_status_fields:
       - name: flight_status
         type: string
         description: Current flight status (read from AgentFlightAPI or updated from server)
