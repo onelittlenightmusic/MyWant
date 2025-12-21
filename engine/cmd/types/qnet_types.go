@@ -142,6 +142,13 @@ func (g *Numbers) Progress() {
 
 	// Batch mechanism: only update state history every N packets to reduce history entries
 	if locals.currentCount%locals.batchUpdateInterval == 0 {
+		achievingPercentage := 0
+		if paramCount > 0 {
+			achievingPercentage = (locals.currentCount * 100) / paramCount
+			if achievingPercentage > 100 {
+				achievingPercentage = 100
+			}
+		}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
 		g.StoreStateMulti(map[string]any{
 			"total_processed":      locals.currentCount,
@@ -149,6 +156,7 @@ func (g *Numbers) Progress() {
 			"total_wait_time":      0.0,
 			"current_time":         locals.currentTime,
 			"current_count":        locals.currentCount,
+			"achieving_percentage": achievingPercentage,
 		})
 	}
 
@@ -157,6 +165,7 @@ func (g *Numbers) Progress() {
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
+		g.StoreState("achieving_percentage", 100)
 
 		endPacket := QueuePacket{Num: -1, Time: 0}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
