@@ -4,6 +4,7 @@ export interface Want {
   spec: WantSpec;
   status: WantExecutionStatus;
   state?: Record<string, unknown>; // Runtime state including error details
+  hidden_state?: Record<string, unknown>; // Internal framework fields
   stats?: WantStats;
   history?: WantHistory;
   results?: Record<string, unknown>;

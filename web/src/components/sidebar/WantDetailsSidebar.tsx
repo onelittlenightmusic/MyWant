@@ -1290,17 +1290,47 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 
 const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
   const hasState = want.state && Object.keys(want.state).length > 0;
+  const hasHiddenState = want.hidden_state && Object.keys(want.hidden_state).length > 0;
+  const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
 
   return (
     <div className="p-8 h-full overflow-y-auto">
-      {hasState ? (
+      {hasState || hasHiddenState ? (
         <div className="space-y-6">
-          <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
-          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-            <div className="space-y-4">
-              {renderKeyValuePairs(want.state)}
-            </div>
-          </div>
+          {hasState && (
+            <>
+              <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
+              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div className="space-y-4">
+                  {renderKeyValuePairs(want.state)}
+                </div>
+              </div>
+            </>
+          )}
+
+          {hasHiddenState && (
+            <>
+              <button
+                onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
+                className="flex items-center gap-2 font-medium text-gray-800 text-sm hover:text-gray-900 py-2 mt-4"
+              >
+                {isHiddenStateExpanded ? (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                )}
+                Hidden State
+                <span className="text-xs text-gray-400 ml-1">({Object.keys(want.hidden_state).length})</span>
+              </button>
+              {isHiddenStateExpanded && (
+                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                  <div className="space-y-4">
+                    {renderKeyValuePairs(want.hidden_state)}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <div className="text-center py-12">
