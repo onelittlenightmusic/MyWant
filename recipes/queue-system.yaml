@@ -48,6 +48,7 @@ recipe:
         params:
           service_time: service_time
           deterministic: deterministic
+          count: count
         using:
           - category: queue-producer  # Connect to generator via recipe-defined label
 

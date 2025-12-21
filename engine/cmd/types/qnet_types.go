@@ -278,6 +278,18 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
 
+	// Calculate achieving percentage
+	achievingPercentage := 0
+	totalCount := q.GetIntParam("count", -1)
+	if totalCount > 0 && locals.processedCount > 0 {
+		achievingPercentage = (locals.processedCount * 100) / totalCount
+		if achievingPercentage > 100 {
+			achievingPercentage = 100
+		}
+	} else if locals.processedCount > 0 {
+		achievingPercentage = 50 // Partial progress for streaming without count
+	}
+
 	// Batch update all statistics at once
 	q.StoreStateMulti(map[string]any{
 		"serverFreeTime":           locals.serverFreeTime,
@@ -287,6 +299,7 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 		"total_processed":          locals.processedCount,
 		"total_wait_time":          locals.waitTimeSum,
 		"current_server_free_time": locals.serverFreeTime,
+		"achieving_percentage":     achievingPercentage,
 	})
 }
 
@@ -308,20 +321,35 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	return nil
 }
 
-// CalculateAchievingPercentage calculates the progress toward completion for Queue For streaming queue, returns 100 when complete (all packets processed) During streaming, this is calculated indirectly through packet count tracking
+// CalculateAchievingPercentage calculates the progress toward completion for Queue
+// Uses processedCount / totalCount * 100 if count parameter is provided
+// Otherwise, returns 100 when complete, 50 during processing, 0 when idle
 func (q *Queue) CalculateAchievingPercentage() int {
 	locals, ok := q.Locals.(*QueueLocals)
 	if !ok {
 		return 0
 	}
-	// Queue is a streaming processor - returns 100 when termination is received The percentage is implicitly tracked by processedCount during streaming
+
+	// Check if count parameter is provided
+	totalCount := q.GetIntParam("count", -1)
+
+	// If count is provided and processedCount is available, calculate percentage
+	if totalCount > 0 && locals.processedCount > 0 {
+		percentage := (locals.processedCount * 100) / totalCount
+		if percentage > 100 {
+			percentage = 100
+		}
+		return percentage
+	}
+
+	// Fallback: returns 100 when termination is received, 50 during processing
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
 		return 100
 	}
-	// For streaming queue, we can't easily determine total expected packets So we return percentage based on whether any packets have been processed
+
+	// For streaming queue without count parameter, indicate partial progress
 	if locals.processedCount > 0 {
-		// Streaming mode: return 100 only when complete
 		return 50 // Indicate partial progress while streaming
 	}
 	return 0
