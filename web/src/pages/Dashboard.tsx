@@ -166,6 +166,13 @@ export const Dashboard: React.FC = () => {
     }
   }, [error, clearError]);
 
+  // Auto-deselect want when opening Add Want form to prevent sidebar overlap
+  useEffect(() => {
+    if (showCreateForm && selectedWantId) {
+      setSelectedWantId(null);
+    }
+  }, [showCreateForm]);
+
   // Handlers
   const handleCreateWant = () => {
     setEditingWant(null);
