@@ -32,10 +32,11 @@ export default function WantTypePage() {
   } = useWantTypeStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSummary, setShowSummary] = useState(false);
 
   // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
@@ -132,13 +133,13 @@ export default function WantTypePage() {
         title="Want Types"
         itemCount={wantTypes.length}
         itemLabel="type"
-        searchPlaceholder="Search want types by name..."
-        onRefresh={() => fetchWantTypes()}
-        loading={loading}
+        showSummary={showSummary}
+        onSummaryToggle={() => setShowSummary(!showSummary)}
+        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
@@ -190,28 +191,32 @@ export default function WantTypePage() {
             />
           </div>
         </div>
+      </main>
 
-        {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
-        <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedWantType ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <div className="p-6 space-y-6">
+      {/* Summary Sidebar */}
+      <RightSidebar
+        isOpen={showSummary && !selectedWantType}
+        onClose={() => setShowSummary(false)}
+        title="Summary"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
-              <div>
-                <WantTypeStatsOverview wantTypes={wantTypes} loading={loading} />
-              </div>
-            </div>
-
-            {/* Search section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Search</h3>
-              <WantTypeFilters
-                searchQuery={searchQuery}
-                onSearchChange={handleSearch}
-              />
+              <WantTypeStatsOverview wantTypes={wantTypes} loading={loading} />
             </div>
           </div>
+
+          {/* Search section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Search</h3>
+            <WantTypeFilters
+              searchQuery={searchQuery}
+              onSearchChange={handleSearch}
+            />
+          </div>
         </div>
-      </main>
+      </RightSidebar>
 
       {/* Right Sidebar for Want Type Details */}
       <RightSidebar

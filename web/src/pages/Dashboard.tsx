@@ -40,7 +40,7 @@ export const Dashboard: React.FC = () => {
   const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
   const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [showAddLabelForm, setShowAddLabelForm] = useState(false);
@@ -49,6 +49,7 @@ export const Dashboard: React.FC = () => {
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
+  const [showSummary, setShowSummary] = useState(false);
 
   // Derive selectedWant from wants array using selectedWantId
   // This ensures selectedWant always reflects the current data from polling
@@ -427,12 +428,13 @@ export const Dashboard: React.FC = () => {
       {/* Header */}
       <Header
         onCreateWant={handleCreateWant}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        showSummary={showSummary}
+        onSummaryToggle={() => setShowSummary(!showSummary)}
+        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
@@ -498,9 +500,13 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
-        <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedWant ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <div className="p-6 space-y-6">
+        {/* Summary Sidebar */}
+        <RightSidebar
+          isOpen={showSummary && !selectedWant}
+          onClose={() => setShowSummary(false)}
+          title="Summary"
+        >
+          <div className="space-y-6">
             {/* All Labels Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -711,7 +717,7 @@ export const Dashboard: React.FC = () => {
               />
             </div>
           </div>
-        </div>
+        </RightSidebar>
       </main>
 
       {/* Right Sidebar for Want Details */}

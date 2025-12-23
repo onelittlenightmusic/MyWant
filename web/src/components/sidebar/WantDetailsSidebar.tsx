@@ -64,6 +64,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   } = useWantStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('settings');
+  const [prevTabIndex, setPrevTabIndex] = useState(0);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState<string>('');
@@ -249,6 +251,15 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [autoRefresh, loading, want, selectedWantDetails, onHeaderStateChange]);
 
+  // Trigger animation when want changes (new want selected)
+  useEffect(() => {
+    if (wantId) {
+      setIsInitialLoad(true);
+      setActiveTab('settings');
+      setPrevTabIndex(-1); // Force animation on initial load
+    }
+  }, [wantId]);
+
   if (!want) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -278,6 +289,23 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     { id: 'logs' as TabType, label: 'Logs', icon: FileText },
     { id: 'agents' as TabType, label: 'Agents', icon: Bot },
   ];
+
+  // Get current tab index
+  const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
+
+  // Handle tab change with animation direction
+  const handleTabChange = (tabId: TabType) => {
+    const newIndex = tabs.findIndex(t => t.id === tabId);
+    setPrevTabIndex(currentTabIndex);
+    setActiveTab(tabId);
+  };
+
+  // Determine animation direction (true = moving right/forward, false = moving left/backward)
+  const isMovingRight = currentTabIndex > prevTabIndex;
+
+  // Get previous tab ID for simultaneous animation
+  const prevTabId = tabs[prevTabIndex]?.id;
+  const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden" style={extendedBackgroundStyle}>
@@ -357,7 +385,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={classNames(
                   'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
                   activeTab === tab.id
@@ -374,46 +402,96 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
         {loading && !selectedWantDetails ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
           </div>
         ) : (
           <>
+            {/* Previous tab - animate out */}
+            {showPrevTab && prevTabId === 'settings' && (
+              <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <SettingsTab
+                  want={wantDetails}
+                  isEditing={isEditing}
+                  editedConfig={editedConfig}
+                  updateLoading={updateLoading}
+                  updateError={updateError}
+                  configMode={configMode}
+                  onEdit={handleEditConfig}
+                  onSave={handleSaveConfig}
+                  onCancel={handleCancelEdit}
+                  onConfigChange={setEditedConfig}
+                  onConfigModeChange={setConfigMode}
+                  onWantUpdate={() => {
+                    const wantId = want.metadata?.id || want.id;
+                    if (wantId) {
+                      fetchWantDetails(wantId);
+                      fetchWants();
+                    }
+                  }}
+                />
+              </div>
+            )}
+            {showPrevTab && prevTabId === 'results' && (
+              <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <ResultsTab want={wantDetails} />
+              </div>
+            )}
+            {showPrevTab && prevTabId === 'logs' && (
+              <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <LogsTab want={wantDetails} results={selectedWantResults} />
+              </div>
+            )}
+            {showPrevTab && prevTabId === 'agents' && (
+              <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <AgentsTab want={wantDetails} />
+              </div>
+            )}
+
+            {/* Current tab - animate in */}
             {activeTab === 'settings' && (
-              <SettingsTab
-                want={wantDetails}
-                isEditing={isEditing}
-                editedConfig={editedConfig}
-                updateLoading={updateLoading}
-                updateError={updateError}
-                configMode={configMode}
-                onEdit={handleEditConfig}
-                onSave={handleSaveConfig}
-                onCancel={handleCancelEdit}
-                onConfigChange={setEditedConfig}
-                onConfigModeChange={setConfigMode}
-                onWantUpdate={() => {
-                  const wantId = want.metadata?.id || want.id;
-                  if (wantId) {
-                    fetchWantDetails(wantId);
-                    fetchWants();
-                  }
-                }}
-              />
+              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <SettingsTab
+                  want={wantDetails}
+                  isEditing={isEditing}
+                  editedConfig={editedConfig}
+                  updateLoading={updateLoading}
+                  updateError={updateError}
+                  configMode={configMode}
+                  onEdit={handleEditConfig}
+                  onSave={handleSaveConfig}
+                  onCancel={handleCancelEdit}
+                  onConfigChange={setEditedConfig}
+                  onConfigModeChange={setConfigMode}
+                  onWantUpdate={() => {
+                    const wantId = want.metadata?.id || want.id;
+                    if (wantId) {
+                      fetchWantDetails(wantId);
+                      fetchWants();
+                    }
+                  }}
+                />
+              </div>
             )}
 
             {activeTab === 'results' && (
-              <ResultsTab want={wantDetails} />
+              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <ResultsTab want={wantDetails} />
+              </div>
             )}
 
             {activeTab === 'logs' && (
-              <LogsTab want={wantDetails} results={selectedWantResults} />
+              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <LogsTab want={wantDetails} results={selectedWantResults} />
+              </div>
             )}
 
             {activeTab === 'agents' && (
-              <AgentsTab want={wantDetails} />
+              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <AgentsTab want={wantDetails} />
+              </div>
             )}
           </>
         )}

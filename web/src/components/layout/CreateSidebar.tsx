@@ -24,7 +24,7 @@ export const CreateSidebar: React.FC<CreateSidebarProps> = ({
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity z-40 lg:hidden"
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity duration-300 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -32,7 +32,7 @@ export const CreateSidebar: React.FC<CreateSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={classNames(
-          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200',
+          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}

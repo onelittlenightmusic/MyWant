@@ -30,7 +30,7 @@ export default function RecipePage() {
   } = useWantStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,6 +38,7 @@ export default function RecipePage() {
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredRecipes, setFilteredRecipes] = useState<GenericRecipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     fetchRecipes();
@@ -184,19 +185,17 @@ export default function RecipePage() {
       {/* Header */}
       <Header
         onCreateWant={handleCreateRecipe}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
         title="Recipes"
         createButtonLabel="Create Recipe"
         itemCount={recipes.length}
         itemLabel="recipe"
-        searchPlaceholder="Search recipes by name..."
-        onRefresh={() => fetchRecipes()}
-        loading={loading}
+        showSummary={showSummary}
+        onSummaryToggle={() => setShowSummary(!showSummary)}
+        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
@@ -245,44 +244,6 @@ export default function RecipePage() {
             </div>
           )}
 
-            {/* Error Message */}
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <svg
-                      className="h-5 w-5 text-red-400"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
-                  </div>
-                  <div className="ml-auto">
-                    <button
-                      onClick={clearError}
-                      className="text-red-400 hover:text-red-600"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Recipes Grid */}
             <RecipeGrid
               recipes={recipes}
@@ -299,28 +260,32 @@ export default function RecipePage() {
             />
           </div>
         </div>
+      </main>
 
-        {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
-        <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedRecipe ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <div className="p-6 space-y-6">
+      {/* Summary Sidebar */}
+      <RightSidebar
+        isOpen={showSummary && !selectedRecipe}
+        onClose={() => setShowSummary(false)}
+        title="Summary"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
-              <div>
-                <RecipeStatsOverview recipes={recipes} loading={loading} />
-              </div>
-            </div>
-
-            {/* Filters section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Search</h3>
-              <RecipeFilters
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-              />
+              <RecipeStatsOverview recipes={recipes} loading={loading} />
             </div>
           </div>
+
+          {/* Filters section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Search</h3>
+            <RecipeFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+            />
+          </div>
         </div>
-      </main>
+      </RightSidebar>
 
       {/* Modals */}
       <RecipeModal

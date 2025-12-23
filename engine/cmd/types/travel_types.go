@@ -1299,6 +1299,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		"reservation_name":      s.ReservationName,
 		"total_processed":       1,
 		"schedule_date":         s.DepartureTime.Format("2006-01-02"),
+		"achieving_percentage":  100,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true

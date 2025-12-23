@@ -4,7 +4,7 @@ import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { FormYamlToggle } from '@/components/common/FormYamlToggle';
-import { CreateSidebar } from '@/components/layout/CreateSidebar';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
@@ -361,8 +361,6 @@ export const WantForm: React.FC<WantFormProps> = ({
     setUsing(prev => prev.filter((_, i) => i !== index));
   };
 
-  if (!isOpen) return null;
-
   const isTypeSelected = !!type || !!recipe;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
 
@@ -394,11 +392,11 @@ export const WantForm: React.FC<WantFormProps> = ({
   );
 
   return (
-    <CreateSidebar
+    <RightSidebar
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Want' : 'New Want'}
-      headerAction={headerAction}
+      headerActions={headerAction}
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
 
@@ -906,6 +904,6 @@ export const WantForm: React.FC<WantFormProps> = ({
           <ErrorDisplay error={error} />
         )}
       </form>
-    </CreateSidebar>
+    </RightSidebar>
   );
 };

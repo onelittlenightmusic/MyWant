@@ -7,7 +7,7 @@ import { classNames } from '@/utils/helpers';
 
 export const ErrorHistoryPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

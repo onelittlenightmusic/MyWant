@@ -1,86 +1,58 @@
 import React from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
-import { useWantStore } from '@/stores/wantStore';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { ExpandableSearchBar } from '@/components/common/ExpandableSearchBar';
+import { Plus, BarChart3 } from 'lucide-react';
+import { classNames } from '@/utils/helpers';
 
 interface HeaderProps {
   onCreateWant: () => void;
-  searchQuery?: string;
-  onSearchChange?: (query: string) => void;
   title?: string;
   createButtonLabel?: string;
   itemCount?: number;
   itemLabel?: string;
-  searchPlaceholder?: string;
-  onRefresh?: () => void;
-  loading?: boolean;
+  showSummary?: boolean;
+  onSummaryToggle?: () => void;
+  sidebarMinimized?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
-  searchQuery = '',
-  onSearchChange,
   title = 'MyWant Dashboard',
   createButtonLabel = 'Add Want',
   itemCount,
   itemLabel,
-  searchPlaceholder = 'Search wants by name, type, or labels...',
-  onRefresh,
-  loading: externalLoading
+  showSummary = false,
+  onSummaryToggle,
+  sidebarMinimized = false
 }) => {
-  const { loading: wantLoading, fetchWants, wants } = useWantStore();
-
-  // Use external loading if provided, otherwise use want store loading
-  const loading = externalLoading !== undefined ? externalLoading : wantLoading;
-
-  // Use itemCount if provided, otherwise use wants.length for backward compatibility
-  const count = itemCount !== undefined ? itemCount : wants.length;
-
-  const handleRefresh = () => {
-    if (onRefresh) {
-      onRefresh();
-    } else {
-      fetchWants();
-    }
-  };
-
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4">
+    <header className={classNames(
+      "bg-white border-b border-gray-200 px-6 py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out",
+      sidebarMinimized ? "lg:left-20" : "lg:left-64"
+    )}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4 min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 whitespace-nowrap">{title}</h1>
           {itemLabel && (
             <div className="text-sm text-gray-500 whitespace-nowrap">
-              {count} {itemLabel}{count !== 1 ? 's' : ''}
+              {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}
             </div>
           )}
         </div>
 
-        {/* Search Bar - centered and expands on interaction */}
-        <div className="flex-1 flex justify-center min-w-0">
-          {onSearchChange && (
-            <ExpandableSearchBar
-              placeholder={searchPlaceholder}
-              value={searchQuery}
-              onChange={onSearchChange}
-            />
-          )}
-        </div>
-
         <div className="flex items-center space-x-3 flex-shrink-0">
-          <button
-            onClick={handleRefresh}
-            disabled={loading}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 whitespace-nowrap"
-          >
-            {loading ? (
-              <LoadingSpinner size="sm" className="mr-2" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Refresh
-          </button>
+          {onSummaryToggle && (
+            <button
+              onClick={onSummaryToggle}
+              className={`inline-flex items-center px-4 py-2 font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
+                showSummary
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500'
+                  : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500'
+              }`}
+              title={showSummary ? 'Hide summary' : 'Show summary'}
+            >
+              <BarChart3 className="h-4 w-4 mr-2 flex-shrink-0" />
+              Summary
+            </button>
+          )}
 
           <button
             onClick={onCreateWant}

@@ -52,10 +52,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         )}
 
         {/* Header */}
-        <div className="flex-shrink-0 bg-white bg-opacity-70 px-6 py-4 flex items-center justify-between z-20 border-b border-gray-200 gap-4 relative">
+        <div className="flex-shrink-0 bg-white px-8 py-6 flex items-center justify-between z-20 border-b border-gray-200 gap-4 relative">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
-              <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
+              <h2 className="text-xl font-semibold text-gray-900 truncate">{title}</h2>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -75,10 +75,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-scroll min-h-0 relative z-10">
-          <div className="bg-white bg-opacity-70">
-            {children}
-          </div>
+        <div className="flex-1 overflow-y-auto h-full px-8 py-6">
+          {children}
         </div>
       </div>
     </>

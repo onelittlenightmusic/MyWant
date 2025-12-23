@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { AgentResponse } from '@/types/agent';
 import { useAgentStore } from '@/stores/agentStore';
 
@@ -28,13 +27,14 @@ export const AgentsPage: React.FC = () => {
   } = useAgentStore();
 
   // UI State
-  const [sidebarMinimized, setSidebarMinimized] = useState(false); // Start expanded, auto-collapse on mouse leave
+  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentResponse | null>(null);
   const [deleteAgentState, setDeleteAgentState] = useState<AgentResponse | null>(null);
   const [currentAgentIndex, setCurrentAgentIndex] = useState(-1);
   const [filteredAgents, setFilteredAgents] = useState<AgentResponse[]>([]);
+  const [showSummary, setShowSummary] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,19 +132,17 @@ export const AgentsPage: React.FC = () => {
       {/* Header */}
       <Header
         onCreateWant={handleCreateAgent}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
         title="Agents"
         createButtonLabel="Create Agent"
         itemCount={agents.length}
         itemLabel="agent"
-        searchPlaceholder="Search agents by name, type, capabilities, or dependencies..."
-        onRefresh={() => fetchAgents()}
-        loading={loading}
+        showSummary={showSummary}
+        onSummaryToggle={() => setShowSummary(!showSummary)}
+        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
@@ -203,9 +201,13 @@ export const AgentsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right sidebar area - reserved for statistics (hidden when sidebar is open) */}
-        <div className={`w-[480px] bg-white border-l border-gray-200 overflow-y-auto transition-opacity duration-300 ease-in-out ${selectedAgent ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-          <div className="p-6 space-y-6">
+        {/* Summary Sidebar */}
+        <RightSidebar
+          isOpen={showSummary && !selectedAgent}
+          onClose={() => setShowSummary(false)}
+          title="Summary"
+        >
+          <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
               <div>
@@ -224,7 +226,7 @@ export const AgentsPage: React.FC = () => {
               />
             </div>
           </div>
-        </div>
+        </RightSidebar>
       </main>
 
       {/* Right Sidebar for Agent Details */}

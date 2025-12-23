@@ -15,7 +15,7 @@ export const Layout: React.FC<LayoutProps> = ({
   onSidebarMinimizedChange
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [internalMinimized, setInternalMinimized] = useState(false); // Start expanded
+  const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -92,7 +92,9 @@ export const Layout: React.FC<LayoutProps> = ({
         "flex-1 flex flex-col relative transition-all duration-300 ease-in-out",
         sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
       )}>
-        {children}
+        <div className="flex-1 flex flex-col">
+          {children}
+        </div>
       </div>
     </div>
   );
