@@ -5,6 +5,7 @@ import { useAgentStore } from '@/stores/agentStore';
 import { classNames } from '@/utils/helpers';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -27,14 +28,11 @@ export const AgentsPage: React.FC = () => {
   } = useAgentStore();
 
   // UI State
+  const sidebar = useRightSidebarExclusivity<AgentResponse>();
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState<AgentResponse | null>(null);
   const [deleteAgentState, setDeleteAgentState] = useState<AgentResponse | null>(null);
-  const [currentAgentIndex, setCurrentAgentIndex] = useState(-1);
   const [filteredAgents, setFilteredAgents] = useState<AgentResponse[]>([]);
-  const [showSummary, setShowSummary] = useState(false);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,16 +56,16 @@ export const AgentsPage: React.FC = () => {
   // Handlers
   const handleCreateAgent = () => {
     setEditingAgent(null);
-    setShowCreateForm(true);
+    sidebar.openForm();
   };
 
   const handleEditAgent = (agent: AgentResponse) => {
     setEditingAgent(agent);
-    setShowCreateForm(true);
+    sidebar.openForm();
   };
 
   const handleViewAgent = (agent: AgentResponse) => {
-    setSelectedAgent(agent);
+    sidebar.selectItem(agent);
   };
 
   const handleDeleteAgentConfirm = async () => {
@@ -82,7 +80,7 @@ export const AgentsPage: React.FC = () => {
   };
 
   const handleCloseModals = () => {
-    setShowCreateForm(false);
+    sidebar.closeForm();
     setEditingAgent(null);
     setDeleteAgentState(null);
   };
@@ -90,30 +88,33 @@ export const AgentsPage: React.FC = () => {
   // Keyboard navigation handler
   const handleKeyboardNavigate = (index: number) => {
     if (filteredAgents[index]) {
-      setCurrentAgentIndex(index);
-      setSelectedAgent(filteredAgents[index]);
+      sidebar.selectItem(filteredAgents[index]);
     }
   };
+
+  // Calculate current agent index for keyboard navigation
+  const currentAgentIndex = sidebar.selectedItem
+    ? filteredAgents.findIndex(agent => agent.name === sidebar.selectedItem?.name)
+    : -1;
 
   // Keyboard navigation hook
   useKeyboardNavigation({
     itemCount: filteredAgents.length,
     currentIndex: currentAgentIndex,
     onNavigate: handleKeyboardNavigate,
-    enabled: !showCreateForm && !editingAgent && filteredAgents.length > 0
+    enabled: !sidebar.showForm && filteredAgents.length > 0
   });
 
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
-    if (selectedAgent) {
-      setSelectedAgent(null);
-      setCurrentAgentIndex(-1);
+    if (sidebar.selectedItem) {
+      sidebar.clearSelection();
     }
   };
 
   useEscapeKey({
     onEscape: handleEscapeKey,
-    enabled: !!selectedAgent
+    enabled: !!sidebar.selectedItem
   });
 
   // Stats calculation
@@ -136,8 +137,8 @@ export const AgentsPage: React.FC = () => {
         createButtonLabel="Create Agent"
         itemCount={agents.length}
         itemLabel="agent"
-        showSummary={showSummary}
-        onSummaryToggle={() => setShowSummary(!showSummary)}
+        showSummary={sidebar.showSummary}
+        onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
       />
 
@@ -191,7 +192,7 @@ export const AgentsPage: React.FC = () => {
                 loading={loading}
                 searchQuery={searchQuery}
                 typeFilters={typeFilters}
-                selectedAgent={selectedAgent}
+                selectedAgent={sidebar.selectedItem}
                 onViewAgent={handleViewAgent}
                 onEditAgent={handleEditAgent}
                 onDeleteAgent={setDeleteAgentState}
@@ -203,8 +204,8 @@ export const AgentsPage: React.FC = () => {
 
         {/* Summary Sidebar */}
         <RightSidebar
-          isOpen={showSummary && !selectedAgent}
-          onClose={() => setShowSummary(false)}
+          isOpen={sidebar.showSummary}
+          onClose={sidebar.closeSummary}
           title="Summary"
         >
           <div className="space-y-6">
@@ -231,11 +232,11 @@ export const AgentsPage: React.FC = () => {
 
       {/* Right Sidebar for Agent Details */}
       <RightSidebar
-        isOpen={!!selectedAgent}
-        onClose={() => setSelectedAgent(null)}
-        title={selectedAgent ? selectedAgent.name : undefined}
+        isOpen={!!sidebar.selectedItem}
+        onClose={sidebar.clearSelection}
+        title={sidebar.selectedItem ? sidebar.selectedItem.name : undefined}
       >
-        <AgentDetailsSidebar agent={selectedAgent} />
+        <AgentDetailsSidebar agent={sidebar.selectedItem} />
       </RightSidebar>
 
       {/* Modals */}

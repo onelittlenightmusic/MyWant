@@ -3,6 +3,7 @@ import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { WantTypeListItem, ExampleDef, WantConfiguration } from '@/types/wantType';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { WantTypeGrid } from '@/components/dashboard/WantTypeGrid';
 import { WantTypeDetailsSidebar } from '@/components/sidebar/WantTypeDetailsSidebar';
 import { WantTypeStatsOverview } from '@/components/dashboard/WantTypeStatsOverview';
@@ -32,11 +33,11 @@ export default function WantTypePage() {
   } = useWantTypeStore();
 
   // UI State
+  const sidebar = useRightSidebarExclusivity<WantTypeListItem>();
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSummary, setShowSummary] = useState(false);
 
   // Auto-dismiss notifications after 5 seconds
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function WantTypePage() {
 
   // Handle view details
   const handleViewDetails = async (wantType: WantTypeListItem) => {
+    sidebar.selectItem(wantType);
     await getWantType(wantType.name);
   };
 
@@ -112,14 +114,15 @@ export default function WantTypePage() {
 
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
-    if (selectedWantType) {
+    if (sidebar.selectedItem) {
+      sidebar.clearSelection();
       setSelectedWantType(null);
     }
   };
 
   useEscapeKey({
     onEscape: handleEscapeKey,
-    enabled: !!selectedWantType
+    enabled: !!sidebar.selectedItem
   });
 
   return (
@@ -133,8 +136,8 @@ export default function WantTypePage() {
         title="Want Types"
         itemCount={wantTypes.length}
         itemLabel="type"
-        showSummary={showSummary}
-        onSummaryToggle={() => setShowSummary(!showSummary)}
+        showSummary={sidebar.showSummary}
+        onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
       />
 
@@ -195,8 +198,8 @@ export default function WantTypePage() {
 
       {/* Summary Sidebar */}
       <RightSidebar
-        isOpen={showSummary && !selectedWantType}
-        onClose={() => setShowSummary(false)}
+        isOpen={sidebar.showSummary}
+        onClose={sidebar.closeSummary}
         title="Summary"
       >
         <div className="space-y-6">
@@ -221,7 +224,7 @@ export default function WantTypePage() {
       {/* Right Sidebar for Want Type Details */}
       <RightSidebar
         isOpen={!!selectedWantType}
-        onClose={() => setSelectedWantType(null)}
+        onClose={sidebar.clearSelection}
         title={selectedWantType ? selectedWantType.metadata.name : undefined}
       >
         <WantTypeDetailsSidebar

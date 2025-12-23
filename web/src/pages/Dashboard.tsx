@@ -5,6 +5,7 @@ import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
@@ -35,9 +36,8 @@ export const Dashboard: React.FC = () => {
   } = useWantStore();
 
   // UI State
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const sidebar = useRightSidebarExclusivity<Want>();
   const [editingWant, setEditingWant] = useState<Want | null>(null);
-  const [selectedWantId, setSelectedWantId] = useState<string | null>(null);
   const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
@@ -49,13 +49,15 @@ export const Dashboard: React.FC = () => {
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
-  const [showSummary, setShowSummary] = useState(false);
 
-  // Derive selectedWant from wants array using selectedWantId
+  // Derive selectedWant from hook or find from wants array
   // This ensures selectedWant always reflects the current data from polling
-  const selectedWant = selectedWantId
-    ? wants.find(w => (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)) || null
+  const selectedWant = sidebar.selectedItem
+    ? wants.find(w => (w.metadata?.id === sidebar.selectedItem!.metadata?.id) || (w.id === sidebar.selectedItem!.id)) || sidebar.selectedItem
     : null;
+
+  // For backward compatibility with code that uses selectedWantId
+  const selectedWantId = selectedWant?.metadata?.id || selectedWant?.id || null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,17 +146,18 @@ export const Dashboard: React.FC = () => {
 
   // Clear selection if selected want was deleted
   useEffect(() => {
-    if (selectedWantId) {
+    if (sidebar.selectedItem) {
+      const wantId = sidebar.selectedItem.metadata?.id || sidebar.selectedItem.id;
       const stillExists = wants.some(w =>
-        (w.metadata?.id === selectedWantId) || (w.id === selectedWantId)
+        (w.metadata?.id === wantId) || (w.id === wantId)
       );
 
       // Only clear selection if the want was actually deleted
       if (!stillExists) {
-        setSelectedWantId(null);
+        sidebar.clearSelection();
       }
     }
-  }, [wants, selectedWantId]);
+  }, [wants, sidebar.selectedItem, sidebar]);
 
   // Clear errors after 5 seconds
   useEffect(() => {
@@ -166,42 +169,24 @@ export const Dashboard: React.FC = () => {
     }
   }, [error, clearError]);
 
-  // Prevent sidebar overlap by ensuring mutual exclusivity
-  // Auto-deselect Details sidebar when Add Want form opens
-  useEffect(() => {
-    if (showCreateForm) {
-      setSelectedWantId(null);
-    }
-  }, [showCreateForm]);
-
-  // Close Add Want form when Details sidebar opens
-  useEffect(() => {
-    if (selectedWantId) {
-      setShowCreateForm(false);
-    }
-  }, [selectedWantId]);
-
   // Handlers
   const handleCreateWant = () => {
     setEditingWant(null);
-    setSelectedWantId(null);
-    setShowCreateForm(true);
+    sidebar.openForm();
   };
 
   const handleEditWant = (want: Want) => {
     setEditingWant(want);
-    setShowCreateForm(true);
+    sidebar.openForm();
   };
 
   const handleViewWant = (want: Want) => {
-    const wantId = want.metadata?.id || want.id;
-    setSelectedWantId(wantId || null);
+    sidebar.selectItem(want);
     setSidebarInitialTab('settings');
   };
 
   const handleViewAgents = (want: Want) => {
-    const wantId = want.metadata?.id || want.id;
-    setSelectedWantId(wantId || null);
+    sidebar.selectItem(want);
     setSidebarInitialTab('agents');
   };
 
@@ -275,7 +260,7 @@ export const Dashboard: React.FC = () => {
 
         // Close the details sidebar if the deleted want is currently selected
         if (selectedWant && (selectedWant.metadata?.id === wantId || selectedWant.id === wantId)) {
-          setSelectedWantId(null);
+          sidebar.clearSelection();
         }
       } catch (error) {
         console.error('Failed to delete want:', error);
@@ -324,7 +309,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleCloseModals = () => {
-    setShowCreateForm(false);
+    sidebar.closeForm();
     setEditingWant(null);
     setDeleteWantState(null);
   };
@@ -362,8 +347,11 @@ export const Dashboard: React.FC = () => {
     await fetchWants();
 
     // Select the want and open the sidebar to show the newly added label
-    setSelectedWantId(wantId);
-    setSidebarInitialTab('settings');
+    const want = wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId));
+    if (want) {
+      sidebar.selectItem(want);
+      setSidebarInitialTab('settings');
+    }
   };
 
   // Use hierarchical keyboard navigation hook
@@ -374,7 +362,7 @@ export const Dashboard: React.FC = () => {
     onToggleExpand: handleToggleExpand,
     expandedItems: expandedParents,
     lastSelectedItemId: lastSelectedWantId,
-    enabled: !showCreateForm && filteredWants.length > 0 // Disable when form is open
+    enabled: !sidebar.showForm && filteredWants.length > 0 // Disable when form is open
   });
 
   // Handle ESC key to close details sidebar and deselect
@@ -385,7 +373,7 @@ export const Dashboard: React.FC = () => {
       if (wantId) {
         setLastSelectedWantId(wantId);
       }
-      setSelectedWantId(null);
+      sidebar.clearSelection();
     }
   };
 
@@ -444,8 +432,8 @@ export const Dashboard: React.FC = () => {
       {/* Header */}
       <Header
         onCreateWant={handleCreateWant}
-        showSummary={showSummary}
-        onSummaryToggle={() => setShowSummary(!showSummary)}
+        showSummary={sidebar.showSummary}
+        onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
       />
 
@@ -518,8 +506,8 @@ export const Dashboard: React.FC = () => {
 
         {/* Summary Sidebar */}
         <RightSidebar
-          isOpen={showSummary && !selectedWant}
-          onClose={() => setShowSummary(false)}
+          isOpen={sidebar.showSummary}
+          onClose={sidebar.closeSummary}
           title="Summary"
         >
           <div className="space-y-6">
@@ -739,7 +727,7 @@ export const Dashboard: React.FC = () => {
       {/* Right Sidebar for Want Details */}
       <RightSidebar
         isOpen={!!selectedWant}
-        onClose={() => setSelectedWantId(null)}
+        onClose={sidebar.clearSelection}
         title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
         backgroundStyle={sidebarBackgroundStyle}
         headerActions={headerActions}
@@ -765,7 +753,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Modals */}
       <WantForm
-        isOpen={showCreateForm}
+        isOpen={sidebar.showForm}
         onClose={handleCloseModals}
         editingWant={editingWant}
       />

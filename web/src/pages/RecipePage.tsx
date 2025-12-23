@@ -5,6 +5,7 @@ import { useWantStore } from '@/stores/wantStore';
 import { GenericRecipe } from '@/types/recipe';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import RecipeModal from '@/components/modals/RecipeModal';
 import { RecipeDetailsSidebar } from '@/components/sidebar/RecipeDetailsSidebar';
 import { RightSidebar } from '@/components/layout/RightSidebar';
@@ -30,16 +31,20 @@ export default function RecipePage() {
   } = useWantStore();
 
   // UI State
+  const sidebar = useRightSidebarExclusivity<GenericRecipe>();
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<GenericRecipe | null>(null);
   const [editingRecipe, setEditingRecipe] = useState<GenericRecipe | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredRecipes, setFilteredRecipes] = useState<GenericRecipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSummary, setShowSummary] = useState(false);
+
+  // Map hook state to modal visibility
+  const showCreateModal = sidebar.showForm && !editingRecipe;
+  const showEditModal = sidebar.showForm && !!editingRecipe;
+
+  // For backward compatibility
+  const selectedRecipe = sidebar.selectedItem;
 
   useEffect(() => {
     fetchRecipes();
@@ -55,21 +60,6 @@ export default function RecipePage() {
     }
   }, [notification]);
 
-  // Auto-deselect Details sidebar when Create/Edit modal opens
-  useEffect(() => {
-    if (showCreateModal || showEditModal) {
-      setSelectedRecipe(null);
-    }
-  }, [showCreateModal, showEditModal]);
-
-  // Close Create/Edit modals when Details sidebar opens
-  useEffect(() => {
-    if (selectedRecipe) {
-      setShowCreateModal(false);
-      setShowEditModal(false);
-    }
-  }, [selectedRecipe]);
-
   // Clear editing recipe when Edit modal closes
   useEffect(() => {
     if (!showEditModal) {
@@ -78,21 +68,21 @@ export default function RecipePage() {
   }, [showEditModal]);
 
   const handleCreateRecipe = () => {
-    setSelectedRecipe(null);
-    setShowCreateModal(true);
+    setEditingRecipe(null);
+    sidebar.openForm();
   };
 
   const handleEditRecipe = (recipe: GenericRecipe) => {
     setEditingRecipe(recipe);
-    setShowEditModal(true);
+    sidebar.openForm();
   };
 
   const handleViewRecipe = (recipe: GenericRecipe) => {
-    setSelectedRecipe(recipe);
+    sidebar.selectItem(recipe);
   };
 
   const handleDeleteRecipe = (recipe: GenericRecipe) => {
-    setSelectedRecipe(recipe);
+    sidebar.selectItem(recipe);
     setShowDeleteModal(true);
   };
 
@@ -100,7 +90,7 @@ export default function RecipePage() {
     if (selectedRecipe) {
       await deleteRecipe(selectedRecipe.recipe.metadata.name);
       setShowDeleteModal(false);
-      setSelectedRecipe(null);
+      sidebar.clearSelection();
     }
   };
 
@@ -185,13 +175,13 @@ export default function RecipePage() {
     itemCount: filteredRecipes.length,
     currentIndex: currentRecipeIndex,
     onNavigate: handleKeyboardNavigate,
-    enabled: !showCreateModal && !showEditModal && filteredRecipes.length > 0
+    enabled: !sidebar.showForm && filteredRecipes.length > 0
   });
 
   // Handle ESC key to close details sidebar and deselect
   const handleEscapeKey = () => {
     if (selectedRecipe) {
-      setSelectedRecipe(null);
+      sidebar.clearSelection();
     }
   };
 
@@ -212,8 +202,8 @@ export default function RecipePage() {
         createButtonLabel="Create Recipe"
         itemCount={recipes.length}
         itemLabel="recipe"
-        showSummary={showSummary}
-        onSummaryToggle={() => setShowSummary(!showSummary)}
+        showSummary={sidebar.showSummary}
+        onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
       />
 
@@ -277,7 +267,7 @@ export default function RecipePage() {
               onDeleteRecipe={handleDeleteRecipe}
               onDeployRecipe={handleDeployRecipe}
               onDeployRecipeExample={handleDeployRecipeExample}
-              onSelectRecipe={setSelectedRecipe}
+              onSelectRecipe={sidebar.selectItem}
               onGetFilteredRecipes={setFilteredRecipes}
               searchQuery={searchQuery}
             />
@@ -287,8 +277,8 @@ export default function RecipePage() {
 
       {/* Summary Sidebar */}
       <RightSidebar
-        isOpen={showSummary && !selectedRecipe}
-        onClose={() => setShowSummary(false)}
+        isOpen={sidebar.showSummary}
+        onClose={sidebar.closeSummary}
         title="Summary"
       >
         <div className="space-y-6">
@@ -313,14 +303,19 @@ export default function RecipePage() {
       {/* Modals */}
       <RecipeModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          sidebar.closeForm();
+        }}
         recipe={null}
         mode="create"
       />
 
       <RecipeModal
         isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
+        onClose={() => {
+          sidebar.closeForm();
+          setEditingRecipe(null);
+        }}
         recipe={editingRecipe}
         mode="edit"
       />
@@ -371,7 +366,7 @@ export default function RecipePage() {
       {/* Right Sidebar for Recipe Details */}
       <RightSidebar
         isOpen={!!selectedRecipe}
-        onClose={() => setSelectedRecipe(null)}
+        onClose={sidebar.clearSelection}
         title={selectedRecipe ? selectedRecipe.recipe.metadata.name : undefined}
       >
         <RecipeDetailsSidebar
