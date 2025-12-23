@@ -35,6 +35,7 @@ export default function RecipePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<GenericRecipe | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<GenericRecipe | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredRecipes, setFilteredRecipes] = useState<GenericRecipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,15 +55,27 @@ export default function RecipePage() {
     }
   }, [notification]);
 
-  // Prevent sidebar overlap by ensuring mutual exclusivity
-  // Priority: Details sidebar > Create/Edit modals (if both would open, close modals)
+  // Auto-deselect Details sidebar when Create/Edit modal opens
   useEffect(() => {
-    if ((showCreateModal || showEditModal) && selectedRecipe) {
-      // Both are open - close the modals to show details
+    if (showCreateModal || showEditModal) {
+      setSelectedRecipe(null);
+    }
+  }, [showCreateModal, showEditModal]);
+
+  // Close Create/Edit modals when Details sidebar opens
+  useEffect(() => {
+    if (selectedRecipe) {
       setShowCreateModal(false);
       setShowEditModal(false);
     }
-  }, [showCreateModal, showEditModal, selectedRecipe]);
+  }, [selectedRecipe]);
+
+  // Clear editing recipe when Edit modal closes
+  useEffect(() => {
+    if (!showEditModal) {
+      setEditingRecipe(null);
+    }
+  }, [showEditModal]);
 
   const handleCreateRecipe = () => {
     setSelectedRecipe(null);
@@ -70,7 +83,7 @@ export default function RecipePage() {
   };
 
   const handleEditRecipe = (recipe: GenericRecipe) => {
-    setSelectedRecipe(recipe);
+    setEditingRecipe(recipe);
     setShowEditModal(true);
   };
 
@@ -308,7 +321,7 @@ export default function RecipePage() {
       <RecipeModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        recipe={selectedRecipe}
+        recipe={editingRecipe}
         mode="edit"
       />
 

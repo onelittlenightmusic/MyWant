@@ -167,17 +167,24 @@ export const Dashboard: React.FC = () => {
   }, [error, clearError]);
 
   // Prevent sidebar overlap by ensuring mutual exclusivity
-  // Priority: Details sidebar > Add Want form (if both would open, close form)
+  // Auto-deselect Details sidebar when Add Want form opens
   useEffect(() => {
-    if (showCreateForm && selectedWantId) {
-      // Both are open - close the form to show details
+    if (showCreateForm) {
+      setSelectedWantId(null);
+    }
+  }, [showCreateForm]);
+
+  // Close Add Want form when Details sidebar opens
+  useEffect(() => {
+    if (selectedWantId) {
       setShowCreateForm(false);
     }
-  }, [showCreateForm, selectedWantId]);
+  }, [selectedWantId]);
 
   // Handlers
   const handleCreateWant = () => {
     setEditingWant(null);
+    setSelectedWantId(null);
     setShowCreateForm(true);
   };
 
