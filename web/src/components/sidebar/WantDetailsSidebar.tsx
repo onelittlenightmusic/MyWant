@@ -379,7 +379,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
       {/* Tab navigation */}
       <div className="border-b border-gray-200 px-8 py-4">
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-hidden">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -387,14 +387,14 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 className={classNames(
-                  'flex-1 flex items-center justify-center space-x-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                  'flex-1 flex items-center justify-center space-x-1 px-2 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap min-w-0',
                   activeTab === tab.id
                     ? 'bg-white text-blue-600 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                 )}
               >
-                <Icon className="h-4 w-4" />
-                <span className="inline">{tab.label}</span>
+                <Icon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{tab.label}</span>
               </button>
             );
           })}
