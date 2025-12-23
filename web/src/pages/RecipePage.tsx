@@ -54,20 +54,15 @@ export default function RecipePage() {
     }
   }, [notification]);
 
-  // Auto-deselect recipe when opening create/edit modal to prevent sidebar overlap
+  // Prevent sidebar overlap by ensuring mutual exclusivity
+  // Priority: Details sidebar > Create/Edit modals (if both would open, close modals)
   useEffect(() => {
     if ((showCreateModal || showEditModal) && selectedRecipe) {
-      setSelectedRecipe(null);
-    }
-  }, [showCreateModal, showEditModal]);
-
-  // Auto-close create/edit modals when selecting a recipe to prevent sidebar overlap
-  useEffect(() => {
-    if (selectedRecipe && (showCreateModal || showEditModal)) {
+      // Both are open - close the modals to show details
       setShowCreateModal(false);
       setShowEditModal(false);
     }
-  }, [selectedRecipe]);
+  }, [showCreateModal, showEditModal, selectedRecipe]);
 
   const handleCreateRecipe = () => {
     setSelectedRecipe(null);
