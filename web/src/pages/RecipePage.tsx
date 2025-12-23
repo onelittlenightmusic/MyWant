@@ -61,6 +61,14 @@ export default function RecipePage() {
     }
   }, [showCreateModal, showEditModal]);
 
+  // Auto-close create/edit modals when selecting a recipe to prevent sidebar overlap
+  useEffect(() => {
+    if (selectedRecipe && (showCreateModal || showEditModal)) {
+      setShowCreateModal(false);
+      setShowEditModal(false);
+    }
+  }, [selectedRecipe]);
+
   const handleCreateRecipe = () => {
     setSelectedRecipe(null);
     setShowCreateModal(true);
