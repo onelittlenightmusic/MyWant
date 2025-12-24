@@ -50,11 +50,9 @@ export const Dashboard: React.FC = () => {
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
 
-  // Derive selectedWant from hook or find from wants array
-  // This ensures selectedWant always reflects the current data from polling
-  const selectedWant = sidebar.selectedItem
-    ? wants.find(w => (w.metadata?.id === sidebar.selectedItem!.metadata?.id) || (w.id === sidebar.selectedItem!.id)) || sidebar.selectedItem
-    : null;
+  // Use sidebar.selectedItem directly as the single source of truth for selection
+  // This prevents unwanted selection changes when the wants array is updated by polling
+  const selectedWant = sidebar.selectedItem;
 
   // For backward compatibility with code that uses selectedWantId
   const selectedWantId = selectedWant?.metadata?.id || selectedWant?.id || null;
@@ -157,7 +155,7 @@ export const Dashboard: React.FC = () => {
         sidebar.clearSelection();
       }
     }
-  }, [wants, sidebar.selectedItem, sidebar]);
+  }, [wants, sidebar.selectedItem]);
 
   // Clear errors after 5 seconds
   useEffect(() => {
