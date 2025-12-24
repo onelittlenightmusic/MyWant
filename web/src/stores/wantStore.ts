@@ -43,7 +43,13 @@ export const useWantStore = create<WantStore>()(
       set({ loading: true, error: null });
       try {
         const wants = await apiClient.listWants();
-        set({ wants, loading: false });
+        // Sort deterministically by ID to ensure consistent ordering across fetches
+        const sortedWants = [...wants].sort((a, b) => {
+          const idA = a.metadata?.id || a.id || '';
+          const idB = b.metadata?.id || b.id || '';
+          return idA.localeCompare(idB);
+        });
+        set({ wants: sortedWants, loading: false });
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch wants',
