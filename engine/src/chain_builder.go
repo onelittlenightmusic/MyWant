@@ -473,6 +473,14 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (any, error) {
 	recipeLoader := NewGenericRecipeLoader("recipes")
 	target.SetRecipeLoader(recipeLoader)
 
+	// Set the custom_target want type definition to enable state fields
+	// Custom targets are based on the custom_target want type, so we set that definition
+	if cb.wantTypeDefinitions != nil {
+		if typeDef, exists := cb.wantTypeDefinitions["custom_target"]; exists {
+			target.Want.SetWantTypeDefinition(typeDef)
+		}
+	}
+
 	// Automatically wrap with OwnerAwareWant if the custom target has owner references This enables parent-child coordination via subscription events (critical for nested targets)
 	var wantInstance any = target
 	if len(want.Metadata.OwnerReferences) > 0 {
