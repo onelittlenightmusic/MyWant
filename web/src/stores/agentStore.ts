@@ -37,7 +37,13 @@ export const useAgentStore = create<AgentStore>()(
       set({ loading: true, error: null });
       try {
         const agents = await apiClient.listAgents();
-        set({ agents, loading: false });
+        // Sort deterministically by name to ensure consistent ordering across fetches
+        const sortedAgents = [...agents].sort((a, b) => {
+          const nameA = a.name || '';
+          const nameB = b.name || '';
+          return nameA.localeCompare(nameB);
+        });
+        set({ agents: sortedAgents, loading: false });
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch agents',

@@ -61,8 +61,15 @@ export const useWantTypeStore = create<WantTypeStore>((set, get) => ({
         patterns.add(wt.pattern);
       });
 
+      // Sort deterministically by name to ensure consistent ordering across fetches
+      const sortedWantTypes = [...response.wantTypes].sort((a, b) => {
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB);
+      });
+
       set({
-        wantTypes: response.wantTypes,
+        wantTypes: sortedWantTypes,
         categories: Array.from(categories).sort(),
         patterns: Array.from(patterns).sort(),
         loading: false,

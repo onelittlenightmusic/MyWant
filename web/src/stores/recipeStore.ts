@@ -40,7 +40,14 @@ export const useRecipeStore = create<RecipeStore>((set, get) => ({
         id, // Add the ID to the recipe object for easier handling
       })) as GenericRecipe[];
 
-      set({ recipes: recipesArray, loading: false });
+      // Sort deterministically by name to ensure consistent ordering across fetches
+      const sortedRecipes = [...recipesArray].sort((a, b) => {
+        const nameA = a.metadata?.name || a.id || '';
+        const nameB = b.metadata?.name || b.id || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      set({ recipes: sortedRecipes, loading: false });
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to fetch recipes',
