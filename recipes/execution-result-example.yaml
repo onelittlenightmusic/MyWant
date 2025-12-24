@@ -52,6 +52,10 @@ recipe:
         params:
           command: fail_command
           timeout: 5
+  result:
+    - want_name: "simple_echo"
+      state_field: ".final_result"
+      description: "Simple echo command result"
 
   # Example deployment section
   example:

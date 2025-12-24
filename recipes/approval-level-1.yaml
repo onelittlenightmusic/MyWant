@@ -79,7 +79,7 @@ recipe:
   # Recipe result definition
   result:
     - want_name: "coordinator"
-      state_field: ".coordinator_result"
+      state_field: ".final_result"
       description: "Level 1 approval coordinator result with inputs"
     - want_name: "coordinator"
       state_field: ".approval_status"
