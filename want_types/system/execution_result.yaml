@@ -94,7 +94,7 @@ wantType:
     initialValue: ''
     example: ''
 
-  - name: finalResult
+  - name: final_result
     description: Combined stdout and stderr output
     type: string
     persistent: true
@@ -149,7 +149,7 @@ wantType:
       2. Executes shell command with default 30 second timeout
       3. Captures stdout as "Hello World"
       4. Records exit code 0 (success)
-      5. Persists results to state
+      5. Persists results to state in final_result
     want:
       metadata:
         name: simple_echo
@@ -165,7 +165,7 @@ wantType:
     expectedBehavior: |
       1. Executes MacOS shortcut via 'shortcuts run' command
       2. Captures the shortcut's output
-      3. Stores result in finalResult state
+      3. Stores result in final_result state
       4. Records execution time and exit code
     want:
       metadata:

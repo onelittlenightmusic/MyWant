@@ -581,7 +581,7 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]an
 		timeline := generateTravelTimeline(allEvents)
 
 		stateUpdates["final_itinerary"] = allEvents
-		stateUpdates["finalResult"] = timeline
+		stateUpdates["final_result"] = timeline
 	}
 
 	// Build travel inputs list

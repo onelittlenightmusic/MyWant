@@ -197,7 +197,7 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		"exit_code":        exitCode,
 		"stdout":           locals.Stdout,
 		"stderr":           locals.Stderr,
-		"finalResult":      finalResult,
+		"final_result":     finalResult,
 		"execution_time_ms": locals.ExecutionTimeMs,
 		"started_at":       startedAt,
 		"completed_at":     completedAt,

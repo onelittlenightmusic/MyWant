@@ -223,7 +223,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
-		"finalResult":                newEvent.Name,
+		"final_result":               newEvent.Name,
 	})
 	return newSchedule
 }

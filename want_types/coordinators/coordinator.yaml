@@ -74,7 +74,7 @@ wantType:
       - JST
       - AEST
   state:
-  - name: finalResult
+  - name: final_result
     description: Final coordinated result (itinerary, approval summary, buffet schedule,
       etc)
     type: map[string]interface{}

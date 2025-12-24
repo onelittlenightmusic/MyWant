@@ -111,7 +111,7 @@ recipe:
       state_field: ".coordinator_result"
       description: "Travel coordinator result with inputs"
     - want_name: "coordinator"
-      state_field: ".finalResult"
+      state_field: ".final_result"
       description: "Travel itinerary summary timeline"
     - want_name: "coordinator"
       state_field: ".total_processed"
