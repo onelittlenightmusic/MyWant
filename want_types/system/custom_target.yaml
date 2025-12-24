@@ -78,6 +78,16 @@ wantType:
     type: map[string]interface{}
     persistent: true
     initialValue: {}
+  - name: final_result
+    description: Final result computed from child wants (for recipe-based targets)
+    type: interface{}
+    persistent: true
+    initialValue: null
+  - name: result_data
+    description: Complete result data dictionary computed from recipe definitions
+    type: map[string]interface{}
+    persistent: true
+    initialValue: {}
   agents: []
   constraints:
   - description: Target name must be non-empty
