@@ -449,6 +449,7 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	types.RegisterFibonacciWantTypes(builder)
 	types.RegisterPrimeWantTypes(builder)
 	types.RegisterApprovalWantTypes(builder)
+	types.RegisterExecutionResultWantType(builder)
 	mywant.RegisterMonitorWantTypes(builder)
 
 	// Step 5: Execute (same as demo_travel_agent_full.go:106)
@@ -1697,6 +1698,7 @@ func (s *Server) Start() error {
 	types.RegisterPrimeWantTypes(s.globalBuilder)
 	types.RegisterTravelWantTypes(s.globalBuilder)
 	types.RegisterApprovalWantTypes(s.globalBuilder)
+	types.RegisterExecutionResultWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 

@@ -1,0 +1,14 @@
+wants:
+  - metadata:
+      name: execution result test
+      type: "execution result"
+      labels:
+        category: execution
+    spec:
+      recipe: recipes/execution-result-example.yaml
+      params:
+        simple_command: "echo 'Hello from ExecutionResult'"
+        list_files_command: "ls -la /tmp | head -5"
+        date_command: "date"
+        fail_command: "exit 1"
+        timeout_value: 10

@@ -1,0 +1,230 @@
+wantType:
+  metadata:
+    name: execution_result
+    title: Command Execution Result
+    description: |
+      Executes shell commands on the backend system and captures output.
+
+      This want type runs arbitrary shell commands with timeout support,
+      capturing stdout, stderr, and exit codes. Results are persisted in state
+      for query and analysis.
+
+      Useful for executing MacOS shortcuts, scripts, or system commands
+      as part of larger workflows.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: command
+    description: Shell command to execute (required)
+    type: string
+    required: true
+    example: "echo 'Hello World'"
+
+  - name: timeout
+    description: Command execution timeout in seconds
+    type: int
+    default: 30
+    required: false
+    validation:
+      min: 1
+      max: 3600
+    example: 60
+
+  - name: working_directory
+    description: Working directory for command execution (optional)
+    type: string
+    default: ''
+    required: false
+    example: /tmp
+
+  - name: shell
+    description: Shell to use for command execution
+    type: string
+    default: /bin/bash
+    required: false
+    validation:
+      enum:
+      - /bin/bash
+      - /bin/sh
+      - /bin/zsh
+    example: /bin/bash
+
+  state:
+  - name: completed
+    description: Whether command execution has completed
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+
+  - name: status
+    description: Execution status (pending, running, completed, failed)
+    type: string
+    persistent: true
+    initialValue: pending
+    example: completed
+
+  - name: command
+    description: The command that was executed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "echo 'Hello World'"
+
+  - name: exit_code
+    description: Exit code returned by the command
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 0
+
+  - name: stdout
+    description: Standard output captured from the command
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'Hello World'
+
+  - name: stderr
+    description: Standard error captured from the command
+    type: string
+    persistent: true
+    initialValue: ''
+    example: ''
+
+  - name: finalResult
+    description: Combined stdout and stderr output
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'Hello World'
+
+  - name: execution_time_ms
+    description: Time taken to execute the command in milliseconds
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 25
+
+  - name: started_at
+    description: RFC3339 timestamp when command started
+    type: string
+    persistent: true
+    initialValue: ''
+    example: '2025-12-24T10:30:45Z'
+
+  - name: completed_at
+    description: RFC3339 timestamp when command completed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: '2025-12-24T10:30:45Z'
+
+  - name: error_message
+    description: Error message if execution failed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'Exit code: 1'
+
+  agents: []
+
+  constraints:
+  - description: Command parameter is required
+    validation: command must not be empty
+
+  - description: Timeout must be positive and reasonable
+    validation: timeout between 1 and 3600 seconds
+
+  - description: Shell must be one of allowed shells
+    validation: shell in [/bin/bash, /bin/sh, /bin/zsh]
+
+  examples:
+  - name: Simple Echo Command
+    description: Execute a simple echo command
+    expectedBehavior: |
+      1. Command initializes with "echo 'Hello World'" parameter
+      2. Executes shell command with default 30 second timeout
+      3. Captures stdout as "Hello World"
+      4. Records exit code 0 (success)
+      5. Persists results to state
+    want:
+      metadata:
+        name: simple_echo
+        type: execution_result
+        labels: {}
+      spec:
+        params:
+          command: "echo 'Hello World'"
+          timeout: 10
+
+  - name: Shortcut Execution
+    description: Execute MacOS shortcut and capture output
+    expectedBehavior: |
+      1. Executes MacOS shortcut via 'shortcuts run' command
+      2. Captures the shortcut's output
+      3. Stores result in finalResult state
+      4. Records execution time and exit code
+    want:
+      metadata:
+        name: run_shortcut
+        type: execution_result
+        labels: {}
+      spec:
+        params:
+          command: 'shortcuts run "My Shortcut" | cat'
+          timeout: 60
+
+  - name: File Listing
+    description: List files in a directory
+    expectedBehavior: |
+      1. Executes 'ls -la' command in /tmp directory
+      2. Captures directory listing to stdout
+      3. Persists file list in state
+      4. Records execution details
+    want:
+      metadata:
+        name: list_files
+        type: execution_result
+        labels: {}
+      spec:
+        params:
+          command: "ls -la /tmp"
+          working_directory: /tmp
+          timeout: 15
+
+  - name: Failing Command
+    description: Handle command that returns non-zero exit code
+    expectedBehavior: |
+      1. Attempts to execute command 'exit 1'
+      2. Captures exit code 1 (failure)
+      3. Records status as 'failed'
+      4. Persists error information in state
+    want:
+      metadata:
+        name: failing_command
+        type: execution_result
+        labels: {}
+      spec:
+        params:
+          command: "exit 1"
+          timeout: 5
+
+  relatedTypes:
+  - owner
+  - custom_target
+
+  seeAlso:
+  - Command execution documentation
+  - Shell command best practices
+  - System integration patterns
+
+  require:
+    type: none
+    outputs:
+    - name: result_data
+      type: state
+      description: Execution results persisted to want state
+      multiple: false

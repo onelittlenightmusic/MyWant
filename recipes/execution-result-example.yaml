@@ -1,0 +1,65 @@
+# ExecutionResult Want Type - Example Recipe
+# This recipe demonstrates command execution with the execution_result want type
+
+recipe:
+  metadata:
+    name: "Command Execution Example"
+    description: "Command execution with result capture"
+    custom_type: "execution result"
+    category: "system"
+    version: "1.0.0"
+
+  parameters:
+    simple_command: "echo 'Hello from ExecutionResult Want!'"
+    list_files_command: "ls -la /tmp | head -5"
+    date_command: "date"
+    fail_command: "exit 1"
+    timeout_value: 10
+
+  wants:
+    # Example 1: Simple echo command
+    - metadata:
+        name: simple_echo
+        type: execution_result
+      spec:
+        params:
+          command: simple_command
+          timeout: 5
+
+    # Example 2: List files
+    - metadata:
+        name: list_files
+        type: execution_result
+      spec:
+        params:
+          command: list_files_command
+          timeout: 5
+
+    # Example 3: Date command
+    - metadata:
+        name: get_date
+        type: execution_result
+      spec:
+        params:
+          command: date_command
+          timeout: 5
+
+    # Example 4: Command that fails
+    - metadata:
+        name: failing_command
+        type: execution_result
+      spec:
+        params:
+          command: fail_command
+          timeout: 5
+
+  # Example deployment section
+  example:
+    wants:
+      - metadata:
+          name: example_echo
+          type: execution_result
+        spec:
+          params:
+            command: "echo 'ExecutionResult Want Type Test'"
+            timeout: 10
