@@ -151,7 +151,9 @@ func NewServer(config ServerConfig) *Server {
 
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
-	_ = wantTypeLoader.LoadAllWantTypes()
+	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
+		log.Printf("[WARN] Failed to load want types: %v", err)
+	}
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
