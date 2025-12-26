@@ -109,22 +109,35 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
             {/* Scheduling indicator */}
             {hasScheduling && (
-              <span
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onView(want);
+                }}
                 className={classNames(
-                  'inline-flex items-center gap-1 font-medium rounded-full border',
+                  'inline-flex items-center gap-1 font-medium rounded-full border hover:opacity-80 transition-opacity',
                   sizes.statusSize === 'xs' ? 'px-1.5 py-0.5 text-xs' :
                   sizes.statusSize === 'sm' ? 'px-2 py-1 text-xs' :
                   sizes.statusSize === 'md' ? 'px-2.5 py-1.5 text-sm' :
                   'px-3 py-2 text-base',
                   'bg-amber-100 text-amber-800 border-amber-200'
                 )}
-                title="Has scheduling (when)"
+                title="Click to view scheduling settings"
               >
                 <Clock className={sizes.iconSize} />
-              </span>
+              </button>
             )}
 
-            <StatusBadge status={want.status} size={sizes.statusSize} />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(want);
+              }}
+              className="hover:opacity-80 transition-opacity"
+              title="Click to view details"
+            >
+              <StatusBadge status={want.status} size={sizes.statusSize} />
+            </button>
 
           </div>
         </div>
