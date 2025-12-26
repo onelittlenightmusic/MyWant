@@ -139,6 +139,11 @@ func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler,
 		&TravelCompletionChecker{IsBuffet: isBuffetParam || coordinatorType == "buffet coordinator"}
 }
 
+// Initialize resets state before execution begins
+func (c *CoordinatorWant) Initialize() {
+	// No state reset needed for coordinator wants
+}
+
 // IsAchieved checks if coordinator has collected all required data and timeout has expired
 func (c *CoordinatorWant) IsAchieved() bool {
 	completionKey := c.DataHandler.GetCompletionKey()

@@ -60,6 +60,11 @@ func NewEvidenceWant(metadata Metadata, spec WantSpec) Progressable {
 	)}
 }
 
+// Initialize resets state before execution begins
+func (e *EvidenceWant) Initialize() {
+	// No state reset needed for approval wants
+}
+
 // IsAchieved checks if evidence has been provided
 func (e *EvidenceWant) IsAchieved() bool {
 	provided, _ := e.GetStateBool("evidence_provided", false)
@@ -146,6 +151,11 @@ func NewDescriptionWant(metadata Metadata, spec WantSpec) Progressable {
 		locals,
 		"description",
 	)}
+}
+
+// Initialize resets state before execution begins
+func (d *DescriptionWant) Initialize() {
+	// No state reset needed for approval wants
 }
 
 // IsAchieved checks if description has been provided

@@ -85,6 +85,11 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progre
 	)}
 }
 
+// Initialize resets state before execution begins
+func (g *Numbers) Initialize() {
+	// No state reset needed for queue wants
+}
+
 // IsAchieved checks if numbers generator is complete (all packets sent)
 func (g *Numbers) IsAchieved() bool {
 	locals, ok := g.Locals.(*NumbersLocals)
@@ -204,6 +209,11 @@ func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressabl
 		&QueueLocals{},
 		"queue",
 	)}
+}
+
+// Initialize resets state before execution begins
+func (q *Queue) Initialize() {
+	// No state reset needed for queue wants
 }
 
 // IsAchieved checks if queue is complete (end signal received)
@@ -378,6 +388,11 @@ func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progress
 	)}
 }
 
+// Initialize resets state before execution begins
+func (c *Combiner) Initialize() {
+	// No state reset needed for queue wants
+}
+
 // IsAchieved checks if combiner is complete (end signal received)
 func (c *Combiner) IsAchieved() bool {
 	completed, _ := c.GetStateBool("completed", false)
@@ -450,6 +465,11 @@ func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 		&SinkLocals{},
 		"sink",
 	)}
+}
+
+// Initialize resets state before execution begins
+func (s *Sink) Initialize() {
+	// No state reset needed for queue wants
 }
 
 // IsAchieved checks if sink is complete (end signal received)

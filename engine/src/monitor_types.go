@@ -65,6 +65,11 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 	return monitor
 }
 
+// Initialize resets state before execution begins
+func (mw *MonitorWant) Initialize() {
+	// No state reset needed for monitor wants
+}
+
 // IsAchieved checks if monitor is complete (always false for continuous monitoring)
 func (mw *MonitorWant) IsAchieved() bool {
 	return false  // Never done - continuous monitoring

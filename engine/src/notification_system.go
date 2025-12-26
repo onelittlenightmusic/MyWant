@@ -81,9 +81,9 @@ func sendParameterNotifications(notification StateNotification) {
 	}
 	wantRegistryMutex.RUnlock()
 	for _, childWant := range childWants {
-		fmt.Printf("[PARAMETER CHANGE] %s: Parameter %s changed to %v, setting status to idle for restart\n",
+		fmt.Printf("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
 			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
-		childWant.SetStatus(WantStatusIdle)
+		childWant.RestartWant()
 	}
 	storeNotificationHistory(notification)
 }

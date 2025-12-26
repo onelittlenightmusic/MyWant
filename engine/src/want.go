@@ -285,6 +285,14 @@ func (n *Want) SetStatus(status WantStatus) {
 	}
 }
 
+// RestartWant restarts the want's execution by setting its status to Idle
+// This triggers the reconcile loop to re-run the want
+// Used for scheduled restarts and other re-execution scenarios
+func (n *Want) RestartWant() {
+	InfoLog("[RESTART] Want '%s' restarting execution\n", n.Metadata.Name)
+	n.SetStatus(WantStatusIdle)
+}
+
 // NotifyCompletion notifies the ChainBuilder that this want has achieved completion Called automatically by SetStatus() when want reaches WantStatusAchieved This enables wants (especially receivers like Coordinators) to self-notify completion Replaces the previous pattern where senders would call UpdateCompletedFlag
 func (n *Want) NotifyCompletion() {
 	cb := GetGlobalChainBuilder()
@@ -539,6 +547,12 @@ func (n *Want) StartProgressionLoop(
 				n.SetStatus(WantStatusAchieved)
 			}
 		}()
+
+		// Initialize the progressable before starting execution
+		// This resets state for fresh execution (especially important for restarts)
+		if n.progressable != nil {
+			n.progressable.Initialize()
+		}
 
 		for {
 			// 1. Check stop channel

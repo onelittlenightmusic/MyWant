@@ -80,6 +80,11 @@ func (s *SchedulerWant) Progress() {
 }
 
 // IsAchieved always returns false since the scheduler runs continuously
+// Initialize resets state before execution begins
+func (s *SchedulerWant) Initialize() {
+	// No state reset needed for scheduler wants
+}
+
 func (s *SchedulerWant) IsAchieved() bool {
 	return false
 }

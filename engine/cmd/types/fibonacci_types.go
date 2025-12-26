@@ -19,6 +19,11 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Progressable {
 	)}
 }
 
+// Initialize resets state before execution begins
+func (g *FibonacciNumbers) Initialize() {
+	// No state reset needed for fibonacci wants
+}
+
 // IsAchieved checks if fibonacci generation is complete
 func (g *FibonacciNumbers) IsAchieved() bool {
 	sentCount, _ := g.GetStateInt("sent_count", 0)
@@ -67,6 +72,11 @@ func NewFibonacciFilter(metadata Metadata, spec WantSpec) Progressable {
 		},
 		"fibonacci filter",
 	)}
+}
+
+// Initialize resets state before execution begins
+func (f *FibonacciFilter) Initialize() {
+	// No state reset needed for fibonacci wants
 }
 
 // IsAchieved checks if fibonacci filtering is complete

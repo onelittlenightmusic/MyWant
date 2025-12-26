@@ -25,6 +25,11 @@ func NewPrimeNumbers(metadata Metadata, spec WantSpec) Progressable {
 	)}
 }
 
+// Initialize resets state before execution begins
+func (g *PrimeNumbers) Initialize() {
+	// No state reset needed for prime wants
+}
+
 // IsAchieved checks if prime number generation is complete
 func (g *PrimeNumbers) IsAchieved() bool {
 	start := g.GetIntParam("start", 1)
@@ -71,6 +76,11 @@ func NewPrimeSequence(metadata Metadata, spec WantSpec) Progressable {
 		},
 		"prime sequence",
 	)}
+}
+
+// Initialize resets state before execution begins
+func (f *PrimeSequence) Initialize() {
+	// No state reset needed for prime wants
 }
 
 // IsAchieved checks if prime sequence filtering is complete

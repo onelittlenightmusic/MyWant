@@ -312,6 +312,11 @@ func (t *Target) CreateChildWants() []*Want {
 }
 
 // IsAchieved checks if target is complete (all children created and completed)
+// Initialize resets state before execution begins
+func (t *Target) Initialize() {
+	// No state reset needed for target wants
+}
+
 func (t *Target) IsAchieved() bool {
 	// Check the Status field which was set by Progress() when all children completed
 	// This is more reliable than re-checking children completion, which can be slow or racy

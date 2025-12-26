@@ -72,6 +72,11 @@ type BaseTravelWant struct {
 	executor TravelWantInterface // Reference to concrete type for interface method dispatch
 }
 
+// Initialize resets state before execution
+func (b *BaseTravelWant) Initialize() {
+	// Travel wants don't need state reset
+}
+
 // IsAchieved checks if the travel want has been achieved
 func (b *BaseTravelWant) IsAchieved() bool {
 	completed, _ := b.GetStateBool("completed", false)

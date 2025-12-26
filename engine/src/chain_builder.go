@@ -1376,7 +1376,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					runtimeWant.want.Metadata.ID = updatedConfigWant.Metadata.ID
 
 					// Reset status to Idle so want can be re-executed with new configuration
-					runtimeWant.want.SetStatus(WantStatusIdle)
+					runtimeWant.want.RestartWant()
 
 				} else {
 				}
@@ -1551,7 +1551,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		// Update the extracted Want with metadata and config info
 		wantPtr.Metadata = wantConfig.Metadata
 		wantPtr.Spec = wantConfig.Spec
-		wantPtr.Status = WantStatusIdle
+		wantPtr.SetStatus(WantStatusIdle)
 
 		// Merge state data if provided
 		if wantConfig.State != nil {
@@ -1673,7 +1673,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Check connectivity satisfaction
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		want.want.SetStatus(WantStatusIdle)
+		want.want.RestartWant()
 		return
 	}
 
@@ -1686,7 +1686,7 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Double-check connectivity and trigger reconciliation if needed
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
-		want.want.SetStatus(WantStatusIdle)
+		want.want.RestartWant()
 		if err := cb.TriggerReconcile(); err != nil {
 			// Log error but continue
 		}
@@ -2378,15 +2378,35 @@ func (cb *ChainBuilder) StopWant(wantID string) error {
 	return cb.SendControlCommand(cmd)
 }
 
-// RestartWant restarts execution of a specific want
+// RestartWant restarts execution of a specific want by setting its status to Idle
+// This triggers the reconcile loop to re-run the want
 func (cb *ChainBuilder) RestartWant(wantID string) error {
-	cmd := &ControlCommand{
-		Trigger:   ControlTriggerRestart,
-		WantID:    wantID,
-		Timestamp: time.Now(),
-		Reason:    "Restarted via API",
+	// Find and restart the want by calling its RestartWant() method
+	cb.reconcileMutex.RLock()
+	var targetWant *Want
+	for _, runtime := range cb.wants {
+		if runtime.want.Metadata.ID == wantID {
+			targetWant = runtime.want
+			break
+		}
 	}
-	return cb.SendControlCommand(cmd)
+	cb.reconcileMutex.RUnlock()
+
+	if targetWant == nil {
+		return fmt.Errorf("want with ID %s not found", wantID)
+	}
+
+	// Call Want's RestartWant method which sets status to Idle
+	targetWant.RestartWant()
+
+	// Trigger reconciliation immediately to detect the Idle status and restart the goroutine
+	select {
+	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+	default:
+		// Channel full, but the reconcile loop will run soon anyway
+	}
+
+	return nil
 }
 func (cb *ChainBuilder) SendControlCommand(cmd *ControlCommand) error {
 	select {
@@ -2717,11 +2737,10 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		InfoLog("[RETRIGGER-RECEIVER] '%s' should retrigger (decision function returned true)\n", wantName)
 		InfoLog("[RETRIGGER-RECEIVER] '%s' current status: %s\n", wantName, want.GetStatus())
 
-		// Set status to Idle and trigger reconcile loop
+		// Restart the want's execution (sets status to Idle)
 		// The reconcile loop's startPhase() will detect the Idle status and restart the want
 		// This avoids duplicate execution and keeps retrigger logic in one place
-		want.SetStatus(WantStatusIdle)
-		InfoLog("[RETRIGGER-RECEIVER] '%s' status set to Idle\n", wantName)
+		want.RestartWant()
 
 		if err := cb.TriggerReconcile(); err != nil {
 			InfoLog("[RETRIGGER-RECEIVER] WARNING: failed to trigger reconcile for '%s': %v\n", wantName, err)
@@ -2760,9 +2779,9 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 				InfoLog("[RETRIGGER] Want ID '%s' completed, found %d users to retrigger\n", wantID, len(users))
 
 				for _, userName := range users {
-					// Reset dependent want to Idle so it can be re-executed This allows the want to pick up new data from the completed source
+					// Restart dependent want so it can be re-executed This allows the want to pick up new data from the completed source
 					if runtimeWant, ok := wantSnapshot[userName]; ok {
-						runtimeWant.want.SetStatus(WantStatusIdle)
+						runtimeWant.want.RestartWant()
 						anyWantRetriggered = true
 					}
 				}

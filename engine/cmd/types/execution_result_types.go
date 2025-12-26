@@ -53,6 +53,24 @@ func NewExecutionResultWant(want *Want) *ExecutionResultWant {
 	return &ExecutionResultWant{Want: *want}
 }
 
+// Initialize resets execution state before starting
+func (e *ExecutionResultWant) Initialize() {
+	// Reset completion state for fresh execution using batch update
+	e.StoreStateMulti(map[string]any{
+		"completed":       false,
+		"status":          "pending",
+		"stdout":          "",
+		"stderr":          "",
+		"error_message":   "",
+		"exit_code":       0,
+		"final_result":    "",
+		"started_at":      "",
+		"completed_at":    "",
+		"execution_time_ms": 0,
+		"_phase":          string(ExecutionPhaseInitial),
+	})
+}
+
 // IsAchieved checks if execution is completed
 func (e *ExecutionResultWant) IsAchieved() bool {
 	completed, _ := e.GetStateBool("completed", false)

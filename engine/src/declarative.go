@@ -116,6 +116,7 @@ func (p *BasePacket) GetData() any { return p.data }
 
 // Progressable represents a want that can execute directly
 type Progressable interface {
+	Initialize()      // Initialize/reset state before execution begins
 	IsAchieved() bool // Returns true when want is complete
 	Progress()        // Execute logic (no completion signal)
 }
