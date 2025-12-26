@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, X, Code, Edit3, Search, ChevronDown } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, Search, ChevronDown, Clock } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -44,13 +44,15 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for label being edited
   const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for dependency being edited
+  const [editingWhenIndex, setEditingWhenIndex] = useState<number | null>(null);
+  const [editingWhenDraft, setEditingWhenDraft] = useState<{ at: string; everyValue: string; everyUnit: string }>({ at: '', everyValue: '', everyUnit: 'seconds' }); // Temporary draft for scheduling being edited
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
   const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
-  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies'>>(() => {
+  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
     // All sections collapsed by default
-    return new Set(['parameters', 'labels', 'dependencies']);
+    return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
   });
 
   // Form state
@@ -60,6 +62,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
   const [recipe, setRecipe] = useState('');
+  const [when, setWhen] = useState<Array<{ at?: string; every: string }>>([]);
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
@@ -80,6 +83,8 @@ export const WantForm: React.FC<WantFormProps> = ({
   const formToWantObject = () => {
     // Filter out using entries with empty keys
     const validUsing = using.filter(item => Object.keys(item)[0]?.trim());
+    // Filter out when entries with empty every
+    const validWhen = when.filter(item => item.every?.trim());
 
     return {
       metadata: {
@@ -89,7 +94,8 @@ export const WantForm: React.FC<WantFormProps> = ({
       },
       spec: {
         ...(Object.keys(params).length > 0 && { params }),
-        ...(validUsing.length > 0 && { using: validUsing })
+        ...(validUsing.length > 0 && { using: validUsing }),
+        ...(validWhen.length > 0 && { when: validWhen })
       }
     };
   };
@@ -102,6 +108,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams(want.spec?.params || {});
     setUsing(want.spec?.using || []);
     setRecipe(want.spec?.recipe || '');
+    setWhen(want.spec?.when || []);
   };
 
   // Update YAML when form data changes
@@ -111,7 +118,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       console.log('Updating YAML - wantObject:', wantObject, 'using state:', using);
       setYamlContent(stringifyYaml(wantObject));
     }
-  }, [name, type, labels, params, using, recipe, editMode]);
+  }, [name, type, labels, params, using, recipe, when, editMode]);
 
   // Initialize form when sidebar opens/closes
   useEffect(() => {
@@ -132,7 +139,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   }, [editingWant]);
 
-  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies') => {
+  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
     setCollapsedSections(prev => {
       const updated = new Set(prev);
       if (updated.has(section)) {
@@ -153,6 +160,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams({});
     setUsing([]);
     setRecipe('');
+    setWhen([]);
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
     setUserNameSuffix('');
@@ -163,7 +171,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     }));
     setValidationError(null);
     setApiError(null);
-    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies']));
+    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
   };
 
   // Update form when want type is selected
@@ -359,6 +367,32 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   const removeUsing = (index: number) => {
     setUsing(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // When (Scheduling) management functions
+  const addWhen = () => {
+    const newIndex = when.length;
+    setWhen(prev => [...prev, { at: '', every: '30 seconds' }]);
+    setEditingWhenIndex(newIndex);
+    setEditingWhenDraft({ at: '', everyValue: '30', everyUnit: 'seconds' });
+  };
+
+  const removeWhen = (index: number) => {
+    setWhen(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Parse every field into value and unit (e.g., "30 seconds" -> { value: "30", unit: "seconds" })
+  const parseEvery = (every: string): { value: string; unit: string } => {
+    const parts = every.trim().split(/\s+/);
+    if (parts.length === 2) {
+      return { value: parts[0], unit: parts[1] };
+    }
+    return { value: every, unit: 'seconds' };
+  };
+
+  // Combine every value and unit back into every string
+  const formatEvery = (value: string, unit: string): string => {
+    return `${value} ${unit}`.trim();
   };
 
   const isTypeSelected = !!type || !!recipe;
@@ -854,6 +888,192 @@ export const WantForm: React.FC<WantFormProps> = ({
                       >
                         <Plus className="w-4 h-4" />
                         Add Dependency
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Scheduling - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg">
+              <button
+                type="button"
+                onClick={() => toggleSection('scheduling')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('scheduling') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-600" />
+                    <h4 className="text-base font-medium text-gray-900">Scheduling (when)</h4>
+                  </div>
+                </div>
+                {collapsedSections.has('scheduling') && when.length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {when.map((whenItem, index) => {
+                      const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
+                      return (
+                        <div key={index} className="text-gray-500">
+                          {display}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </button>
+
+              {!collapsedSections.has('scheduling') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {/* Display existing scheduling as styled chips */}
+                  {when.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {when.map((whenItem, index) => {
+                        // Don't show chip if this schedule is being edited
+                        if (editingWhenIndex === index) return null;
+
+                        const parsed = parseEvery(whenItem.every);
+                        const display = whenItem.at ? `${whenItem.at}, every ${parsed.value} ${parsed.unit}` : `every ${parsed.value} ${parsed.unit}`;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => {
+                              setEditingWhenIndex(index);
+                              const parsed = parseEvery(whenItem.every);
+                              setEditingWhenDraft({
+                                at: whenItem.at || '',
+                                everyValue: parsed.value,
+                                everyUnit: parsed.unit
+                              });
+                            }}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors cursor-pointer"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            {display}
+                            <X
+                              className="w-3 h-3 ml-2 hover:text-amber-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeWhen(index);
+                              }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Scheduling input form - shown when editing or adding new schedule */}
+                  {editingWhenIndex !== null && (
+                    <div className="space-y-3 pt-4 border-t border-gray-200">
+                      {/* At (time) - Optional */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          At (optional - e.g., "7am", "17:30", "midnight")
+                        </label>
+                        <input
+                          type="text"
+                          value={editingWhenDraft.at}
+                          onChange={(e) => {
+                            setEditingWhenDraft(prev => ({ ...prev, at: e.target.value }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                          placeholder="Optional - e.g., 7am, 17:30"
+                        />
+                      </div>
+
+                      {/* Every (frequency) */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Every (required)
+                        </label>
+                        <div className="flex gap-2 items-end">
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              value={editingWhenDraft.everyValue}
+                              onChange={(e) => {
+                                setEditingWhenDraft(prev => ({ ...prev, everyValue: e.target.value }));
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                              placeholder="30"
+                              min="1"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <select
+                              value={editingWhenDraft.everyUnit}
+                              onChange={(e) => {
+                                setEditingWhenDraft(prev => ({ ...prev, everyUnit: e.target.value }));
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            >
+                              <option value="seconds">seconds</option>
+                              <option value="minutes">minutes</option>
+                              <option value="hours">hours</option>
+                              <option value="days">days</option>
+                              <option value="weeks">weeks</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingWhenDraft.everyValue.trim()) {
+                              const newWhen = [...when];
+                              const every = formatEvery(editingWhenDraft.everyValue, editingWhenDraft.everyUnit);
+                              if (editingWhenIndex !== null && editingWhenIndex < newWhen.length) {
+                                newWhen[editingWhenIndex] = {
+                                  ...(editingWhenDraft.at && { at: editingWhenDraft.at }),
+                                  every
+                                };
+                              } else {
+                                newWhen.push({
+                                  ...(editingWhenDraft.at && { at: editingWhenDraft.at }),
+                                  every
+                                });
+                              }
+                              setWhen(newWhen);
+                            }
+                            setEditingWhenIndex(null);
+                            setEditingWhenDraft({ at: '', everyValue: '', everyUnit: 'seconds' });
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingWhenIndex(null);
+                            setEditingWhenDraft({ at: '', everyValue: '', everyUnit: 'seconds' });
+                          }}
+                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    {editingWhenIndex === null && (
+                      <button
+                        type="button"
+                        onClick={addWhen}
+                        className="text-amber-600 hover:text-amber-800 text-sm font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Schedule
                       </button>
                     )}
                   </div>
