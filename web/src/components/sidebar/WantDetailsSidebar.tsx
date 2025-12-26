@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { RefreshCw, Settings, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2, Database, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -75,6 +75,22 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [configMode, setConfigMode] = useState<'form' | 'yaml'>('form');
 
+  // Memoize handlers to prevent recreation on every render
+  const handleRefresh = useCallback(() => {
+    if (want) {
+      const wantId = want.metadata?.id || want.id;
+      if (wantId) {
+        fetchWantDetails(wantId);
+        fetchWantResults(wantId);
+        fetchWants();
+      }
+    }
+  }, [want, fetchWantDetails, fetchWantResults, fetchWants]);
+
+  const handleToggleAutoRefresh = useCallback(() => {
+    setAutoRefresh(prev => !prev);
+  }, []);
+
   // Control panel logic (use want for status since it comes from the live dashboard state)
   const isRunning = want?.status === 'reaching';
   const isSuspended = want?.status === 'suspended';
@@ -137,12 +153,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }, [initialTab]);
 
   // Auto-enable refresh for running wants (but don't auto-disable - let user control it)
+  // Only depends on status, not want object, to avoid infinite loops from polling
   useEffect(() => {
-    if (want && selectedWantDetails && selectedWantDetails.status === 'reaching' && !autoRefresh) {
+    if (selectedWantDetails?.status === 'reaching' && !autoRefresh) {
       // Auto-enable only if currently disabled
       setAutoRefresh(true);
     }
-  }, [want, selectedWantDetails?.status, wantId]);
+  }, [selectedWantDetails?.status, autoRefresh]);
 
   // Auto refresh setup (only refresh specific want details, not the whole list)
   useEffect(() => {
@@ -156,20 +173,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [autoRefresh, wantId, fetchWantDetails, fetchWantResults]);
 
-  const handleRefresh = () => {
-    if (want) {
-      const wantId = want.metadata?.id || want.id;
-      if (wantId) {
-        fetchWantDetails(wantId);
-        fetchWantResults(wantId);
-        fetchWants();
-      }
-    }
-  };
-
-  const handleToggleAutoRefresh = () => {
-    setAutoRefresh(!autoRefresh);
-  };
 
   // Register header action handlers with the sidebar
   useEffect(() => {
@@ -249,22 +252,20 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     setUpdateError(null);
   };
 
+  // Memoize header state to only trigger when values actually change (not object reference)
+  const headerState = useMemo(() => ({
+    autoRefresh,
+    loading,
+    status: (selectedWantDetails?.status || want?.status || 'created') as WantExecutionStatus
+  }), [autoRefresh, loading, selectedWantDetails?.status, want?.status]);
+
   // Notify parent of header state changes - must be before early return to keep hook order consistent
+  // Only depends on memoized state object, not on want/selectedWantDetails objects
   useEffect(() => {
-    if (want && selectedWantDetails) {
-      onHeaderStateChange?.({
-        autoRefresh,
-        loading,
-        status: (selectedWantDetails.status as WantExecutionStatus) || 'created'
-      });
-    } else if (want) {
-      onHeaderStateChange?.({
-        autoRefresh,
-        loading,
-        status: (want.status as WantExecutionStatus) || 'created'
-      });
+    if (want) {
+      onHeaderStateChange?.(headerState);
     }
-  }, [autoRefresh, loading, want, selectedWantDetails, onHeaderStateChange]);
+  }, [want, headerState, onHeaderStateChange]);
 
   // Trigger animation when want changes (new want selected)
   // Note: Don't set activeTab here - let the initialTab effect handle it
