@@ -573,6 +573,10 @@ components:
           items:
             $ref: '#/components/schemas/OwnerReference'
           description: References to owner objects for hierarchical relationships
+        isSystemWant:
+          type: boolean
+          description: true for system-managed wants (e.g., system-scheduler)
+          example: false
       required:
         - name
         - type

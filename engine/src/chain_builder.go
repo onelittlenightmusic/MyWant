@@ -2413,9 +2413,10 @@ func (cb *ChainBuilder) initializeSystemScheduler() {
 	// Create a new Scheduler Want
 	schedulerWant := &Want{
 		Metadata: Metadata{
-			ID:   generateUUID(),
-			Name: "system-scheduler",
-			Type: "scheduler",
+			ID:             generateUUID(),
+			Name:           "system-scheduler",
+			Type:           "scheduler",
+			IsSystemWant:   true, // Mark as system-managed want
 			Labels: map[string]string{
 				"system": "true",
 				"role":   "scheduler",

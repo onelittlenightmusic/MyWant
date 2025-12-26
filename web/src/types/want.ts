@@ -41,6 +41,7 @@ export interface WantMetadata {
   labels?: Record<string, string>;
   ownerReferences?: OwnerReference[];
   updatedAt?: number; // Server-managed timestamp for detecting metadata changes
+  isSystemWant?: boolean; // true for system-managed wants (e.g., system-scheduler)
 }
 
 export interface WhenSpec {

@@ -59,6 +59,7 @@ type Metadata struct {
 	Labels          map[string]string `json:"labels" yaml:"labels"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	UpdatedAt       int64             `json:"updatedAt" yaml:"-"` // Server-managed timestamp, ignored on load
+	IsSystemWant    bool              `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
 }
 
 // WantSpec contains the desired state configuration for a want
