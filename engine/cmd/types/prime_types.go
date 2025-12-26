@@ -64,18 +64,16 @@ func (g *PrimeNumbers) Progress() {
 		achievingPercentage = 100
 	}
 
+	g.StoreStateMulti(map[string]any{
+		"current_number":       currentNumber,
+		"achieving_percentage": achievingPercentage,
+	})
+
 	if currentNumber >= end {
 		// Send end signal
 		g.Provide(-1)
-		g.StoreStateMulti(map[string]any{
-			"final_result":         fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end),
-			"achieving_percentage": 100,
-		})
-	} else {
-		g.StoreStateMulti(map[string]any{
-			"current_number":       currentNumber,
-			"achieving_percentage": achievingPercentage,
-		})
+		g.StoreState("final_result", fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end))
+		g.StoreState("achieving_percentage", 100)
 	}
 }
 

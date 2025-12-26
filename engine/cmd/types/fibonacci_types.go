@@ -52,13 +52,12 @@ func (g *FibonacciNumbers) Progress() {
 		"sent_count":           sentCount,
 		"achieving_percentage": achievingPercentage,
 	})
+
 	if sentCount >= count {
 		// Send end signal
 		g.Provide(-1)
-		g.StoreStateMulti(map[string]any{
-			"final_result":         fmt.Sprintf("Generated %d fibonacci numbers", count),
-			"achieving_percentage": 100,
-		})
+		g.StoreState("final_result", fmt.Sprintf("Generated %d fibonacci numbers", count))
+		g.StoreState("achieving_percentage", 100)
 	}
 
 }

@@ -208,28 +208,15 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          {wantType === 'execution_result' ? (
-            // Execution result wants: semi-transparent, larger font
-            <p className={`${isChild ? 'text-base' : 'text-lg'} font-semibold text-gray-700 opacity-60 truncate`}>
-              {truncateText(
-                typeof want.state.final_result === 'string'
-                  ? want.state.final_result
-                  : JSON.stringify(want.state.final_result),
-                20
-              )}
-            </p>
-          ) : (
-            // Other want types: standard styling
-            <p className={`${sizes.errorTextSize} text-gray-600 truncate`}>
-              Result: {truncateText(
-                typeof want.state.final_result === 'string'
-                  ? want.state.final_result
-                  : JSON.stringify(want.state.final_result),
-                isChild ? 30 : 50
-              )}
-            </p>
-          )}
+        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
+          <p className={`${isChild ? 'text-base' : 'text-lg'} font-semibold text-gray-700 opacity-60 truncate`}>
+            {truncateText(
+              typeof want.state.final_result === 'string'
+                ? want.state.final_result
+                : JSON.stringify(want.state.final_result),
+              isChild ? 40 : 50
+            )}
+          </p>
         </div>
       )}
     </>
