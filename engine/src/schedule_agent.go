@@ -10,9 +10,9 @@ import (
 // It implements the BackgroundAgent interface
 type SchedulerAgent struct {
 	id        string
-	wantID    string           // ID of the Want to schedule
-	wantName  string           // Name of the Want to schedule
-	builder   *ChainBuilder    // Reference to ChainBuilder for triggering restarts
+	wantID    string        // ID of the Want to schedule
+	wantName  string        // Name of the Want to schedule
+	builder   *ChainBuilder // Reference to ChainBuilder for triggering restarts
 	ticker    *time.Ticker
 	done      chan struct{}
 	ctx       context.Context

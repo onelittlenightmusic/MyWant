@@ -245,7 +245,7 @@ func (q *Queue) Progress() {
 		q.State = make(map[string]any)
 	}
 
-	_, i, ok := q.Use(100)  // Use 100ms timeout instead of forever
+	_, i, ok := q.Use(100) // Use 100ms timeout instead of forever
 	if !ok {
 		// No packet received (timeout) - skip this cycle
 		return

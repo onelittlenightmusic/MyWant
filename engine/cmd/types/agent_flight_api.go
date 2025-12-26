@@ -85,6 +85,7 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 	// Default to create_flight if no action specified
 	return a.CreateFlight(ctx, want)
 }
+
 // 2. "created" - after successful API response 3. "confirmed" - when monitor api checks the status Supports two date parameter formats: 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
 // 2. departure_time: RFC3339 format - used directly When rebooking (_previous_flight_id exists), generates new flight number and adjusted departure time
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {

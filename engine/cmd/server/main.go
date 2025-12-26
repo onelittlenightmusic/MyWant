@@ -29,50 +29,50 @@ type ServerConfig struct {
 	Debug bool   `json:"debug"`
 }
 type ErrorHistoryEntry struct {
-	ID          string      `json:"id"`
-	Timestamp   string      `json:"timestamp"`
-	Message     string      `json:"message"`
-	Status      int         `json:"status"`
-	Code        string      `json:"code,omitempty"`
-	Type        string      `json:"type,omitempty"`
-	Details     string      `json:"details,omitempty"`
-	Endpoint    string      `json:"endpoint"`
-	Method      string      `json:"method"`
-	RequestData any `json:"request_data,omitempty"`
-	UserAgent   string      `json:"user_agent,omitempty"`
-	Resolved    bool        `json:"resolved"`
-	Notes       string      `json:"notes,omitempty"`
+	ID          string `json:"id"`
+	Timestamp   string `json:"timestamp"`
+	Message     string `json:"message"`
+	Status      int    `json:"status"`
+	Code        string `json:"code,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Details     string `json:"details,omitempty"`
+	Endpoint    string `json:"endpoint"`
+	Method      string `json:"method"`
+	RequestData any    `json:"request_data,omitempty"`
+	UserAgent   string `json:"user_agent,omitempty"`
+	Resolved    bool   `json:"resolved"`
+	Notes       string `json:"notes,omitempty"`
 }
 
 // Server represents the MyWant server
 type Server struct {
-	config            ServerConfig
-	wants             map[string]*WantExecution        // Store active want executions
-	globalBuilder     *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
-	agentRegistry     *mywant.AgentRegistry            // Agent and capability registry
-	recipeRegistry    *mywant.CustomTargetTypeRegistry // Recipe registry
-	wantTypeLoader    *mywant.WantTypeLoader           // Want type definitions loader
-	errorHistory      []ErrorHistoryEntry              // Store error history
-	router            *mux.Router
-	globalLabels      map[string]map[string]bool       // Globally registered labels (key -> value -> true)
+	config         ServerConfig
+	wants          map[string]*WantExecution        // Store active want executions
+	globalBuilder  *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
+	agentRegistry  *mywant.AgentRegistry            // Agent and capability registry
+	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
+	wantTypeLoader *mywant.WantTypeLoader           // Want type definitions loader
+	errorHistory   []ErrorHistoryEntry              // Store error history
+	router         *mux.Router
+	globalLabels   map[string]map[string]bool // Globally registered labels (key -> value -> true)
 }
 
 // WantExecution represents a running want execution
 type WantExecution struct {
-	ID      string                 `json:"id"`
-	Config  mywant.Config          `json:"config"` // Changed from pointer
-	Status  string                 `json:"status"` // "running", "completed", "failed"
-	Results map[string]any `json:"results,omitempty"`
-	Builder *mywant.ChainBuilder   `json:"-"` // Don't serialize builder
+	ID      string               `json:"id"`
+	Config  mywant.Config        `json:"config"` // Changed from pointer
+	Status  string               `json:"status"` // "running", "completed", "failed"
+	Results map[string]any       `json:"results,omitempty"`
+	Builder *mywant.ChainBuilder `json:"-"` // Don't serialize builder
 }
 
 // WantResponseWithGroupedAgents wraps a Want with grouped agent history
 type WantResponseWithGroupedAgents struct {
-	Metadata mywant.Metadata        `json:"metadata"`
-	Spec     mywant.WantSpec        `json:"spec"`
-	Status   mywant.WantStatus      `json:"status"`
-	History  mywant.WantHistory     `json:"history"`
-	State    map[string]any `json:"state"`
+	Metadata mywant.Metadata    `json:"metadata"`
+	Spec     mywant.WantSpec    `json:"spec"`
+	Status   mywant.WantStatus  `json:"status"`
+	History  mywant.WantHistory `json:"history"`
+	State    map[string]any     `json:"state"`
 }
 
 // LLMRequest represents a request to the LLM inference API
@@ -110,6 +110,7 @@ type OllamaResponse struct {
 	EvalCount          int    `json:"eval_count,omitempty"`
 	EvalDuration       int64  `json:"eval_duration,omitempty"`
 }
+
 func buildWantResponse(want *mywant.Want, groupBy string) any {
 	response := &WantResponseWithGroupedAgents{
 		Metadata: want.Metadata,
@@ -168,15 +169,15 @@ func NewServer(config ServerConfig) *Server {
 	tempServer.registerDynamicAgents(agentRegistry)
 
 	return &Server{
-		config:            config,
-		wants:             make(map[string]*WantExecution),
-		globalBuilder:     globalBuilder,
-		agentRegistry:     agentRegistry,
-		recipeRegistry:    recipeRegistry,
-		wantTypeLoader:    wantTypeLoader,
-		errorHistory:      make([]ErrorHistoryEntry, 0),
-		router:            mux.NewRouter(),
-		globalLabels:      make(map[string]map[string]bool),
+		config:         config,
+		wants:          make(map[string]*WantExecution),
+		globalBuilder:  globalBuilder,
+		agentRegistry:  agentRegistry,
+		recipeRegistry: recipeRegistry,
+		wantTypeLoader: wantTypeLoader,
+		errorHistory:   make([]ErrorHistoryEntry, 0),
+		router:         mux.NewRouter(),
+		globalLabels:   make(map[string]map[string]bool),
 	}
 }
 
@@ -2152,8 +2153,8 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 
 	// Collect all unique label keys and their values from all wants Also track which wants use each label
 	labelKeys := make(map[string]bool)
-	labelValues := make(map[string]map[string]bool)                    // key -> (value -> true)
-	labelToWants := make(map[string]map[string]map[string]bool)        // key -> value -> (wantID -> true)
+	labelValues := make(map[string]map[string]bool)             // key -> (value -> true)
+	labelToWants := make(map[string]map[string]map[string]bool) // key -> value -> (wantID -> true)
 
 	// Start with globally registered labels (added via POST /api/v1/labels) These labels don't have owners - they're just registered labels
 	if s.globalLabels != nil {

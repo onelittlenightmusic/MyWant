@@ -4,4 +4,3 @@
 // `engine/cmd/demos/debug_simple`.
 
 package demos_moved
-

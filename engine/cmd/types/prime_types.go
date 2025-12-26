@@ -144,10 +144,10 @@ func (f *PrimeSequence) Progress() {
 		if val == -1 {
 			// End signal received - finalize and complete
 			f.StoreStateMulti(map[string]any{
-				"foundPrimes":    locals.foundPrimes,
-				"primeCount":     len(locals.foundPrimes),
+				"foundPrimes":     locals.foundPrimes,
+				"primeCount":      len(locals.foundPrimes),
 				"total_processed": totalProcessed,
-				"achieved":       true,
+				"achieved":        true,
 			})
 			return
 		}

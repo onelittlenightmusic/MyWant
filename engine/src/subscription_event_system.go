@@ -11,6 +11,7 @@ import (
 // Global subscription system shared across all wants
 var globalSubscriptionSystem *UnifiedSubscriptionSystem
 var globalSubscriptionSystemOnce sync.Once
+
 func GetGlobalSubscriptionSystem() *UnifiedSubscriptionSystem {
 	globalSubscriptionSystemOnce.Do(func() {
 		globalSubscriptionSystem = NewUnifiedSubscriptionSystem()
@@ -49,6 +50,7 @@ const (
 	ExecutionBlock     ExecutionControl = "block"     // Wait for condition
 	ExecutionRestart   ExecutionControl = "restart"   // Restart from beginning
 )
+
 type ProcessingMode int
 
 const (
@@ -158,7 +160,7 @@ type ChannelEndEvent struct {
 // UnifiedSubscriptionSystem manages all event subscriptions and delivery
 type UnifiedSubscriptionSystem struct {
 	// Subscription storage: eventType -> list of subscriptions
-	subscriptions map[EventType][]EventSubscription
+	subscriptions  map[EventType][]EventSubscription
 	processingMode map[EventType]ProcessingMode
 
 	// Priority ordering for sync processing

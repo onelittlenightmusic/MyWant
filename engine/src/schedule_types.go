@@ -4,8 +4,8 @@ import "time"
 
 // WhenSpec defines a scheduled execution time for a Want
 type WhenSpec struct {
-	At    string `json:"at,omitempty" yaml:"at,omitempty"`       // Time expression like "7am", "17:30", "midnight" (optional)
-	Every string `json:"every" yaml:"every"`                     // Frequency like "day", "5 minutes", "2 hours"
+	At    string `json:"at,omitempty" yaml:"at,omitempty"` // Time expression like "7am", "17:30", "midnight" (optional)
+	Every string `json:"every" yaml:"every"`               // Frequency like "day", "5 minutes", "2 hours"
 }
 
 // ParsedSchedule represents a parsed and processed schedule

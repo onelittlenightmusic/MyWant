@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net/http"
 	. "mywant/engine/src"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -244,6 +244,7 @@ type RestaurantSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
+
 // SetSchedule implements TravelWantInterface for RestaurantWant
 func (r *RestaurantWant) SetSchedule(schedule any) {
 	s, ok := schedule.(RestaurantSchedule)
@@ -398,7 +399,7 @@ func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
 // tryAgentExecution implements TravelWantInterface for HotelWant
 func (h *HotelWant) tryAgentExecution() any {
 	if len(h.Spec.Requires) > 0 {
-	h.StoreState("agent_requirements", h.Spec.Requires)
+		h.StoreState("agent_requirements", h.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := h.ExecuteAgents(); err != nil {
@@ -486,7 +487,7 @@ func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
 // tryAgentExecution implements TravelWantInterface for BuffetWant
 func (b *BuffetWant) tryAgentExecution() any {
 	if len(b.Spec.Requires) > 0 {
-	b.StoreState("agent_requirements", b.Spec.Requires)
+		b.StoreState("agent_requirements", b.Spec.Requires)
 
 		// Use dynamic agent execution based on requirements
 		if err := b.ExecuteAgents(); err != nil {
@@ -536,13 +537,13 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		Completed: true,
 	}
 	b.StoreStateMulti(map[string]any{
-		"total_processed":        1,
-		"buffet_type":            buffetLocals.BuffetType,
-		"buffet_start_time":      newEvent.Start.Format("15:04 Jan 2"),
-		"buffet_end_time":        newEvent.End.Format("15:04 Jan 2"),
-		"buffet_duration_hours":  buffetLocals.Duration.Hours(),
-		"reservation_name":       newEvent.Name,
-		"achieving_percentage":   100,
+		"total_processed":       1,
+		"buffet_type":           buffetLocals.BuffetType,
+		"buffet_start_time":     newEvent.Start.Format("15:04 Jan 2"),
+		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
+		"buffet_duration_hours": buffetLocals.Duration.Hours(),
+		"reservation_name":      newEvent.Name,
+		"achieving_percentage":  100,
 	})
 	return newSchedule
 }
@@ -558,6 +559,7 @@ type BuffetSchedule struct {
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
 }
+
 // SetSchedule implements TravelWantInterface for BuffetWant
 func (b *BuffetWant) SetSchedule(schedule any) {
 	s, ok := schedule.(BuffetSchedule)
@@ -571,13 +573,13 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 	}
 
 	stateUpdates := map[string]any{
-		"completed":               true,
-		"buffet_start_time":       s.ReservationTime.Format("15:04 Jan 2"),
-		"buffet_end_time":         s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
-		"buffet_type":             s.BuffetType,
-		"buffet_duration_hours":   s.DurationHours,
-		"reservation_name":        s.ReservationName,
-		"total_processed":         1,
+		"completed":             true,
+		"buffet_start_time":     s.ReservationTime.Format("15:04 Jan 2"),
+		"buffet_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
+		"buffet_type":           s.BuffetType,
+		"buffet_duration_hours": s.DurationHours,
+		"reservation_name":      s.ReservationName,
+		"total_processed":       1,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
@@ -599,13 +601,13 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 
 // FlightMonitoringAgent implements BackgroundAgent for continuous flight status monitoring
 type FlightMonitoringAgent struct {
-	id       string
-	monitor  *MonitorFlightAPI
-	ticker   *time.Ticker
-	done     chan struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
-	want     *Want
+	id      string
+	monitor *MonitorFlightAPI
+	ticker  *time.Ticker
+	done    chan struct{}
+	ctx     context.Context
+	cancel  context.CancelFunc
+	want    *Want
 }
 
 // ID returns the agent's unique identifier
@@ -699,7 +701,7 @@ func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent
 type FlightWantLocals struct {
 	FlightType          string
 	Duration            time.Duration
-	DepartureDate       string        // Departure date in YYYY-MM-DD format
+	DepartureDate       string // Departure date in YYYY-MM-DD format
 	monitoringStartTime time.Time
 	monitoringDuration  time.Duration // How long to monitor for status changes
 	monitoringActive    bool          // Whether monitoring is currently active
@@ -1123,7 +1125,7 @@ func (f *FlightWant) Progress() {
 				f.StoreStateMulti(map[string]any{
 					"flight_action": "cancel_flight",
 					"completed":     false,
-					"_flight_phase":  PhaseCanceling,
+					"_flight_phase": PhaseCanceling,
 				})
 				return
 			}
@@ -1152,7 +1154,7 @@ func (f *FlightWant) Progress() {
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
 				"_flight_phase": PhaseBooking,
-				"completed":    false,
+				"completed":     false,
 			})
 			return
 		}
@@ -1163,7 +1165,7 @@ func (f *FlightWant) Progress() {
 			f.ResetFlightState()
 			f.StoreStateMulti(map[string]any{
 				"_flight_phase": PhaseBooking,
-				"completed":    false,
+				"completed":     false,
 			})
 			return
 		}
@@ -1179,7 +1181,7 @@ func (f *FlightWant) Progress() {
 		f.ResetFlightState()
 		f.StoreStateMulti(map[string]any{
 			"_flight_phase": PhaseBooking,
-			"completed":    false,
+			"completed":     false,
 		})
 		return
 
@@ -1397,6 +1399,7 @@ type HotelSchedule struct {
 	ServiceTier       string    `json:"service_tier,omitempty"`
 	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
 }
+
 // SetSchedule implements TravelWantInterface for HotelWant
 func (h *HotelWant) SetSchedule(schedule any) {
 	s, ok := schedule.(HotelSchedule)

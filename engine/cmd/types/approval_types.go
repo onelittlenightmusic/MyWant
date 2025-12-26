@@ -211,7 +211,6 @@ func (d *DescriptionWant) CalculateAchievingPercentage() int {
 	return 0
 }
 
-
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("evidence", NewEvidenceWant)

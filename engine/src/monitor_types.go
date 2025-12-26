@@ -17,13 +17,13 @@ type MonitorWant struct {
 
 // AlertRecord stores information about triggered alerts
 type AlertRecord struct {
-	Timestamp  time.Time   `json:"timestamp"`
-	SourceWant string      `json:"sourceWant"`
-	StateKey   string      `json:"stateKey"`
-	Value      any `json:"value"`
-	Threshold  any `json:"threshold"`
-	AlertType  string      `json:"alertType"`
-	Message    string      `json:"message"`
+	Timestamp  time.Time `json:"timestamp"`
+	SourceWant string    `json:"sourceWant"`
+	StateKey   string    `json:"stateKey"`
+	Value      any       `json:"value"`
+	Threshold  any       `json:"threshold"`
+	AlertType  string    `json:"alertType"`
+	Message    string    `json:"message"`
 }
 
 // NewMonitorWant creates a new monitor want
@@ -72,7 +72,7 @@ func (mw *MonitorWant) Initialize() {
 
 // IsAchieved checks if monitor is complete (always false for continuous monitoring)
 func (mw *MonitorWant) IsAchieved() bool {
-	return false  // Never done - continuous monitoring
+	return false // Never done - continuous monitoring
 }
 
 // Progress implements the Progressable interface

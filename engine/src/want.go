@@ -12,7 +12,7 @@ import (
 // System-reserved state field names - automatically initialized and managed by the framework
 // These fields don't need to be explicitly defined in want type YAML specifications
 const (
-	StateFieldActionByAgent    = "action_by_agent"     // Agent type that performed last action (MonitorAgent, DoAgent)
+	StateFieldActionByAgent    = "action_by_agent"      // Agent type that performed last action (MonitorAgent, DoAgent)
 	StateFieldAchievingPercent = "achieving_percentage" // Progress percentage of want execution (0-100)
 	StateFieldCompleted        = "completed"            // Whether the want has reached achieved status
 )
@@ -58,19 +58,19 @@ type Metadata struct {
 	Type            string            `json:"type" yaml:"type"`
 	Labels          map[string]string `json:"labels" yaml:"labels"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	UpdatedAt       int64             `json:"updatedAt" yaml:"-"` // Server-managed timestamp, ignored on load
+	UpdatedAt       int64             `json:"updatedAt" yaml:"-"`                                   // Server-managed timestamp, ignored on load
 	IsSystemWant    bool              `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
 }
 
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
-	Params              map[string]any `json:"params" yaml:"params"`
-	Using               []map[string]string    `json:"using,omitempty" yaml:"using,omitempty"`
-	Recipe              string                 `json:"recipe,omitempty" yaml:"recipe,omitempty"`
-	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
-	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
-	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`
-	When                []WhenSpec             `json:"when,omitempty" yaml:"when,omitempty"`
+	Params              map[string]any       `json:"params" yaml:"params"`
+	Using               []map[string]string  `json:"using,omitempty" yaml:"using,omitempty"`
+	Recipe              string               `json:"recipe,omitempty" yaml:"recipe,omitempty"`
+	StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
+	NotificationFilters []NotificationFilter `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
+	Requires            []string             `json:"requires,omitempty" yaml:"requires,omitempty"`
+	When                []WhenSpec           `json:"when,omitempty" yaml:"when,omitempty"`
 }
 
 // WantHistory contains both parameter and state history
@@ -124,13 +124,14 @@ type ControlCommand struct {
 
 // TriggerCommand is a union type that wraps either a reconciliation trigger or a control command This allows reconcileTrigger channel to handle both types of signals in a unified way
 type TriggerCommand struct {
-	Type             string           // "reconcile" or "control"
-	ControlCommand   *ControlCommand  // Non-nil for control triggers
-	ReconcileTrigger bool             // Non-zero for reconciliation triggers
+	Type             string          // "reconcile" or "control"
+	ControlCommand   *ControlCommand // Non-nil for control triggers
+	ReconcileTrigger bool            // Non-zero for reconciliation triggers
 }
 
 // WantStats is deprecated - use State field instead Keeping type alias for backward compatibility during transition
 type WantStats = map[string]any
+
 func getCurrentTimestamp() int64 {
 	return time.Now().Unix()
 }
@@ -147,7 +148,6 @@ type WantFactory func(metadata Metadata, spec WantSpec) Progressable
 
 // LocalsFactory defines a factory function for creating WantLocals instances
 type LocalsFactory func() WantLocals
-
 
 // NewWantWithLocals is a variant of NewWant that accepts a WantLocals instance directly
 // instead of a factory function. Useful when you have a simple initialization that doesn't
@@ -178,12 +178,12 @@ func NewWantWithLocals(
 
 // Want represents a processing unit in the chain
 type Want struct {
-	Metadata    Metadata               `json:"metadata" yaml:"metadata"`
-	Spec        WantSpec               `json:"spec" yaml:"spec"`
-	Status      WantStatus             `json:"status,omitempty" yaml:"status,omitempty"`
-	State       map[string]any         `json:"state,omitempty" yaml:"state,omitempty"`
-	HiddenState map[string]any         `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
-	History     WantHistory            `json:"history" yaml:"history"`
+	Metadata    Metadata       `json:"metadata" yaml:"metadata"`
+	Spec        WantSpec       `json:"spec" yaml:"spec"`
+	Status      WantStatus     `json:"status,omitempty" yaml:"status,omitempty"`
+	State       map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
+	HiddenState map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
+	History     WantHistory    `json:"history" yaml:"history"`
 
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
@@ -192,14 +192,14 @@ type Want struct {
 	// Internal fields for batching state changes during Exec cycles
 	pendingStateChanges     map[string]any `json:"-" yaml:"-"`
 	pendingParameterChanges map[string]any `json:"-" yaml:"-"`
-	execCycleCount          int                    `json:"-" yaml:"-"`
-	inExecCycle             bool                   `json:"-" yaml:"-"`
-	pendingLogs             []string               `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
+	execCycleCount          int            `json:"-" yaml:"-"`
+	inExecCycle             bool           `json:"-" yaml:"-"`
+	pendingLogs             []string       `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
-	agentStateChanges map[string]any        `json:"-" yaml:"-"`
+	agentStateChanges map[string]any                `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
 
 	// Background agents for long-running operations
@@ -243,12 +243,12 @@ type Want struct {
 
 	// Goroutine execution tracking - Want owns this state for proper encapsulation
 	// ChainBuilder sets this via SetGoroutineActive() to inform Want when goroutine starts/stops
-	goroutineActive   bool       `json:"-" yaml:"-"`
+	goroutineActive   bool         `json:"-" yaml:"-"`
 	goroutineActiveMu sync.RWMutex `json:"-" yaml:"-"`
 
 	// Packet cache for non-consuming checks
 	cachedPacket *CachedPacket `json:"-" yaml:"-"`
-	cacheMutex   sync.Mutex   `json:"-" yaml:"-"`
+	cacheMutex   sync.Mutex    `json:"-" yaml:"-"`
 }
 
 // CachedPacket holds a packet and its original channel index for the caching mechanism.
@@ -256,6 +256,7 @@ type CachedPacket struct {
 	Packet        any
 	OriginalIndex int
 }
+
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
@@ -595,7 +596,6 @@ func (n *Want) StartProgressionLoop(
 			// 3.5. Get current paths (called each iteration to track topology changes)
 			currentPaths := getPathsFunc()
 
-
 			// 3.8. Check preconditions: verify required providers/users are connected
 			if !n.checkPreconditions(currentPaths) {
 				// Preconditions not satisfied - mark as suspended and return to loop start
@@ -815,6 +815,7 @@ func (n *Want) StoreState(key string, value any) {
 	}
 	sendStateNotifications(notification)
 }
+
 // "description_received": true, "description_text": "some text", "description_provided": true, })
 func (n *Want) StoreStateMulti(updates map[string]any) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
@@ -857,7 +858,8 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 		sendStateNotifications(notification)
 	}
 }
-//   want.StoreLog("Calculation complete: result = 42")
+
+// want.StoreLog("Calculation complete: result = 42")
 func (n *Want) StoreLog(message string) {
 	// Only buffer logs if we're in an Exec cycle
 	if !n.inExecCycle {
@@ -876,6 +878,7 @@ func (n *Want) GetState(key string) (any, bool) {
 	value, exists := n.State[key]
 	return value, exists
 }
+
 // if ok { // provided is a valid bool }
 func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	value, exists := n.GetState(key)
@@ -887,6 +890,7 @@ func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 	}
 	return defaultValue, false
 }
+
 // count, ok := want.GetStateInt("total_processed", 0) if ok { // count is a valid int }
 func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	value, exists := n.GetState(key)
@@ -900,6 +904,7 @@ func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	}
 	return defaultValue, false
 }
+
 // if ok { // name is a valid string }
 func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	value, exists := n.GetState(key)
@@ -936,6 +941,7 @@ func (n *Want) CalculateAchievingPercentage() int {
 		return 0
 	}
 }
+
 // ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
 func (n *Want) addAggregatedStateHistory() {
 	// CRITICAL: Protect all History.StateHistory access with stateMutex to prevent concurrent slice mutations
@@ -1392,8 +1398,6 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 	return true
 }
 
-
-
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
@@ -1469,7 +1473,8 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	}
 	return defaultValue
 }
-//   count := want.IncrementIntState("total_processed")  // Returns new count
+
+// count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
 	if n.State == nil {
 		n.State = make(map[string]any)
@@ -1548,10 +1553,11 @@ func (n *Want) emitOwnerCompletionEventIfOwned() {
 //   - ok: True if data was successfully received, false if timeout or no channels
 //
 // Usage:
-//   index, data, ok := w.Use(1000)  // Wait up to 1 second
-//   if ok {
-//       fmt.Printf("Received data from channel %d: %v\n", index, data)
-//   }
+//
+//	index, data, ok := w.Use(1000)  // Wait up to 1 second
+//	if ok {
+//	    fmt.Printf("Received data from channel %d: %v\n", index, data)
+//	}
 func (n *Want) Use(timeoutMilliseconds int) (int, any, bool) {
 	// 1. Check internal cache first (filled by UnusedExists)
 	n.cacheMutex.Lock()
@@ -1635,12 +1641,13 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool) {
 //   - ok: True if data was successfully received, false if all channels are closed
 //
 // Usage:
-//   index, data, ok := w.UseForever()
-//   if ok {
-//       fmt.Printf("Received data from channel %d: %v\n", index, data)
-//   } else {
-//       // All input channels are closed
-//   }
+//
+//	index, data, ok := w.UseForever()
+//	if ok {
+//	    fmt.Printf("Received data from channel %d: %v\n", index, data)
+//	} else {
+//	    // All input channels are closed
+//	}
 func (n *Want) UseForever() (int, any, bool) {
 	return n.Use(-1)
 }

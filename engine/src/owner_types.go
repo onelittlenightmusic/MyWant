@@ -26,10 +26,10 @@ func extractIntParam(params map[string]any, key string, defaultValue int) int {
 type Target struct {
 	Want
 	MaxDisplay             int
-	Description            string                 // Human-readable description of this target
-	RecipePath             string                 // Path to the recipe file to use for child creation
-	RecipeParams           map[string]any // Parameters to pass to recipe (derived from spec.params)
-	parameterSubscriptions map[string][]string    // Map of parameter names to child want names that subscribe to them
+	Description            string              // Human-readable description of this target
+	RecipePath             string              // Path to the recipe file to use for child creation
+	RecipeParams           map[string]any      // Parameters to pass to recipe (derived from spec.params)
+	parameterSubscriptions map[string][]string // Map of parameter names to child want names that subscribe to them
 	childWants             []*Want
 	completedChildren      map[string]bool      // Track which children have completed
 	childCompletionMutex   sync.Mutex           // Protect completedChildren map
@@ -98,6 +98,7 @@ func (t *Target) subscribeToChildCompletion() {
 type TargetCompletionSubscription struct {
 	target *Target
 }
+
 func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
 	return tcs.target.Metadata.Name + "-completion-handler"
 }
@@ -377,9 +378,9 @@ func (t *Target) Progress() {
 
 				// Send completion packet to parent/upstream wants
 				packet := map[string]any{
-					"status":   "completed",
-					"name":     t.Metadata.Name,
-					"type":     t.Metadata.Type,
+					"status":     "completed",
+					"name":       t.Metadata.Name,
+					"type":       t.Metadata.Type,
 					"childCount": t.childCount,
 				}
 				t.Provide(packet)
@@ -593,8 +594,8 @@ func (t *Target) addChildWantsToMemory() error {
 
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
-	BaseWant   any // The original want (Generator, Queue, Sink, etc.)
-	Want       *Want       // Direct reference to Want (extracted at creation time)
+	BaseWant   any   // The original want (Generator, Queue, Sink, etc.)
+	Want       *Want // Direct reference to Want (extracted at creation time)
 	TargetName string
 	WantName   string
 }
@@ -757,7 +758,7 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 		return target
 	})
 
-	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies. 
+	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies.
 	// This means: 1. Domain types can be registered in any order (QNet, Travel, etc.) 2. No need for separate "NoOwner" builder variants 3. Wrapping happens at runtime based on actual metadata, not factory registration
 }
 func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]*Want) any {

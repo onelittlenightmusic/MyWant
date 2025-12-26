@@ -9,10 +9,10 @@ import (
 
 // RecipeParameter defines a configurable parameter for recipes
 type RecipeParameter struct {
-	Name        string      `yaml:"name"`
-	Type        string      `yaml:"type"`
-	Default     any `yaml:"default"`
-	Description string      `yaml:"description"`
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Default     any    `yaml:"default"`
+	Description string `yaml:"description"`
 }
 
 // WantRecipe defines a recipe for creating child wants (legacy format)
@@ -23,20 +23,20 @@ type WantRecipe struct {
 		Labels map[string]string `yaml:"labels"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Params map[string]any `yaml:"params"`
-		Using  []map[string]string    `yaml:"using,omitempty"`
+		Params map[string]any      `yaml:"params"`
+		Using  []map[string]string `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
 
 // DRYWantSpec defines minimal want specification in DRY format
 type DRYWantSpec struct {
-	Name   string                 `yaml:"name"`
-	Type   string                 `yaml:"type"`
-	Labels map[string]string      `yaml:"labels,omitempty"`
-	Params map[string]any `yaml:"params,omitempty"`
-	Using  []map[string]string    `yaml:"using,omitempty"`
-	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
+	Name      string              `yaml:"name"`
+	Type      string              `yaml:"type"`
+	Labels    map[string]string   `yaml:"labels,omitempty"`
+	Params    map[string]any      `yaml:"params,omitempty"`
+	Using     []map[string]string `yaml:"using,omitempty"`
+	TypeHints map[string]string   `yaml:"-"` // param_name -> type_tag
 }
 
 // DRYRecipeDefaults defines common defaults for all wants in a recipe
@@ -155,7 +155,7 @@ func (rl *RecipeLoader) loadRecipeFile(filename string) error {
 // RecipeFile represents the new simplified recipe file format
 type RecipeFile struct {
 	Parameters map[string]any `yaml:"parameters"`
-	Wants      []DRYWantSpec          `yaml:"wants"`
+	Wants      []DRYWantSpec  `yaml:"wants"`
 }
 
 // loadDefaultRecipes provides fallback hardcoded recipes (simplified)
@@ -319,8 +319,8 @@ func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecip
 			Labels: make(map[string]string),
 		},
 		Spec: struct {
-			Params map[string]any `yaml:"params"`
-			Using  []map[string]string    `yaml:"using,omitempty"`
+			Params map[string]any      `yaml:"params"`
+			Using  []map[string]string `yaml:"using,omitempty"`
 		}{
 			Params: make(map[string]any),
 			Using:  dryWant.Using, // Copy using directly

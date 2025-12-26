@@ -14,9 +14,9 @@ type CustomTargetTypeRegistry struct {
 
 // CustomTargetTypeConfig defines a custom target want type
 type CustomTargetTypeConfig struct {
-	Name             string                 // "wait time in queue system"
-	Description      string                 // Human description
-	DefaultRecipe    string                 // Default recipe path
+	Name             string         // "wait time in queue system"
+	Description      string         // Human description
+	DefaultRecipe    string         // Default recipe path
 	DefaultParams    map[string]any // Default parameters
 	CreateTargetFunc func(metadata Metadata, spec WantSpec) *Target
 }

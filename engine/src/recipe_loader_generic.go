@@ -16,13 +16,13 @@ type RecipeWant struct {
 	Spec     WantSpec `yaml:"spec,omitempty" json:"spec,omitempty"`
 
 	// Legacy flattened fields for backward compatibility
-	Name        string                 `yaml:"name,omitempty" json:"name,omitempty"`
-	Type        string                 `yaml:"type,omitempty" json:"type,omitempty"`
-	Labels      map[string]string      `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Params      map[string]any `yaml:"params,omitempty" json:"params,omitempty"`
-	Using       []map[string]string    `yaml:"using,omitempty" json:"using,omitempty"`
-	Requires    []string               `yaml:"requires,omitempty" json:"requires,omitempty"`
-	RecipeAgent bool                   `yaml:"recipeAgent,omitempty" json:"recipeAgent,omitempty"`
+	Name        string              `yaml:"name,omitempty" json:"name,omitempty"`
+	Type        string              `yaml:"type,omitempty" json:"type,omitempty"`
+	Labels      map[string]string   `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Params      map[string]any      `yaml:"params,omitempty" json:"params,omitempty"`
+	Using       []map[string]string `yaml:"using,omitempty" json:"using,omitempty"`
+	Requires    []string            `yaml:"requires,omitempty" json:"requires,omitempty"`
+	RecipeAgent bool                `yaml:"recipeAgent,omitempty" json:"recipeAgent,omitempty"`
 }
 
 // GenericRecipe represents the top-level recipe structure
@@ -35,9 +35,9 @@ type RecipeResult []RecipeResultSpec
 
 // RecipeResultSpec specifies which want and state field to use for result computation
 type RecipeResultSpec struct {
-	WantName   string `yaml:"want_name" json:"want_name"`
-	StateField string `yaml:"state_field,omitempty" json:"state_field,omitempty"`   // New: want type state field name (preferred)
-	StatName   string `yaml:"stat_name,omitempty" json:"stat_name,omitempty"`       // Deprecated: use state_field instead
+	WantName    string `yaml:"want_name" json:"want_name"`
+	StateField  string `yaml:"state_field,omitempty" json:"state_field,omitempty"` // New: want type state field name (preferred)
+	StatName    string `yaml:"stat_name,omitempty" json:"stat_name,omitempty"`     // Deprecated: use state_field instead
 	Description string `yaml:"description,omitempty" json:"description,omitempty"`
 }
 
@@ -48,12 +48,13 @@ type RecipeExample struct {
 
 // RecipeContent contains the actual recipe data
 type RecipeContent struct {
-	Metadata   GenericRecipeMetadata  `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Wants      []RecipeWant           `yaml:"wants,omitempty" json:"wants,omitempty"`
-	Parameters map[string]any `yaml:"parameters,omitempty" json:"parameters,omitempty"`
-	Result     *RecipeResult          `yaml:"result,omitempty" json:"result,omitempty"`
-	Example    *RecipeExample         `yaml:"example,omitempty" json:"example,omitempty"`
+	Metadata   GenericRecipeMetadata `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Wants      []RecipeWant          `yaml:"wants,omitempty" json:"wants,omitempty"`
+	Parameters map[string]any        `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	Result     *RecipeResult         `yaml:"result,omitempty" json:"result,omitempty"`
+	Example    *RecipeExample        `yaml:"example,omitempty" json:"example,omitempty"`
 }
+
 func (rw RecipeWant) ConvertToWant() *Want {
 	want := &Want{}
 
@@ -295,7 +296,7 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 	}
 	var configFile struct {
 		Recipe struct {
-			Path       string                 `yaml:"path"`
+			Path       string         `yaml:"path"`
 			Parameters map[string]any `yaml:"parameters"`
 		} `yaml:"recipe"`
 	}

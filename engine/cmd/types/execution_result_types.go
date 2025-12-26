@@ -4,24 +4,24 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	. "mywant/engine/src"
 	"os/exec"
 	"strings"
 	"time"
-	. "mywant/engine/src"
 )
 
 // ExecutionResultWantLocals holds type-specific local state for ExecutionResultWant
 type ExecutionResultWantLocals struct {
-	Command            string
-	Timeout            int    // seconds
-	WorkingDirectory   string
-	Shell              string
-	Phase              string
-	StartTime          time.Time
-	ExecutionTimeMs    int64
-	ExitCode           int
-	Stdout             string
-	Stderr             string
+	Command          string
+	Timeout          int // seconds
+	WorkingDirectory string
+	Shell            string
+	Phase            string
+	StartTime        time.Time
+	ExecutionTimeMs  int64
+	ExitCode         int
+	Stdout           string
+	Stderr           string
 }
 
 // ExecutionResult represents command execution result
@@ -58,18 +58,25 @@ func (e *ExecutionResultWant) Initialize() {
 	InfoLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
 	// Reset completion state for fresh execution using batch update
 	e.StoreStateMulti(map[string]any{
-		"completed":       false,
-		"status":          "pending",
-		"stdout":          "",
-		"stderr":          "",
-		"error_message":   "",
-		"exit_code":       0,
-		"final_result":    "",
-		"started_at":      "",
-		"completed_at":    "",
+		"completed":         false,
+		"status":            "pending",
+		"stdout":            "",
+		"stderr":            "",
+		"error_message":     "",
+		"exit_code":         0,
+		"final_result":      "",
+		"started_at":        "",
+		"completed_at":      "",
 		"execution_time_ms": 0,
-		"_phase":          string(ExecutionPhaseInitial),
+		"_phase":            string(ExecutionPhaseInitial),
 	})
+
+	// Also reset the in-memory Locals struct to ensure Progress() loop starts fresh
+	e.Locals = &ExecutionResultWantLocals{
+		Phase:   ExecutionPhaseInitial,
+		Timeout: 30,
+		Shell:   "/bin/bash",
+	}
 }
 
 // IsAchieved checks if execution is completed
@@ -217,14 +224,14 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 
 	// Build state updates batch with all execution results
 	stateUpdates := map[string]any{
-		"completed":        true,
-		"exit_code":        exitCode,
-		"stdout":           locals.Stdout,
-		"stderr":           locals.Stderr,
-		"final_result":     finalResult,
+		"completed":         true,
+		"exit_code":         exitCode,
+		"stdout":            locals.Stdout,
+		"stderr":            locals.Stderr,
+		"final_result":      finalResult,
 		"execution_time_ms": locals.ExecutionTimeMs,
-		"started_at":       startedAt,
-		"completed_at":     completedAt,
+		"started_at":        startedAt,
+		"completed_at":      completedAt,
 	}
 
 	// Add status based on exit code

@@ -12,17 +12,17 @@ import (
 
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition struct {
-	Metadata      WantTypeMetadata  `json:"metadata" yaml:"metadata"`
-	Parameters    []ParameterDef    `json:"parameters" yaml:"parameters"`
-	State         []StateDef        `json:"state" yaml:"state"`
-	Connectivity  ConnectivityDef   `json:"connectivity" yaml:"connectivity"`
-	Require       *RequireSpec      `json:"require,omitempty" yaml:"require,omitempty"` // Structured connectivity requirement
-	UsageLimit    *UsageLimitSpec   `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use require instead
-	Agents        []AgentDef        `json:"agents" yaml:"agents"`
-	Constraints   []ConstraintDef   `json:"constraints" yaml:"constraints"`
-	Examples      []ExampleDef      `json:"examples" yaml:"examples"`
-	RelatedTypes  []string          `json:"relatedTypes" yaml:"relatedTypes"`
-	SeeAlso       []string          `json:"seeAlso" yaml:"seeAlso"`
+	Metadata     WantTypeMetadata `json:"metadata" yaml:"metadata"`
+	Parameters   []ParameterDef   `json:"parameters" yaml:"parameters"`
+	State        []StateDef       `json:"state" yaml:"state"`
+	Connectivity ConnectivityDef  `json:"connectivity" yaml:"connectivity"`
+	Require      *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`       // Structured connectivity requirement
+	UsageLimit   *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use require instead
+	Agents       []AgentDef       `json:"agents" yaml:"agents"`
+	Constraints  []ConstraintDef  `json:"constraints" yaml:"constraints"`
+	Examples     []ExampleDef     `json:"examples" yaml:"examples"`
+	RelatedTypes []string         `json:"relatedTypes" yaml:"relatedTypes"`
+	SeeAlso      []string         `json:"seeAlso" yaml:"seeAlso"`
 }
 
 // WantTypeMetadata contains want type identity and classification
@@ -37,31 +37,31 @@ type WantTypeMetadata struct {
 
 // ParameterDef defines a parameter for want type configuration
 type ParameterDef struct {
-	Name        string           `json:"name" yaml:"name"`
-	Description string           `json:"description" yaml:"description"`
-	Type        string           `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
-	Default     any      `json:"default,omitempty" yaml:"default,omitempty"`
-	Required    bool             `json:"required" yaml:"required"`
-	Validation  ValidationRules  `json:"validation,omitempty" yaml:"validation,omitempty"`
-	Example     any      `json:"example,omitempty" yaml:"example,omitempty"`
+	Name        string          `json:"name" yaml:"name"`
+	Description string          `json:"description" yaml:"description"`
+	Type        string          `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
+	Default     any             `json:"default,omitempty" yaml:"default,omitempty"`
+	Required    bool            `json:"required" yaml:"required"`
+	Validation  ValidationRules `json:"validation,omitempty" yaml:"validation,omitempty"`
+	Example     any             `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ValidationRules defines validation constraints for parameters
 type ValidationRules struct {
-	Min     *float64      `json:"min,omitempty" yaml:"min,omitempty"`
-	Max     *float64      `json:"max,omitempty" yaml:"max,omitempty"`
-	Pattern string        `json:"pattern,omitempty" yaml:"pattern,omitempty"`
-	Enum    []any `json:"enum,omitempty" yaml:"enum,omitempty"`
+	Min     *float64 `json:"min,omitempty" yaml:"min,omitempty"`
+	Max     *float64 `json:"max,omitempty" yaml:"max,omitempty"`
+	Pattern string   `json:"pattern,omitempty" yaml:"pattern,omitempty"`
+	Enum    []any    `json:"enum,omitempty" yaml:"enum,omitempty"`
 }
 
 // StateDef defines a state key for a want type
 type StateDef struct {
-	Name         string      `json:"name" yaml:"name"`
-	Description  string      `json:"description" yaml:"description"`
-	Type         string      `json:"type" yaml:"type"`
-	Persistent   bool        `json:"persistent" yaml:"persistent"`
-	InitialValue any         `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
-	Example      any         `json:"example,omitempty" yaml:"example,omitempty"`
+	Name         string `json:"name" yaml:"name"`
+	Description  string `json:"description" yaml:"description"`
+	Type         string `json:"type" yaml:"type"`
+	Persistent   bool   `json:"persistent" yaml:"persistent"`
+	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
+	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ConnectivityDef defines input/output patterns for a want type
@@ -96,10 +96,10 @@ type ConstraintDef struct {
 // ExampleDef defines an example usage of a want type
 // The Want field contains the full want configuration that can be deployed via the want API
 type ExampleDef struct {
-	Name             string                 `json:"name" yaml:"name"`
-	Description      string                 `json:"description" yaml:"description"`
-	Want             map[string]any `json:"want" yaml:"want"`             // Full want configuration (metadata + spec)
-	ExpectedBehavior string                 `json:"expectedBehavior" yaml:"expectedBehavior"`
+	Name             string         `json:"name" yaml:"name"`
+	Description      string         `json:"description" yaml:"description"`
+	Want             map[string]any `json:"want" yaml:"want"` // Full want configuration (metadata + spec)
+	ExpectedBehavior string         `json:"expectedBehavior" yaml:"expectedBehavior"`
 }
 
 // WantTypeWrapper is the top-level YAML structure
@@ -348,11 +348,11 @@ func (w *WantTypeLoader) GetStats() map[string]any {
 	defer w.mu.RUnlock()
 
 	stats := map[string]any{
-		"total":            len(w.definitions),
-		"categories":       len(w.validCategories),
-		"patterns":         len(w.validPatterns),
-		"byCategory":       make(map[string]int),
-		"byPattern":        make(map[string]int),
+		"total":      len(w.definitions),
+		"categories": len(w.validCategories),
+		"patterns":   len(w.validPatterns),
+		"byCategory": make(map[string]int),
+		"byPattern":  make(map[string]int),
 	}
 
 	// Count by category

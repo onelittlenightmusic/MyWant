@@ -19,7 +19,7 @@ type RecipeTestData struct {
 			CustomType  string `json:"custom_type"`
 			Version     string `json:"version"`
 		} `json:"metadata"`
-		Parameters map[string]interface{} `json:"parameters"`
+		Parameters map[string]interface{}   `json:"parameters"`
 		Wants      []map[string]interface{} `json:"wants"`
 	} `json:"recipe"`
 }

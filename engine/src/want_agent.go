@@ -17,6 +17,7 @@ func (n *Want) SetAgentRegistry(registry *AgentRegistry) {
 func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
+
 // Example: "Flight reservation has been created" or "Hotel booking confirmed" Will find the last execution record for this agent and set the activity
 // regardless of current status (running, completed, or failed)
 func (n *Want) SetAgentActivity(agentName string, activity string) {

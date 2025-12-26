@@ -25,9 +25,9 @@ type RecipeRequest struct {
 			CustomType  string `json:"custom_type"`
 			Version     string `json:"version"`
 		} `json:"metadata"`
-		Parameters map[string]interface{} `json:"parameters"`
+		Parameters map[string]interface{}   `json:"parameters"`
 		Wants      []map[string]interface{} `json:"wants"`
-		Example    map[string]interface{} `json:"example,omitempty"`
+		Example    map[string]interface{}   `json:"example,omitempty"`
 	} `json:"recipe"`
 }
 
@@ -40,9 +40,9 @@ type RecipeYAML struct {
 			CustomType  string `yaml:"custom_type"`
 			Version     string `yaml:"version"`
 		} `yaml:"metadata"`
-		Parameters map[string]interface{} `yaml:"parameters"`
+		Parameters map[string]interface{}   `yaml:"parameters"`
 		Wants      []map[string]interface{} `yaml:"wants"`
-		Example    map[string]interface{} `yaml:"example,omitempty"`
+		Example    map[string]interface{}   `yaml:"example,omitempty"`
 	} `yaml:"recipe"`
 }
 

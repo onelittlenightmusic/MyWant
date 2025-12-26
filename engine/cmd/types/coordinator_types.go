@@ -20,7 +20,7 @@ type DataHandler interface {
 // Handlers are registered by type name, making it easy to add new types without modifying the dispatcher
 type DataHandlerDispatcher struct {
 	handlers       map[string]DataHandler // Maps type name to handler
-	defaultHandler DataHandler             // Fallback handler for unknown types
+	defaultHandler DataHandler            // Fallback handler for unknown types
 }
 
 // NewDataHandlerDispatcher creates a new dispatcher with the appropriate handlers
@@ -69,12 +69,12 @@ type CompletionChecker interface {
 // CoordinatorWant is a generic coordinator that collects data from multiple input channels and processes it according to customizable handlers
 type CoordinatorWant struct {
 	Want
-	DataHandler        DataHandler // The primary data handler (delegated to dispatcher)
+	DataHandler           DataHandler            // The primary data handler (delegated to dispatcher)
 	DataHandlerDispatcher *DataHandlerDispatcher // Dispatcher for routing to type-specific handlers
-	CompletionChecker  CompletionChecker
-	CoordinatorType    string
-	paths              Paths
-	channelsHeard 		map[int]bool
+	CompletionChecker     CompletionChecker
+	CoordinatorType       string
+	paths                 Paths
+	channelsHeard         map[int]bool
 }
 
 // NewCoordinatorWant creates a new generic coordinator want It automatically determines the required inputs and handlers based on the want type
@@ -110,6 +110,7 @@ func NewCoordinatorWant(
 
 	return coordinator
 }
+
 // This enables full customization of coordinator behavior through parameters
 func getCoordinatorConfig(coordinatorType string, want *Want) (int, DataHandler, CompletionChecker) {
 	coordinatorLevel := want.GetIntParam("coordinator_level", -1)
@@ -386,9 +387,9 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 	// Store evidence data if present
 	if approvalData.Evidence != nil {
 		want.StoreStateMulti(map[string]any{
-			"evidence_received":   true,
-			"evidence_type":       approvalData.Evidence,
-			"evidence_provided":   true,
+			"evidence_received":    true,
+			"evidence_type":        approvalData.Evidence,
+			"evidence_provided":    true,
 			"evidence_provided_at": approvalData.Timestamp.Format(time.RFC3339),
 		})
 		if !approvalData.Timestamp.IsZero() {
@@ -399,9 +400,9 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 	// Store description data if present
 	if approvalData.Description != "" {
 		want.StoreStateMulti(map[string]any{
-			"description_received":   true,
-			"description_text":       approvalData.Description,
-			"description_provided":   true,
+			"description_received":    true,
+			"description_text":        approvalData.Description,
+			"description_provided":    true,
 			"description_provided_at": approvalData.Timestamp.Format(time.RFC3339),
 		})
 		if !approvalData.Timestamp.IsZero() {
@@ -416,12 +417,12 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 	level2Authority := want.GetStringParam("level2_authority", "senior_manager")
 
 	stateUpdates := map[string]any{
-		"total_processed":              1,
-		"evidence_provider_complete":   true,
+		"total_processed":               1,
+		"evidence_provider_complete":    true,
 		"description_provider_complete": true,
-		"approval_level":               h.Level,
-		"approval_status":              "approved",
-		"approval_time":                time.Now().Format(time.RFC3339),
+		"approval_level":                h.Level,
+		"approval_status":               "approved",
+		"approval_time":                 time.Now().Format(time.RFC3339),
 	}
 
 	// Build approval input details
