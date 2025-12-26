@@ -32,22 +32,6 @@ func (s *SchedulerWant) Progress() {
 	// Get all current Want states
 	allWants := s.builder.GetAllWantStates()
 
-	// Get the list of registered agent IDs from state
-	registeredAgentsAny, exists := s.GetState("registered_agents")
-	registeredAgents := make(map[string]bool)
-	if exists {
-		if agentList, ok := registeredAgentsAny.([]interface{}); ok {
-			for _, agent := range agentList {
-				if agentID, ok := agent.(string); ok {
-					registeredAgents[agentID] = true
-				}
-			}
-		}
-	}
-
-	// Track which agents are currently registered
-	currentAgents := make([]string, 0)
-
 	// Scan each Want for scheduling requirements
 	for _, want := range allWants {
 		if len(want.Spec.When) == 0 {
@@ -60,11 +44,10 @@ func (s *SchedulerWant) Progress() {
 		}
 
 		agentID := fmt.Sprintf("scheduler-%s", want.Metadata.Name)
-		currentAgents = append(currentAgents, agentID)
 
-		// Skip if agent already exists for this Want
-		if registeredAgents[agentID] {
-			continue
+		// Skip if agent already exists for this Want - check directly via GetBackgroundAgent
+		if _, exists := s.GetBackgroundAgent(agentID); exists {
+			continue // Agent already created for this want
 		}
 
 		// Create a new SchedulerAgent for this Want
@@ -87,13 +70,9 @@ func (s *SchedulerWant) Progress() {
 			continue
 		}
 
-		registeredAgents[agentID] = true
 		InfoLog("[SCHEDULER_WANT] Added SchedulerAgent for Want '%s'\n",
 			want.Metadata.Name)
 	}
-
-	// Update the list of registered agents
-	s.StoreState("registered_agents", currentAgents)
 
 	// Update scheduler statistics in state
 	s.StoreState("total_scheduled_wants", s.GetBackgroundAgentCount())
