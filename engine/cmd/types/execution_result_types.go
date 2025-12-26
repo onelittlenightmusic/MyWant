@@ -90,11 +90,6 @@ func (e *ExecutionResultWant) Progress() {
 	// Get or initialize locals
 	locals := e.getOrInitializeLocals()
 
-	// Debug logging for restart testing
-	if locals.Phase == ExecutionPhaseInitial {
-		InfoLog("[PROGRESS] %s - Phase: %s (restart)\n", e.Metadata.Name, locals.Phase)
-	}
-
 	switch locals.Phase {
 	case ExecutionPhaseInitial:
 		e.handlePhaseInitial(locals)

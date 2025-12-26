@@ -140,9 +140,6 @@ func (s *SchedulerAgent) updateNextExecution(now time.Time) {
 		s.schedules[i].Time = s.schedules[i].Time.Add(s.schedules[i].Interval)
 	}
 	s.nextExec = findEarliestExecution(s.schedules)
-
-	InfoLog("[SCHEDULER] Next execution for '%s': %s\n",
-		s.wantName, s.nextExec.Format("2006-01-02 15:04:05"))
 }
 
 // findEarliestExecution finds the earliest execution time among all schedules
