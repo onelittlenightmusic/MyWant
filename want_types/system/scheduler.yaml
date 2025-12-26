@@ -31,7 +31,8 @@ wantType:
       persistent: true
       initialValue: []
 
-  require: none
+  require:
+    type: none
 
   examples:
     - name: "System Scheduler"
