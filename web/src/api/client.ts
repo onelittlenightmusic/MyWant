@@ -35,6 +35,7 @@ import {
 
 class MyWantApiClient {
   private client: AxiosInstance;
+  private pendingRequests: Map<string, Promise<any>> = new Map();
 
   constructor(baseURL: string = '') {
     this.client = axios.create({
@@ -90,10 +91,33 @@ class MyWantApiClient {
     );
   }
 
+  // Helper method for deduplicating GET requests
+  private async deduplicatedGet<T>(url: string): Promise<T> {
+    const key = `GET:${url}`;
+
+    // If request is already pending, return the existing promise
+    if (this.pendingRequests.has(key)) {
+      return this.pendingRequests.get(key) as Promise<T>;
+    }
+
+    // Create new request and store it
+    const promise = (async () => {
+      try {
+        const response = await this.client.get<T>(url);
+        return response.data;
+      } finally {
+        // Clean up pending request after completion (success or error)
+        this.pendingRequests.delete(key);
+      }
+    })();
+
+    this.pendingRequests.set(key, promise);
+    return promise;
+  }
+
   // Health check
   async healthCheck(): Promise<HealthCheck> {
-    const response = await this.client.get<HealthCheck>('/health');
-    return response.data;
+    return this.deduplicatedGet<HealthCheck>('/health');
   }
 
   // Want management
@@ -103,13 +127,12 @@ class MyWantApiClient {
   }
 
   async listWants(): Promise<Want[]> {
-    const response = await this.client.get<{wants: Want[], execution_id: string, timestamp: string}>('/api/v1/wants');
-    return response.data.wants;
+    const data = await this.deduplicatedGet<{wants: Want[], execution_id: string, timestamp: string}>('/api/v1/wants');
+    return data.wants;
   }
 
   async getWant(id: string): Promise<WantDetails> {
-    const response = await this.client.get<WantDetails>(`/api/v1/wants/${id}`);
-    return response.data;
+    return this.deduplicatedGet<WantDetails>(`/api/v1/wants/${id}`);
   }
 
   async updateWant(id: string, request: UpdateWantRequest): Promise<Want> {
@@ -122,13 +145,11 @@ class MyWantApiClient {
   }
 
   async getWantStatus(id: string): Promise<WantStatusResponse> {
-    const response = await this.client.get<WantStatusResponse>(`/api/v1/wants/${id}/status`);
-    return response.data;
+    return this.deduplicatedGet<WantStatusResponse>(`/api/v1/wants/${id}/status`);
   }
 
   async getWantResults(id: string): Promise<WantResults> {
-    const response = await this.client.get<WantResults>(`/api/v1/wants/${id}/results`);
-    return response.data;
+    return this.deduplicatedGet<WantResults>(`/api/v1/wants/${id}/results`);
   }
 
   // Suspend/Resume/Stop/Start operations
@@ -154,13 +175,11 @@ class MyWantApiClient {
 
   // Error history operations
   async listErrorHistory(): Promise<ErrorHistoryResponse> {
-    const response = await this.client.get<ErrorHistoryResponse>('/api/v1/errors');
-    return response.data;
+    return this.deduplicatedGet<ErrorHistoryResponse>('/api/v1/errors');
   }
 
   async getErrorHistoryEntry(id: string): Promise<ErrorHistoryEntry> {
-    const response = await this.client.get<ErrorHistoryEntry>(`/api/v1/errors/${id}`);
-    return response.data;
+    return this.deduplicatedGet<ErrorHistoryEntry>(`/api/v1/errors/${id}`);
   }
 
   async updateErrorHistoryEntry(id: string, updates: { resolved?: boolean; notes?: string }): Promise<ErrorHistoryEntry> {
@@ -179,13 +198,12 @@ class MyWantApiClient {
   }
 
   async listAgents(): Promise<AgentResponse[]> {
-    const response = await this.client.get<AgentsListResponse>('/api/v1/agents');
-    return response.data.agents;
+    const data = await this.deduplicatedGet<AgentsListResponse>('/api/v1/agents');
+    return data.agents;
   }
 
   async getAgent(name: string): Promise<AgentResponse> {
-    const response = await this.client.get<AgentResponse>(`/api/v1/agents/${name}`);
-    return response.data;
+    return this.deduplicatedGet<AgentResponse>(`/api/v1/agents/${name}`);
   }
 
   async deleteAgent(name: string): Promise<void> {
@@ -199,13 +217,12 @@ class MyWantApiClient {
   }
 
   async listCapabilities(): Promise<CapabilityResponse[]> {
-    const response = await this.client.get<CapabilitiesListResponse>('/api/v1/capabilities');
-    return response.data.capabilities;
+    const data = await this.deduplicatedGet<CapabilitiesListResponse>('/api/v1/capabilities');
+    return data.capabilities;
   }
 
   async getCapability(name: string): Promise<CapabilityResponse> {
-    const response = await this.client.get<CapabilityResponse>(`/api/v1/capabilities/${name}`);
-    return response.data;
+    return this.deduplicatedGet<CapabilityResponse>(`/api/v1/capabilities/${name}`);
   }
 
   async deleteCapability(name: string): Promise<void> {
@@ -213,8 +230,7 @@ class MyWantApiClient {
   }
 
   async findAgentsByCapability(capabilityName: string): Promise<FindAgentsByCapabilityResponse> {
-    const response = await this.client.get<FindAgentsByCapabilityResponse>(`/api/v1/capabilities/${capabilityName}/agents`);
-    return response.data;
+    return this.deduplicatedGet<FindAgentsByCapabilityResponse>(`/api/v1/capabilities/${capabilityName}/agents`);
   }
 
   // Recipe management
@@ -224,13 +240,11 @@ class MyWantApiClient {
   }
 
   async listRecipes(): Promise<RecipeListResponse> {
-    const response = await this.client.get<RecipeListResponse>('/api/v1/recipes');
-    return response.data;
+    return this.deduplicatedGet<RecipeListResponse>('/api/v1/recipes');
   }
 
   async getRecipe(id: string): Promise<GenericRecipe> {
-    const response = await this.client.get<GenericRecipe>(`/api/v1/recipes/${id}`);
-    return response.data;
+    return this.deduplicatedGet<GenericRecipe>(`/api/v1/recipes/${id}`);
   }
 
   async updateRecipe(id: string, recipe: GenericRecipe): Promise<RecipeUpdateResponse> {
@@ -248,23 +262,19 @@ class MyWantApiClient {
     if (category) params.append('category', category);
     if (pattern) params.append('pattern', pattern);
     const url = `/api/v1/want-types${params.toString() ? `?${params.toString()}` : ''}`;
-    const response = await this.client.get<WantTypeListResponse>(url);
-    return response.data;
+    return this.deduplicatedGet<WantTypeListResponse>(url);
   }
 
   async getWantType(name: string): Promise<WantTypeDetailResponse> {
-    const response = await this.client.get<WantTypeDetailResponse>(`/api/v1/want-types/${name}`);
-    return response.data;
+    return this.deduplicatedGet<WantTypeDetailResponse>(`/api/v1/want-types/${name}`);
   }
 
   async getWantTypeExamples(name: string): Promise<WantTypeExamplesResponse> {
-    const response = await this.client.get<WantTypeExamplesResponse>(`/api/v1/want-types/${name}/examples`);
-    return response.data;
+    return this.deduplicatedGet<WantTypeExamplesResponse>(`/api/v1/want-types/${name}/examples`);
   }
 
   async getLabels(): Promise<LabelsResponse> {
-    const response = await this.client.get<LabelsResponse>('/api/v1/labels');
-    return response.data;
+    return this.deduplicatedGet<LabelsResponse>('/api/v1/labels');
   }
 }
 
