@@ -377,7 +377,7 @@ func (t *Target) Progress() {
 				t.StoreState("achieving_percentage", 100)
 
 				// Send completion packet to parent/upstream wants
-				packet := map[string]any{
+				packet := Dict{
 					"status":     "completed",
 					"name":       t.Metadata.Name,
 					"type":       t.Metadata.Type,

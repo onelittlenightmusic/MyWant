@@ -155,7 +155,7 @@ func (g *Numbers) Progress() {
 			}
 		}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
-		g.StoreStateMulti(map[string]any{
+		g.StoreStateMulti(mywant.Dict{
 			"total_processed":      locals.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
 			"total_wait_time":      0.0,
@@ -170,7 +170,7 @@ func (g *Numbers) Progress() {
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
-		g.StoreStateMulti(map[string]any{
+		g.StoreStateMulti(mywant.Dict{
 			"achieving_percentage": 100,
 			"final_result":         fmt.Sprintf("Generated %d packets", paramCount),
 		})
@@ -313,7 +313,7 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 	}
 
 	// Batch update all statistics at once
-	q.StoreStateMulti(map[string]any{
+	q.StoreStateMulti(mywant.Dict{
 		"serverFreeTime":           locals.serverFreeTime,
 		"waitTimeSum":              locals.waitTimeSum,
 		"processedCount":           locals.processedCount,
@@ -332,7 +332,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	if locals.processedCount > 0 {
 		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
-	q.StoreStateMulti(map[string]any{
+	q.StoreStateMulti(mywant.Dict{
 		"average_wait_time":        avgWaitTime,
 		"total_processed":          locals.processedCount,
 		"total_wait_time":          locals.waitTimeSum,
@@ -447,7 +447,7 @@ func (c *Combiner) Progress() {
 func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
 	processed, _ := c.State["processed"].(int)
-	c.StoreStateMulti(map[string]any{
+	c.StoreStateMulti(mywant.Dict{
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time
 		"total_wait_time":   0.0,
@@ -526,7 +526,7 @@ func (s *Sink) Progress() {
 
 // OnEnded implements PacketHandler interface for Sink termination callbacks
 func (s *Sink) OnEnded(packet mywant.Packet, locals *SinkLocals) error {
-	s.StoreStateMulti(map[string]any{
+	s.StoreStateMulti(mywant.Dict{
 		"total_processed":      locals.Received,
 		"average_wait_time":    0.0, // Sinks don't add wait time
 		"total_wait_time":      0.0,

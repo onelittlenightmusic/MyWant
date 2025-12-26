@@ -93,7 +93,7 @@ func (e *EvidenceWant) Progress() {
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
-	e.StoreStateMulti(map[string]any{
+	e.StoreStateMulti(Dict{
 		"evidence_type":        locals.EvidenceType,
 		"approval_id":          locals.ApprovalID,
 		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
@@ -187,7 +187,7 @@ func (d *DescriptionWant) Progress() {
 		Description: description,
 		Timestamp:   time.Now(),
 	}
-	d.StoreStateMulti(map[string]any{
+	d.StoreStateMulti(Dict{
 		"description_format":      locals.DescriptionFormat,
 		"approval_id":             locals.ApprovalID,
 		"description":             description,

@@ -325,7 +325,7 @@ func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap ma
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-	want.StoreStateMulti(map[string]any{
+	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
 		"last_packet_time":       time.Now(),
@@ -378,7 +378,7 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 
 	// Store packet data and tracking
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-	want.StoreStateMulti(map[string]any{
+	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
 		"last_packet_time":       time.Now(),
@@ -386,7 +386,7 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 
 	// Store evidence data if present
 	if approvalData.Evidence != nil {
-		want.StoreStateMulti(map[string]any{
+		want.StoreStateMulti(Dict{
 			"evidence_received":    true,
 			"evidence_type":        approvalData.Evidence,
 			"evidence_provided":    true,
@@ -399,7 +399,7 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 
 	// Store description data if present
 	if approvalData.Description != "" {
-		want.StoreStateMulti(map[string]any{
+		want.StoreStateMulti(Dict{
 			"description_received":    true,
 			"description_text":        approvalData.Description,
 			"description_provided":    true,
@@ -416,7 +416,7 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]any {
 	level2Authority := want.GetStringParam("level2_authority", "senior_manager")
 
-	stateUpdates := map[string]any{
+	stateUpdates := Dict{
 		"total_processed":               1,
 		"evidence_provider_complete":    true,
 		"description_provider_complete": true,
@@ -438,7 +438,7 @@ func (h *ApprovalDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]
 	}
 
 	// Build coordinator result with nested structure
-	coordinatorResult := map[string]any{
+	coordinatorResult := Dict{
 		"approval_input": approvalInputs,
 	}
 	stateUpdates["coordinator_result"] = coordinatorResult
@@ -530,7 +530,7 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	totalPackets := totalPacketsVal + 1
 
-	want.StoreStateMulti(map[string]any{
+	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
 	})
@@ -592,7 +592,7 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]an
 
 	// Build travel inputs list
 	travelInputs := []string{"restaurant", "hotel", "buffet"}
-	coordinatorResult := map[string]any{
+	coordinatorResult := Dict{
 		"travel_input": travelInputs,
 	}
 	stateUpdates["coordinator_result"] = coordinatorResult

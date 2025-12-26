@@ -1498,7 +1498,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
 			Status:   WantStatusFailed,
-			State: map[string]any{
+			State: Dict{
 				"error": err.Error(),
 			},
 			History: wantConfig.History,
@@ -2474,7 +2474,7 @@ func (cb *ChainBuilder) initializeSystemScheduler() {
 			},
 		},
 		Spec: WantSpec{
-			Params: map[string]any{
+			Params: Dict{
 				"scan_interval": 60,
 			},
 		},

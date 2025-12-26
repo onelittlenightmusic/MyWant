@@ -1118,7 +1118,7 @@ func (n *Want) copyCurrentState() map[string]any {
 	return stateCopy
 }
 func (n *Want) addToParameterHistory(paramName string, paramValue any, previousValue any) {
-	paramMap := map[string]any{
+	paramMap := Dict{
 		paramName: paramValue,
 	}
 

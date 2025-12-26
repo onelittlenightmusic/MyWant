@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// Dict is a convenience alias for map[string]any
+// Used throughout the codebase for configuration, state, and parameter dictionaries
+type Dict = map[string]any
+
 // Re-export chain types for easier access
 type Chan = chain.Chan
 

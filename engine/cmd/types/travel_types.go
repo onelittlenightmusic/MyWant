@@ -219,7 +219,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	r.StoreStateMulti(map[string]any{
+	r.StoreStateMulti(Dict{
 		"total_processed":            1,
 		"reservation_type":           restaurantLocals.RestaurantType,
 		"reservation_start_time":     newEvent.Start.Format("15:04"),
@@ -257,7 +257,7 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := map[string]any{
+	stateUpdates := Dict{
 		"completed":                  true,
 		"reservation_start_time":     s.ReservationTime.Format("15:04"),
 		"reservation_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04"),
@@ -452,7 +452,7 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	h.StoreStateMulti(map[string]any{
+	h.StoreStateMulti(Dict{
 		"total_processed":      1,
 		"hotel_type":           hotelLocals.HotelType,
 		"check_in_time":        newEvent.Start.Format("15:04 Jan 2"),
@@ -538,7 +538,7 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	b.StoreStateMulti(map[string]any{
+	b.StoreStateMulti(Dict{
 		"total_processed":       1,
 		"buffet_type":           buffetLocals.BuffetType,
 		"buffet_start_time":     newEvent.Start.Format("15:04 Jan 2"),
@@ -575,7 +575,7 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := map[string]any{
+	stateUpdates := Dict{
 		"completed":             true,
 		"buffet_start_time":     s.ReservationTime.Format("15:04 Jan 2"),
 		"buffet_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
@@ -829,7 +829,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 
 	// Only update state if state has actually changed (differential history) NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go Individual agents should NOT call BeginExecCycle/EndExecCycle
 	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
-		updates := map[string]any{
+		updates := Dict{
 			"flight_id":      reservation.ID,
 			"flight_number":  reservation.FlightNumber,
 			"from":           reservation.From,
@@ -1126,7 +1126,7 @@ func (f *FlightWant) Progress() {
 			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
 				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
-				f.StoreStateMulti(map[string]any{
+				f.StoreStateMulti(Dict{
 					"flight_action": "cancel_flight",
 					"completed":     false,
 					"_flight_phase": PhaseCanceling,
@@ -1156,7 +1156,7 @@ func (f *FlightWant) Progress() {
 		if !flightIDExists || flightIDVal == "" {
 			f.StoreLog("No flight_id to cancel, resetting to booking phase")
 			f.ResetFlightState()
-			f.StoreStateMulti(map[string]any{
+			f.StoreStateMulti(Dict{
 				"_flight_phase": PhaseBooking,
 				"completed":     false,
 			})
@@ -1167,7 +1167,7 @@ func (f *FlightWant) Progress() {
 		if !ok {
 			f.StoreLog("Invalid flight_id type, resetting to booking phase")
 			f.ResetFlightState()
-			f.StoreStateMulti(map[string]any{
+			f.StoreStateMulti(Dict{
 				"_flight_phase": PhaseBooking,
 				"completed":     false,
 			})
@@ -1183,7 +1183,7 @@ func (f *FlightWant) Progress() {
 		// Reset flight state and transition back to booking phase for rebooking
 		f.StoreLog("Cancellation completed, resetting state and returning to booking phase")
 		f.ResetFlightState()
-		f.StoreStateMulti(map[string]any{
+		f.StoreStateMulti(Dict{
 			"_flight_phase": PhaseBooking,
 			"completed":     false,
 		})
@@ -1234,7 +1234,7 @@ func (f *FlightWant) tryAgentExecution() any {
 
 		// Execute agents via ExecuteAgents() which properly tracks agent history
 		if err := f.ExecuteAgents(); err != nil {
-			f.StoreStateMulti(map[string]any{
+			f.StoreStateMulti(Dict{
 				"agent_execution_status": "failed",
 				"agent_execution_error":  err.Error(),
 			})
@@ -1300,7 +1300,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := map[string]any{
+	stateUpdates := Dict{
 		"completed":             true,
 		"departure_time":        s.DepartureTime.Format("15:04 Jan 2"),
 		"arrival_time":          s.ArrivalTime.Format("15:04 Jan 2"),
@@ -1417,7 +1417,7 @@ func (h *HotelWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := map[string]any{
+	stateUpdates := Dict{
 		"completed":           true,
 		"check_in_time":       s.CheckInTime.Format("15:04 Jan 2"),
 		"check_out_time":      s.CheckOutTime.Format("15:04 Jan 2"),

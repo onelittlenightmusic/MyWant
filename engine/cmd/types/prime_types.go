@@ -64,7 +64,7 @@ func (g *PrimeNumbers) Progress() {
 		achievingPercentage = 100
 	}
 
-	g.StoreStateMulti(map[string]any{
+	g.StoreStateMulti(Dict{
 		"current_number":       currentNumber,
 		"achieving_percentage": achievingPercentage,
 	})
@@ -165,7 +165,7 @@ func (f *PrimeSequence) Progress() {
 		// Check for end signal
 		if val == -1 {
 			// End signal received - finalize and complete
-			f.StoreStateMulti(map[string]any{
+			f.StoreStateMulti(Dict{
 				"foundPrimes":          locals.foundPrimes,
 				"primeCount":           len(locals.foundPrimes),
 				"total_processed":      totalProcessed,
@@ -209,7 +209,7 @@ func (f *PrimeSequence) Progress() {
 		}
 
 		// Update state for this packet
-		f.StoreStateMulti(map[string]any{
+		f.StoreStateMulti(Dict{
 			"total_processed":       totalProcessed,
 			"last_number_processed": val,
 			"foundPrimes":           locals.foundPrimes,
