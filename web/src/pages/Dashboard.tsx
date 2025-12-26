@@ -402,7 +402,7 @@ export const Dashboard: React.FC = () => {
     <div className="flex items-center gap-2">
       <StatusBadge status={headerState.status} size="sm" />
       <button
-        onClick={() => {/* auto refresh toggle will be handled in sidebar */}}
+        onClick={() => sidebar.toggleHeaderAction?.('autoRefresh')}
         className={`p-2 rounded-md transition-colors ${
           headerState.autoRefresh
             ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
@@ -413,8 +413,9 @@ export const Dashboard: React.FC = () => {
         <RefreshCw className="h-4 w-4" />
       </button>
       <button
+        onClick={() => sidebar.toggleHeaderAction?.('refresh')}
         disabled={headerState.loading}
-        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
         title="Refresh"
       >
         <RefreshCw className={classNames('h-4 w-4', headerState.loading && 'animate-spin')} />
@@ -741,6 +742,7 @@ export const Dashboard: React.FC = () => {
             }
           }}
           onHeaderStateChange={setHeaderState}
+          onRegisterHeaderActions={sidebar.registerHeaderActions}
           onStart={handleStartWant}
           onStop={handleStopWant}
           onSuspend={handleSuspendWant}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Bot, Pause } from 'lucide-react';
+import { AlertTriangle, Bot, Pause, Clock } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
@@ -38,6 +38,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const isSuspended = want.status === 'suspended';
   const canControl = want.status === 'reaching' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
+  const hasScheduling = (want.spec?.when && want.spec.when.length > 0);
 
   // Responsive sizing based on whether it's a child card
   const sizes = isChild ? {
@@ -107,6 +108,23 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             )}
 
             <StatusBadge status={want.status} size={sizes.statusSize} />
+
+            {/* Scheduling indicator */}
+            {hasScheduling && (
+              <span
+                className={classNames(
+                  'inline-flex items-center gap-1 font-medium rounded-full border',
+                  sizes.statusSize === 'xs' ? 'px-1.5 py-0.5 text-xs' :
+                  sizes.statusSize === 'sm' ? 'px-2 py-1 text-xs' :
+                  sizes.statusSize === 'md' ? 'px-2.5 py-1.5 text-sm' :
+                  'px-3 py-2 text-base',
+                  'bg-amber-100 text-amber-800 border-amber-200'
+                )}
+                title="Has scheduling (when)"
+              >
+                <Clock className={sizes.iconSize} />
+              </span>
+            )}
 
           </div>
         </div>

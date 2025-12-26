@@ -18,6 +18,10 @@ export interface UseRightSidebarExclusivityReturn<T> {
   openForm: () => void;
   closeForm: () => void;
   closeAll: () => void;
+
+  // Header actions (for Details sidebar)
+  toggleHeaderAction?: ((action: 'refresh' | 'autoRefresh') => void) | null;
+  registerHeaderActions?: (handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => void;
 }
 
 /**
@@ -42,6 +46,7 @@ export interface UseRightSidebarExclusivityReturn<T> {
 export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivityReturn<T> {
   const [activeSidebar, setActiveSidebar] = useState<SidebarType>(null);
   const [selectedItem, setSelectedItem] = useState<T | null>(null);
+  const [headerActionHandlers, setHeaderActionHandlers] = useState<{ handleRefresh: () => void; handleToggleAutoRefresh: () => void } | null>(null);
 
   // Computed states for easier usage
   const showSummary = activeSidebar === 'summary';
@@ -138,6 +143,26 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     setSelectedItem(null);
   }, []);
 
+  /**
+   * Register header action handlers from Details sidebar
+   */
+  const registerHeaderActions = useCallback((handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => {
+    setHeaderActionHandlers(handlers);
+  }, []);
+
+  /**
+   * Execute header actions registered from Details sidebar
+   */
+  const toggleHeaderAction = useCallback((action: 'refresh' | 'autoRefresh') => {
+    if (!headerActionHandlers) return;
+
+    if (action === 'refresh') {
+      headerActionHandlers.handleRefresh();
+    } else if (action === 'autoRefresh') {
+      headerActionHandlers.handleToggleAutoRefresh();
+    }
+  }, [headerActionHandlers]);
+
   return {
     // State
     showSummary,
@@ -154,5 +179,9 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     openForm,
     closeForm,
     closeAll,
+
+    // Header actions
+    toggleHeaderAction,
+    registerHeaderActions,
   };
 }
