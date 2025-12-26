@@ -338,7 +338,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 		"total_wait_time":          locals.waitTimeSum,
 		"current_server_free_time": locals.serverFreeTime,
 		"achieving_percentage":     100,
-		"final_result":             fmt.Sprintf("Processed %d packets with avg wait time %.2f", locals.processedCount, avgWaitTime),
+		"final_result":             fmt.Sprintf("%.2f", avgWaitTime),
 	})
 
 	return nil
