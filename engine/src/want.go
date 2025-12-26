@@ -23,6 +23,7 @@ func SystemReservedStateFields() []string {
 		StateFieldActionByAgent,
 		StateFieldAchievingPercent,
 		StateFieldCompleted,
+		"final_result",
 	}
 }
 

@@ -459,6 +459,7 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
 		"reservation_name":     newEvent.Name,
+		"final_result":         newEvent.Name,
 		"achieving_percentage": 100,
 	})
 	return newSchedule
@@ -544,6 +545,7 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
 		"buffet_duration_hours": buffetLocals.Duration.Hours(),
 		"reservation_name":      newEvent.Name,
+		"final_result":          newEvent.Name,
 		"achieving_percentage":  100,
 	})
 	return newSchedule
