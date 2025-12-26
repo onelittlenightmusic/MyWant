@@ -1088,43 +1088,30 @@ func (cb *ChainBuilder) startPhase() {
 		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
-				if strings.Contains(wantName, "date") {
-					InfoLog("[START-PHASE:DEBUG] Checking connectivity for '%s'\n", wantName)
-				}
 				paths := cb.pathMap[wantName]
-				if w, ok := want.function.(*Want); ok {
-					if strings.Contains(wantName, "date") {
-						InfoLog("[START-PHASE:DEBUG] Type assertion OK for '%s', calling startWant\n", wantName)
-					}
-					meta := w.GetConnectivityMetadata()
-					inCount := len(paths.In)
-					outCount := len(paths.Out)
+				meta := want.want.GetConnectivityMetadata()
+				inCount := len(paths.In)
+				outCount := len(paths.Out)
 
-					// DEBUG: Log nested want startup
-					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-						log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
-							wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-					}
+				// DEBUG: Log nested want startup
+				if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+					log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
+						wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+				}
 
-					// Log for coordinator startup
+				// Log for coordinator startup
+				if wantName == "dynamic-travel-coordinator-5" {
+					InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+				}
+
+				// Skip if required connections are not met
+				if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
 					if wantName == "dynamic-travel-coordinator-5" {
-						InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+						InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
 					}
-
-					// Skip if required connections are not met
-					if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-						if wantName == "dynamic-travel-coordinator-5" {
-							InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
-						}
-						// DEBUG: Log why nested wants are skipped
-						if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-							log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
-						}
-						continue
-					}
-				} else {
-					if strings.Contains(wantName, "date") {
-						InfoLog("[START-PHASE:DEBUG] Type assertion FAILED for '%s'\n", wantName)
+					// DEBUG: Log why nested wants are skipped
+					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+						log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
 					}
 					continue
 				}
@@ -1673,11 +1660,17 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
+	if strings.Contains(wantName, "date") {
+		InfoLog("[START-WANT:ENTRY] Called for '%s'\n", wantName)
+	}
 	currentStatus := want.want.GetStatus()
 	InfoLog("[START-WANT] '%s' called, current status: %s\n", wantName, currentStatus)
 
 	// Check if already completed
 	if currentStatus == WantStatusReaching || currentStatus == WantStatusAchieved {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:SKIP] '%s' in terminal state (%s)\n", wantName, currentStatus)
+		}
 		InfoLog("[START-WANT] '%s' already in terminal state (%s), skipping\n", wantName, currentStatus)
 		return
 	}
@@ -1692,6 +1685,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Check connectivity satisfaction
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:SKIP] '%s' - connectivity not satisfied\n", wantName)
+		}
 		want.want.RestartWant()
 		return
 	}
@@ -1700,11 +1696,17 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	hasUsingSelectors := len(want.want.Spec.Using) > 0
 	paths, pathsExist := cb.pathMap[wantName]
 	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:SKIP] '%s' - using selectors but no paths\n", wantName)
+		}
 		return
 	}
 
 	// Double-check connectivity and trigger reconciliation if needed
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:SKIP] '%s' - double-check connectivity failed\n", wantName)
+		}
 		want.want.RestartWant()
 		if err := cb.TriggerReconcile(); err != nil {
 			// Log error but continue
@@ -1722,6 +1724,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Start execution if want is Progressable
 	if progressable, ok := want.function.(Progressable); ok {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:PROGRESSABLE] '%s' is Progressable, starting goroutine\n", wantName)
+		}
 		want.want.SetStatus(WantStatusReaching)
 		InfoLog("[START-WANT] '%s' transitioned to Reaching status\n", wantName)
 		want.want.InitializeControlChannel()
@@ -1751,6 +1756,10 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				cb.waitGroup.Done()  // Signal completion
 			},
 		)
+	} else {
+		if strings.Contains(wantName, "date") {
+			InfoLog("[START-WANT:NOT-PROGRESSABLE] '%s' is NOT Progressable\n", wantName)
+		}
 	}
 }
 

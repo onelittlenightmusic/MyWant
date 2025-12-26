@@ -55,6 +55,7 @@ func NewExecutionResultWant(want *Want) *ExecutionResultWant {
 
 // Initialize resets execution state before starting
 func (e *ExecutionResultWant) Initialize() {
+	InfoLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
 	// Reset completion state for fresh execution using batch update
 	e.StoreStateMulti(map[string]any{
 		"completed":       false,
@@ -81,6 +82,11 @@ func (e *ExecutionResultWant) IsAchieved() bool {
 func (e *ExecutionResultWant) Progress() {
 	// Get or initialize locals
 	locals := e.getOrInitializeLocals()
+
+	// Debug logging for restart testing
+	if locals.Phase == ExecutionPhaseInitial {
+		InfoLog("[PROGRESS] %s - Phase: %s (restart)\n", e.Metadata.Name, locals.Phase)
+	}
 
 	switch locals.Phase {
 	case ExecutionPhaseInitial:
