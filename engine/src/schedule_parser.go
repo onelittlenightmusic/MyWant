@@ -156,8 +156,22 @@ func CalculateNextExecution(spec WhenSpec, now time.Time) (time.Time, error) {
 		return next, nil
 	}
 
-	// If no 'at' is specified, next execution is now + interval
-	return now.Add(interval), nil
+	// If no 'at' is specified, calculate based on daily 00:00:00 as reference
+	// For example, {every: "30 seconds"} executes at 00:00:00, 00:00:30, 00:01:00, 00:01:30, ...
+	nowLocal := now.Local()
+	startOfDay := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, time.Local)
+
+	// Calculate elapsed time since start of day
+	elapsedSinceStartOfDay := nowLocal.Sub(startOfDay)
+
+	// Calculate how many intervals have passed
+	intervalsPassedFloat := float64(elapsedSinceStartOfDay) / float64(interval)
+	intervalsPassed := int64(intervalsPassedFloat)
+
+	// Calculate the next scheduled execution time
+	nextExecution := startOfDay.Add(time.Duration(intervalsPassed+1) * interval)
+
+	return nextExecution, nil
 }
 
 // ValidateWhenSpec validates a WhenSpec configuration

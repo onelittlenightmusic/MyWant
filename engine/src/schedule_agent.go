@@ -73,6 +73,17 @@ func (s *SchedulerAgent) Start(ctx context.Context, w *Want) error {
 
 	InfoLog("[SCHEDULER] Started for Want '%s' (ID: %s) with %d schedule(s)\n",
 		s.wantName, s.wantID, len(s.schedules))
+
+	// Log initial schedule details
+	for i, sched := range s.schedules {
+		atInfo := "no fixed time (from 00:00:00)"
+		if sched.IsAbsolute {
+			atInfo = fmt.Sprintf("at %s", sched.OriginalAt)
+		}
+		InfoLog("[SCHEDULER] Schedule %d: %s, every %s, next execution: %s\n",
+			i+1, atInfo, sched.OriginalEvery, s.nextExec.Format("2006-01-02 15:04:05"))
+	}
+
 	return nil
 }
 
