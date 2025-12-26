@@ -1139,6 +1139,9 @@ func (cb *ChainBuilder) startPhase() {
 				}
 			}
 		}
+
+		// Initialize system scheduler if not already present
+		cb.initializeSystemScheduler()
 	} else {
 	}
 }
@@ -2395,6 +2398,43 @@ func (cb *ChainBuilder) SendControlCommand(cmd *ControlCommand) error {
 	default:
 		return fmt.Errorf("failed to send control command - trigger channel full")
 	}
+}
+
+// initializeSystemScheduler creates and starts the system scheduler Want
+// This is called during startPhase to ensure the scheduler is always running
+func (cb *ChainBuilder) initializeSystemScheduler() {
+	// Check if scheduler already exists
+	for _, want := range cb.wants {
+		if want.want.Metadata.Type == "scheduler" {
+			return // Scheduler already exists, nothing to do
+		}
+	}
+
+	// Create a new Scheduler Want
+	schedulerWant := &Want{
+		Metadata: Metadata{
+			ID:   generateUUID(),
+			Name: "system-scheduler",
+			Type: "scheduler",
+			Labels: map[string]string{
+				"system": "true",
+				"role":   "scheduler",
+			},
+		},
+		Spec: WantSpec{
+			Params: map[string]any{
+				"scan_interval": 60,
+			},
+		},
+	}
+
+	// Add the scheduler want asynchronously
+	if err := cb.AddWantsAsync([]*Want{schedulerWant}); err != nil {
+		InfoLog("[SYSTEM] Failed to initialize Scheduler Want: %v\n", err)
+		return
+	}
+
+	InfoLog("[SYSTEM] System Scheduler Want initialized\n")
 }
 
 // Suspend pauses the execution of all wants (deprecated - use SuspendWant instead)

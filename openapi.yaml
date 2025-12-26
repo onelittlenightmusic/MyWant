@@ -636,6 +636,16 @@ components:
           items:
             $ref: '#/components/schemas/NotificationFilter'
           description: Filters for received notifications
+        when:
+          type: array
+          items:
+            $ref: '#/components/schemas/WhenSpec'
+          description: Schedule specifications for automated want execution
+          example:
+            - at: "7am"
+              every: "day"
+            - at: "9pm"
+              every: "day"
       required:
         - params
 
@@ -686,6 +696,21 @@ components:
           example: "value > 50"
       required:
         - sourcePattern
+
+    WhenSpec:
+      type: object
+      description: Schedule specification for automated want execution
+      properties:
+        at:
+          type: string
+          description: Time expression (e.g., "7am", "17:30", "midnight", "noon")
+          example: "7am"
+        every:
+          type: string
+          description: Frequency expression (e.g., "day", "5 minutes", "2 hours", "week")
+          example: "day"
+      required:
+        - every
 
     WantStatusEnum:
       type: string

@@ -1,0 +1,45 @@
+wantType:
+  metadata:
+    name: scheduler
+    category: system
+    pattern: independent
+    description: System-level scheduler for managing scheduled Wants
+
+  parameters:
+    - name: scan_interval
+      description: Interval for scanning new scheduled Wants (seconds)
+      type: int
+      required: false
+      defaultValue: 60
+
+  state:
+    - name: total_scheduled_wants
+      description: Number of Wants currently being scheduled
+      type: int
+      persistent: true
+      initialValue: 0
+
+    - name: last_scan_time
+      description: Last time Wants were scanned for schedules
+      type: int64
+      persistent: true
+      initialValue: 0
+
+    - name: active_schedulers
+      description: List of active SchedulerAgent IDs
+      type: '[]string'
+      persistent: true
+      initialValue: []
+
+  require: none
+
+  examples:
+    - name: "System Scheduler"
+      description: "Automatic scheduler management"
+      config:
+        metadata:
+          name: system-scheduler
+          type: scheduler
+        spec:
+          params:
+            scan_interval: 60

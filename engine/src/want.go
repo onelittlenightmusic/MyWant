@@ -69,6 +69,7 @@ type WantSpec struct {
 	StateSubscriptions  []StateSubscription    `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
 	NotificationFilters []NotificationFilter   `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
 	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`
+	When                []WhenSpec             `json:"when,omitempty" yaml:"when,omitempty"`
 }
 
 // WantHistory contains both parameter and state history

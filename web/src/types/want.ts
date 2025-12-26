@@ -43,10 +43,16 @@ export interface WantMetadata {
   updatedAt?: number; // Server-managed timestamp for detecting metadata changes
 }
 
+export interface WhenSpec {
+  at?: string;    // Time expression like "7am", "17:30", "midnight"
+  every: string;  // Frequency like "day", "5 minutes", "2 hours"
+}
+
 export interface WantSpec {
   params?: Record<string, unknown>;
   using?: Array<Record<string, string>>;
   recipe?: string;
+  when?: WhenSpec[];
 }
 
 export interface WantStats {

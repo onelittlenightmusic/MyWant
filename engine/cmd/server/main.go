@@ -453,6 +453,7 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 	types.RegisterApprovalWantTypes(builder)
 	types.RegisterExecutionResultWantType(builder)
 	mywant.RegisterMonitorWantTypes(builder)
+	mywant.RegisterSchedulerWantTypes(builder)
 
 	// Step 5: Execute (same as demo_travel_agent_full.go:106)
 	builder.Execute()
@@ -1703,6 +1704,7 @@ func (s *Server) Start() error {
 	types.RegisterExecutionResultWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
+	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
 
 	// Transfer loaded want type definitions to global builder for state initialization
 	// This ensures that SetWantTypeDefinition can be called during want creation
