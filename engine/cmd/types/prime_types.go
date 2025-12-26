@@ -49,13 +49,34 @@ func (g *PrimeNumbers) Progress() {
 	currentNumber += 1
 
 	g.Provide(currentNumber)
+
+	// Calculate achieving percentage
+	totalCount := end - start + 1
+	if totalCount <= 0 {
+		totalCount = 1
+	}
+	currentProgress := currentNumber - start + 1
+	if currentProgress < 0 {
+		currentProgress = 0
+	}
+	achievingPercentage := int(float64(currentProgress) * 100 / float64(totalCount))
+	if achievingPercentage > 100 {
+		achievingPercentage = 100
+	}
+
 	if currentNumber >= end {
 		// Send end signal
 		g.Provide(-1)
-		g.StoreState("final_result", fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end))
+		g.StoreStateMulti(map[string]any{
+			"final_result":         fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end),
+			"achieving_percentage": 100,
+		})
+	} else {
+		g.StoreStateMulti(map[string]any{
+			"current_number":       currentNumber,
+			"achieving_percentage": achievingPercentage,
+		})
 	}
-
-	g.StoreState("current_number", currentNumber)
 }
 
 // PrimeSequenceLocals holds type-specific local state for PrimeSequence want
@@ -147,11 +168,12 @@ func (f *PrimeSequence) Progress() {
 		if val == -1 {
 			// End signal received - finalize and complete
 			f.StoreStateMulti(map[string]any{
-				"foundPrimes":     locals.foundPrimes,
-				"primeCount":      len(locals.foundPrimes),
-				"total_processed": totalProcessed,
-				"achieved":        true,
-				"final_result":    fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
+				"foundPrimes":          locals.foundPrimes,
+				"primeCount":           len(locals.foundPrimes),
+				"total_processed":      totalProcessed,
+				"achieved":             true,
+				"achieving_percentage": 100,
+				"final_result":         fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
 			})
 			return
 		}
@@ -181,12 +203,20 @@ func (f *PrimeSequence) Progress() {
 			locals.foundPrimes = append(locals.foundPrimes, val)
 		}
 
+		// Calculate achieving percentage based on processed count
+		// Since we don't know the total, use 50% while processing
+		achievingPercentage := 50
+		if totalProcessed > 0 {
+			achievingPercentage = 50 // Partial progress for streaming without count
+		}
+
 		// Update state for this packet
 		f.StoreStateMulti(map[string]any{
 			"total_processed":       totalProcessed,
 			"last_number_processed": val,
 			"foundPrimes":           locals.foundPrimes,
 			"primeCount":            len(locals.foundPrimes),
+			"achieving_percentage":  achievingPercentage,
 		})
 	}
 

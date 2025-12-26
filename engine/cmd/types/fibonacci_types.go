@@ -42,15 +42,23 @@ func (g *FibonacciNumbers) Progress() {
 
 	sentCount += 1
 	g.Provide(a)
+
+	// Calculate achieving percentage
+	achievingPercentage := int(float64(sentCount) * 100 / float64(count))
+
 	g.StoreStateMulti(map[string]any{
-		"a":          b,
-		"b":          a + b,
-		"sent_count": sentCount,
+		"a":                    b,
+		"b":                    a + b,
+		"sent_count":           sentCount,
+		"achieving_percentage": achievingPercentage,
 	})
 	if sentCount >= count {
 		// Send end signal
 		g.Provide(-1)
-		g.StoreState("final_result", fmt.Sprintf("Generated %d fibonacci numbers", count))
+		g.StoreStateMulti(map[string]any{
+			"final_result":         fmt.Sprintf("Generated %d fibonacci numbers", count),
+			"achieving_percentage": 100,
+		})
 	}
 
 }
@@ -126,11 +134,12 @@ func (f *FibonacciFilter) Progress() {
 		if val == -1 {
 			// End signal received - finalize and complete
 			f.StoreStateMulti(map[string]any{
-				"filtered":        locals.filtered,
-				"count":           len(locals.filtered),
-				"total_processed": totalProcessed,
-				"achieved":        true,
-				"final_result":    fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
+				"filtered":             locals.filtered,
+				"count":                len(locals.filtered),
+				"total_processed":      totalProcessed,
+				"achieved":             true,
+				"achieving_percentage": 100,
+				"final_result":         fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
 			})
 			return
 		}
@@ -143,12 +152,20 @@ func (f *FibonacciFilter) Progress() {
 			locals.filtered = append(locals.filtered, val)
 		}
 
+		// Calculate achieving percentage based on processed count
+		// Since we don't know the total, use 50% while processing
+		achievingPercentage := 50
+		if totalProcessed > 0 {
+			achievingPercentage = 50 // Partial progress for streaming without count
+		}
+
 		// Update state for this packet
 		f.StoreStateMulti(map[string]any{
 			"total_processed":       totalProcessed,
 			"filtered":              locals.filtered,
 			"count":                 len(locals.filtered),
 			"last_number_processed": val,
+			"achieving_percentage":  achievingPercentage,
 		})
 	}
 
