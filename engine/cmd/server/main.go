@@ -592,6 +592,12 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Parse includeSystemWants query parameter (default: false)
+	includeSystemWants := false
+	if includeSystemWantsStr := r.URL.Query().Get("includeSystemWants"); includeSystemWantsStr != "" {
+		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
+	}
+
 	// Collect all wants from all executions in memory dump format Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
@@ -627,6 +633,10 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	}
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
 	for _, want := range wantsByID {
+		// Filter out system wants if includeSystemWants is false
+		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
 		allWants = append(allWants, want)
 	}
 	response := map[string]any{
