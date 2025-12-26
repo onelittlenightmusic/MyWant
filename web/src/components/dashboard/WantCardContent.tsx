@@ -107,8 +107,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               </button>
             )}
 
-            <StatusBadge status={want.status} size={sizes.statusSize} />
-
             {/* Scheduling indicator */}
             {hasScheduling && (
               <span
@@ -125,6 +123,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 <Clock className={sizes.iconSize} />
               </span>
             )}
+
+            <StatusBadge status={want.status} size={sizes.statusSize} />
 
           </div>
         </div>
