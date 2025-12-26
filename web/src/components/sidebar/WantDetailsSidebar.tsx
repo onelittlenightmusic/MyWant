@@ -125,7 +125,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [wantId, fetchWantDetails, fetchWantResults]);
 
-  // Reset state when want ID changes (not on every want object change from polling)
+  // Reset state when initialTab prop changes (from parent handling onViewResults)
+  // Only depends on initialTab, not on want, to avoid infinite loops from polling
   useEffect(() => {
     if (want) {
       setIsEditing(false);
@@ -266,10 +267,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }, [autoRefresh, loading, want, selectedWantDetails, onHeaderStateChange]);
 
   // Trigger animation when want changes (new want selected)
+  // Note: Don't set activeTab here - let the initialTab effect handle it
+  // This ensures initialTab prop takes precedence over wantId changes
   useEffect(() => {
     if (wantId) {
       setIsInitialLoad(true);
-      setActiveTab('settings');
       setPrevTabIndex(-1); // Force animation on initial load
     }
   }, [wantId]);
@@ -323,10 +325,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden" style={extendedBackgroundStyle}>
-      {/* Background overlay - semi-transparent white */}
-      {sidebarBackgroundStyle.hasBackgroundImage && (
-        <div className="absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none" style={{ minHeight: '100vh' }}></div>
-      )}
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}

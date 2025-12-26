@@ -16,6 +16,7 @@ interface WantGridProps {
   selectedWant: Want | null;
   onViewWant: (want: Want) => void;
   onViewAgentsWant?: (want: Want) => void;
+  onViewResultsWant?: (want: Want) => void;
   onEditWant: (want: Want) => void;
   onDeleteWant: (want: Want) => void;
   onSuspendWant?: (want: Want) => void;
@@ -35,6 +36,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
   selectedWant,
   onViewWant,
   onViewAgentsWant,
+  onViewResultsWant,
   onEditWant,
   onDeleteWant,
   onSuspendWant,
@@ -235,6 +237,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               selectedWant={selectedWant}
               onView={onViewWant}
               onViewAgents={onViewAgentsWant}
+              onViewResults={onViewResultsWant}
               onEdit={onEditWant}
               onDelete={onDeleteWant}
               onSuspend={onSuspendWant}

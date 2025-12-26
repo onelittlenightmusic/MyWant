@@ -58,17 +58,18 @@ func (e *ExecutionResultWant) Initialize() {
 	InfoLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
 	// Reset completion state for fresh execution using batch update
 	e.StoreStateMulti(map[string]any{
-		"completed":         false,
-		"status":            "pending",
-		"stdout":            "",
-		"stderr":            "",
-		"error_message":     "",
-		"exit_code":         0,
-		"final_result":      "",
-		"started_at":        "",
-		"completed_at":      "",
-		"execution_time_ms": 0,
-		"_phase":            string(ExecutionPhaseInitial),
+		"completed":            false,
+		"status":               "pending",
+		"stdout":               "",
+		"stderr":               "",
+		"error_message":        "",
+		"exit_code":            0,
+		"final_result":         "",
+		"started_at":           "",
+		"completed_at":         "",
+		"execution_time_ms":    0,
+		"achieving_percentage": 0,
+		"_phase":               string(ExecutionPhaseInitial),
 	})
 
 	// Also reset the in-memory Locals struct to ensure Progress() loop starts fresh
@@ -148,9 +149,12 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	}
 
 	// Initialize state
-	e.StoreState("status", "pending")
-	e.StoreState("command", locals.Command)
-	e.StoreState("completed", false)
+	e.StoreStateMulti(map[string]any{
+		"status":               "pending",
+		"command":              locals.Command,
+		"completed":            false,
+		"achieving_percentage": 0,
+	})
 
 	e.StoreLog(fmt.Sprintf("Initializing execution of command: %s", locals.Command))
 
@@ -162,6 +166,7 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 // handlePhaseExecuting handles the execution phase
 func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLocals) {
 	e.StoreLog("Starting command execution...")
+	e.StoreState("achieving_percentage", 50)
 
 	// Record start time
 	locals.StartTime = time.Now()
@@ -227,6 +232,7 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		"execution_time_ms": locals.ExecutionTimeMs,
 		"started_at":        startedAt,
 		"completed_at":      completedAt,
+		"achieving_percentage": 100,
 	}
 
 	// Add status based on exit code

@@ -9,6 +9,7 @@ interface WantCardContentProps {
   isChild?: boolean;
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
+  onViewResults?: (want: Want) => void;
   onEdit?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -20,6 +21,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   isChild = false,
   onView,
   onViewAgents,
+  onViewResults,
   onEdit,
   onDelete,
   onSuspend,
@@ -209,14 +211,18 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {/* Final result display */}
       {want.state?.final_result && (
         <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
-          <p className={`${isChild ? 'text-base' : 'text-lg'} font-semibold text-gray-700 opacity-60 truncate`}>
+          <button
+            onClick={() => onViewResults ? onViewResults(want) : onView(want)}
+            className={`${isChild ? 'text-base' : 'text-lg'} font-semibold text-gray-700 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
+            title="Click to view results"
+          >
             {truncateText(
               typeof want.state.final_result === 'string'
                 ? want.state.final_result
                 : JSON.stringify(want.state.final_result),
               isChild ? 40 : 50
             )}
-          </p>
+          </button>
         </div>
       )}
     </>

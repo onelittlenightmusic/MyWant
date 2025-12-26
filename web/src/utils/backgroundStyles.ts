@@ -42,6 +42,19 @@ export const getBackgroundImage = (type?: string): string | undefined => {
     return '/resources/agent.png';
   }
 
+  // System/Execution category - applies to scheduler, execution_result, execution result, and related types
+  const systemTypes = [
+    'scheduler',
+    'execution_result',
+    'execution result',
+    'command execution',
+    'command_execution'
+  ];
+
+  if (systemTypes.includes(type.toLowerCase()) || type.toLowerCase().includes('execution') || type.toLowerCase().includes('scheduler')) {
+    return '/resources/screen.png';
+  }
+
   return undefined;
 };
 

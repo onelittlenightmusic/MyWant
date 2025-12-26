@@ -188,6 +188,11 @@ export const Dashboard: React.FC = () => {
     setSidebarInitialTab('agents');
   };
 
+  const handleViewResults = (want: Want) => {
+    sidebar.selectItem(want);
+    setSidebarInitialTab('results');
+  };
+
   // Fetch wants that use a specific label
   const handleLabelClick = async (key: string, value: string) => {
     setSelectedLabel({ key, value });
@@ -380,12 +385,29 @@ export const Dashboard: React.FC = () => {
     enabled: !!selectedWant
   });
 
-  // Determine background style for flight, hotel, restaurant, and buffet wants
+  // Determine background style for flight, hotel, restaurant, buffet, and system/execution wants
   const getWantBackgroundImage = (type?: string) => {
     if (type === 'flight') return '/resources/flight.png';
     if (type === 'hotel') return '/resources/hotel.png';
     if (type === 'restaurant') return '/resources/restaurant.png';
     if (type === 'buffet') return '/resources/buffet.png';
+
+    // System/Execution category - applies to scheduler, execution_result, execution result, and related types
+    if (type) {
+      const lowerType = type.toLowerCase();
+      if (
+        lowerType === 'scheduler' ||
+        lowerType === 'execution_result' ||
+        lowerType === 'execution result' ||
+        lowerType === 'command execution' ||
+        lowerType === 'command_execution' ||
+        lowerType.includes('execution') ||
+        lowerType.includes('scheduler')
+      ) {
+        return '/resources/screen.png';
+      }
+    }
+
     return undefined;
   };
 
@@ -489,6 +511,7 @@ export const Dashboard: React.FC = () => {
                 selectedWant={selectedWant}
                 onViewWant={handleViewWant}
                 onViewAgentsWant={handleViewAgents}
+                onViewResultsWant={handleViewResults}
                 onEditWant={handleEditWant}
                 onDeleteWant={setDeleteWantState}
                 onSuspendWant={handleSuspendWant}

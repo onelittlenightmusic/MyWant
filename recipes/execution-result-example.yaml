@@ -35,7 +35,7 @@ recipe:
           command: list_files_command
           timeout: 5
 
-    # Example 3: Date command
+    # Example 3: Date command - executes every 10 seconds
     - metadata:
         name: get_date
         type: execution_result
@@ -43,6 +43,8 @@ recipe:
         params:
           command: date_command
           timeout: 5
+        when:
+          - every: "10 seconds"
 
     # Example 4: Command that fails
     - metadata:
