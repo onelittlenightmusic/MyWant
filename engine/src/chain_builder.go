@@ -1078,11 +1078,24 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
+		// Debug: Log all idle wants found
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusIdle && strings.Contains(wantName, "date") {
+				InfoLog("[START-PHASE:DEBUG] Found Idle want: '%s'\n", wantName)
+			}
+		}
+
 		// First pass: start idle wants (only if connectivity requirements are met)
 		for wantName, want := range cb.wants {
 			if want.want.GetStatus() == WantStatusIdle {
+				if strings.Contains(wantName, "date") {
+					InfoLog("[START-PHASE:DEBUG] Checking connectivity for '%s'\n", wantName)
+				}
 				paths := cb.pathMap[wantName]
 				if w, ok := want.function.(*Want); ok {
+					if strings.Contains(wantName, "date") {
+						InfoLog("[START-PHASE:DEBUG] Type assertion OK for '%s', calling startWant\n", wantName)
+					}
 					meta := w.GetConnectivityMetadata()
 					inCount := len(paths.In)
 					outCount := len(paths.Out)
@@ -1110,9 +1123,15 @@ func (cb *ChainBuilder) startPhase() {
 						continue
 					}
 				} else {
-				continue
+					if strings.Contains(wantName, "date") {
+						InfoLog("[START-PHASE:DEBUG] Type assertion FAILED for '%s'\n", wantName)
+					}
+					continue
 				}
 
+				if strings.Contains(wantName, "date") {
+					InfoLog("[START-PHASE:DEBUG] About to call startWant for '%s'\n", wantName)
+				}
 				cb.startWant(wantName, want)
 				startedCount++
 			}
@@ -2398,12 +2417,14 @@ func (cb *ChainBuilder) RestartWant(wantID string) error {
 
 	// Call Want's RestartWant method which sets status to Idle
 	targetWant.RestartWant()
+	InfoLog("[RESTART:DEBUG] Want '%s' status now: %s\n", targetWant.Metadata.Name, targetWant.GetStatus())
 
 	// Trigger reconciliation immediately to detect the Idle status and restart the goroutine
 	select {
 	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+		InfoLog("[RESTART:DEBUG] Reconciliation trigger sent for '%s'\n", targetWant.Metadata.Name)
 	default:
-		// Channel full, but the reconcile loop will run soon anyway
+		InfoLog("[RESTART:DEBUG] Reconciliation trigger channel full for '%s'\n", targetWant.Metadata.Name)
 	}
 
 	return nil
