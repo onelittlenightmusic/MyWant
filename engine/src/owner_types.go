@@ -663,6 +663,13 @@ func extractWantViaReflection(baseWant any) *Want {
 	return nil
 }
 
+// Initialize resets state before execution begins
+func (oaw *OwnerAwareWant) Initialize() {
+	if progressable, ok := oaw.BaseWant.(Progressable); ok {
+		progressable.Initialize()
+	}
+}
+
 // IsAchieved checks if the wrapped want is complete
 func (oaw *OwnerAwareWant) IsAchieved() bool {
 	if progressable, ok := oaw.BaseWant.(Progressable); ok {
