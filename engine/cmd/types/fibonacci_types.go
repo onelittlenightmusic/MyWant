@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	. "mywant/engine/src"
 )
 
@@ -48,6 +50,7 @@ func (g *FibonacciNumbers) Progress() {
 	if sentCount >= count {
 		// Send end signal
 		g.Provide(-1)
+		g.StoreState("final_result", fmt.Sprintf("Generated %d fibonacci numbers", count))
 	}
 
 }
@@ -127,6 +130,7 @@ func (f *FibonacciFilter) Progress() {
 				"count":           len(locals.filtered),
 				"total_processed": totalProcessed,
 				"achieved":        true,
+				"final_result":    fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
 			})
 			return
 		}

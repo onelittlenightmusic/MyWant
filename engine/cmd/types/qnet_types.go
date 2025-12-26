@@ -170,7 +170,10 @@ func (g *Numbers) Progress() {
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
-		g.StoreState("achieving_percentage", 100)
+		g.StoreStateMulti(map[string]any{
+			"achieving_percentage": 100,
+			"final_result":         fmt.Sprintf("Generated %d packets", paramCount),
+		})
 
 		endPacket := QueuePacket{Num: -1, Time: 0}
 		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
@@ -335,6 +338,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 		"total_wait_time":          locals.waitTimeSum,
 		"current_server_free_time": locals.serverFreeTime,
 		"achieving_percentage":     100,
+		"final_result":             fmt.Sprintf("Processed %d packets with avg wait time %.2f", locals.processedCount, avgWaitTime),
 	})
 
 	return nil
@@ -447,6 +451,7 @@ func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time
 		"total_wait_time":   0.0,
+		"final_result":      fmt.Sprintf("Combined %d packets", processed),
 	})
 
 	return nil
@@ -526,6 +531,7 @@ func (s *Sink) OnEnded(packet mywant.Packet, locals *SinkLocals) error {
 		"average_wait_time":    0.0, // Sinks don't add wait time
 		"total_wait_time":      0.0,
 		"achieving_percentage": 100,
+		"final_result":         fmt.Sprintf("Collected %d packets", locals.Received),
 	})
 
 	return nil

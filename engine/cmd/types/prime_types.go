@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	. "mywant/engine/src"
 )
 
@@ -50,6 +52,7 @@ func (g *PrimeNumbers) Progress() {
 	if currentNumber >= end {
 		// Send end signal
 		g.Provide(-1)
+		g.StoreState("final_result", fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end))
 	}
 
 	g.StoreState("current_number", currentNumber)
@@ -148,6 +151,7 @@ func (f *PrimeSequence) Progress() {
 				"primeCount":      len(locals.foundPrimes),
 				"total_processed": totalProcessed,
 				"achieved":        true,
+				"final_result":    fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
 			})
 			return
 		}
