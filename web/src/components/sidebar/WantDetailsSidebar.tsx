@@ -27,6 +27,7 @@ interface WantDetailsSidebarProps {
   initialTab?: 'settings' | 'results' | 'logs' | 'agents';
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
+  onRegisterHeaderActions?: (handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => void;
   onStart?: (want: Want) => void;
   onStop?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -41,6 +42,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   initialTab = 'settings',
   onWantUpdate,
   onHeaderStateChange,
+  onRegisterHeaderActions,
   onStart,
   onStop,
   onSuspend,
@@ -133,13 +135,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [initialTab]);
 
-  // Auto-enable refresh for running wants
+  // Auto-enable refresh for running wants (but don't auto-disable - let user control it)
   useEffect(() => {
-    if (want && selectedWantDetails && selectedWantDetails.status === 'reaching') {
+    if (want && selectedWantDetails && selectedWantDetails.status === 'reaching' && !autoRefresh) {
+      // Auto-enable only if currently disabled
       setAutoRefresh(true);
-    } else if (want && selectedWantDetails && selectedWantDetails.status !== 'reaching' && autoRefresh) {
-      // Auto-disable when want stops running
-      setAutoRefresh(false);
     }
   }, [want, selectedWantDetails?.status, wantId]);
 
@@ -165,6 +165,20 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       }
     }
   };
+
+  const handleToggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
+
+  // Register header action handlers with the sidebar
+  useEffect(() => {
+    if (onRegisterHeaderActions) {
+      onRegisterHeaderActions({
+        handleRefresh,
+        handleToggleAutoRefresh
+      });
+    }
+  }, [onRegisterHeaderActions, handleRefresh, handleToggleAutoRefresh]);
 
   const handleEditConfig = () => {
     if (selectedWantDetails) {
@@ -535,12 +549,13 @@ const SettingsTab: React.FC<{
   const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
   const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
-  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies'>>(() => {
-    return new Set(['parameters', 'labels', 'dependencies']);
+  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
+    return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
   });
   const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
   const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
   const [using, setUsing] = useState<Array<Record<string, string>>>(want.spec?.using || []);
+  const [when, setWhen] = useState<Array<{ at?: string; every: string }>>(want.spec?.when || []);
 
   const handleSaveLabel = async (oldKey: string) => {
     if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
@@ -621,7 +636,7 @@ const SettingsTab: React.FC<{
     }
   };
 
-  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies') => {
+  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
     setCollapsedSections(prev => {
       const updated = new Set(prev);
       if (updated.has(section)) {
@@ -695,11 +710,12 @@ const SettingsTab: React.FC<{
     setParams(want.spec?.params || {});
     setLabels(want.metadata?.labels || {});
     setUsing(want.spec?.using || []);
+    setWhen(want.spec?.when || []);
     setEditingLabelKey(null);
     setEditingLabelDraft({ key: '', value: '' });
     setEditingUsingIndex(null);
     setEditingUsingDraft({ key: '', value: '' });
-    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies']));
+    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
   }, [want.metadata?.id, want.metadata?.updatedAt]);
 
   return (
@@ -1158,6 +1174,62 @@ const SettingsTab: React.FC<{
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Scheduling (when) - Collapsible Section */}
+            <div className="border border-gray-200 rounded-lg mt-6">
+              <button
+                type="button"
+                onClick={() => toggleSection('scheduling')}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-600 transition-transform ${
+                      collapsedSections.has('scheduling') ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-600" />
+                    <h4 className="text-base font-medium text-gray-900">Scheduling (when)</h4>
+                  </div>
+                </div>
+                {collapsedSections.has('scheduling') && when.length > 0 && (
+                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
+                    {when.map((whenItem, index) => {
+                      const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
+                      return (
+                        <div key={index} className="text-gray-500">
+                          {display}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </button>
+
+              {!collapsedSections.has('scheduling') && (
+                <div className="border-t border-gray-200 p-4 space-y-4">
+                  {when.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {when.map((whenItem, index) => {
+                        const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
+                        return (
+                          <div
+                            key={index}
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800"
+                          >
+                            <Clock className="w-3 h-3 mr-1" />
+                            {display}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No scheduling configured</p>
+                  )}
                 </div>
               )}
             </div>
