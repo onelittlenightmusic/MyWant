@@ -4,6 +4,7 @@ import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
+import styles from './WantCard.module.css';
 
 /**
  * Get color for a want status
@@ -286,7 +287,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                 {children!.map((child, idx) => (
                   <div
                     key={idx}
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${child.status === 'reaching' ? 'animate-pulse' : ''}`}
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${child.status === 'reaching' ? styles.pulseGlow : ''}`}
                     style={{ backgroundColor: getStatusColor(child.status) }}
                     title={child.status}
                   />
