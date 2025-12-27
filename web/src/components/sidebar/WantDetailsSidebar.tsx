@@ -1421,13 +1421,24 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
       items.push(
         <CollapsibleArray key={key} label={key} items={value} depth={depth} />
       );
-    } else {
+    } else if (isNested) {
+      // For nested objects, show key with collapsible content
       items.push(
         <div key={key} className="space-y-1">
           <div className="font-medium text-gray-800 text-sm">{key}:</div>
-          <div className={`${isNested ? 'ml-4 border-l border-gray-200 pl-3' : 'ml-4 text-gray-700'}`}>
+          <div className="ml-4 border-l border-gray-200 pl-3">
             {renderKeyValuePairs(value, depth + 1)}
           </div>
+        </div>
+      );
+    } else {
+      // For simple key-value pairs, display in left-right format with dots
+      const valueStr = String(value);
+      items.push(
+        <div key={key} className="flex items-center gap-2 text-sm">
+          <span className="text-gray-600 font-normal text-xs whitespace-nowrap">{key}</span>
+          <div className="flex-1 border-b border-dotted border-gray-300" />
+          <span className="text-gray-800 font-semibold text-base whitespace-nowrap">{valueStr}</span>
         </div>
       );
     }
