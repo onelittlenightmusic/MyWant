@@ -30,33 +30,40 @@ export const CompositeBackground: React.FC<CompositeBackgroundProps> = ({
       )}
       style={{ zIndex: 0 }}
     >
-      {childImages.map((img, index) => (
-        <div
-          key={index}
-          className="relative flex-1"
-          style={{
-            backgroundImage: `url(${img})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat'
-          }}
-        >
-          {/* Diagonal divider - only show if not last element */}
-          {index < childImages.length - 1 && (
-            <div
-              className="absolute inset-y-0 right-0"
-              style={{
-                width: '5px',
-                background: 'rgba(0, 0, 0, 0.7)',
-                right: '-2px',
-                transform: 'skewX(-22deg)',
-                transformOrigin: 'top right',
-                boxShadow: '2px 0 4px rgba(0,0,0,0.5)'
-              }}
-            />
-          )}
-        </div>
-      ))}
+      {childImages.map((img, index) => {
+        // Calculate clip-path for diagonal cuts
+        let clipPath = '';
+        const isFirst = index === 0;
+        const isLast = index === childImages.length - 1;
+
+        if (isFirst && childImages.length === 1) {
+          // Single image, no clip needed
+          clipPath = 'none';
+        } else if (isFirst) {
+          // First segment: right edge angled (top-right to bottom-left diagonal)
+          clipPath = 'polygon(0 0, 100% 0, 95% 100%, 0 100%)';
+        } else if (isLast) {
+          // Last segment: left edge angled
+          clipPath = 'polygon(5% 0, 100% 0, 100% 100%, 0 100%)';
+        } else {
+          // Middle segments: both edges angled
+          clipPath = 'polygon(5% 0, 100% 0, 95% 100%, 0 100%)';
+        }
+
+        return (
+          <div
+            key={index}
+            className="relative flex-1"
+            style={{
+              backgroundImage: `url(${img})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              clipPath: clipPath
+            }}
+          />
+        );
+      })}
     </div>
   );
 };
