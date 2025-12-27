@@ -1,6 +1,7 @@
 import React from 'react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
 import { getStatusColor, getStatusIconComponent, classNames } from '@/utils/helpers';
+import styles from '@/components/dashboard/WantCard.module.css';
 
 interface StatusBadgeProps {
   status: WantExecutionStatus | WantPhase;
@@ -39,6 +40,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         'inline-flex items-center gap-1 font-medium rounded-full border group/status relative',
         sizeClasses[size],
         colorClasses[color as keyof typeof colorClasses],
+        (status === 'reaching') && styles.pulseGlow,
         className
       )}
       title={status}

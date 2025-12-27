@@ -3,6 +3,7 @@ import { AlertTriangle, Bot, Pause, Clock } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
+import styles from './WantCard.module.css';
 
 interface WantCardContentProps {
   want: Want;
@@ -96,14 +97,14 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               >
                 <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800`} />
                 {want.current_agent && (
-                  <div className={`${sizes.agentDotSize} bg-green-500 rounded-full animate-pulse`} title="Agent running" />
+                  <div className={`${sizes.agentDotSize} bg-green-500 rounded-full ${styles.pulseGlow}`} title="Agent running" />
                 )}
                 {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
                   <span className={classNames(
                     `${sizes.agentDotSize} rounded-full`,
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'achieved' && 'bg-green-500',
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
-                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'reaching' && 'bg-blue-500 animate-pulse'
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'reaching' && `bg-blue-500 ${styles.pulseGlow}`
                   )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
                 )}
               </button>
