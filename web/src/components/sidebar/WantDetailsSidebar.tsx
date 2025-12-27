@@ -1445,11 +1445,11 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 
       items.push(
         <div key={key} className="flex justify-between items-center text-sm gap-2">
+          <span className="text-gray-600 font-normal text-xs whitespace-nowrap">{key}</span>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-gray-600 font-normal text-xs whitespace-nowrap">{key}</span>
             <span className="text-gray-400 text-xs">{dots}</span>
+            <span className="text-gray-800 font-semibold text-base whitespace-nowrap">{valueStr}</span>
           </div>
-          <span className="text-gray-800 font-semibold text-base whitespace-nowrap">{valueStr}</span>
         </div>
       );
     }
