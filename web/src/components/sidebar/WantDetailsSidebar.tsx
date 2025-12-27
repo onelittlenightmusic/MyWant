@@ -1434,11 +1434,20 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
     } else {
       // For simple key-value pairs, display in left-right format with dots
       const valueStr = String(value);
+      // Calculate spacing to fill with dots
+      const keyLength = key.length;
+      const valueLength = valueStr.length;
+      const minDots = 3;
+      // Estimate: key (small) + value (large) + spacing
+      const totalAvailableChars = 50; // Approximate character width available
+      const dotsNeeded = Math.max(minDots, totalAvailableChars - keyLength - valueLength);
+      const dots = '.'.repeat(Math.max(minDots, Math.min(dotsNeeded, 30)));
+
       items.push(
-        <div key={key} className="flex items-center gap-2 text-sm">
-          <span className="text-gray-600 font-normal text-xs whitespace-nowrap">{key}</span>
-          <div className="flex-1 border-b border-dotted border-gray-300" />
-          <span className="text-gray-800 font-semibold text-base whitespace-nowrap">{valueStr}</span>
+        <div key={key} className="text-sm">
+          <span className="text-gray-600 font-normal text-xs">{key}</span>
+          <span className="text-gray-400 text-xs mx-1">{dots}</span>
+          <span className="text-gray-800 font-semibold text-base">{valueStr}</span>
         </div>
       );
     }
