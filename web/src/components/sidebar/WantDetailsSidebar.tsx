@@ -290,15 +290,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   const wantDetails = selectedWantDetails || want;
 
-  // Get background style for sidebar (using isParentWant = true for full background)
-  const sidebarBackgroundStyle = getBackgroundStyle(wantDetails.metadata?.type, true);
-
-  // Extend background style with fixed attachment and full height
-  const extendedBackgroundStyle = sidebarBackgroundStyle.style ? {
-    ...sidebarBackgroundStyle.style,
-    backgroundAttachment: 'fixed',
-    minHeight: '100vh'
-  } : undefined;
+  // For sidebar details view, we apply only the className (semi-transparent white)
+  // and NOT the background image, to avoid overlapping backgrounds with the dashboard card
+  const sidebarBackgroundClass = 'bg-white bg-opacity-70';
+  const sidebarBackgroundStyle = undefined;
 
   const tabs = [
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
@@ -325,7 +320,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden" style={extendedBackgroundStyle}>
+    <div className={classNames("h-full flex flex-col relative overflow-hidden", sidebarBackgroundClass)} style={sidebarBackgroundStyle}>
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
