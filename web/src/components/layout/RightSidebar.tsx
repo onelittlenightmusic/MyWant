@@ -39,7 +39,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           className || ''
         )}
       >
-        {/* Background overlay - covers entire sidebar */}
+        {/* Background image - covers entire sidebar */}
         {backgroundStyle && (
           <div
             className="absolute inset-0 w-full pointer-events-none z-0"
@@ -47,6 +47,18 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
               ...backgroundStyle,
               backgroundAttachment: 'fixed',
               minHeight: '100vh'
+            }}
+          />
+        )}
+
+        {/* White semi-transparent overlay on background image */}
+        {backgroundStyle && (
+          <div
+            className="absolute inset-0 w-full pointer-events-none"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.6)',
+              minHeight: '100vh',
+              zIndex: 1
             }}
           />
         )}
@@ -75,7 +87,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto h-full px-8 py-6">
+        <div className="flex-1 overflow-y-auto h-full px-8 py-6 relative z-10">
           {children}
         </div>
       </div>
