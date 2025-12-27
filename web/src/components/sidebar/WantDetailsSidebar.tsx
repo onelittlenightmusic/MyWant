@@ -290,10 +290,19 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   const wantDetails = selectedWantDetails || want;
 
-  // For sidebar details view, we apply only the className (semi-transparent white)
-  // and NOT the background image, to avoid overlapping backgrounds with the dashboard card
-  const sidebarBackgroundClass = 'bg-white bg-opacity-70';
-  const sidebarBackgroundStyle = undefined;
+  // Get background style for sidebar
+  const backgroundStyle = getBackgroundStyle(wantDetails.metadata?.type, false);
+
+  // Types that already have card backgrounds and shouldn't repeat in sidebar
+  // (to avoid visual duplication). All other types should show sidebar background.
+  const typesWithCardBackgroundOnly = ['flight', 'hotel', 'restaurant', 'buffet'];
+  const typeKey = wantDetails.metadata?.type?.toLowerCase() || '';
+  const shouldShowSidebarBackground = !typesWithCardBackgroundOnly.includes(typeKey);
+
+  const sidebarBackgroundClass = backgroundStyle.className;
+  const extendedBackgroundStyle = shouldShowSidebarBackground
+    ? backgroundStyle.style  // Show background for types like Prime, Evidence, etc
+    : undefined;  // Don't show background for Flight, Hotel, Restaurant, Buffet (card background visible)
 
   const tabs = [
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
@@ -320,7 +329,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
   return (
-    <div className={classNames("h-full flex flex-col relative overflow-hidden", sidebarBackgroundClass)} style={sidebarBackgroundStyle}>
+    <div className={classNames("h-full flex flex-col relative overflow-hidden", sidebarBackgroundClass)} style={extendedBackgroundStyle}>
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
