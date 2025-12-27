@@ -44,14 +44,14 @@ export const CompositeBackground: React.FC<CompositeBackgroundProps> = ({
           {/* Diagonal divider - only show if not last element */}
           {index < childImages.length - 1 && (
             <div
-              className="absolute top-0 right-0 h-full origin-top-right"
+              className="absolute inset-y-0 right-0"
               style={{
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.4) 100%)',
-                boxShadow: '0 0 4px rgba(0,0,0,0.3)',
-                transform: 'skewX(-15deg) translateX(-50%)',
-                height: '141.42%',
-                top: '-20.71%',
-                width: '2px'
+                width: '5px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                right: '-2px',
+                transform: 'skewX(-22deg)',
+                transformOrigin: 'top right',
+                boxShadow: '2px 0 4px rgba(0,0,0,0.5)'
               }}
             />
           )}
