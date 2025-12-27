@@ -841,11 +841,15 @@ const SettingsTab: React.FC<{
                 </div>
                 {collapsedSections.has('labels') && Object.entries(labels).length > 0 && (
                   <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {Object.entries(labels).map(([key, value]) => (
-                      <div key={key} className="text-gray-500">
-                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
-                      </div>
-                    ))}
+                    {Object.entries(labels).map(([key, value]) => {
+                      const maxLength = 20;
+                      const displayValue = value.length > maxLength ? value.substring(0, maxLength) + '...' : value;
+                      return (
+                        <div key={key} className="text-gray-500 truncate">
+                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{displayValue}"</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </button>
@@ -999,9 +1003,11 @@ const SettingsTab: React.FC<{
                   <div className="text-sm text-gray-600 text-right flex-1 mr-2">
                     {using.map((usingItem, index) => {
                       const [key, value] = Object.entries(usingItem)[0];
+                      const maxLength = 20;
+                      const displayValue = value.length > maxLength ? value.substring(0, maxLength) + '...' : value;
                       return (
-                        <div key={index} className="text-gray-500">
-                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
+                        <div key={index} className="text-gray-500 truncate">
+                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{displayValue}"</span>
                         </div>
                       );
                     })}
