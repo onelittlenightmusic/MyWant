@@ -36,6 +36,9 @@ interface WantDetailsSidebarProps {
 
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
 
+// Unified section container styling for all metadata/state sections
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50';
+
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'settings',
@@ -624,9 +627,6 @@ const SettingsTab: React.FC<{
     }
   };
 
-  // Shared styling for all section containers
-  const sectionContainerClass = 'border border-gray-200 rounded-lg bg-white bg-opacity-50';
-
   const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
     setCollapsedSections(prev => {
       const updated = new Set(prev);
@@ -724,7 +724,7 @@ const SettingsTab: React.FC<{
         {configMode === 'form' ? (
           <div className="space-y-8">
             {/* Metadata Section */}
-            <div className="bg-gray-50 rounded-lg p-6">
+            <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
@@ -743,7 +743,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Parameters - Collapsible Section */}
-            <div className={sectionContainerClass}>
+            <div className={SECTION_CONTAINER_CLASS}>
               <button
                 type="button"
                 onClick={() => toggleSection('parameters')}
@@ -825,7 +825,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Labels - Collapsible Section */}
-            <div className={sectionContainerClass}>
+            <div className={SECTION_CONTAINER_CLASS}>
               <button
                 type="button"
                 onClick={() => toggleSection('labels')}
@@ -949,7 +949,7 @@ const SettingsTab: React.FC<{
 
       {/* Timeline */}
       {want.stats && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-base font-medium text-gray-900 mb-4">Timeline</h4>
           <div className="space-y-3">
             {want.stats.created_at && (
@@ -981,7 +981,7 @@ const SettingsTab: React.FC<{
       )}
 
             {/* Dependencies (using) - Collapsible Section */}
-            <div className={sectionContainerClass}>
+            <div className={SECTION_CONTAINER_CLASS}>
               <button
                 type="button"
                 onClick={() => toggleSection('dependencies')}
@@ -1170,7 +1170,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Scheduling (when) - Collapsible Section */}
-            <div className={classNames(sectionContainerClass, 'mt-6')}>
+            <div className={classNames(SECTION_CONTAINER_CLASS, 'mt-6')}>
               <button
                 type="button"
                 onClick={() => toggleSection('scheduling')}
@@ -1446,14 +1446,12 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
       {hasState || hasHiddenState ? (
         <div className="space-y-6">
           {hasState && (
-            <>
+            <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <div className="space-y-4">
-                  {renderKeyValuePairs(want.state)}
-                </div>
+              <div className="space-y-4">
+                {renderKeyValuePairs(want.state)}
               </div>
-            </>
+            </div>
           )}
 
           {hasHiddenState && (
@@ -1471,7 +1469,7 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
                 <span className="text-xs text-gray-400 ml-1">({Object.keys(want.hidden_state).length})</span>
               </button>
               {isHiddenStateExpanded && (
-                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                <div className={SECTION_CONTAINER_CLASS}>
                   <div className="space-y-4">
                     {renderKeyValuePairs(want.hidden_state)}
                   </div>
@@ -1565,7 +1563,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
 
       {/* Running Agents */}
       {want.running_agents && want.running_agents.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-sm font-medium text-gray-900 mb-3">Running Agents</h4>
           <div className="space-y-2">
             {want.running_agents.map((agent, index) => (
@@ -1580,7 +1578,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
 
       {/* Grouped Agent History */}
       {groupedAgents && Object.keys(groupedAgents).length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div className={SECTION_CONTAINER_CLASS}>
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-medium text-gray-900">Agent Execution History</h4>
             <div className="flex space-x-2">
@@ -1896,7 +1894,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
     <div className="p-8 space-y-8">
       {/* Parameter History Section */}
       {hasParameterHistory && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-base font-medium text-gray-900 mb-4">Parameter History</h4>
           <div className="space-y-3">
             {want.history!.parameterHistory!.map((entry, index) => (
@@ -1908,7 +1906,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
 
       {/* Execution Logs Section */}
       {hasLogs && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-base font-medium text-gray-900 mb-4">Execution Logs</h4>
           <div className="space-y-2">
             {results.logs.map((log: string, index: number) => (
@@ -1924,7 +1922,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
 
       {/* State History Section */}
       {want.history?.stateHistory && want.history.stateHistory.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-base font-medium text-gray-900 mb-4">State History</h4>
           <div className="space-y-0">
             {want.history.stateHistory.slice().reverse().map((state, index) => (
@@ -1936,7 +1934,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
 
       {/* Log History Section */}
       {hasLogHistory && (
-        <div className="bg-gray-50 rounded-lg p-6">
+        <div className={SECTION_CONTAINER_CLASS}>
           <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
           <div className="space-y-0">
             {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
