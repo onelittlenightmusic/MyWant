@@ -722,7 +722,7 @@ const SettingsTab: React.FC<{
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-8">
         {configMode === 'form' ? (
-          <div className="space-y-8">
+          <div className="space-y-2">
             {/* Metadata Section */}
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
@@ -1170,7 +1170,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Scheduling (when) - Collapsible Section */}
-            <div className={classNames(SECTION_CONTAINER_CLASS, 'mt-6')}>
+            <div className={classNames(SECTION_CONTAINER_CLASS, 'mt-2')}>
               <button
                 type="button"
                 onClick={() => toggleSection('scheduling')}
@@ -1466,7 +1466,7 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
   return (
     <div className="p-8 h-full overflow-y-auto">
       {hasState || hasHiddenState ? (
-        <div className="space-y-6">
+        <div className="space-y-2">
           {hasState && (
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
@@ -1566,7 +1566,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 space-y-2">
       {/* Current Agent */}
       {want.current_agent && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1913,7 +1913,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasLogs = results?.logs && results.logs.length > 0;
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-8 space-y-2">
       {/* Parameter History Section */}
       {hasParameterHistory && (
         <div className={SECTION_CONTAINER_CLASS}>
