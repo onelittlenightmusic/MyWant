@@ -61,7 +61,6 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
-  const [recipe, setRecipe] = useState('');
   const [when, setWhen] = useState<Array<{ at?: string; every: string }>>([]);
 
   // YAML state
@@ -107,7 +106,6 @@ export const WantForm: React.FC<WantFormProps> = ({
     setLabels(want.metadata?.labels || {});
     setParams(want.spec?.params || {});
     setUsing(want.spec?.using || []);
-    setRecipe(want.spec?.recipe || '');
     setWhen(want.spec?.when || []);
   };
 
@@ -118,7 +116,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       console.log('Updating YAML - wantObject:', wantObject, 'using state:', using);
       setYamlContent(stringifyYaml(wantObject));
     }
-  }, [name, type, labels, params, using, recipe, when, editMode]);
+  }, [name, type, labels, params, using, when, editMode]);
 
   // Initialize form when sidebar opens/closes
   useEffect(() => {
@@ -159,7 +157,6 @@ export const WantForm: React.FC<WantFormProps> = ({
     setLabels({});
     setParams({});
     setUsing([]);
-    setRecipe('');
     setWhen([]);
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
@@ -215,8 +212,8 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   // Populate parameters from recipe definition when a recipe is selected
   useEffect(() => {
-    if (selectedItemType === 'recipe' && !isEditing && recipe) {
-      const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === recipe);
+    if (selectedItemType === 'recipe' && !isEditing && type) {
+      const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === type);
       if (selectedRecipe && selectedRecipe.recipe?.parameters) {
         // Use recipe parameters directly
         setParams(selectedRecipe.recipe.parameters);
@@ -224,15 +221,15 @@ export const WantForm: React.FC<WantFormProps> = ({
         setParams({});
       }
     }
-  }, [selectedItemType, recipe, recipes, isEditing]);
+  }, [selectedItemType, type, recipes, isEditing]);
 
   const validateForm = (): boolean => {
     if (!name.trim()) {
       setValidationError('Want name is required');
       return false;
     }
-    if (!type.trim() && !recipe.trim()) {
-      setValidationError('Either want type or recipe is required');
+    if (!type.trim()) {
+      setValidationError('Want type or recipe is required');
       return false;
     }
     setValidationError(null);
@@ -395,7 +392,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     return `${value} ${unit}`.trim();
   };
 
-  const isTypeSelected = !!type || !!recipe;
+  const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
 
   const headerAction = (
@@ -432,7 +429,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       title={isEditing ? 'Edit Want' : 'New Want'}
       headerActions={headerAction}
     >
-      <form id="want-form" onSubmit={handleSubmit} className="space-y-6">
+      <form id="want-form" onSubmit={handleSubmit} className="space-y-3">
 
         {editMode === 'form' ? (
           <>
@@ -459,15 +456,8 @@ export const WantForm: React.FC<WantFormProps> = ({
                 onSelect={(id, itemType) => {
                   setSelectedTypeId(id);
                   setSelectedItemType(itemType);
-                  // Update type and recipe fields based on selection
-                  if (itemType === 'want-type') {
-                    setType(id);
-                    setRecipe('');
-                  } else {
-                    // For recipes, set both type (custom_type) and recipe field
-                    setType(id); // Set type to recipe's custom_type
-                    setRecipe(id); // Set recipe to the recipe custom_type/name
-                  }
+                  // Update type based on selection
+                  setType(id);
                   // Auto-generate unique name that doesn't conflict with existing wants
                   const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
                   const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
@@ -510,9 +500,9 @@ export const WantForm: React.FC<WantFormProps> = ({
               <button
                 type="button"
                 onClick={() => toggleSection('parameters')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-0">
                   <ChevronDown
                     className={`w-5 h-5 text-gray-600 transition-transform ${
                       collapsedSections.has('parameters') ? '-rotate-90' : ''
@@ -644,9 +634,9 @@ export const WantForm: React.FC<WantFormProps> = ({
               <button
                 type="button"
                 onClick={() => toggleSection('labels')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-0">
                   <ChevronDown
                     className={`w-5 h-5 text-gray-600 transition-transform ${
                       collapsedSections.has('labels') ? '-rotate-90' : ''
@@ -763,9 +753,9 @@ export const WantForm: React.FC<WantFormProps> = ({
               <button
                 type="button"
                 onClick={() => toggleSection('dependencies')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
                   <ChevronDown
                     className={`w-5 h-5 text-gray-600 transition-transform ${
                       collapsedSections.has('dependencies') ? '-rotate-90' : ''
@@ -900,15 +890,15 @@ export const WantForm: React.FC<WantFormProps> = ({
               <button
                 type="button"
                 onClick={() => toggleSection('scheduling')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
                   <ChevronDown
                     className={`w-5 h-5 text-gray-600 transition-transform ${
                       collapsedSections.has('scheduling') ? '-rotate-90' : ''
                     }`}
                   />
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4 text-gray-600" />
                     <h4 className="text-base font-medium text-gray-900">Scheduling (when)</h4>
                   </div>
@@ -1080,20 +1070,6 @@ export const WantForm: React.FC<WantFormProps> = ({
                 </div>
               )}
             </div>
-
-        {/* Recipe */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Recipe (optional)
-          </label>
-          <input
-            type="text"
-            value={recipe}
-            onChange={(e) => setRecipe(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Recipe name"
-          />
-        </div>
           </>
         ) : (
           <>

@@ -167,6 +167,7 @@ func NewServer(config ServerConfig) *Server {
 
 	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
 	tempServer.registerDynamicAgents(agentRegistry)
+	types.RegisterExecutionAgents(agentRegistry)
 
 	return &Server{
 		config:         config,
@@ -444,6 +445,7 @@ func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywa
 
 	// Register dynamic agents (same as demo_travel_agent_full.go:52-98)
 	s.registerDynamicAgents(agentRegistry)
+	types.RegisterExecutionAgents(agentRegistry)
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Step 4: Register want types (same as demo_travel_agent_full.go:103)

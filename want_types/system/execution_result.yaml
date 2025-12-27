@@ -129,7 +129,18 @@ wantType:
     initialValue: ''
     example: 'Exit code: 1'
 
-  agents: []
+  - name: agent_result
+    description: Raw result from ExecutionAgent
+    type: object
+    persistent: false
+    initialValue: {}
+    example: '{"exit_code": 0, "stdout": "Hello World", "stderr": "", "execution_time_ms": 25, "started_at": "2025-12-24T10:30:45Z", "completed_at": "2025-12-24T10:30:45Z", "success": true}'
+
+  agents:
+  - name: execution_command
+    description: Agent that executes shell commands
+    type: do
+    capability: command_execution
 
   constraints:
   - description: Command parameter is required
@@ -221,10 +232,4 @@ wantType:
   - Shell command best practices
   - System integration patterns
 
-  require:
-    type: none
-    outputs:
-    - name: result_data
-      type: state
-      description: Execution results persisted to want state
-      multiple: false
+  require: execute_shell_command

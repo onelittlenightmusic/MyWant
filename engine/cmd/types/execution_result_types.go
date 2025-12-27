@@ -1,11 +1,8 @@
 package types
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	. "mywant/engine/src"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -163,75 +160,64 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	e.updateLocals(locals)
 }
 
-// handlePhaseExecuting handles the execution phase
-func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLocals) {
-	e.StoreLog("Starting command execution...")
-	e.StoreState("achieving_percentage", 50)
+// tryAgentExecution delegates command execution to ExecutionAgent
+func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
+	// Store command parameters in state for agent to read
+	e.StoreStateMulti(map[string]any{
+		"shell":              e.Locals.(*ExecutionResultWantLocals).Shell,
+		"timeout":            e.Locals.(*ExecutionResultWantLocals).Timeout,
+		"working_directory":  e.Locals.(*ExecutionResultWantLocals).WorkingDirectory,
+	})
 
-	// Record start time
-	locals.StartTime = time.Now()
-	startedAt := locals.StartTime.Format(time.RFC3339)
-
-	// Execute command with timeout
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Duration(locals.Timeout)*time.Second,
-	)
-	defer cancel()
-
-	// Create command
-	cmd := exec.CommandContext(ctx, locals.Shell, "-c", locals.Command)
-
-	// Set working directory if specified
-	if locals.WorkingDirectory != "" {
-		cmd.Dir = locals.WorkingDirectory
+	// Execute agents via framework
+	if err := e.ExecuteAgents(); err != nil {
+		return nil, fmt.Errorf("agent execution failed: %w", err)
 	}
 
-	// Capture output
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	// Execute command
-	err := cmd.Run()
-
-	// Record execution time
-	executionTime := time.Since(locals.StartTime)
-	locals.ExecutionTimeMs = executionTime.Milliseconds()
-	completedAt := time.Now().Format(time.RFC3339)
-
-	// Capture output
-	locals.Stdout = stdout.String()
-	locals.Stderr = stderr.String()
-
-	// Get exit code
-	exitCode := 0
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		} else {
-			// Command failed to start or timeout
-			exitCode = -1
-			locals.Stderr = fmt.Sprintf("Command execution error: %v", err)
-			e.StoreLog(fmt.Sprintf("ERROR executing command: %v", err))
+	// Retrieve agent result from state
+	if result, exists := e.GetState("agent_result"); exists {
+		if resultMap, ok := result.(map[string]any); ok {
+			return resultMap, nil
 		}
 	}
 
+	return nil, fmt.Errorf("no agent result found")
+}
+
+// handlePhaseExecuting handles the execution phase
+func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLocals) {
+	// Delegate to ExecutionAgent
+	result, err := e.tryAgentExecution()
+	if err != nil {
+		// Handle agent execution failure
+		e.StoreState("status", "failed")
+		e.StoreState("error_message", fmt.Sprintf("Agent execution error: %v", err))
+		e.StoreLog(fmt.Sprintf("ERROR: Agent execution failed: %v", err))
+		locals.Phase = ExecutionPhaseFailed
+		e.updateLocals(locals)
+		return
+	}
+
+	// Extract results from agent
+	exitCode := result["exit_code"].(int)
 	locals.ExitCode = exitCode
+	locals.Stdout = result["stdout"].(string)
+	locals.Stderr = result["stderr"].(string)
+	locals.ExecutionTimeMs = result["execution_time_ms"].(int64)
 
 	// Build final result
 	finalResult := e.buildFinalResult(locals)
 
-	// Build state updates batch with all execution results
+	// Build state updates batch
 	stateUpdates := map[string]any{
-		"completed":         true,
-		"exit_code":         exitCode,
-		"stdout":            locals.Stdout,
-		"stderr":            locals.Stderr,
-		"final_result":      finalResult,
-		"execution_time_ms": locals.ExecutionTimeMs,
-		"started_at":        startedAt,
-		"completed_at":      completedAt,
+		"completed":            true,
+		"exit_code":            exitCode,
+		"stdout":               locals.Stdout,
+		"stderr":               locals.Stderr,
+		"final_result":         finalResult,
+		"execution_time_ms":    locals.ExecutionTimeMs,
+		"started_at":           result["started_at"],
+		"completed_at":         result["completed_at"],
 		"achieving_percentage": 100,
 	}
 
@@ -320,4 +306,24 @@ func RegisterExecutionResultWantType(builder *ChainBuilder) {
 		}
 		return NewExecutionResultWant(want)
 	})
+}
+
+// RegisterExecutionAgents registers the ExecutionAgent with the agent registry
+func RegisterExecutionAgents(registry *AgentRegistry) {
+	if registry == nil {
+		fmt.Println("Warning: No agent registry found, skipping ExecutionAgent registration")
+		return
+	}
+
+	// Register capability
+	registry.RegisterCapability(Capability{
+		Name:  "command_execution",
+		Gives: []string{"execute_shell_command"},
+	})
+
+	// Register agent
+	agent := NewExecutionAgent()
+	registry.RegisterAgent(agent)
+
+	fmt.Println("[AGENT] Registered ExecutionAgent with capability: command_execution")
 }
