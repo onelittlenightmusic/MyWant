@@ -3,7 +3,6 @@ import { ChevronDown, Users } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
-import { getBackgroundStyle, getBackgroundOverlayClass, getBackgroundContentContainerClass } from '@/utils/backgroundStyles';
 
 interface WantCardProps {
   want: Want;
@@ -182,9 +181,6 @@ export const WantCard: React.FC<WantCardProps> = ({
   const isFlightWant = want.metadata?.type === 'flight';
   const isHotelWant = want.metadata?.type === 'hotel';
 
-  // Get background style for parent want (isParentWant = true)
-  const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, true);
-
   // Get achieving percentage for progress bar
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
 
@@ -222,13 +218,11 @@ export const WantCard: React.FC<WantCardProps> = ({
       onDrop={handleDrop}
       data-keyboard-nav-selected={selected}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px]',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px] bg-white',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         isDragOver && 'border-green-500 border-2 bg-green-50',
-        parentBackgroundStyle.className,
         className || ''
       )}
-      style={parentBackgroundStyle.style}
     >
       {/* White progress bar - animates from left to right */}
       <div style={whiteProgressBarStyle}></div>
@@ -321,8 +315,6 @@ export const WantCard: React.FC<WantCardProps> = ({
                 (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
                 (selectedWant.id && selectedWant.id === child.id)
               );
-              // Get background style for child want (isParentWant = false)
-              const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
 
               // Get achieving percentage for child card progress bar
               const childAchievingPercentage = (child.state?.achieving_percentage as number) ?? 0;
@@ -411,12 +403,10 @@ export const WantCard: React.FC<WantCardProps> = ({
                   key={childId || `child-${index}`}
                   data-keyboard-nav-selected={isChildSelected}
                   className={classNames(
-                    "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer",
+                    "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer bg-white",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
-                    isDragOver && 'border-green-500 border-2 bg-green-50',
-                    childBackgroundStyle.className
+                    isDragOver && 'border-green-500 border-2 bg-green-50'
                   )}
-                  style={childBackgroundStyle.style}
                   onClick={handleChildCardClick(child)}
                   onDragOver={handleChildDragOver}
                   onDragLeave={handleChildDragLeave}

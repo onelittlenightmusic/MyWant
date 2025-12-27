@@ -385,27 +385,45 @@ export const Dashboard: React.FC = () => {
     enabled: !!selectedWant
   });
 
-  // Determine background style for flight, hotel, restaurant, buffet, and system/execution wants
+  // Determine background style for want details sidebar
+  // Maps want types to background images, ensuring each type has a consistent visual
   const getWantBackgroundImage = (type?: string) => {
-    if (type === 'flight') return '/resources/flight.png';
-    if (type === 'hotel') return '/resources/hotel.png';
-    if (type === 'restaurant') return '/resources/restaurant.png';
-    if (type === 'buffet') return '/resources/buffet.png';
+    if (!type) return undefined;
 
-    // System/Execution category - applies to scheduler, execution_result, execution result, and related types
-    if (type) {
-      const lowerType = type.toLowerCase();
-      if (
-        lowerType === 'scheduler' ||
-        lowerType === 'execution_result' ||
-        lowerType === 'execution result' ||
-        lowerType === 'command execution' ||
-        lowerType === 'command_execution' ||
-        lowerType.includes('execution') ||
-        lowerType.includes('scheduler')
-      ) {
-        return '/resources/screen.png';
-      }
+    const lowerType = type.toLowerCase();
+
+    // Travel types - always show background
+    if (lowerType === 'flight') return '/resources/flight.png';
+    if (lowerType === 'hotel') return '/resources/hotel.png';
+    if (lowerType === 'restaurant') return '/resources/restaurant.png';
+    if (lowerType === 'buffet') return '/resources/buffet.png';
+
+    // Evidence type
+    if (lowerType === 'evidence') return '/resources/evidence.png';
+
+    // Coordinator types - apply agent background
+    if (lowerType.includes('coordinator')) return '/resources/agent.png';
+
+    // Mathematics types - apply numbers background
+    if (
+      lowerType.includes('prime') ||
+      lowerType.includes('fibonacci') ||
+      lowerType.includes('numbers')
+    ) {
+      return '/resources/numbers.png';
+    }
+
+    // System/Execution category - applies to scheduler, execution_result, and related types
+    if (
+      lowerType === 'scheduler' ||
+      lowerType === 'execution_result' ||
+      lowerType === 'execution result' ||
+      lowerType === 'command execution' ||
+      lowerType === 'command_execution' ||
+      lowerType.includes('execution') ||
+      lowerType.includes('scheduler')
+    ) {
+      return '/resources/screen.png';
     }
 
     return undefined;

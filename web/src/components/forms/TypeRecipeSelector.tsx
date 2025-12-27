@@ -131,7 +131,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
       : { className: '', style: {}, hasBackgroundImage: false };
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className={`border-2 rounded-lg p-4 relative overflow-hidden ${
           selectedItem.type === 'want-type'
             ? 'border-blue-500 bg-blue-50'
@@ -174,7 +174,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 
   // Expanded view - show all options
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Search Input - Collapsible */}
       {showSearch && (
         <input
@@ -219,7 +219,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+      <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
@@ -227,7 +227,7 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
               <Zap className="w-4 h-4" />
               Want Types ({groupedItems.wantTypes.length})
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {groupedItems.wantTypes.map(item => {
                 const backgroundStyle = getBackgroundStyle(item.name);
                 return (
@@ -265,12 +265,12 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 
         {/* Recipes Section */}
         {groupedItems.recipes.length > 0 && (
-          <div className="pt-4 border-t border-gray-200">
+          <div className="pt-2 border-t border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
               <Package className="w-4 h-4" />
               Recipes ({groupedItems.recipes.length})
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {groupedItems.recipes.map(item => (
                 <button
                   key={item.id}
