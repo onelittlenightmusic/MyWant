@@ -232,4 +232,5 @@ wantType:
   - Shell command best practices
   - System integration patterns
 
-  require: execute_shell_command
+  require:
+    type: none

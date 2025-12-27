@@ -50,7 +50,17 @@ func (a *ExecutionAgent) executeCommand(ctx context.Context, want *mywant.Want) 
 	commandStr := command.(string)
 	shellStr := shell.(string)
 	workingDirStr, _ := workingDir.(string)
-	timeoutSec := timeout.(int)
+
+	// Handle timeout as either int or float64 (from JSON/params)
+	var timeoutSec int
+	switch v := timeout.(type) {
+	case float64:
+		timeoutSec = int(v)
+	case int:
+		timeoutSec = v
+	default:
+		timeoutSec = 30 // default timeout
+	}
 
 	want.StoreState("achieving_percentage", 50)
 	want.StoreLog("Starting command execution...")

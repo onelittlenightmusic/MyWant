@@ -124,6 +124,10 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 
 	locals.Command = fmt.Sprintf("%v", command)
 
+	// Set agent requirement for command execution
+	// This tells ExecuteAgents() to find agents that provide "command_execution" capability
+	e.Spec.Requires = []string{"command_execution"}
+
 	// Get optional parameters
 	if timeout, ok := e.Spec.Params["timeout"]; ok {
 		if timeoutVal, ok := timeout.(float64); ok {
@@ -198,12 +202,40 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		return
 	}
 
-	// Extract results from agent
-	exitCode := result["exit_code"].(int)
+	// Extract results from agent with type safety
+	if result == nil {
+		e.StoreState("status", "failed")
+		e.StoreState("error_message", "Agent returned nil result")
+		e.StoreLog("ERROR: Agent returned nil result")
+		locals.Phase = ExecutionPhaseFailed
+		e.updateLocals(locals)
+		return
+	}
+
+	// Safely extract results with type handling
+	var exitCode int
+	if ec, ok := result["exit_code"].(int); ok {
+		exitCode = ec
+	} else if ec, ok := result["exit_code"].(float64); ok {
+		exitCode = int(ec)
+	} else {
+		exitCode = -1
+	}
+
 	locals.ExitCode = exitCode
-	locals.Stdout = result["stdout"].(string)
-	locals.Stderr = result["stderr"].(string)
-	locals.ExecutionTimeMs = result["execution_time_ms"].(int64)
+	if stdout, ok := result["stdout"].(string); ok {
+		locals.Stdout = stdout
+	}
+	if stderr, ok := result["stderr"].(string); ok {
+		locals.Stderr = stderr
+	}
+
+	// Handle execution_time_ms as int64 or float64
+	if etm, ok := result["execution_time_ms"].(int64); ok {
+		locals.ExecutionTimeMs = etm
+	} else if etm, ok := result["execution_time_ms"].(float64); ok {
+		locals.ExecutionTimeMs = int64(etm)
+	}
 
 	// Build final result
 	finalResult := e.buildFinalResult(locals)
