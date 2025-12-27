@@ -624,6 +624,9 @@ const SettingsTab: React.FC<{
     }
   };
 
+  // Shared styling for all section containers
+  const sectionContainerClass = 'border border-gray-200 rounded-lg bg-white bg-opacity-50';
+
   const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
     setCollapsedSections(prev => {
       const updated = new Set(prev);
@@ -740,7 +743,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Parameters - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
+            <div className={sectionContainerClass}>
               <button
                 type="button"
                 onClick={() => toggleSection('parameters')}
@@ -822,7 +825,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Labels - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
+            <div className={sectionContainerClass}>
               <button
                 type="button"
                 onClick={() => toggleSection('labels')}
@@ -978,7 +981,7 @@ const SettingsTab: React.FC<{
       )}
 
             {/* Dependencies (using) - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg bg-white bg-opacity-50">
+            <div className={sectionContainerClass}>
               <button
                 type="button"
                 onClick={() => toggleSection('dependencies')}
@@ -1167,7 +1170,7 @@ const SettingsTab: React.FC<{
             </div>
 
             {/* Scheduling (when) - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg mt-6">
+            <div className={classNames(sectionContainerClass, 'mt-6')}>
               <button
                 type="button"
                 onClick={() => toggleSection('scheduling')}
