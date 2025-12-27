@@ -1,9 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Users } from 'lucide-react';
-import { Want } from '@/types/want';
+import { ChevronDown } from 'lucide-react';
+import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
+
+/**
+ * Get color for a want status
+ */
+const getStatusColor = (status: WantExecutionStatus): string => {
+  switch (status) {
+    case 'achieved':
+      return '#10b981'; // Green
+    case 'reaching':
+      return '#3b82f6'; // Blue
+    case 'failed':
+      return '#ef4444'; // Red
+    default:
+      return '#d1d5db'; // Gray for created, suspended, stopped
+  }
+};
 
 interface WantCardProps {
   want: Want;
@@ -264,8 +280,18 @@ export const WantCard: React.FC<WantCardProps> = ({
             }}
             className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
-            <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4 text-blue-600" />
+            <div className="flex items-center gap-3">
+              {/* Status dots for each child want */}
+              <div className="flex items-center gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
+                {children!.map((child, idx) => (
+                  <div
+                    key={idx}
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: getStatusColor(child.status) }}
+                    title={child.status}
+                  />
+                ))}
+              </div>
               <span className="text-blue-600 font-medium">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
             </div>
             <ChevronDown className="h-4 w-4 text-gray-400" />
