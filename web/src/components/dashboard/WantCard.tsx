@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Users } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
-import { CompositeBackground } from './CompositeBackground';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 
@@ -179,12 +178,8 @@ export const WantCard: React.FC<WantCardProps> = ({
     }
   };
 
-  // Check if this is a flight or hotel want
-  const isFlightWant = want.metadata?.type === 'flight';
-  const isHotelWant = want.metadata?.type === 'hotel';
-
-  // Get background style for parent want card
-  const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, true);
+  // Get background style for parent want card (plain white, no background images)
+  const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, false);
 
   // Get achieving percentage for progress bar
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
@@ -229,20 +224,8 @@ export const WantCard: React.FC<WantCardProps> = ({
         parentBackgroundStyle.className,
         className || ''
       )}
-      style={!hasChildren ? parentBackgroundStyle.style : undefined}
+      style={parentBackgroundStyle.style}
     >
-      {/* Composite background for parents with children */}
-      {hasChildren && (
-        <CompositeBackground children={children!} />
-      )}
-
-      {/* Single background for parents without children */}
-      {!hasChildren && parentBackgroundStyle.style && (
-        <div
-          className="absolute inset-0"
-          style={{...parentBackgroundStyle.style, zIndex: 0}}
-        />
-      )}
 
       {/* White progress bar - animates from left to right */}
       <div style={whiteProgressBarStyle}></div>
