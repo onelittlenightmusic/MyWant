@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
-import { ErrorHistoryPage } from '@/pages/ErrorHistoryPage';
+import { LogsPage } from '@/pages/ErrorHistoryPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import RecipePage from '@/pages/RecipePage';
 import WantTypePage from '@/pages/WantTypePage';
@@ -18,7 +18,7 @@ function App() {
             <Route path="/agents" element={<AgentsPage />} />
             <Route path="/recipes" element={<RecipePage />} />
             <Route path="/want-types" element={<WantTypePage />} />
-            <Route path="/errors" element={<ErrorHistoryPage />} />
+            <Route path="/logs" element={<LogsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

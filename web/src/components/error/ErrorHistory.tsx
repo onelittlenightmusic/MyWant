@@ -117,10 +117,10 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`space-y-6 w-full min-w-0 overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold text-gray-900">Error History</h2>
           <p className="text-gray-600 mt-1">
             View and manage API errors that have occurred
@@ -129,7 +129,7 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
         <button
           onClick={handleRefresh}
           disabled={loading}
-          className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
         >
           <RefreshCw className={classNames('h-4 w-4 mr-2', loading && 'animate-spin')} />
           Refresh
@@ -155,50 +155,6 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
         </div>
       )}
 
-      {/* Summary stats */}
-      {errors.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <AlertCircle className="h-8 w-8 text-gray-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Total Errors</p>
-                <p className="text-2xl font-semibold text-gray-900">{errors.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircle className="h-8 w-8 text-green-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Resolved</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {errors.filter(e => e.resolved).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg border border-gray-200">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <XCircle className="h-8 w-8 text-red-400" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Unresolved</p>
-                <p className="text-2xl font-semibold text-gray-900">
-                  {errors.filter(e => !e.resolved).length}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Error list */}
       {errors.length === 0 ? (
@@ -211,7 +167,7 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
         </div>
       ) : (
         <div className="space-y-4">
-          {errors.map((errorEntry) => {
+          {[...errors].reverse().map((errorEntry) => {
             const Icon = getErrorIcon(errorEntry);
             const isEditing = editingNotes === errorEntry.id;
 
@@ -337,33 +293,33 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
 
                 {/* Detailed view */}
                 {selectedError?.id === errorEntry.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="mt-4 pt-4 border-t border-gray-200 min-w-0">
                     <h5 className="text-sm font-medium text-gray-700 mb-3">Error Details</h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm min-w-0">
+                      <div className="min-w-0">
                         <span className="font-medium text-gray-700">ID:</span>
                         <span className="ml-2 text-gray-600 font-mono">{errorEntry.id}</span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-medium text-gray-700">Status:</span>
                         <span className="ml-2 text-gray-600">{errorEntry.status}</span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-medium text-gray-700">Method:</span>
                         <span className="ml-2 text-gray-600 font-mono">{errorEntry.method}</span>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <span className="font-medium text-gray-700">Endpoint:</span>
                         <span className="ml-2 text-gray-600 font-mono">{errorEntry.endpoint}</span>
                       </div>
                       {errorEntry.code && (
-                        <div>
+                        <div className="min-w-0">
                           <span className="font-medium text-gray-700">Code:</span>
                           <span className="ml-2 text-gray-600 font-mono">{errorEntry.code}</span>
                         </div>
                       )}
                       {errorEntry.userAgent && (
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 min-w-0">
                           <span className="font-medium text-gray-700">User Agent:</span>
                           <span className="ml-2 text-gray-600 text-xs">{errorEntry.userAgent}</span>
                         </div>
@@ -371,9 +327,9 @@ export const ErrorHistory: React.FC<ErrorHistoryProps> = ({ className = '' }) =>
                     </div>
 
                     {errorEntry.requestData && (
-                      <div className="mt-4">
+                      <div className="mt-4 min-w-0">
                         <span className="font-medium text-gray-700">Request Data:</span>
-                        <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
+                        <pre className="mt-1 p-2 bg-gray-100 rounded text-xs overflow-x-auto min-w-0">
                           {JSON.stringify(errorEntry.requestData, null, 2)}
                         </pre>
                       </div>

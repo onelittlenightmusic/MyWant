@@ -11,6 +11,7 @@ interface HeaderProps {
   showSummary?: boolean;
   onSummaryToggle?: () => void;
   sidebarMinimized?: boolean;
+  hideCreateButton?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,7 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   itemLabel,
   showSummary = false,
   onSummaryToggle,
-  sidebarMinimized = false
+  sidebarMinimized = false,
+  hideCreateButton = false
 }) => {
   return (
     <header className={classNames(
@@ -54,13 +56,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <button
-            onClick={onCreateWant}
-            className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
-          >
-            <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
-            {createButtonLabel}
-          </button>
+          {!hideCreateButton && (
+            <button
+              onClick={onCreateWant}
+              className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
+            >
+              <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
+              {createButtonLabel}
+            </button>
+          )}
         </div>
       </div>
     </header>

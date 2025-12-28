@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Heart, Bot, BookOpen, AlertTriangle, Zap, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { X, Heart, Bot, BookOpen, AlertTriangle, Activity, Zap, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface SidebarProps {
@@ -68,11 +68,11 @@ const getAdvancedItems = (): MenuItem[] => {
       disabled: false
     },
     {
-      id: 'errors',
-      label: 'Error History',
-      icon: AlertTriangle,
-      href: '/errors',
-      active: currentPath === '/errors'
+      id: 'logs',
+      label: 'Logs',
+      icon: Activity,
+      href: '/logs',
+      active: currentPath === '/logs'
     }
   ];
 };

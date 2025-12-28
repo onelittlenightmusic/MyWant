@@ -8,7 +8,7 @@ import {
   SuspendResumeResponse,
   WantStatusResponse
 } from '@/types/want';
-import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse } from '@/types/api';
+import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse, LogEntry, LogsResponse } from '@/types/api';
 import {
   Agent,
   AgentResponse,
@@ -189,6 +189,15 @@ class MyWantApiClient {
 
   async deleteErrorHistoryEntry(id: string): Promise<void> {
     await this.client.delete(`/api/v1/errors/${id}`);
+  }
+
+  // API logs operations
+  async listLogs(): Promise<LogsResponse> {
+    return this.deduplicatedGet<LogsResponse>('/api/v1/logs');
+  }
+
+  async clearLogs(): Promise<void> {
+    await this.client.delete('/api/v1/logs');
   }
 
   // Agent management

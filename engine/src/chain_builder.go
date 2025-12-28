@@ -47,6 +47,18 @@ type ChangeEvent struct {
 	Want     *Want
 }
 
+// APILogEntry represents a log entry for API operations
+type APILogEntry struct {
+	Timestamp   time.Time   `json:"timestamp"`
+	Method      string      `json:"method"`      // POST, PUT, DELETE, etc.
+	Endpoint    string      `json:"endpoint"`    // /api/v1/wants, /api/v1/recipes, etc.
+	Resource    string      `json:"resource"`    // Want/Recipe name or ID
+	Status      string      `json:"status"`      // "success" or "error"
+	StatusCode  int         `json:"statusCode"`  // HTTP status code
+	ErrorMsg    string      `json:"errorMsg,omitempty"`
+	Details     string      `json:"details,omitempty"`
+}
+
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop
 type ChainBuilder struct {
 	configPath           string                          // Path to original config file
@@ -95,6 +107,11 @@ type ChainBuilder struct {
 
 	// Server mode flag
 	isServerMode bool // True when running as API server (globalBuilder), false for batch/CLI mode
+
+	// API logging
+	apiLogs      []APILogEntry // API operation logs
+	apiLogsMutex sync.RWMutex  // Protect concurrent access to logs
+	maxLogSize   int           // Maximum number of log entries to keep (default: 1000)
 }
 
 // runtimeWant holds the runtime state of a want
@@ -153,6 +170,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		suspendChan:            make(chan bool),
 		resumeChan:             make(chan bool),
 		controlStop:            make(chan bool),
+		apiLogs:                make([]APILogEntry, 0),
+		maxLogSize:             1000,
 	}
 
 	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes() This avoids duplicate scanning logs when multiple ChainBuilder instances are created Recipe registry is passed via the environment during server initialization
@@ -2950,4 +2969,46 @@ func SetGlobalChainBuilder(cb *ChainBuilder) {
 }
 func GetGlobalChainBuilder() *ChainBuilder {
 	return globalChainBuilder
+}
+
+// LogAPIOperation logs an API operation (POST, PUT, DELETE, etc.)
+func (cb *ChainBuilder) LogAPIOperation(method, endpoint, resource, status string, statusCode int, errorMsg, details string) {
+	entry := APILogEntry{
+		Timestamp:  time.Now(),
+		Method:     method,
+		Endpoint:   endpoint,
+		Resource:   resource,
+		Status:     status,
+		StatusCode: statusCode,
+		ErrorMsg:   errorMsg,
+		Details:    details,
+	}
+
+	cb.apiLogsMutex.Lock()
+	defer cb.apiLogsMutex.Unlock()
+
+	cb.apiLogs = append(cb.apiLogs, entry)
+
+	// Keep only the most recent maxLogSize entries
+	if len(cb.apiLogs) > cb.maxLogSize {
+		cb.apiLogs = cb.apiLogs[len(cb.apiLogs)-cb.maxLogSize:]
+	}
+}
+
+// GetAPILogs returns a copy of all API logs
+func (cb *ChainBuilder) GetAPILogs() []APILogEntry {
+	cb.apiLogsMutex.RLock()
+	defer cb.apiLogsMutex.RUnlock()
+
+	// Return a copy to prevent external modification
+	logs := make([]APILogEntry, len(cb.apiLogs))
+	copy(logs, cb.apiLogs)
+	return logs
+}
+
+// ClearAPILogs clears all API logs
+func (cb *ChainBuilder) ClearAPILogs() {
+	cb.apiLogsMutex.Lock()
+	defer cb.apiLogsMutex.Unlock()
+	cb.apiLogs = make([]APILogEntry, 0)
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { RefreshCw, Download, Upload } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
@@ -20,6 +20,7 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { MessageNotification } from '@/components/common/MessageNotification';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -49,6 +50,26 @@ export const Dashboard: React.FC = () => {
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
+
+  // Export/Import state
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Message notification state
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
+  const [isNotificationVisible, setIsNotificationVisible] = useState(false);
+
+  // Helper function to show notification message
+  const showNotification = (message: string) => {
+    setNotificationMessage(message);
+    setIsNotificationVisible(true);
+  };
+
+  const dismissNotification = () => {
+    setIsNotificationVisible(false);
+    setNotificationMessage(null);
+  };
 
   // Use sidebar.selectedItem directly as the single source of truth for selection
   // This prevents unwanted selection changes when the wants array is updated by polling
@@ -315,6 +336,102 @@ export const Dashboard: React.FC = () => {
     sidebar.closeForm();
     setEditingWant(null);
     setDeleteWantState(null);
+  };
+
+  // Export wants as YAML
+  const handleExportWants = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('http://localhost:8080/api/v1/wants/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.statusText}`);
+      }
+
+      // Get the filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'wants-export.yaml';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        if (match) filename = match[1];
+      }
+
+      // Create blob from response and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      showNotification('✓ Exported wants to YAML');
+    } catch (error) {
+      console.error('Failed to export wants:', error);
+      showNotification(`✗ Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Import wants from YAML
+  const handleImportWants = async (file: File) => {
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Read file as text for YAML import
+      const fileText = await file.text();
+
+      const response = await fetch('http://localhost:8080/api/v1/wants/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/yaml',
+        },
+        body: fileText,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Import failed: ${errorData || response.statusText}`);
+      }
+
+      const result = await response.json();
+      showNotification(`✓ Imported ${result.wants} want(s)`);
+
+      // Refresh wants list
+      fetchWants();
+
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Failed to import wants:', error);
+      showNotification(`✗ Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file extension
+      if (!file.name.endsWith('.yaml') && !file.name.endsWith('.yml')) {
+        alert('Please select a YAML file (.yaml or .yml)');
+        return;
+      }
+      handleImportWants(file);
+    }
   };
 
   // Keyboard navigation handler
@@ -748,6 +865,41 @@ export const Dashboard: React.FC = () => {
               <div>
                 <StatsOverview wants={wants} loading={loading} layout="vertical" />
               </div>
+
+              {/* Export and Import buttons */}
+              <div className="mt-6 flex gap-3">
+                {/* Export button */}
+                <button
+                  onClick={handleExportWants}
+                  disabled={isExporting || wants.length === 0}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  title={wants.length === 0 ? 'No wants to export' : 'Download all wants as YAML'}
+                >
+                  <Download className="h-4 w-4" />
+                  <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+                </button>
+
+                {/* Import button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  title="Upload YAML file to import wants"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>{isImporting ? 'Importing...' : 'Import'}</span>
+                </button>
+
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".yaml,.yml"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                  disabled={isImporting}
+                />
+              </div>
             </div>
 
             {/* Filters section */}
@@ -814,6 +966,13 @@ export const Dashboard: React.FC = () => {
               ).length
             : 0
         }
+      />
+
+      {/* Message Notification */}
+      <MessageNotification
+        message={notificationMessage}
+        isVisible={isNotificationVisible}
+        onDismiss={dismissNotification}
       />
     </Layout>
   );

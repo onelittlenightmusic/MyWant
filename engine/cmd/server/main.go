@@ -212,6 +212,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("", s.createWant).Methods("POST")
 	wants.HandleFunc("", s.listWants).Methods("GET")
 	wants.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/export", s.exportWants).Methods("POST", "OPTIONS")
+	wants.HandleFunc("/import", s.importWants).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
@@ -230,11 +232,6 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/using", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/labels/{key}", s.handleOptions).Methods("OPTIONS")
-
-	// Config CRUD endpoints - for loading recipe-based configurations
-	configs := api.PathPrefix("/configs").Subrouter()
-	configs.HandleFunc("", s.createConfig).Methods("POST")
-	configs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
 	// Agents CRUD endpoints
 	agents := api.PathPrefix("/agents").Subrouter()
@@ -279,6 +276,12 @@ func (s *Server) setupRoutes() {
 	errors.HandleFunc("/{id}", s.updateErrorHistoryEntry).Methods("PUT")
 	errors.HandleFunc("/{id}", s.deleteErrorHistoryEntry).Methods("DELETE")
 
+	// API logs endpoints
+	logs := api.PathPrefix("/logs").Subrouter()
+	logs.HandleFunc("", s.getLogs).Methods("GET")
+	logs.HandleFunc("", s.clearLogs).Methods("DELETE")
+	logs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
 	// LLM inference endpoints
 	llm := api.PathPrefix("/llm").Subrouter()
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
@@ -298,6 +301,7 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errorMsg := "Invalid request format"
 		s.logError(r, http.StatusBadRequest, errorMsg, "parse_error", err.Error(), "")
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", "", "error", http.StatusBadRequest, errorMsg, "invalid_json")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
@@ -313,9 +317,11 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to query LLM: %v", err)
 		s.logError(r, http.StatusInternalServerError, errorMsg, "llm_error", err.Error(), "")
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", model, "error", http.StatusInternalServerError, errorMsg, "llm_query_failed")
 		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return
 	}
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", model, "success", http.StatusOK, "", "LLM query successful")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
@@ -364,113 +370,13 @@ func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
-func (s *Server) createConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Read raw config data from request body and save to temporary file
-	configData := make([]byte, r.ContentLength)
-	r.Body.Read(configData)
-
-	// Generate unique ID for this configuration execution
-	configID := generateWantID()
-	tempConfigPath := fmt.Sprintf("/tmp/config-%s.yaml", configID)
-	if err := os.WriteFile(tempConfigPath, configData, 0644); err != nil {
-		errorMsg := fmt.Sprintf("Failed to create temporary config file: %v", err)
-		s.logError(r, http.StatusInternalServerError, errorMsg, "file_creation", err.Error(), "")
-		http.Error(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-	defer os.Remove(tempConfigPath) // Clean up temp file
-
-	// Execute using the same logic as demo_travel_agent_full.go for DRY principle
-	config, builder, err := s.executeConfigLikeDemo(tempConfigPath, configID)
-	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to execute config: %v", err)
-		s.logError(r, http.StatusBadRequest, errorMsg, "execution", err.Error(), tempConfigPath)
-		http.Error(w, errorMsg, http.StatusBadRequest)
-		return
-	}
-	execution := &WantExecution{
-		ID:      configID,
-		Config:  config,
-		Status:  "completed",
-		Builder: builder,
-	}
-	s.wants[configID] = execution
-	w.WriteHeader(http.StatusCreated)
-	response := map[string]any{
-		"id":      configID,
-		"status":  "completed",
-		"wants":   len(config.Wants),
-		"message": "Configuration executed using demo program logic (DRY)",
-	}
-	json.NewEncoder(w).Encode(response)
-}
-
-// executeConfigLikeDemo executes config using the same logic as demo programs This is the DRY implementation that reuses offline mode logic
-func (s *Server) executeConfigLikeDemo(configPath string, configID string) (mywant.Config, *mywant.ChainBuilder, error) {
-	// Step 1: Load configuration using automatic recipe loading (same as demo_travel_agent_full.go:23)
-	config, err := mywant.LoadConfigFromYAML(configPath)
-	if err != nil {
-		return mywant.Config{}, nil, fmt.Errorf("error loading %s: %v", configPath, err)
-	}
-
-	// Step 2: Create chain builder (same as demo_travel_agent_full.go:38)
-	memoryPath := fmt.Sprintf("engine/memory/memory-%s.yaml", configID)
-	builder := mywant.NewChainBuilderWithPaths("", memoryPath)
-	builder.SetConfigInternal(config)
-
-	// Transfer want type definitions to this builder for state initialization
-	if s.wantTypeLoader != nil {
-		allDefs := s.wantTypeLoader.GetAll()
-		for _, def := range allDefs {
-			builder.StoreWantTypeDefinition(def)
-		}
-	}
-
-	// Set custom target registry (CRITICAL for recipe-based custom types like prime sieve)
-	builder.SetCustomTargetRegistry(s.recipeRegistry)
-
-	// Step 3: Create and configure agent registry (same as demo_travel_agent_full.go:40-50)
-	agentRegistry := mywant.NewAgentRegistry()
-
-	// Load capabilities and agents
-	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
-	}
-
-	if err := agentRegistry.LoadAgents("agents/"); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
-	}
-
-	// Register dynamic agents (same as demo_travel_agent_full.go:52-98)
-	s.registerDynamicAgents(agentRegistry)
-	types.RegisterExecutionAgents(agentRegistry)
-	builder.SetAgentRegistry(agentRegistry)
-
-	// Step 4: Register want types (same as demo_travel_agent_full.go:103)
-	types.RegisterTravelWantTypes(builder)
-	types.RegisterQNetWantTypes(builder)
-	types.RegisterFibonacciWantTypes(builder)
-	types.RegisterPrimeWantTypes(builder)
-	types.RegisterApprovalWantTypes(builder)
-	types.RegisterExecutionResultWantType(builder)
-	mywant.RegisterMonitorWantTypes(builder)
-	mywant.RegisterSchedulerWantTypes(builder)
-
-	// Step 5: Execute (same as demo_travel_agent_full.go:106)
-	builder.Execute()
-
-	return config, builder, nil
-}
 
 // registerDynamicAgents registers implementations for special agents loaded from YAML
 func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
-
 	// Override the generic implementations with specific ones for special agents
 	setupFlightAPIAgents(agentRegistry)
-
 }
+
 func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
 		if doAgent, ok := agent.(*mywant.DoAgent); ok {
@@ -484,6 +390,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 		}
 	}
 }
+
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -513,19 +420,23 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if configErr != nil || newWant == nil {
-			http.Error(w, fmt.Sprintf("Invalid request: must be either a Want object or Config with wants array. Error: %v", configErr), http.StatusBadRequest)
+			errorMsg := fmt.Sprintf("Invalid request: must be either a Want object or Config with wants array. Error: %v", configErr)
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "")
+			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
 		config = mywant.Config{Wants: []*mywant.Want{newWant}}
 	}
 	if err := s.validateWantTypes(config); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "validation")
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	if err := s.validateWantSpec(config); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "validation")
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
@@ -551,6 +462,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		delete(s.wants, executionID)
 		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusConflict, errorMsg, "duplicate_name")
 		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusConflict)
 		return
@@ -575,10 +487,18 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	wantCount := len(config.Wants)
 	if wantCount < 0 || wantCount > 1000000 {
 		errorMsg := fmt.Sprintf("Invalid want count after parsing: %d", wantCount)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusInternalServerError, errorMsg, "parsing_error")
 		s.logError(r, http.StatusInternalServerError, errorMsg, "parsing_error", "Invalid want count", "")
 		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return
 	}
+
+	// Log successful creation
+	wantNames := []string{}
+	for _, want := range config.Wants {
+		wantNames = append(wantNames, want.Metadata.Name)
+	}
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", wantCount))
 
 	response := map[string]any{
 		"id":       executionID,
@@ -650,6 +570,226 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(response)
 }
+
+// exportWants handles POST /api/v1/wants/export - exports all wants as YAML
+func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
+	// Parse includeSystemWants query parameter (default: false)
+	includeSystemWants := false
+	if includeSystemWantsStr := r.URL.Query().Get("includeSystemWants"); includeSystemWantsStr != "" {
+		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
+	}
+
+	// Collect all wants from all executions (same logic as listWants)
+	wantsByID := make(map[string]*mywant.Want)
+
+	for _, execution := range s.wants {
+		currentStates := execution.Builder.GetAllWantStates()
+		for _, want := range currentStates {
+			wantCopy := &mywant.Want{
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.History,
+				State:       want.GetExplicitState(),
+				HiddenState: want.GetHiddenState(),
+			}
+			wantsByID[want.Metadata.ID] = wantCopy
+		}
+	}
+
+	// If no wants from executions, also check global builder
+	if len(wantsByID) == 0 && s.globalBuilder != nil {
+		currentStates := s.globalBuilder.GetAllWantStates()
+		for _, want := range currentStates {
+			wantCopy := &mywant.Want{
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.History,
+				State:       want.GetExplicitState(),
+				HiddenState: want.GetHiddenState(),
+			}
+			wantsByID[want.Metadata.ID] = wantCopy
+		}
+	}
+
+	// Build list of wants to export (filter out system wants if needed)
+	allWants := make([]*mywant.Want, 0, len(wantsByID))
+	for _, want := range wantsByID {
+		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		allWants = append(allWants, want)
+	}
+
+	// Create config with all wants
+	config := mywant.Config{
+		Wants: allWants,
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&config)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to marshal wants to YAML: %v", err)
+		s.globalBuilder.LogAPIOperation("EXPORT", "/api/v1/wants/export", "", "error", http.StatusInternalServerError, errorMsg, "marshaling_error")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// Set response headers for file download
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"wants-export-%d.yaml\"", time.Now().Unix()))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(yamlData)))
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(yamlData)
+
+	// Collect want names for logging
+	wantNames := []string{}
+	for _, want := range allWants {
+		wantNames = append(wantNames, want.Metadata.Name)
+	}
+
+	// Log successful export
+	s.globalBuilder.LogAPIOperation(
+		"EXPORT",
+		"/api/v1/wants/export",
+		strings.Join(wantNames, ", "),
+		"success",
+		http.StatusOK,
+		"",
+		fmt.Sprintf("Exported %d wants to YAML (%d bytes)", len(allWants), len(yamlData)),
+	)
+
+	InfoLog("[API:EXPORT] Exported %d wants to YAML\n", len(allWants))
+}
+
+// importWants handles POST /api/v1/wants/import - imports wants from YAML
+func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Read request body
+	var buf bytes.Buffer
+	io.Copy(&buf, r.Body)
+	data := buf.Bytes()
+
+	// Parse YAML into Config
+	var config mywant.Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		errorMsg := fmt.Sprintf("Failed to parse YAML: %v", err)
+		s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusBadRequest, errorMsg, "parsing_error")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	if len(config.Wants) == 0 {
+		errorMsg := "No wants found in YAML"
+		s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusBadRequest, errorMsg, "empty_wants")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Validate want types
+	if err := s.validateWantTypes(config); err != nil {
+		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusBadRequest, errorMsg, "validation")
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Validate want spec
+	if err := s.validateWantSpec(config); err != nil {
+		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
+		s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusBadRequest, errorMsg, "validation")
+		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Verify all wants have IDs (from export)
+	for _, want := range config.Wants {
+		if want.Metadata.ID == "" {
+			errorMsg := "Imported wants must have IDs (from export)"
+			s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusBadRequest, errorMsg, "missing_ids")
+			http.Error(w, errorMsg, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Generate unique ID for this execution
+	executionID := generateWantID()
+	execution := &WantExecution{
+		ID:      executionID,
+		Config:  config,
+		Status:  "created",
+		Builder: s.globalBuilder,
+	}
+	s.wants[executionID] = execution
+
+	// Add wants to global builder
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	if err != nil {
+		delete(s.wants, executionID)
+		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
+		s.globalBuilder.LogAPIOperation("IMPORT", "/api/v1/wants/import", "", "error", http.StatusConflict, errorMsg, "duplicate_ids")
+		s.logError(r, http.StatusConflict, errorMsg, "duplicate_id", err.Error(), "")
+		http.Error(w, errorMsg, http.StatusConflict)
+		return
+	}
+
+	// Wait for wants to be added to reconcile loop
+	maxAttempts := 100
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if s.globalBuilder.AreWantsAdded(wantIDs) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Restore state for each want
+	for _, want := range config.Wants {
+		if importedWant, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
+			// Restore State
+			if want.State != nil && len(want.State) > 0 {
+				for key, value := range want.State {
+					importedWant.StoreState(key, value)
+				}
+				InfoLog("[API:IMPORT] Restored state for want %s: %d fields\n", want.Metadata.ID, len(want.State))
+			}
+
+			// Note: HiddenState is already part of State map, so it's restored above
+		}
+	}
+
+	// Collect want names for logging
+	wantNames := []string{}
+	for _, want := range config.Wants {
+		InfoLog("[API:IMPORT] Want imported: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+		wantNames = append(wantNames, want.Metadata.Name)
+	}
+
+	// Log successful import with summary
+	s.globalBuilder.LogAPIOperation(
+		"IMPORT",
+		"/api/v1/wants/import",
+		strings.Join(wantNames, ", "),
+		"success",
+		http.StatusCreated,
+		"",
+		fmt.Sprintf("Imported %d wants with state restoration", len(config.Wants)),
+	)
+
+	w.WriteHeader(http.StatusCreated)
+	response := map[string]any{
+		"id":      executionID,
+		"status":  execution.Status,
+		"wants":   len(config.Wants),
+		"message": fmt.Sprintf("Successfully imported %d wants", len(config.Wants)),
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -742,13 +882,17 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetExecution == nil || foundWant == nil {
-		http.Error(w, "Want not found", http.StatusNotFound)
+		errorMsg := "Want not found"
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 
 	// Only allow updates if the execution is not currently running
 	if targetExecution.Status == "running" {
-		http.Error(w, "Cannot update running want", http.StatusConflict)
+		errorMsg := "Cannot update running want"
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusConflict, errorMsg, "want_running")
+		http.Error(w, errorMsg, http.StatusConflict)
 		return
 	}
 	var updatedWant *mywant.Want
@@ -758,23 +902,30 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		r.Body.Read(wantYAML)
 
 		if err := yaml.Unmarshal(wantYAML, &updatedWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid YAML want: %v", err), http.StatusBadRequest)
+			errorMsg := fmt.Sprintf("Invalid YAML want: %v", err)
+			s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "parsing_error")
+			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&updatedWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON want: %v", err), http.StatusBadRequest)
+			errorMsg := fmt.Sprintf("Invalid JSON want: %v", err)
+			s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "parsing_error")
+			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
 	}
 
 	if updatedWant == nil {
-		http.Error(w, "Want object is required", http.StatusBadRequest)
+		errorMsg := "Want object is required"
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "validation")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
 	if err := s.validateWantTypes(tempConfig); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "validation")
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
@@ -782,6 +933,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.validateWantSpec(tempConfig); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "validation")
 		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
@@ -803,6 +955,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	targetExecution.Status = "updated"
+	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedWant)
 }
@@ -863,6 +1016,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				_, err := execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
 				if err != nil {
 					ErrorLog("Failed to send deletion request: %v\n", err)
+					s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "error", http.StatusInternalServerError, err.Error(), "deletion_failed")
 				} else {
 					// Wait for want to be deleted (poll with timeout)
 					maxAttempts := 100
@@ -872,6 +1026,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 						}
 						time.Sleep(10 * time.Millisecond)
 					}
+					s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", fmt.Sprintf("Deleted want: %s", wantNameToDelete))
 				}
 
 				// NOTE: Do NOT call SetConfigInternal with partial execution config! API-created wants from different executions should not affect the global config. The global config is only for wants loaded from YAML files or recipe-based creation. Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
@@ -898,6 +1053,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				ErrorLog("Failed to send deletion request: %v\n", err)
 				errorMsg := fmt.Sprintf("Failed to delete want: %v", err)
+				s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "error", http.StatusInternalServerError, errorMsg, "deletion_failed")
 				s.logError(r, http.StatusInternalServerError, errorMsg, "deletion", err.Error(), wantID)
 				http.Error(w, errorMsg, http.StatusInternalServerError)
 				return
@@ -914,6 +1070,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			}
 
 			InfoLog("Successfully deleted want from global builder\n")
+			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deleted from global builder")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -922,6 +1079,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	ErrorLog("Want %s not found in any execution or global builder\n", wantID)
 
 	errorMsg := fmt.Sprintf("Want not found: %s", wantID)
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
 	http.Error(w, "Want not found", http.StatusNotFound)
 }
@@ -1023,7 +1181,9 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&agentData); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid JSON: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/agents", "", "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	var agent mywant.Agent
@@ -1046,13 +1206,16 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 			Monitor:   nil, // Default monitor will be set by registry
 		}
 	default:
-		http.Error(w, "Invalid agent type. Must be 'do' or 'monitor'", http.StatusBadRequest)
+		errorMsg := "Invalid agent type. Must be 'do' or 'monitor'"
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/agents", agentData.Name, "error", http.StatusBadRequest, errorMsg, "invalid_type")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
 	// Register the agent
 	s.agentRegistry.RegisterAgent(agent)
 
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/agents", agentData.Name, "success", http.StatusCreated, "", fmt.Sprintf("Created agent type=%s", agentData.Type))
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
 		"name":         agent.GetName(),
@@ -1109,10 +1272,13 @@ func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	agentName := vars["name"]
 	if !s.agentRegistry.UnregisterAgent(agentName) {
-		http.Error(w, "Agent not found", http.StatusNotFound)
+		errorMsg := "Agent not found"
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/agents/{name}", agentName, "error", http.StatusNotFound, errorMsg, "agent_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/agents/{name}", agentName, "success", http.StatusNoContent, "", "Agent deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1122,13 +1288,16 @@ func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
 
 	var capability mywant.Capability
 	if err := json.NewDecoder(r.Body).Decode(&capability); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid JSON: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/capabilities", "", "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
 	// Register the capability
 	s.agentRegistry.RegisterCapability(capability)
 
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/capabilities", capability.Name, "success", http.StatusCreated, "", fmt.Sprintf("Created capability"))
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(capability)
 }
@@ -1164,10 +1333,13 @@ func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	capabilityName := vars["name"]
 	if !s.agentRegistry.UnregisterCapability(capabilityName) {
-		http.Error(w, "Capability not found", http.StatusNotFound)
+		errorMsg := "Capability not found"
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/capabilities/{name}", capabilityName, "error", http.StatusNotFound, errorMsg, "capability_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/capabilities/{name}", capabilityName, "success", http.StatusNoContent, "", "Capability deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) {
@@ -1212,12 +1384,15 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 			if _, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Suspend the specific want execution
 				if err := execution.Builder.SuspendWant(wantID); err != nil {
+					errorMsg := fmt.Sprintf("Failed to suspend want execution: %v", err)
+					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusInternalServerError, errorMsg, "suspension_failed")
 					w.WriteHeader(http.StatusInternalServerError)
 					json.NewEncoder(w).Encode(map[string]string{
-						"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
+						"error": errorMsg,
 					})
 					return
 				}
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "success", http.StatusOK, "", "Want suspended")
 				response := map[string]any{
 					"message":   "Want execution suspended successfully",
 					"wantId":    wantID,
@@ -1235,12 +1410,15 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Suspend the specific want execution
 			if err := s.globalBuilder.SuspendWant(wantID); err != nil {
+				errorMsg := fmt.Sprintf("Failed to suspend want execution: %v", err)
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusInternalServerError, errorMsg, "suspension_failed")
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{
-					"error": fmt.Sprintf("Failed to suspend want execution: %v", err),
+					"error": errorMsg,
 				})
 				return
 			}
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "success", http.StatusOK, "", "Want suspended")
 			response := map[string]any{
 				"message":   "Want execution suspended successfully",
 				"wantId":    wantID,
@@ -1253,9 +1431,11 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Want not found
+	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	w.WriteHeader(http.StatusNotFound)
 	json.NewEncoder(w).Encode(map[string]string{
-		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+		"error": errorMsg,
 	})
 }
 
@@ -1273,12 +1453,15 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 			if _, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Resume the specific want execution
 				if err := execution.Builder.ResumeWant(wantID); err != nil {
+					errorMsg := fmt.Sprintf("Failed to resume want execution: %v", err)
+					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusInternalServerError, errorMsg, "resume_failed")
 					w.WriteHeader(http.StatusInternalServerError)
 					json.NewEncoder(w).Encode(map[string]string{
-						"error": fmt.Sprintf("Failed to resume want execution: %v", err),
+						"error": errorMsg,
 					})
 					return
 				}
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "success", http.StatusOK, "", "Want resumed")
 				response := map[string]any{
 					"message":   "Want execution resumed successfully",
 					"wantId":    wantID,
@@ -1296,12 +1479,15 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Resume the specific want execution
 			if err := s.globalBuilder.ResumeWant(wantID); err != nil {
+				errorMsg := fmt.Sprintf("Failed to resume want execution: %v", err)
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusInternalServerError, errorMsg, "resume_failed")
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{
-					"error": fmt.Sprintf("Failed to resume want execution: %v", err),
+					"error": errorMsg,
 				})
 				return
 			}
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "success", http.StatusOK, "", "Want resumed")
 			response := map[string]any{
 				"message":   "Want execution resumed successfully",
 				"wantId":    wantID,
@@ -1314,9 +1500,11 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Want not found
+	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	w.WriteHeader(http.StatusNotFound)
 	json.NewEncoder(w).Encode(map[string]string{
-		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+		"error": errorMsg,
 	})
 }
 
@@ -1334,12 +1522,15 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 			if _, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Stop the specific want execution
 				if err := execution.Builder.StopWant(wantID); err != nil {
+					errorMsg := fmt.Sprintf("Failed to stop want execution: %v", err)
+					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusInternalServerError, errorMsg, "stop_failed")
 					w.WriteHeader(http.StatusInternalServerError)
 					json.NewEncoder(w).Encode(map[string]string{
-						"error": fmt.Sprintf("Failed to stop want execution: %v", err),
+						"error": errorMsg,
 					})
 					return
 				}
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "success", http.StatusOK, "", "Want stopped")
 				response := map[string]any{
 					"message":   "Want execution stopped successfully",
 					"wantId":    wantID,
@@ -1357,12 +1548,15 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Stop the specific want execution
 			if err := s.globalBuilder.StopWant(wantID); err != nil {
+				errorMsg := fmt.Sprintf("Failed to stop want execution: %v", err)
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusInternalServerError, errorMsg, "stop_failed")
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{
-					"error": fmt.Sprintf("Failed to stop want execution: %v", err),
+					"error": errorMsg,
 				})
 				return
 			}
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "success", http.StatusOK, "", "Want stopped")
 			response := map[string]any{
 				"message":   "Want execution stopped successfully",
 				"wantId":    wantID,
@@ -1375,9 +1569,11 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Want not found
+	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	w.WriteHeader(http.StatusNotFound)
 	json.NewEncoder(w).Encode(map[string]string{
-		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+		"error": errorMsg,
 	})
 }
 
@@ -1395,12 +1591,15 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 			if _, _, found := execution.Builder.FindWantByID(wantID); found {
 				// Restart the specific want execution
 				if err := execution.Builder.RestartWant(wantID); err != nil {
+					errorMsg := fmt.Sprintf("Failed to restart want execution: %v", err)
+					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusInternalServerError, errorMsg, "start_failed")
 					w.WriteHeader(http.StatusInternalServerError)
 					json.NewEncoder(w).Encode(map[string]string{
-						"error": fmt.Sprintf("Failed to restart want execution: %v", err),
+						"error": errorMsg,
 					})
 					return
 				}
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "success", http.StatusOK, "", "Want started")
 				response := map[string]any{
 					"message":   "Want execution restarted successfully",
 					"wantId":    wantID,
@@ -1418,12 +1617,15 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			// Restart the specific want execution
 			if err := s.globalBuilder.RestartWant(wantID); err != nil {
+				errorMsg := fmt.Sprintf("Failed to restart want execution: %v", err)
+				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusInternalServerError, errorMsg, "start_failed")
 				w.WriteHeader(http.StatusInternalServerError)
 				json.NewEncoder(w).Encode(map[string]string{
-					"error": fmt.Sprintf("Failed to restart want execution: %v", err),
+					"error": errorMsg,
 				})
 				return
 			}
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "success", http.StatusOK, "", "Want started")
 			response := map[string]any{
 				"message":   "Want execution restarted successfully",
 				"wantId":    wantID,
@@ -1436,11 +1638,14 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Want not found
+	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	w.WriteHeader(http.StatusNotFound)
 	json.NewEncoder(w).Encode(map[string]string{
-		"error": fmt.Sprintf("Want with ID %s not found", wantID),
+		"error": errorMsg,
 	})
 }
+
 func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1452,11 +1657,15 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&labelReq); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid JSON request: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	if labelReq.Key == "" || labelReq.Value == "" {
-		http.Error(w, "Label key and value are required", http.StatusBadRequest)
+		errorMsg := "Label key and value are required"
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "error", http.StatusBadRequest, errorMsg, "missing_fields")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -1483,7 +1692,9 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found || targetWant == nil {
-		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 	if targetWant.Metadata.Labels == nil {
@@ -1493,6 +1704,7 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "success", http.StatusOK, "", fmt.Sprintf("Added label %s=%s", labelReq.Key, labelReq.Value))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Label added successfully",
@@ -1532,7 +1744,9 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found || targetWant == nil {
-		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 	if targetWant.Metadata.Labels != nil {
@@ -1541,6 +1755,7 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Removed label %s", keyToRemove))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Label removed successfully",
@@ -1560,11 +1775,15 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&usingReq); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON request: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid JSON request: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/using", wantID, "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	if usingReq.Key == "" || usingReq.Value == "" {
-		http.Error(w, "Using dependency key and value are required", http.StatusBadRequest)
+		errorMsg := "Using dependency key and value are required"
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/using", wantID, "error", http.StatusBadRequest, errorMsg, "missing_fields")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -1600,7 +1819,9 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found || targetWant == nil {
-		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/using", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 	if targetWant.Spec.Using == nil {
@@ -1616,6 +1837,7 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/using", wantID, "success", http.StatusOK, "", fmt.Sprintf("Added dependency %s=%s", usingReq.Key, usingReq.Value))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Using dependency added successfully",
@@ -1664,7 +1886,9 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found || targetWant == nil {
-		http.Error(w, fmt.Sprintf("Want with ID %s not found", wantID), http.StatusNotFound)
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/using/{key}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 	if targetWant.Spec.Using != nil {
@@ -1684,6 +1908,7 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 
 	// Update the metadata timestamp
 	targetWant.Metadata.UpdatedAt = time.Now().Unix()
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/using/{key}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Removed dependency %s", keyToRemove))
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
 		"message":   "Using dependency removed successfully",
@@ -1738,7 +1963,6 @@ func (s *Server) Start() error {
 	log.Printf("🚀 MyWant server starting on %s\n", addr)
 	log.Printf("📋 Available endpoints:\n")
 	log.Printf("  GET  /health                        - Health check\n")
-	log.Printf("  POST /api/v1/configs               - Create config (YAML config with recipe reference)\n")
 	log.Printf("  POST /api/v1/wants                 - Create want (JSON/YAML want object)\n")
 	log.Printf("  GET  /api/v1/wants                 - List wants\n")
 	log.Printf("  GET  /api/v1/wants/{id}            - Get want\n")
@@ -1765,6 +1989,8 @@ func (s *Server) Start() error {
 	log.Printf("  GET  /api/v1/errors/{id}         - Get error details\n")
 	log.Printf("  PUT  /api/v1/errors/{id}         - Update error (mark resolved, add notes)\n")
 	log.Printf("  DELETE /api/v1/errors/{id}       - Delete error entry\n")
+	log.Printf("  GET  /api/v1/logs                - List API operation logs (POST/PUT/DELETE only)\n")
+	log.Printf("  DELETE /api/v1/logs              - Clear all API operation logs\n")
 	log.Printf("\n")
 
 	return http.ListenAndServe(addr, s.router)
@@ -1902,7 +2128,9 @@ func (s *Server) updateErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&updateRequest); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid JSON: %v", err)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/errors/{id}", errorID, "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 
@@ -1914,12 +2142,15 @@ func (s *Server) updateErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 			if updateRequest.Notes != "" {
 				s.errorHistory[i].Notes = updateRequest.Notes
 			}
+			s.globalBuilder.LogAPIOperation("PUT", "/api/v1/errors/{id}", errorID, "success", http.StatusOK, "", "Error entry updated")
 			json.NewEncoder(w).Encode(s.errorHistory[i])
 			return
 		}
 	}
 
-	http.Error(w, "Error entry not found", http.StatusNotFound)
+	errorMsg := "Error entry not found"
+	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/errors/{id}", errorID, "error", http.StatusNotFound, errorMsg, "error_not_found")
+	http.Error(w, errorMsg, http.StatusNotFound)
 }
 
 // deleteErrorHistoryEntry handles DELETE /api/v1/errors/{id} - deletes an error entry
@@ -1930,12 +2161,51 @@ func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 	for i, entry := range s.errorHistory {
 		if entry.ID == errorID {
 			s.errorHistory = append(s.errorHistory[:i], s.errorHistory[i+1:]...)
+			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/errors/{id}", errorID, "success", http.StatusNoContent, "", "Error entry deleted")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
 
-	http.Error(w, "Error entry not found", http.StatusNotFound)
+	errorMsg := "Error entry not found"
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/errors/{id}", errorID, "error", http.StatusNotFound, errorMsg, "error_not_found")
+	http.Error(w, errorMsg, http.StatusNotFound)
+}
+
+// getLogs returns all API operation logs
+func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get logs from global builder
+	var logs []mywant.APILogEntry
+	if s.globalBuilder != nil {
+		logs = s.globalBuilder.GetAPILogs()
+	}
+
+	response := map[string]any{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"count":     len(logs),
+		"logs":      logs,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// clearLogs clears all API operation logs
+func (s *Server) clearLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.globalBuilder != nil {
+		s.globalBuilder.ClearAPILogs()
+	}
+
+	response := map[string]any{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"message":   "All API logs cleared",
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 // generateErrorID generates a unique ID for error entries
@@ -1963,6 +2233,7 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	var recipe mywant.GenericRecipe
 	if err := json.NewDecoder(r.Body).Decode(&recipe); err != nil {
 		s.logError(r, http.StatusBadRequest, "Invalid recipe format", "recipe_creation", err.Error(), "")
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", "", "error", http.StatusBadRequest, "Invalid recipe format", "parsing_error")
 		http.Error(w, "Invalid recipe format", http.StatusBadRequest)
 		return
 	}
@@ -1971,16 +2242,19 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	recipeID := recipe.Recipe.Metadata.Name
 	if recipeID == "" {
 		s.logError(r, http.StatusBadRequest, "Recipe name is required", "recipe_creation", "missing name", "")
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", "", "error", http.StatusBadRequest, "Recipe name is required", "missing_name")
 		http.Error(w, "Recipe name is required", http.StatusBadRequest)
 		return
 	}
 
 	if err := s.recipeRegistry.CreateRecipe(recipeID, &recipe); err != nil {
 		s.logError(r, http.StatusConflict, err.Error(), "recipe_creation", "duplicate recipe", recipeID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", recipeID, "error", http.StatusConflict, err.Error(), "duplicate_recipe")
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", recipeID, "success", http.StatusCreated, "", "Recipe created successfully")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":      recipeID,
@@ -2021,16 +2295,19 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	var recipe mywant.GenericRecipe
 	if err := json.NewDecoder(r.Body).Decode(&recipe); err != nil {
 		s.logError(r, http.StatusBadRequest, "Invalid recipe format", "recipe_update", err.Error(), recipeID)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/recipes/{id}", recipeID, "error", http.StatusBadRequest, "Invalid recipe format", "parsing_error")
 		http.Error(w, "Invalid recipe format", http.StatusBadRequest)
 		return
 	}
 
 	if err := s.recipeRegistry.UpdateRecipe(recipeID, &recipe); err != nil {
 		s.logError(r, http.StatusNotFound, err.Error(), "recipe_update", "recipe not found", recipeID)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/recipes/{id}", recipeID, "error", http.StatusNotFound, err.Error(), "recipe_not_found")
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/recipes/{id}", recipeID, "success", http.StatusOK, "", "Recipe updated successfully")
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":      recipeID,
 		"message": "Recipe updated successfully",
@@ -2044,10 +2321,12 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.recipeRegistry.DeleteRecipe(recipeID); err != nil {
 		s.logError(r, http.StatusNotFound, err.Error(), "recipe_deletion", "recipe not found", recipeID)
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/recipes/{id}", recipeID, "error", http.StatusNotFound, err.Error(), "recipe_not_found")
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/recipes/{id}", recipeID, "success", http.StatusNoContent, "", "Recipe deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -2346,14 +2625,18 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&labelReq); err != nil {
-		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
+		errorMsg := fmt.Sprintf("Invalid request body: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/labels", "", "error", http.StatusBadRequest, errorMsg, "invalid_json")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	labelReq.Key = strings.TrimSpace(labelReq.Key)
 	labelReq.Value = strings.TrimSpace(labelReq.Value)
 
 	if labelReq.Key == "" || labelReq.Value == "" {
-		http.Error(w, "Label key and value must not be empty", http.StatusBadRequest)
+		errorMsg := "Label key and value must not be empty"
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/labels", "", "error", http.StatusBadRequest, errorMsg, "missing_fields")
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
 	if s.globalLabels == nil {
@@ -2363,6 +2646,7 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 		s.globalLabels[labelReq.Key] = make(map[string]bool)
 	}
 	s.globalLabels[labelReq.Key][labelReq.Value] = true
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/labels", fmt.Sprintf("%s=%s", labelReq.Key, labelReq.Value), "success", http.StatusCreated, "", "Label registered successfully")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
 		"key":     labelReq.Key,

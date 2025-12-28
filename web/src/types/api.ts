@@ -37,3 +37,20 @@ export interface HealthCheck {
   version?: string;
   uptime?: string;
 }
+
+export interface LogEntry {
+  timestamp: string;
+  method: string;
+  endpoint: string;
+  resource: string;
+  status: string;
+  statusCode: number;
+  errorMsg?: string;
+  details?: string;
+}
+
+export interface LogsResponse {
+  timestamp: string;
+  count: number;
+  logs: LogEntry[];
+}

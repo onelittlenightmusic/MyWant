@@ -1,47 +1,182 @@
 import React, { useState } from 'react';
-import { Menu } from 'lucide-react';
+import { AlertTriangle, Activity, CheckCircle, XCircle } from 'lucide-react';
+import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
-import { Sidebar } from '@/components/layout/Sidebar';
+import { RightSidebar } from '@/components/layout/RightSidebar';
 import { ErrorHistory } from '@/components/error/ErrorHistory';
+import { LogHistory } from '@/components/logs/LogHistory';
+import { useLogStore } from '@/stores/logStore';
+import { useErrorHistoryStore } from '@/stores/errorHistoryStore';
 import { classNames } from '@/utils/helpers';
 
-export const ErrorHistoryPage: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
+type TabType = 'errors' | 'logs';
+
+export const LogsPage: React.FC = () => {
+  const [sidebarMinimized, setSidebarMinimized] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('logs');
+  const [showSummary, setShowSummary] = useState(false);
+
+  const { logs } = useLogStore();
+  const { errors } = useErrorHistoryStore();
+
+  // Calculate statistics
+  const logSuccessCount = logs.filter(l => l.status === 'success').length;
+  const logErrorCount = logs.filter(l => l.status === 'error').length;
+  const errorResolvedCount = errors.filter(e => e.resolved).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-md bg-white shadow-md border border-gray-200 text-gray-600 hover:text-gray-900"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        isMinimized={sidebarMinimized}
-        onClose={() => setSidebarOpen(false)}
-        onMinimizeToggle={() => setSidebarMinimized(!sidebarMinimized)}
+    <Layout
+      sidebarMinimized={sidebarMinimized}
+      onSidebarMinimizedChange={setSidebarMinimized}
+    >
+      {/* Header */}
+      <Header
+        title="Logs"
+        onCreateWant={() => {}}
+        sidebarMinimized={sidebarMinimized}
+        showSummary={showSummary}
+        onSummaryToggle={() => setShowSummary(!showSummary)}
+        hideCreateButton={true}
       />
 
-      {/* Main content */}
-      <div className={classNames(
-        "flex-1 flex flex-col relative transition-all duration-300 ease-in-out",
-        sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
-      )}>
-        {/* Header */}
-        <Header onCreateWant={() => {}} />
+      {/* Main content area */}
+      <main className="flex-1 p-6 mt-16 overflow-x-hidden w-full min-w-0">
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={classNames(
+                'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
+                activeTab === 'logs'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              <Activity className={classNames(
+                'mr-2 h-5 w-5',
+                activeTab === 'logs' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+              )} />
+              API Logs
+            </button>
+            <button
+              onClick={() => setActiveTab('errors')}
+              className={classNames(
+                'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
+                activeTab === 'errors'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              <AlertTriangle className={classNames(
+                'mr-2 h-5 w-5',
+                activeTab === 'errors' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+              )} />
+              Errors
+            </button>
+          </nav>
+        </div>
 
-        {/* Main content area */}
-        <main className="flex-1 p-6">
-          <ErrorHistory />
-        </main>
-      </div>
-    </div>
+        {/* Tab Content */}
+        <div className="mt-6">
+          {activeTab === 'errors' && <ErrorHistory />}
+          {activeTab === 'logs' && <LogHistory />}
+        </div>
+      </main>
+
+      {/* Right Sidebar for Summary */}
+      <RightSidebar
+        isOpen={showSummary}
+        onClose={() => setShowSummary(false)}
+        title="Summary"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {activeTab === 'logs' ? 'API Logs' : 'Errors'} Statistics
+            </h3>
+            <div className="space-y-4">
+              {activeTab === 'logs' ? (
+                <>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <Activity className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Logs</p>
+                        <p className="text-2xl font-semibold text-gray-900">{logs.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <CheckCircle className="h-8 w-8 text-green-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Success</p>
+                        <p className="text-2xl font-semibold text-gray-900">{logSuccessCount}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <XCircle className="h-8 w-8 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Errors</p>
+                        <p className="text-2xl font-semibold text-gray-900">{logErrorCount}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <AlertTriangle className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Total Errors</p>
+                        <p className="text-2xl font-semibold text-gray-900">{errors.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <CheckCircle className="h-8 w-8 text-green-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Resolved</p>
+                        <p className="text-2xl font-semibold text-gray-900">{errorResolvedCount}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <XCircle className="h-8 w-8 text-red-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Unresolved</p>
+                        <p className="text-2xl font-semibold text-gray-900">{errors.length - errorResolvedCount}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </RightSidebar>
+    </Layout>
   );
 };
