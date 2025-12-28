@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Download, Upload } from 'lucide-react';
+import { RefreshCw, Download, Upload, ChevronDown } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { usePolling } from '@/hooks/usePolling';
@@ -47,6 +47,7 @@ export const Dashboard: React.FC = () => {
   const [showAddLabelForm, setShowAddLabelForm] = useState(false);
   const [newLabel, setNewLabel] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
+  const [expandedLabels, setExpandedLabels] = useState(false);
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
@@ -671,7 +672,23 @@ export const Dashboard: React.FC = () => {
             {/* All Labels Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
+                  {allLabels.size > 0 && (
+                    <button
+                      onClick={() => setExpandedLabels(!expandedLabels)}
+                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 transition-colors"
+                      title={expandedLabels ? "Collapse labels" : "Expand labels"}
+                    >
+                      <ChevronDown
+                        className={classNames(
+                          'w-4 h-4 transition-transform',
+                          expandedLabels && 'rotate-180'
+                        )}
+                      />
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowAddLabelForm(!showAddLabelForm)}
                   className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -736,11 +753,19 @@ export const Dashboard: React.FC = () => {
                 </div>
               )}
 
-              <div>
+              <div
+                className={classNames(
+                  'overflow-hidden transition-all duration-300 ease-in-out',
+                  expandedLabels ? 'max-h-none' : 'max-h-[200px]'
+                )}
+              >
                 {allLabels.size === 0 ? (
                   <p className="text-sm text-gray-500">No labels found</p>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className={classNames(
+                    'flex flex-wrap gap-2',
+                    !expandedLabels && 'overflow-y-auto pr-2'
+                  )}>
                     {Array.from(allLabels.entries()).map(([key, values]) => (
                       Array.from(values).map((value) => (
                         <div
