@@ -203,6 +203,8 @@ func NewServer(config ServerConfig) *Server {
 	if err := types.RegisterUserReactionMonitorAgent(agentRegistry, reactionQueue); err != nil {
 		log.Printf("[SERVER] Warning: Failed to register user reaction monitor agent: %v\n", err)
 	}
+	// Make reaction queue globally accessible to reminder wants
+	types.SetGlobalReactionQueue(reactionQueue)
 
 	return &Server{
 		config:         config,
@@ -513,18 +515,11 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wait for wants to be added to reconcile loop (poll with timeout)
-	maxAttempts := 100
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if s.globalBuilder.AreWantsAdded(wantIDs) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
+	// Return immediately without blocking HTTP handler
+	// The reconciliation loop adds wants asynchronously
 	for _, want := range config.Wants {
 		// API-level logging for want creation
-		InfoLog("[API:CREATE] Want created: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
+		InfoLog("[API:CREATE] Want queued for addition: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
 	}
 	w.WriteHeader(http.StatusCreated)
 
@@ -860,29 +855,33 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wait for wants to be added to reconcile loop
-	maxAttempts := 100
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if s.globalBuilder.AreWantsAdded(wantIDs) {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	// Restore state for each want
-	for _, want := range config.Wants {
-		if importedWant, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
-			// Restore State
-			if want.State != nil && len(want.State) > 0 {
-				for key, value := range want.State {
-					importedWant.StoreState(key, value)
-				}
-				InfoLog("[API:IMPORT] Restored state for want %s: %d fields\n", want.Metadata.ID, len(want.State))
+	// Restore state asynchronously (non-blocking)
+	// This allows wants to be added to the system while we return response immediately
+	go func() {
+		// Wait a short time for wants to be added (with very short timeout)
+		maxAttempts := 20
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if s.globalBuilder.AreWantsAdded(wantIDs) {
+				break
 			}
-
-			// Note: HiddenState is already part of State map, so it's restored above
+			time.Sleep(5 * time.Millisecond)
 		}
-	}
+
+		// Restore state for each want
+		for _, want := range config.Wants {
+			if importedWant, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
+				// Restore State
+				if want.State != nil && len(want.State) > 0 {
+					for key, value := range want.State {
+						importedWant.StoreState(key, value)
+					}
+					InfoLog("[API:IMPORT] Restored state for want %s: %d fields\n", want.Metadata.ID, len(want.State))
+				}
+
+				// Note: HiddenState is already part of State map, so it's restored above
+			}
+		}
+	}()
 
 	// Collect want names for logging
 	wantNames := []string{}
@@ -1140,15 +1139,10 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 					ErrorLog("Failed to send deletion request: %v\n", err)
 					s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "error", http.StatusInternalServerError, err.Error(), "deletion_failed")
 				} else {
-					// Wait for want to be deleted (poll with timeout)
-					maxAttempts := 100
-					for attempt := 0; attempt < maxAttempts; attempt++ {
-						if execution.Builder.AreWantsDeleted([]string{wantID}) {
-							break
-						}
-						time.Sleep(10 * time.Millisecond)
-					}
-					s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", fmt.Sprintf("Deleted want: %s", wantNameToDelete))
+					// Return immediately without blocking HTTP handler
+					// The reconciliation loop processes deletion asynchronously
+					s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", fmt.Sprintf("Deletion queued for want: %s", wantNameToDelete))
+					InfoLog("Deletion queued asynchronously for want %s (type: %s)\n", wantID, wantTypeToDelete)
 				}
 
 				// NOTE: Do NOT call SetConfigInternal with partial execution config! API-created wants from different executions should not affect the global config. The global config is only for wants loaded from YAML files or recipe-based creation. Calling SetConfigInternal here with an incomplete config causes other wants to be deleted incorrectly.
@@ -1181,18 +1175,10 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Wait for want to be deleted (poll with timeout)
-			maxAttempts := 100
-			for attempt := 0; attempt < maxAttempts; attempt++ {
-				if s.globalBuilder.AreWantsDeleted([]string{wantID}) {
-					InfoLog("Want %s deletion confirmed from global builder\n", wantID)
-					break
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-
-			InfoLog("Successfully deleted want from global builder\n")
-			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deleted from global builder")
+			// Return immediately without blocking HTTP handler
+			// The reconciliation loop processes deletion asynchronously
+			InfoLog("Deletion queued asynchronously for want %s from global builder\n", wantID)
+			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued from global builder")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -1496,68 +1482,50 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract want ID from URL path
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Search for the want by metadata.id across all executions
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if _, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Suspend the specific want execution
-				if err := execution.Builder.SuspendWant(wantID); err != nil {
-					errorMsg := fmt.Sprintf("Failed to suspend want execution: %v", err)
-					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusInternalServerError, errorMsg, "suspension_failed")
-					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(map[string]string{
-						"error": errorMsg,
-					})
-					return
-				}
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "success", http.StatusOK, "", "Want suspended")
-				response := map[string]any{
-					"message":   "Want execution suspended successfully",
-					"wantId":    wantID,
-					"suspended": true,
-					"timestamp": time.Now().Format(time.RFC3339),
-				}
-				json.NewEncoder(w).Encode(response)
-				return
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
+				found = true
+				break
 			}
 		}
 	}
-
-	// If not found in executions, also search in global builder (for wants loaded from memory file)
-	if s.globalBuilder != nil {
-		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Suspend the specific want execution
-			if err := s.globalBuilder.SuspendWant(wantID); err != nil {
-				errorMsg := fmt.Sprintf("Failed to suspend want execution: %v", err)
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusInternalServerError, errorMsg, "suspension_failed")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": errorMsg,
-				})
-				return
-			}
-			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "success", http.StatusOK, "", "Want suspended")
-			response := map[string]any{
-				"message":   "Want execution suspended successfully",
-				"wantId":    wantID,
-				"suspended": true,
-				"timestamp": time.Now().Format(time.RFC3339),
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	// Check in global builder
+	if !found && s.globalBuilder != nil {
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
+			found = true
 		}
 	}
 
-	// Want not found
-	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": errorMsg,
+	if !found {
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	// Queue suspension operation
+	if err := s.globalBuilder.QueueWantSuspend([]string{wantID}); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue suspension: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/suspend", wantID, "success", http.StatusAccepted, "", "Suspension queued")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message":   "Suspension operation queued",
+		"wantId":    wantID,
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
@@ -1565,68 +1533,50 @@ func (s *Server) suspendWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract want ID from URL path
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Search for the want by metadata.id across all executions
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if _, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Resume the specific want execution
-				if err := execution.Builder.ResumeWant(wantID); err != nil {
-					errorMsg := fmt.Sprintf("Failed to resume want execution: %v", err)
-					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusInternalServerError, errorMsg, "resume_failed")
-					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(map[string]string{
-						"error": errorMsg,
-					})
-					return
-				}
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "success", http.StatusOK, "", "Want resumed")
-				response := map[string]any{
-					"message":   "Want execution resumed successfully",
-					"wantId":    wantID,
-					"suspended": false,
-					"timestamp": time.Now().Format(time.RFC3339),
-				}
-				json.NewEncoder(w).Encode(response)
-				return
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
+				found = true
+				break
 			}
 		}
 	}
-
-	// If not found in executions, also search in global builder (for wants loaded from memory file)
-	if s.globalBuilder != nil {
-		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Resume the specific want execution
-			if err := s.globalBuilder.ResumeWant(wantID); err != nil {
-				errorMsg := fmt.Sprintf("Failed to resume want execution: %v", err)
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusInternalServerError, errorMsg, "resume_failed")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": errorMsg,
-				})
-				return
-			}
-			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "success", http.StatusOK, "", "Want resumed")
-			response := map[string]any{
-				"message":   "Want execution resumed successfully",
-				"wantId":    wantID,
-				"suspended": false,
-				"timestamp": time.Now().Format(time.RFC3339),
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	// Check in global builder
+	if !found && s.globalBuilder != nil {
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
+			found = true
 		}
 	}
 
-	// Want not found
-	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": errorMsg,
+	if !found {
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	// Queue resume operation
+	if err := s.globalBuilder.QueueWantResume([]string{wantID}); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue resume: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/resume", wantID, "success", http.StatusAccepted, "", "Resume queued")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message":   "Resume operation queued",
+		"wantId":    wantID,
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
@@ -1634,68 +1584,50 @@ func (s *Server) resumeWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract want ID from URL path
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Search for the want by metadata.id across all executions
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if _, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Stop the specific want execution
-				if err := execution.Builder.StopWant(wantID); err != nil {
-					errorMsg := fmt.Sprintf("Failed to stop want execution: %v", err)
-					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusInternalServerError, errorMsg, "stop_failed")
-					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(map[string]string{
-						"error": errorMsg,
-					})
-					return
-				}
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "success", http.StatusOK, "", "Want stopped")
-				response := map[string]any{
-					"message":   "Want execution stopped successfully",
-					"wantId":    wantID,
-					"status":    "stopped",
-					"timestamp": time.Now().Format(time.RFC3339),
-				}
-				json.NewEncoder(w).Encode(response)
-				return
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
+				found = true
+				break
 			}
 		}
 	}
-
-	// If not found in executions, also search in global builder (for wants loaded from memory file)
-	if s.globalBuilder != nil {
-		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Stop the specific want execution
-			if err := s.globalBuilder.StopWant(wantID); err != nil {
-				errorMsg := fmt.Sprintf("Failed to stop want execution: %v", err)
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusInternalServerError, errorMsg, "stop_failed")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": errorMsg,
-				})
-				return
-			}
-			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "success", http.StatusOK, "", "Want stopped")
-			response := map[string]any{
-				"message":   "Want execution stopped successfully",
-				"wantId":    wantID,
-				"status":    "stopped",
-				"timestamp": time.Now().Format(time.RFC3339),
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	// Check in global builder
+	if !found && s.globalBuilder != nil {
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
+			found = true
 		}
 	}
 
-	// Want not found
-	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": errorMsg,
+	if !found {
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	// Queue stop operation
+	if err := s.globalBuilder.QueueWantStop([]string{wantID}); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue stop: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/stop", wantID, "success", http.StatusAccepted, "", "Stop queued")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message":   "Stop operation queued",
+		"wantId":    wantID,
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
@@ -1703,68 +1635,50 @@ func (s *Server) stopWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract want ID from URL path
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	// Search for the want by metadata.id across all executions
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if _, _, found := execution.Builder.FindWantByID(wantID); found {
-				// Restart the specific want execution
-				if err := execution.Builder.RestartWant(wantID); err != nil {
-					errorMsg := fmt.Sprintf("Failed to restart want execution: %v", err)
-					s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusInternalServerError, errorMsg, "start_failed")
-					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(map[string]string{
-						"error": errorMsg,
-					})
-					return
-				}
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "success", http.StatusOK, "", "Want started")
-				response := map[string]any{
-					"message":   "Want execution restarted successfully",
-					"wantId":    wantID,
-					"status":    "running",
-					"timestamp": time.Now().Format(time.RFC3339),
-				}
-				json.NewEncoder(w).Encode(response)
-				return
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
+				found = true
+				break
 			}
 		}
 	}
-
-	// If not found in executions, also search in global builder (for wants loaded from memory file)
-	if s.globalBuilder != nil {
-		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Restart the specific want execution
-			if err := s.globalBuilder.RestartWant(wantID); err != nil {
-				errorMsg := fmt.Sprintf("Failed to restart want execution: %v", err)
-				s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusInternalServerError, errorMsg, "start_failed")
-				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{
-					"error": errorMsg,
-				})
-				return
-			}
-			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "success", http.StatusOK, "", "Want started")
-			response := map[string]any{
-				"message":   "Want execution restarted successfully",
-				"wantId":    wantID,
-				"status":    "running",
-				"timestamp": time.Now().Format(time.RFC3339),
-			}
-			json.NewEncoder(w).Encode(response)
-			return
+	// Check in global builder
+	if !found && s.globalBuilder != nil {
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
+			found = true
 		}
 	}
 
-	// Want not found
-	errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": errorMsg,
+	if !found {
+		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	// Queue start operation
+	if err := s.globalBuilder.QueueWantStart([]string{wantID}); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue start: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/start", wantID, "success", http.StatusAccepted, "", "Start queued")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message":   "Start operation queued",
+		"wantId":    wantID,
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
@@ -1791,45 +1705,44 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Search for the want by metadata.id across all executions
-	var targetWant *mywant.Want
-	var found bool
-
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
-				targetWant = want
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
 				found = true
 				break
 			}
 		}
 	}
-
-	// If not found in executions, search in global builder
+	// Check in global builder
 	if !found && s.globalBuilder != nil {
-		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
-			targetWant = want
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
 			found = true
 		}
 	}
 
-	if !found || targetWant == nil {
+	if !found {
 		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
 		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
-	if targetWant.Metadata.Labels == nil {
-		targetWant.Metadata.Labels = make(map[string]string)
-	}
-	targetWant.Metadata.Labels[labelReq.Key] = labelReq.Value
 
-	// Update the metadata timestamp
-	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "success", http.StatusOK, "", fmt.Sprintf("Added label %s=%s", labelReq.Key, labelReq.Value))
-	w.WriteHeader(http.StatusOK)
+	// Queue add label operation
+	if err := s.globalBuilder.QueueWantAddLabel(wantID, labelReq.Key, labelReq.Value); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue add label: %v", err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/{id}/labels", wantID, "success", http.StatusAccepted, "", fmt.Sprintf("Add label queued %s=%s", labelReq.Key, labelReq.Value))
+	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]any{
-		"message":   "Label added successfully",
+		"message":   "Add label operation queued",
 		"wantId":    wantID,
 		"key":       labelReq.Key,
 		"value":     labelReq.Value,
@@ -1843,44 +1756,44 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 	wantID := vars["id"]
 	keyToRemove := vars["key"]
 
-	// Search for the want by metadata.id across all executions
-	var targetWant *mywant.Want
-	var found bool
-
+	// Verify want exists before queuing operation
+	found := false
+	// Check in executions
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if want, _, foundInExecution := execution.Builder.FindWantByID(wantID); foundInExecution {
-				targetWant = want
+			if _, _, ok := execution.Builder.FindWantByID(wantID); ok {
 				found = true
 				break
 			}
 		}
 	}
-
-	// If not found in executions, search in global builder
+	// Check in global builder
 	if !found && s.globalBuilder != nil {
-		if want, _, foundInGlobal := s.globalBuilder.FindWantByID(wantID); foundInGlobal {
-			targetWant = want
+		if _, _, ok := s.globalBuilder.FindWantByID(wantID); ok {
 			found = true
 		}
 	}
 
-	if !found || targetWant == nil {
+	if !found {
 		errorMsg := fmt.Sprintf("Want with ID %s not found", wantID)
 		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
-	if targetWant.Metadata.Labels != nil {
-		delete(targetWant.Metadata.Labels, keyToRemove)
+
+	// Queue remove label operation
+	if err := s.globalBuilder.QueueWantRemoveLabel(wantID, keyToRemove); err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue remove label: %v", err)
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "error", http.StatusConflict, errorMsg, "queue_full")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": errorMsg})
+		return
 	}
 
-	// Update the metadata timestamp
-	targetWant.Metadata.UpdatedAt = time.Now().Unix()
-	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Removed label %s", keyToRemove))
-	w.WriteHeader(http.StatusOK)
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}/labels/{key}", wantID, "success", http.StatusAccepted, "", fmt.Sprintf("Remove label queued %s", keyToRemove))
+	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]any{
-		"message":   "Label removed successfully",
+		"message":   "Remove label operation queued",
 		"wantId":    wantID,
 		"key":       keyToRemove,
 		"timestamp": time.Now().Format(time.RFC3339),
