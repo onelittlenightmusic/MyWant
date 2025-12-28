@@ -1,0 +1,8 @@
+wants:
+  - metadata:
+      name: date_command
+      type: execution_result
+    spec:
+      params:
+        command: "date"
+        timeout: 10

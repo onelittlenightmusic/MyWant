@@ -90,7 +90,7 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main content */}
       <div className={classNames(
         "flex-1 flex flex-col relative transition-all duration-300 ease-in-out min-w-0",
-        sidebarMinimized ? "lg:ml-20" : "lg:ml-64"
+        sidebarMinimized ? "lg:ml-20" : "lg:ml-44"
       )}>
         <div className="flex-1 flex flex-col min-w-0">
           {children}

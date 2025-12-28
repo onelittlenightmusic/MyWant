@@ -111,6 +111,34 @@ type OllamaResponse struct {
 	EvalDuration       int64  `json:"eval_duration,omitempty"`
 }
 
+// ValidationResult represents the complete validation response
+type ValidationResult struct {
+	Valid       bool                 `json:"valid"`
+	FatalErrors []ValidationError    `json:"fatalErrors"`
+	Warnings    []ValidationWarning  `json:"warnings"`
+	WantCount   int                  `json:"wantCount"`
+	ValidatedAt string               `json:"validatedAt"`
+}
+
+// ValidationError represents a fatal validation error
+type ValidationError struct {
+	WantName  string `json:"wantName,omitempty"`
+	ErrorType string `json:"errorType"`
+	Field     string `json:"field,omitempty"`
+	Message   string `json:"message"`
+	Details   string `json:"details,omitempty"`
+}
+
+// ValidationWarning represents a non-fatal issue
+type ValidationWarning struct {
+	WantName     string   `json:"wantName"`
+	WarningType  string   `json:"warningType"`
+	Field        string   `json:"field,omitempty"`
+	Message      string   `json:"message"`
+	Suggestion   string   `json:"suggestion,omitempty"`
+	RelatedWants []string `json:"relatedWants,omitempty"`
+}
+
 func buildWantResponse(want *mywant.Want, groupBy string) any {
 	response := &WantResponseWithGroupedAgents{
 		Metadata: want.Metadata,
@@ -212,6 +240,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("", s.createWant).Methods("POST")
 	wants.HandleFunc("", s.listWants).Methods("GET")
 	wants.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/validate", s.validateWant).Methods("POST")
+	wants.HandleFunc("/validate", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/export", s.exportWants).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/import", s.importWants).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
@@ -509,6 +539,83 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
+}
+
+// validateWant handles POST /api/v1/wants/validate - validates want configuration without deployment
+func (s *Server) validateWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Read request body
+	var buf bytes.Buffer
+	io.Copy(&buf, r.Body)
+	data := buf.Bytes()
+
+	result := ValidationResult{
+		Valid:       true,
+		FatalErrors: make([]ValidationError, 0),
+		Warnings:    make([]ValidationWarning, 0),
+		ValidatedAt: time.Now().Format(time.RFC3339),
+	}
+
+	// Step 1: Parse YAML/JSON (Fatal: syntax errors)
+	var config mywant.Config
+	var parseErr error
+
+	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+		parseErr = yaml.Unmarshal(data, &config)
+	} else {
+		parseErr = json.Unmarshal(data, &config)
+	}
+
+	if parseErr != nil || len(config.Wants) == 0 {
+		// Try parsing as single Want
+		var newWant *mywant.Want
+
+		if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+			parseErr = yaml.Unmarshal(data, &newWant)
+		} else {
+			parseErr = json.Unmarshal(data, &newWant)
+		}
+
+		if parseErr != nil || newWant == nil {
+			result.Valid = false
+			result.FatalErrors = append(result.FatalErrors, ValidationError{
+				ErrorType: "syntax",
+				Message:   "Invalid YAML/JSON syntax",
+				Details:   fmt.Sprintf("%v", parseErr),
+			})
+			statusCode := http.StatusBadRequest
+			w.WriteHeader(statusCode)
+			json.NewEncoder(w).Encode(result)
+			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/validate", "", "error", statusCode, "Syntax error", "validation")
+			return
+		}
+		config = mywant.Config{Wants: []*mywant.Want{newWant}}
+	}
+
+	result.WantCount = len(config.Wants)
+
+	// Step 2: Fatal error checks
+	s.collectFatalErrors(&config, &result)
+
+	// Step 3: Warning checks (only if no fatal errors)
+	if result.Valid {
+		s.collectWarnings(&config, &result)
+	}
+
+	// Return validation result
+	statusCode := http.StatusOK
+	if !result.Valid {
+		statusCode = http.StatusBadRequest
+	}
+
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(result)
+
+	// Log validation request
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/validate",
+		fmt.Sprintf("%d wants", result.WantCount),
+		"success", statusCode, "", "")
 }
 
 // listWants handles GET /api/v1/wants - lists all wants in memory dump format
@@ -2044,6 +2151,381 @@ func (s *Server) validateWantSpec(config mywant.Config) error {
 		}
 	}
 	return nil
+}
+
+// collectFatalErrors performs all fatal validation checks
+func (s *Server) collectFatalErrors(config *mywant.Config, result *ValidationResult) {
+	for _, want := range config.Wants {
+		wantName := want.Metadata.Name
+		if wantName == "" {
+			wantName = want.Metadata.Type
+		}
+
+		// Check 1: Want type exists (if not using recipe)
+		if want.Spec.Recipe == "" {
+			if err := s.validateWantType(want); err != nil {
+				result.Valid = false
+				result.FatalErrors = append(result.FatalErrors, ValidationError{
+					WantName:  wantName,
+					ErrorType: "want_type",
+					Field:     "metadata.type",
+					Message:   fmt.Sprintf("Want type '%s' does not exist", want.Metadata.Type),
+					Details:   err.Error(),
+				})
+			}
+		}
+
+		// Check 2: Recipe file exists (if using recipe)
+		if want.Spec.Recipe != "" {
+			if err := s.validateRecipeExists(want.Spec.Recipe); err != nil {
+				result.Valid = false
+				result.FatalErrors = append(result.FatalErrors, ValidationError{
+					WantName:  wantName,
+					ErrorType: "recipe",
+					Field:     "spec.recipe",
+					Message:   fmt.Sprintf("Recipe file '%s' does not exist", want.Spec.Recipe),
+					Details:   err.Error(),
+				})
+			}
+		}
+
+		// Check 3: Empty selector/label keys
+		if err := s.validateSelectors(want); err != nil {
+			result.Valid = false
+			result.FatalErrors = append(result.FatalErrors, ValidationError{
+				WantName:  wantName,
+				ErrorType: "selector",
+				Field:     "spec.using or metadata.labels",
+				Message:   "Empty keys in selectors or labels",
+				Details:   err.Error(),
+			})
+		}
+
+		// Check 4: Required parameters missing (skip for recipe wants)
+		if want.Spec.Recipe == "" {
+			if errs := s.validateRequiredParameters(want); len(errs) > 0 {
+				result.Valid = false
+				for _, err := range errs {
+					result.FatalErrors = append(result.FatalErrors, err)
+				}
+			}
+		}
+	}
+}
+
+// validateWantType checks if want type exists
+func (s *Server) validateWantType(want *mywant.Want) error {
+	wantType := want.Metadata.Type
+
+	if wantType == "" {
+		return fmt.Errorf("want type is empty")
+	}
+
+	testWant := &mywant.Want{
+		Metadata: mywant.Metadata{
+			Name: want.Metadata.Name,
+			Type: wantType,
+		},
+		Spec: mywant.WantSpec{
+			Params: make(map[string]any),
+		},
+	}
+
+	_, err := s.globalBuilder.TestCreateWantFunction(testWant)
+	return err
+}
+
+// validateRecipeExists checks if recipe file exists
+func (s *Server) validateRecipeExists(recipePath string) error {
+	// Try with recipes/ prefix if not absolute
+	fullPath := recipePath
+	if !strings.HasPrefix(recipePath, "/") {
+		fullPath = fmt.Sprintf("recipes/%s", recipePath)
+	}
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return fmt.Errorf("recipe file not found: %s", fullPath)
+	}
+
+	return nil
+}
+
+// validateSelectors checks for empty keys
+func (s *Server) validateSelectors(want *mywant.Want) error {
+	// Check using selectors
+	for i, selector := range want.Spec.Using {
+		for key := range selector {
+			if key == "" {
+				return fmt.Errorf("using[%d] has empty selector key", i)
+			}
+		}
+	}
+
+	// Check labels
+	for key := range want.Metadata.Labels {
+		if key == "" {
+			return fmt.Errorf("labels has empty key")
+		}
+	}
+
+	return nil
+}
+
+// validateRequiredParameters checks if all required parameters are provided
+func (s *Server) validateRequiredParameters(want *mywant.Want) []ValidationError {
+	errors := make([]ValidationError, 0)
+
+	// Get want type definition
+	if s.wantTypeLoader == nil {
+		return errors
+	}
+
+	typeDef := s.wantTypeLoader.GetDefinition(want.Metadata.Type)
+	if typeDef == nil {
+		return errors
+	}
+
+	// Check each required parameter
+	for _, paramDef := range typeDef.Parameters {
+		if paramDef.Required {
+			if _, exists := want.Spec.Params[paramDef.Name]; !exists {
+				errors = append(errors, ValidationError{
+					WantName:  want.Metadata.Name,
+					ErrorType: "parameter",
+					Field:     fmt.Sprintf("spec.params.%s", paramDef.Name),
+					Message:   fmt.Sprintf("Required parameter '%s' is missing", paramDef.Name),
+					Details:   paramDef.Description,
+				})
+			}
+		}
+	}
+
+	return errors
+}
+
+// collectWarnings performs all non-fatal validation checks
+func (s *Server) collectWarnings(config *mywant.Config, result *ValidationResult) {
+	for _, want := range config.Wants {
+		wantName := want.Metadata.Name
+		if wantName == "" {
+			wantName = want.Metadata.Type
+		}
+
+		// Warning 1: Using dependencies not satisfied
+		if warnings := s.checkDependencySatisfaction(want); len(warnings) > 0 {
+			result.Warnings = append(result.Warnings, warnings...)
+		}
+
+		// Warning 2: Connectivity requirements not met
+		if warnings := s.checkConnectivityRequirements(want); len(warnings) > 0 {
+			result.Warnings = append(result.Warnings, warnings...)
+		}
+
+		// Warning 3: Parameter type mismatches (skip for recipe wants)
+		if want.Spec.Recipe == "" {
+			if warnings := s.checkParameterTypes(want); len(warnings) > 0 {
+				result.Warnings = append(result.Warnings, warnings...)
+			}
+		}
+	}
+}
+
+// checkDependencySatisfaction checks if using dependencies are satisfied
+func (s *Server) checkDependencySatisfaction(want *mywant.Want) []ValidationWarning {
+	warnings := make([]ValidationWarning, 0)
+
+	if len(want.Spec.Using) == 0 {
+		return warnings
+	}
+
+	// Get all currently deployed wants
+	deployedWants := s.globalBuilder.GetAllWantStates()
+
+	for i, selector := range want.Spec.Using {
+		matched := false
+
+		for _, deployed := range deployedWants {
+			if s.matchesSelector(deployed.Metadata.Labels, selector) {
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			selectorStr := fmt.Sprintf("%v", selector)
+			warnings = append(warnings, ValidationWarning{
+				WantName:    want.Metadata.Name,
+				WarningType: "dependency",
+				Field:       fmt.Sprintf("spec.using[%d]", i),
+				Message:     fmt.Sprintf("No deployed wants match selector: %s", selectorStr),
+				Suggestion:  "Deploy wants with matching labels before deploying this want",
+			})
+		}
+	}
+
+	return warnings
+}
+
+// matchesSelector checks if labels match selector
+func (s *Server) matchesSelector(labels map[string]string, selector map[string]string) bool {
+	for key, value := range selector {
+		if labels[key] != value {
+			return false
+		}
+	}
+	return true
+}
+
+// checkConnectivityRequirements checks if connectivity requirements are met
+func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWarning {
+	warnings := make([]ValidationWarning, 0)
+
+	// Get want type definition for connectivity requirements
+	if s.wantTypeLoader == nil {
+		return warnings
+	}
+
+	typeDef := s.wantTypeLoader.GetDefinition(want.Metadata.Type)
+	if typeDef == nil || typeDef.Require == nil {
+		return warnings
+	}
+
+	// Convert RequireSpec to ConnectivityMetadata
+	connMeta := typeDef.Require.ToConnectivityMetadata(want.Metadata.Type)
+
+	// Simulate path generation to check connectivity
+	deployedWants := s.globalBuilder.GetAllWantStates()
+
+	// Count potential inputs (wants that this want uses via using selectors)
+	inputCount := 0
+	for _, selector := range want.Spec.Using {
+		for _, deployed := range deployedWants {
+			if s.matchesSelector(deployed.Metadata.Labels, selector) {
+				inputCount++
+				break
+			}
+		}
+	}
+
+	// Count potential outputs (wants that use this want's labels)
+	outputCount := 0
+	for _, deployed := range deployedWants {
+		for _, deployedSelector := range deployed.Spec.Using {
+			if s.matchesSelector(want.Metadata.Labels, deployedSelector) {
+				outputCount++
+				break
+			}
+		}
+	}
+
+	// Check connectivity requirements
+	if connMeta.RequiredInputs > 0 && inputCount < connMeta.RequiredInputs {
+		warnings = append(warnings, ValidationWarning{
+			WantName:    want.Metadata.Name,
+			WarningType: "connectivity",
+			Field:       "spec.using",
+			Message:     fmt.Sprintf("Requires %d input connection(s), but may only have %d", connMeta.RequiredInputs, inputCount),
+			Suggestion:  "Ensure upstream wants with matching labels are deployed",
+		})
+	}
+
+	if connMeta.RequiredOutputs > 0 && outputCount < connMeta.RequiredOutputs {
+		warnings = append(warnings, ValidationWarning{
+			WantName:    want.Metadata.Name,
+			WarningType: "connectivity",
+			Field:       "metadata.labels",
+			Message:     fmt.Sprintf("Requires %d output connection(s), but may only have %d", connMeta.RequiredOutputs, outputCount),
+			Suggestion:  "Ensure downstream wants that depend on this want are deployed",
+		})
+	}
+
+	return warnings
+}
+
+// checkParameterTypes checks for parameter type mismatches
+func (s *Server) checkParameterTypes(want *mywant.Want) []ValidationWarning {
+	warnings := make([]ValidationWarning, 0)
+
+	if s.wantTypeLoader == nil {
+		return warnings
+	}
+
+	typeDef := s.wantTypeLoader.GetDefinition(want.Metadata.Type)
+	if typeDef == nil {
+		return warnings
+	}
+
+	// Build parameter definition map
+	paramDefs := make(map[string]*mywant.ParameterDef)
+	for i := range typeDef.Parameters {
+		paramDefs[typeDef.Parameters[i].Name] = &typeDef.Parameters[i]
+	}
+
+	// Check each provided parameter
+	for paramName, paramValue := range want.Spec.Params {
+		paramDef, exists := paramDefs[paramName]
+		if !exists {
+			continue
+		}
+
+		// Simple type checking
+		expectedType := paramDef.Type
+		actualType := s.getGoType(paramValue)
+
+		if !s.isTypeCompatible(expectedType, actualType) {
+			warnings = append(warnings, ValidationWarning{
+				WantName:    want.Metadata.Name,
+				WarningType: "parameter_type",
+				Field:       fmt.Sprintf("spec.params.%s", paramName),
+				Message:     fmt.Sprintf("Parameter type mismatch: expected %s, got %s", expectedType, actualType),
+				Suggestion:  fmt.Sprintf("Convert value to %s type", expectedType),
+			})
+		}
+	}
+
+	return warnings
+}
+
+// getGoType returns the Go type name of a value
+func (s *Server) getGoType(value any) string {
+	if value == nil {
+		return "nil"
+	}
+
+	switch value.(type) {
+	case bool:
+		return "bool"
+	case float64:
+		return "float64"
+	case string:
+		return "string"
+	case []any:
+		return "[]any"
+	case map[string]any:
+		return "map[string]any"
+	default:
+		return fmt.Sprintf("%T", value)
+	}
+}
+
+// isTypeCompatible checks if types are compatible
+func (s *Server) isTypeCompatible(expected, actual string) bool {
+	if expected == actual {
+		return true
+	}
+
+	// Allow numeric conversions
+	numericTypes := map[string]bool{"int": true, "int64": true, "float64": true}
+	if numericTypes[expected] && numericTypes[actual] {
+		return true
+	}
+
+	// JSON unmarshals numbers as float64
+	if expected == "int" && actual == "float64" {
+		return true
+	}
+
+	return false
 }
 
 // ======= ERROR HISTORY HANDLERS =======

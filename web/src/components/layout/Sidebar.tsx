@@ -99,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={classNames(
         'fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transform transition-all duration-300 ease-in-out lg:flex lg:flex-col lg:h-screen',
         isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-        isMinimized ? 'w-20' : 'w-64'
+        isMinimized ? 'w-20' : 'w-44'
       )}>
         <div className="flex flex-col h-full">
           {/* Mobile Header */}

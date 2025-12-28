@@ -1,0 +1,266 @@
+wantType:
+  metadata:
+    name: reminder
+    title: Reminder Notification
+    description: |
+      Sends a reminder notification at a scheduled time with optional user reaction.
+
+      Supports both one-time and recurring reminders through the when specification.
+      The reminder goes through three phases: waiting (until reaching_time), reaching
+      (sending notification and optionally waiting for reaction), and completed.
+
+      The 'ahead' parameter allows sending the reminder N time units before the
+      scheduled event time. For example, with event_time at 14:00 and ahead: "10 minutes",
+      the reminder enters the reaching phase at 13:50.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: message
+    description: Reminder message to display
+    type: string
+    required: true
+    example: "Team meeting in 10 minutes"
+
+  - name: ahead
+    description: How much time before the event to trigger the reminder
+    type: string
+    default: "5 minutes"
+    required: false
+    validation:
+      pattern: '\d+ (seconds|minutes|hours|days)'
+    example: "10 minutes"
+
+  - name: event_time
+    description: |
+      RFC3339 formatted time for the scheduled event.
+      Either event_time or when spec (recurring) must be provided.
+    type: string
+    required: false
+    example: "2025-12-28T14:00:00Z"
+
+  - name: require_reaction
+    description: |
+      If true, reminder requires user approval/rejection via API.
+      If false, reminder auto-completes after reaching the event time.
+    type: bool
+    default: false
+    required: false
+    example: true
+
+  - name: reaction_type
+    description: Type of reaction channel (internal API by default)
+    type: string
+    default: "internal"
+    required: false
+    validation:
+      enum:
+      - internal
+      - slack
+      - webhook
+    example: "internal"
+
+  state:
+  - name: reminder_phase
+    description: Current phase of the reminder (waiting, reaching, completed, failed)
+    type: string
+    persistent: true
+    initialValue: waiting
+    example: reaching
+
+  - name: message
+    description: The reminder message
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "Team meeting in 10 minutes"
+
+  - name: ahead
+    description: Duration string for advance notification (e.g., "5 minutes")
+    type: string
+    persistent: true
+    initialValue: "5 minutes"
+    example: "10 minutes"
+
+  - name: event_time
+    description: RFC3339 timestamp of the scheduled event
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "2025-12-28T14:00:00Z"
+
+  - name: reaching_time
+    description: RFC3339 timestamp when reminder enters reaching phase
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "2025-12-28T13:50:00Z"
+
+  - name: reaction_id
+    description: Unique identifier for tracking user reactions
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'reminder-meeting-1735376400123'
+
+  - name: require_reaction
+    description: Whether user reaction is required
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+
+  - name: reaction_type
+    description: Type of reaction channel
+    type: string
+    persistent: true
+    initialValue: 'internal'
+    example: 'slack'
+
+  - name: user_reaction
+    description: User's reaction (written by MonitorAgent)
+    type: object
+    persistent: true
+    initialValue: {}
+    example: '{"approved": true, "comment": "Approved"}'
+
+  - name: reaction_result
+    description: Result of user reaction (approved or rejected)
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'approved'
+
+  - name: timeout
+    description: Whether the reminder timed out waiting for reaction
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+
+  - name: auto_completed
+    description: Whether the reminder auto-completed without requiring reaction
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+
+  - name: error_message
+    description: Error message if reminder failed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'Invalid event_time format'
+
+  constraints:
+  - description: Message parameter is required
+    validation: message must not be empty
+
+  - description: Either event_time or when spec must be provided
+    validation: event_time or when specification required
+
+  - description: Ahead parameter must be valid duration
+    validation: ahead must match pattern like "5 minutes", "10 seconds", etc
+
+  - description: require_reaction must be boolean
+    validation: require_reaction must be true or false
+
+  examples:
+  - name: Simple Auto-Complete Reminder
+    description: One-time reminder that auto-completes without requiring user reaction
+    expectedBehavior: |
+      1. Reminder initialized with event_time and ahead parameters
+      2. ReminderSchedulerAgent monitors for reaching_time
+      3. At reaching_time, reminder_phase transitions to "reaching"
+      4. No reaction required, so at event_time reminder auto-completes
+      5. reminder_phase transitions to "completed"
+    want:
+      metadata:
+        name: simple_reminder
+        type: reminder
+      spec:
+        params:
+          message: "Team meeting in 10 minutes"
+          ahead: "10 minutes"
+          event_time: "2025-12-28T14:00:00Z"
+          require_reaction: false
+
+  - name: Reminder Requiring Approval
+    description: Reminder that requires user approval via API before completing
+    expectedBehavior: |
+      1. Reminder initializes with require_reaction: true
+      2. At reaching_time, reminder_phase transitions to "reaching"
+      3. MonitorAgent waits for user reaction via /api/v1/reactions/{reaction_id}
+      4. User submits POST /api/v1/reactions with {"approved": true}
+      5. MonitorAgent detects reaction and updates user_reaction state
+      6. Progress() processes reaction and transitions to "completed"
+      7. If no reaction within 5 minutes, transitions to "failed"
+    want:
+      metadata:
+        name: deployment_approval
+        type: reminder
+      spec:
+        params:
+          message: "Please approve production deployment"
+          ahead: "5 minutes"
+          event_time: "2025-12-28T15:00:00Z"
+          require_reaction: true
+
+  - name: Recurring Daily Reminder
+    description: Reminder that recurs daily at a specific time
+    expectedBehavior: |
+      1. Reminder initialized with when spec instead of event_time
+      2. SchedulerAgent calculates next execution time (next 9:00 AM)
+      3. Each day at 08:55 AM (5 min ahead), reminder enters reaching phase
+      4. At 09:00 AM, reminder auto-completes
+      5. SchedulerAgent restarts reminder for next day at 9:00 AM
+      6. Cycle repeats indefinitely
+    want:
+      metadata:
+        name: daily_standup
+        type: reminder
+      spec:
+        params:
+          message: "Daily standup starting in 5 minutes"
+          ahead: "5 minutes"
+          require_reaction: false
+        when:
+          - at: "9am"
+            every: "day"
+
+  - name: Recurring Weekly Reminder with Reaction
+    description: Weekly reminder that requires user acknowledgment
+    expectedBehavior: |
+      1. Every Monday at 10:00 AM, reminder is triggered
+      2. At 09:50 AM (10 min ahead), reminder enters reaching phase
+      3. Notification sent, waiting for user reaction
+      4. User must approve/reject via API within timeout period
+      5. If approved, reminder completes successfully
+      6. If rejected or timed out, reminder transitions to failed
+      7. Next Monday, new reminder instance is created
+    want:
+      metadata:
+        name: weekly_report_approval
+        type: reminder
+      spec:
+        params:
+          message: "Please review and approve the weekly report"
+          ahead: "10 minutes"
+          require_reaction: true
+          reaction_type: "internal"
+        when:
+          - at: "10am"
+            every: "week"
+
+  relatedTypes:
+  - execution_result
+  - coordinator
+
+  seeAlso:
+  - Reminder scheduling documentation
+  - User reaction API specification
+  - Recurring schedule patterns
+
+  require:
+    type: none

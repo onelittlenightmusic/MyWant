@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      name: periodic_time_display
+      type: execution_result
+      labels:
+        role: timer
+    spec:
+      params:
+        command: "date '+[%H:%M:%S] Current Time'"
+        timeout: 5
+      when:
+        - every: 10 seconds

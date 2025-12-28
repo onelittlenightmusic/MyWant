@@ -1,0 +1,64 @@
+wants:
+  - metadata:
+      name: print_time_1
+      type: execution_result
+    spec:
+      params:
+        command: "echo '[1] Current time:' && date '+%H:%M:%S'"
+        timeout: 5
+  - metadata:
+      name: wait_10_sec_1
+      type: execution_result
+    spec:
+      params:
+        command: "sleep 10"
+        timeout: 15
+  - metadata:
+      name: print_time_2
+      type: execution_result
+    spec:
+      params:
+        command: "echo '[2] Current time:' && date '+%H:%M:%S'"
+        timeout: 5
+  - metadata:
+      name: wait_10_sec_2
+      type: execution_result
+    spec:
+      params:
+        command: "sleep 10"
+        timeout: 15
+  - metadata:
+      name: print_time_3
+      type: execution_result
+    spec:
+      params:
+        command: "echo '[3] Current time:' && date '+%H:%M:%S'"
+        timeout: 5
+  - metadata:
+      name: wait_10_sec_3
+      type: execution_result
+    spec:
+      params:
+        command: "sleep 10"
+        timeout: 15
+  - metadata:
+      name: print_time_4
+      type: execution_result
+    spec:
+      params:
+        command: "echo '[4] Current time:' && date '+%H:%M:%S'"
+        timeout: 5
+  - metadata:
+      name: wait_10_sec_4
+      type: execution_result
+    spec:
+      params:
+        command: "sleep 10"
+        timeout: 15
+  - metadata:
+      name: print_time_5
+      type: execution_result
+    spec:
+      params:
+        command: "echo '[5] Current time (Final):' && date '+%H:%M:%S'"
+        timeout: 5

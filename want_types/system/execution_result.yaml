@@ -223,6 +223,27 @@ wantType:
           command: "exit 1"
           timeout: 5
 
+  - name: Periodic Date Display
+    description: Display current time every 10 seconds
+    expectedBehavior: |
+      1. Command initialized to run every 10 seconds
+      2. Executes 'date' command at each interval
+      3. Captures current date/time to stdout
+      4. Records execution details and timestamp
+      5. Repeats indefinitely until want is stopped
+    want:
+      metadata:
+        name: periodic_date_display
+        type: execution_result
+        labels:
+          role: time_printer
+      spec:
+        params:
+          command: "date '+%Y-%m-%d %H:%M:%S'"
+          timeout: 5
+        when:
+          - every: 10 seconds
+
   relatedTypes:
   - owner
   - custom_target
