@@ -170,18 +170,27 @@ wantType:
   - name: Simple Auto-Complete Reminder
     description: One-time reminder that auto-completes without requiring user reaction
     expectedBehavior: |
-      1. Reminder initialized with event_time and ahead parameters
-      2. ReminderSchedulerAgent monitors for reaching_time
-      3. At reaching_time, reminder_phase transitions to "reaching"
-      4. No reaction required, so at event_time reminder auto-completes
-      5. reminder_phase transitions to "completed"
+      AHEAD PARAMETER CALCULATION:
+      • event_time: 2025-12-28T14:00:00Z
+      • ahead: "10 minutes"
+      • reaching_time = event_time - ahead = 2025-12-28T13:50:00Z
+
+      TIMELINE:
+      1. 13:50:00 - Reminder enters "reaching" phase (notification sent)
+      2. 13:50:00-14:00:00 - Notification active for 10 minutes
+      3. 14:00:00 - reminder_phase transitions to "completed" (auto-complete)
+
+      BEHAVIOR:
+      • No user interaction required
+      • Reminder automatically completes at event_time
+      • Useful for informational alerts, countdown timers
     want:
       metadata:
-        name: simple_reminder
+        name: meeting_reminder
         type: reminder
       spec:
         params:
-          message: "Team meeting in 10 minutes"
+          message: "Team meeting starting soon"
           ahead: "10 minutes"
           event_time: "2025-12-28T14:00:00Z"
           require_reaction: false
@@ -189,13 +198,29 @@ wantType:
   - name: Reminder Requiring Approval
     description: Reminder that requires user approval via API before completing
     expectedBehavior: |
-      1. Reminder initializes with require_reaction: true
-      2. At reaching_time, reminder_phase transitions to "reaching"
-      3. MonitorAgent waits for user reaction via /api/v1/reactions/{reaction_id}
-      4. User submits POST /api/v1/reactions with {"approved": true}
-      5. MonitorAgent detects reaction and updates user_reaction state
-      6. Progress() processes reaction and transitions to "completed"
-      7. If no reaction within 5 minutes, transitions to "failed"
+      AHEAD PARAMETER CALCULATION:
+      • event_time: 2025-12-28T15:00:00Z
+      • ahead: "5 minutes"
+      • reaching_time = event_time - ahead = 2025-12-28T14:55:00Z
+
+      TIMELINE:
+      1. 14:55:00 - Reminder enters "reaching" phase
+      2. 14:55:00-15:05:00 - Awaiting user reaction (5 min timeout + 5 min buffer)
+      3. User submits: POST /api/v1/reactions/{reaction_id}
+         {"approved": true, "comment": "Approved"}
+      4. MonitorAgent detects reaction, updates state
+      5. Process() transitions to "completed"
+
+      REACTION API EXAMPLE:
+      curl -X POST /api/v1/reactions/reminder-deployment_approval-1735286100123 \
+        -H "Content-Type: application/json" \
+        -d '{"approved": true, "comment": "Approved by DevOps"}'
+
+      BEHAVIOR:
+      • Requires external approval via API call
+      • Timeout after 5 minutes with no response
+      • Can be rejected or approved via single API call
+      • Useful for critical decisions, deployments
     want:
       metadata:
         name: deployment_approval
@@ -207,22 +232,66 @@ wantType:
           event_time: "2025-12-28T15:00:00Z"
           require_reaction: true
 
+  - name: Long Advance Warning
+    description: Reminder with extended ahead time for important events
+    expectedBehavior: |
+      AHEAD PARAMETER CALCULATION:
+      • event_time: 2025-12-29T22:00:00Z
+      • ahead: "1 hours"
+      • reaching_time = event_time - ahead = 2025-12-29T21:00:00Z
+
+      TIMELINE:
+      1. 21:00:00 - Reminder enters "reaching" phase (1 hour before event)
+      2. 21:00:00-22:00:00 - Extended notification window (60 minutes)
+      3. 22:00:00 - reminder_phase transitions to "completed"
+
+      BEHAVIOR:
+      • Extended preparation time (1 hour)
+      • Useful for system maintenance, major events
+      • Gives users ample time to prepare or react
+      • Auto-completes if no reaction required
+    want:
+      metadata:
+        name: system_maintenance
+        type: reminder
+      spec:
+        params:
+          message: "System maintenance window in 1 hour - save your work"
+          ahead: "1 hours"
+          event_time: "2025-12-29T22:00:00Z"
+          require_reaction: false
+
   - name: Recurring Daily Reminder
     description: Reminder that recurs daily at a specific time
     expectedBehavior: |
-      1. Reminder initialized with when spec instead of event_time
-      2. SchedulerAgent calculates next execution time (next 9:00 AM)
-      3. Each day at 08:55 AM (5 min ahead), reminder enters reaching phase
-      4. At 09:00 AM, reminder auto-completes
-      5. SchedulerAgent restarts reminder for next day at 9:00 AM
-      6. Cycle repeats indefinitely
+      WHEN SPECIFICATION:
+      • at: "9am" - Execute at 9:00 AM daily
+      • every: "day" - Repeat pattern
+
+      AHEAD PARAMETER CALCULATION (each day):
+      • event_time: 9:00 AM
+      • ahead: "5 minutes"
+      • reaching_time = 08:55 AM (each day)
+
+      DAILY TIMELINE:
+      1. 08:55:00 - Reminder enters "reaching" phase
+      2. 08:55:00-09:00:00 - Notification active for 5 minutes
+      3. 09:00:00 - reminder_phase transitions to "completed"
+      4. SchedulerAgent restarts for next day's 09:00 AM
+      5. Cycle repeats indefinitely
+
+      BEHAVIOR:
+      • Automatically recurring each day
+      • Same notification time each day
+      • Useful for daily standups, status checks
+      • No manual intervention needed
     want:
       metadata:
         name: daily_standup
         type: reminder
       spec:
         params:
-          message: "Daily standup starting in 5 minutes"
+          message: "Daily standup meeting in 5 minutes"
           ahead: "5 minutes"
           require_reaction: false
         when:
@@ -232,13 +301,33 @@ wantType:
   - name: Recurring Weekly Reminder with Reaction
     description: Weekly reminder that requires user acknowledgment
     expectedBehavior: |
-      1. Every Monday at 10:00 AM, reminder is triggered
-      2. At 09:50 AM (10 min ahead), reminder enters reaching phase
-      3. Notification sent, waiting for user reaction
-      4. User must approve/reject via API within timeout period
-      5. If approved, reminder completes successfully
-      6. If rejected or timed out, reminder transitions to failed
-      7. Next Monday, new reminder instance is created
+      WHEN SPECIFICATION:
+      • at: "10am" - Execute at 10:00 AM
+      • every: "week" - Repeat weekly (default Monday)
+
+      AHEAD PARAMETER CALCULATION (weekly):
+      • event_time: 10:00 AM every Monday
+      • ahead: "10 minutes"
+      • reaching_time = 09:50 AM (Mondays)
+
+      WEEKLY TIMELINE:
+      Monday:
+      1. 09:50:00 - Reminder enters "reaching" phase
+      2. 09:50:00-10:05:00 - Awaiting user reaction
+      3. User submits via: POST /api/v1/reactions/{reaction_id}
+      4. If approved: reminder_phase = "completed"
+      5. If rejected or timeout: reminder_phase = "failed"
+      6. Next Monday, new reminder instance created
+
+      REACTION TIMEOUT:
+      • Default timeout: 5 minutes from reaching phase
+      • If no reaction within timeout: automatic failure
+
+      BEHAVIOR:
+      • Weekly recurring pattern
+      • Requires explicit user approval
+      • Useful for weekly reviews, approvals
+      • Previous week's outcome doesn't affect next week
     want:
       metadata:
         name: weekly_report_approval
@@ -252,6 +341,39 @@ wantType:
         when:
           - at: "10am"
             every: "week"
+
+  - name: Emergency Alert (Minimal Ahead)
+    description: Time-critical alert with minimal advance notice
+    expectedBehavior: |
+      AHEAD PARAMETER CALCULATION:
+      • event_time: 2025-12-28T21:35:30Z
+      • ahead: "10 seconds"
+      • reaching_time = 2025-12-28T21:35:20Z
+
+      TIMELINE:
+      1. 21:35:20 - Reminder enters "reaching" phase (emergency alert sent)
+      2. 21:35:20-21:35:25 - Quick reaction window (only 5-10 seconds)
+      3. User must react immediately via API
+      4. 21:35:30 - Hard deadline reached
+      5. If no reaction: reminder_phase = "failed"
+
+      BEHAVIOR:
+      • Minimal lead time (10 seconds)
+      • Critical for emergency situations
+      • Requires require_reaction: true for immediate action
+      • Short timeout window - quick decision needed
+      • Useful for alerts, emergency stop commands
+    want:
+      metadata:
+        name: critical_alert
+        type: reminder
+      spec:
+        params:
+          message: "CRITICAL: Database connection pool exhausted"
+          ahead: "10 seconds"
+          event_time: "2025-12-28T21:35:30Z"
+          require_reaction: true
+          reaction_type: "internal"
 
   relatedTypes:
   - execution_result
