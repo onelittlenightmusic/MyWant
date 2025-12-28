@@ -55,6 +55,7 @@ type Server struct {
 	errorHistory   []ErrorHistoryEntry              // Store error history
 	router         *mux.Router
 	globalLabels   map[string]map[string]bool // Globally registered labels (key -> value -> true)
+	reactionQueue  *types.ReactionQueue       // Reaction queue for reminder wants
 }
 
 // WantExecution represents a running want execution
@@ -197,6 +198,12 @@ func NewServer(config ServerConfig) *Server {
 	tempServer.registerDynamicAgents(agentRegistry)
 	types.RegisterExecutionAgents(agentRegistry)
 
+	// Create and register reaction queue for reminders
+	reactionQueue := types.NewReactionQueue()
+	if err := types.RegisterUserReactionMonitorAgent(agentRegistry, reactionQueue); err != nil {
+		log.Printf("[SERVER] Warning: Failed to register user reaction monitor agent: %v\n", err)
+	}
+
 	return &Server{
 		config:         config,
 		wants:          make(map[string]*WantExecution),
@@ -207,6 +214,7 @@ func NewServer(config ServerConfig) *Server {
 		errorHistory:   make([]ErrorHistoryEntry, 0),
 		router:         mux.NewRouter(),
 		globalLabels:   make(map[string]map[string]bool),
+		reactionQueue:  reactionQueue,
 	}
 }
 
@@ -316,6 +324,13 @@ func (s *Server) setupRoutes() {
 	llm := api.PathPrefix("/llm").Subrouter()
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
 	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
+
+	// Reactions endpoints for reminder wants
+	reactions := api.PathPrefix("/reactions").Subrouter()
+	reactions.HandleFunc("/{id}", s.createReaction).Methods("POST")
+	reactions.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+	reactions.HandleFunc("", s.listReactions).Methods("GET")
+	reactions.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
 	// Health check endpoint
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
@@ -2047,6 +2062,7 @@ func (s *Server) Start() error {
 	types.RegisterTravelWantTypes(s.globalBuilder)
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	types.RegisterExecutionResultWantType(s.globalBuilder)
+	types.RegisterReminderWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
@@ -3200,6 +3216,70 @@ func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 		"name":     name,
 		"examples": def.Examples,
 	})
+}
+
+// ReactionRequest represents a user reaction to a reminder
+type ReactionRequest struct {
+	Approved bool   `json:"approved"`
+	Comment  string `json:"comment,omitempty"`
+}
+
+// createReaction handles POST /api/v1/reactions/{id}
+func (s *Server) createReaction(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract reaction ID from URL path
+	parts := strings.Split(r.URL.Path, "/")
+	var reactionID string
+	for i, part := range parts {
+		if part == "reactions" && i+1 < len(parts) {
+			reactionID = parts[i+1]
+			break
+		}
+	}
+
+	if reactionID == "" {
+		http.Error(w, "Missing reaction ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body
+	var req ReactionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorMsg := "Invalid request format"
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Add reaction to queue
+	s.reactionQueue.AddReaction(reactionID, req.Approved, req.Comment)
+
+	// Return success response
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"reaction_id": reactionID,
+		"approved":    req.Approved,
+		"timestamp":   time.Now().Format(time.RFC3339),
+	})
+
+	s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "success", http.StatusCreated,
+		fmt.Sprintf("Reaction created for %s", reactionID), "reaction_created")
+}
+
+// listReactions handles GET /api/v1/reactions (debugging endpoint)
+func (s *Server) listReactions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	reactions := s.reactionQueue.ListReactions()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"count":     len(reactions),
+		"reactions": reactions,
+	})
+
+	s.globalBuilder.LogAPIOperation("GET", r.URL.Path, "", "success", http.StatusOK,
+		fmt.Sprintf("Listed %d pending reactions", len(reactions)), "reactions_listed")
 }
 
 func main() {

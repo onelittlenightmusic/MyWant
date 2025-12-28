@@ -28,7 +28,7 @@ func NewUserReactionMonitorAgent(reactionQueue *ReactionQueue) *MonitorAgent {
 // monitorUserReactions monitors a single want for user reactions
 func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *ReactionQueue) error {
 	// Only process reminder wants in reaching phase
-	if want.Type != "reminder" {
+	if want.Metadata.Type != "reminder" {
 		return nil
 	}
 
@@ -102,5 +102,6 @@ func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *Reacti
 // RegisterUserReactionMonitorAgent registers the user reaction monitor agent with the registry
 func RegisterUserReactionMonitorAgent(registry *AgentRegistry, reactionQueue *ReactionQueue) error {
 	agent := NewUserReactionMonitorAgent(reactionQueue)
-	return registry.RegisterAgent(agent)
+	registry.RegisterAgent(agent)
+	return nil
 }

@@ -355,7 +355,6 @@ func (r *ReminderWant) updateLocals(locals *ReminderLocals) {
 // parseDurationString parses duration strings like "5 minutes", "10 seconds", etc.
 func parseDurationString(s string) (time.Duration, error) {
 	// Simple parser for common formats
-	var multiplier time.Duration = 1
 	var unit time.Duration
 
 	// Parse from the end to find the unit
@@ -401,4 +400,15 @@ func parseDurationString(s string) (time.Duration, error) {
 	}
 
 	return time.Duration(num) * unit, nil
+}
+
+// RegisterReminderWantType registers the ReminderWant type with the ChainBuilder
+func RegisterReminderWantType(builder *ChainBuilder) {
+	builder.RegisterWantType("reminder", func(metadata Metadata, spec WantSpec) Progressable {
+		want := &Want{
+			Metadata: metadata,
+			Spec:     spec,
+		}
+		return NewReminderWant(want)
+	})
 }
