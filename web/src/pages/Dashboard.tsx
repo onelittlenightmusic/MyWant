@@ -672,23 +672,7 @@ export const Dashboard: React.FC = () => {
             {/* All Labels Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
-                  {allLabels.size > 0 && (
-                    <button
-                      onClick={() => setExpandedLabels(!expandedLabels)}
-                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 transition-colors"
-                      title={expandedLabels ? "Collapse labels" : "Expand labels"}
-                    >
-                      <ChevronDown
-                        className={classNames(
-                          'w-4 h-4 transition-transform',
-                          expandedLabels && 'rotate-180'
-                        )}
-                      />
-                    </button>
-                  )}
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
                 <button
                   onClick={() => setShowAddLabelForm(!showAddLabelForm)}
                   className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -807,6 +791,24 @@ export const Dashboard: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Expand/Collapse button below labels */}
+              {allLabels.size > 0 && (
+                <div className="flex justify-center mt-3 w-full">
+                  <button
+                    onClick={() => setExpandedLabels(!expandedLabels)}
+                    className="w-full flex justify-center py-2 px-4 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                    title={expandedLabels ? "Collapse labels" : "Expand labels"}
+                  >
+                    <ChevronDown
+                      className={classNames(
+                        'w-4 h-4 transition-transform',
+                        expandedLabels && 'rotate-180'
+                      )}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Owners and Users Section - Display wants using selected label */}
