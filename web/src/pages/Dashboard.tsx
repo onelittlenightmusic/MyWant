@@ -19,7 +19,7 @@ import { WantFilters } from '@/components/dashboard/WantFilters';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
-import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
 import { MessageNotification } from '@/components/common/MessageNotification';
 
 export const Dashboard: React.FC = () => {
@@ -41,6 +41,8 @@ export const Dashboard: React.FC = () => {
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isDeletingWant, setIsDeletingWant] = useState(false);
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
@@ -275,12 +277,14 @@ export const Dashboard: React.FC = () => {
   const handleDeleteWantConfirm = async () => {
     if (deleteWantState) {
       try {
+        setIsDeletingWant(true);
         const wantId = deleteWantState.metadata?.id || deleteWantState.id;
         if (!wantId) {
           console.error('No want ID found for deletion');
           return;
         }
         await deleteWant(wantId);
+        setShowDeleteConfirmation(false);
         setDeleteWantState(null);
 
         // Close the details sidebar if the deleted want is currently selected
@@ -289,8 +293,20 @@ export const Dashboard: React.FC = () => {
         }
       } catch (error) {
         console.error('Failed to delete want:', error);
+      } finally {
+        setIsDeletingWant(false);
       }
     }
+  };
+
+  const handleDeleteWantCancel = () => {
+    setShowDeleteConfirmation(false);
+    setDeleteWantState(null);
+  };
+
+  const handleShowDeleteConfirmation = (want: Want) => {
+    setDeleteWantState(want);
+    setShowDeleteConfirmation(true);
   };
 
   const handleSuspendWant = async (want: Want) => {
@@ -337,6 +353,7 @@ export const Dashboard: React.FC = () => {
     sidebar.closeForm();
     setEditingWant(null);
     setDeleteWantState(null);
+    setShowDeleteConfirmation(false);
   };
 
   // Export wants as YAML
@@ -649,7 +666,7 @@ export const Dashboard: React.FC = () => {
                 onViewAgentsWant={handleViewAgents}
                 onViewResultsWant={handleViewResults}
                 onEditWant={handleEditWant}
-                onDeleteWant={setDeleteWantState}
+                onDeleteWant={handleShowDeleteConfirmation}
                 onSuspendWant={handleSuspendWant}
                 onResumeWant={handleResumeWant}
                 onGetFilteredWants={setFilteredWants}
@@ -967,7 +984,7 @@ export const Dashboard: React.FC = () => {
           onStop={handleStopWant}
           onSuspend={handleSuspendWant}
           onResume={handleResumeWant}
-          onDelete={setDeleteWantState}
+          onDelete={handleShowDeleteConfirmation}
         />
       </RightSidebar>
 
@@ -978,21 +995,15 @@ export const Dashboard: React.FC = () => {
         editingWant={editingWant}
       />
 
-      <ConfirmDeleteModal
-        isOpen={!!deleteWantState}
-        onClose={handleCloseModals}
+      {/* Delete Want Confirmation - using robot and bubble component */}
+      <ConfirmationMessageNotification
+        message={deleteWantState ? `Delete want: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null}
+        isVisible={showDeleteConfirmation}
+        onDismiss={() => setShowDeleteConfirmation(false)}
         onConfirm={handleDeleteWantConfirm}
-        want={deleteWantState}
-        loading={loading}
-        childrenCount={
-          deleteWantState
-            ? wants.filter(w =>
-                w.metadata?.ownerReferences?.some(
-                  ref => ref.id === deleteWantState.metadata?.id
-                )
-              ).length
-            : 0
-        }
+        onCancel={handleDeleteWantCancel}
+        loading={isDeletingWant}
+        title="Delete Want"
       />
 
       {/* Message Notification */}
