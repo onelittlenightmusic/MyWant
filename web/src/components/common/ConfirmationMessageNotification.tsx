@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, Check, X } from 'lucide-react';
-import { classNames } from '@/utils/helpers';
+import { classNames, truncateText } from '@/utils/helpers';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface ConfirmationMessageNotificationProps {
@@ -11,7 +11,7 @@ interface ConfirmationMessageNotificationProps {
   onCancel: () => void;
   loading?: boolean;
   title?: string;
-  layout?: 'bottom-center' | 'inline-header'; // 'inline-header' = robot right, bubble left in header
+  layout?: 'bottom-center' | 'inline-header' | 'dashboard-right'; // 'dashboard-right' = fixed right side, robot left, bubble right
 }
 
 export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotificationProps> = ({
@@ -27,14 +27,31 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
   const [isAnimating, setIsAnimating] = useState(false);
   const [displayMessage, setDisplayMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnimatingRobot, setIsAnimatingRobot] = useState(false);
+  const [isAnimatingBubble, setIsAnimatingBubble] = useState(false);
 
   useEffect(() => {
     if (isVisible && message) {
-      // Set message and start fade-in animation
+      // Set message and ensure initial state is rendered
       setDisplayMessage(message);
       setIsAnimating(true);
+      setIsAnimatingRobot(false);
+      setIsAnimatingBubble(false);
     }
   }, [isVisible, message]);
+
+  // Separate effect to trigger animation after the notification is displayed
+  useEffect(() => {
+    if (displayMessage && !isAnimatingRobot && !isAnimatingBubble) {
+      // Wait for the initial state to be painted, then trigger animation
+      const timer = setTimeout(() => {
+        setIsAnimatingRobot(true);
+        setIsAnimatingBubble(true);
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [displayMessage]);
 
   // Handle fade-out completion
   useEffect(() => {
@@ -61,11 +78,15 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
       console.error('Confirmation error:', error);
     } finally {
       setIsLoading(false);
+      setIsAnimatingBubble(false);
+      setIsAnimatingRobot(false);
       setIsAnimating(false);
     }
   };
 
   const handleCancel = () => {
+    setIsAnimatingBubble(false);
+    setIsAnimatingRobot(false);
     setIsAnimating(false);
     onCancel();
   };
@@ -75,87 +96,86 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
   }
 
   const isInlineHeader = layout === 'inline-header';
+  const isDashboardRight = layout === 'dashboard-right';
 
   return (
     <div
       className={classNames(
-        'flex items-center gap-3 transition-opacity duration-300',
-        isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto',
-        isAnimating ? 'opacity-100' : 'opacity-0',
-        isInlineHeader ? '' : 'pointer-events-auto'
+        'flex items-center gap-0',
+        isDashboardRight ? 'fixed top-2 right-[480px] z-50 pointer-events-auto h-16 pr-6' : (
+          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto'
+        ),
+        !isDashboardRight && (isAnimating ? 'opacity-100' : 'opacity-0'),
+        !isDashboardRight && !isInlineHeader ? 'pointer-events-auto' : ''
       )}
     >
       {/* Layout 1: Bubble on left, Robot on right (for inline-header) */}
       {isInlineHeader && (
         <>
           {/* Message bubble with buttons - pointing to the right */}
-          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 whitespace-nowrap">
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 px-3 py-2">
             {/* Close button */}
             <button
               onClick={handleCancel}
               disabled={isLoading || loading}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="absolute top-1 right-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </button>
 
             {/* Arrow pointing right */}
             <div className="absolute right-0 top-1/2 transform translate-x-2 -translate-y-1/2">
               <div
-                className="w-0 h-0 border-t-6 border-b-6 border-l-6 border-t-transparent border-b-transparent border-l-white"
+                className="w-0 h-0 border-t-5 border-b-5 border-l-5 border-t-transparent border-b-transparent border-l-white"
                 style={{
                   filter: 'drop-shadow(1px 0 0 rgba(229, 231, 235, 1))'
                 }}
               />
             </div>
 
-            {/* Content */}
-            <div className="space-y-2 pr-6">
-              {/* Title */}
-              <p className="text-xs font-semibold text-gray-900">
-                {title}
-              </p>
-
-              {/* Message */}
-              <p className="text-xs text-gray-700">
-                {message}
-              </p>
+            {/* Content - single line */}
+            <div className="flex items-center gap-2 pr-6">
+              {/* Title and Message on one line */}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-gray-900 inline">
+                  {title}:&nbsp;
+                </p>
+                <p className="text-xs text-gray-700 inline truncate">
+                  {message ? truncateText(message, 40) : ''}
+                </p>
+              </div>
 
               {/* Action buttons */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-1 flex-shrink-0 ml-2">
                 <button
                   onClick={handleCancel}
                   disabled={isLoading || loading}
                   className={classNames(
-                    'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+                    'flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium',
                     'bg-gray-100 text-gray-700 hover:bg-gray-200',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
+                  title="Cancel"
                 >
-                  Cancel
+                  <X className="h-3 w-3" />
                 </button>
                 <button
                   onClick={handleConfirm}
                   disabled={isLoading || loading}
                   className={classNames(
-                    'flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium',
+                    'flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium',
                     'bg-blue-100 text-blue-700 hover:bg-blue-200',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
+                  title="Confirm"
                 >
                   {isLoading || loading ? (
-                    <>
-                      <LoadingSpinner size="sm" color="white" className="h-3 w-3" />
-                      <span>...</span>
-                    </>
+                    <LoadingSpinner size="sm" color="white" className="h-3 w-3" />
                   ) : (
-                    <>
-                      <Check className="h-3 w-3" />
-                      OK
-                    </>
+                    <Check className="h-3 w-3" />
                   )}
                 </button>
               </div>
@@ -172,7 +192,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
       )}
 
       {/* Layout 2: Robot on left, Bubble on right (for bottom-center) */}
-      {!isInlineHeader && (
+      {!isInlineHeader && !isDashboardRight && (
         <>
           {/* Robot icon */}
           <div className="flex-shrink-0">
@@ -255,6 +275,64 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
             </div>
           </div>
         </>
+      )}
+
+      {/* Layout 3: Dashboard right - Robot left, Bubble middle, Buttons right (full height) */}
+      {isDashboardRight && (
+        <div className={classNames(
+          'flex items-stretch gap-0 h-16 transition-all duration-300',
+          (isAnimatingRobot || isAnimatingBubble) ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+        )}>
+          {/* Robot icon - left (header height) */}
+          <div className="flex items-center justify-center flex-shrink-0 w-16 bg-blue-600 rounded-full">
+            <Bot className="h-9 w-9 text-white" />
+          </div>
+
+          {/* Message bubble - middle */}
+          <div className="flex-1 ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 flex flex-col justify-center min-w-0">
+            {/* Title and Message */}
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {title}
+            </p>
+            <p className="text-sm text-gray-700 truncate">
+              {truncateText(message || '', 50)}
+            </p>
+          </div>
+
+          {/* Action buttons - right (full height) */}
+          <div className="flex gap-2 ml-3 h-full">
+            <button
+              onClick={handleCancel}
+              disabled={isLoading || loading}
+              className={classNames(
+                'flex items-center justify-center rounded-md font-medium h-full px-4',
+                'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-colors'
+              )}
+              title="Cancel"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={isLoading || loading}
+              className={classNames(
+                'flex items-center justify-center rounded-md font-medium h-full px-4',
+                'bg-blue-100 text-blue-700 hover:bg-blue-200',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-colors'
+              )}
+              title="Confirm"
+            >
+              {isLoading || loading ? (
+                <LoadingSpinner size="sm" color="white" className="h-6 w-6" />
+              ) : (
+                <Check className="h-6 w-6" />
+              )}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
