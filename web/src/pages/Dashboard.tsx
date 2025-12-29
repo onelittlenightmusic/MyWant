@@ -609,6 +609,18 @@ export const Dashboard: React.FC = () => {
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
+        confirmationNotification={
+          <ConfirmationMessageNotification
+            message={deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null}
+            isVisible={showDeleteConfirmation}
+            onDismiss={() => setShowDeleteConfirmation(false)}
+            onConfirm={handleDeleteWantConfirm}
+            onCancel={handleDeleteWantCancel}
+            loading={isDeletingWant}
+            title="Delete Want"
+            layout="inline-header"
+          />
+        }
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -993,17 +1005,6 @@ export const Dashboard: React.FC = () => {
         isOpen={sidebar.showForm}
         onClose={handleCloseModals}
         editingWant={editingWant}
-      />
-
-      {/* Delete Want Confirmation - using robot and bubble component */}
-      <ConfirmationMessageNotification
-        message={deleteWantState ? `Delete want: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null}
-        isVisible={showDeleteConfirmation}
-        onDismiss={() => setShowDeleteConfirmation(false)}
-        onConfirm={handleDeleteWantConfirm}
-        onCancel={handleDeleteWantCancel}
-        loading={isDeletingWant}
-        title="Delete Want"
       />
 
       {/* Message Notification */}

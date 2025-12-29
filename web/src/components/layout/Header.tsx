@@ -12,6 +12,7 @@ interface HeaderProps {
   onSummaryToggle?: () => void;
   sidebarMinimized?: boolean;
   hideCreateButton?: boolean;
+  confirmationNotification?: React.ReactNode; // Confirmation notification to display left of Summary
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,7 +24,8 @@ export const Header: React.FC<HeaderProps> = ({
   showSummary = false,
   onSummaryToggle,
   sidebarMinimized = false,
-  hideCreateButton = false
+  hideCreateButton = false,
+  confirmationNotification
 }) => {
   return (
     <header className={classNames(
@@ -41,6 +43,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* Confirmation notification to the left of Summary */}
+          {confirmationNotification && (
+            <div>
+              {confirmationNotification}
+            </div>
+          )}
+
           {onSummaryToggle && (
             <button
               onClick={onSummaryToggle}
