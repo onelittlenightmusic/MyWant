@@ -1,16 +1,359 @@
 package types
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
+	"sync"
 
 	mywant "mywant/engine/src"
 )
+
+// ============ GooseManager ============
+
+// GooseManager creates and executes Goose processes for MCP tool execution via LLM
+// Uses per-request `goose run` processes rather than persistent sessions
+type GooseManager struct {
+	mu sync.Mutex
+	// Currently unused - kept for API compatibility
+	running bool
+}
+
+var (
+	gooseManager *GooseManager
+	gooseMutex   sync.Mutex
+)
+
+// NewGooseManager creates a GooseManager instance (mostly a no-op for per-request model)
+func NewGooseManager(ctx context.Context) (*GooseManager, error) {
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Initializing Goose manager (per-request mode with Gmail MCP)...\n")
+
+	manager := &GooseManager{
+		running: true,
+	}
+
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose manager ready for per-request execution\n")
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Gmail MCP extension will be loaded from ~/.config/goose/config.yaml\n")
+	return manager, nil
+}
+
+// ExecuteViaGoose executes an MCP operation via Goose with LLM decision-making
+// Creates a new `goose run` process for each request
+func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, params map[string]interface{}) (interface{}, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	if !g.running {
+		return nil, fmt.Errorf("Goose manager is not running")
+	}
+
+	// Build natural language prompt for Goose
+	prompt := g.buildPrompt(operation, params)
+
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Starting per-request Goose process for: %s\n", operation)
+
+	// Create a new goose run process for this request
+	// Use context.Background() for the process itself (not the request context)
+	// so that it can run to completion
+	cmd := exec.CommandContext(context.Background(), "goose", "run", "-i", "-")
+	cmd.Env = os.Environ()
+
+	// Set up pipes
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	cmd.Stderr = os.Stderr
+
+	// Start the process
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Goose process: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process started (PID: %d)\n", cmd.Process.Pid)
+
+	// Send the prompt to stdin
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Sending prompt to Goose:\n%s\n", prompt)
+	if _, err := io.WriteString(stdin, prompt+"\n"); err != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+		return nil, fmt.Errorf("failed to send prompt to Goose: %w", err)
+	}
+
+	// Close stdin to signal EOF - this tells Goose to process the input and finish
+	stdin.Close()
+
+	// Read the response
+	scanner := bufio.NewScanner(stdout)
+	var outputLines []string
+
+	// Read all output from Goose
+	for scanner.Scan() {
+		line := scanner.Text()
+		outputLines = append(outputLines, line)
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] stdout: %s\n", line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+		return nil, fmt.Errorf("error reading Goose output: %w", err)
+	}
+
+	// Wait for the process to complete
+	if err := cmd.Wait(); err != nil {
+		// Don't fail on non-zero exit - Goose might exit with error codes
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process exited with error: %v\n", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process completed\n")
+
+	// Parse the response
+	fullOutput := strings.Join(outputLines, "\n")
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output (%d lines):\n%s\n", len(outputLines), fullOutput[:minInt(len(fullOutput), 500)])
+
+	result, err := parseGooseResponse(fullOutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return result, nil
+}
+
+// buildPrompt constructs natural language instructions for Goose
+func (g *GooseManager) buildPrompt(operation string, params map[string]interface{}) string {
+	switch operation {
+	case "gmail_search":
+		query := params["query"].(string)
+		maxResults := 10
+		if mr, ok := params["maxResults"].(int); ok {
+			maxResults = mr
+		}
+		return fmt.Sprintf(`You have access to the Gmail MCP server. Please use the search_emails tool to search for emails.
+
+Search parameters:
+- Query: "%s"
+- Maximum results: %d
+
+Steps:
+1. Use the search_emails tool with the query and maxResults
+2. Extract the email results
+3. Format each email as a JSON object with these fields: id, from, subject, date, snippet
+4. Return ONLY a JSON array of email objects, nothing else
+
+Example output format:
+[{"id":"msg123","from":"user@example.com","subject":"Example","date":"2025-01-01","snippet":"..."}]`, query, maxResults)
+
+	case "gmail_read":
+		messageID := params["messageID"].(string)
+		return fmt.Sprintf(`You have access to the Gmail MCP server. Please use the read_email tool to read an email.
+
+Message ID: "%s"
+
+Steps:
+1. Use the read_email tool with the message ID
+2. Extract the email content
+3. Return ONLY a JSON object with the email details, nothing else`, messageID)
+
+	case "gmail_send":
+		to := params["to"].(string)
+		subject := params["subject"].(string)
+		body := ""
+		if b, ok := params["body"].(string); ok {
+			body = b
+		}
+		return fmt.Sprintf(`You have access to the Gmail MCP server. Please use the send_email tool to send an email.
+
+Email details:
+- To: %s
+- Subject: %s
+- Body: %s
+
+Steps:
+1. Use the send_email tool with the email details
+2. Extract the message ID from the response
+3. Return ONLY a JSON object with: {"status":"sent","messageId":"..."}`, to, subject, body)
+
+	default:
+		return fmt.Sprintf("Execute MCP operation: %s with parameters: %v", operation, params)
+	}
+}
+
+// parseGooseResponse extracts and processes Goose JSON output
+func parseGooseResponse(output string) (interface{}, error) {
+	// Look for JSON object or array
+	startIdx := strings.Index(output, "{")
+	if startIdx == -1 {
+		startIdx = strings.Index(output, "[")
+	}
+
+	if startIdx == -1 {
+		return nil, fmt.Errorf("no JSON found in response")
+	}
+
+	// Find the matching closing bracket
+	var endIdx int
+	if output[startIdx] == '[' {
+		endIdx = strings.LastIndex(output, "]")
+	} else {
+		endIdx = strings.LastIndex(output, "}")
+	}
+
+	if endIdx == -1 || endIdx <= startIdx {
+		return nil, fmt.Errorf("invalid JSON in response")
+	}
+
+	jsonStr := output[startIdx : endIdx+1]
+	fmt.Printf("[GOOSE-MANAGER] Extracted JSON:\n%s\n", jsonStr[:minInt(len(jsonStr), 500)])
+
+	// First, try to parse as Goose conversation format (with "messages" key)
+	var gooseFormat map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &gooseFormat); err == nil {
+		// Check if this is Goose conversation format
+		if messages, ok := gooseFormat["messages"].([]interface{}); ok {
+			// Extract the last assistant message content
+			for i := len(messages) - 1; i >= 0; i-- {
+				msg, ok := messages[i].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if role, ok := msg["role"].(string); ok && role == "assistant" {
+					if contentArr, ok := msg["content"].([]interface{}); ok && len(contentArr) > 0 {
+						if content, ok := contentArr[0].(map[string]interface{}); ok {
+							if text, ok := content["text"].(string); ok {
+								// Try to extract JSON from the assistant's text response
+								return extractJSONFromText(text)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Try to unmarshal as array first (for email search results)
+	var arrResult []map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &arrResult); err == nil {
+		return arrResult, nil
+	}
+
+	// Try as object (for other operations)
+	var objResult map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &objResult); err == nil {
+		// If it's not a Goose format message, return it as is
+		if _, hasMessages := objResult["messages"]; !hasMessages {
+			return objResult, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to parse JSON response")
+}
+
+// extractJSONFromText tries to extract JSON data from text content
+func extractJSONFromText(text string) (interface{}, error) {
+	// Look for JSON array in text
+	startIdx := strings.Index(text, "[")
+	if startIdx == -1 {
+		startIdx = strings.Index(text, "{")
+	}
+
+	if startIdx == -1 {
+		// No JSON found, return the text as is
+		return map[string]interface{}{
+			"text": text,
+		}, nil
+	}
+
+	// Find matching closing bracket
+	var endIdx int
+	if text[startIdx] == '[' {
+		endIdx = strings.LastIndex(text, "]")
+	} else {
+		endIdx = strings.LastIndex(text, "}")
+	}
+
+	if endIdx <= startIdx {
+		// Invalid JSON, return text
+		return map[string]interface{}{
+			"text": text,
+		}, nil
+	}
+
+	jsonStr := text[startIdx : endIdx+1]
+
+	// Try to unmarshal as array
+	var arrResult []map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &arrResult); err == nil {
+		return arrResult, nil
+	}
+
+	// Try as object
+	var objResult map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &objResult); err == nil {
+		return objResult, nil
+	}
+
+	// Return raw text if JSON parsing fails
+	return map[string]interface{}{
+		"text": text,
+	}, nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Close is a no-op for per-request model
+// (processes are created and destroyed for each request)
+func (g *GooseManager) Close() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	g.running = false
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] GooseManager closed (no persistent process)\n")
+	return nil
+}
+
+// GetGooseManager returns or creates a GooseManager instance
+// In per-request mode, the manager creates new `goose run` processes for each request
+// This avoids issues with interactive session management
+func GetGooseManager(ctx context.Context) (*GooseManager, error) {
+	gooseMutex.Lock()
+	defer gooseMutex.Unlock()
+
+	// Check if we already have a running manager
+	if gooseManager != nil && gooseManager.running {
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Reusing existing GooseManager\n")
+		return gooseManager, nil
+	}
+
+	// Create a new GooseManager instance
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Creating new GooseManager\n")
+	manager, err := NewGooseManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store the manager for reuse
+	gooseManager = manager
+	return manager, nil
+}
+
+// ============ MCPAgent ============
 
 // MCPAgent handles MCP tool invocations for Gmail and other MCP services
 type MCPAgent struct {
@@ -41,7 +384,7 @@ func NewMCPAgent() *MCPAgent {
 	return agent
 }
 
-// executeMCPOperation performs the actual MCP tool invocation
+// executeMCPOperation performs the actual MCP tool invocation via Goose
 func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 	// Read operation type and parameters from want state
 	operation, hasOp := want.GetState("mcp_operation")
@@ -53,55 +396,125 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	operationStr := fmt.Sprintf("%v", operation)
 
 	want.StoreState("achieving_percentage", 25)
-	logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation: %s", operationStr)
+	logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation via Goose: %s", operationStr)
 	want.StoreLog(logMsg)
-	fmt.Printf("%s\n", logMsg)
+
+	// Get the Goose session server (singleton, persistent)
+	goose, err := GetGooseManager(ctx)
+	if err != nil {
+		errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Goose initialization failed: %v", err)
+		want.StoreLog(errMsg)
+		return fmt.Errorf("Goose initialization failed: %w", err)
+	}
+
+	// Note: We don't close Goose here because it's a singleton session server
+	// that should remain running to handle multiple requests
 
 	var result map[string]interface{}
 
-	// Route to appropriate MCP operation
+	// Route to appropriate MCP operation via Goose
 	switch operationStr {
 	case "gmail_search":
 		query, _ := want.GetState("mcp_query")
 		maxResults, _ := want.GetState("mcp_max_results")
 		queryStr := fmt.Sprintf("%v", query)
+		maxResultsInt := 10
+		if maxResults != nil {
+			if mr, ok := maxResults.(float64); ok {
+				maxResultsInt = int(mr)
+			}
+		}
 
-		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail search via MCP for query: %s", queryStr))
+		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail search via Goose for query: %s", queryStr))
 
-		// Execute actual Gmail search via MCP
-		searchResult, err := a.executeGmailSearchViaClaude(ctx, queryStr)
+		// Execute Gmail search via Goose
+		searchResult, err := goose.ExecuteViaGoose(ctx, "gmail_search", map[string]interface{}{
+			"query":      queryStr,
+			"maxResults": maxResultsInt,
+		})
 		if err != nil {
-			want.StoreLog(fmt.Sprintf("[MCP-AGENT] ERROR: Gmail search via MCP failed: %v", err))
-			return fmt.Errorf("Gmail MCP search failed: %w", err)
+			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail search via Goose failed: %v", err)
+			want.StoreLog(errMsg)
+			return fmt.Errorf("Gmail Goose search failed: %w", err)
+		}
+
+		// Convert result to email list
+		var emails []map[string]interface{}
+		if resultData, ok := searchResult.([]map[string]interface{}); ok {
+			emails = resultData
+		} else if resultData, ok := searchResult.([]interface{}); ok {
+			for _, item := range resultData {
+				if emailMap, ok := item.(map[string]interface{}); ok {
+					emails = append(emails, emailMap)
+				}
+			}
 		}
 
 		result = map[string]interface{}{
 			"operation":    "gmail_search",
 			"query":        queryStr,
-			"maxResults":   maxResults,
+			"maxResults":   maxResultsInt,
 			"status":       "completed",
-			"emails":       searchResult,
-			"total":        len(searchResult),
-			"message":      "Gmail search executed via MCP",
+			"emails":       emails,
+			"total":        len(emails),
+			"message":      "Gmail search executed via Goose + MCP",
 		}
+
 	case "gmail_read":
 		messageID, _ := want.GetState("mcp_message_id")
+		messageIDStr := fmt.Sprintf("%v", messageID)
+
+		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail read via Goose for messageID: %s", messageIDStr))
+
+		// Execute via Goose
+		readResult, err := goose.ExecuteViaGoose(ctx, "gmail_read", map[string]interface{}{
+			"messageID": messageIDStr,
+		})
+		if err != nil {
+			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail read via Goose failed: %v", err)
+			want.StoreLog(errMsg)
+			return fmt.Errorf("Gmail Goose read failed: %w", err)
+		}
+
 		result = map[string]interface{}{
 			"operation":  "gmail_read",
-			"messageID":  fmt.Sprintf("%v", messageID),
+			"messageID":  messageIDStr,
 			"status":     "completed",
-			"message":    "Gmail message read via MCP",
+			"data":       readResult,
+			"message":    "Gmail message read via Goose + MCP",
 		}
+
 	case "gmail_send":
 		to, _ := want.GetState("mcp_to")
 		subject, _ := want.GetState("mcp_subject")
+		body, _ := want.GetState("mcp_body")
+		toStr := fmt.Sprintf("%v", to)
+		subjectStr := fmt.Sprintf("%v", subject)
+		bodyStr := fmt.Sprintf("%v", body)
+
+		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail send via Goose to: %s", toStr))
+
+		// Execute via Goose
+		sendResult, err := goose.ExecuteViaGoose(ctx, "gmail_send", map[string]interface{}{
+			"to":      toStr,
+			"subject": subjectStr,
+			"body":    bodyStr,
+		})
+		if err != nil {
+			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail send via Goose failed: %v", err)
+			want.StoreLog(errMsg)
+			return fmt.Errorf("Gmail Goose send failed: %w", err)
+		}
+
 		result = map[string]interface{}{
 			"operation": "gmail_send",
-			"to":        fmt.Sprintf("%v", to),
-			"subject":   fmt.Sprintf("%v", subject),
+			"to":        toStr,
+			"subject":   subjectStr,
 			"status":    "sent",
-			"message":   "Gmail message sent via MCP",
+			"data":      sendResult,
+			"message":   "Gmail message sent via Goose + MCP",
 		}
+
 	default:
 		return fmt.Errorf("unknown MCP operation: %s", operationStr)
 	}
@@ -109,186 +522,9 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	// Store result in state for want to retrieve
 	want.StoreState("agent_result", result)
 	want.StoreState("achieving_percentage", 100)
-	want.StoreLog(fmt.Sprintf("[MCP-AGENT] Operation completed"))
+	want.StoreLog(fmt.Sprintf("[MCP-AGENT] Operation completed via Goose"))
 
 	return nil
-}
-
-// executeGmailSearchViaClaude executes actual Gmail search by connecting directly to Gmail MCP server via JSON-RPC
-func (a *MCPAgent) executeGmailSearchViaClaude(ctx context.Context, query string) ([]map[string]interface{}, error) {
-	fmt.Printf("[MCP-AGENT] Calling Gmail MCP tool (search_emails) for query: %s\n", query)
-
-	// Spawn the Gmail MCP server process with auto-auth
-	searchCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	// Start the Gmail MCP server which handles authentication automatically
-	cmd := exec.CommandContext(searchCtx, "npx", "@gongrzhe/server-gmail-autoauth-mcp")
-	cmd.Env = os.Environ()
-
-	// Create pipes for stdin/stdout communication
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MCP server stdin pipe: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MCP server stdout pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Gmail MCP server: %w", err)
-	}
-	defer cmd.Process.Kill()
-
-	// Give the server a moment to initialize
-	time.Sleep(1 * time.Second)
-
-	// Build the JSON-RPC request to search emails
-	request := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"id":      1,
-		"method":  "tools/call",
-		"params": map[string]interface{}{
-			"name": "search_emails",
-			"arguments": map[string]interface{}{
-				"query":      query,
-				"maxResults": 10,
-			},
-		},
-	}
-
-	// Serialize and send the request
-	requestBytes, _ := json.Marshal(request)
-	_, err = stdin.Write(append(requestBytes, '\n'))
-	if err != nil {
-		return nil, fmt.Errorf("failed to send MCP request: %w", err)
-	}
-	stdin.Close()
-
-	// Read the response
-	var fullOutput string
-	responseBytes := make([]byte, 4096)
-	n, err := stdout.Read(responseBytes)
-	if err != nil && n == 0 {
-		return nil, fmt.Errorf("failed to read MCP response")
-	}
-	fullOutput = string(responseBytes[:n])
-
-	fmt.Printf("[MCP-AGENT] MCP call completed. Output length: %d\n", len(fullOutput))
-
-	// Parse the JSON-RPC response
-	var response map[string]interface{}
-	if err := json.Unmarshal([]byte(fullOutput), &response); err != nil {
-		return nil, fmt.Errorf("failed to parse MCP response as JSON: %w, got: %s", err, fullOutput[:minInt(len(fullOutput), 200)])
-	}
-
-	// Extract the result content
-	result, ok := response["result"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("MCP response missing result field")
-	}
-
-	content, ok := result["content"].([]interface{})
-	if !ok || len(content) == 0 {
-		return nil, fmt.Errorf("MCP response missing content field")
-	}
-
-	// Extract text content which contains the email list
-	contentMap, ok := content[0].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("MCP response content has unexpected format")
-	}
-
-	text, ok := contentMap["text"].(string)
-	if !ok {
-		return nil, fmt.Errorf("MCP response content missing text field")
-	}
-
-	// Try to parse the text as JSON email list
-	var emails []map[string]interface{}
-	if err := json.Unmarshal([]byte(text), &emails); err == nil {
-		fmt.Printf("[MCP-AGENT] Successfully retrieved %d emails from Gmail MCP\n", len(emails))
-		return emails, nil
-	}
-
-	// Try to find JSON array in the response
-	startIdx := strings.Index(text, "[")
-	endIdx := strings.LastIndex(text, "]")
-	if startIdx >= 0 && endIdx > startIdx {
-		jsonStr := text[startIdx : endIdx+1]
-		if err := json.Unmarshal([]byte(jsonStr), &emails); err == nil {
-			fmt.Printf("[MCP-AGENT] Successfully retrieved %d emails from Gmail MCP (extracted JSON)\n", len(emails))
-			return emails, nil
-		}
-	}
-
-	// If not JSON format, parse text format with ID:, Subject:, From:, Date: fields
-	// This handles the Gmail MCP text format response
-	emails = parseEmailTextFormat(text)
-	if len(emails) > 0 {
-		fmt.Printf("[MCP-AGENT] Successfully retrieved %d emails from Gmail MCP (parsed text format)\n", len(emails))
-		return emails, nil
-	}
-
-	return nil, fmt.Errorf("no valid email format found in MCP response: %s", text[:minInt(len(text), 200)])
-}
-
-// parseEmailTextFormat parses Gmail MCP text format with ID:, Subject:, From:, Date: fields
-func parseEmailTextFormat(text string) []map[string]interface{} {
-	var emails []map[string]interface{}
-
-	// Split by "ID:" to find individual emails
-	emailSections := strings.Split(text, "\nID: ")
-
-	for _, section := range emailSections {
-		if strings.TrimSpace(section) == "" {
-			continue
-		}
-
-		email := make(map[string]interface{})
-
-		// Extract ID from the beginning or from the section
-		lines := strings.Split(section, "\n")
-		if len(lines) > 0 {
-			idLine := lines[0]
-			// ID might be at the start if this is the first email
-			if strings.HasPrefix(idLine, "ID: ") {
-				email["id"] = strings.TrimPrefix(idLine, "ID: ")
-			} else {
-				// For the first email, ID might not have the "ID: " prefix
-				email["id"] = strings.TrimSpace(idLine)
-			}
-		}
-
-		// Parse remaining fields: Subject, From, Date, Snippet
-		for _, line := range lines[1:] {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "Subject: ") {
-				email["subject"] = strings.TrimPrefix(line, "Subject: ")
-			} else if strings.HasPrefix(line, "From: ") {
-				email["from"] = strings.TrimPrefix(line, "From: ")
-			} else if strings.HasPrefix(line, "Date: ") {
-				email["date"] = strings.TrimPrefix(line, "Date: ")
-			} else if strings.HasPrefix(line, "Snippet: ") || strings.HasPrefix(line, "snippet: ") {
-				email["snippet"] = strings.TrimPrefix(strings.TrimPrefix(line, "Snippet: "), "snippet: ")
-			}
-		}
-
-		// Only add email if it has an ID and at least one other field
-		if id, ok := email["id"]; ok && id != "" && len(email) > 1 {
-			emails = append(emails, email)
-		}
-	}
-
-	return emails
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // generateMockEmails creates a mock email list based on the search query
@@ -374,5 +610,6 @@ func RegisterMCPAgent(registry *mywant.AgentRegistry) {
 	agent := NewMCPAgent()
 	registry.RegisterAgent(agent)
 
+	fmt.Fprintf(os.Stderr, "[AGENT] MCPAgent registered with capabilities: mcp_gmail\n")
 	fmt.Println("[AGENT] MCPAgent registered with capabilities: mcp_gmail")
 }
