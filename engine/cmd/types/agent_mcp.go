@@ -192,6 +192,11 @@ Steps:
 
 // parseGooseResponse extracts and processes Goose JSON output
 func parseGooseResponse(output string) (interface{}, error) {
+	// Remove markdown code blocks if present (Goose may wrap JSON in ```json...```)
+	output = strings.ReplaceAll(output, "```json", "")
+	output = strings.ReplaceAll(output, "```", "")
+	output = strings.TrimSpace(output)
+
 	// Look for JSON object or array
 	startIdx := strings.Index(output, "{")
 	if startIdx == -1 {
@@ -215,7 +220,6 @@ func parseGooseResponse(output string) (interface{}, error) {
 	}
 
 	jsonStr := output[startIdx : endIdx+1]
-	fmt.Printf("[GOOSE-MANAGER] Extracted JSON:\n%s\n", jsonStr[:minInt(len(jsonStr), 500)])
 
 	// First, try to parse as Goose conversation format (with "messages" key)
 	var gooseFormat map[string]interface{}
@@ -251,6 +255,19 @@ func parseGooseResponse(output string) (interface{}, error) {
 	// Try as object (for other operations)
 	var objResult map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &objResult); err == nil {
+		// Check for "emails" field (sometimes Goose wraps array in object)
+		if emails, ok := objResult["emails"].([]interface{}); ok {
+			var emailList []map[string]interface{}
+			for _, email := range emails {
+				if emailMap, ok := email.(map[string]interface{}); ok {
+					emailList = append(emailList, emailMap)
+				}
+			}
+			if len(emailList) > 0 {
+				return emailList, nil
+			}
+		}
+
 		// If it's not a Goose format message, return it as is
 		if _, hasMessages := objResult["messages"]; !hasMessages {
 			return objResult, nil
