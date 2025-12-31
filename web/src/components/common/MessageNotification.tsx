@@ -65,7 +65,7 @@ export const MessageNotification: React.FC<MessageNotificationProps> = ({
     >
       {/* Robot icon */}
       <div className="flex-shrink-0">
-        <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600">
+        <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg">
           <Bot className="h-6 w-6 text-white" />
         </div>
       </div>

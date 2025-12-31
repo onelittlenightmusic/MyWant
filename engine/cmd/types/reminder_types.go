@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+// Global reaction queue for reminder wants
+var globalReactionQueue *ReactionQueue
+
+// SetGlobalReactionQueue sets the global reaction queue
+func SetGlobalReactionQueue(queue *ReactionQueue) {
+	globalReactionQueue = queue
+}
+
 // ReminderPhase constants
 const (
 	ReminderPhaseWaiting   = "waiting"
@@ -17,16 +25,17 @@ const (
 
 // ReminderLocals holds type-specific local state for ReminderWant
 type ReminderLocals struct {
-	Message         string
-	Ahead           string
-	EventTime       time.Time
-	ReachingTime    time.Time
-	RequireReaction bool
-	ReactionType    string
-	Phase           string
-	ReactionID      string
-	TimeoutSeconds  int
-	LastCheckTime   time.Time
+	Message          string
+	Ahead            string
+	EventTime        time.Time
+	DurationFromNow  string
+	ReachingTime     time.Time
+	RequireReaction  bool
+	ReactionType     string
+	Phase            string
+	ReactionID       string
+	TimeoutSeconds   int
+	LastCheckTime    time.Time
 }
 
 // ReminderWant represents a want that sends reminders at scheduled times
@@ -57,6 +66,7 @@ func (r *ReminderWant) Initialize() {
 		r.StoreLog("ERROR: Missing required parameter 'message'")
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		r.StoreState("error_message", "Missing required parameter 'message'")
+		r.Status = "failed"
 		r.Locals = locals
 		return
 	}
@@ -75,13 +85,30 @@ func (r *ReminderWant) Initialize() {
 		r.StoreLog(fmt.Sprintf("ERROR: Invalid ahead parameter '%s': %v", ahead, err))
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		r.StoreState("error_message", fmt.Sprintf("Invalid ahead parameter: %s", ahead))
+		r.Status = "failed"
 		r.Locals = locals
 		return
 	}
 
 	// event_time parameter
 	eventTimeStr, hasEventTime := r.Spec.Params["event_time"]
+
+	// duration_from_now parameter
+	durationFromNowStr, hasDurationFromNow := r.Spec.Params["duration_from_now"]
+
+	// Check for mutually exclusive parameters
+	if hasEventTime && eventTimeStr != "" && hasDurationFromNow && durationFromNowStr != "" {
+		r.StoreLog("ERROR: Cannot provide both 'event_time' and 'duration_from_now'")
+		r.StoreState("reminder_phase", ReminderPhaseFailed)
+		r.StoreState("error_message", "Cannot provide both 'event_time' and 'duration_from_now'")
+		r.Status = "failed"
+		r.Locals = locals
+		return
+	}
+
 	var eventTime time.Time
+
+	// Parse event_time if provided
 	if hasEventTime && eventTimeStr != "" {
 		var parseErr error
 		eventTime, parseErr = time.Parse(time.RFC3339, fmt.Sprintf("%v", eventTimeStr))
@@ -89,15 +116,35 @@ func (r *ReminderWant) Initialize() {
 			r.StoreLog(fmt.Sprintf("ERROR: Invalid event_time format: %v", parseErr))
 			r.StoreState("reminder_phase", ReminderPhaseFailed)
 			r.StoreState("error_message", "Invalid event_time format (use RFC3339)")
+			r.Status = "failed"
 			r.Locals = locals
 			return
 		}
+	} else if hasDurationFromNow && durationFromNowStr != "" {
+		// Calculate event_time from duration_from_now
+		durationStr := fmt.Sprintf("%v", durationFromNowStr)
+		duration, parseErr := parseDurationString(durationStr)
+		if parseErr != nil {
+			r.StoreLog(fmt.Sprintf("ERROR: Invalid duration_from_now format: %v", parseErr))
+			r.StoreState("reminder_phase", ReminderPhaseFailed)
+			r.StoreState("error_message", fmt.Sprintf("Invalid duration_from_now format: %s", durationStr))
+			r.Status = "failed"
+			r.Locals = locals
+			return
+		}
+		eventTime = time.Now().Add(duration)
 	} else if !r.hasWhenSpec() {
-		r.StoreLog("ERROR: Either 'event_time' or 'when' spec must be provided")
+		r.StoreLog("ERROR: Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("error_message", "Either 'event_time' or 'when' spec must be provided")
+		r.StoreState("error_message", "Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
+		r.Status = "failed"
 		r.Locals = locals
 		return
+	}
+
+	// Store duration_from_now for reference
+	if hasDurationFromNow && durationFromNowStr != "" {
+		locals.DurationFromNow = fmt.Sprintf("%v", durationFromNowStr)
 	}
 
 	// Calculate reaching time if we have event_time
@@ -133,15 +180,22 @@ func (r *ReminderWant) Initialize() {
 	locals.ReactionID = fmt.Sprintf("reminder-%s-%d", r.Metadata.Name, time.Now().UnixNano())
 
 	// Store initial state
-	r.StoreStateMulti(map[string]any{
-		"reminder_phase": locals.Phase,
-		"message":        locals.Message,
-		"ahead":          locals.Ahead,
-		"reaction_id":    locals.ReactionID,
+	stateMap := map[string]any{
+		"reminder_phase":   locals.Phase,
+		"message":          locals.Message,
+		"ahead":            locals.Ahead,
+		"reaction_id":      locals.ReactionID,
 		"require_reaction": requireReaction,
-		"reaction_type":  reactionType,
-		"timeout":        300,
-	})
+		"reaction_type":    reactionType,
+		"timeout":          300,
+	}
+
+	// Add duration_from_now if it was provided
+	if locals.DurationFromNow != "" {
+		stateMap["duration_from_now"] = locals.DurationFromNow
+	}
+
+	r.StoreStateMulti(stateMap)
 
 	if !locals.ReachingTime.IsZero() {
 		r.StoreStateMulti(map[string]any{
@@ -156,6 +210,11 @@ func (r *ReminderWant) Initialize() {
 	if r.hasWhenSpec() {
 		r.StoreLog("Setting up scheduler for recurring reminder")
 		// Scheduler agent will be set up by the caller
+	}
+
+	// If reaction is required, set Spec.Requires to trigger MonitorAgent
+	if requireReaction {
+		r.Spec.Requires = []string{"reminder_monitoring"}
 	}
 
 	InfoLog("[REMINDER] Initialized reminder '%s' with phase=%s, require_reaction=%v\n",
@@ -196,6 +255,7 @@ func (r *ReminderWant) Progress() {
 		r.StoreLog(fmt.Sprintf("ERROR: Unknown phase: %s", locals.Phase))
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		locals.Phase = ReminderPhaseFailed
+		r.Status = "failed"
 		r.updateLocals(locals)
 	}
 }
@@ -222,6 +282,27 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 	// Check if user reaction is available
 	if locals.RequireReaction {
+		// First check the global reaction queue
+		if globalReactionQueue != nil {
+			reactionID, _ := r.GetState("reaction_id")
+			reactionIDStr := fmt.Sprintf("%v", reactionID)
+
+			if reaction, found := globalReactionQueue.GetReaction(reactionIDStr); found {
+				// Convert reaction to state-compatible format
+				reactionData := map[string]any{
+					"approved": reaction.Approved,
+					"comment":  reaction.Comment,
+					"timestamp": reaction.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+				}
+				r.StoreLog(fmt.Sprintf("Reaction from queue: %v", reaction.Approved))
+				r.processReaction(locals, reactionData)
+				// Remove reaction from queue after processing
+				globalReactionQueue.RemoveReaction(reactionIDStr)
+				return
+			}
+		}
+
+		// Fall back to checking state
 		if userReaction, exists := r.GetState("user_reaction"); exists {
 			r.processReaction(locals, userReaction)
 			return
@@ -241,6 +322,7 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 			r.StoreState("reminder_phase", ReminderPhaseCompleted)
 			r.StoreState("auto_completed", true)
 			locals.Phase = ReminderPhaseCompleted
+			r.Status = "achieved"
 			r.updateLocals(locals)
 			return
 		}
@@ -252,6 +334,7 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 			r.StoreState("reminder_phase", ReminderPhaseCompleted)
 			r.StoreState("auto_completed", true)
 			locals.Phase = ReminderPhaseCompleted
+			r.Status = "achieved"
 			r.updateLocals(locals)
 		}
 	}
@@ -267,11 +350,13 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 				r.StoreState("reminder_phase", ReminderPhaseCompleted)
 				r.StoreState("reaction_result", "approved")
 				locals.Phase = ReminderPhaseCompleted
+				r.Status = "achieved"
 			} else {
 				r.StoreLog("Reminder rejected by user")
 				r.StoreState("reminder_phase", ReminderPhaseFailed)
 				r.StoreState("reaction_result", "rejected")
 				locals.Phase = ReminderPhaseFailed
+				r.Status = "failed"
 			}
 			r.updateLocals(locals)
 		}
@@ -285,11 +370,13 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		r.StoreState("timeout", true)
 		locals.Phase = ReminderPhaseFailed
+		r.Status = "failed"
 	} else {
 		r.StoreLog("Reaction timeout - auto-completing (require_reaction=false)")
 		r.StoreState("reminder_phase", ReminderPhaseCompleted)
 		r.StoreState("auto_completed", true)
 		locals.Phase = ReminderPhaseCompleted
+		r.Status = "achieved"
 	}
 	r.updateLocals(locals)
 }

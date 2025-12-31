@@ -1,0 +1,168 @@
+wantType:
+  metadata:
+    name: gmail
+    title: Gmail Operations via Natural Language
+    description: |
+      Executes Gmail operations using natural language prompts.
+
+      Leverages Claude Code's Gmail MCP tools to search, read, and send emails
+      through natural language instructions. The operation completes in a single execution
+      and provides results to downstream wants through output channels.
+
+      Examples:
+      - "Search for unread emails from boss@company.com"
+      - "Read the latest email from smagol"
+      - "Send an email to colleague@example.com with subject 'Report'"
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: prompt
+    description: |
+      Natural language instruction for Gmail operation.
+
+      Claude will interpret the prompt and execute the appropriate Gmail MCP tool.
+      The prompt can describe email searches, reading specific emails, or sending emails.
+
+      Claude determines the operation type automatically from the language context.
+    type: string
+    required: true
+    example: "Search for emails from boss@company.com that are unread"
+    validation:
+      minLength: 1
+
+  state:
+  - name: gmail_status
+    description: Current status of the Gmail operation (initialized, executing, completed, failed)
+    type: string
+    persistent: true
+    initialValue: "pending"
+    example: "completed"
+
+  - name: claude_output
+    description: Full output text from Claude Code execution
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "Found 3 emails from boss@company.com..."
+
+  - name: error
+    description: Error message if the operation failed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "claude command not found"
+
+  constraints:
+  - description: Prompt parameter is required
+    validation: prompt must not be empty
+
+  - description: Claude Code must be installed and available in PATH
+    validation: claude command must be available on the system
+
+  - description: Gmail MCP must be authenticated
+    validation: gmail MCP authentication must be configured
+
+  examples:
+  - name: Search Unread Emails from Boss
+    description: Search for unread emails from a specific sender
+    expectedBehavior: |
+      1. Natural language prompt sent to claude -p
+      2. Claude recognizes search operation and invokes gmail search MCP
+      3. Results returned as formatted email list
+      4. Output stored in claude_output state
+      5. Results provided to output channels for downstream processing
+    want:
+      metadata:
+        name: search_boss_emails
+        type: gmail
+        labels:
+          provides: boss_emails
+      spec:
+        params:
+          prompt: "Find unread emails from boss@company.com"
+
+  - name: Search Latest smagol Reservation
+    description: Search for latest booking/reservation emails from smagol
+    expectedBehavior: |
+      1. Natural language prompt about smagol reservations
+      2. Claude interprets the search intent
+      3. Gmail search finds matching emails
+      4. Output provides reservation details
+      5. Can be fed to coordinator for further processing
+    want:
+      metadata:
+        name: smagol_latest_booking
+        type: gmail
+        labels:
+          provides: booking_info
+      spec:
+        params:
+          prompt: "Find the latest reservation email from smagol"
+
+  - name: Read Specific Email by ID
+    description: Read full content of a specific email message
+    expectedBehavior: |
+      1. Prompt includes message ID reference
+      2. Claude extracts message ID and reads the email
+      3. Full email content returned (subject, from, body, attachments info)
+      4. Results stored and can be processed by downstream wants
+    want:
+      metadata:
+        name: read_booking_details
+        type: gmail
+      spec:
+        params:
+          prompt: "Show me the full content of the latest email with ID starting with '19b64e8b'"
+
+  - name: Send Email Notification
+    description: Send an email to specified recipient
+    expectedBehavior: |
+      1. Prompt contains recipient, subject, and message content
+      2. Claude parses email details from natural language
+      3. Email sent via Gmail MCP
+      4. Confirmation message returned
+      5. Status stored in state for auditing
+    want:
+      metadata:
+        name: send_notification
+        type: gmail
+      spec:
+        params:
+          prompt: "Send email to colleague@example.com with subject 'Weekly Report' and include the summary"
+
+  - name: Multi-Want with Coordinator
+    description: Gmail search followed by approval workflow (requires recipe)
+    expectedBehavior: |
+      1. Gmail want searches for emails matching criteria
+      2. Results provided to coordinator via output channel
+      3. Coordinator processes results for approval
+      4. Downstream wants can act on approval
+
+      Example flow:
+      1. Search important emails (Gmail want)
+      2. Pass results to approval coordinator
+      3. User reviews via API
+      4. Action want processes approved items
+    want:
+      metadata:
+        name: gmail_search_emails
+        type: gmail
+        labels:
+          provides: important_emails
+      spec:
+        params:
+          prompt: "Find all emails from important clients received this week"
+
+  relatedTypes:
+  - coordinator
+  - approval
+
+  seeAlso:
+  - Claude Code Gmail MCP documentation
+  - Natural language processing capabilities
+  - Email MCP tool specifications
+
+  require:
+    type: users

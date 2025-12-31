@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: reminder
-    title: Reminder Notification
+    title: Reminder
     description: |
       Sends a reminder notification at a scheduled time with optional user reaction.
 
@@ -35,17 +35,27 @@ wantType:
   - name: event_time
     description: |
       RFC3339 formatted time for the scheduled event.
-      Either event_time or when spec (recurring) must be provided.
+      Either event_time or duration_from_now or when spec (recurring) must be provided.
     type: string
     required: false
     example: "2025-12-28T14:00:00Z"
+
+  - name: duration_from_now
+    description: |
+      Duration from now until the event (e.g., "20 seconds", "5 minutes", "2 hours").
+      Either event_time or duration_from_now or when spec (recurring) must be provided.
+    type: string
+    required: false
+    validation:
+      pattern: '\d+ (seconds|minutes|hours|days)'
+    example: "20 seconds"
 
   - name: require_reaction
     description: |
       If true, reminder requires user approval/rejection via API.
       If false, reminder auto-completes after reaching the event time.
     type: bool
-    default: false
+    default: true
     required: false
     example: true
 
@@ -89,6 +99,13 @@ wantType:
     persistent: true
     initialValue: ''
     example: "2025-12-28T14:00:00Z"
+
+  - name: duration_from_now
+    description: Duration string used to calculate event_time (e.g., "20 seconds", "5 minutes")
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "20 seconds"
 
   - name: reaching_time
     description: RFC3339 timestamp when reminder enters reaching phase
@@ -157,8 +174,8 @@ wantType:
   - description: Message parameter is required
     validation: message must not be empty
 
-  - description: Either event_time or when spec must be provided
-    validation: event_time or when specification required
+  - description: Either event_time, duration_from_now, or when spec must be provided
+    validation: event_time or duration_from_now or when specification required
 
   - description: Ahead parameter must be valid duration
     validation: ahead must match pattern like "5 minutes", "10 seconds", etc
@@ -166,34 +183,41 @@ wantType:
   - description: require_reaction must be boolean
     validation: require_reaction must be true or false
 
+  - description: event_time and duration_from_now are mutually exclusive
+    validation: cannot provide both event_time and duration_from_now
+
   examples:
   - name: Simple Auto-Complete Reminder
-    description: One-time reminder that auto-completes without requiring user reaction
+    description: One-time reminder using relative time (duration_from_now)
     expectedBehavior: |
-      AHEAD PARAMETER CALCULATION:
-      • event_time: 2025-12-28T14:00:00Z
-      • ahead: "10 minutes"
-      • reaching_time = event_time - ahead = 2025-12-28T13:50:00Z
+      DURATION_FROM_NOW PARAMETER CALCULATION:
+      • duration_from_now: "10 seconds"
+      • ahead: "5 seconds"
+      • event_time = now + 10 seconds (calculated automatically)
+      • reaching_time = event_time - ahead = now + 5 seconds
 
       TIMELINE:
-      1. 13:50:00 - Reminder enters "reaching" phase (notification sent)
-      2. 13:50:00-14:00:00 - Notification active for 10 minutes
-      3. 14:00:00 - reminder_phase transitions to "completed" (auto-complete)
+      1. 0s - Reminder created, event_time set to 10 seconds from now
+      2. 5s - Reminder enters "reaching" phase (notification sent)
+      3. 5s-10s - Notification active for 5 seconds
+      4. 10s - reminder_phase transitions to "completed" (auto-complete)
 
       BEHAVIOR:
       • No user interaction required
-      • Reminder automatically completes at event_time
-      • Useful for informational alerts, countdown timers
+      • Uses relative time (duration_from_now) instead of absolute timestamp
+      • Automatically completes after duration_from_now expires
+      • Useful for quick alerts, relative scheduling
+      • Simpler than calculating absolute RFC3339 timestamps
     want:
       metadata:
-        name: meeting_reminder
+        name: quick_reminder
         type: reminder
       spec:
         params:
-          message: "Team meeting starting soon"
-          ahead: "10 minutes"
-          event_time: "2025-12-28T14:00:00Z"
-          require_reaction: false
+          message: "Quick check reminder"
+          ahead: "5 seconds"
+          duration_from_now: "10 seconds"
+          require_reaction: true
 
   - name: Reminder Requiring Approval
     description: Reminder that requires user approval via API before completing
@@ -374,6 +398,38 @@ wantType:
           event_time: "2025-12-28T21:35:30Z"
           require_reaction: true
           reaction_type: "internal"
+
+  - name: Relative Time Reminder (duration_from_now)
+    description: Reminder using relative time instead of absolute timestamp
+    expectedBehavior: |
+      DURATION_FROM_NOW PARAMETER:
+      • duration_from_now: "20 seconds"
+      • Calculated event_time = now + 20 seconds
+
+      TIMELINE:
+      1. 0s - Reminder created, event_time calculated as now + 20 seconds
+      2. If ahead: "5 seconds":
+         - reaching_time = event_time - 5 seconds = now + 15 seconds
+      3. 15s - Reminder enters "reaching" phase
+      4. 15s-20s - Notification active for 5 seconds (same as ahead)
+      5. 20s - reminder_phase transitions to "completed"
+
+      BEHAVIOR:
+      • No need to calculate absolute timestamps
+      • Useful for relative scheduling (e.g., "alert in 20 seconds")
+      • Convenient for dynamic reminder creation
+      • Automatically calculated at creation time
+      • Cannot use both event_time and duration_from_now together
+    want:
+      metadata:
+        name: quick_check_reminder
+        type: reminder
+      spec:
+        params:
+          message: "Quick reminder in 20 seconds"
+          ahead: "5 seconds"
+          duration_from_now: "20 seconds"
+          require_reaction: false
 
   relatedTypes:
   - execution_result

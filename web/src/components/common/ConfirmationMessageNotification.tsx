@@ -153,7 +153,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
                   disabled={isLoading || loading}
                   className={classNames(
                     'flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium',
-                    'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                    'bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-lg',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
@@ -166,7 +166,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
                   disabled={isLoading || loading}
                   className={classNames(
                     'flex items-center justify-center px-2 py-1 rounded-md text-xs font-medium',
-                    'bg-blue-100 text-blue-700 hover:bg-blue-200',
+                    'bg-blue-100 text-blue-700 hover:bg-blue-200 shadow-lg',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
@@ -184,7 +184,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
 
           {/* Robot icon on right */}
           <div className="flex-shrink-0">
-            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
+            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600 shadow-lg">
               <Bot className="h-5 w-5 text-white" />
             </div>
           </div>
@@ -196,7 +196,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
         <>
           {/* Robot icon */}
           <div className="flex-shrink-0">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600">
+            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg">
               <Bot className="h-6 w-6 text-white" />
             </div>
           </div>
@@ -242,7 +242,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
                   disabled={isLoading || loading}
                   className={classNames(
                     'flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium',
-                    'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                    'bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-lg',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
@@ -254,7 +254,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
                   disabled={isLoading || loading}
                   className={classNames(
                     'flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium',
-                    'bg-blue-100 text-blue-700 hover:bg-blue-200',
+                    'bg-blue-100 text-blue-700 hover:bg-blue-200 shadow-lg',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'transition-colors'
                   )}
@@ -284,7 +284,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
           (isAnimatingRobot || isAnimatingBubble) ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
         )}>
           {/* Robot icon - left (header height) */}
-          <div className="flex items-center justify-center flex-shrink-0 w-16 bg-blue-600 rounded-full">
+          <div className="flex items-center justify-center flex-shrink-0 w-16 bg-blue-600 rounded-full shadow-lg">
             <Bot className="h-9 w-9 text-white" />
           </div>
 
@@ -305,7 +305,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
               onClick={handleCancel}
               disabled={isLoading || loading}
               className={classNames(
-                'flex items-center justify-center rounded-md font-medium h-full px-4',
+                'flex items-center justify-center rounded-md font-medium h-full px-4 shadow-lg',
                 'bg-gray-100 text-gray-700 hover:bg-gray-200',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-colors'
@@ -318,7 +318,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
               onClick={handleConfirm}
               disabled={isLoading || loading}
               className={classNames(
-                'flex items-center justify-center rounded-md font-medium h-full px-4',
+                'flex items-center justify-center rounded-md font-medium h-full px-4 shadow-lg',
                 'bg-blue-100 text-blue-700 hover:bg-blue-200',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-colors'

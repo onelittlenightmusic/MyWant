@@ -34,6 +34,7 @@ interface WantCardProps {
   onDelete: (want: Want) => void;
   onSuspend?: (want: Want) => void;
   onResume?: (want: Want) => void;
+  onShowReactionConfirmation?: (want: Want, action: 'approve' | 'deny') => void;
   className?: string;
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
@@ -52,6 +53,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   onDelete,
   onSuspend,
   onResume,
+  onShowReactionConfirmation,
   className,
   expandedParents,
   onToggleExpand,
@@ -262,6 +264,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           onDelete={onDelete}
           onSuspend={onSuspend}
           onResume={onResume}
+          onShowReactionConfirmation={onShowReactionConfirmation}
         />
       </div>
 

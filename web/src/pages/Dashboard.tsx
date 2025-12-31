@@ -43,6 +43,13 @@ export const Dashboard: React.FC = () => {
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeletingWant, setIsDeletingWant] = useState(false);
+
+  // Reminder reaction (approve/deny) confirmation state
+  const [reactionWantState, setReactionWantState] = useState<Want | null>(null);
+  const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
+  const [reactionAction, setReactionAction] = useState<'approve' | 'deny' | null>(null);
+  const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
+
   const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
@@ -309,6 +316,55 @@ export const Dashboard: React.FC = () => {
     setShowDeleteConfirmation(true);
   };
 
+  const handleShowReactionConfirmation = (want: Want, action: 'approve' | 'deny') => {
+    setReactionWantState(want);
+    setReactionAction(action);
+    setShowReactionConfirmation(true);
+  };
+
+  const handleReactionConfirm = async () => {
+    if (!reactionWantState || !reactionAction) return;
+
+    setIsSubmittingReaction(true);
+    try {
+      const reactionId = reactionWantState.state?.reaction_id as string | undefined;
+      if (!reactionId) {
+        console.error('No reaction ID found');
+        return;
+      }
+
+      const response = await fetch(`/api/v1/reactions/${reactionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          approved: reactionAction === 'approve',
+          comment: `User ${reactionAction === 'approve' ? 'approved' : 'denied'} reminder`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit reaction: ${response.statusText}`);
+      }
+
+      setShowReactionConfirmation(false);
+      setReactionWantState(null);
+      setReactionAction(null);
+      console.log(`Reminder ${reactionAction === 'approve' ? 'approved' : 'denied'} successfully`);
+    } catch (error) {
+      console.error('Error submitting reaction:', error);
+    } finally {
+      setIsSubmittingReaction(false);
+    }
+  };
+
+  const handleReactionCancel = () => {
+    setShowReactionConfirmation(false);
+    setReactionWantState(null);
+    setReactionAction(null);
+  };
+
   const handleSuspendWant = async (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     if (!wantId) return;
@@ -354,6 +410,9 @@ export const Dashboard: React.FC = () => {
     setEditingWant(null);
     setDeleteWantState(null);
     setShowDeleteConfirmation(false);
+    setReactionWantState(null);
+    setShowReactionConfirmation(false);
+    setReactionAction(null);
   };
 
   // Export wants as YAML
@@ -609,22 +668,31 @@ export const Dashboard: React.FC = () => {
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
-        confirmationNotification={
-          <ConfirmationMessageNotification
-            message={deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null}
-            isVisible={showDeleteConfirmation}
-            onDismiss={() => setShowDeleteConfirmation(false)}
-            onConfirm={handleDeleteWantConfirm}
-            onCancel={handleDeleteWantCancel}
-            loading={isDeletingWant}
-            title="Delete Want"
-            layout="inline-header"
-          />
-        }
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px] relative">
+        {/* Confirmation Notification - Dashboard Right Layout */}
+        {(showDeleteConfirmation || showReactionConfirmation) && (
+          <ConfirmationMessageNotification
+            message={
+              showDeleteConfirmation
+                ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
+                : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
+            }
+            isVisible={showDeleteConfirmation || showReactionConfirmation}
+            onDismiss={() => {
+              setShowDeleteConfirmation(false);
+              setShowReactionConfirmation(false);
+            }}
+            onConfirm={showDeleteConfirmation ? handleDeleteWantConfirm : handleReactionConfirm}
+            onCancel={showDeleteConfirmation ? handleDeleteWantCancel : handleReactionCancel}
+            loading={isDeletingWant || isSubmittingReaction}
+            title={showDeleteConfirmation ? "Delete Want" : "Confirm"}
+            layout="dashboard-right"
+          />
+        )}
+
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
@@ -686,6 +754,7 @@ export const Dashboard: React.FC = () => {
                 onToggleExpand={handleToggleExpand}
                 onCreateWant={handleCreateWant}
                 onLabelDropped={handleLabelDropped}
+                onShowReactionConfirmation={handleShowReactionConfirmation}
               />
             </div>
           </div>

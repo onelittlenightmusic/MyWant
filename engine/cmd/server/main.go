@@ -197,6 +197,7 @@ func NewServer(config ServerConfig) *Server {
 	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
 	tempServer.registerDynamicAgents(agentRegistry)
 	types.RegisterExecutionAgents(agentRegistry)
+	types.RegisterMCPAgent(agentRegistry)
 
 	// Create and register reaction queue for reminders
 	reactionQueue := types.NewReactionQueue()
@@ -1976,6 +1977,7 @@ func (s *Server) Start() error {
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	types.RegisterExecutionResultWantType(s.globalBuilder)
 	types.RegisterReminderWantType(s.globalBuilder)
+	types.RegisterGmailWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)

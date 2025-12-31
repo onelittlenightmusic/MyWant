@@ -1,7 +1,8 @@
-import React from 'react';
-import { AlertTriangle, Bot, Pause, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, Bot, Pause, Clock, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import styles from './WantCard.module.css';
 
@@ -15,6 +16,7 @@ interface WantCardContentProps {
   onDelete?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
   onResume?: (want: Want) => void;
+  onShowReactionConfirmation?: (want: Want, action: 'approve' | 'deny') => void;
 }
 
 export const WantCardContent: React.FC<WantCardContentProps> = ({
@@ -26,7 +28,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   onEdit,
   onDelete,
   onSuspend,
-  onResume
+  onResume,
+  onShowReactionConfirmation
 }) => {
   const wantName = want.metadata?.name || want.metadata?.id || 'Unnamed Want';
   const wantType = want.metadata?.type || 'unknown';
@@ -34,6 +37,19 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const createdAt = want.stats?.created_at;
   const startedAt = want.stats?.started_at;
   const completedAt = want.stats?.completed_at;
+
+  // Reminder-specific state
+  const isReminder = want.metadata?.type === 'reminder';
+  const reminderPhase = want.state?.reminder_phase as string | undefined;
+  const reactionId = want.state?.reaction_id as string | undefined;
+  const requireReaction = want.spec?.params?.require_reaction !== false; // Default to true
+  const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && reactionId && requireReaction;
+
+  // Confirmation dialog state
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationAction, setConfirmationAction] = useState<'approve' | 'deny' | null>(null);
+  const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
 
   const isRunning = want.status === 'reaching';
   const isFailed = want.status === 'failed';
@@ -43,8 +59,87 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const canSuspendResume = isRunning && (onSuspend || onResume);
   const hasScheduling = (want.spec?.when && want.spec.when.length > 0);
 
+  // Handler for approval button
+  const handleApproveClick = () => {
+    if (onShowReactionConfirmation) {
+      onShowReactionConfirmation(want, 'approve');
+    } else {
+      // Fallback to local confirmation if handler not provided
+      setConfirmationAction('approve');
+      setConfirmationMessage('reminder');
+      setShowConfirmation(true);
+    }
+  };
+
+  // Handler for denial button
+  const handleDenyClick = () => {
+    if (onShowReactionConfirmation) {
+      onShowReactionConfirmation(want, 'deny');
+    } else {
+      // Fallback to local confirmation if handler not provided
+      setConfirmationAction('deny');
+      setConfirmationMessage('reminder');
+      setShowConfirmation(true);
+    }
+  };
+
+  // Handler for confirmation dialog confirmation
+  const handleReactionConfirm = async () => {
+    if (!reactionId || !confirmationAction) return;
+
+    setIsSubmittingReaction(true);
+    try {
+      const response = await fetch(`/api/v1/reactions/${reactionId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          approved: confirmationAction === 'approve',
+          comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} reminder`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit reaction: ${response.statusText}`);
+      }
+
+      // Success - close confirmation dialog
+      setShowConfirmation(false);
+      setConfirmationAction(null);
+      setConfirmationMessage(null);
+
+      // Optionally refresh the want data or show success message
+      console.log(`Reminder ${confirmationAction === 'approve' ? 'approved' : 'denied'} successfully`);
+    } catch (error) {
+      console.error('Error submitting reaction:', error);
+      // Could show error notification here
+    } finally {
+      setIsSubmittingReaction(false);
+    }
+  };
+
+  // Handler for confirmation dialog cancellation
+  const handleReactionCancel = () => {
+    setShowConfirmation(false);
+    setConfirmationAction(null);
+    setConfirmationMessage(null);
+  };
+
   // Responsive sizing based on whether it's a child card
-  const sizes = isChild ? {
+  type SizeConfig = {
+    titleClass: string;
+    typeClass: string;
+    idClass: string;
+    iconSize: string;
+    statusSize: 'xs' | 'sm' | 'md' | 'lg';
+    agentDotSize: string;
+    errorIconSize: string;
+    errorTextSize: string;
+    textTruncate: number;
+  };
+
+  const sizes: SizeConfig = isChild ? {
     titleClass: 'text-sm font-semibold',
     typeClass: 'text-xs',
     idClass: 'text-xs',
@@ -226,6 +321,56 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </button>
         </div>
       )}
+
+      {/* Reminder Reaction Buttons */}
+      {shouldShowReactionButtons && (
+        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDenyClick}
+              disabled={isSubmittingReaction}
+              className={classNames(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
+                'bg-red-100 text-red-700 hover:bg-red-200',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-colors'
+              )}
+              title="Reject this reminder"
+            >
+              <ThumbsDown className="h-4 w-4" />
+              <span className={isChild ? 'hidden' : ''}>Deny</span>
+            </button>
+            <button
+              onClick={handleApproveClick}
+              disabled={isSubmittingReaction}
+              className={classNames(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
+                'bg-green-100 text-green-700 hover:bg-green-200',
+                'disabled:opacity-50 disabled:cursor-not-allowed',
+                'transition-colors'
+              )}
+              title="Approve this reminder"
+            >
+              <ThumbsUp className="h-4 w-4" />
+              <span className={isChild ? 'hidden' : ''}>Approve</span>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            Waiting for your decision...
+          </p>
+        </div>
+      )}
+
+      {/* Confirmation Message Notification */}
+      <ConfirmationMessageNotification
+        message={confirmationMessage}
+        isVisible={showConfirmation}
+        onDismiss={() => setShowConfirmation(false)}
+        onConfirm={handleReactionConfirm}
+        onCancel={handleReactionCancel}
+        loading={isSubmittingReaction}
+        title="Confirm"
+      />
     </>
   );
 };
