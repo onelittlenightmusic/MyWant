@@ -19,6 +19,7 @@ import { WantFilters } from '@/components/dashboard/WantFilters';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
+import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
 import { MessageNotification } from '@/components/common/MessageNotification';
 
@@ -61,6 +62,11 @@ export const Dashboard: React.FC = () => {
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
 
+  // Multi-select mode state
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedWantIds, setSelectedWantIds] = useState<Set<string>>(new Set());
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
   // Export/Import state
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -84,9 +90,6 @@ export const Dashboard: React.FC = () => {
   // Use sidebar.selectedItem directly as the single source of truth for selection
   // This prevents unwanted selection changes when the wants array is updated by polling
   const selectedWant = sidebar.selectedItem;
-
-  // For backward compatibility with code that uses selectedWantId
-  const selectedWantId = selectedWant?.metadata?.id || selectedWant?.id || null;
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,6 +200,78 @@ export const Dashboard: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [error, clearError]);
+
+  // Multi-select handlers
+  const handleToggleSelectMode = () => {
+    setIsSelectMode(prev => {
+      const newValue = !prev;
+      if (!newValue) {
+        // Exiting select mode - clear selection
+        setSelectedWantIds(new Set());
+      } else {
+        // Entering select mode - clear detail view
+        sidebar.clearSelection();
+      }
+      return newValue;
+    });
+  };
+
+  const handleSelectWant = (wantId: string) => {
+    setSelectedWantIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(wantId)) {
+        newSet.delete(wantId);
+      } else {
+        newSet.add(wantId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBatchStart = async () => {
+    setIsBatchProcessing(true);
+    try {
+      const promises = Array.from(selectedWantIds).map(id => startWant(id));
+      await Promise.all(promises);
+      showNotification(`Started ${selectedWantIds.size} wants`);
+    } catch (error) {
+      console.error('Batch start failed:', error);
+      showNotification('Failed to start some wants');
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  };
+
+  const handleBatchStop = async () => {
+    setIsBatchProcessing(true);
+    try {
+      const promises = Array.from(selectedWantIds).map(id => stopWant(id));
+      await Promise.all(promises);
+      showNotification(`Stopped ${selectedWantIds.size} wants`);
+    } catch (error) {
+      console.error('Batch stop failed:', error);
+      showNotification('Failed to stop some wants');
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedWantIds.size} wants?`)) return;
+    
+    setIsBatchProcessing(true);
+    try {
+      const promises = Array.from(selectedWantIds).map(id => deleteWant(id));
+      await Promise.all(promises);
+      showNotification(`Deleted ${selectedWantIds.size} wants`);
+      setSelectedWantIds(new Set()); // Clear selection after delete
+    } catch (error) {
+      console.error('Batch delete failed:', error);
+      showNotification('Failed to delete some wants');
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  };
 
   // Handlers
   const handleCreateWant = () => {
@@ -668,6 +743,8 @@ export const Dashboard: React.FC = () => {
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
         sidebarMinimized={sidebarMinimized}
+        showSelectMode={isSelectMode}
+        onToggleSelectMode={handleToggleSelectMode}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -755,6 +832,9 @@ export const Dashboard: React.FC = () => {
                 onCreateWant={handleCreateWant}
                 onLabelDropped={handleLabelDropped}
                 onShowReactionConfirmation={handleShowReactionConfirmation}
+                isSelectMode={isSelectMode}
+                selectedWantIds={selectedWantIds}
+                onSelectWant={handleSelectWant}
               />
             </div>
           </div>
@@ -1041,32 +1121,54 @@ export const Dashboard: React.FC = () => {
         </RightSidebar>
       </main>
 
-      {/* Right Sidebar for Want Details */}
+      {/* Right Sidebar for Want Details or Batch Control */}
       <RightSidebar
-        isOpen={!!selectedWant}
-        onClose={sidebar.clearSelection}
-        title={selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined}
-        backgroundStyle={sidebarBackgroundStyle}
-        headerActions={headerActions}
+        isOpen={!!selectedWant || (isSelectMode && selectedWantIds.size > 0)}
+        onClose={() => {
+          if (isSelectMode) {
+            // In select mode, closing sidebar clears selection but stays in select mode
+            setSelectedWantIds(new Set());
+          } else {
+            sidebar.clearSelection();
+          }
+        }}
+        title={
+          isSelectMode 
+            ? 'Batch Actions' 
+            : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined)
+        }
+        backgroundStyle={!isSelectMode ? sidebarBackgroundStyle : undefined}
+        headerActions={!isSelectMode ? headerActions : undefined}
       >
-        <WantDetailsSidebar
-          want={selectedWant}
-          initialTab={sidebarInitialTab}
-          onWantUpdate={() => {
-            if (selectedWant?.metadata?.id || selectedWant?.id) {
-              const wantId = (selectedWant.metadata?.id || selectedWant.id) as string;
-              const { fetchWantDetails } = useWantStore.getState();
-              fetchWantDetails(wantId);
-            }
-          }}
-          onHeaderStateChange={setHeaderState}
-          onRegisterHeaderActions={sidebar.registerHeaderActions}
-          onStart={handleStartWant}
-          onStop={handleStopWant}
-          onSuspend={handleSuspendWant}
-          onResume={handleResumeWant}
-          onDelete={handleShowDeleteConfirmation}
-        />
+        {isSelectMode ? (
+          <WantBatchControlPanel 
+            selectedCount={selectedWantIds.size}
+            onBatchStart={handleBatchStart}
+            onBatchStop={handleBatchStop}
+            onBatchDelete={handleBatchDelete}
+            onBatchCancel={handleToggleSelectMode}
+            loading={isBatchProcessing}
+          />
+        ) : (
+          <WantDetailsSidebar
+            want={selectedWant}
+            initialTab={sidebarInitialTab}
+            onWantUpdate={() => {
+              if (selectedWant?.metadata?.id || selectedWant?.id) {
+                const wantId = (selectedWant.metadata?.id || selectedWant.id) as string;
+                const { fetchWantDetails } = useWantStore.getState();
+                fetchWantDetails(wantId);
+              }
+            }}
+            onHeaderStateChange={setHeaderState}
+            onRegisterHeaderActions={sidebar.registerHeaderActions}
+            onStart={handleStartWant}
+            onStop={handleStopWant}
+            onSuspend={handleSuspendWant}
+            onResume={handleResumeWant}
+            onDelete={handleShowDeleteConfirmation}
+          />
+        )}
       </RightSidebar>
 
       {/* Modals */}

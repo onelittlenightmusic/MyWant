@@ -27,6 +27,9 @@ interface WantGridProps {
   onToggleExpand?: (wantId: string) => void;
   onCreateWant?: () => void;
   onLabelDropped?: (wantId: string) => void;
+  isSelectMode?: boolean;
+  selectedWantIds?: Set<string>;
+  onSelectWant?: (wantId: string) => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -47,7 +50,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onToggleExpand,
   onCreateWant,
   onLabelDropped,
-  onShowReactionConfirmation
+  onShowReactionConfirmation,
+  isSelectMode = false,
+  selectedWantIds = new Set(),
+  onSelectWant
 }) => {
   const hierarchicalWants = useMemo(() => {
     // First, build a map of all wants by name for efficient lookup
@@ -222,6 +228,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
         const wantId = want.metadata?.id || want.id;
         const isExpanded = expandedParents?.has(wantId || '') ?? false;
         const childCount = want.children?.length || 0;
+        
+        const isSelected = isSelectMode 
+          ? (wantId && selectedWantIds.has(wantId))
+          : selectedWant?.metadata?.id === want.metadata?.id;
 
         return (
           <div
@@ -235,9 +245,16 @@ export const WantGrid: React.FC<WantGridProps> = ({
             <WantCard
               want={want}
               children={want.children}
-              selected={selectedWant?.metadata?.id === want.metadata?.id}
+              selected={!!isSelected}
               selectedWant={selectedWant}
-              onView={onViewWant}
+              onView={(w) => {
+                if (isSelectMode && onSelectWant) {
+                  const id = w.metadata?.id || w.id;
+                  if (id) onSelectWant(id);
+                } else {
+                  onViewWant(w);
+                }
+              }}
               onViewAgents={onViewAgentsWant}
               onViewResults={onViewResultsWant}
               onEdit={onEditWant}
@@ -248,6 +265,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
               onToggleExpand={onToggleExpand}
               onLabelDropped={onLabelDropped}
               onShowReactionConfirmation={onShowReactionConfirmation}
+              isSelectMode={isSelectMode}
+              selectedWantIds={selectedWantIds}
             />
           </div>
         );

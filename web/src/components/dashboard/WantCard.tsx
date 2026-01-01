@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, CheckSquare, Square } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
@@ -39,6 +39,8 @@ interface WantCardProps {
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
   onLabelDropped?: (wantId: string) => void;
+  isSelectMode?: boolean;
+  selectedWantIds?: Set<string>;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -57,7 +59,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   className,
   expandedParents,
   onToggleExpand,
-  onLabelDropped
+  onLabelDropped,
+  isSelectMode = false,
+  selectedWantIds
 }) => {
   const wantId = want.metadata?.id || want.id;
   // Use expandedParents from keyboard navigation if provided, otherwise use local state
@@ -252,6 +256,17 @@ export const WantCard: React.FC<WantCardProps> = ({
       {/* Black overlay - covers remaining right portion */}
       <div style={blackOverlayStyle}></div>
 
+      {/* Selection Checkbox Overlay */}
+      {isSelectMode && (
+        <div className="absolute top-2 right-2 z-20 pointer-events-none">
+          {selected ? (
+            <CheckSquare className="w-6 h-6 text-blue-600 bg-white rounded-md" />
+          ) : (
+            <Square className="w-6 h-6 text-gray-400 bg-white rounded-md opacity-50" />
+          )}
+        </div>
+      )}
+
       {/* Parent want content using reusable component */}
       <div className="relative z-10">
         <WantCardContent
@@ -344,11 +359,13 @@ export const WantCard: React.FC<WantCardProps> = ({
               return idA.localeCompare(idB);
             }).map((child, index) => {
               const childId = child.metadata?.id || child.id || '';
-              const isChildSelected = selectedWant && (
-                (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
-                (selectedWant.id && selectedWant.id === child.id)
-              );
-
+              const isChildSelected = isSelectMode 
+                ? (selectedWantIds?.has(childId))
+                : (selectedWant && (
+                  (selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) ||
+                  (selectedWant.id && selectedWant.id === child.id)
+                ));
+              
               // Get background style for child want card
               const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
 
@@ -450,6 +467,17 @@ export const WantCard: React.FC<WantCardProps> = ({
                   onDragLeave={handleChildDragLeave}
                   onDrop={handleChildDrop}
                 >
+                  {/* Selection Checkbox Overlay for Child */}
+                  {isSelectMode && (
+                    <div className="absolute top-2 right-2 z-20 pointer-events-none">
+                      {isChildSelected ? (
+                        <CheckSquare className="w-5 h-5 text-blue-600 bg-white rounded-md" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-400 bg-white rounded-md opacity-50" />
+                      )}
+                    </div>
+                  )}
+
                   {/* White progress bar for child - animates from left to right */}
                   <div style={childWhiteProgressBarStyle}></div>
 

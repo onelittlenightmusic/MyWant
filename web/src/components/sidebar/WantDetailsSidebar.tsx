@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { RefreshCw, Settings, Eye, AlertTriangle, User, Users, Clock, CheckCircle, XCircle, Minus, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Play, Pause, Square, Trash2, Database, Plus } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
-import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { FormYamlToggle } from '@/components/common/FormYamlToggle';
@@ -11,6 +10,7 @@ import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutoc
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
+import { WantControlButtons } from '@/components/dashboard/WantControlButtons';
 import {
   DetailsSidebar,
   TabContent,
@@ -322,63 +322,19 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {want && (
-        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
-          {/* Start / Resume */}
-          <button
-            onClick={handleStartClick}
-            disabled={!canStart || loading}
-            title={canStart ? (isSuspended ? 'Resume execution' : 'Start execution') : 'Cannot start in current state'}
-            className={classNames(
-              'p-2 rounded-md transition-colors',
-              canStart && !loading
-                ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            )}
-          >
-            <Play className="h-4 w-4" />
-          </button>
-
-          {/* Suspend */}
-          {canSuspend && (
-            <button
-              onClick={handleSuspendClick}
-              disabled={!canSuspend || loading}
-              title="Suspend execution"
-              className="p-2 rounded-md transition-colors bg-orange-100 text-orange-600 hover:bg-orange-200"
-            >
-              <Pause className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Stop */}
-          <button
-            onClick={handleStopClick}
-            disabled={!canStop || loading}
-            title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
-            className={classNames(
-              'p-2 rounded-md transition-colors',
-              canStop && !loading
-                ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            )}
-          >
-            <Square className="h-4 w-4" />
-          </button>
-
-          {/* Delete */}
-          <button
-            onClick={handleDeleteClick}
-            disabled={!canDelete || loading}
-            title={canDelete ? 'Delete want' : 'No want selected'}
-            className={classNames(
-              'p-2 rounded-md transition-colors',
-              canDelete && !loading
-                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            )}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2">
+          <WantControlButtons
+            onStart={handleStartClick}
+            onStop={handleStopClick}
+            onSuspend={handleSuspendClick}
+            onDelete={handleDeleteClick}
+            canStart={canStart}
+            canStop={canStop}
+            canSuspend={canSuspend}
+            canDelete={canDelete}
+            isSuspended={isSuspended}
+            loading={loading}
+          />
         </div>
       )}
 

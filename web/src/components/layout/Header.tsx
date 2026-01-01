@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, BarChart3 } from 'lucide-react';
+import { Plus, BarChart3, CheckSquare } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface HeaderProps {
@@ -12,6 +12,8 @@ interface HeaderProps {
   onSummaryToggle?: () => void;
   sidebarMinimized?: boolean;
   hideCreateButton?: boolean;
+  showSelectMode?: boolean;
+  onToggleSelectMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -23,7 +25,9 @@ export const Header: React.FC<HeaderProps> = ({
   showSummary = false,
   onSummaryToggle,
   sidebarMinimized = false,
-  hideCreateButton = false
+  hideCreateButton = false,
+  showSelectMode = false,
+  onToggleSelectMode
 }) => {
   return (
     <header className={classNames(
@@ -41,10 +45,25 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 flex-shrink-0">
+          {onToggleSelectMode && (
+            <button
+              onClick={onToggleSelectMode}
+              className={`inline-flex items-center px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
+                showSelectMode
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500'
+                  : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500'
+              }`}
+              title={showSelectMode ? 'Exit Select Mode' : 'Enter Select Mode'}
+            >
+              <CheckSquare className="h-4 w-4 mr-2 flex-shrink-0" />
+              Select
+            </button>
+          )}
+
           {onSummaryToggle && (
             <button
               onClick={onSummaryToggle}
-              className={`inline-flex items-center px-4 py-2 font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
+              className={`inline-flex items-center px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
                 showSummary
                   ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500'
                   : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500'
@@ -59,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
           {!hideCreateButton && (
             <button
               onClick={onCreateWant}
-              className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
+              className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
             >
               <Plus className="h-4 w-4 mr-2 flex-shrink-0" />
               {createButtonLabel}
