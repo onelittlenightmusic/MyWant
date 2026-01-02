@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown, Search } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -279,30 +279,33 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   // Expanded view - show all options
   return (
     <div className="space-y-2">
-      {/* Search Input - Collapsible */}
+      {/* Search Input with Icon */}
       {showSearch && (
-        <input
-          ref={searchInputRef}
-          type="text"
-          placeholder="Search want types or recipes..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              searchInputRef.current?.blur();
-            } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
-              e.preventDefault();
-              setFocusedIndex(0);
-              itemRefs.current[0]?.focus();
-            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              // Allow arrow keys from search input
-              handleKeyNavigation(e);
-            }
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          autoFocus
-        />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search want types or recipes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                searchInputRef.current?.blur();
+              } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
+                e.preventDefault();
+                setFocusedIndex(0);
+                itemRefs.current[0]?.focus();
+              } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                // Allow arrow keys from search input
+                handleKeyNavigation(e);
+              }
+            }}
+            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            autoFocus
+          />
+        </div>
       )}
 
       {/* Category Filter - Toggle Buttons */}

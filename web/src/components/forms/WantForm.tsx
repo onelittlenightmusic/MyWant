@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Plus, X, Code, Edit3, Search, ChevronDown, Clock } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, ChevronDown, Clock } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -58,7 +58,6 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
-  const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
   const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
     // All sections collapsed by default
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
@@ -105,8 +104,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       // Handle / to open search and focus
       if (e.key === '/' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        setShowSearch(true);
-        // Focus search input after state update
+        // Focus search input
         setTimeout(() => {
           typeSelectorRef.current?.focusSearch();
         }, 0);
@@ -250,7 +248,6 @@ export const WantForm: React.FC<WantFormProps> = ({
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
     setUserNameSuffix('');
-    setShowSearch(false);
     setYamlContent(stringifyYaml({
       metadata: { name: '', type: '' },
       spec: {}
@@ -425,26 +422,16 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Type/Recipe Selector */}
             <div>
               {!selectedTypeId && (
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Select Want Type or Recipe *
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowSearch(!showSearch)}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    title="Filter want types and recipes"
-                  >
-                    <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : 'text-gray-500'}`} />
-                  </button>
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Want Type or Recipe *
+                </label>
               )}
               <TypeRecipeSelector
                 ref={typeSelectorRef}
                 wantTypes={wantTypes}
                 recipes={recipes}
                 selectedId={selectedTypeId}
-                showSearch={showSearch}
+                showSearch={true}
                 onSelect={(id, itemType) => {
                   setSelectedTypeId(id);
                   setSelectedItemType(itemType);
