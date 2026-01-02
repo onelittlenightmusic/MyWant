@@ -9,10 +9,15 @@ import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { TypeRecipeSelector, TypeRecipeSelectorRef } from './TypeRecipeSelector';
+import { LabelsSection } from './sections/LabelsSection';
+import { DependenciesSection } from './sections/DependenciesSection';
+import { SchedulingSection } from './sections/SchedulingSection';
+import { ParametersSection } from './sections/ParametersSection';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 import { truncateText } from '@/utils/helpers';
+import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
@@ -50,17 +55,10 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<ApiError | null>(null);
   const [wantTypeLoading, setWantTypeLoading] = useState(false);
-  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
-  const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for label being edited
-  const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
-  const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' }); // Temporary draft for dependency being edited
-  const [editingWhenIndex, setEditingWhenIndex] = useState<number | null>(null);
-  const [editingWhenDraft, setEditingWhenDraft] = useState<{ at: string; everyValue: string; everyUnit: string }>({ at: '', everyValue: '', everyUnit: 'seconds' }); // Temporary draft for scheduling being edited
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
   const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
-  const [showOptionalParams, setShowOptionalParams] = useState(false); // Show/hide optional parameters
   const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
     // All sections collapsed by default
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
@@ -119,22 +117,20 @@ export const WantForm: React.FC<WantFormProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, editMode]);
 
-  // Reset optional parameters visibility when want type changes
-  useEffect(() => {
-    setShowOptionalParams(false);
-  }, [selectedTypeId]);
-
   // Handle arrow key navigation for form fields
   const handleArrowKeyNavigation = (e: React.KeyboardEvent, currentField: string) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
-    const fields = ['name', 'parameters', 'labels', 'dependencies', 'scheduling'];
+    const fields = ['type', 'name', 'parameters', 'labels', 'dependencies', 'scheduling'];
     const currentIndex = fields.indexOf(currentField);
 
     if (e.key === 'ArrowDown' && currentIndex < fields.length - 1) {
       e.preventDefault();
       const nextField = fields[currentIndex + 1];
       switch (nextField) {
+        case 'name':
+          nameInputRef.current?.focus();
+          break;
         case 'parameters':
           paramsSectionRef.current?.focus();
           break;
@@ -151,20 +147,22 @@ export const WantForm: React.FC<WantFormProps> = ({
     } else if (e.key === 'ArrowUp' && currentIndex > 0) {
       e.preventDefault();
       const prevField = fields[currentIndex - 1];
-      if (prevField === 'name') {
-        nameInputRef.current?.focus();
-      } else {
-        switch (prevField) {
-          case 'parameters':
-            paramsSectionRef.current?.focus();
-            break;
-          case 'labels':
-            labelsSectionRef.current?.focus();
-            break;
-          case 'dependencies':
-            dependenciesSectionRef.current?.focus();
-            break;
-        }
+      switch (prevField) {
+        case 'type':
+          typeSelectorRef.current?.focus();
+          break;
+        case 'name':
+          nameInputRef.current?.focus();
+          break;
+        case 'parameters':
+          paramsSectionRef.current?.focus();
+          break;
+        case 'labels':
+          labelsSectionRef.current?.focus();
+          break;
+        case 'dependencies':
+          dependenciesSectionRef.current?.focus();
+          break;
       }
     }
   };
@@ -375,113 +373,6 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   };
 
-  const addLabel = () => {
-    setLabels(prev => ({ ...prev, '': '' }));
-    setEditingLabelKey(''); // Start editing the new label immediately
-    setEditingLabelDraft({ key: '', value: '' }); // Initialize draft state
-  };
-
-  const updateLabel = async (oldKey: string, newKey: string, value: string) => {
-    setLabels(prev => {
-      const newLabels = { ...prev };
-      if (oldKey !== newKey && oldKey in newLabels) {
-        delete newLabels[oldKey];
-      }
-      if (newKey.trim()) {
-        newLabels[newKey] = value;
-      }
-      return newLabels;
-    });
-
-    // Register the label in the global registry
-    if (newKey.trim() && value.trim()) {
-      await addLabelToRegistry(newKey.trim(), value.trim());
-    }
-  };
-
-  const removeLabel = (key: string) => {
-    setLabels(prev => {
-      const newLabels = { ...prev };
-      delete newLabels[key];
-      return newLabels;
-    });
-  };
-
-  const addParam = () => {
-    setParams(prev => ({ ...prev, '': '' }));
-  };
-
-  const updateParam = (key: string, value: string) => {
-    setParams(prev => {
-      const newParams = { ...prev };
-      if (key.trim()) {
-        // Try to parse as number if possible, otherwise keep as string
-        const numValue = Number(value);
-        newParams[key] = !isNaN(numValue) && value.trim() !== '' ? numValue : value;
-      }
-      return newParams;
-    });
-  };
-
-  const removeParam = (key: string) => {
-    setParams(prev => {
-      const newParams = { ...prev };
-      delete newParams[key];
-      return newParams;
-    });
-  };
-
-  const addUsing = () => {
-    console.log('addUsing called, current using state:', using);
-    const newIndex = using.length; // Capture the index before state update
-    setUsing(prev => {
-      console.log('setUsing callback - prev length:', prev.length, 'new index:', newIndex);
-      return [...prev, { '': '' }];
-    });
-    setEditingUsingIndex(newIndex); // Use the captured index
-    setEditingUsingDraft({ key: '', value: '' });
-  };
-
-  const updateUsing = (index: number, key: string, value: string) => {
-    console.log('updateUsing called - index:', index, 'key:', key, 'value:', value, 'current using:', using);
-    setUsing(prev => {
-      const updated = prev.map((item, i) =>
-        i === index ? { [key]: value } : item
-      );
-      console.log('updateUsing - updated using array:', updated);
-      return updated;
-    });
-  };
-
-  const removeUsing = (index: number) => {
-    setUsing(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // When (Scheduling) management functions
-  const addWhen = () => {
-    const newIndex = when.length;
-    setWhen(prev => [...prev, { at: '', every: '30 seconds' }]);
-    setEditingWhenIndex(newIndex);
-    setEditingWhenDraft({ at: '', everyValue: '30', everyUnit: 'seconds' });
-  };
-
-  const removeWhen = (index: number) => {
-    setWhen(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Parse every field into value and unit (e.g., "30 seconds" -> { value: "30", unit: "seconds" })
-  const parseEvery = (every: string): { value: string; unit: string } => {
-    const parts = every.trim().split(/\s+/);
-    if (parts.length === 2) {
-      return { value: parts[0], unit: parts[1] };
-    }
-    return { value: every, unit: 'seconds' };
-  };
-
-  // Combine every value and unit back into every string
-  const formatEvery = (value: string, unit: string): string => {
-    return `${value} ${unit}`.trim();
-  };
 
   const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
@@ -513,12 +404,19 @@ export const WantForm: React.FC<WantFormProps> = ({
     </div>
   );
 
+  // Get background style based on selected want type
+  // Only show background when a type is selected (not during selection/re-selection)
+  const backgroundStyle = (selectedTypeId && selectedWantType)
+    ? getBackgroundStyle(selectedWantType.metadata.name).style
+    : undefined;
+
   return (
     <RightSidebar
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Want' : 'New Want'}
       headerActions={headerAction}
+      backgroundStyle={backgroundStyle}
     >
       <form id="want-form" onSubmit={handleSubmit} className="space-y-3">
 
@@ -526,19 +424,21 @@ export const WantForm: React.FC<WantFormProps> = ({
           <>
             {/* Type/Recipe Selector */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Select Want Type or Recipe *
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowSearch(!showSearch)}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                  title="Filter want types and recipes"
-                >
-                  <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : 'text-gray-500'}`} />
-                </button>
-              </div>
+              {!selectedTypeId && (
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Select Want Type or Recipe *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowSearch(!showSearch)}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Filter want types and recipes"
+                  >
+                    <Search className={`w-4 h-4 ${showSearch ? 'text-blue-500' : 'text-gray-500'}`} />
+                  </button>
+                </div>
+              )}
               <TypeRecipeSelector
                 ref={typeSelectorRef}
                 wantTypes={wantTypes}
@@ -554,754 +454,110 @@ export const WantForm: React.FC<WantFormProps> = ({
                   const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
                   const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
                   setName(generatedName);
+
+                  // Auto-focus Want Name after selection
+                  setTimeout(() => {
+                    nameInputRef.current?.focus();
+                  }, 0);
+                }}
+                onClear={() => {
+                  setSelectedTypeId(null);
+                  setSelectedItemType(null);
+                  setType('');
+                  setName('');
                 }}
                 onGenerateName={(id, itemType, suffix) => {
                   const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
                   return generateUniqueWantName(id, itemType, existingNames, suffix);
                 }}
+                onArrowDown={() => {
+                  nameInputRef.current?.focus();
+                }}
               />
             </div>
 
-            {/* Want Name with Auto-generation */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Want Name *
-              </label>
-              <div className="space-y-2">
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => handleArrowKeyNavigation(e, 'name')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Auto-generated or enter custom name"
-                  required
-                />
-                {selectedTypeId && (
-                  <div className="text-xs text-gray-600">
-                    <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
-                    {!isValidWantName(name) && name.trim() && (
-                      <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Parameters - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                ref={paramsSectionRef}
-                type="button"
-                onClick={() => toggleSection('parameters')}
-                onFocus={() => {
-                  if (collapsedSections.has('parameters')) {
-                    toggleSection('parameters');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const container = e.currentTarget.parentElement;
-                    // Expand section if collapsed
-                    if (collapsedSections.has('parameters')) {
-                      toggleSection('parameters');
-                    }
-                    // Focus first parameter input when right arrow is pressed
-                    setTimeout(() => {
-                      // Look for the first input within the expanded content
-                      const firstInput = container?.querySelector('input[type="text"]');
-                      if (firstInput) {
-                        (firstInput as HTMLInputElement)?.focus();
-                      }
-                    }, 100);
-                  } else {
-                    handleArrowKeyNavigation(e, 'parameters');
-                  }
-                }}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-              >
-                <div className="flex items-center gap-0">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('parameters') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Parameters</h4>
-                </div>
-                {collapsedSections.has('parameters') && Object.entries(params).length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {Object.entries(params).map(([key, value]) => (
-                      <div key={key} className="text-gray-500">
-                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{String(value)}"</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('parameters') && (
-                <div className="border-t border-gray-200 p-4 space-y-3">
-                  {/* Show all parameters from want type definition */}
-                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
-                    <>
-                      {/* Required Parameters */}
-                      <div className="space-y-2">
-                        {selectedWantType.parameters
-                          .filter(param => param.required || showOptionalParams)
-                          .map((param, index, filteredParams) => (
-                            <div key={param.name} className="space-y-1">
-                              <div className="flex gap-2 items-start">
-                                <div className="w-32 flex-shrink-0">
-                                  <label className="block text-sm font-medium text-gray-700 pt-2">
-                                    {param.name}
-                                    {param.required && <span className="text-red-600 ml-1">*</span>}
-                                  </label>
-                                </div>
-                                <input
-                                  type="text"
-                                  value={String(params[param.name] || '')}
-                                  onChange={(e) => updateParam(param.name, e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'ArrowDown') {
-                                      e.preventDefault();
-                                      if (index < filteredParams.length - 1) {
-                                        const nextInput = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.querySelector('input');
-                                        (nextInput as HTMLInputElement)?.focus();
-                                      }
-                                    } else if (e.key === 'ArrowUp') {
-                                      e.preventDefault();
-                                      if (index > 0) {
-                                        const prevInput = e.currentTarget.parentElement?.parentElement?.previousElementSibling?.querySelector('input');
-                                        (prevInput as HTMLInputElement)?.focus();
-                                      }
-                                    } else if (e.key === 'ArrowLeft') {
-                                      e.preventDefault();
-                                      paramsSectionRef.current?.focus();
-                                    }
-                                  }}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                  placeholder={param.description || 'Enter value'}
-                                />
-                              </div>
-                              {param.description && (
-                                <p className="text-xs text-gray-600 ml-32">{param.description}</p>
-                              )}
-                            </div>
-                          ))}
-                      </div>
-
-                      {/* Show Optional Parameters Toggle */}
-                      {selectedWantType.parameters.some(param => !param.required) && (
-                        <div className="pt-2 border-t border-gray-200">
-                          <button
-                            type="button"
-                            onClick={() => setShowOptionalParams(!showOptionalParams)}
-                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                          >
-                            <ChevronDown className={`w-4 h-4 transition-transform ${showOptionalParams ? '' : '-rotate-90'}`} />
-                            {showOptionalParams ? 'Hide' : 'Show'} Optional Parameters ({selectedWantType.parameters.filter(p => !p.required).length})
-                          </button>
-                        </div>
+            {/* Show fields only when a want type or recipe is selected */}
+            {selectedTypeId && (
+              <>
+                {/* Want Name with Auto-generation */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Want Name *
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => handleArrowKeyNavigation(e, 'name')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Auto-generated or enter custom name"
+                      required
+                    />
+                    <div className="text-xs text-gray-600">
+                      <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
+                      {!isValidWantName(name) && name.trim() && (
+                        <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      {/* Fallback for types without parameter definitions */}
-                      <div className="space-y-2">
-                        {Object.entries(params).map(([key, value], index) => (
-                          <div key={index} className="space-y-1">
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={key}
-                                onChange={(e) => {
-                                  const newKey = e.target.value;
-                                  const newParams = { ...params };
-                                  if (key !== newKey) {
-                                    delete newParams[key];
-                                    if (newKey.trim()) {
-                                      newParams[newKey] = value;
-                                    }
-                                    setParams(newParams);
-                                  }
-                                }}
-                                className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                placeholder="Key"
-                              />
-                              <input
-                                type="text"
-                                value={String(value)}
-                                onChange={(e) => updateParam(key, e.target.value)}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                                placeholder="Value"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeParam(key)}
-                                className="text-red-600 hover:text-red-800 p-2"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex gap-2 pt-2 border-t border-gray-200">
-                        <button
-                          type="button"
-                          onClick={addParam}
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                          disabled={!type}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Add Parameter
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Labels - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                ref={labelsSectionRef}
-                type="button"
-                onClick={() => toggleSection('labels')}
-                onFocus={() => {
-                  if (collapsedSections.has('labels')) {
-                    toggleSection('labels');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const container = e.currentTarget.parentElement;
-                    // Expand section if collapsed
-                    if (collapsedSections.has('labels')) {
-                      toggleSection('labels');
-                    }
-                    // If no label is being edited, start editing a new label
-                    if (editingLabelKey === null) {
-                      addLabel();
-                    }
-                    // Focus first label input when right arrow is pressed
-                    setTimeout(() => {
-                      const firstInput = container?.querySelector('.border-t input[type="text"]');
-                      (firstInput as HTMLInputElement)?.focus();
-                    }, 100);
-                  } else {
-                    handleArrowKeyNavigation(e, 'labels');
-                  }
-                }}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-              >
-                <div className="flex items-center gap-0">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('labels') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Labels</h4>
-                </div>
-                {collapsedSections.has('labels') && Object.entries(labels).length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {Object.entries(labels).map(([key, value]) => (
-                      <div key={key} className="text-gray-500">
-                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('labels') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Display existing labels as styled chips */}
-                  {Object.entries(labels).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {Object.entries(labels).map(([key, value]) => {
-                        // Don't show chip if this label is being edited
-                        if (editingLabelKey === key) return null;
-
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => {
-                              setEditingLabelKey(key);
-                              setEditingLabelDraft({ key, value });
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                            title={`${key}: ${value}`.length > 20 ? `${key}: ${value}` : undefined}
-                          >
-                            {truncateText(`${key}: ${value}`, 20)}
-                            <X
-                              className="w-3 h-3 ml-2 hover:text-blue-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeLabel(key);
-                              }}
-                            />
-                          </button>
-                        );
-                      })}
                     </div>
-                  )}
-
-                  {/* Label input form - shown when editing or adding new label */}
-                  {editingLabelKey !== null && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      <LabelAutocomplete
-                        keyValue={editingLabelDraft.key}
-                        valueValue={editingLabelDraft.value}
-                        onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
-                        onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
-                        onRemove={() => {
-                          removeLabel(editingLabelKey);
-                          setEditingLabelKey(null);
-                          setEditingLabelDraft({ key: '', value: '' });
-                        }}
-                        onLeftKey={() => labelsSectionRef.current?.focus()}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Only update if draft has a key value
-                            if (editingLabelDraft.key.trim()) {
-                              updateLabel(editingLabelKey === '__new__' ? '' : editingLabelKey, editingLabelDraft.key, editingLabelDraft.value);
-                            }
-                            setEditingLabelKey(null);
-                            setEditingLabelDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingLabelKey(null);
-                            setEditingLabelDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    {editingLabelKey === null && (
-                      <button
-                        type="button"
-                        onClick={() => addLabel()}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Label
-                      </button>
-                    )}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Dependencies - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                ref={dependenciesSectionRef}
-                type="button"
-                onClick={() => toggleSection('dependencies')}
-                onFocus={() => {
-                  if (collapsedSections.has('dependencies')) {
-                    toggleSection('dependencies');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const container = e.currentTarget.parentElement;
-                    // Expand section if collapsed
-                    if (collapsedSections.has('dependencies')) {
-                      toggleSection('dependencies');
-                    }
-                    // If no dependency is being edited, start editing a new dependency
-                    if (editingUsingIndex === null) {
-                      addUsing();
-                    }
-                    // Focus first dependency input when right arrow is pressed
-                    setTimeout(() => {
-                      const firstInput = container?.querySelector('.border-t input[type="text"]');
-                      (firstInput as HTMLInputElement)?.focus();
-                    }, 100);
-                  } else {
-                    handleArrowKeyNavigation(e, 'dependencies');
-                  }
-                }}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-              >
-                <div className="flex items-center gap-1">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('dependencies') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
-                </div>
-                {collapsedSections.has('dependencies') && using.length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {using.map((usingItem, index) => {
-                      const [key, value] = Object.entries(usingItem)[0];
-                      return (
-                        <div key={index} className="text-gray-500">
-                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{value}"</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </button>
+                {/* Parameters Section */}
+                <ParametersSection
+                  ref={paramsSectionRef}
+                  parameters={params}
+                  parameterDefinitions={selectedWantType?.parameters}
+                  onChange={setParams}
+                  isCollapsed={collapsedSections.has('parameters')}
+                  onToggleCollapse={() => toggleSection('parameters')}
+                  navigationCallbacks={{
+                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'parameters'),
+                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'parameters'),
+                  }}
+                />
 
-              {!collapsedSections.has('dependencies') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Display existing dependencies as styled chips */}
-                  {using.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {using.map((usingItem, index) => {
-                        // Don't show chip if this dependency is being edited
-                        if (editingUsingIndex === index) return null;
+                {/* Labels Section */}
+                <LabelsSection
+                  ref={labelsSectionRef}
+                  labels={labels}
+                  onChange={setLabels}
+                  isCollapsed={collapsedSections.has('labels')}
+                  onToggleCollapse={() => toggleSection('labels')}
+                  navigationCallbacks={{
+                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'labels'),
+                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'labels'),
+                  }}
+                />
 
-                        return Object.entries(usingItem).map(([key, value], keyIndex) => (
-                          <button
-                            key={`${index}-${keyIndex}`}
-                            type="button"
-                            onClick={() => {
-                              setEditingUsingIndex(index);
-                              setEditingUsingDraft({ key, value });
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                          >
-                            {key}: {value}
-                            <X
-                              className="w-3 h-3 ml-2 hover:text-blue-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeUsing(index);
-                              }}
-                            />
-                          </button>
-                        ));
-                      })}
-                    </div>
-                  )}
+                {/* Dependencies Section */}
+                <DependenciesSection
+                  ref={dependenciesSectionRef}
+                  dependencies={using}
+                  onChange={setUsing}
+                  isCollapsed={collapsedSections.has('dependencies')}
+                  onToggleCollapse={() => toggleSection('dependencies')}
+                  navigationCallbacks={{
+                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'dependencies'),
+                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'dependencies'),
+                  }}
+                />
 
-                  {/* Dependency input form - shown when editing or adding new dependency */}
-                  {editingUsingIndex !== null && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      <LabelSelectorAutocomplete
-                        keyValue={editingUsingDraft.key}
-                        valuValue={editingUsingDraft.value}
-                        onKeyChange={(newKey) => {
-                          setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
-                        }}
-                        onValueChange={(newValue) => {
-                          setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
-                        }}
-                        onRemove={() => {
-                          if (editingUsingIndex >= 0) {
-                            removeUsing(editingUsingIndex);
-                          }
-                          setEditingUsingIndex(null);
-                          setEditingUsingDraft({ key: '', value: '' });
-                        }}
-                        onLeftKey={() => dependenciesSectionRef.current?.focus()}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Confirm the changes
-                            console.log('Save button clicked - editingUsingDraft:', editingUsingDraft, 'editingUsingIndex:', editingUsingIndex, 'current using:', using);
-                            if (editingUsingDraft.key.trim()) {
-                              const newUsing = [...using];
-                              if (editingUsingIndex !== null && editingUsingIndex < newUsing.length) {
-                                // Replace the entire item with just the new key-value pair
-                                newUsing[editingUsingIndex] = { [editingUsingDraft.key]: editingUsingDraft.value };
-                              } else {
-                                // Adding new dependency
-                                newUsing.push({ [editingUsingDraft.key]: editingUsingDraft.value });
-                              }
-                              console.log('Setting using to:', newUsing);
-                              setUsing(newUsing);
-                            }
-                            setEditingUsingIndex(null);
-                            setEditingUsingDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingUsingIndex(null);
-                            setEditingUsingDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    {editingUsingIndex === null && (
-                      <button
-                        type="button"
-                        onClick={addUsing}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Dependency
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Scheduling - Collapsible Section */}
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                ref={schedulingSectionRef}
-                type="button"
-                onClick={() => toggleSection('scheduling')}
-                onFocus={() => {
-                  if (collapsedSections.has('scheduling')) {
-                    toggleSection('scheduling');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const container = e.currentTarget.parentElement;
-                    // Expand section if collapsed
-                    if (collapsedSections.has('scheduling')) {
-                      toggleSection('scheduling');
-                    }
-                    // If no scheduling is being edited, start editing a new schedule
-                    if (editingWhenIndex === null) {
-                      addWhen();
-                    }
-                    // Focus first scheduling input when right arrow is pressed
-                    setTimeout(() => {
-                      const firstInput = container?.querySelector('.border-t input[type="text"]');
-                      (firstInput as HTMLInputElement)?.focus();
-                    }, 100);
-                  } else {
-                    handleArrowKeyNavigation(e, 'scheduling');
-                  }
-                }}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
-              >
-                <div className="flex items-center gap-1">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('scheduling') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4 text-gray-600" />
-                    <h4 className="text-base font-medium text-gray-900">Scheduling (when)</h4>
-                  </div>
-                </div>
-                {collapsedSections.has('scheduling') && when.length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {when.map((whenItem, index) => {
-                      const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
-                      return (
-                        <div key={index} className="text-gray-500">
-                          {display}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('scheduling') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Display existing scheduling as styled chips */}
-                  {when.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {when.map((whenItem, index) => {
-                        // Don't show chip if this schedule is being edited
-                        if (editingWhenIndex === index) return null;
-
-                        const parsed = parseEvery(whenItem.every);
-                        const display = whenItem.at ? `${whenItem.at}, every ${parsed.value} ${parsed.unit}` : `every ${parsed.value} ${parsed.unit}`;
-
-                        return (
-                          <button
-                            key={index}
-                            type="button"
-                            onClick={() => {
-                              setEditingWhenIndex(index);
-                              const parsed = parseEvery(whenItem.every);
-                              setEditingWhenDraft({
-                                at: whenItem.at || '',
-                                everyValue: parsed.value,
-                                everyUnit: parsed.unit
-                              });
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors cursor-pointer"
-                          >
-                            <Clock className="w-3 h-3 mr-1" />
-                            {display}
-                            <X
-                              className="w-3 h-3 ml-2 hover:text-amber-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeWhen(index);
-                              }}
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Scheduling input form - shown when editing or adding new schedule */}
-                  {editingWhenIndex !== null && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      {/* At (time) - Optional */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          At (optional - e.g., "7am", "17:30", "midnight")
-                        </label>
-                        <input
-                          type="text"
-                          value={editingWhenDraft.at}
-                          onChange={(e) => {
-                            setEditingWhenDraft(prev => ({ ...prev, at: e.target.value }));
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'ArrowLeft') {
-                              e.preventDefault();
-                              schedulingSectionRef.current?.focus();
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                          placeholder="Optional - e.g., 7am, 17:30"
-                        />
-                      </div>
-
-                      {/* Every (frequency) */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Every (required)
-                        </label>
-                        <div className="flex gap-2 items-end">
-                          <div className="flex-1">
-                            <input
-                              type="number"
-                              value={editingWhenDraft.everyValue}
-                              onChange={(e) => {
-                                setEditingWhenDraft(prev => ({ ...prev, everyValue: e.target.value }));
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'ArrowLeft') {
-                                  e.preventDefault();
-                                  schedulingSectionRef.current?.focus();
-                                }
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                              placeholder="30"
-                              min="1"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <select
-                              value={editingWhenDraft.everyUnit}
-                              onChange={(e) => {
-                                setEditingWhenDraft(prev => ({ ...prev, everyUnit: e.target.value }));
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                            >
-                              <option value="seconds">seconds</option>
-                              <option value="minutes">minutes</option>
-                              <option value="hours">hours</option>
-                              <option value="days">days</option>
-                              <option value="weeks">weeks</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (editingWhenDraft.everyValue.trim()) {
-                              const newWhen = [...when];
-                              const every = formatEvery(editingWhenDraft.everyValue, editingWhenDraft.everyUnit);
-                              if (editingWhenIndex !== null && editingWhenIndex < newWhen.length) {
-                                newWhen[editingWhenIndex] = {
-                                  ...(editingWhenDraft.at && { at: editingWhenDraft.at }),
-                                  every
-                                };
-                              } else {
-                                newWhen.push({
-                                  ...(editingWhenDraft.at && { at: editingWhenDraft.at }),
-                                  every
-                                });
-                              }
-                              setWhen(newWhen);
-                            }
-                            setEditingWhenIndex(null);
-                            setEditingWhenDraft({ at: '', everyValue: '', everyUnit: 'seconds' });
-                          }}
-                          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingWhenIndex(null);
-                            setEditingWhenDraft({ at: '', everyValue: '', everyUnit: 'seconds' });
-                          }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    {editingWhenIndex === null && (
-                      <button
-                        type="button"
-                        onClick={addWhen}
-                        className="text-amber-600 hover:text-amber-800 text-sm font-medium flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Schedule
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                {/* Scheduling Section */}
+                <SchedulingSection
+                  ref={schedulingSectionRef}
+                  schedules={when}
+                  onChange={setWhen}
+                  isCollapsed={collapsedSections.has('scheduling')}
+                  onToggleCollapse={() => toggleSection('scheduling')}
+                  navigationCallbacks={{
+                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'scheduling'),
+                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'scheduling'),
+                  }}
+                />
+              </>
+            )}
           </>
         ) : (
           <>

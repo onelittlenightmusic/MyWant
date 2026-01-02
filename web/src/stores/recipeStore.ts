@@ -42,8 +42,8 @@ export const useRecipeStore = create<RecipeStore>((set, get) => ({
 
       // Sort deterministically by name to ensure consistent ordering across fetches
       const sortedRecipes = [...recipesArray].sort((a, b) => {
-        const nameA = a.metadata?.name || a.id || '';
-        const nameB = b.metadata?.name || b.id || '';
+        const nameA = a.recipe?.metadata?.name || (a as any).id || '';
+        const nameB = b.recipe?.metadata?.name || (b as any).id || '';
         return nameA.localeCompare(nameB);
       });
 

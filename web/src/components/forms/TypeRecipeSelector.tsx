@@ -20,11 +20,14 @@ interface TypeRecipeSelectorProps {
   selectedId: string | null;
   showSearch: boolean;
   onSelect: (id: string, itemType: 'want-type' | 'recipe') => void;
+  onClear?: () => void;
   onGenerateName: (selectedId: string, itemType: 'want-type' | 'recipe', userInput?: string) => string;
+  onArrowDown?: () => void;
 }
 
 export interface TypeRecipeSelectorRef {
   focusSearch: () => void;
+  focus: () => void;
 }
 
 export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSelectorProps>(({
@@ -33,13 +36,16 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   selectedId,
   showSearch,
   onSelect,
-  onGenerateName
+  onClear,
+  onGenerateName,
+  onArrowDown
 }, ref) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(!selectedId); // Auto-expand if nothing selected
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const collapsedButtonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Auto-expand when selectedId becomes null
@@ -49,10 +55,13 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
     }
   }, [selectedId]);
 
-  // Expose focusSearch method to parent
+  // Expose focus methods to parent
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
       searchInputRef.current?.focus();
+    },
+    focus: () => {
+      collapsedButtonRef.current?.focus();
     }
   }));
 
@@ -143,9 +152,15 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   }, [onSelect]);
 
   const handleToggleExpand = useCallback(() => {
-    setIsExpanded(prev => !prev);
+    setIsExpanded(prev => {
+      // Clear selection when expanding from collapsed state
+      if (!prev && onClear) {
+        onClear();
+      }
+      return !prev;
+    });
     setFocusedIndex(-1);
-  }, []);
+  }, [onClear]);
 
   // Handle keyboard navigation
   const handleKeyNavigation = useCallback((e: React.KeyboardEvent) => {
@@ -209,12 +224,26 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
     return (
       <div className="space-y-2">
-        <div className={`border-2 rounded-lg p-4 relative overflow-hidden ${
-          selectedItem.type === 'want-type'
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-green-500 bg-green-50'
-        } ${backgroundStyle.className}`}
-        style={backgroundStyle.style}>
+        <button
+          ref={collapsedButtonRef}
+          type="button"
+          onClick={handleToggleExpand}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleToggleExpand();
+            } else if (e.key === 'ArrowDown' && onArrowDown) {
+              e.preventDefault();
+              onArrowDown();
+            }
+          }}
+          className={`w-full border-2 rounded-lg p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
+            selectedItem.type === 'want-type'
+              ? 'border-blue-500 bg-blue-50 focus:ring-blue-500'
+              : 'border-green-500 bg-green-50 focus:ring-green-500'
+          } ${backgroundStyle.className}`}
+          style={backgroundStyle.style}
+        >
           {backgroundStyle.hasBackgroundImage && (
             <div className={getBackgroundOverlayClass()}></div>
           )}
@@ -232,19 +261,17 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleExpand}
+            <span
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 selectedItem.type === 'want-type'
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-green-100 text-green-700'
               }`}
             >
               Change
-            </button>
+            </span>
           </div>
-        </div>
+        </button>
       </div>
     );
   }
