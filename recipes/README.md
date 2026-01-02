@@ -244,14 +244,12 @@ All recipes include an `example` field for one-click frontend deployment:
 
 | File | Type | Description | Example Deploy |
 |------|------|-------------|-----------------|
-| `travel-itinerary.yaml` | Independent | Restaurant, hotel, and buffet coordination | ✓ |
 | `queue-system.yaml` | Dependent | Queue processing pipeline | ✓ |
 | `fibonacci-sequence.yaml` | Dependent | Fibonacci number generation | ✓ |
 | `fibonacci-pipeline.yaml` | Dependent | Fibonacci with pipeline pattern | ✓ |
 | `prime-sieve.yaml` | Dependent | Prime number generation | ✓ |
 | `qnet-pipeline.yaml` | Dependent | QNet queue network | ✓ |
 | `travel-agent.yaml` | Independent | Full agent-enabled travel system | ✓ |
-| `travel-itinerary-agent.yaml` | Independent | Travel with agent integration | ✓ |
 | `dynamic-travel-change.yaml` | Dynamic | Travel with real-time changes | ✓ |
 | `approval-level-1.yaml` | Approval | Multi-level approval workflows | ✓ |
 | `approval-level-2.yaml` | Approval | Advanced approval workflows | ✓ |
