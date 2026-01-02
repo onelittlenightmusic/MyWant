@@ -4,6 +4,7 @@ bin/
 *.dll
 *.so
 *.dylib
+engine/cmd/server/mywant-server
 
 # Test artifacts
 test/
