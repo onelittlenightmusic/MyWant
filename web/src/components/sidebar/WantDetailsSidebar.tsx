@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -11,6 +11,10 @@ import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import { WantControlButtons } from '@/components/dashboard/WantControlButtons';
+import { ParametersSection } from '@/components/forms/sections/ParametersSection';
+import { LabelsSection } from '@/components/forms/sections/LabelsSection';
+import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
+import { SchedulingSection } from '@/components/forms/sections/SchedulingSection';
 import {
   DetailsSidebar,
   TabContent,
@@ -490,167 +494,129 @@ const SettingsTab: React.FC<{
   onConfigModeChange,
   onWantUpdate
 }) => {
-  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
-  const [editingLabelDraft, setEditingLabelDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
-  const [editingUsingIndex, setEditingUsingIndex] = useState<number | null>(null);
-  const [editingUsingDraft, setEditingUsingDraft] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
   const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
-  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
-    return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
-  });
+
+  // Section collapsed states
+  const [isParametersCollapsed, setIsParametersCollapsed] = useState(true);
+  const [isLabelsCollapsed, setIsLabelsCollapsed] = useState(true);
+  const [isDependenciesCollapsed, setIsDependenciesCollapsed] = useState(true);
+  const [isSchedulingCollapsed, setIsSchedulingCollapsed] = useState(true);
+
+  // Form data states
   const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
   const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
   const [using, setUsing] = useState<Array<Record<string, string>>>(want.spec?.using || []);
   const [when, setWhen] = useState<Array<{ at?: string; every: string }>>(want.spec?.when || []);
 
-  const handleSaveLabel = async (oldKey: string) => {
-    if (!editingLabelDraft.key.trim() || !want.metadata?.id) return;
+  // Section refs for keyboard navigation
+  const paramsSectionRef = useRef<HTMLButtonElement>(null);
+  const labelsSectionRef = useRef<HTMLButtonElement>(null);
+  const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
+  const schedulingSectionRef = useRef<HTMLButtonElement>(null);
 
-    setLocalUpdateLoading(true);
-    setLocalUpdateError(null);
+  // Handler for parameter changes
+  const handleParametersChange = useCallback(async (newParams: Record<string, any>) => {
+    setParams(newParams);
+    // Parameters are saved via YAML edit mode, not directly via API
+  }, []);
+
+  // Handler for label changes - saves to API
+  const handleLabelsChange = useCallback(async (newLabels: Record<string, string>) => {
+    if (!want.metadata?.id) return;
+
+    const oldLabels = labels;
+    setLabels(newLabels);
 
     try {
-      // If key changed, remove old key first
-      if (oldKey && oldKey !== editingLabelDraft.key) {
-        const deleteResponse = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${oldKey}`, {
+      // Determine what changed
+      const added = Object.keys(newLabels).filter(key => !oldLabels[key]);
+      const removed = Object.keys(oldLabels).filter(key => !newLabels[key]);
+      const updated = Object.keys(newLabels).filter(key =>
+        oldLabels[key] && oldLabels[key] !== newLabels[key]
+      );
+
+      // Remove deleted labels
+      for (const key of removed) {
+        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' }
         });
-        if (!deleteResponse.ok) {
-          throw new Error('Failed to remove old label');
+      }
+
+      // Add new labels
+      for (const key of added) {
+        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: newLabels[key] })
+        });
+      }
+
+      // Update changed labels (delete old + add new)
+      for (const key of updated) {
+        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: newLabels[key] })
+        });
+      }
+
+      onWantUpdate?.();
+    } catch (error) {
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update labels');
+      setLabels(oldLabels); // Revert on error
+    }
+  }, [want.metadata?.id, labels, onWantUpdate]);
+
+  // Handler for dependency changes - saves to API
+  const handleDependenciesChange = useCallback(async (newUsing: Array<Record<string, string>>) => {
+    if (!want.metadata?.id) return;
+
+    const oldUsing = using;
+    setUsing(newUsing);
+
+    try {
+      // Simple approach: remove all old, add all new
+      // Remove all old dependencies
+      for (const dep of oldUsing) {
+        const key = Object.keys(dep)[0];
+        if (key) {
+          await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${key}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
       }
 
-      // Add new label
-      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: editingLabelDraft.key,
-          value: editingLabelDraft.value
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update label');
+      // Add all new dependencies
+      for (const dep of newUsing) {
+        const [key, value] = Object.entries(dep)[0];
+        if (key) {
+          await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/using`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value })
+          });
+        }
       }
-
-      // Update local state with new label
-      setLabels(prev => ({
-        ...prev,
-        [editingLabelDraft.key]: editingLabelDraft.value
-      }));
-
-      setEditingLabelKey(null);
-      setEditingLabelDraft({ key: '', value: '' });
-      onWantUpdate?.();
-    } catch (error) {
-      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update label');
-    } finally {
-      setLocalUpdateLoading(false);
-    }
-  };
-
-  const handleRemoveLabel = async (key: string) => {
-    if (!want.metadata?.id) return;
-
-    setLocalUpdateLoading(true);
-    setLocalUpdateError(null);
-
-    try {
-      const response = await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove label');
-      }
-
-      // Update local state to remove label
-      setLabels(prev => {
-        const updated = { ...prev };
-        delete updated[key];
-        return updated;
-      });
 
       onWantUpdate?.();
     } catch (error) {
-      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to remove label');
-    } finally {
-      setLocalUpdateLoading(false);
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependencies');
+      setUsing(oldUsing); // Revert on error
     }
-  };
+  }, [want.metadata?.id, using, onWantUpdate]);
 
-  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
-    setCollapsedSections(prev => {
-      const updated = new Set(prev);
-      if (updated.has(section)) {
-        updated.delete(section);
-      } else {
-        updated.add(section);
-      }
-      return updated;
-    });
-  };
-
-  const addParam = () => {
-    setParams(prev => ({ ...prev, '': '' }));
-  };
-
-  const updateParam = (key: string, value: string) => {
-    setParams(prev => {
-      const newParams = { ...prev };
-      if (key.trim()) {
-        const numValue = Number(value);
-        newParams[key] = !isNaN(numValue) && value.trim() !== '' ? numValue : value;
-      }
-      return newParams;
-    });
-  };
-
-  const removeParam = (key: string) => {
-    setParams(prev => {
-      const newParams = { ...prev };
-      delete newParams[key];
-      return newParams;
-    });
-  };
-
-  const addUsing = () => {
-    setEditingUsingIndex(using.length);  // Point to "new" index
-    setEditingUsingDraft({ key: '', value: '' });
-  };
-
-  const removeUsing = async (index: number) => {
-    if (!want.metadata?.id || index < 0 || index >= using.length) return;
-
-    setLocalUpdateLoading(true);
-    setLocalUpdateError(null);
-
-    try {
-      const keyToRemove = Object.keys(using[index])[0];
-      if (!keyToRemove) return;
-
-      const response = await fetch(
-        `http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${keyToRemove}`,
-        { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to remove dependency');
-      }
-
-      // Update local state to remove dependency
-      setUsing(prev => prev.filter((_, i) => i !== index));
-      onWantUpdate?.();
-    } catch (error) {
-      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to remove dependency');
-    } finally {
-      setLocalUpdateLoading(false);
-    }
-  };
+  // Handler for scheduling changes
+  const handleSchedulingChange = useCallback(async (newWhen: Array<{ at?: string; every: string }>) => {
+    setWhen(newWhen);
+    // Scheduling is saved via YAML edit mode, not directly via API
+  }, []);
 
   // Reset form state when want changes or metadata is updated (including labels/dependencies)
   useEffect(() => {
@@ -658,11 +624,11 @@ const SettingsTab: React.FC<{
     setLabels(want.metadata?.labels || {});
     setUsing(want.spec?.using || []);
     setWhen(want.spec?.when || []);
-    setEditingLabelKey(null);
-    setEditingLabelDraft({ key: '', value: '' });
-    setEditingUsingIndex(null);
-    setEditingUsingDraft({ key: '', value: '' });
-    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
+    // Reset collapsed states
+    setIsParametersCollapsed(true);
+    setIsLabelsCollapsed(true);
+    setIsDependenciesCollapsed(true);
+    setIsSchedulingCollapsed(true);
   }, [want.metadata?.id, want.metadata?.updatedAt]);
 
   return (
@@ -698,509 +664,121 @@ const SettingsTab: React.FC<{
               </div>
             </div>
 
-            {/* Parameters - Collapsible Section */}
-            <div className={SECTION_CONTAINER_CLASS}>
-              <button
-                type="button"
-                onClick={() => toggleSection('parameters')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('parameters') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Parameters</h4>
-                </div>
-                {collapsedSections.has('parameters') && Object.entries(params).length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {Object.entries(params).map(([key, value]) => (
-                      <div key={key} className="text-gray-500">
-                        <span className="font-medium">"{key}"</span> is <span className="font-medium">"{String(value)}"</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </button>
+            {/* Parameters - Using Common Component */}
+            <ParametersSection
+              ref={paramsSectionRef}
+              parameters={params}
+              onChange={handleParametersChange}
+              isCollapsed={isParametersCollapsed}
+              onToggleCollapse={() => setIsParametersCollapsed(!isParametersCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  // Navigate to metadata section (not implemented)
+                },
+                onNavigateDown: () => {
+                  labelsSectionRef.current?.focus();
+                }
+              }}
+            />
 
-              {!collapsedSections.has('parameters') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  <div className="space-y-2">
-                    {Object.entries(params).map(([key, value], index) => (
-                      <div key={index} className="space-y-1">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={key}
-                            onChange={(e) => {
-                              const newKey = e.target.value;
-                              const newParams = { ...params };
-                              if (key !== newKey) {
-                                delete newParams[key];
-                                if (newKey.trim()) {
-                                  newParams[newKey] = value;
-                                }
-                                setParams(newParams);
-                              }
-                            }}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Parameter name"
-                          />
-                          <input
-                            type="text"
-                            value={String(value)}
-                            onChange={(e) => updateParam(key, e.target.value)}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Parameter value"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeParam(key)}
-                            className="text-red-600 hover:text-red-800 p-2"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Labels - Using Common Component */}
+            <LabelsSection
+              ref={labelsSectionRef}
+              labels={labels}
+              onChange={handleLabelsChange}
+              isCollapsed={isLabelsCollapsed}
+              onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  paramsSectionRef.current?.focus();
+                },
+                onNavigateDown: () => {
+                  dependenciesSectionRef.current?.focus();
+                }
+              }}
+            />
 
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={addParam}
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Parameter
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Labels - Collapsible Section */}
-            <div className={SECTION_CONTAINER_CLASS}>
-              <button
-                type="button"
-                onClick={() => toggleSection('labels')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('labels') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Labels</h4>
-                </div>
-                {collapsedSections.has('labels') && Object.entries(labels).length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {Object.entries(labels).map(([key, value]) => {
-                      const maxLength = 20;
-                      const displayValue = value.length > maxLength ? value.substring(0, maxLength) + '...' : value;
-                      return (
-                        <div key={key} className="text-gray-500 truncate">
-                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{displayValue}"</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('labels') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Display existing labels as styled chips */}
-                  {Object.entries(labels).filter(([key]) => key.trim()).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {Object.entries(labels).map(([key, value]) => {
-                        if (editingLabelKey === key) return null;
-                        // Skip rendering labels with empty keys
-                        if (!key.trim()) return null;
-                        const labelText = `${key}: ${value}`;
-                        const displayText = truncateText(labelText, 20);
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            title={labelText.length > 20 ? labelText : undefined}
-                            onClick={() => {
-                              setEditingLabelKey(key);
-                              setEditingLabelDraft({ key, value });
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                          >
-                            {displayText}
-                            <X
-                              className="w-3 h-3 ml-2 hover:text-blue-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveLabel(key);
-                              }}
-                            />
-                          </button>
-                        );
-                      })}
+            {/* Timeline */}
+            {want.stats && (
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-base font-medium text-gray-900 mb-4">Timeline</h4>
+                <div className="space-y-3">
+                  {want.stats.created_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Created:</span>
+                      <span className="text-sm">{formatDate(want.stats.created_at)}</span>
                     </div>
                   )}
-
-                  {/* Label input form - shown when editing or adding new label */}
-                  {editingLabelKey !== null && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      <LabelAutocomplete
-                        keyValue={editingLabelDraft.key}
-                        valueValue={editingLabelDraft.value}
-                        onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
-                        onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
-                        onRemove={() => {
-                          handleRemoveLabel(editingLabelKey);
-                          setEditingLabelKey(null);
-                          setEditingLabelDraft({ key: '', value: '' });
-                        }}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (editingLabelDraft.key.trim()) {
-                              handleSaveLabel(editingLabelKey === '__new__' ? '' : editingLabelKey);
-                            }
-                            setEditingLabelKey(null);
-                            setEditingLabelDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingLabelKey(null);
-                            setEditingLabelDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                  {want.stats.started_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Started:</span>
+                      <span className="text-sm">{formatDate(want.stats.started_at)}</span>
                     </div>
                   )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    {editingLabelKey === null && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingLabelKey('__new__');
-                          setEditingLabelDraft({ key: '', value: '' });
-                        }}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Label
-                      </button>
-                    )}
-                  </div>
+                  {want.stats.completed_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Achieved:</span>
+                      <span className="text-sm">{formatDate(want.stats.completed_at)}</span>
+                    </div>
+                  )}
+                  {want.stats.started_at && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Duration:</span>
+                      <span className="text-sm">{formatDuration(want.stats.started_at, want.stats.completed_at)}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-
-      {/* Timeline */}
-      {want.stats && (
-        <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-base font-medium text-gray-900 mb-4">Timeline</h4>
-          <div className="space-y-3">
-            {want.stats.created_at && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Created:</span>
-                <span className="text-sm">{formatDate(want.stats.created_at)}</span>
               </div>
             )}
-            {want.stats.started_at && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Started:</span>
-                <span className="text-sm">{formatDate(want.stats.started_at)}</span>
+
+            {/* Dependencies - Using Common Component */}
+            <DependenciesSection
+              ref={dependenciesSectionRef}
+              dependencies={using}
+              onChange={handleDependenciesChange}
+              isCollapsed={isDependenciesCollapsed}
+              onToggleCollapse={() => setIsDependenciesCollapsed(!isDependenciesCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  labelsSectionRef.current?.focus();
+                },
+                onNavigateDown: () => {
+                  schedulingSectionRef.current?.focus();
+                }
+              }}
+            />
+
+            {/* Scheduling - Using Common Component */}
+            <SchedulingSection
+              ref={schedulingSectionRef}
+              schedules={when}
+              onChange={handleSchedulingChange}
+              isCollapsed={isSchedulingCollapsed}
+              onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  dependenciesSectionRef.current?.focus();
+                },
+                onNavigateDown: () => {
+                  // Last section, no navigation down
+                }
+              }}
+            />
+
+            {/* Error Information */}
+            {want.status === 'failed' && want.state?.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-base font-medium text-red-800 mb-3">Error Details</h4>
+                    <p className="text-sm text-red-600 break-words leading-relaxed">
+                      {typeof want.state.error === 'string' ? want.state.error : JSON.stringify(want.state.error)}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
-            {want.stats.completed_at && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Achieved:</span>
-                <span className="text-sm">{formatDate(want.stats.completed_at)}</span>
-              </div>
-            )}
-            {want.stats.started_at && (
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Duration:</span>
-                <span className="text-sm">{formatDuration(want.stats.started_at, want.stats.completed_at)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-            {/* Dependencies (using) - Collapsible Section */}
-            <div className={SECTION_CONTAINER_CLASS}>
-              <button
-                type="button"
-                onClick={() => toggleSection('dependencies')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('dependencies') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <h4 className="text-base font-medium text-gray-900">Dependencies (using)</h4>
-                </div>
-                {collapsedSections.has('dependencies') && using.length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {using.map((usingItem, index) => {
-                      const [key, value] = Object.entries(usingItem)[0];
-                      const maxLength = 20;
-                      const displayValue = value.length > maxLength ? value.substring(0, maxLength) + '...' : value;
-                      return (
-                        <div key={index} className="text-gray-500 truncate">
-                          <span className="font-medium">"{key}"</span> is <span className="font-medium">"{displayValue}"</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('dependencies') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Display existing dependencies as styled chips */}
-                  {using.filter(item => Object.keys(item)[0]?.trim()).length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {using.map((usingItem, index) => {
-                        if (editingUsingIndex === index) return null;
-                        const key = Object.keys(usingItem)[0];
-                        const value = usingItem[key];
-                        // Skip rendering empty keys
-                        if (!key?.trim()) return null;
-                        return (
-                          <button
-                            key={`${index}-${key}`}
-                            type="button"
-                            onClick={() => {
-                              setEditingUsingIndex(index);
-                              setEditingUsingDraft({ key, value });
-                            }}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer"
-                          >
-                            {key}: {value}
-                            <X
-                              className="w-3 h-3 ml-2 hover:text-blue-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeUsing(index).catch(() => {
-                                  // Error handling is done in removeUsing function
-                                });
-                              }}
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dependency input form - shown when editing or adding new dependency */}
-                  {editingUsingIndex !== null && (
-                    <div className="space-y-3 pt-4 border-t border-gray-200">
-                      <LabelSelectorAutocomplete
-                        keyValue={editingUsingDraft.key}
-                        valuValue={editingUsingDraft.value}
-                        onKeyChange={(newKey) => {
-                          setEditingUsingDraft(prev => ({ ...prev, key: newKey }));
-                        }}
-                        onValueChange={(newValue) => {
-                          setEditingUsingDraft(prev => ({ ...prev, value: newValue }));
-                        }}
-                        onRemove={() => {
-                          if (editingUsingIndex >= 0 && editingUsingIndex < using.length) {
-                            removeUsing(editingUsingIndex).catch(() => {
-                              // Error handling is done in removeUsing function
-                            });
-                          }
-                          setEditingUsingIndex(null);
-                          setEditingUsingDraft({ key: '', value: '' });
-                        }}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (!editingUsingDraft.key.trim() || !want.metadata?.id) return;
-
-                            setLocalUpdateLoading(true);
-                            setLocalUpdateError(null);
-
-                            try {
-                              // If editing existing dependency, remove old one first
-                              if (editingUsingIndex < using.length) {
-                                const oldDep = using[editingUsingIndex];
-                                const oldKey = Object.keys(oldDep)[0];
-                                if (oldKey && oldKey !== editingUsingDraft.key) {
-                                  const deleteResponse = await fetch(
-                                    `http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${oldKey}`,
-                                    { method: 'DELETE', headers: { 'Content-Type': 'application/json' } }
-                                  );
-                                  if (!deleteResponse.ok) {
-                                    throw new Error('Failed to remove old dependency');
-                                  }
-                                }
-                              }
-
-                              // Add new dependency
-                              const response = await fetch(
-                                `http://localhost:8080/api/v1/wants/${want.metadata.id}/using`,
-                                {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    key: editingUsingDraft.key,
-                                    value: editingUsingDraft.value
-                                  })
-                                }
-                              );
-
-                              if (!response.ok) {
-                                throw new Error('Failed to update dependency');
-                              }
-
-                              // Update local state with new using dependency
-                              if (editingUsingIndex < using.length) {
-                                // Editing existing - replace it
-                                const updated = [...using];
-                                updated[editingUsingIndex] = {
-                                  [editingUsingDraft.key]: editingUsingDraft.value
-                                };
-                                setUsing(updated);
-                              } else {
-                                // Adding new dependency
-                                setUsing(prev => [...prev, {
-                                  [editingUsingDraft.key]: editingUsingDraft.value
-                                }]);
-                              }
-
-                              setEditingUsingIndex(null);
-                              setEditingUsingDraft({ key: '', value: '' });
-                              onWantUpdate?.();
-                            } catch (error) {
-                              setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependency');
-                            } finally {
-                              setLocalUpdateLoading(false);
-                            }
-                          }}
-                          disabled={localUpdateLoading}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {localUpdateLoading ? 'Saving...' : 'Save'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingUsingIndex(null);
-                            setEditingUsingDraft({ key: '', value: '' });
-                          }}
-                          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    {editingUsingIndex === null && (
-                      <button
-                        type="button"
-                        onClick={addUsing}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Add Dependency
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Scheduling (when) - Collapsible Section */}
-            <div className={classNames(SECTION_CONTAINER_CLASS, 'mt-2')}>
-              <button
-                type="button"
-                onClick={() => toggleSection('scheduling')}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown
-                    className={`w-5 h-5 text-gray-600 transition-transform ${
-                      collapsedSections.has('scheduling') ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-600" />
-                    <h4 className="text-base font-medium text-gray-900">Scheduling (when)</h4>
-                  </div>
-                </div>
-                {collapsedSections.has('scheduling') && when.length > 0 && (
-                  <div className="text-sm text-gray-600 text-right flex-1 mr-2">
-                    {when.map((whenItem, index) => {
-                      const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
-                      return (
-                        <div key={index} className="text-gray-500">
-                          {display}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </button>
-
-              {!collapsedSections.has('scheduling') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {when.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {when.map((whenItem, index) => {
-                        const display = whenItem.at ? `${whenItem.at}, every ${whenItem.every}` : `every ${whenItem.every}`;
-                        return (
-                          <div
-                            key={index}
-                            className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-amber-100 text-amber-800"
-                          >
-                            <Clock className="w-3 h-3 mr-1" />
-                            {display}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">No scheduling configured</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-      {/* Error Information */}
-      {want.status === 'failed' && want.state?.error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <div className="flex items-start">
-            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <h4 className="text-base font-medium text-red-800 mb-3">Error Details</h4>
-              <p className="text-sm text-red-600 break-words leading-relaxed">
-                {typeof want.state.error === 'string' ? want.state.error : JSON.stringify(want.state.error)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
           </div>
         ) : (
           /* Config Editor View */
