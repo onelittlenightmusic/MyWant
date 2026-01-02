@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bot, Check, X } from 'lucide-react';
 import { classNames, truncateText } from '@/utils/helpers';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useConfirmationDialogKeyboard } from '@/hooks/useConfirmationDialogKeyboard';
 
 interface ConfirmationMessageNotificationProps {
   message: string | null;
@@ -90,6 +91,15 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
     setIsAnimating(false);
     onCancel();
   };
+
+  // Keyboard shortcuts for confirmation dialog
+  useConfirmationDialogKeyboard({
+    isVisible,
+    onConfirm: handleConfirm,
+    onCancel: handleCancel,
+    loading: isLoading || loading,
+    enabled: true
+  });
 
   if (!displayMessage) {
     return null;

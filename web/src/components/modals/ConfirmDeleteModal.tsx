@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { Want } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useConfirmationDialogKeyboard } from '@/hooks/useConfirmationDialogKeyboard';
 
 interface ConfirmDeleteModalProps {
   isOpen: boolean;
@@ -22,6 +23,15 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   loading = false,
   childrenCount = 0
 }) => {
+  // Keyboard shortcuts for confirmation dialog
+  useConfirmationDialogKeyboard({
+    isVisible: isOpen,
+    onConfirm,
+    onCancel: onClose,
+    loading,
+    enabled: isOpen && !loading
+  });
+
   if (!isOpen || !want) return null;
 
   const wantName = want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want';
