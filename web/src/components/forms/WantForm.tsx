@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, Plus, X, Code, Edit3, Search, ChevronDown, Clock } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -8,7 +8,7 @@ import { RightSidebar } from '@/components/layout/RightSidebar';
 import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
-import { TypeRecipeSelector } from './TypeRecipeSelector';
+import { TypeRecipeSelector, TypeRecipeSelectorRef } from './TypeRecipeSelector';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
 import { addLabelToRegistry } from '@/utils/labelUtils';
@@ -34,6 +34,16 @@ export const WantForm: React.FC<WantFormProps> = ({
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
   const { recipes, fetchRecipes } = useRecipeStore();
 
+  // Ref for TypeRecipeSelector
+  const typeSelectorRef = useRef<TypeRecipeSelectorRef>(null);
+
+  // Refs for form fields navigation
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const paramsSectionRef = useRef<HTMLButtonElement>(null);
+  const labelsSectionRef = useRef<HTMLButtonElement>(null);
+  const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
+  const schedulingSectionRef = useRef<HTMLButtonElement>(null);
+
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
   const [isEditing, setIsEditing] = useState(false);
@@ -50,6 +60,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
   const [showSearch, setShowSearch] = useState(false); // Show/hide search filter
+  const [showOptionalParams, setShowOptionalParams] = useState(false); // Show/hide optional parameters
   const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
     // All sections collapsed by default
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
@@ -77,6 +88,86 @@ export const WantForm: React.FC<WantFormProps> = ({
       }
     }
   }, [isOpen, wantTypes.length, recipes.length, fetchWantTypes, fetchRecipes]);
+
+  // Keyboard shortcut: / to focus search
+  useEffect(() => {
+    if (!isOpen || editMode !== 'form') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input (except for the target search box)
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      // If typing in an input, skip (the search input will handle ESC itself)
+      if (isInputElement) return;
+
+      // Handle / to open search and focus
+      if (e.key === '/' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShowSearch(true);
+        // Focus search input after state update
+        setTimeout(() => {
+          typeSelectorRef.current?.focusSearch();
+        }, 0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, editMode]);
+
+  // Reset optional parameters visibility when want type changes
+  useEffect(() => {
+    setShowOptionalParams(false);
+  }, [selectedTypeId]);
+
+  // Handle arrow key navigation for form fields
+  const handleArrowKeyNavigation = (e: React.KeyboardEvent, currentField: string) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+
+    const fields = ['name', 'parameters', 'labels', 'dependencies', 'scheduling'];
+    const currentIndex = fields.indexOf(currentField);
+
+    if (e.key === 'ArrowDown' && currentIndex < fields.length - 1) {
+      e.preventDefault();
+      const nextField = fields[currentIndex + 1];
+      switch (nextField) {
+        case 'parameters':
+          paramsSectionRef.current?.focus();
+          break;
+        case 'labels':
+          labelsSectionRef.current?.focus();
+          break;
+        case 'dependencies':
+          dependenciesSectionRef.current?.focus();
+          break;
+        case 'scheduling':
+          schedulingSectionRef.current?.focus();
+          break;
+      }
+    } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+      e.preventDefault();
+      const prevField = fields[currentIndex - 1];
+      if (prevField === 'name') {
+        nameInputRef.current?.focus();
+      } else {
+        switch (prevField) {
+          case 'parameters':
+            paramsSectionRef.current?.focus();
+            break;
+          case 'labels':
+            labelsSectionRef.current?.focus();
+            break;
+          case 'dependencies':
+            dependenciesSectionRef.current?.focus();
+            break;
+        }
+      }
+    }
+  };
 
   // Convert form data to want object
   const formToWantObject = () => {
@@ -449,6 +540,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                 </button>
               </div>
               <TypeRecipeSelector
+                ref={typeSelectorRef}
                 wantTypes={wantTypes}
                 recipes={recipes}
                 selectedId={selectedTypeId}
@@ -477,9 +569,11 @@ export const WantForm: React.FC<WantFormProps> = ({
               </label>
               <div className="space-y-2">
                 <input
+                  ref={nameInputRef}
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => handleArrowKeyNavigation(e, 'name')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Auto-generated or enter custom name"
                   required
@@ -498,9 +592,35 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Parameters - Collapsible Section */}
             <div className="border border-gray-200 rounded-lg">
               <button
+                ref={paramsSectionRef}
                 type="button"
                 onClick={() => toggleSection('parameters')}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
+                onFocus={() => {
+                  if (collapsedSections.has('parameters')) {
+                    toggleSection('parameters');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const container = e.currentTarget.parentElement;
+                    // Expand section if collapsed
+                    if (collapsedSections.has('parameters')) {
+                      toggleSection('parameters');
+                    }
+                    // Focus first parameter input when right arrow is pressed
+                    setTimeout(() => {
+                      // Look for the first input within the expanded content
+                      const firstInput = container?.querySelector('input[type="text"]');
+                      if (firstInput) {
+                        (firstInput as HTMLInputElement)?.focus();
+                      }
+                    }, 100);
+                  } else {
+                    handleArrowKeyNavigation(e, 'parameters');
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
               >
                 <div className="flex items-center gap-0">
                   <ChevronDown
@@ -522,109 +642,126 @@ export const WantForm: React.FC<WantFormProps> = ({
               </button>
 
               {!collapsedSections.has('parameters') && (
-                <div className="border-t border-gray-200 p-4 space-y-4">
-                  {/* Parameter definitions hint from want type */}
-                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                      <p className="text-sm font-medium text-blue-900 mb-2">Available Parameters:</p>
-                      <div className="space-y-1">
-                        {selectedWantType.parameters.map((param) => (
-                          <div key={param.name} className="text-xs text-blue-800">
-                            <span className="font-medium">{param.name}</span>
-                            {param.required && <span className="text-red-600 ml-1">*</span>}
-                            <span className="text-blue-700 ml-1">({param.type})</span>
-                            {param.description && <span className="text-blue-600 ml-1">- {param.description}</span>}
+                <div className="border-t border-gray-200 p-4 space-y-3">
+                  {/* Show all parameters from want type definition */}
+                  {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
+                    <>
+                      {/* Required Parameters */}
+                      <div className="space-y-2">
+                        {selectedWantType.parameters
+                          .filter(param => param.required || showOptionalParams)
+                          .map((param, index, filteredParams) => (
+                            <div key={param.name} className="space-y-1">
+                              <div className="flex gap-2 items-start">
+                                <div className="w-32 flex-shrink-0">
+                                  <label className="block text-sm font-medium text-gray-700 pt-2">
+                                    {param.name}
+                                    {param.required && <span className="text-red-600 ml-1">*</span>}
+                                  </label>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={String(params[param.name] || '')}
+                                  onChange={(e) => updateParam(param.name, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'ArrowDown') {
+                                      e.preventDefault();
+                                      if (index < filteredParams.length - 1) {
+                                        const nextInput = e.currentTarget.parentElement?.parentElement?.nextElementSibling?.querySelector('input');
+                                        (nextInput as HTMLInputElement)?.focus();
+                                      }
+                                    } else if (e.key === 'ArrowUp') {
+                                      e.preventDefault();
+                                      if (index > 0) {
+                                        const prevInput = e.currentTarget.parentElement?.parentElement?.previousElementSibling?.querySelector('input');
+                                        (prevInput as HTMLInputElement)?.focus();
+                                      }
+                                    } else if (e.key === 'ArrowLeft') {
+                                      e.preventDefault();
+                                      paramsSectionRef.current?.focus();
+                                    }
+                                  }}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                  placeholder={param.description || 'Enter value'}
+                                />
+                              </div>
+                              {param.description && (
+                                <p className="text-xs text-gray-600 ml-32">{param.description}</p>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+
+                      {/* Show Optional Parameters Toggle */}
+                      {selectedWantType.parameters.some(param => !param.required) && (
+                        <div className="pt-2 border-t border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => setShowOptionalParams(!showOptionalParams)}
+                            className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                          >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${showOptionalParams ? '' : '-rotate-90'}`} />
+                            {showOptionalParams ? 'Hide' : 'Show'} Optional Parameters ({selectedWantType.parameters.filter(p => !p.required).length})
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Fallback for types without parameter definitions */}
+                      <div className="space-y-2">
+                        {Object.entries(params).map(([key, value], index) => (
+                          <div key={index} className="space-y-1">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={key}
+                                onChange={(e) => {
+                                  const newKey = e.target.value;
+                                  const newParams = { ...params };
+                                  if (key !== newKey) {
+                                    delete newParams[key];
+                                    if (newKey.trim()) {
+                                      newParams[newKey] = value;
+                                    }
+                                    setParams(newParams);
+                                  }
+                                }}
+                                className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                placeholder="Key"
+                              />
+                              <input
+                                type="text"
+                                value={String(value)}
+                                onChange={(e) => updateParam(key, e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                placeholder="Value"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeParam(key)}
+                                className="text-red-600 hover:text-red-800 p-2"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
 
-                  <div className="space-y-2">
-                    {Object.entries(params).map(([key, value], index) => (
-                      <div key={index} className="space-y-1">
-                        <div className="flex gap-2">
-                          {selectedWantType && selectedWantType.parameters && selectedWantType.parameters.length > 0 ? (
-                            <select
-                              value={key}
-                              onChange={(e) => {
-                                const newKey = e.target.value;
-                                const newParams = { ...params };
-                                if (key !== newKey) {
-                                  delete newParams[key];
-                                  if (newKey.trim()) {
-                                    newParams[newKey] = value;
-                                  }
-                                  setParams(newParams);
-                                }
-                              }}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                              <option value="">Select parameter...</option>
-                              {selectedWantType.parameters.map((param) => (
-                                <option key={param.name} value={param.name}>
-                                  {param.name} {param.required ? '*' : ''} ({param.type})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              value={key}
-                              onChange={(e) => {
-                                const newKey = e.target.value;
-                                const newParams = { ...params };
-                                if (key !== newKey) {
-                                  delete newParams[key];
-                                  if (newKey.trim()) {
-                                    newParams[newKey] = value;
-                                  }
-                                  setParams(newParams);
-                                }
-                              }}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Parameter name"
-                            />
-                          )}
-                          <input
-                            type="text"
-                            value={String(value)}
-                            onChange={(e) => updateParam(key, e.target.value)}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Parameter value"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeParam(key)}
-                            className="text-red-600 hover:text-red-800 p-2"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {/* Show parameter help text from want type definition */}
-                        {selectedWantType && selectedWantType.parameters && (
-                          (() => {
-                            const paramDef = selectedWantType.parameters.find(p => p.name === key);
-                            return paramDef ? (
-                              <p className="text-xs text-gray-600 ml-3">{paramDef.description}</p>
-                            ) : null;
-                          })()
-                        )}
+                      <div className="flex gap-2 pt-2 border-t border-gray-200">
+                        <button
+                          type="button"
+                          onClick={addParam}
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                          disabled={!type}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Parameter
+                        </button>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={addParam}
-                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                      disabled={!type}
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Parameter
-                    </button>
-                  </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -632,9 +769,36 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Labels - Collapsible Section */}
             <div className="border border-gray-200 rounded-lg">
               <button
+                ref={labelsSectionRef}
                 type="button"
                 onClick={() => toggleSection('labels')}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
+                onFocus={() => {
+                  if (collapsedSections.has('labels')) {
+                    toggleSection('labels');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const container = e.currentTarget.parentElement;
+                    // Expand section if collapsed
+                    if (collapsedSections.has('labels')) {
+                      toggleSection('labels');
+                    }
+                    // If no label is being edited, start editing a new label
+                    if (editingLabelKey === null) {
+                      addLabel();
+                    }
+                    // Focus first label input when right arrow is pressed
+                    setTimeout(() => {
+                      const firstInput = container?.querySelector('.border-t input[type="text"]');
+                      (firstInput as HTMLInputElement)?.focus();
+                    }, 100);
+                  } else {
+                    handleArrowKeyNavigation(e, 'labels');
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
               >
                 <div className="flex items-center gap-0">
                   <ChevronDown
@@ -702,6 +866,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                           setEditingLabelKey(null);
                           setEditingLabelDraft({ key: '', value: '' });
                         }}
+                        onLeftKey={() => labelsSectionRef.current?.focus()}
                       />
                       <div className="flex gap-2">
                         <button
@@ -751,9 +916,36 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Dependencies - Collapsible Section */}
             <div className="border border-gray-200 rounded-lg">
               <button
+                ref={dependenciesSectionRef}
                 type="button"
                 onClick={() => toggleSection('dependencies')}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
+                onFocus={() => {
+                  if (collapsedSections.has('dependencies')) {
+                    toggleSection('dependencies');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const container = e.currentTarget.parentElement;
+                    // Expand section if collapsed
+                    if (collapsedSections.has('dependencies')) {
+                      toggleSection('dependencies');
+                    }
+                    // If no dependency is being edited, start editing a new dependency
+                    if (editingUsingIndex === null) {
+                      addUsing();
+                    }
+                    // Focus first dependency input when right arrow is pressed
+                    setTimeout(() => {
+                      const firstInput = container?.querySelector('.border-t input[type="text"]');
+                      (firstInput as HTMLInputElement)?.focus();
+                    }, 100);
+                  } else {
+                    handleArrowKeyNavigation(e, 'dependencies');
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
               >
                 <div className="flex items-center gap-1">
                   <ChevronDown
@@ -829,6 +1021,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                           setEditingUsingIndex(null);
                           setEditingUsingDraft({ key: '', value: '' });
                         }}
+                        onLeftKey={() => dependenciesSectionRef.current?.focus()}
                       />
                       <div className="flex gap-2">
                         <button
@@ -888,9 +1081,36 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Scheduling - Collapsible Section */}
             <div className="border border-gray-200 rounded-lg">
               <button
+                ref={schedulingSectionRef}
                 type="button"
                 onClick={() => toggleSection('scheduling')}
-                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors"
+                onFocus={() => {
+                  if (collapsedSections.has('scheduling')) {
+                    toggleSection('scheduling');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const container = e.currentTarget.parentElement;
+                    // Expand section if collapsed
+                    if (collapsedSections.has('scheduling')) {
+                      toggleSection('scheduling');
+                    }
+                    // If no scheduling is being edited, start editing a new schedule
+                    if (editingWhenIndex === null) {
+                      addWhen();
+                    }
+                    // Focus first scheduling input when right arrow is pressed
+                    setTimeout(() => {
+                      const firstInput = container?.querySelector('.border-t input[type="text"]');
+                      (firstInput as HTMLInputElement)?.focus();
+                    }, 100);
+                  } else {
+                    handleArrowKeyNavigation(e, 'scheduling');
+                  }
+                }}
+                className="w-full flex items-center justify-between p-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
               >
                 <div className="flex items-center gap-1">
                   <ChevronDown
@@ -973,6 +1193,12 @@ export const WantForm: React.FC<WantFormProps> = ({
                           onChange={(e) => {
                             setEditingWhenDraft(prev => ({ ...prev, at: e.target.value }));
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowLeft') {
+                              e.preventDefault();
+                              schedulingSectionRef.current?.focus();
+                            }
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                           placeholder="Optional - e.g., 7am, 17:30"
                         />
@@ -990,6 +1216,12 @@ export const WantForm: React.FC<WantFormProps> = ({
                               value={editingWhenDraft.everyValue}
                               onChange={(e) => {
                                 setEditingWhenDraft(prev => ({ ...prev, everyValue: e.target.value }));
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'ArrowLeft') {
+                                  e.preventDefault();
+                                  schedulingSectionRef.current?.focus();
+                                }
                               }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                               placeholder="30"

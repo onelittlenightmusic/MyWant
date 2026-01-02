@@ -8,6 +8,7 @@ interface LabelSelectorAutocompleteProps {
   onKeyChange: (key: string) => void;
   onValueChange: (value: string) => void;
   onRemove: () => void;
+  onLeftKey?: () => void;
 }
 
 export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps> = ({
@@ -16,6 +17,7 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
   onKeyChange,
   onValueChange,
   onRemove,
+  onLeftKey,
 }) => {
   const [keyOpen, setKeyOpen] = useState(false);
   const [valueOpen, setValueOpen] = useState(false);
@@ -168,6 +170,9 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
                   } else {
                     valueInputRef.current?.focus();
                   }
+                } else if (e.key === 'ArrowLeft' && onLeftKey) {
+                  e.preventDefault();
+                  onLeftKey();
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
@@ -234,6 +239,9 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
                   } else {
                     setValueOpen(false);
                   }
+                } else if (e.key === 'ArrowLeft' && onLeftKey) {
+                  e.preventDefault();
+                  onLeftKey();
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"

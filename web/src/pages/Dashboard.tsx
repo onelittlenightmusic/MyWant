@@ -203,17 +203,15 @@ export const Dashboard: React.FC = () => {
 
   // Multi-select handlers
   const handleToggleSelectMode = () => {
-    setIsSelectMode(prev => {
-      const newValue = !prev;
-      if (!newValue) {
-        // Exiting select mode - clear selection
-        setSelectedWantIds(new Set());
-      } else {
-        // Entering select mode - clear detail view
-        sidebar.clearSelection();
-      }
-      return newValue;
-    });
+    if (isSelectMode) {
+      // Exiting select mode - clear selection and close batch sidebar
+      setSelectedWantIds(new Set());
+      sidebar.closeBatch();
+      setIsSelectMode(false);
+    } else {
+      // Entering select mode - don't open batch sidebar yet
+      setIsSelectMode(true);
+    }
   };
 
   const handleSelectWant = (wantId: string) => {
@@ -221,8 +219,16 @@ export const Dashboard: React.FC = () => {
       const newSet = new Set(prev);
       if (newSet.has(wantId)) {
         newSet.delete(wantId);
+        // If no wants are selected, close batch sidebar
+        if (newSet.size === 0) {
+          sidebar.closeBatch();
+        }
       } else {
         newSet.add(wantId);
+        // Open batch sidebar when first want is selected
+        if (newSet.size === 1) {
+          sidebar.openBatch();
+        }
       }
       return newSet;
     });
@@ -637,7 +643,7 @@ export const Dashboard: React.FC = () => {
     enabled: !sidebar.showForm && filteredWants.length > 0 // Disable when form is open
   });
 
-  // Handle ESC key to close details sidebar and deselect
+  // Handle ESC key to close any open sidebar
   const handleEscapeKey = () => {
     if (selectedWant) {
       // Remember the last selected want before deselecting
@@ -646,13 +652,51 @@ export const Dashboard: React.FC = () => {
         setLastSelectedWantId(wantId);
       }
       sidebar.clearSelection();
+    } else if (sidebar.showSummary) {
+      sidebar.closeSummary();
+    } else if (sidebar.showForm) {
+      sidebar.closeForm();
+    } else if (isSelectMode) {
+      // Exit select mode
+      sidebar.closeBatch();
+      setSelectedWantIds(new Set());
+      setIsSelectMode(false);
     }
   };
 
   useEscapeKey({
     onEscape: handleEscapeKey,
-    enabled: !!selectedWant
+    enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode
   });
+
+  // Keyboard shortcuts: a (add), s (summary), Shift+S (select)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      // Handle shortcuts
+      if (e.key === 'a' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        handleCreateWant();
+      } else if (e.key === 's' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        sidebar.toggleSummary();
+      } else if (e.key === 'S' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        handleToggleSelectMode();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCreateWant, handleToggleSelectMode, sidebar]);
 
   // Determine background style for want details sidebar
   // Maps want types to background images, ensuring each type has a consistent visual
@@ -1123,10 +1167,11 @@ export const Dashboard: React.FC = () => {
 
       {/* Right Sidebar for Want Details or Batch Control */}
       <RightSidebar
-        isOpen={!!selectedWant || (isSelectMode && selectedWantIds.size > 0)}
+        isOpen={!!selectedWant || sidebar.showBatch}
         onClose={() => {
           if (isSelectMode) {
-            // In select mode, closing sidebar clears selection but stays in select mode
+            // In select mode, closing sidebar exits select mode
+            sidebar.closeBatch();
             setSelectedWantIds(new Set());
           } else {
             sidebar.clearSelection();

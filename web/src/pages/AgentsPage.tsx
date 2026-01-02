@@ -134,7 +134,7 @@ export const AgentsPage: React.FC = () => {
       <Header
         onCreateWant={handleCreateAgent}
         title="Agents"
-        createButtonLabel="Create Agent"
+        createButtonLabel="Add Agent"
         itemCount={agents.length}
         itemLabel="agent"
         showSummary={sidebar.showSummary}

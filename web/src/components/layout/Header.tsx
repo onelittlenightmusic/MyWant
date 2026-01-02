@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, BarChart3, CheckSquare } from 'lucide-react';
+import { Plus, BarChart3, ListChecks } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 interface HeaderProps {
@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
               title={showSelectMode ? 'Exit Select Mode' : 'Enter Select Mode'}
             >
-              <CheckSquare className="h-4 w-4 mr-2 flex-shrink-0" />
+              <ListChecks className="h-4 w-4 mr-2 flex-shrink-0" />
               Select
             </button>
           )}

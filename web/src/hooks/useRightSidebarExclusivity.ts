@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
 
-export type SidebarType = 'summary' | 'details' | 'form' | null;
+export type SidebarType = 'summary' | 'details' | 'form' | 'batch' | null;
 
 export interface UseRightSidebarExclusivityReturn<T> {
   // State
   showSummary: boolean;
   selectedItem: T | null;
   showForm: boolean;
+  showBatch: boolean;
   activeSidebar: SidebarType;
 
   // Actions
@@ -17,6 +18,8 @@ export interface UseRightSidebarExclusivityReturn<T> {
   clearSelection: () => void;
   openForm: () => void;
   closeForm: () => void;
+  openBatch: () => void;
+  closeBatch: () => void;
   closeAll: () => void;
 
   // Header actions (for Details sidebar)
@@ -26,7 +29,7 @@ export interface UseRightSidebarExclusivityReturn<T> {
 
 /**
  * Hook for managing mutually exclusive RightSidebar instances
- * Ensures only one of Summary, Details, or Form sidebars is visible at a time
+ * Ensures only one of Summary, Details, Form, or Batch sidebars is visible at a time
  *
  * @template T - Type of item in Details sidebar
  * @returns {UseRightSidebarExclusivityReturn<T>} Sidebar state and control methods
@@ -34,14 +37,17 @@ export interface UseRightSidebarExclusivityReturn<T> {
  * @example
  * const sidebar = useRightSidebarExclusivity<Want>();
  *
- * // Open Summary (auto-closes Details and Form)
+ * // Open Summary (auto-closes Details, Form, and Batch)
  * sidebar.openSummary();
  *
- * // Select item for Details (auto-closes Summary and Form)
+ * // Select item for Details (auto-closes Summary, Form, and Batch)
  * sidebar.selectItem(want);
  *
- * // Open Form (auto-closes Summary and Details)
+ * // Open Form (auto-closes Summary, Details, and Batch)
  * sidebar.openForm();
+ *
+ * // Open Batch (auto-closes Summary, Details, and Form)
+ * sidebar.openBatch();
  */
 export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivityReturn<T> {
   const [activeSidebar, setActiveSidebar] = useState<SidebarType>(null);
@@ -51,6 +57,7 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   // Computed states for easier usage
   const showSummary = activeSidebar === 'summary';
   const showForm = activeSidebar === 'form';
+  const showBatch = activeSidebar === 'batch';
 
   /**
    * Open Summary sidebar
@@ -135,6 +142,25 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   }, [activeSidebar]);
 
   /**
+   * Open Batch sidebar (for batch operations)
+   * Automatically closes Summary, Details, and Form sidebars
+   */
+  const openBatch = useCallback(() => {
+    setActiveSidebar('batch');
+    setSelectedItem(null);
+  }, []);
+
+  /**
+   * Close Batch sidebar
+   * Only closes if Batch is currently active
+   */
+  const closeBatch = useCallback(() => {
+    if (activeSidebar === 'batch') {
+      setActiveSidebar(null);
+    }
+  }, [activeSidebar]);
+
+  /**
    * Close all sidebars
    * Clears both active sidebar and selected item
    */
@@ -168,6 +194,7 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     showSummary,
     selectedItem,
     showForm,
+    showBatch,
     activeSidebar,
 
     // Actions
@@ -178,6 +205,8 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     clearSelection,
     openForm,
     closeForm,
+    openBatch,
+    closeBatch,
     closeAll,
 
     // Header actions

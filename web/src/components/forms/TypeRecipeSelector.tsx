@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import { ChevronRight, Package, Zap, ChevronDown } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
@@ -23,17 +23,38 @@ interface TypeRecipeSelectorProps {
   onGenerateName: (selectedId: string, itemType: 'want-type' | 'recipe', userInput?: string) => string;
 }
 
-export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
+export interface TypeRecipeSelectorRef {
+  focusSearch: () => void;
+}
+
+export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSelectorProps>(({
   wantTypes,
   recipes,
   selectedId,
   showSearch,
   onSelect,
   onGenerateName
-}) => {
+}, ref) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(!selectedId); // Auto-expand if nothing selected
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Auto-expand when selectedId becomes null
+  useEffect(() => {
+    if (!selectedId) {
+      setIsExpanded(true);
+    }
+  }, [selectedId]);
+
+  // Expose focusSearch method to parent
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => {
+      searchInputRef.current?.focus();
+    }
+  }));
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -115,14 +136,70 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
     return items.find(item => item.id === selectedId);
   }, [items, selectedId]);
 
-  const handleSelect = (item: TypeRecipeSelectorItem) => {
+  const handleSelect = useCallback((item: TypeRecipeSelectorItem) => {
     onSelect(item.id, item.type);
     setIsExpanded(false);
-  };
+    setFocusedIndex(-1);
+  }, [onSelect]);
 
-  const handleToggleExpand = () => {
-    setIsExpanded(!isExpanded);
-  };
+  const handleToggleExpand = useCallback(() => {
+    setIsExpanded(prev => !prev);
+    setFocusedIndex(-1);
+  }, []);
+
+  // Handle keyboard navigation
+  const handleKeyNavigation = useCallback((e: React.KeyboardEvent) => {
+    const totalItems = filteredItems.length;
+    if (totalItems === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const newIndex = focusedIndex < totalItems - 1 ? focusedIndex + 1 : 0;
+      setFocusedIndex(newIndex);
+      itemRefs.current[newIndex]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const newIndex = focusedIndex > 0 ? focusedIndex - 1 : totalItems - 1;
+      setFocusedIndex(newIndex);
+      itemRefs.current[newIndex]?.focus();
+    } else if (e.key === 'Enter' && focusedIndex >= 0) {
+      e.preventDefault();
+      const item = filteredItems[focusedIndex];
+      if (item) {
+        handleSelect(item);
+      }
+    }
+  }, [filteredItems, focusedIndex, handleSelect]);
+
+  // Reset focused index when filtered items change
+  useEffect(() => {
+    setFocusedIndex(-1);
+    itemRefs.current = [];
+  }, [searchQuery, selectedCategory]);
+
+  // Keyboard shortcut for Delete key in collapsed view
+  useEffect(() => {
+    if (!isExpanded && selectedItem) {
+      const handleDeleteKey = (e: KeyboardEvent) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          // Don't trigger if user is typing in an input
+          const target = e.target as HTMLElement;
+          const isInputElement =
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable;
+
+          if (!isInputElement) {
+            e.preventDefault();
+            handleToggleExpand();
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleDeleteKey);
+      return () => window.removeEventListener('keydown', handleDeleteKey);
+    }
+  }, [isExpanded, selectedItem, handleToggleExpand]);
 
   // Collapsed view - show only selected item
   if (!isExpanded && selectedItem) {
@@ -178,10 +255,24 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
       {/* Search Input - Collapsible */}
       {showSearch && (
         <input
+          ref={searchInputRef}
           type="text"
           placeholder="Search want types or recipes..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              searchInputRef.current?.blur();
+            } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
+              e.preventDefault();
+              setFocusedIndex(0);
+              itemRefs.current[0]?.focus();
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              // Allow arrow keys from search input
+              handleKeyNavigation(e);
+            }
+          }}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           autoFocus
         />
@@ -228,16 +319,24 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
               Want Types ({groupedItems.wantTypes.length})
             </h3>
             <div className="space-y-1">
-              {groupedItems.wantTypes.map(item => {
+              {groupedItems.wantTypes.map((item, index) => {
                 const backgroundStyle = getBackgroundStyle(item.name);
+                const globalIndex = filteredItems.findIndex(i => i.id === item.id);
+                const isFocused = focusedIndex === globalIndex;
                 return (
                   <button
                     key={item.id}
+                    ref={(el) => {
+                      if (el) itemRefs.current[globalIndex] = el;
+                    }}
                     type="button"
                     onClick={() => handleSelect(item)}
+                    onKeyDown={handleKeyNavigation}
                     className={`w-full text-left p-3 rounded-lg border-2 transition-colors relative overflow-hidden ${
                       selectedId === item.id
                         ? 'border-blue-500 bg-blue-50'
+                        : isFocused
+                        ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300'
                         : 'border-gray-200 hover:border-gray-300'
                     } ${backgroundStyle.className}`}
                     style={backgroundStyle.style}
@@ -271,17 +370,26 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
               Recipes ({groupedItems.recipes.length})
             </h3>
             <div className="space-y-1">
-              {groupedItems.recipes.map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleSelect(item)}
-                  className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
-                    selectedId === item.id
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
+              {groupedItems.recipes.map((item, index) => {
+                const globalIndex = filteredItems.findIndex(i => i.id === item.id);
+                const isFocused = focusedIndex === globalIndex;
+                return (
+                  <button
+                    key={item.id}
+                    ref={(el) => {
+                      if (el) itemRefs.current[globalIndex] = el;
+                    }}
+                    type="button"
+                    onClick={() => handleSelect(item)}
+                    onKeyDown={handleKeyNavigation}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                      selectedId === item.id
+                        ? 'border-green-500 bg-green-50'
+                        : isFocused
+                        ? 'border-green-400 bg-green-50 ring-2 ring-green-300'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-900">{item.title}</h4>
@@ -294,7 +402,8 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
                     )}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -308,4 +417,6 @@ export const TypeRecipeSelector: React.FC<TypeRecipeSelectorProps> = ({
 
     </div>
   );
-};
+});
+
+TypeRecipeSelector.displayName = 'TypeRecipeSelector';

@@ -199,7 +199,7 @@ export default function RecipePage() {
       <Header
         onCreateWant={handleCreateRecipe}
         title="Recipes"
-        createButtonLabel="Create Recipe"
+        createButtonLabel="Add Recipe"
         itemCount={recipes.length}
         itemLabel="recipe"
         showSummary={sidebar.showSummary}
