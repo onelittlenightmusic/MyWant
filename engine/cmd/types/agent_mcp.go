@@ -121,7 +121,12 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 
 	// Parse the response
 	fullOutput := strings.Join(outputLines, "\n")
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output (%d lines):\n%s\n", len(outputLines), fullOutput[:minInt(len(fullOutput), 500)])
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output (%d lines, %d chars):\n%s\n", len(outputLines), len(fullOutput), fullOutput[:minInt(len(fullOutput), 2000)])
+
+	// Debug: save full output to file
+	if err := os.WriteFile("/tmp/goose-output.txt", []byte(fullOutput), 0644); err == nil {
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output saved to /tmp/goose-output.txt\n")
+	}
 
 	result, err := parseGooseResponse(fullOutput)
 	if err != nil {
@@ -192,34 +197,66 @@ Steps:
 
 // parseGooseResponse extracts and processes Goose JSON output
 func parseGooseResponse(output string) (interface{}, error) {
+	// Debug: log raw input
+	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Raw input (%d chars, %d lines)\n", len(output), strings.Count(output, "\n")+1)
+	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] First 500 chars: %s\n", output[:minInt(len(output), 500)])
+	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Last 500 chars: %s\n", output[maxInt(0, len(output)-500):])
+
+	// Remove Goose session information lines
+	lines := strings.Split(output, "\n")
+	var cleanedLines []string
+	for _, line := range lines {
+		// Skip session info lines
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "starting session") ||
+			strings.HasPrefix(trimmed, "session id:") ||
+			strings.HasPrefix(trimmed, "working directory:") {
+			continue
+		}
+		cleanedLines = append(cleanedLines, line)
+	}
+	output = strings.Join(cleanedLines, "\n")
+
 	// Remove markdown code blocks if present (Goose may wrap JSON in ```json...```)
 	output = strings.ReplaceAll(output, "```json", "")
 	output = strings.ReplaceAll(output, "```", "")
 	output = strings.TrimSpace(output)
 
-	// Look for JSON object or array
-	startIdx := strings.Index(output, "{")
-	if startIdx == -1 {
-		startIdx = strings.Index(output, "[")
-	}
+	// Look for JSON object or array - check for both and use whichever comes first
+	objIdx := strings.Index(output, "{")
+	arrIdx := strings.Index(output, "[")
 
-	if startIdx == -1 {
+	var startIdx int
+	var isArray bool
+
+	if objIdx == -1 && arrIdx == -1 {
 		return nil, fmt.Errorf("no JSON found in response")
+	} else if arrIdx != -1 && (objIdx == -1 || arrIdx < objIdx) {
+		// Array comes first (or object not found)
+		startIdx = arrIdx
+		isArray = true
+	} else {
+		// Object comes first (or array not found)
+		startIdx = objIdx
+		isArray = false
 	}
 
 	// Find the matching closing bracket
 	var endIdx int
-	if output[startIdx] == '[' {
+	if isArray {
 		endIdx = strings.LastIndex(output, "]")
 	} else {
 		endIdx = strings.LastIndex(output, "}")
 	}
 
 	if endIdx == -1 || endIdx <= startIdx {
-		return nil, fmt.Errorf("invalid JSON in response")
+		return nil, fmt.Errorf("invalid JSON in response (startIdx=%d, endIdx=%d, isArray=%v)", startIdx, endIdx, isArray)
 	}
 
 	jsonStr := output[startIdx : endIdx+1]
+
+	// Debug: log the extracted JSON string
+	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Extracted JSON (%d chars):\n%s\n", len(jsonStr), jsonStr[:minInt(len(jsonStr), 500)])
 
 	// First, try to parse as Goose conversation format (with "messages" key)
 	var gooseFormat map[string]interface{}
@@ -329,6 +366,13 @@ func extractJSONFromText(text string) (interface{}, error) {
 
 func minInt(a, b int) int {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
 		return a
 	}
 	return b
