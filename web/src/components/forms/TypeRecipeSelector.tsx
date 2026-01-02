@@ -216,7 +216,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
     }
   }, [isExpanded, selectedItem, handleToggleExpand]);
 
-  // Collapsed view - show only selected item with search box
+  // Collapsed view - show only selected item
   if (!isExpanded && selectedItem) {
     const backgroundStyle = selectedItem.type === 'want-type'
       ? getBackgroundStyle(selectedItem.name)
@@ -224,44 +224,6 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
     return (
       <div className="space-y-2">
-        {/* Search Input - Always visible */}
-        {showSearch && (
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search want types or recipes..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              // Auto-expand when user starts typing
-              if (e.target.value.trim()) {
-                setIsExpanded(true);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setSearchQuery('');
-                searchInputRef.current?.blur();
-              } else if (e.key === 'Tab' && !e.shiftKey) {
-                e.preventDefault();
-                // Expand and focus first item
-                setIsExpanded(true);
-                setTimeout(() => {
-                  if (filteredItems.length > 0) {
-                    setFocusedIndex(0);
-                    itemRefs.current[0]?.focus();
-                  }
-                }, 0);
-              } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                // Auto-expand on arrow keys
-                setIsExpanded(true);
-              }
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        )}
-
         <button
           ref={collapsedButtonRef}
           type="button"
