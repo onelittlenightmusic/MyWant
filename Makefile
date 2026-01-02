@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api test-buffet-restart test-all
+.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api test-buffet-restart test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -451,6 +451,10 @@ help:
 	@echo "  test-server-api  - Test server API endpoints"
 	@echo "  restart-all      - Kill and restart frontend, backend, and mock server"
 	@echo ""
+	@echo "🔧 Gmail MCP Troubleshooting:"
+	@echo "  fix-mcp          - Quick fix: Reset Gmail MCP (kill processes, clear cache)"
+	@echo "  troubleshoot-mcp - Full diagnostic: Check config, test Goose, analyze logs"
+	@echo ""
 	@echo "🧹 Utility:"
 	@echo "  clean - Clean build artifacts"
 	@echo "  help  - Show this help"
@@ -497,6 +501,15 @@ restart-all:
 	@echo "  Backend: tail -f ./logs/mywant-backend.log"
 	@echo "  Mock Server: tail -f ./logs/flight-server.log"
 	@echo "  Frontend: tail -f /tmp/npm-dev.log"
+
+# Gmail MCP troubleshooting targets
+troubleshoot-mcp:
+	@echo "🔍 Running Gmail MCP troubleshooting..."
+	@./scripts/troubleshoot-gmail-mcp.sh
+
+fix-mcp:
+	@echo "🔧 Quick fix for Gmail MCP..."
+	@./scripts/fix-gmail-mcp.sh
 
 # Default target
 .DEFAULT_GOAL := help
