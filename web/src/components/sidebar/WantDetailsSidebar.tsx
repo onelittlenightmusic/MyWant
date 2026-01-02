@@ -158,6 +158,50 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [initialTab]);
 
+  // Keyboard shortcuts for want control buttons
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'd':
+          // Delete button
+          if (canDelete) {
+            e.preventDefault();
+            handleDeleteClick();
+          }
+          break;
+        case 'p':
+          // Start/Resume button (if available), otherwise Suspend button
+          if (canStart) {
+            e.preventDefault();
+            handleStartClick();
+          } else if (canSuspend) {
+            e.preventDefault();
+            handleSuspendClick();
+          }
+          break;
+        case 'r':
+          // Stop button (square icon - reset)
+          if (canStop) {
+            e.preventDefault();
+            handleStopClick();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canStart, canStop, canSuspend, canDelete, handleStartClick, handleStopClick, handleSuspendClick, handleDeleteClick]);
+
   // Auto-enable refresh for running wants (but don't auto-disable - let user control it)
   // Only depends on status, not want object, to avoid infinite loops from polling
   useEffect(() => {
