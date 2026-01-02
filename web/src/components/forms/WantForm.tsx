@@ -304,7 +304,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (selectedItemType === 'recipe' && !isEditing && type) {
       const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === type);
       if (selectedRecipe && selectedRecipe.recipe?.parameters) {
-        // Use recipe parameters directly
+        // Use recipe parameters directly as editable parameters
         setParams(selectedRecipe.recipe.parameters);
       } else {
         setParams({});
