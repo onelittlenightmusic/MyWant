@@ -37,6 +37,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   const headerRef = useRef<HTMLButtonElement>(null);
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const editFormRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
 
   // Merge forwarded ref with local ref
   const mergedRef = useCallback((node: HTMLButtonElement | null) => {
@@ -182,7 +183,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   }, [isEditing]);
 
   return (
-    <div className="space-y-2">
+    <div ref={sectionRef} className="space-y-2">
       {/* Section Header */}
       <button
         ref={mergedRef}
@@ -194,7 +195,12 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
             onToggleCollapse();
           }
         }}
-        onBlur={() => {
+        onBlur={(e) => {
+          // フォーカスがセクション内の要素に移った場合は閉じない
+          const relatedTarget = e.relatedTarget as Node;
+          if (relatedTarget && sectionRef.current?.contains(relatedTarget)) {
+            return;
+          }
           // ヘッダーからフォーカスが外れた時、展開されていれば自動的に折りたたむ
           if (!isCollapsed) {
             onToggleCollapse();

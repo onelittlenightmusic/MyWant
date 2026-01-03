@@ -46,6 +46,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   const [showOptionalParams, setShowOptionalParams] = useState(false);
   const headerRef = useRef<HTMLButtonElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
 
   // Merge forwarded ref with local ref
   const mergedRef = useCallback((node: HTMLButtonElement | null) => {
@@ -146,7 +147,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   ) || [];
 
   return (
-    <div className="space-y-2">
+    <div ref={sectionRef} className="space-y-2">
       {/* Section Header */}
       <button
         ref={mergedRef}
@@ -158,7 +159,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
             onToggleCollapse();
           }
         }}
-        onBlur={() => {
+        onBlur={(e) => {
+          // フォーカスがセクション内の要素に移った場合は閉じない
+          const relatedTarget = e.relatedTarget as Node;
+          if (relatedTarget && sectionRef.current?.contains(relatedTarget)) {
+            return;
+          }
           // ヘッダーからフォーカスが外れた時、展開されていれば自動的に折りたたむ
           if (!isCollapsed) {
             onToggleCollapse();
@@ -248,6 +254,15 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                             headerRef.current?.focus();
                           }
                         }}
+                        onBlur={(e) => {
+                          // フォーカスがセクション外に移った場合のみセクションを閉じる
+                          const relatedTarget = e.relatedTarget as Node;
+                          if (!relatedTarget || !sectionRef.current?.contains(relatedTarget)) {
+                            if (!isCollapsed) {
+                              onToggleCollapse();
+                            }
+                          }
+                        }}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         placeholder={param.description || 'Enter value'}
                       />
@@ -296,6 +311,15 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                         if (e.key === 'Escape') {
                           e.preventDefault();
                           headerRef.current?.focus();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // フォーカスがセクション外に移った場合のみセクションを閉じる
+                        const relatedTarget = e.relatedTarget as Node;
+                        if (!relatedTarget || !sectionRef.current?.contains(relatedTarget)) {
+                          if (!isCollapsed) {
+                            onToggleCollapse();
+                          }
                         }
                       }}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
