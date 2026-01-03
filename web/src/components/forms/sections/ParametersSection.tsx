@@ -158,6 +158,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
             onToggleCollapse();
           }
         }}
+        onBlur={() => {
+          // ヘッダーからフォーカスが外れた時、展開されていれば自動的に折りたたむ
+          if (!isCollapsed) {
+            onToggleCollapse();
+          }
+        }}
         onKeyDown={handleHeaderKeyDown}
         className={`
           w-full text-left px-4 py-3 rounded-lg border-2
