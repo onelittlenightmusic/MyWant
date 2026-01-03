@@ -295,6 +295,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 searchInputRef.current?.blur();
               } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
                 e.preventDefault();
+                searchInputRef.current?.blur();
                 setFocusedIndex(0);
                 itemRefs.current[0]?.focus();
               } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
