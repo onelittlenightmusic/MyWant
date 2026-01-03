@@ -45,9 +45,21 @@ func (s *SchedulerWant) Progress() {
 
 		agentID := fmt.Sprintf("scheduler-%s", want.Metadata.Name)
 
-		// Skip if agent already exists for this Want - check directly via GetBackgroundAgent
-		if _, exists := s.GetBackgroundAgent(agentID); exists {
-			continue // Agent already created for this want
+		// Check if agent already exists for this Want
+		if existingAgent, exists := s.GetBackgroundAgent(agentID); exists {
+			// Verify if the want ID has changed
+			if schedAgent, ok := existingAgent.(*SchedulerAgent); ok {
+				if schedAgent.wantID == want.Metadata.ID {
+					continue // ID matches, no update needed
+				}
+				// ID mismatch! This happens when a Want is redeployed.
+				// Stop and remove the old agent before creating a new one.
+				InfoLog("[SCHEDULER_WANT] Want ID changed for '%s' (%s -> %s), updating agent\n",
+					want.Metadata.Name, schedAgent.wantID, want.Metadata.ID)
+				s.DeleteBackgroundAgent(agentID)
+			} else {
+				continue // Should not happen, but safe fallback
+			}
 		}
 
 		// Create a new SchedulerAgent for this Want

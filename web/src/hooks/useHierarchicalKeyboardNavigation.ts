@@ -52,6 +52,9 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
       if (isInputElement) return;
 
+      // Don't intercept if focus is inside a sidebar
+      if (target.closest('[data-sidebar="true"]')) return;
+
       let nextItem: T | null = null;
       let shouldNavigate = false;
 

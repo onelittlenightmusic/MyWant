@@ -40,47 +40,51 @@ export const LogsPage: React.FC = () => {
       />
 
       {/* Main content area */}
-      <main className="flex-1 p-6 mt-16 overflow-x-hidden w-full min-w-0">
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={classNames(
-                'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'logs'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              <Activity className={classNames(
-                'mr-2 h-5 w-5',
-                activeTab === 'logs' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-              )} />
-              API Logs
-            </button>
-            <button
-              onClick={() => setActiveTab('errors')}
-              className={classNames(
-                'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'errors'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              <AlertTriangle className={classNames(
-                'mr-2 h-5 w-5',
-                activeTab === 'errors' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
-              )} />
-              Errors
-            </button>
-          </nav>
-        </div>
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px] relative">
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-6 pb-24">
+            {/* Tab Navigation */}
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('logs')}
+                  className={classNames(
+                    'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
+                    activeTab === 'logs'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  )}
+                >
+                  <Activity className={classNames(
+                    'mr-2 h-5 w-5',
+                    activeTab === 'logs' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  )} />
+                  API Logs
+                </button>
+                <button
+                  onClick={() => setActiveTab('errors')}
+                  className={classNames(
+                    'group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm',
+                    activeTab === 'errors'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  )}
+                >
+                  <AlertTriangle className={classNames(
+                    'mr-2 h-5 w-5',
+                    activeTab === 'errors' ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  )} />
+                  Errors
+                </button>
+              </nav>
+            </div>
 
-        {/* Tab Content */}
-        <div className="mt-6">
-          {activeTab === 'errors' && <ErrorHistory />}
-          {activeTab === 'logs' && <LogHistory />}
+            {/* Tab Content */}
+            <div className="mt-6">
+              {activeTab === 'errors' && <ErrorHistory />}
+              {activeTab === 'logs' && <LogHistory />}
+            </div>
+          </div>
         </div>
       </main>
 

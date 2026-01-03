@@ -35,6 +35,9 @@ export const useKeyboardNavigation = ({
 
       if (isInputElement) return;
 
+      // Don't intercept if focus is inside a sidebar
+      if (target.closest('[data-sidebar="true"]')) return;
+
       let newIndex = currentIndex;
       let shouldNavigate = false;
 

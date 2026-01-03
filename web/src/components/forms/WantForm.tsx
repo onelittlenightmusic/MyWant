@@ -49,11 +49,12 @@ export const WantForm: React.FC<WantFormProps> = ({
   const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
   const schedulingSectionRef = useRef<HTMLButtonElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
-  const lastFocusedSectionRef = useRef<HTMLElement | null>(null);
+  const lastFocusedFieldRef = useRef<HTMLElement | null>(null);
 
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<ApiError | null>(null);
   const [wantTypeLoading, setWantTypeLoading] = useState(false);
@@ -65,21 +66,21 @@ export const WantForm: React.FC<WantFormProps> = ({
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
   });
 
-  // Handle Tab key from sections to focus Add button
-  const handleSectionTab = () => {
-    lastFocusedSectionRef.current = document.activeElement as HTMLElement;
+  // Handle Tab key from editing fields (Name or Sections) to focus Add button
+  const handleFieldTab = () => {
+    lastFocusedFieldRef.current = document.activeElement as HTMLElement;
     addButtonRef.current?.focus();
   };
 
-  // Handle Tab key from Add button to return to last focused section
+  // Handle Tab key from Add button to return to last focused field
   const handleAddButtonKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
       e.preventDefault();
-      if (lastFocusedSectionRef.current) {
-        lastFocusedSectionRef.current.focus();
+      if (lastFocusedFieldRef.current) {
+        lastFocusedFieldRef.current.focus();
       } else {
         // Fallback to name input or first section
-        paramsSectionRef.current?.focus();
+        nameInputRef.current?.focus() || paramsSectionRef.current?.focus();
       }
     }
   };
@@ -346,6 +347,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setApiError(null);
+    setIsSubmitting(true);
 
     try {
       let wantRequest: CreateWantRequest | UpdateWantRequest;
@@ -356,12 +358,14 @@ export const WantForm: React.FC<WantFormProps> = ({
         // Parse YAML to want object
         if (!yamlContent.trim()) {
           setValidationError('YAML content is required');
+          setIsSubmitting(false);
           return;
         }
 
         const yamlValidation = validateYaml(yamlContent);
         if (!yamlValidation.isValid) {
           setValidationError(`Invalid YAML: ${yamlValidation.error}`);
+          setIsSubmitting(false);
           return;
         }
 
@@ -369,6 +373,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       } else {
         // Use form data
         if (!validateForm()) {
+          setIsSubmitting(false);
           return;
         }
         wantRequest = formToWantObject();
@@ -388,6 +393,8 @@ export const WantForm: React.FC<WantFormProps> = ({
     } catch (error) {
       console.error('Failed to save want:', error);
       setApiError(error as ApiError);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -404,15 +411,15 @@ export const WantForm: React.FC<WantFormProps> = ({
       <button
         ref={addButtonRef}
         type="submit"
-        disabled={loading || (!isEditing && !isTypeSelected)}
+        disabled={isSubmitting || (!isEditing && !isTypeSelected)}
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
-        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
+        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
           shouldGlowButton ? '' : ''
         }`}
         style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
       >
-        {loading ? (
+        {isSubmitting ? (
           <LoadingSpinner size="sm" />
         ) : (
           <>
@@ -500,7 +507,14 @@ export const WantForm: React.FC<WantFormProps> = ({
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => handleArrowKeyNavigation(e, 'name')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          handleFieldTab();
+                        } else {
+                          handleArrowKeyNavigation(e, 'name');
+                        }
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="Auto-generated or enter custom name"
                       required
@@ -525,7 +539,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'parameters'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'parameters'),
-                    onTab: handleSectionTab,
+                    onTab: handleFieldTab,
                   }}
                 />
 
@@ -539,7 +553,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'labels'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'labels'),
-                    onTab: handleSectionTab,
+                    onTab: handleFieldTab,
                   }}
                 />
 
@@ -553,7 +567,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'dependencies'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'dependencies'),
-                    onTab: handleSectionTab,
+                    onTab: handleFieldTab,
                   }}
                 />
 
@@ -567,7 +581,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'scheduling'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'scheduling'),
-                    onTab: handleSectionTab,
+                    onTab: handleFieldTab,
                   }}
                 />
               </>

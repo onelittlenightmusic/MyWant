@@ -67,7 +67,7 @@ func (s *SchedulerAgent) ID() string {
 func (s *SchedulerAgent) Start(ctx context.Context, w *Want) error {
 	s.ctx, s.cancel = context.WithCancel(ctx)
 	s.done = make(chan struct{})
-	s.ticker = time.NewTicker(10 * time.Second)
+	s.ticker = time.NewTicker(1 * time.Second)
 
 	go s.run()
 
