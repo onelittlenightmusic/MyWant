@@ -418,7 +418,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         disabled={isSubmitting || (!isEditing && !isTypeSelected)}
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
-        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-xl hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-full hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
           shouldGlowButton ? '' : ''
         }`}
         style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
