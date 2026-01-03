@@ -189,7 +189,6 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   // Reset focused index when filtered items change
   useEffect(() => {
     setFocusedIndex(-1);
-    itemRefs.current = [];
   }, [searchQuery, selectedCategory]);
 
   // Keyboard shortcut for Delete key in collapsed view
@@ -295,7 +294,6 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 searchInputRef.current?.blur();
               } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
                 e.preventDefault();
-                searchInputRef.current?.blur();
                 setFocusedIndex(0);
                 itemRefs.current[0]?.focus();
               } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -362,7 +360,14 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     type="button"
                     onClick={() => handleSelect(item)}
-                    onKeyDown={handleKeyNavigation}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSelect(item);
+                      } else {
+                        handleKeyNavigation(e);
+                      }
+                    }}
                     className={`w-full text-left p-3 rounded-lg border-2 transition-colors relative overflow-hidden ${
                       selectedId === item.id
                         ? 'border-blue-500 bg-blue-50'
@@ -412,7 +417,14 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     type="button"
                     onClick={() => handleSelect(item)}
-                    onKeyDown={handleKeyNavigation}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSelect(item);
+                      } else {
+                        handleKeyNavigation(e);
+                      }
+                    }}
                     className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
                       selectedId === item.id
                         ? 'border-green-500 bg-green-50'

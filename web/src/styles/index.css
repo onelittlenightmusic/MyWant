@@ -69,3 +69,8 @@
 .glow-button {
   animation: button-glow 0.6s ease-in-out infinite;
 }
+
+.focus-glow:focus {
+  animation: button-glow 0.6s ease-in-out infinite;
+  outline: none;
+}

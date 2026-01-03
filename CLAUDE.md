@@ -4,6 +4,10 @@
 
 MyWant is a Go library for functional chain programming with channels. Uses **recipe-based configuration** where config YAML files reference reusable recipe templates.
 
+## Documentation
+
+- [Keyboard Shortcuts & MCP Testing Guide](web/SHORTCUTS_AND_MCP_TESTING.md) - Shortcut keys and automated testing guide for the frontend.
+
 ## Core Architecture
 
 **Main Components:**

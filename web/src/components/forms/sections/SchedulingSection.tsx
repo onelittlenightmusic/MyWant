@@ -291,7 +291,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
     <CollapsibleFormSection
       ref={ref}
       sectionId="scheduling"
-      title="Scheduling (when)"
+      title="When"
       icon={<Clock className="w-5 h-5" />}
       colorScheme="amber"
       isCollapsed={isCollapsed}

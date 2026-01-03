@@ -37,6 +37,8 @@ export interface SectionNavigationCallbacks {
   onNavigateUp: () => void;
   /** Navigate to the next section */
   onNavigateDown: () => void;
+  /** Navigate via Tab key (e.g. to action button) */
+  onTab?: () => void;
 }
 
 /**

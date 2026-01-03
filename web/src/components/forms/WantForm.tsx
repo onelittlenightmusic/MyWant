@@ -48,6 +48,8 @@ export const WantForm: React.FC<WantFormProps> = ({
   const labelsSectionRef = useRef<HTMLButtonElement>(null);
   const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
   const schedulingSectionRef = useRef<HTMLButtonElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const lastFocusedSectionRef = useRef<HTMLElement | null>(null);
 
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
@@ -62,6 +64,25 @@ export const WantForm: React.FC<WantFormProps> = ({
     // All sections collapsed by default
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
   });
+
+  // Handle Tab key from sections to focus Add button
+  const handleSectionTab = () => {
+    lastFocusedSectionRef.current = document.activeElement as HTMLElement;
+    addButtonRef.current?.focus();
+  };
+
+  // Handle Tab key from Add button to return to last focused section
+  const handleAddButtonKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (lastFocusedSectionRef.current) {
+        lastFocusedSectionRef.current.focus();
+      } else {
+        // Fallback to name input or first section
+        paramsSectionRef.current?.focus();
+      }
+    }
+  };
 
   // Form state
   const [name, setName] = useState('');
@@ -381,11 +402,13 @@ export const WantForm: React.FC<WantFormProps> = ({
         onModeChange={setEditMode}
       />
       <button
+        ref={addButtonRef}
         type="submit"
         disabled={loading || (!isEditing && !isTypeSelected)}
         form="want-form"
-        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
-          shouldGlowButton ? 'glow-button' : ''
+        onKeyDown={handleAddButtonKeyDown}
+        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap transition-all ${
+          shouldGlowButton ? '' : ''
         }`}
         style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
       >
@@ -502,6 +525,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'parameters'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'parameters'),
+                    onTab: handleSectionTab,
                   }}
                 />
 
@@ -515,6 +539,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'labels'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'labels'),
+                    onTab: handleSectionTab,
                   }}
                 />
 
@@ -528,6 +553,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'dependencies'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'dependencies'),
+                    onTab: handleSectionTab,
                   }}
                 />
 
@@ -541,6 +567,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'scheduling'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'scheduling'),
+                    onTab: handleSectionTab,
                   }}
                 />
               </>

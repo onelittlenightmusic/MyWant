@@ -131,6 +131,11 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
       e.preventDefault();
       onToggleCollapse();
     }
+    // Tab - custom navigation (e.g. to Add button)
+    else if (e.key === 'Tab' && navigationCallbacks.onTab) {
+      e.preventDefault();
+      navigationCallbacks.onTab();
+    }
   }, [isCollapsed, onToggleCollapse, navigationCallbacks]);
 
   /**

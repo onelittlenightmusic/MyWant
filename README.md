@@ -4,7 +4,7 @@
 
 **Declarative chain programming with YAML configuration.** Express what you want to achieve, not how to do it.
 
-📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Examples](docs/agent-examples.md)
+📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Examples](docs/agent-examples.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Features
 

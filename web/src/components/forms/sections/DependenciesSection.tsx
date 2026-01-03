@@ -215,7 +215,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
     <CollapsibleFormSection
       ref={ref}
       sectionId="dependencies"
-      title="Dependencies (using)"
+      title="Using"
       icon={<GitBranch className="w-5 h-5" />}
       colorScheme="blue"
       isCollapsed={isCollapsed}
