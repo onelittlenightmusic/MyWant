@@ -11,14 +11,14 @@ interface LabelAutocompleteProps {
   onLeftKey?: () => void;
 }
 
-export const LabelAutocomplete: React.FC<LabelAutocompleteProps> = ({
+export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocompleteProps>(({
   keyValue,
   valueValue,
   onKeyChange,
   onValueChange,
   onRemove,
   onLeftKey,
-}) => {
+}, ref) => {
   const [keyOpen, setKeyOpen] = useState(false);
   const [valueOpen, setValueOpen] = useState(false);
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
@@ -27,6 +27,15 @@ export const LabelAutocomplete: React.FC<LabelAutocompleteProps> = ({
   const valueInputRef = useRef<HTMLInputElement>(null);
   const keyContainerRef = useRef<HTMLDivElement>(null);
   const valueContainerRef = useRef<HTMLDivElement>(null);
+
+  // Merge forwarded ref with local keyInputRef
+  React.useEffect(() => {
+    if (typeof ref === 'function') {
+      ref(keyInputRef.current);
+    } else if (ref) {
+      (ref as React.MutableRefObject<HTMLInputElement | null>).current = keyInputRef.current;
+    }
+  }, [ref]);
 
   const { labelKeys, labelValues, fetchLabels } = useLabelHistoryStore();
 
@@ -124,6 +133,11 @@ export const LabelAutocomplete: React.FC<LabelAutocompleteProps> = ({
             value={keyValue}
             onChange={(e) => onKeyChange(e.target.value)}
             onFocus={handleKeyFocus}
+            onBlur={() => {
+              // フォーカスが外れたら少し遅延してドロップダウンを閉じる
+              // （ドロップダウンのボタンクリックを可能にするため）
+              setTimeout(() => setKeyOpen(false), 200);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -173,6 +187,11 @@ export const LabelAutocomplete: React.FC<LabelAutocompleteProps> = ({
             value={valueValue}
             onChange={(e) => onValueChange(e.target.value)}
             onFocus={handleValueFocus}
+            onBlur={() => {
+              // フォーカスが外れたら少し遅延してドロップダウンを閉じる
+              // （ドロップダウンのボタンクリックを可能にするため）
+              setTimeout(() => setValueOpen(false), 200);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -222,4 +241,6 @@ export const LabelAutocomplete: React.FC<LabelAutocompleteProps> = ({
       </button>
     </div>
   );
-};
+});
+
+LabelAutocomplete.displayName = 'LabelAutocomplete';

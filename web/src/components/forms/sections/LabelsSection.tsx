@@ -45,6 +45,28 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
   const [editingLabelDraft, setEditingLabelDraft] = useState<LabelDraft>({ key: '', value: '' });
 
+  // Refs for focus management
+  const headerRef = React.useRef<HTMLButtonElement>(null);
+  const firstInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Merge forwarded ref with local headerRef
+  React.useEffect(() => {
+    if (typeof ref === 'function') {
+      ref(headerRef.current);
+    } else if (ref) {
+      (ref as React.MutableRefObject<HTMLButtonElement | null>).current = headerRef.current;
+    }
+  }, [ref]);
+
+  // Auto-focus first input when editing starts
+  React.useEffect(() => {
+    if (editingLabelKey !== null && firstInputRef.current) {
+      setTimeout(() => {
+        firstInputRef.current?.focus();
+      }, 100);
+    }
+  }, [editingLabelKey]);
+
   /**
    * Convert labels to chip items for display
    */
@@ -121,10 +143,13 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   }, []);
 
   /**
-   * Handle escape key - same as cancel
+   * Handle escape key - cancel and return focus to header
    */
   const handleEscape = useCallback(() => {
     handleCancel();
+    setTimeout(() => {
+      headerRef.current?.focus();
+    }, 0);
   }, [handleCancel]);
 
   /**
@@ -147,6 +172,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   const renderEditForm = useCallback(() => (
     <div className="space-y-3">
       <LabelAutocomplete
+        ref={firstInputRef}
         keyValue={editingLabelDraft.key}
         valueValue={editingLabelDraft.value}
         onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
@@ -193,7 +219,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
 
   return (
     <CollapsibleFormSection
-      ref={ref}
+      ref={headerRef}
       sectionId="labels"
       title="Labels"
       icon={<Tag className="w-5 h-5" />}

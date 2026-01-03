@@ -11,14 +11,14 @@ interface LabelSelectorAutocompleteProps {
   onLeftKey?: () => void;
 }
 
-export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps> = ({
+export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, LabelSelectorAutocompleteProps>(({
   keyValue,
   valuValue,
   onKeyChange,
   onValueChange,
   onRemove,
   onLeftKey,
-}) => {
+}, ref) => {
   const [keyOpen, setKeyOpen] = useState(false);
   const [valueOpen, setValueOpen] = useState(false);
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
@@ -29,6 +29,15 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
   const valueInputRef = useRef<HTMLInputElement>(null);
   const keyContainerRef = useRef<HTMLDivElement>(null);
   const valueContainerRef = useRef<HTMLDivElement>(null);
+
+  // Merge forwarded ref with local keyInputRef
+  React.useEffect(() => {
+    if (typeof ref === 'function') {
+      ref(keyInputRef.current);
+    } else if (ref) {
+      (ref as React.MutableRefObject<HTMLInputElement | null>).current = keyInputRef.current;
+    }
+  }, [ref]);
 
   const { labelKeys, labelValues, fetchLabels } = useLabelHistoryStore();
 
@@ -145,6 +154,11 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
               value={keyValue}
               onChange={(e) => onKeyChange(e.target.value)}
               onFocus={handleKeyFocus}
+              onBlur={() => {
+                // フォーカスが外れたら少し遅延してドロップダウンを閉じる
+                // （ドロップダウンのボタンクリックを可能にするため）
+                setTimeout(() => setKeyOpen(false), 200);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') {
                   e.preventDefault();
@@ -214,6 +228,11 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
               value={valuValue}
               onChange={(e) => onValueChange(e.target.value)}
               onFocus={handleValueFocus}
+              onBlur={() => {
+                // フォーカスが外れたら少し遅延してドロップダウンを閉じる
+                // （ドロップダウンのボタンクリックを可能にするため）
+                setTimeout(() => setValueOpen(false), 200);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') {
                   e.preventDefault();
@@ -287,4 +306,6 @@ export const LabelSelectorAutocomplete: React.FC<LabelSelectorAutocompleteProps>
       </div>
     </div>
   );
-};
+});
+
+LabelSelectorAutocomplete.displayName = 'LabelSelectorAutocomplete';

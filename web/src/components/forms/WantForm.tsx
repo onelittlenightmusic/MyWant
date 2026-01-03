@@ -80,7 +80,11 @@ export const WantForm: React.FC<WantFormProps> = ({
         lastFocusedFieldRef.current.focus();
       } else {
         // Fallback to name input or first section
-        nameInputRef.current?.focus() || paramsSectionRef.current?.focus();
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+        } else {
+          paramsSectionRef.current?.focus();
+        }
       }
     }
   };

@@ -67,6 +67,28 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
     everyUnit: 'seconds'
   });
 
+  // Refs for focus management
+  const headerRef = React.useRef<HTMLButtonElement>(null);
+  const firstInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Merge forwarded ref with local headerRef
+  React.useEffect(() => {
+    if (typeof ref === 'function') {
+      ref(headerRef.current);
+    } else if (ref) {
+      (ref as React.MutableRefObject<HTMLButtonElement | null>).current = headerRef.current;
+    }
+  }, [ref]);
+
+  // Auto-focus first input when editing starts
+  React.useEffect(() => {
+    if (editingIndex !== null && firstInputRef.current) {
+      setTimeout(() => {
+        firstInputRef.current?.focus();
+      }, 100);
+    }
+  }, [editingIndex]);
+
   /**
    * Convert schedules to chip items for display
    */
@@ -174,10 +196,13 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
   }, []);
 
   /**
-   * Handle escape key - same as cancel
+   * Handle escape key - cancel and return focus to header
    */
   const handleEscape = useCallback(() => {
     handleCancel();
+    setTimeout(() => {
+      headerRef.current?.focus();
+    }, 0);
   }, [handleCancel]);
 
   /**
@@ -191,6 +216,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
           At (optional - e.g., "7am", "17:30", "midnight")
         </label>
         <input
+          ref={firstInputRef}
           type="text"
           value={editingDraft.at}
           onChange={(e) => setEditingDraft(prev => ({ ...prev, at: e.target.value }))}
@@ -289,7 +315,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
 
   return (
     <CollapsibleFormSection
-      ref={ref}
+      ref={headerRef}
       sectionId="scheduling"
       title="When"
       icon={<Clock className="w-5 h-5" />}
