@@ -154,7 +154,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
     onGetFilteredWants?.(filteredWants);
   }, [filteredWants, onGetFilteredWants]);
 
-  if (loading && wants.length === 0) {
+  // Calculate non-internal wants count (exclude internal wants prefixed with __)
+  const hasUserWants = hierarchicalWants.length > 0;
+
+  if (loading && !hasUserWants) {
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner size="lg" />
@@ -163,7 +166,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
     );
   }
 
-  if (wants.length === 0) {
+  if (!hasUserWants) {
     return (
       <div className="flex items-center justify-center py-16">
         <button
