@@ -188,6 +188,12 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         ref={mergedRef}
         type="button"
         onClick={onToggleCollapse}
+        onFocus={() => {
+          // ヘッダーにフォーカスが当たった時、折りたたまれていれば自動的に展開
+          if (isCollapsed) {
+            onToggleCollapse();
+          }
+        }}
         onKeyDown={handleHeaderKeyDown}
         className={`
           w-full text-left px-4 py-3 rounded-lg border-2
