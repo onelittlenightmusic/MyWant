@@ -48,6 +48,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   const headerRef = useRef<HTMLButtonElement>(null);
   const firstInputRef = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const wasCollapsedOnMouseDown = useRef<boolean>(false);
 
   // Merge forwarded ref with local ref
   const mergedRef = useCallback((node: HTMLButtonElement | null) => {
@@ -58,6 +59,23 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
       (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
     }
   }, [ref]);
+
+  /**
+   * Handle Click - only toggle if it wasn't just expanded by focus
+   */
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (wasCollapsedOnMouseDown.current && !isCollapsed) {
+      return;
+    }
+    onToggleCollapse();
+  }, [isCollapsed, onToggleCollapse]);
+
+  /**
+   * Handle Mouse Down - capture state before focus fires
+   */
+  const handleMouseDown = useCallback(() => {
+    wasCollapsedOnMouseDown.current = isCollapsed;
+  }, [isCollapsed]);
 
   /**
    * Update a parameter value
@@ -153,7 +171,14 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
       <button
         ref={mergedRef}
         type="button"
-        onClick={onToggleCollapse}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onFocus={() => {
+          // ヘッダーにフォーカスが当たった時、折りたたまれていれば自動的に展開
+          if (isCollapsed) {
+            onToggleCollapse();
+          }
+        }}
         onBlur={(e) => {
           // フォーカスがセクション内の要素に移った場合は閉じない
           const relatedTarget = e.relatedTarget as Node;

@@ -38,6 +38,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const editFormRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const wasCollapsedOnMouseDown = useRef<boolean>(false);
 
   // Merge forwarded ref with local ref
   const mergedRef = useCallback((node: HTMLButtonElement | null) => {
@@ -48,6 +49,25 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
       (ref as React.MutableRefObject<HTMLButtonElement | null>).current = node;
     }
   }, [ref]);
+
+  /**
+   * Handle Click - only toggle if it wasn't just expanded by focus
+   */
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // If it was already expanded by onFocus during this same click interaction, 
+    // don't toggle it back to collapsed.
+    if (wasCollapsedOnMouseDown.current && !isCollapsed) {
+      return;
+    }
+    onToggleCollapse();
+  }, [isCollapsed, onToggleCollapse]);
+
+  /**
+   * Handle Mouse Down - capture state before focus fires
+   */
+  const handleMouseDown = useCallback(() => {
+    wasCollapsedOnMouseDown.current = isCollapsed;
+  }, [isCollapsed]);
 
   /**
    * Get header color classes based on color scheme
@@ -188,7 +208,14 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
       <button
         ref={mergedRef}
         type="button"
-        onClick={onToggleCollapse}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onFocus={() => {
+          // ヘッダーにフォーカスが当たった時、折りたたまれていれば自動的に展開
+          if (isCollapsed) {
+            onToggleCollapse();
+          }
+        }}
         onBlur={(e) => {
           // フォーカスがセクション内の要素に移った場合は閉じない
           const relatedTarget = e.relatedTarget as Node;
