@@ -159,7 +159,7 @@ func (r *RestaurantWant) tryAgentExecution() any {
 		)
 
 		ctx := context.Background()
-		if err := monitorAgent.Exec(ctx, &r.Want); err != nil {
+		if _, err := monitorAgent.Exec(ctx, &r.Want); err != nil {
 		}
 
 		r.AggregateChanges()
@@ -603,40 +603,17 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 // FlightWant Implementation (migrated from flight_types.go)
 // ============================================================================
 
-// CreateFlightMonitorPollFunc returns a PollFunc for flight monitoring
-func CreateFlightMonitorPollFunc(flightID, serverURL string) PollFunc {
-	agentID := "flight-monitor-" + flightID
-
-	// Initialize MonitorFlightAPI with agent configuration
-	monitor := &MonitorFlightAPI{
-		MonitorAgent: MonitorAgent{
-			BaseAgent: BaseAgent{
-				Name:         agentID,
-				Capabilities: []string{},
-				Type:         MonitorAgentType,
-			},
-		},
-		ServerURL:           serverURL,
-		PollInterval:        10 * time.Second,
-		StatusChangeHistory: make([]StatusChange, 0),
-	}
-
-	return func(ctx context.Context, w *Want) (bool, error) {
-		err := monitor.Exec(ctx, w)
-		return false, err // Flight monitoring usually continues until explicitly stopped
-	}
-}
-
 // FlightWantLocals holds type-specific local state for FlightWant
 type FlightWantLocals struct {
 	FlightType          string
 	Duration            time.Duration
 	DepartureDate       string // Departure date in YYYY-MM-DD format
 	monitoringStartTime time.Time
-	monitoringDuration  time.Duration // How long to monitor for status changes
-	monitoringActive    bool          // Whether monitoring is currently active
-	lastLogTime         time.Time     // Track last monitoring log time to reduce spam
-	monitoringDone      chan struct{} // Signal to stop monitoring goroutine
+	monitoringDuration  time.Duration     // How long to monitor for status changes
+	monitoringActive    bool              // Whether monitoring is currently active
+	lastLogTime         time.Time         // Track last monitoring log time to reduce spam
+	monitoringDone      chan struct{}     // Signal to stop monitoring goroutine
+	monitor             *MonitorFlightAPI // Monitoring agent instance
 }
 
 // StatusChange represents a status change event
@@ -659,26 +636,26 @@ type MonitorFlightAPI struct {
 }
 
 // Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Progress method (FlightWant) Individual agents should NOT implement their own polling loops
-func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
+func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 	flightID, exists := want.GetState("flight_id")
 	if !exists {
-		return fmt.Errorf("no flight_id found in state - flight not created yet")
+		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
 	}
 
 	flightIDStr, ok := flightID.(string)
 	if !ok {
-		return fmt.Errorf("flight_id is not a string")
+		return false, fmt.Errorf("flight_id is not a string")
 	}
 
 	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
 	if flightIDStr == "" {
 		want.StoreLog("Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
-		return nil
+		return false, nil
 	}
 	now := time.Now()
 	if !m.LastPollTime.IsZero() && now.Sub(m.LastPollTime) < m.PollInterval {
 		// Skip this polling cycle - wait for PollInterval to elapse
-		return nil
+		return false, nil
 	}
 
 	// Record this poll time for next interval check
@@ -734,16 +711,16 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 	url := fmt.Sprintf("%s/api/flights/%s", m.ServerURL, flightIDStr)
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to get flight status: %v", err)
+		return false, fmt.Errorf("failed to get flight status: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
+		return false, fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
 	var reservation FlightReservation
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
-		return fmt.Errorf("failed to decode response: %v", err)
+		return false, fmt.Errorf("failed to decode response: %v", err)
 	}
 	newStatus := reservation.Status
 	oldStatus := m.LastKnownStatus
@@ -826,7 +803,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) error {
 		want.StoreStateMultiForAgent(updates)
 	}
 
-	return nil
+	return false, nil // Continue monitoring
 }
 
 // GetStatusChangeHistory returns the status change history
@@ -910,8 +887,29 @@ type FlightWant struct {
 
 // NewFlightWant creates a new flight booking want
 func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
+	// Get server URL from params
+	serverURL, ok := spec.Params["server_url"].(string)
+	if !ok || serverURL == "" {
+		serverURL = "http://localhost:8081"
+	}
+
+	// Create monitoring agent during initialization
+	monitor := &MonitorFlightAPI{
+		MonitorAgent: MonitorAgent{
+			BaseAgent: BaseAgent{
+				Name:         "flight-monitor-" + metadata.ID,
+				Capabilities: []string{},
+				Type:         MonitorAgentType,
+			},
+		},
+		ServerURL:           serverURL,
+		PollInterval:        10 * time.Second,
+		StatusChangeHistory: make([]StatusChange, 0),
+	}
+
 	locals := &FlightWantLocals{
 		monitoringDone: make(chan struct{}),
+		monitor:        monitor,
 	}
 	want := NewWantWithLocals(metadata, spec, locals, "flight")
 	flightWant := &FlightWant{
@@ -1171,21 +1169,19 @@ func (f *FlightWant) tryAgentExecution() any {
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			f.StoreState("execution_source", "agent")
 
-			// Start background monitoring for this flight
+			// Start background monitoring for this flight using pre-initialized monitor
 			flightIDVal, _ := f.GetState("flight_id")
 			flightID, _ := flightIDVal.(string)
 
-			params := f.Spec.Params
-			serverURL, ok := params["server_url"].(string)
-			if !ok || serverURL == "" {
-				serverURL = "http://localhost:8081"
-			}
+			// Get monitor from locals (created during initialization)
+			locals := f.GetLocals()
+			monitor := locals.monitor
 
-			// Create and add background monitoring agent
+			// Update monitor name with actual flight ID
 			agentName := "flight-monitor-" + flightID
-			pollFunc := CreateFlightMonitorPollFunc(flightID, serverURL)
-			
-			if err := f.AddMonitoringAgent(agentName, 10*time.Second, pollFunc); err != nil {
+			monitor.Name = agentName
+
+			if err := f.AddMonitoringAgent(agentName, 10*time.Second, monitor.Exec); err != nil {
 				f.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
 			}
 

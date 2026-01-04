@@ -52,7 +52,8 @@ func main() {
 	)
 	agentPremium.Action = func(ctx context.Context, want *Want) error {
 		fmt.Printf("[AGENT_PREMIUM_ACTION] Simple action called, delegating to AgentPremium.Exec()\n")
-		return agentPremium.Exec(ctx, want)
+		_, err := agentPremium.Exec(ctx, want)
+		return err
 	}
 
 	agentRegistry.RegisterAgent(agentPremium)

@@ -55,7 +55,7 @@ func NewAgentFlightAPI(name string, capabilities []string, uses []string, server
 }
 
 // Exec implements the Agent interface and handles both create_flight and cancel_flight actions Reads the "flight_action" state to determine which action to perform This satisfies the agent framework's requirement for Exec() method
-func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
+func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 	actionVal, exists := want.GetState("flight_action")
 	if exists && actionVal != nil {
 		action, ok := actionVal.(string)
@@ -64,25 +64,26 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) error {
 			case "cancel_flight":
 				want.StoreLog("Executing cancel_flight action")
 				if err := a.CancelFlight(ctx, want); err != nil {
-					return err
+					return false, err
 				}
 				// Clear the action after completion
 				want.StoreStateForAgent("flight_action", "")
-				return nil
+				return false, nil
 			case "create_flight":
 				want.StoreLog("Executing create_flight action")
 				if err := a.CreateFlight(ctx, want); err != nil {
-					return err
+					return false, err
 				}
 				// Clear the action after completion
 				want.StoreStateForAgent("flight_action", "")
-				return nil
+				return false, nil
 			}
 		}
 	}
 
 	// Default to create_flight if no action specified
-	return a.CreateFlight(ctx, want)
+	err := a.CreateFlight(ctx, want)
+	return false, err
 }
 
 // 2. "created" - after successful API response 3. "confirmed" - when monitor api checks the status Supports two date parameter formats: 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date

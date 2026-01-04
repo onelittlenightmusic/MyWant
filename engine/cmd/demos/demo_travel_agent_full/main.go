@@ -53,7 +53,8 @@ func main() {
 
 	agentPremium.Action = func(ctx context.Context, want *Want) error {
 		fmt.Printf("[AGENT_PREMIUM_ACTION] Hotel agent called, delegating to AgentPremium.Exec()\n")
-		return agentPremium.Exec(ctx, want)
+		_, err := agentPremium.Exec(ctx, want)
+		return err
 	}
 
 	agentRegistry.RegisterAgent(agentPremium)
@@ -69,7 +70,8 @@ func main() {
 
 	agentRestaurant.Action = func(ctx context.Context, want *Want) error {
 		fmt.Printf("[AGENT_RESTAURANT_ACTION] Restaurant agent called, processing reservation\n")
-		return agentRestaurant.Exec(ctx, want)
+		_, err := agentRestaurant.Exec(ctx, want)
+		return err
 	}
 
 	agentRegistry.RegisterAgent(agentRestaurant)
@@ -85,7 +87,8 @@ func main() {
 
 	agentBuffet.Action = func(ctx context.Context, want *Want) error {
 		fmt.Printf("[AGENT_BUFFET_ACTION] Buffet agent called, processing reservation\n")
-		return agentBuffet.Exec(ctx, want)
+		_, err := agentBuffet.Exec(ctx, want)
+		return err
 	}
 
 	agentRegistry.RegisterAgent(agentBuffet)

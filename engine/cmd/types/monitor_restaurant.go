@@ -45,7 +45,7 @@ func NewMonitorRestaurant(name string, capabilities []string, uses []string) *Mo
 }
 
 // Exec executes restaurant monitoring by reading state from YAML files
-func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
+func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) (bool, error) {
 	want.StoreLog(fmt.Sprintf("Starting monitoring for %s (execution #%d)", want.Metadata.Name, m.ExecutionCount))
 
 	// Determine which YAML file to read based on execution count
@@ -61,13 +61,13 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 			want.StoreLog(fmt.Sprintf("No initial state file found at %s, proceeding without existing schedule", filepath))
 		} else {
 			want.StoreLog(fmt.Sprintf("Error reading %s: %v", filepath, err))
-			return err
+			return false, err
 		}
 	}
 	var restaurantState RestaurantState
 	if err := yaml.Unmarshal(data, &restaurantState); err != nil {
 		want.StoreLog(fmt.Sprintf("Error parsing YAML: %v", err))
-		return err
+		return false, err
 	}
 
 	// Debug: Print parsed state
@@ -109,7 +109,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) error {
 	}
 	m.ExecutionCount++
 
-	return nil
+	return false, nil // Continue monitoring
 }
 
 // HasExistingSchedule checks if the monitoring found an existing schedule

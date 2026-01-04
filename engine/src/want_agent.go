@@ -142,7 +142,8 @@ func (n *Want) executeAgent(agent Agent) error {
 		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
 		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
 
-		if err := agent.Exec(ctx, n); err != nil {
+		shouldStop, err := agent.Exec(ctx, n)
+		if err != nil {
 			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
 			// Update agent execution record with error
 			for i := range n.History.AgentHistory {
@@ -162,6 +163,7 @@ func (n *Want) executeAgent(agent Agent) error {
 			}
 			// AgentHistory is now managed separately from state
 		}
+		_ = shouldStop // Currently unused at framework level, but available for future use
 
 		// FRAMEWORK-LEVEL: Commit all agent state changes
 		n.DumpStateForAgent("DoAgent")

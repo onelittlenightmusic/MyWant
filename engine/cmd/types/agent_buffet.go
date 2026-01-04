@@ -27,7 +27,7 @@ func NewAgentBuffet(name string, capabilities []string, uses []string, premiumLe
 }
 
 // Exec executes buffet agent actions and returns BuffetSchedule
-func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
+func (a *AgentBuffet) Exec(ctx context.Context, want *Want) (bool, error) {
 	// Generate buffet reservation schedule
 	schedule := a.generateBuffetSchedule(want)
 	want.StoreStateForAgent("agent_result", schedule)
@@ -40,7 +40,7 @@ func (a *AgentBuffet) Exec(ctx context.Context, want *Want) error {
 	want.StoreLog(fmt.Sprintf("Buffet reservation completed: %s at %s for %.1f hours",
 		schedule.BuffetType, schedule.ReservationTime.Format("15:04 Jan 2"), schedule.DurationHours))
 
-	return nil
+	return false, nil // Action completed
 }
 
 // generateBuffetSchedule creates a buffet reservation schedule

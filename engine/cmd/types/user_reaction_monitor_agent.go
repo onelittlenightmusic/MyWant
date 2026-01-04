@@ -8,50 +8,55 @@ import (
 	. "mywant/engine/src"
 )
 
-// CreateReactionMonitorPollFunc returns a PollFunc for reaction monitoring
-// This is used with Want.AddMonitoringAgent()
-func CreateReactionMonitorPollFunc() PollFunc {
-	return func(ctx context.Context, w *Want) (bool, error) {
-		// Check if want is still in reaching phase
-		phase, exists := w.GetState("reminder_phase")
-		if !exists || phase != ReminderPhaseReaching {
-			return true, nil // Stop monitoring
-		}
-
-		// Monitor reaction status
-		err := monitorUserReactions(ctx, w)
-		if err != nil {
-			return false, err
-		}
-
-		// Check if reaction was received (non-empty)
-		if userReaction, exists := w.GetState("user_reaction"); exists && userReaction != nil {
-			if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
-				return true, nil // Stop monitoring
-			}
-		}
-
-		return false, nil
-	}
+// UserReactionMonitorAgent extends MonitorAgent with stop logic
+type UserReactionMonitorAgent struct {
+	MonitorAgent
 }
 
 // NewUserReactionMonitorAgent creates a MonitorAgent that monitors user reactions via HTTP API
 // This is used for registration in the agent registry
 // The actual continuous monitoring is handled by AddMonitoringAgent in ReminderWant
-func NewUserReactionMonitorAgent() *MonitorAgent {
-	agent := &MonitorAgent{
-		BaseAgent: *NewBaseAgent(
-			"user_reaction_monitor",
-			[]string{"reminder_monitoring"},
-			MonitorAgentType,
-		),
+func NewUserReactionMonitorAgent() *UserReactionMonitorAgent {
+	return &UserReactionMonitorAgent{
+		MonitorAgent: MonitorAgent{
+			BaseAgent: *NewBaseAgent(
+				"user_reaction_monitor",
+				[]string{"reminder_monitoring"},
+				MonitorAgentType,
+			),
+		},
+	}
+}
+
+// Exec implements Agent interface with stop logic for user reaction monitoring
+func (a *UserReactionMonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
+	// Check if want is still in reaching phase
+	phase, exists := want.GetState("reminder_phase")
+	if !exists || phase != ReminderPhaseReaching {
+		return true, nil // Stop monitoring - phase ended
 	}
 
-	agent.Monitor = func(ctx context.Context, want *Want) error {
-		return monitorUserReactions(ctx, want)
+	// Begin batching cycle for state changes
+	want.BeginProgressCycle()
+
+	// Monitor reaction status
+	err := monitorUserReactions(ctx, want)
+
+	// Commit state changes
+	want.CommitStateChanges()
+
+	if err != nil {
+		return false, err
 	}
 
-	return agent
+	// Check if reaction was received (non-empty)
+	if userReaction, exists := want.GetState("user_reaction"); exists && userReaction != nil {
+		if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
+			return true, nil // Stop monitoring - reaction received
+		}
+	}
+
+	return false, nil // Continue monitoring
 }
 
 // monitorUserReactions monitors a single want for user reactions via HTTP API

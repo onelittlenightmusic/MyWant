@@ -27,6 +27,7 @@ type ReminderLocals struct {
 	Phase            string
 	TimeoutSeconds   int
 	LastCheckTime    time.Time
+	monitor          *UserReactionMonitorAgent // Monitoring agent instance
 }
 
 // ReminderWant represents a want that sends reminders at scheduled times
@@ -191,6 +192,9 @@ func (r *ReminderWant) Initialize() {
 		})
 	}
 
+	// Create monitoring agent during initialization (used if reaction is required)
+	locals.monitor = NewUserReactionMonitorAgent()
+
 	r.Locals = locals
 
 	// Set up scheduler agent if we have when specs
@@ -283,11 +287,11 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 		if locals.RequireReaction {
 			queueIDValue, exists := r.GetState("reaction_queue_id")
 			if exists && queueIDValue != nil && queueIDValue != "" {
-				// Use helper to add polling agent
+				// Use pre-initialized monitor from locals
 				agentName := "reaction-monitor-" + r.Metadata.ID
-				pollFunc := CreateReactionMonitorPollFunc()
-				
-				if err := r.AddMonitoringAgent(agentName, 2*time.Second, pollFunc); err != nil {
+				monitor := locals.monitor
+
+				if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
 					r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
 				} else {
 					InfoLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -445,7 +446,10 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 				[]string{},
 				"http://localhost:8081",
 			)
-			doAgent.Action = flightAgent.Exec
+			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
+				_, err := flightAgent.Exec(ctx, want)
+				return err
+			}
 		}
 	}
 }

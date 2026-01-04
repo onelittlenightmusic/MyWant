@@ -22,7 +22,7 @@ type Capability struct {
 
 // Agent defines the interface for all agent implementations.
 type Agent interface {
-	Exec(ctx context.Context, want *Want) error
+	Exec(ctx context.Context, want *Want) (shouldStop bool, err error)
 	GetCapabilities() []string
 	GetName() string
 	GetType() AgentType
@@ -63,7 +63,7 @@ type DoAgent struct {
 	Action func(ctx context.Context, want *Want) error
 }
 
-func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
+func (a *DoAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	if a.Action != nil {
 		// Begin batching cycle for all state changes from agent execution This includes agent-generated state changes and any subsequent SetSchedule() calls
 		want.BeginProgressCycle()
@@ -72,9 +72,9 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) error {
 
 		// Commit all staged state changes from the agent in a single batch
 		want.CommitStateChanges()
-		return err
+		return false, err // DoAgents don't stop monitoring
 	}
-	return fmt.Errorf("no action defined for DoAgent %s", a.Name)
+	return false, fmt.Errorf("no action defined for DoAgent %s", a.Name)
 }
 
 // MonitorAgent implements an agent that monitors want execution and state.
@@ -83,7 +83,7 @@ type MonitorAgent struct {
 	Monitor func(ctx context.Context, want *Want) error
 }
 
-func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
+func (a *MonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	if a.Monitor != nil {
 		// Begin batching cycle for all state changes from agent execution This includes agent-generated state changes and any subsequent SetSchedule() calls
 		want.BeginProgressCycle()
@@ -92,9 +92,9 @@ func (a *MonitorAgent) Exec(ctx context.Context, want *Want) error {
 
 		// Commit all staged state changes from the agent in a single batch
 		want.CommitStateChanges()
-		return err
+		return false, err // Default: continue monitoring
 	}
-	return fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
+	return false, fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
 }
 
 // AgentSpec holds specification for state field validation

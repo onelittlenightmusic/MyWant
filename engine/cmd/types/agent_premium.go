@@ -27,7 +27,7 @@ func NewAgentPremium(name string, capabilities []string, uses []string, premiumL
 }
 
 // Exec executes premium agent actions with enhanced capabilities
-func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
+func (a *AgentPremium) Exec(ctx context.Context, want *Want) (bool, error) {
 	// Generate premium hotel booking schedule
 	schedule := a.generateHotelSchedule(want)
 	want.StoreStateForAgent("agent_result", schedule)
@@ -43,7 +43,7 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) error {
 	want.StoreLog(fmt.Sprintf("Premium hotel booking completed: %s from %s to %s",
 		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2")))
 
-	return nil
+	return false, nil // Action completed
 }
 
 // generateHotelSchedule creates a premium hotel schedule
