@@ -60,93 +60,87 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       let nextItem: T | null = null;
       let shouldNavigate = false;
 
+      // Determine the reference item for navigation (current or last selected)
+      let refItem = currentItem;
+      if (!refItem && lastSelectedItemId && items.length > 0) {
+        refItem = items.find(item => item.id === lastSelectedItemId) || null;
+      }
+
       switch (e.key) {
         case 'ArrowRight':
-          e.preventDefault();
-          // Hierarchical Right arrow behavior:
-          // - If parent is expanded, move to first child
-          // - If at a child, move to next sibling
-          // - If at last child, move to next parent's sibling
-          // - If at top-level non-expanded parent, move to next top-level item
-          // - If no current item, restore last selected item or start with first item
-          let itemForRight = currentItem;
-          if (!itemForRight && lastSelectedItemId && items.length > 0) {
-            // No current item but we have a last selected ID, restore it
-            itemForRight = items.find(item => item.id === lastSelectedItemId) || null;
-          }
-
-          if (itemForRight) {
-            if (!itemForRight.parentId) {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          if (refItem) {
+            if (!refItem.parentId) {
               // Current item is top-level (parent)
-              const hasChildren = items.some(item => item.parentId === itemForRight.id);
-              const isExpanded = expandedItems?.has(itemForRight.id);
+              const hasChildren = items.some(item => item.parentId === refItem!.id);
+              const isExpanded = expandedItems?.has(refItem!.id);
 
               if (hasChildren && isExpanded) {
                 // Parent is expanded, move to first child
-                nextItem = getFirstChild(items, itemForRight);
+                nextItem = getFirstChild(items, refItem);
               } else {
                 // Parent is not expanded or has no children, move to next top-level
-                nextItem = getNextTopLevel(items, itemForRight);
+                nextItem = getNextTopLevel(items, refItem);
               }
             } else {
               // Current item is a child, move to next sibling
-              nextItem = getNextSibling(items, itemForRight);
+              nextItem = getNextSibling(items, refItem);
               if (!nextItem) {
                 // No next sibling, move to next parent's sibling
-                const parent = getParent(items, itemForRight);
+                const parent = getParent(items, refItem);
                 if (parent) {
                   nextItem = getNextSibling(items, parent);
                 }
               }
             }
-            shouldNavigate = !!nextItem;
           } else if (items.length > 0) {
-            // No current item or last selected item, start with first item
+            // No current item, start with first item
             nextItem = items[0];
-            shouldNavigate = true;
           }
+          shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowLeft':
-          e.preventDefault();
-          // Hierarchical Left arrow behavior:
-          // - If at a child with previous sibling, move to previous sibling
-          // - If at first child or no previous sibling, move to parent
-          // - If at top-level, move to previous top-level item
-          // - If no current item, restore last selected item
-          let itemForLeft = currentItem;
-          if (!itemForLeft && lastSelectedItemId && items.length > 0) {
-            // No current item but we have a last selected ID, restore it
-            itemForLeft = items.find(item => item.id === lastSelectedItemId) || null;
-          }
-
-          if (itemForLeft) {
-            if (itemForLeft.parentId) {
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          if (refItem) {
+            if (refItem.parentId) {
               // Current item is a child
-              nextItem = getPreviousSibling(items, itemForLeft);
+              nextItem = getPreviousSibling(items, refItem);
               if (!nextItem) {
                 // No previous sibling, move to parent
-                nextItem = getParent(items, itemForLeft);
+                nextItem = getParent(items, refItem);
               }
             } else {
               // Current item is top-level, move to previous top-level item
-              nextItem = getPreviousTopLevel(items, itemForLeft);
+              nextItem = getPreviousTopLevel(items, refItem);
             }
-            shouldNavigate = !!nextItem;
+          } else if (items.length > 0) {
+            // No current item, start with first item (or could be last)
+            nextItem = items[0];
           }
+          shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowDown':
-          e.preventDefault();
-          // Down arrow: navigate to next top-level want (previously Right)
-          nextItem = getNextTopLevel(items, currentItem);
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          // Down arrow: navigate to next top-level want
+          nextItem = getNextTopLevel(items, refItem);
+          if (!nextItem && !refItem && items.length > 0) {
+            // Fallback for first press
+            nextItem = getTopLevelItems(items)[0];
+          }
           shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowUp':
-          e.preventDefault();
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           // Up arrow: navigate to previous top-level want
-          nextItem = getPreviousTopLevel(items, currentItem);
+          nextItem = getPreviousTopLevel(items, refItem);
+          if (!nextItem && !refItem && items.length > 0) {
+            // Fallback for first press
+            const topLevel = getTopLevelItems(items);
+            nextItem = topLevel[topLevel.length - 1];
+          }
           shouldNavigate = !!nextItem;
           break;
 
