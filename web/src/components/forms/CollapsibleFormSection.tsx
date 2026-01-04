@@ -189,12 +189,6 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         ref={mergedRef}
         type="button"
         onClick={onToggleCollapse}
-        onFocus={() => {
-          // ヘッダーにフォーカスが当たった時、折りたたまれていれば自動的に展開
-          if (isCollapsed) {
-            onToggleCollapse();
-          }
-        }}
         onBlur={(e) => {
           // フォーカスがセクション内の要素に移った場合は閉じない
           const relatedTarget = e.relatedTarget as Node;
