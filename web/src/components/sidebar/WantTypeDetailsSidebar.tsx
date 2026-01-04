@@ -229,7 +229,7 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
 
 const ParametersTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
-    {wantType.parameters.length > 0 ? (
+    {wantType.parameters && wantType.parameters.length > 0 ? (
       <div className="space-y-4">
         {wantType.parameters.map((param) => (
           <TabSection key={param.name} title={param.name}>
@@ -282,7 +282,7 @@ const ParametersTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType })
 
 const StateTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
-    {wantType.state.length > 0 ? (
+    {wantType.state && wantType.state.length > 0 ? (
       <div className="space-y-4">
         {wantType.state.map((state) => (
           <TabSection key={state.name} title={state.name}>
@@ -365,7 +365,7 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
     )}
 
     <TabSection title="Inputs (Legacy)">
-      {wantType.connectivity.inputs.length > 0 ? (
+      {wantType.connectivity?.inputs && wantType.connectivity.inputs.length > 0 ? (
         <div className="space-y-3">
           {wantType.connectivity.inputs.map((input) => (
             <div key={input.name} className="p-2 bg-blue-50 rounded">
@@ -383,7 +383,7 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
     </TabSection>
 
     <TabSection title="Outputs (Legacy)">
-      {wantType.connectivity.outputs.length > 0 ? (
+      {wantType.connectivity?.outputs && wantType.connectivity.outputs.length > 0 ? (
         <div className="space-y-3">
           {wantType.connectivity.outputs.map((output) => (
             <div key={output.name} className="p-2 bg-green-50 rounded">
@@ -404,7 +404,7 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
 
 const AgentsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
-    {wantType.agents.length > 0 ? (
+    {wantType.agents && wantType.agents.length > 0 ? (
       <div className="space-y-4">
         {wantType.agents.map((agent) => (
           <TabSection key={agent.name} title={agent.name}>
@@ -441,7 +441,7 @@ const ExamplesTab: React.FC<{
   deployingExample?: string | null;
 }> = ({ wantType, onDeployExample, deployingExample }) => (
   <TabContent>
-    {wantType.examples.length > 0 ? (
+    {wantType.examples && wantType.examples.length > 0 ? (
       <div className="space-y-4">
         {wantType.examples.map((example, index) => (
           <TabSection key={index} title={example.name}>
@@ -494,7 +494,7 @@ const ExamplesTab: React.FC<{
 
 const ConstraintsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
-    {wantType.constraints.length > 0 ? (
+    {wantType.constraints && wantType.constraints.length > 0 ? (
       <div className="space-y-4">
         {wantType.constraints.map((constraint, index) => (
           <TabSection key={index} title={`Constraint ${index + 1}`}>
@@ -518,7 +518,6 @@ const ConstraintsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }
     )}
   </TabContent>
 );
-
 // Helper function for want type download
 function downloadWantTypeJSON(wantType: WantTypeDefinition): void {
   const filename = `${wantType.metadata.name}.json`;
