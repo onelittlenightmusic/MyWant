@@ -35,12 +35,11 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault();
       if (hasChanges) {
+        e.preventDefault();
         onChange(localValue);
       }
-      // Re-sync after change to avoid yellow flash if update is slow
-      // but actually the prop change will handle it
+      // If no changes, let it bubble up (e.g. for form submission)
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setLocalValue(String(value));
