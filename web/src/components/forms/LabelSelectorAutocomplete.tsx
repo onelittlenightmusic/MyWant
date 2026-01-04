@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLabelHistoryStore } from '@/stores/labelHistoryStore';
 import { ChevronDown, X } from 'lucide-react';
+import { CommitInput } from '@/components/common/CommitInput';
 
 interface LabelSelectorAutocompleteProps {
   keyValue: string;
@@ -120,6 +121,7 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
   };
 
   const handleValueSelect = (value: string) => {
+    onKeyChange(keyValue); // Trigger commit of current key if needed
     onValueChange(value);
     setValueOpen(false);
     // Move focus back to key input after value selection
@@ -148,11 +150,11 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
         {/* Key Input */}
         <div ref={keyContainerRef} className="relative flex-1">
           <div className="relative">
-            <input
+            <CommitInput
               ref={keyInputRef}
               type="text"
               value={keyValue}
-              onChange={(e) => onKeyChange(e.target.value)}
+              onChange={(val) => onKeyChange(val)}
               onFocus={handleKeyFocus}
               onBlur={() => {
                 // フォーカスが外れたら少し遅延してドロップダウンを閉じる
@@ -171,11 +173,12 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
                     setKeySelectedIndex(keySelectedIndex - 1);
                   }
                 } else if (e.key === 'Enter') {
-                  e.preventDefault();
                   if (keyOpen && keySelectedIndex >= 0 && filteredKeys[keySelectedIndex]) {
+                    e.preventDefault();
                     handleKeySelect(filteredKeys[keySelectedIndex]);
                   } else {
-                    valueInputRef.current?.focus();
+                    // CommitInput handles the commit, we just need to move focus
+                    setTimeout(() => valueInputRef.current?.focus(), 0);
                   }
                 } else if (e.key === 'Tab') {
                   e.preventDefault();
@@ -189,7 +192,7 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
                   onLeftKey();
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
+              className="pr-8"
               placeholder="Selector key (e.g., role, category)"
             />
             {labelKeys.length > 0 && (
@@ -222,11 +225,11 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
         {/* Value Input */}
         <div ref={valueContainerRef} className="relative flex-1">
           <div className="relative">
-            <input
+            <CommitInput
               ref={valueInputRef}
               type="text"
               value={valuValue}
-              onChange={(e) => onValueChange(e.target.value)}
+              onChange={(val) => onValueChange(val)}
               onFocus={handleValueFocus}
               onBlur={() => {
                 // フォーカスが外れたら少し遅延してドロップダウンを閉じる
@@ -245,8 +248,8 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
                     setValueSelectedIndex(valueSelectedIndex - 1);
                   }
                 } else if (e.key === 'Enter') {
-                  e.preventDefault();
                   if (valueOpen && valueSelectedIndex >= 0 && filteredValues[valueSelectedIndex]) {
+                    e.preventDefault();
                     handleValueSelect(filteredValues[valueSelectedIndex]);
                   } else {
                     setValueOpen(false);
@@ -263,7 +266,7 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
                   onLeftKey();
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
+              className="pr-8"
               placeholder="Selector value"
               disabled={!keyValue}
             />

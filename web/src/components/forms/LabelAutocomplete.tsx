@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLabelHistoryStore } from '@/stores/labelHistoryStore';
 import { ChevronDown, X } from 'lucide-react';
+import { CommitInput } from '@/components/common/CommitInput';
 
 interface LabelAutocompleteProps {
   keyValue: string;
@@ -127,11 +128,11 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
       {/* Key Input */}
       <div ref={keyContainerRef} className="relative flex-1">
         <div className="relative">
-          <input
+          <CommitInput
             ref={keyInputRef}
             type="text"
             value={keyValue}
-            onChange={(e) => onKeyChange(e.target.value)}
+            onChange={(val) => onKeyChange(val)}
             onFocus={handleKeyFocus}
             onBlur={() => {
               // フォーカスが外れたら少し遅延してドロップダウンを閉じる
@@ -140,9 +141,11 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                e.preventDefault();
-                // Enterキーでキーを確定し、フォーカスを値フィールドに移動
-                valueInputRef.current?.focus();
+                // We let CommitInput handle Enter for committing, 
+                // but we might want to also focus the value input.
+                // However, CommitInput's onChange will be called on Enter.
+                // Let's see if we can chain it.
+                setTimeout(() => valueInputRef.current?.focus(), 0);
               } else if (e.key === 'Tab') {
                 // Tabキーでもフォーカスを値フィールドに移動
                 e.preventDefault();
@@ -152,7 +155,7 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
                 onLeftKey();
               }
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
+            className="pr-8"
             placeholder="Key"
           />
           {labelKeys.length > 0 && (
@@ -181,11 +184,11 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
       {/* Value Input */}
       <div ref={valueContainerRef} className="relative flex-1">
         <div className="relative">
-          <input
+          <CommitInput
             ref={valueInputRef}
             type="text"
             value={valueValue}
-            onChange={(e) => onValueChange(e.target.value)}
+            onChange={(val) => onValueChange(val)}
             onFocus={handleValueFocus}
             onBlur={() => {
               // フォーカスが外れたら少し遅延してドロップダウンを閉じる
@@ -194,7 +197,6 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                e.preventDefault();
                 // Enterキーで値を確定（親でDoneボタンをクリック）
                 // または外側をクリックしてドロップダウンを閉じる
                 setValueOpen(false);
@@ -203,7 +205,7 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
                 onLeftKey();
               }
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
+            className="pr-8"
             placeholder="Value"
             disabled={!keyValue}
           />

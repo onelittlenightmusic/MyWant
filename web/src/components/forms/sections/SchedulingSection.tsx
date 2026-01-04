@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, forwardRef } from 'react';
 import { Clock } from 'lucide-react';
 import { CollapsibleFormSection } from '../CollapsibleFormSection';
 import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
+import { CommitInput } from '@/components/common/CommitInput';
 
 /**
  * Props for SchedulingSection
@@ -215,18 +216,18 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
         <label className="block text-sm font-medium text-gray-700 mb-1">
           At (optional - e.g., "7am", "17:30", "midnight")
         </label>
-        <input
+        <CommitInput
           ref={firstInputRef}
           type="text"
           value={editingDraft.at}
-          onChange={(e) => setEditingDraft(prev => ({ ...prev, at: e.target.value }))}
+          onChange={(val) => setEditingDraft(prev => ({ ...prev, at: val }))}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
               e.preventDefault();
               handleEscape();
             }
           }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          className="w-full"
           placeholder="Optional - e.g., 7am, 17:30"
         />
       </div>
@@ -238,17 +239,17 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
         </label>
         <div className="flex gap-2 items-end">
           <div className="flex-1">
-            <input
+            <CommitInput
               type="number"
               value={editingDraft.everyValue}
-              onChange={(e) => setEditingDraft(prev => ({ ...prev, everyValue: e.target.value }))}
+              onChange={(val) => setEditingDraft(prev => ({ ...prev, everyValue: val }))}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   e.preventDefault();
                   handleEscape();
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              className="w-full"
               placeholder="30"
               min="1"
             />
@@ -257,7 +258,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
             <select
               value={editingDraft.everyUnit}
               onChange={(e) => setEditingDraft(prev => ({ ...prev, everyUnit: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
             >
               <option value="seconds">seconds</option>
               <option value="minutes">minutes</option>

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, forwardRef } from 'react';
 import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { SectionNavigationCallbacks } from '@/types/formSection';
+import { CommitInput } from '@/components/common/CommitInput';
 
 /**
  * Parameter definition from want type
@@ -243,11 +244,11 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                           {param.required && <span className="text-red-600 ml-1">*</span>}
                         </label>
                       </div>
-                      <input
+                      <CommitInput
                         ref={index === 0 ? firstInputRef : undefined}
                         type="text"
                         value={String(parameters[param.name] || '')}
-                        onChange={(e) => handleUpdateParam(param.name, e.target.value)}
+                        onChange={(val) => handleUpdateParam(param.name, val)}
                         onKeyDown={(e) => {
                           if (e.key === 'Escape') {
                             e.preventDefault();
@@ -263,7 +264,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                             }
                           }
                         }}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        className="flex-1"
                         placeholder={param.description || 'Enter value'}
                       />
                     </div>
@@ -302,11 +303,11 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                         {key}
                       </label>
                     </div>
-                    <input
+                    <CommitInput
                       ref={index === 0 ? firstInputRef : undefined}
                       type="text"
                       value={String(value)}
-                      onChange={(e) => handleUpdateParam(key, e.target.value)}
+                      onChange={(val) => handleUpdateParam(key, val)}
                       onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                           e.preventDefault();
@@ -322,7 +323,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                           }
                         }
                       }}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      className="flex-1"
                       placeholder="Enter value"
                     />
                     <button
