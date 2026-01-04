@@ -63,20 +63,6 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       switch (e.key) {
         case 'ArrowRight':
           e.preventDefault();
-          // Right arrow behavior:
-          // - If onSelect is provided (select mode), use flat navigation
-          // - Otherwise, use hierarchical navigation
-          if (onSelect) {
-            const currentIndex = items.findIndex(item => item.id === (currentItem?.id || lastSelectedItemId));
-            if (currentIndex === -1) {
-              nextItem = items[0];
-            } else if (currentIndex < items.length - 1) {
-              nextItem = items[currentIndex + 1];
-            }
-            shouldNavigate = !!nextItem;
-            break;
-          }
-
           // Hierarchical Right arrow behavior:
           // - If parent is expanded, move to first child
           // - If at a child, move to next sibling
@@ -123,20 +109,6 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case 'ArrowLeft':
           e.preventDefault();
-          // Left arrow behavior:
-          // - If onSelect is provided (select mode), use flat navigation
-          // - Otherwise, use hierarchical navigation
-          if (onSelect) {
-            const currentIndex = items.findIndex(item => item.id === (currentItem?.id || lastSelectedItemId));
-            if (currentIndex === -1) {
-              nextItem = items[items.length - 1];
-            } else if (currentIndex > 0) {
-              nextItem = items[currentIndex - 1];
-            }
-            shouldNavigate = !!nextItem;
-            break;
-          }
-
           // Hierarchical Left arrow behavior:
           // - If at a child with previous sibling, move to previous sibling
           // - If at first child or no previous sibling, move to parent
