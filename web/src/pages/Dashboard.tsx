@@ -70,7 +70,6 @@ export const Dashboard: React.FC = () => {
   // Multi-select mode state
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedWantIds, setSelectedWantIds] = useState<Set<string>>(new Set());
-  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   // Export/Import state
   const [isExporting, setIsExporting] = useState(false);
