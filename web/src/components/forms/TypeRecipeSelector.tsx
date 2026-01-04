@@ -285,7 +285,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search want types or recipes..."
+            placeholder='Search by keyword (press "/")'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
