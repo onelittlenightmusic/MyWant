@@ -66,81 +66,82 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
         refItem = items.find(item => item.id === lastSelectedItemId) || null;
       }
 
+      // If still no refItem, and we press an arrow key, default to the first/last item
+      if (!refItem && items.length > 0) {
+        const topLevel = getTopLevelItems(items);
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'ArrowDown':
+          case 'ArrowLeft':
+            e.preventDefault();
+            onNavigate(items[0]);
+            return;
+          case 'ArrowUp':
+            e.preventDefault();
+            onNavigate(items[items.length - 1]);
+            return;
+        }
+      }
+
+      // If we have no items at all, don't proceed
+      if (!refItem) return;
+
       switch (e.key) {
         case 'ArrowRight':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          if (refItem) {
-            if (!refItem.parentId) {
-              // Current item is top-level (parent)
-              const hasChildren = items.some(item => item.parentId === refItem!.id);
-              const isExpanded = expandedItems?.has(refItem!.id);
+          e.preventDefault();
+          if (!refItem.parentId) {
+            // Current item is top-level (parent)
+            const hasChildren = items.some(item => item.parentId === refItem!.id);
+            const isExpanded = expandedItems?.has(refItem!.id);
 
-              if (hasChildren && isExpanded) {
-                // Parent is expanded, move to first child
-                nextItem = getFirstChild(items, refItem);
-              } else {
-                // Parent is not expanded or has no children, move to next top-level
-                nextItem = getNextTopLevel(items, refItem);
-              }
+            if (hasChildren && isExpanded) {
+              // Parent is expanded, move to first child
+              nextItem = getFirstChild(items, refItem);
             } else {
-              // Current item is a child, move to next sibling
-              nextItem = getNextSibling(items, refItem);
-              if (!nextItem) {
-                // No next sibling, move to next parent's sibling
-                const parent = getParent(items, refItem);
-                if (parent) {
-                  nextItem = getNextSibling(items, parent);
-                }
+              // Parent is not expanded or has no children, move to next top-level
+              nextItem = getNextTopLevel(items, refItem);
+            }
+          } else {
+            // Current item is a child, move to next sibling
+            nextItem = getNextSibling(items, refItem);
+            if (!nextItem) {
+              // No next sibling, move to next parent's sibling
+              const parent = getParent(items, refItem);
+              if (parent) {
+                nextItem = getNextSibling(items, parent);
               }
             }
-          } else if (items.length > 0) {
-            // No current item, start with first item
-            nextItem = items[0];
           }
           shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowLeft':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          if (refItem) {
-            if (refItem.parentId) {
-              // Current item is a child
-              nextItem = getPreviousSibling(items, refItem);
-              if (!nextItem) {
-                // No previous sibling, move to parent
-                nextItem = getParent(items, refItem);
-              }
-            } else {
-              // Current item is top-level, move to previous top-level item
-              nextItem = getPreviousTopLevel(items, refItem);
+          e.preventDefault();
+          if (refItem.parentId) {
+            // Current item is a child
+            nextItem = getPreviousSibling(items, refItem);
+            if (!nextItem) {
+              // No previous sibling, move to parent
+              nextItem = getParent(items, refItem);
             }
-          } else if (items.length > 0) {
-            // No current item, start with first item (or could be last)
-            nextItem = items[0];
+          } else {
+            // Current item is top-level, move to previous top-level item
+            nextItem = getPreviousTopLevel(items, refItem);
           }
           shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowDown':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
+          e.preventDefault();
           // Down arrow: navigate to next top-level want
           nextItem = getNextTopLevel(items, refItem);
-          if (!nextItem && !refItem && items.length > 0) {
-            // Fallback for first press
-            nextItem = getTopLevelItems(items)[0];
-          }
           shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowUp':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
+          e.preventDefault();
           // Up arrow: navigate to previous top-level want
           nextItem = getPreviousTopLevel(items, refItem);
-          if (!nextItem && !refItem && items.length > 0) {
-            // Fallback for first press
-            const topLevel = getTopLevelItems(items);
-            nextItem = topLevel[topLevel.length - 1];
-          }
           shouldNavigate = !!nextItem;
           break;
 

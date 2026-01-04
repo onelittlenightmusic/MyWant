@@ -224,6 +224,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleSelectWant = (wantId: string) => {
+    setLastSelectedWantId(wantId);
     setSelectedWantIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(wantId)) {
@@ -305,16 +306,22 @@ export const Dashboard: React.FC = () => {
   const handleViewWant = (want: Want) => {
     sidebar.selectItem(want);
     setSidebarInitialTab('settings');
+    const wantId = want.metadata?.id || want.id;
+    if (wantId) setLastSelectedWantId(wantId);
   };
 
   const handleViewAgents = (want: Want) => {
     sidebar.selectItem(want);
     setSidebarInitialTab('agents');
+    const wantId = want.metadata?.id || want.id;
+    if (wantId) setLastSelectedWantId(wantId);
   };
 
   const handleViewResults = (want: Want) => {
     sidebar.selectItem(want);
     setSidebarInitialTab('results');
+    const wantId = want.metadata?.id || want.id;
+    if (wantId) setLastSelectedWantId(wantId);
   };
 
   // Fetch wants that use a specific label
