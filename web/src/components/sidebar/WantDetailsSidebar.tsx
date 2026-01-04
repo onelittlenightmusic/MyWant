@@ -633,7 +633,7 @@ const SettingsTab: React.FC<{
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
     // Find the closest container that holds all sections
-    const container = e.currentTarget.closest('.space-y-2');
+    const container = e.currentTarget.closest('.focusable-container');
     if (!container) return;
 
     const focusableElements = Array.from(container.querySelectorAll('.focusable-section-header')) as HTMLElement[];
@@ -680,7 +680,7 @@ const SettingsTab: React.FC<{
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-8 focusable-container">
         {configMode === 'form' ? (
           <div className="space-y-2">
             {/* Metadata Section */}

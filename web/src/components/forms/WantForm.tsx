@@ -145,11 +145,11 @@ export const WantForm: React.FC<WantFormProps> = ({
   const handleArrowKeyNavigation = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
-    // Find all focusable form elements within this form
-    const form = e.currentTarget.closest('form');
-    if (!form) return;
+    // Find all focusable form elements within this container
+    const container = e.currentTarget.closest('.focusable-container');
+    if (!container) return;
 
-    const focusableElements = Array.from(form.querySelectorAll('.focusable-section-header')) as HTMLElement[];
+    const focusableElements = Array.from(container.querySelectorAll('.focusable-section-header')) as HTMLElement[];
     const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
 
     if (currentIndex === -1) {
@@ -428,7 +428,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       headerActions={headerAction}
       backgroundStyle={backgroundStyle}
     >
-      <form id="want-form" onSubmit={handleSubmit} className="space-y-3">
+      <form id="want-form" onSubmit={handleSubmit} className="space-y-3 focusable-container">
 
         {editMode === 'form' ? (
           <>
