@@ -10,6 +10,7 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
   currentItem: T | null;
   onNavigate: (item: T) => void;
   onToggleExpand?: (itemId: string) => void;
+  onSelect?: (itemId: string) => void;
   expandedItems?: Set<string>;
   lastSelectedItemId?: string | null;
   enabled?: boolean;
@@ -35,6 +36,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   currentItem,
   onNavigate,
   onToggleExpand,
+  onSelect,
   expandedItems,
   lastSelectedItemId,
   enabled = true
@@ -62,6 +64,20 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
         case 'ArrowRight':
           e.preventDefault();
           // Right arrow behavior:
+          // - If onSelect is provided (select mode), use flat navigation
+          // - Otherwise, use hierarchical navigation
+          if (onSelect) {
+            const currentIndex = items.findIndex(item => item.id === (currentItem?.id || lastSelectedItemId));
+            if (currentIndex === -1) {
+              nextItem = items[0];
+            } else if (currentIndex < items.length - 1) {
+              nextItem = items[currentIndex + 1];
+            }
+            shouldNavigate = !!nextItem;
+            break;
+          }
+
+          // Hierarchical Right arrow behavior:
           // - If parent is expanded, move to first child
           // - If at a child, move to next sibling
           // - If at last child, move to next parent's sibling
@@ -108,6 +124,20 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
         case 'ArrowLeft':
           e.preventDefault();
           // Left arrow behavior:
+          // - If onSelect is provided (select mode), use flat navigation
+          // - Otherwise, use hierarchical navigation
+          if (onSelect) {
+            const currentIndex = items.findIndex(item => item.id === (currentItem?.id || lastSelectedItemId));
+            if (currentIndex === -1) {
+              nextItem = items[items.length - 1];
+            } else if (currentIndex > 0) {
+              nextItem = items[currentIndex - 1];
+            }
+            shouldNavigate = !!nextItem;
+            break;
+          }
+
+          // Hierarchical Left arrow behavior:
           // - If at a child with previous sibling, move to previous sibling
           // - If at first child or no previous sibling, move to parent
           // - If at top-level, move to previous top-level item
@@ -150,12 +180,16 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case ' ':
           e.preventDefault();
-          // Space: Toggle expand/collapse on current parent item
+          // Space: Toggle selection if onSelect provided, else toggle expand/collapse
           if (currentItem) {
-            // Check if current item is a parent (has children)
-            const hasChildren = items.some(item => item.parentId === currentItem.id);
-            if (hasChildren && onToggleExpand) {
-              onToggleExpand(currentItem.id);
+            if (onSelect) {
+              onSelect(currentItem.id);
+            } else {
+              // Check if current item is a parent (has children)
+              const hasChildren = items.some(item => item.parentId === currentItem.id);
+              if (hasChildren && onToggleExpand) {
+                onToggleExpand(currentItem.id);
+              }
             }
           }
           return;  // Don't navigate, just toggle

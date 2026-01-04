@@ -668,6 +668,7 @@ export const Dashboard: React.FC = () => {
     currentItem: currentHierarchicalWant,
     onNavigate: handleHierarchicalNavigate,
     onToggleExpand: handleToggleExpand,
+    onSelect: handleSelectWant,
     expandedItems: expandedParents,
     lastSelectedItemId: lastSelectedWantId,
     enabled: !sidebar.showForm && filteredWants.length > 0 // Disable when form is open
