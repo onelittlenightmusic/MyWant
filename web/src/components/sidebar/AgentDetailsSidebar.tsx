@@ -65,11 +65,11 @@ export const AgentDetailsSidebar: React.FC<AgentDetailsSidebarProps> = ({
     if (!agent) return <Bot className="h-5 w-5" />;
     switch (agent.type) {
       case 'do':
-        return <Zap className="h-5 w-5" />;
+        return <Zap className="h-4 w-4" />;
       case 'monitor':
-        return <Monitor className="h-5 w-5" />;
+        return <Monitor className="h-4 w-4" />;
       default:
-        return <Bot className="h-5 w-5" />;
+        return <Bot className="h-4 w-4" />;
     }
   };
 
@@ -88,13 +88,6 @@ export const AgentDetailsSidebar: React.FC<AgentDetailsSidebarProps> = ({
   if (!agent) {
     return <EmptyState icon={Bot} message="Select an agent to view details" />;
   }
-
-  const tabs: TabConfig[] = [
-    { id: 'overview', label: 'Overview', icon: Eye },
-    { id: 'capabilities', label: 'Capabilities', icon: Settings },
-    { id: 'dependencies', label: 'Dependencies', icon: Bot },
-    { id: 'config', label: 'Config', icon: Code }
-  ];
 
   const badge = (
     <div className={classNames(
