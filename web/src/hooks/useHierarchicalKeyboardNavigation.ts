@@ -147,6 +147,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
         case ' ':
           e.preventDefault();
+          e.stopImmediatePropagation();
           // Space: Toggle selection if onSelect provided, else toggle expand/collapse
           if (currentItem) {
             if (onSelect) {
