@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown, Search } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown, Search, X } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -291,7 +291,11 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
-                searchInputRef.current?.blur();
+                if (searchQuery) {
+                  setSearchQuery('');
+                } else {
+                  searchInputRef.current?.blur();
+                }
               } else if (e.key === 'Tab' && !e.shiftKey && filteredItems.length > 0) {
                 e.preventDefault();
                 setFocusedIndex(0);
@@ -301,9 +305,22 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 handleKeyNavigation(e);
               }
             }}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             autoFocus
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                searchInputRef.current?.focus();
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 
