@@ -159,7 +159,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [initialTab]);
 
-  // Keyboard shortcuts for want control buttons
+  // Keyboard shortcuts for want control buttons and tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if user is typing in an input/textarea
@@ -170,6 +170,18 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
         target.isContentEditable;
 
       if (isInputElement) return;
+
+      // Tab switching shortcut: when focus is on a want card, Tab cycles sidebar tabs
+      if (e.key === 'Tab') {
+        const isFocusOnCard = !!target.closest('[data-keyboard-nav-id]');
+        if (isFocusOnCard) {
+          e.preventDefault();
+          const currentIndex = tabs.findIndex(t => t.id === activeTab);
+          const nextIndex = (currentIndex + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
+          handleTabChange(tabs[nextIndex].id);
+          return;
+        }
+      }
 
       switch (e.key.toLowerCase()) {
         case 'd':
