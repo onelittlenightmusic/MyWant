@@ -38,6 +38,39 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [deploying, setDeploying] = useState(false);
 
+  const tabs = React.useMemo(() => [
+    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
+    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
+    { id: 'wants' as TabType, label: 'Wants', icon: List },
+    { id: 'results' as TabType, label: 'Results', icon: BookOpen }
+  ], []);
+
+  // Tab switching shortcut
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      if (e.key === 'Tab') {
+        const isFocusOnCard = !!target.closest('[data-keyboard-nav-id]');
+        if (isFocusOnCard) {
+          e.preventDefault();
+          const currentIndex = tabs.findIndex(t => t.id === activeTab);
+          const nextIndex = (currentIndex + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
+          setActiveTab(tabs[nextIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, tabs]);
+
   // Check if recipe has example deployment
   const hasExample = recipe?.recipe.example?.wants &&
                      recipe.recipe.example.wants.length > 0;
@@ -121,13 +154,6 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
       </div>
     );
   }
-
-  const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
-    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
-    { id: 'wants' as TabType, label: 'Wants', icon: List },
-    { id: 'results' as TabType, label: 'Results', icon: BookOpen }
-  ];
 
   return (
     <div className="h-full flex flex-col">

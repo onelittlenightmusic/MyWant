@@ -26,6 +26,42 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [deployingExample, setDeployingExample] = useState<string | null>(null);
 
+  const tabs = React.useMemo(() => [
+    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
+    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
+    { id: 'state' as TabType, label: 'State', icon: Database },
+    { id: 'connectivity' as TabType, label: 'Connectivity', icon: Share2 },
+    { id: 'agents' as TabType, label: 'Agents', icon: Zap },
+    { id: 'examples' as TabType, label: 'Examples', icon: BookOpen },
+    { id: 'constraints' as TabType, label: 'Constraints', icon: List }
+  ], []);
+
+  // Tab switching shortcut
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      if (e.key === 'Tab') {
+        const isFocusOnCard = !!target.closest('[data-keyboard-nav-id]');
+        if (isFocusOnCard) {
+          e.preventDefault();
+          const currentIndex = tabs.findIndex(t => t.id === activeTab);
+          const nextIndex = (currentIndex + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
+          setActiveTab(tabs[nextIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, tabs]);
+
   if (!wantType) {
     return (
       <div className="text-center py-12">
@@ -56,16 +92,6 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
 
   // Get background style for want type detail sidebar
   const sidebarBackgroundStyle = getBackgroundStyle(wantType.metadata.name, true);
-
-  const tabs = [
-    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
-    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
-    { id: 'state' as TabType, label: 'State', icon: Database },
-    { id: 'connectivity' as TabType, label: 'Connectivity', icon: Share2 },
-    { id: 'agents' as TabType, label: 'Agents', icon: Zap },
-    { id: 'examples' as TabType, label: 'Examples', icon: BookOpen },
-    { id: 'constraints' as TabType, label: 'Constraints', icon: List }
-  ];
 
   return (
     <div className="h-full flex flex-col" style={sidebarBackgroundStyle.style}>

@@ -94,11 +94,13 @@ export const useKeyboardNavigation = ({
         onNavigate(newIndex);
 
         // Use requestAnimationFrame and a small timeout to ensure React has fully updated the DOM
-        // before attempting to scroll. This prevents animation artifacts.
+        // before attempting to scroll and focus. This prevents animation artifacts.
         requestAnimationFrame(() => {
           setTimeout(() => {
+            // Find the element that is now selected (marked by selected state in parent)
             const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
             if (selectedElement && selectedElement instanceof HTMLElement) {
+              selectedElement.focus();
               // Use 'center' to ensure the selected element is clearly visible in the center of the viewport
               selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }

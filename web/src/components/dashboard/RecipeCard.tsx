@@ -32,6 +32,14 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const version = recipe.recipe.metadata.version || '';
   const wantsCount = recipe.recipe.wants.length;
   const parametersCount = recipe.recipe.parameters ? Object.keys(recipe.recipe.parameters).length : 0;
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // Focus the card when it's targeted by keyboard navigation
+  React.useEffect(() => {
+    if (selected && document.activeElement !== cardRef.current) {
+      cardRef.current?.focus();
+    }
+  }, [selected]);
 
   const formatParametersCount = (params?: Record<string, any>) => {
     if (!params) return 0;
@@ -80,9 +88,13 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       onClick={handleCardClick}
+      tabIndex={0}
+      data-keyboard-nav-selected={selected}
+      data-keyboard-nav-id={recipeName}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bot, Monitor, Zap, Settings, Eye, Code } from 'lucide-react';
 import { AgentResponse } from '@/types/agent';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -26,6 +26,40 @@ export const AgentDetailsSidebar: React.FC<AgentDetailsSidebarProps> = ({
 }) => {
   const { loading, error } = useAgentStore();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  const tabs: TabConfig[] = [
+    { id: 'overview', label: 'Overview', icon: Eye },
+    { id: 'capabilities', label: 'Capabilities', icon: Settings },
+    { id: 'dependencies', label: 'Dependencies', icon: Bot },
+    { id: 'config', label: 'Config', icon: Code }
+  ];
+
+  // Tab switching shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      if (e.key === 'Tab') {
+        // Look for any element with data-keyboard-nav-id (generic card focus)
+        const isFocusOnCard = !!target.closest('[data-keyboard-nav-id]');
+        if (isFocusOnCard) {
+          e.preventDefault();
+          const currentIndex = tabs.findIndex(t => t.id === activeTab);
+          const nextIndex = (currentIndex + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
+          setActiveTab(tabs[nextIndex].id as TabType);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, tabs]);
 
   const getTypeIcon = () => {
     if (!agent) return <Bot className="h-5 w-5" />;

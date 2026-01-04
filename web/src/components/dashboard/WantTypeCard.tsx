@@ -42,6 +42,15 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
   onView,
   className
 }) => {
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // Focus the card when it's targeted by keyboard navigation
+  React.useEffect(() => {
+    if (selected && document.activeElement !== cardRef.current) {
+      cardRef.current?.focus();
+    }
+  }, [selected]);
+
   const handleCardClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
 
@@ -68,9 +77,13 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       onClick={handleCardClick}
+      tabIndex={0}
+      data-keyboard-nav-selected={selected}
+      data-keyboard-nav-id={wantType.name}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className || ''
       )}

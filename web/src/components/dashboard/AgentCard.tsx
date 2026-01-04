@@ -24,6 +24,14 @@ export const AgentCard: React.FC<AgentCardProps> = ({
   const agentType = agent.type || 'unknown';
   const capabilities = agent.capabilities || [];
   const uses = agent.uses || [];
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  // Focus the card when it's targeted by keyboard navigation
+  React.useEffect(() => {
+    if (selected && document.activeElement !== cardRef.current) {
+      cardRef.current?.focus();
+    }
+  }, [selected]);
 
   const handleCardClick = () => {
     onView(agent);
@@ -63,9 +71,13 @@ export const AgentCard: React.FC<AgentCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       onClick={handleCardClick}
+      tabIndex={0}
+      data-keyboard-nav-selected={selected}
+      data-keyboard-nav-id={agentName}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group',
+        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         className
       )}>
