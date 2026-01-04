@@ -73,11 +73,11 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           case 'ArrowRight':
           case 'ArrowDown':
           case 'ArrowLeft':
-            e.preventDefault();
+            if (typeof e.preventDefault === 'function') e.preventDefault();
             onNavigate(items[0]);
             return;
           case 'ArrowUp':
-            e.preventDefault();
+            if (typeof e.preventDefault === 'function') e.preventDefault();
             onNavigate(items[items.length - 1]);
             return;
         }
@@ -88,7 +88,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
 
       switch (e.key) {
         case 'ArrowRight':
-          e.preventDefault();
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           if (!refItem.parentId) {
             // Current item is top-level (parent)
             const hasChildren = items.some(item => item.parentId === refItem!.id);
@@ -116,7 +116,7 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           break;
 
         case 'ArrowLeft':
-          e.preventDefault();
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           if (refItem.parentId) {
             // Current item is a child
             nextItem = getPreviousSibling(items, refItem);
@@ -132,14 +132,14 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           break;
 
         case 'ArrowDown':
-          e.preventDefault();
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           // Down arrow: navigate to next top-level want
           nextItem = getNextTopLevel(items, refItem);
           shouldNavigate = !!nextItem;
           break;
 
         case 'ArrowUp':
-          e.preventDefault();
+          if (typeof e.preventDefault === 'function') e.preventDefault();
           // Up arrow: navigate to previous top-level want
           nextItem = getPreviousTopLevel(items, refItem);
           shouldNavigate = !!nextItem;
@@ -184,12 +184,15 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
       if (shouldNavigate && nextItem) {
         onNavigate(nextItem);
 
+        const targetId = nextItem.id;
+
         // Use requestAnimationFrame and a small timeout to ensure React has fully updated the DOM
-        // before attempting to scroll. This prevents animation artifacts.
+        // before attempting to scroll and focus. This prevents animation artifacts.
         requestAnimationFrame(() => {
           setTimeout(() => {
-            const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
+            const selectedElement = document.querySelector(`[data-keyboard-nav-id="${targetId}"]`);
             if (selectedElement && selectedElement instanceof HTMLElement) {
+              selectedElement.focus();
               selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }, 0);
