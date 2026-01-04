@@ -78,6 +78,15 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // State for drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Focus the card when it's targeted by keyboard navigation
+  useEffect(() => {
+    const isNavSelected = selectedWant?.metadata?.id === want.metadata?.id || selectedWant?.id === want.id;
+    if (isNavSelected && document.activeElement !== cardRef.current) {
+      cardRef.current?.focus();
+    }
+  }, [selectedWant, want.metadata?.id, want.id]);
 
   // Trigger animation when expanded children section mounts
   useEffect(() => {
@@ -235,13 +244,14 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   return (
     <div
+      ref={cardRef}
       onClick={handleCardClick}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onFocus={() => onView(want)}
       tabIndex={0}
       data-keyboard-nav-selected={selected}
+      data-keyboard-nav-id={wantId}
       className={classNames(
         'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
@@ -457,8 +467,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                 <div
                   key={childId || `child-${index}`}
                   data-keyboard-nav-selected={isChildSelected}
+                  data-keyboard-nav-id={childId}
                   tabIndex={0}
-                  onFocus={() => onView(child)}
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
