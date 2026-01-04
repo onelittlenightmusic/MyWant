@@ -229,6 +229,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`
+          focusable-section-header
           w-full text-left px-4 py-3 rounded-lg border-2
           transition-all duration-200 focus:outline-none
           relative

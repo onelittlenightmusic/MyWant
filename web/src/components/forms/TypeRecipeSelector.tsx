@@ -236,7 +236,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               onArrowDown();
             }
           }}
-          className={`w-full border-2 rounded-lg p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
+          className={`focusable-section-header w-full border-2 rounded-lg p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
             selectedItem.type === 'want-type'
               ? 'border-blue-500 bg-blue-50 focus:ring-blue-500'
               : 'border-green-500 bg-green-50 focus:ring-green-500'
@@ -305,7 +305,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 handleKeyNavigation(e);
               }
             }}
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="focusable-section-header w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             autoFocus
           />
           {searchQuery && (

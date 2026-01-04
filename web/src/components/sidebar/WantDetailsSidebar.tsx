@@ -628,6 +628,34 @@ const SettingsTab: React.FC<{
     }
   }, [want.metadata?.id, want, when, updateWant, onWantUpdate, setLocalUpdateError]);
 
+  // Handle arrow key navigation for form fields based on DOM order
+  const handleArrowKeyNavigation = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+
+    // Find the closest container that holds all sections
+    const container = e.currentTarget.closest('.space-y-2');
+    if (!container) return;
+
+    const focusableElements = Array.from(container.querySelectorAll('.focusable-section-header')) as HTMLElement[];
+    const currentIndex = focusableElements.indexOf(document.activeElement as HTMLElement);
+
+    if (currentIndex === -1) {
+      if (e.key === 'ArrowDown' && focusableElements.length > 0) {
+        e.preventDefault();
+        focusableElements[0].focus();
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown' && currentIndex < focusableElements.length - 1) {
+      e.preventDefault();
+      focusableElements[currentIndex + 1].focus();
+    } else if (e.key === 'ArrowUp' && currentIndex > 0) {
+      e.preventDefault();
+      focusableElements[currentIndex - 1].focus();
+    }
+  }, []);
+
   // Reset form state when want changes or metadata is updated (including labels/dependencies)
   useEffect(() => {
     setParams(want.spec?.params || {});
@@ -682,12 +710,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isParametersCollapsed}
               onToggleCollapse={() => setIsParametersCollapsed(!isParametersCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => {
-                  // Navigate to metadata section (not implemented)
-                },
-                onNavigateDown: () => {
-                  schedulingSectionRef.current?.focus();
-                }
+                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: paramsSectionRef.current } as any),
+                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: paramsSectionRef.current } as any),
               }}
             />
 
@@ -732,12 +756,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isSchedulingCollapsed}
               onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => {
-                  paramsSectionRef.current?.focus();
-                },
-                onNavigateDown: () => {
-                  labelsSectionRef.current?.focus();
-                }
+                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: schedulingSectionRef.current } as any),
+                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: schedulingSectionRef.current } as any),
               }}
             />
 
@@ -749,12 +769,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isLabelsCollapsed}
               onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => {
-                  schedulingSectionRef.current?.focus();
-                },
-                onNavigateDown: () => {
-                  dependenciesSectionRef.current?.focus();
-                }
+                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: labelsSectionRef.current } as any),
+                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: labelsSectionRef.current } as any),
               }}
             />
 
@@ -766,12 +782,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isDependenciesCollapsed}
               onToggleCollapse={() => setIsDependenciesCollapsed(!isDependenciesCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => {
-                  labelsSectionRef.current?.focus();
-                },
-                onNavigateDown: () => {
-                  // Last section, no navigation down
-                }
+                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: dependenciesSectionRef.current } as any),
+                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: dependenciesSectionRef.current } as any),
               }}
             />
 

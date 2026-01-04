@@ -192,6 +192,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`
+          focusable-section-header
           w-full text-left px-4 py-3 rounded-lg border-2
           transition-all duration-200 focus:outline-none
           relative bg-blue-50 border-blue-200 hover:bg-blue-100
