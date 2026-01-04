@@ -145,7 +145,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const handleArrowKeyNavigation = (e: React.KeyboardEvent, currentField: string) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
-    const fields = ['type', 'name', 'parameters', 'labels', 'dependencies', 'scheduling'];
+    const fields = ['type', 'name', 'parameters', 'scheduling', 'labels', 'dependencies'];
     const currentIndex = fields.indexOf(currentField);
 
     if (e.key === 'ArrowDown' && currentIndex < fields.length - 1) {
@@ -158,14 +158,14 @@ export const WantForm: React.FC<WantFormProps> = ({
         case 'parameters':
           paramsSectionRef.current?.focus();
           break;
+        case 'scheduling':
+          schedulingSectionRef.current?.focus();
+          break;
         case 'labels':
           labelsSectionRef.current?.focus();
           break;
         case 'dependencies':
           dependenciesSectionRef.current?.focus();
-          break;
-        case 'scheduling':
-          schedulingSectionRef.current?.focus();
           break;
       }
     } else if (e.key === 'ArrowUp' && currentIndex > 0) {
@@ -180,6 +180,9 @@ export const WantForm: React.FC<WantFormProps> = ({
           break;
         case 'parameters':
           paramsSectionRef.current?.focus();
+          break;
+        case 'scheduling':
+          schedulingSectionRef.current?.focus();
           break;
         case 'labels':
           labelsSectionRef.current?.focus();
@@ -547,6 +550,20 @@ export const WantForm: React.FC<WantFormProps> = ({
                   }}
                 />
 
+                {/* Scheduling Section */}
+                <SchedulingSection
+                  ref={schedulingSectionRef}
+                  schedules={when}
+                  onChange={setWhen}
+                  isCollapsed={collapsedSections.has('scheduling')}
+                  onToggleCollapse={() => toggleSection('scheduling')}
+                  navigationCallbacks={{
+                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'scheduling'),
+                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'scheduling'),
+                    onTab: handleFieldTab,
+                  }}
+                />
+
                 {/* Labels Section */}
                 <LabelsSection
                   ref={labelsSectionRef}
@@ -571,20 +588,6 @@ export const WantForm: React.FC<WantFormProps> = ({
                   navigationCallbacks={{
                     onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'dependencies'),
                     onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'dependencies'),
-                    onTab: handleFieldTab,
-                  }}
-                />
-
-                {/* Scheduling Section */}
-                <SchedulingSection
-                  ref={schedulingSectionRef}
-                  schedules={when}
-                  onChange={setWhen}
-                  isCollapsed={collapsedSections.has('scheduling')}
-                  onToggleCollapse={() => toggleSection('scheduling')}
-                  navigationCallbacks={{
-                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', preventDefault: () => {} } as any, 'scheduling'),
-                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', preventDefault: () => {} } as any, 'scheduling'),
                     onTab: handleFieldTab,
                   }}
                 />
