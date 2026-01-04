@@ -151,8 +151,8 @@ const OverviewTab: React.FC<{ agent: AgentResponse }> = ({ agent }) => (
 
       <TabSection title="Statistics">
         <dl className="space-y-2">
-          <InfoRow label="Capabilities" value={agent.capabilities.length} />
-          <InfoRow label="Dependencies" value={agent.uses.length} />
+          <InfoRow label="Capabilities" value={agent.capabilities?.length || 0} />
+          <InfoRow label="Dependencies" value={agent.uses?.length || 0} />
         </dl>
       </TabSection>
     </TabGrid>
@@ -161,7 +161,7 @@ const OverviewTab: React.FC<{ agent: AgentResponse }> = ({ agent }) => (
 
 const CapabilitiesTab: React.FC<{ agent: AgentResponse }> = ({ agent }) => (
   <TabContent>
-    {agent.capabilities.length > 0 ? (
+    {agent.capabilities && agent.capabilities.length > 0 ? (
       <div className="space-y-3">
         {agent.capabilities.map((capability, index) => (
           <div
@@ -185,7 +185,7 @@ const CapabilitiesTab: React.FC<{ agent: AgentResponse }> = ({ agent }) => (
 
 const DependenciesTab: React.FC<{ agent: AgentResponse }> = ({ agent }) => (
   <TabContent>
-    {agent.uses.length > 0 ? (
+    {agent.uses && agent.uses.length > 0 ? (
       <div className="space-y-3">
         {agent.uses.map((dependency, index) => (
           <div
