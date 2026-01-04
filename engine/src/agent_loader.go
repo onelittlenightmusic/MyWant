@@ -3,10 +3,11 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -299,7 +300,6 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 		baseAgent := BaseAgent{
 			Name:         agentDef.Name,
 			Capabilities: agentDef.Capabilities,
-			Uses:         agentDef.Uses,
 		}
 
 		switch strings.ToLower(agentDef.Type) {

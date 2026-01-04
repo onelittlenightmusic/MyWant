@@ -16,10 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v3"
 	types "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
+
+	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
 )
 
 // ServerConfig holds server configuration
@@ -1309,7 +1310,6 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	baseAgent := mywant.BaseAgent{
 		Name:         agentData.Name,
 		Capabilities: agentData.Capabilities,
-		Uses:         agentData.Uses,
 		Type:         mywant.AgentType(agentData.Type),
 	}
 
@@ -1340,7 +1340,6 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		"name":         agent.GetName(),
 		"type":         agent.GetType(),
 		"capabilities": agent.GetCapabilities(),
-		"uses":         agent.GetUses(),
 	})
 }
 
@@ -1354,7 +1353,6 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 			"name":         agent.GetName(),
 			"type":         agent.GetType(),
 			"capabilities": agent.GetCapabilities(),
-			"uses":         agent.GetUses(),
 		}
 	}
 
@@ -1380,7 +1378,6 @@ func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 		"name":         agent.GetName(),
 		"type":         agent.GetType(),
 		"capabilities": agent.GetCapabilities(),
-		"uses":         agent.GetUses(),
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -1477,7 +1474,6 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 			"name":         agent.GetName(),
 			"type":         agent.GetType(),
 			"capabilities": agent.GetCapabilities(),
-			"uses":         agent.GetUses(),
 		}
 	}
 

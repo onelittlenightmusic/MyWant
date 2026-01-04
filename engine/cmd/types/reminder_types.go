@@ -283,9 +283,11 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 		if locals.RequireReaction {
 			queueIDValue, exists := r.GetState("reaction_queue_id")
 			if exists && queueIDValue != nil && queueIDValue != "" {
-				// Create and add background monitoring agent
-				monitorAgent := NewReactionMonitoringAgent(r.Metadata.ID)
-				if err := r.AddBackgroundAgent(monitorAgent); err != nil {
+				// Use helper to add polling agent
+				agentName := "reaction-monitor-" + r.Metadata.ID
+				pollFunc := CreateReactionMonitorPollFunc()
+				
+				if err := r.AddMonitoringAgent(agentName, 2*time.Second, pollFunc); err != nil {
 					r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
 				} else {
 					InfoLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)

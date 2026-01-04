@@ -36,7 +36,6 @@ func NewMonitorRestaurant(name string, capabilities []string, uses []string) *Mo
 			BaseAgent: BaseAgent{
 				Name:         name,
 				Capabilities: capabilities,
-				Uses:         uses,
 				Type:         MonitorAgentType,
 			},
 		},

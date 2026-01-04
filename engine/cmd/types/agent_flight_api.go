@@ -47,7 +47,6 @@ func NewAgentFlightAPI(name string, capabilities []string, uses []string, server
 			BaseAgent: BaseAgent{
 				Name:         name,
 				Capabilities: capabilities,
-				Uses:         []string{},
 				Type:         DoAgentType,
 			},
 		},

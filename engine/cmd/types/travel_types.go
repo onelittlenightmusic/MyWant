@@ -603,14 +603,8 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 // FlightWant Implementation (migrated from flight_types.go)
 // ============================================================================
 
-// FlightMonitoringAgent implements BackgroundAgent for continuous flight status monitoring
-type FlightMonitoringAgent struct {
-	BaseMonitoringAgent
-}
-
-// NewFlightMonitoringAgent creates a new flight monitoring background agent
-// Initializes MonitorFlightAPI internally with proper configuration
-func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent {
+// CreateFlightMonitorPollFunc returns a PollFunc for flight monitoring
+func CreateFlightMonitorPollFunc(flightID, serverURL string) PollFunc {
 	agentID := "flight-monitor-" + flightID
 
 	// Initialize MonitorFlightAPI with agent configuration
@@ -619,7 +613,6 @@ func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent
 			BaseAgent: BaseAgent{
 				Name:         agentID,
 				Capabilities: []string{},
-				Uses:         []string{},
 				Type:         MonitorAgentType,
 			},
 		},
@@ -628,13 +621,9 @@ func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent
 		StatusChangeHistory: make([]StatusChange, 0),
 	}
 
-	pollFunc := func(ctx context.Context, w *Want) (bool, error) {
+	return func(ctx context.Context, w *Want) (bool, error) {
 		err := monitor.Exec(ctx, w)
 		return false, err // Flight monitoring usually continues until explicitly stopped
-	}
-
-	return &FlightMonitoringAgent{
-		BaseMonitoringAgent: *NewBaseMonitoringAgent(agentID, 10*time.Second, "MonitorAgent", pollFunc),
 	}
 }
 
@@ -1193,8 +1182,10 @@ func (f *FlightWant) tryAgentExecution() any {
 			}
 
 			// Create and add background monitoring agent
-			monitorAgent := NewFlightMonitoringAgent(flightID, serverURL)
-			if err := f.AddBackgroundAgent(monitorAgent); err != nil {
+			agentName := "flight-monitor-" + flightID
+			pollFunc := CreateFlightMonitorPollFunc(flightID, serverURL)
+			
+			if err := f.AddMonitoringAgent(agentName, 10*time.Second, pollFunc); err != nil {
 				f.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
 			}
 

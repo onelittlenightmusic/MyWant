@@ -1413,6 +1413,13 @@ func (n *Want) Init() {
 	n.State[StateFieldCompleted] = false
 }
 
+// AddMonitoringAgent is a helper to easily create and add a polling-based monitoring agent
+// It creates a PollingAgent with the specified logic and registers it
+func (w *Want) AddMonitoringAgent(name string, interval time.Duration, poll PollFunc) error {
+	agent := NewPollingAgent(name, interval, "MonitorAgent", poll)
+	return w.AddBackgroundAgent(agent)
+}
+
 // SetWantTypeDefinition sets the want type definition and initializes provided state fields
 func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 	if typeDef == nil {

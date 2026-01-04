@@ -26,23 +26,20 @@ type Agent interface {
 	GetCapabilities() []string
 	GetName() string
 	GetType() AgentType
-	GetUses() []string
 }
 
 // BaseAgent provides common functionality for all agent types.
 type BaseAgent struct {
 	Name         string    `yaml:"name"`
 	Capabilities []string  `yaml:"capabilities"`
-	Uses         []string  `yaml:"uses"`
 	Type         AgentType `yaml:"type"`
 }
 
 // NewBaseAgent creates a new BaseAgent with the given parameters. This is the canonical constructor for creating agents.
-func NewBaseAgent(name string, capabilities []string, uses []string, agentType AgentType) *BaseAgent {
+func NewBaseAgent(name string, capabilities []string, agentType AgentType) *BaseAgent {
 	return &BaseAgent{
 		Name:         name,
 		Capabilities: capabilities,
-		Uses:         uses,
 		Type:         agentType,
 	}
 }
@@ -59,9 +56,6 @@ func (a *BaseAgent) GetType() AgentType {
 	return a.Type
 }
 
-func (a *BaseAgent) GetUses() []string {
-	return a.Uses
-}
 
 // DoAgent implements an agent that performs specific actions on wants.
 type DoAgent struct {

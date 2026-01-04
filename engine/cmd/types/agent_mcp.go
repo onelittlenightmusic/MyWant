@@ -426,7 +426,6 @@ func NewMCPAgent() *MCPAgent {
 	baseAgent := mywant.NewBaseAgent(
 		"mcp_tools",                    // Agent name
 		[]string{"mcp_gmail"},          // Capabilities
-		[]string{},                     // Uses (no dependencies)
 		mywant.DoAgentType,             // Execute synchronously
 	)
 

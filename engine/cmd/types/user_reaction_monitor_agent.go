@@ -5,21 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 	. "mywant/engine/src"
 )
 
-// ReactionMonitoringAgent implements BackgroundAgent for continuous reaction monitoring
-// Inherits from BaseMonitoringAgent
-type ReactionMonitoringAgent struct {
-	BaseMonitoringAgent
-}
-
-// NewReactionMonitoringAgent creates a new reaction monitoring background agent
-func NewReactionMonitoringAgent(reminderID string) *ReactionMonitoringAgent {
-	agentID := "reaction-monitor-" + reminderID
-
-	pollFunc := func(ctx context.Context, w *Want) (bool, error) {
+// CreateReactionMonitorPollFunc returns a PollFunc for reaction monitoring
+// This is used with Want.AddMonitoringAgent()
+func CreateReactionMonitorPollFunc() PollFunc {
+	return func(ctx context.Context, w *Want) (bool, error) {
 		// Check if want is still in reaching phase
 		phase, exists := w.GetState("reminder_phase")
 		if !exists || phase != ReminderPhaseReaching {
@@ -41,21 +33,16 @@ func NewReactionMonitoringAgent(reminderID string) *ReactionMonitoringAgent {
 
 		return false, nil
 	}
-
-	return &ReactionMonitoringAgent{
-		BaseMonitoringAgent: *NewBaseMonitoringAgent(agentID, 2*time.Second, "MonitorAgent", pollFunc),
-	}
 }
 
 // NewUserReactionMonitorAgent creates a MonitorAgent that monitors user reactions via HTTP API
 // This is used for registration in the agent registry
-// The actual continuous monitoring is handled by ReactionMonitoringAgent (BackgroundAgent)
+// The actual continuous monitoring is handled by AddMonitoringAgent in ReminderWant
 func NewUserReactionMonitorAgent() *MonitorAgent {
 	agent := &MonitorAgent{
 		BaseAgent: *NewBaseAgent(
 			"user_reaction_monitor",
 			[]string{"reminder_monitoring"},
-			[]string{},
 			MonitorAgentType,
 		),
 	}

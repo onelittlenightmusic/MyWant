@@ -16,7 +16,6 @@ func NewReminderQueueAgent() *mywant.DoAgent {
 		BaseAgent: *mywant.NewBaseAgent(
 			"reminder_queue_manager",
 			[]string{"reminder_queue_management"},
-			[]string{},
 			mywant.DoAgentType,
 		),
 	}

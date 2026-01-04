@@ -20,7 +20,6 @@ func NewExecutionAgent() *ExecutionAgent {
 	baseAgent := mywant.NewBaseAgent(
 		"execution_command",           // Agent name
 		[]string{"command_execution"}, // Capabilities
-		[]string{},                    // Uses (no dependencies)
 		mywant.DoAgentType,            // Execute synchronously
 	)
 
