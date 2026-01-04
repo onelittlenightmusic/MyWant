@@ -17,6 +17,7 @@ interface WantStore {
   createWant: (request: CreateWantRequest) => Promise<Want>;
   updateWant: (id: string, request: UpdateWantRequest) => Promise<void>;
   deleteWant: (id: string) => Promise<void>;
+  deleteWants: (ids: string[]) => Promise<void>;
   selectWant: (want: Want | null) => void;
   fetchWantDetails: (id: string) => Promise<void>;
   fetchWantResults: (id: string) => Promise<void>;
@@ -26,6 +27,10 @@ interface WantStore {
   resumeWant: (id: string) => Promise<void>;
   stopWant: (id: string) => Promise<void>;
   startWant: (id: string) => Promise<void>;
+  suspendWants: (ids: string[]) => Promise<void>;
+  resumeWants: (ids: string[]) => Promise<void>;
+  stopWants: (ids: string[]) => Promise<void>;
+  startWants: (ids: string[]) => Promise<void>;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -109,6 +114,26 @@ export const useWantStore = create<WantStore>()(
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to delete want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    deleteWants: async (ids: string[]) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.deleteWants(ids);
+        set(state => ({
+          wants: state.wants.filter(w => !ids.includes(w.metadata?.id || w.id || '')),
+          selectedWant: (state.selectedWant && ids.includes(state.selectedWant.metadata?.id || state.selectedWant.id || '')) ? null : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails && ids.includes(state.selectedWantDetails.metadata?.id || state.selectedWantDetails.id || '')) ? null : state.selectedWantDetails,
+          selectedWantResults: (state.selectedWantDetails && ids.includes(state.selectedWantDetails.metadata?.id || state.selectedWantDetails.id || '')) ? null : state.selectedWantResults,
+          loading: false
+        }));
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to delete wants',
           loading: false
         });
         throw error;
@@ -270,6 +295,62 @@ export const useWantStore = create<WantStore>()(
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to start want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    suspendWants: async (ids: string[]) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.suspendWants(ids);
+        set({ loading: false });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to suspend wants',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    resumeWants: async (ids: string[]) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.resumeWants(ids);
+        set({ loading: false });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to resume wants',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    stopWants: async (ids: string[]) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.stopWants(ids);
+        set({ loading: false });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to stop wants',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
+    startWants: async (ids: string[]) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.startWants(ids);
+        set({ loading: false });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to start wants',
           loading: false
         });
         throw error;

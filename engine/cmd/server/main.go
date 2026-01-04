@@ -257,6 +257,7 @@ func (s *Server) setupRoutes() {
 	wants := api.PathPrefix("/wants").Subrouter()
 	wants.HandleFunc("", s.createWant).Methods("POST")
 	wants.HandleFunc("", s.listWants).Methods("GET")
+	wants.HandleFunc("", s.deleteWants).Methods("DELETE")
 	wants.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/validate", s.validateWant).Methods("POST")
 	wants.HandleFunc("/validate", s.handleOptions).Methods("OPTIONS")
@@ -272,6 +273,10 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
 	wants.HandleFunc("/{id}/start", s.startWant).Methods("POST")
+	wants.HandleFunc("/suspend", s.suspendWants).Methods("POST")
+	wants.HandleFunc("/resume", s.resumeWants).Methods("POST")
+	wants.HandleFunc("/stop", s.stopWants).Methods("POST")
+	wants.HandleFunc("/start", s.startWants).Methods("POST")
 	wants.HandleFunc("/{id}/labels", s.addLabelToWant).Methods("POST")
 	wants.HandleFunc("/{id}/labels/{key}", s.removeLabelFromWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/labels", s.handleOptions).Methods("OPTIONS")
@@ -1206,6 +1211,99 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 	s.logError(r, http.StatusNotFound, errorMsg, "deletion", "want not found", wantID)
 	http.Error(w, "Want not found", http.StatusNotFound)
+}
+
+// deleteWants handles DELETE /api/v1/wants - deletes multiple wants by their IDs
+func (s *Server) deleteWants(w http.ResponseWriter, r *http.Request) {
+	// Try to get IDs from query parameter first (convenient for some clients)
+	idsParam := r.URL.Query().Get("ids")
+	if idsParam != "" {
+		w.Header().Set("Content-Type", "application/json")
+		wantIDs := strings.Split(idsParam, ",")
+		if err := s.globalBuilder.QueueWantDelete(wantIDs); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": "Batch deletion queued",
+			"ids":     wantIDs,
+		})
+		return
+	}
+
+	// Otherwise use the helper which handles JSON body
+	s.handleBatchOperation(w, r, "delete")
+}
+
+// suspendWants handles POST /api/v1/wants/suspend - suspends multiple wants
+func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "suspend")
+}
+
+// resumeWants handles POST /api/v1/wants/resume - resumes multiple wants
+func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "resume")
+}
+
+// stopWants handles POST /api/v1/wants/stop - stops multiple wants
+func (s *Server) stopWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "stop")
+}
+
+// startWants handles POST /api/v1/wants/start - starts multiple wants
+func (s *Server) startWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "start")
+}
+
+// handleBatchOperation helper for batch operations (suspend, resume, stop, start)
+func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, operation string) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errorMsg := "Invalid request format"
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	if len(body.IDs) == 0 {
+		errorMsg := "No want IDs provided"
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	var err error
+	switch operation {
+	case "delete":
+		err = s.globalBuilder.QueueWantDelete(body.IDs)
+	case "suspend":
+		err = s.globalBuilder.QueueWantSuspend(body.IDs)
+	case "resume":
+		err = s.globalBuilder.QueueWantResume(body.IDs)
+	case "stop":
+		err = s.globalBuilder.QueueWantStop(body.IDs)
+	case "start":
+		err = s.globalBuilder.QueueWantStart(body.IDs)
+	}
+
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to queue batch %s: %v", operation, err)
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/"+operation, strings.Join(body.IDs, ","), "error", http.StatusInternalServerError, errorMsg, "queue_full")
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/"+operation, strings.Join(body.IDs, ","), "success", http.StatusAccepted, "", fmt.Sprintf("Batch %s queued for %d wants", operation, len(body.IDs)))
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]any{
+		"message":   fmt.Sprintf("Batch %s operation queued", operation),
+		"ids":       body.IDs,
+		"count":     len(body.IDs),
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
 }
 func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

@@ -30,10 +30,15 @@ export const Dashboard: React.FC = () => {
     error,
     fetchWants,
     deleteWant,
+    deleteWants,
     suspendWant,
     resumeWant,
     stopWant,
     startWant,
+    suspendWants,
+    resumeWants,
+    stopWants,
+    startWants,
     clearError
   } = useWantStore();
 
@@ -257,18 +262,16 @@ export const Dashboard: React.FC = () => {
     if (!batchAction || selectedWantIds.size === 0) return;
     
     setIsBatchProcessing(true);
+    const ids = Array.from(selectedWantIds);
     try {
       if (batchAction === 'start') {
-        const promises = Array.from(selectedWantIds).map(id => startWant(id));
-        await Promise.all(promises);
+        await startWants(ids);
         showNotification(`Started ${selectedWantIds.size} wants`);
       } else if (batchAction === 'stop') {
-        const promises = Array.from(selectedWantIds).map(id => stopWant(id));
-        await Promise.all(promises);
+        await stopWants(ids);
         showNotification(`Stopped ${selectedWantIds.size} wants`);
       } else if (batchAction === 'delete') {
-        const promises = Array.from(selectedWantIds).map(id => deleteWant(id));
-        await Promise.all(promises);
+        await deleteWants(ids);
         showNotification(`Deleted ${selectedWantIds.size} wants`);
         setSelectedWantIds(new Set()); // Clear selection after delete
         sidebar.closeBatch();

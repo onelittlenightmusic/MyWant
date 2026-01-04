@@ -144,6 +144,10 @@ class MyWantApiClient {
     await this.client.delete(`/api/v1/wants/${id}`);
   }
 
+  async deleteWants(ids: string[]): Promise<void> {
+    await this.client.delete('/api/v1/wants', { data: { ids } });
+  }
+
   async getWantStatus(id: string): Promise<WantStatusResponse> {
     return this.deduplicatedGet<WantStatusResponse>(`/api/v1/wants/${id}/status`);
   }
@@ -171,6 +175,22 @@ class MyWantApiClient {
   async startWant(id: string): Promise<SuspendResumeResponse> {
     const response = await this.client.post<SuspendResumeResponse>(`/api/v1/wants/${id}/start`);
     return response.data;
+  }
+
+  async suspendWants(ids: string[]): Promise<void> {
+    await this.client.post('/api/v1/wants/suspend', { ids });
+  }
+
+  async resumeWants(ids: string[]): Promise<void> {
+    await this.client.post('/api/v1/wants/resume', { ids });
+  }
+
+  async stopWants(ids: string[]): Promise<void> {
+    await this.client.post('/api/v1/wants/stop', { ids });
+  }
+
+  async startWants(ids: string[]): Promise<void> {
+    await this.client.post('/api/v1/wants/start', { ids });
   }
 
   // Error history operations
