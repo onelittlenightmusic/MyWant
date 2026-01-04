@@ -34,9 +34,9 @@ export interface ChipItem {
  */
 export interface SectionNavigationCallbacks {
   /** Navigate to the previous section */
-  onNavigateUp: () => void;
+  onNavigateUp: (e?: React.KeyboardEvent) => void;
   /** Navigate to the next section */
-  onNavigateDown: () => void;
+  onNavigateDown: (e?: React.KeyboardEvent) => void;
   /** Navigate via Tab key (e.g. to action button) */
   onTab?: () => void;
 }

@@ -146,7 +146,8 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
     // Find all focusable form elements within this container
-    const container = e.currentTarget.closest('.focusable-container');
+    const currentTarget = e.currentTarget || (e as any).target;
+    const container = currentTarget?.closest('.focusable-container');
     if (!container) return;
 
     const focusableElements = Array.from(container.querySelectorAll('.focusable-section-header')) as HTMLElement[];
@@ -155,17 +156,17 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (currentIndex === -1) {
       // If none focused, focus the first one on ArrowDown
       if (e.key === 'ArrowDown' && focusableElements.length > 0) {
-        e.preventDefault();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
         focusableElements[0].focus();
       }
       return;
     }
 
     if (e.key === 'ArrowDown' && currentIndex < focusableElements.length - 1) {
-      e.preventDefault();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
       focusableElements[currentIndex + 1].focus();
     } else if (e.key === 'ArrowUp' && currentIndex > 0) {
-      e.preventDefault();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
       focusableElements[currentIndex - 1].focus();
     }
   };
@@ -520,8 +521,8 @@ export const WantForm: React.FC<WantFormProps> = ({
                   isCollapsed={collapsedSections.has('parameters')}
                   onToggleCollapse={() => toggleSection('parameters')}
                   navigationCallbacks={{
-                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: paramsSectionRef.current } as any),
-                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: paramsSectionRef.current } as any),
+                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                     onTab: handleFieldTab,
                   }}
                 />
@@ -534,8 +535,8 @@ export const WantForm: React.FC<WantFormProps> = ({
                   isCollapsed={collapsedSections.has('scheduling')}
                   onToggleCollapse={() => toggleSection('scheduling')}
                   navigationCallbacks={{
-                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: schedulingSectionRef.current } as any),
-                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: schedulingSectionRef.current } as any),
+                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                     onTab: handleFieldTab,
                   }}
                 />
@@ -548,8 +549,8 @@ export const WantForm: React.FC<WantFormProps> = ({
                   isCollapsed={collapsedSections.has('labels')}
                   onToggleCollapse={() => toggleSection('labels')}
                   navigationCallbacks={{
-                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: labelsSectionRef.current } as any),
-                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: labelsSectionRef.current } as any),
+                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                     onTab: handleFieldTab,
                   }}
                 />
@@ -562,8 +563,8 @@ export const WantForm: React.FC<WantFormProps> = ({
                   isCollapsed={collapsedSections.has('dependencies')}
                   onToggleCollapse={() => toggleSection('dependencies')}
                   navigationCallbacks={{
-                    onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: dependenciesSectionRef.current } as any),
-                    onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: dependenciesSectionRef.current } as any),
+                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                     onTab: handleFieldTab,
                   }}
                 />

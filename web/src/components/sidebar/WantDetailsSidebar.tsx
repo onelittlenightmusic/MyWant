@@ -633,7 +633,8 @@ const SettingsTab: React.FC<{
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
 
     // Find the closest container that holds all sections
-    const container = e.currentTarget.closest('.focusable-container');
+    const currentTarget = e.currentTarget || (e as any).target;
+    const container = currentTarget?.closest('.focusable-container');
     if (!container) return;
 
     const focusableElements = Array.from(container.querySelectorAll('.focusable-section-header')) as HTMLElement[];
@@ -641,17 +642,17 @@ const SettingsTab: React.FC<{
 
     if (currentIndex === -1) {
       if (e.key === 'ArrowDown' && focusableElements.length > 0) {
-        e.preventDefault();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
         focusableElements[0].focus();
       }
       return;
     }
 
     if (e.key === 'ArrowDown' && currentIndex < focusableElements.length - 1) {
-      e.preventDefault();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
       focusableElements[currentIndex + 1].focus();
     } else if (e.key === 'ArrowUp' && currentIndex > 0) {
-      e.preventDefault();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
       focusableElements[currentIndex - 1].focus();
     }
   }, []);
@@ -710,8 +711,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isParametersCollapsed}
               onToggleCollapse={() => setIsParametersCollapsed(!isParametersCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: paramsSectionRef.current } as any),
-                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: paramsSectionRef.current } as any),
+                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
               }}
             />
 
@@ -756,8 +757,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isSchedulingCollapsed}
               onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: schedulingSectionRef.current } as any),
-                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: schedulingSectionRef.current } as any),
+                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
               }}
             />
 
@@ -769,8 +770,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isLabelsCollapsed}
               onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: labelsSectionRef.current } as any),
-                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: labelsSectionRef.current } as any),
+                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
               }}
             />
 
@@ -782,8 +783,8 @@ const SettingsTab: React.FC<{
               isCollapsed={isDependenciesCollapsed}
               onToggleCollapse={() => setIsDependenciesCollapsed(!isDependenciesCollapsed)}
               navigationCallbacks={{
-                onNavigateUp: () => handleArrowKeyNavigation({ key: 'ArrowUp', currentTarget: dependenciesSectionRef.current } as any),
-                onNavigateDown: () => handleArrowKeyNavigation({ key: 'ArrowDown', currentTarget: dependenciesSectionRef.current } as any),
+                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
               }}
             />
 

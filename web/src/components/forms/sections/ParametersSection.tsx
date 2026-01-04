@@ -139,12 +139,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
     // Up arrow - navigate to previous section
     else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      navigationCallbacks.onNavigateUp();
+      navigationCallbacks.onNavigateUp(e);
     }
     // Down arrow - navigate to next section
     else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      navigationCallbacks.onNavigateDown();
+      navigationCallbacks.onNavigateDown(e);
     }
     // Enter/Space - toggle collapse
     else if (e.key === 'Enter' || e.key === ' ') {
