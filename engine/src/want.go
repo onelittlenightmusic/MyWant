@@ -291,7 +291,7 @@ func (n *Want) SetStatus(status WantStatus) {
 // This triggers the reconcile loop to re-run the want
 // Used for scheduled restarts and other re-execution scenarios
 func (n *Want) RestartWant() {
-	InfoLog("[RESTART] Want '%s' restarting execution\n", n.Metadata.Name)
+	n.StoreLog("[RESTART] Want '%s' restarting execution\n", n.Metadata.Name)
 	n.SetStatus(WantStatusIdle)
 }
 
@@ -473,7 +473,7 @@ func (n *Want) ShouldRetrigger() bool {
 		// Use 0 timeout since packet should already be in channel if we're called after Provide()
 		hasUnused := n.UnusedExists(0)
 		if hasUnused {
-			InfoLog("[SHOULD-RETRIGGER] '%s' - goroutine inactive, will retrigger (unused packets available)\n", n.Metadata.Name)
+			n.StoreLog("[SHOULD-RETRIGGER] '%s' - goroutine inactive, will retrigger (unused packets available)\n", n.Metadata.Name)
 		}
 		return hasUnused
 	}
@@ -860,14 +860,23 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 	}
 }
 
-// want.StoreLog("Calculation complete: result = 42")
-func (n *Want) StoreLog(message string) {
+// // want.StoreLog("Calculation complete: result = 42")
+// func (n *Want) StoreLog(message string) {
+// 	// Only buffer logs if we're in an Exec cycle
+// 	if !n.inExecCycle {
+// 		return
+// 	}
+// 	n.pendingLogs = append(n.pendingLogs, message)
+// }
+
+func (n *Want) StoreLog(message string, args ...any) {
 	// Only buffer logs if we're in an Exec cycle
 	if !n.inExecCycle {
 		return
 	}
-	n.pendingLogs = append(n.pendingLogs, message)
+	n.pendingLogs = append(n.pendingLogs, fmt.Sprintf(message, args...))
 }
+
 func (n *Want) GetState(key string) (any, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
@@ -1101,7 +1110,7 @@ func (n *Want) addAggregatedLogHistory() {
 	lines := strings.Split(logsText, "\n")
 	for _, line := range lines {
 		if line != "" { // Skip empty lines
-			InfoLog("[%s] %s", n.Metadata.Name, line)
+			n.StoreLog("[%s] %s", n.Metadata.Name, line)
 		}
 	}
 }
@@ -1374,13 +1383,13 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 
 	if isTimeout || isDefault {
 		if isTimeout {
-			InfoLog("[UnusedExists] TIMEOUT after %dms (no packets found).\n", timeoutMs)
+			n.StoreLog("[UnusedExists] TIMEOUT after %dms (no packets found).\n", timeoutMs)
 		}
 		return false
 	}
 
 	if !ok {
-		InfoLog("[UnusedExists] A channel was closed (index: %d).\n", chosen)
+		n.StoreLog("[UnusedExists] A channel was closed (index: %d).\n", chosen)
 		return false
 	}
 
@@ -1394,7 +1403,7 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 	n.cacheMutex.Unlock()
 
 	elapsed := time.Now().Sub(startTime).Milliseconds()
-	InfoLog("[UnusedExists] FOUND and CACHED packet from channel index %d in %dms\n", originalIndex, elapsed)
+	n.StoreLog("[UnusedExists] FOUND and CACHED packet from channel index %d in %dms\n", originalIndex, elapsed)
 
 	return true
 }

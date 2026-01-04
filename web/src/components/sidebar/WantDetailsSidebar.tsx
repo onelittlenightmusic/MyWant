@@ -10,6 +10,7 @@ import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutoc
 import { useWantStore } from '@/stores/wantStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
+import { updateWantParameters, updateWantScheduling, updateWantLabels, updateWantDependencies } from '@/utils/wantUtils';
 import { WantControlButtons } from '@/components/dashboard/WantControlButtons';
 import { ParametersSection } from '@/components/forms/sections/ParametersSection';
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
@@ -440,6 +441,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                       fetchWants();
                     }
                   }}
+                  updateWant={updateWant}
                 />
               </div>
             )}
@@ -481,6 +483,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                       fetchWants();
                     }
                   }}
+                  updateWant={updateWant}
                 />
               </div>
             )}
@@ -524,6 +527,7 @@ const SettingsTab: React.FC<{
   onConfigChange: (value: string) => void;
   onConfigModeChange: (mode: 'form' | 'yaml') => void;
   onWantUpdate?: () => void;
+  updateWant: (id: string, request: any) => Promise<void>;
 }> = ({
   want,
   isEditing,
@@ -536,7 +540,8 @@ const SettingsTab: React.FC<{
   onCancel,
   onConfigChange,
   onConfigModeChange,
-  onWantUpdate
+  onWantUpdate,
+  updateWant
 }) => {
   const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
   const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
@@ -559,11 +564,21 @@ const SettingsTab: React.FC<{
   const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
   const schedulingSectionRef = useRef<HTMLButtonElement>(null);
 
-  // Handler for parameter changes
+  // Handler for parameter changes - saves to API
   const handleParametersChange = useCallback(async (newParams: Record<string, any>) => {
+    if (!want.metadata?.id) return;
+
+    const oldParams = params;
     setParams(newParams);
-    // Parameters are saved via YAML edit mode, not directly via API
-  }, []);
+
+    try {
+      await updateWantParameters(want.metadata.id, want, newParams, updateWant);
+      onWantUpdate?.();
+    } catch (error) {
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update parameters');
+      setParams(oldParams); // Revert on error
+    }
+  }, [want.metadata?.id, want, params, updateWant, onWantUpdate, setLocalUpdateError]);
 
   // Handler for label changes - saves to API
   const handleLabelsChange = useCallback(async (newLabels: Record<string, string>) => {
@@ -573,49 +588,13 @@ const SettingsTab: React.FC<{
     setLabels(newLabels);
 
     try {
-      // Determine what changed
-      const added = Object.keys(newLabels).filter(key => !oldLabels[key]);
-      const removed = Object.keys(oldLabels).filter(key => !newLabels[key]);
-      const updated = Object.keys(newLabels).filter(key =>
-        oldLabels[key] && oldLabels[key] !== newLabels[key]
-      );
-
-      // Remove deleted labels
-      for (const key of removed) {
-        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
-      // Add new labels
-      for (const key of added) {
-        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value: newLabels[key] })
-        });
-      }
-
-      // Update changed labels (delete old + add new)
-      for (const key of updated) {
-        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels/${key}`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/labels`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value: newLabels[key] })
-        });
-      }
-
+      await updateWantLabels(want.metadata.id, oldLabels, newLabels);
       onWantUpdate?.();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update labels');
       setLabels(oldLabels); // Revert on error
     }
-  }, [want.metadata?.id, labels, onWantUpdate]);
+  }, [want.metadata?.id, labels, onWantUpdate, setLocalUpdateError]);
 
   // Handler for dependency changes - saves to API
   const handleDependenciesChange = useCallback(async (newUsing: Array<Record<string, string>>) => {
@@ -625,42 +604,29 @@ const SettingsTab: React.FC<{
     setUsing(newUsing);
 
     try {
-      // Simple approach: remove all old, add all new
-      // Remove all old dependencies
-      for (const dep of oldUsing) {
-        const key = Object.keys(dep)[0];
-        if (key) {
-          await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/using/${key}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-      }
-
-      // Add all new dependencies
-      for (const dep of newUsing) {
-        const [key, value] = Object.entries(dep)[0];
-        if (key) {
-          await fetch(`http://localhost:8080/api/v1/wants/${want.metadata.id}/using`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, value })
-          });
-        }
-      }
-
+      await updateWantDependencies(want.metadata.id, oldUsing, newUsing);
       onWantUpdate?.();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependencies');
       setUsing(oldUsing); // Revert on error
     }
-  }, [want.metadata?.id, using, onWantUpdate]);
+  }, [want.metadata?.id, using, onWantUpdate, setLocalUpdateError]);
 
-  // Handler for scheduling changes
+  // Handler for scheduling changes - saves to API
   const handleSchedulingChange = useCallback(async (newWhen: Array<{ at?: string; every: string }>) => {
+    if (!want.metadata?.id) return;
+
+    const oldWhen = when;
     setWhen(newWhen);
-    // Scheduling is saved via YAML edit mode, not directly via API
-  }, []);
+
+    try {
+      await updateWantScheduling(want.metadata.id, want, newWhen, updateWant);
+      onWantUpdate?.();
+    } catch (error) {
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update scheduling');
+      setWhen(oldWhen); // Revert on error
+    }
+  }, [want.metadata?.id, want, when, updateWant, onWantUpdate, setLocalUpdateError]);
 
   // Reset form state when want changes or metadata is updated (including labels/dependencies)
   useEffect(() => {
@@ -720,24 +686,7 @@ const SettingsTab: React.FC<{
                   // Navigate to metadata section (not implemented)
                 },
                 onNavigateDown: () => {
-                  labelsSectionRef.current?.focus();
-                }
-              }}
-            />
-
-            {/* Labels - Using Common Component */}
-            <LabelsSection
-              ref={labelsSectionRef}
-              labels={labels}
-              onChange={handleLabelsChange}
-              isCollapsed={isLabelsCollapsed}
-              onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: () => {
-                  paramsSectionRef.current?.focus();
-                },
-                onNavigateDown: () => {
-                  dependenciesSectionRef.current?.focus();
+                  schedulingSectionRef.current?.focus();
                 }
               }}
             />
@@ -775,6 +724,40 @@ const SettingsTab: React.FC<{
               </div>
             )}
 
+            {/* Scheduling - Using Common Component */}
+            <SchedulingSection
+              ref={schedulingSectionRef}
+              schedules={when}
+              onChange={handleSchedulingChange}
+              isCollapsed={isSchedulingCollapsed}
+              onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  paramsSectionRef.current?.focus();
+                },
+                onNavigateDown: () => {
+                  labelsSectionRef.current?.focus();
+                }
+              }}
+            />
+
+            {/* Labels - Using Common Component */}
+            <LabelsSection
+              ref={labelsSectionRef}
+              labels={labels}
+              onChange={handleLabelsChange}
+              isCollapsed={isLabelsCollapsed}
+              onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
+              navigationCallbacks={{
+                onNavigateUp: () => {
+                  schedulingSectionRef.current?.focus();
+                },
+                onNavigateDown: () => {
+                  dependenciesSectionRef.current?.focus();
+                }
+              }}
+            />
+
             {/* Dependencies - Using Common Component */}
             <DependenciesSection
               ref={dependenciesSectionRef}
@@ -785,23 +768,6 @@ const SettingsTab: React.FC<{
               navigationCallbacks={{
                 onNavigateUp: () => {
                   labelsSectionRef.current?.focus();
-                },
-                onNavigateDown: () => {
-                  schedulingSectionRef.current?.focus();
-                }
-              }}
-            />
-
-            {/* Scheduling - Using Common Component */}
-            <SchedulingSection
-              ref={schedulingSectionRef}
-              schedules={when}
-              onChange={handleSchedulingChange}
-              isCollapsed={isSchedulingCollapsed}
-              onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: () => {
-                  dependenciesSectionRef.current?.focus();
                 },
                 onNavigateDown: () => {
                   // Last section, no navigation down

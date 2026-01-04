@@ -52,7 +52,7 @@ func NewExecutionResultWant(want *Want) *ExecutionResultWant {
 
 // Initialize resets execution state before starting
 func (e *ExecutionResultWant) Initialize() {
-	InfoLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
+	e.StoreLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
 	// Reset completion state for fresh execution using batch update
 	e.StoreStateMulti(map[string]any{
 		"completed":            false,
@@ -102,7 +102,7 @@ func (e *ExecutionResultWant) Progress() {
 		e.handlePhaseFailed(locals)
 
 	default:
-		e.StoreLog(fmt.Sprintf("ERROR: Unknown phase: %s", locals.Phase))
+		e.StoreLog("ERROR: Unknown phase: %s", locals.Phase)
 		locals.Phase = ExecutionPhaseFailed
 		e.updateLocals(locals)
 	}
@@ -157,7 +157,7 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 		"achieving_percentage": 0,
 	})
 
-	e.StoreLog(fmt.Sprintf("Initializing execution of command: %s", locals.Command))
+	e.StoreLog("Initializing execution of command: %s", locals.Command)
 
 	// Transition to executing phase
 	locals.Phase = ExecutionPhaseExecuting
@@ -196,7 +196,7 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		// Handle agent execution failure
 		e.StoreState("status", "failed")
 		e.StoreState("error_message", fmt.Sprintf("Agent execution error: %v", err))
-		e.StoreLog(fmt.Sprintf("ERROR: Agent execution failed: %v", err))
+		e.StoreLog("ERROR: Agent execution failed: %v", err)
 		locals.Phase = ExecutionPhaseFailed
 		e.updateLocals(locals)
 		return
@@ -256,12 +256,12 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	// Add status based on exit code
 	if exitCode == 0 {
 		stateUpdates["status"] = "completed"
-		e.StoreLog(fmt.Sprintf("Command executed successfully in %dms", locals.ExecutionTimeMs))
+		e.StoreLog("Command executed successfully in %dms", locals.ExecutionTimeMs)
 		locals.Phase = ExecutionPhaseCompleted
 	} else {
 		stateUpdates["status"] = "failed"
 		stateUpdates["error_message"] = fmt.Sprintf("Exit code: %d", exitCode)
-		e.StoreLog(fmt.Sprintf("Command failed with exit code %d", exitCode))
+		e.StoreLog("Command failed with exit code %d", exitCode)
 		locals.Phase = ExecutionPhaseFailed
 	}
 
@@ -343,7 +343,7 @@ func RegisterExecutionResultWantType(builder *ChainBuilder) {
 // RegisterExecutionAgents registers the ExecutionAgent with the agent registry
 func RegisterExecutionAgents(registry *AgentRegistry) {
 	if registry == nil {
-		fmt.Println("Warning: No agent registry found, skipping ExecutionAgent registration")
+		InfoLog("Warning: No agent registry found, skipping ExecutionAgent registration")
 		return
 	}
 
@@ -357,5 +357,5 @@ func RegisterExecutionAgents(registry *AgentRegistry) {
 	agent := NewExecutionAgent()
 	registry.RegisterAgent(agent)
 
-	fmt.Println("[AGENT] Registered ExecutionAgent with capability: command_execution")
+	InfoLog("[AGENT] Registered ExecutionAgent with capability: command_execution")
 }

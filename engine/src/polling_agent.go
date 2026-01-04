@@ -49,12 +49,12 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 		defer p.ticker.Stop()
 		defer close(p.done)
 
-		InfoLog("[%s] Starting continuous monitoring for want %s\n", p.name, w.Metadata.Name)
+		p.want.StoreLog("[%s] Starting continuous monitoring for want %s\n", p.name, w.Metadata.Name)
 
 		for {
 			select {
 			case <-p.ctx.Done():
-				InfoLog("[%s] Context cancelled, stopping monitoring for %s\n", p.name, w.Metadata.Name)
+				p.want.StoreLog("[%s] Context cancelled, stopping monitoring for %s\n", p.name, w.Metadata.Name)
 				return
 			case <-p.ticker.C:
 				p.BeginProgressCycle()
@@ -62,11 +62,11 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 				p.EndProgressCycle()
 
 				if err != nil {
-					InfoLog("[%s] Error during polling for %s: %v\n", p.name, w.Metadata.Name, err)
+					p.want.StoreLog("[%s] Error during polling for %s: %v\n", p.name, w.Metadata.Name, err)
 				}
 
 				if shouldStop {
-					InfoLog("[%s] Termination condition met for %s, stopping monitoring\n", p.name, w.Metadata.Name)
+					p.want.StoreLog("[%s] Termination condition met for %s, stopping monitoring\n", p.name, w.Metadata.Name)
 					return
 				}
 			}

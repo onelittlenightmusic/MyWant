@@ -223,7 +223,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
       sectionId="labels"
       title="Labels"
       icon={<Tag className="w-5 h-5" />}
-      colorScheme="blue"
+      colorScheme="green"
       isCollapsed={isCollapsed}
       onToggleCollapse={onToggleCollapse}
       navigationCallbacks={navigationCallbacks}

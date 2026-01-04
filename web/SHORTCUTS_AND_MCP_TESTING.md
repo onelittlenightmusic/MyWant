@@ -122,3 +122,37 @@ await use_mcp_tool("press_key", { key: "Enter" });
 2.  **Verify State:** After major actions (like opening the form), verify the UI state (e.g., check for "New Want" text) before proceeding.
 3.  **Use `press_key` for Navigation:** Rely on `Arrow` keys and `Enter` for navigation instead of trying to find dynamic UIDs for every list item.
 4.  **Use `fill` for Text:** For long text inputs, finding the element UID and using `fill` is much faster and less error-prone than simulating individual keystrokes.
+
+---
+
+## Automated Test Scripts
+
+The repository includes two Playwright-based scripts in the `test/` directory to verify the deployment flow.
+
+### Prerequisites
+
+Ensure you have Playwright installed in the project root:
+```bash
+npm install -D playwright
+npx playwright install chromium
+```
+
+### 1. UI-based Deployment Test
+This script simulates a standard user interaction using mouse clicks and explicit locators.
+
+- **File:** `test/deploy_execution_result.mjs`
+- **Action:** Navigates the dashboard, searches for "Command", expands sections manually, and fills the form.
+- **Run:**
+  ```bash
+  node test/deploy_execution_result.mjs
+  ```
+
+### 2. Shortcut-based Deployment Test
+This script simulates a "power user" flow relying entirely on keyboard shortcuts as described in this guide.
+
+- **File:** `test/deploy_via_shortcuts.mjs`
+- **Action:** Uses `a`, `/`, `ArrowDown`, `ArrowRight`, and `Enter` to complete the deployment without clicking buttons.
+- **Run:**
+  ```bash
+  node test/deploy_via_shortcuts.mjs
+  ```

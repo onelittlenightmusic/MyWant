@@ -43,9 +43,9 @@ func (r *ReminderSchedulerAgent) Start(ctx context.Context, w *Want) error {
 
 	go r.run(w)
 
-	InfoLog("[REMINDER-SCHEDULER] Started for want '%s' (ID: %s)\n",
+	w.StoreLog("[REMINDER-SCHEDULER] Started for want '%s' (ID: %s)\n",
 		r.wantName, r.id)
-	InfoLog("[REMINDER-SCHEDULER] Reaching time: %s, Event time: %s\n",
+	w.StoreLog("[REMINDER-SCHEDULER] Reaching time: %s, Event time: %s\n",
 		r.reachingTime.Format(time.RFC3339), r.eventTime.Format(time.RFC3339))
 
 	return nil
@@ -72,7 +72,7 @@ func (r *ReminderSchedulerAgent) run(w *Want) {
 	for {
 		select {
 		case <-r.ctx.Done():
-			InfoLog("[REMINDER-SCHEDULER] Stopping scheduler for '%s'\n", r.wantName)
+			w.StoreLog("[REMINDER-SCHEDULER] Stopping scheduler for '%s'\n", r.wantName)
 			return
 
 		case <-r.ticker.C:
@@ -91,13 +91,13 @@ func (r *ReminderSchedulerAgent) checkAndTriggerTransitions(w *Want) {
 
 	// Check if we should transition to reaching phase
 	if phaseStr == ReminderPhaseWaiting && now.After(r.reachingTime) {
-		InfoLog("[REMINDER-SCHEDULER] Reaching time detected, transitioning to reaching phase\n")
+		w.StoreLog("[REMINDER-SCHEDULER] Reaching time detected, transitioning to reaching phase\n")
 		w.StoreState("reminder_phase", ReminderPhaseReaching)
 	}
 
 	// Check if event time has passed while in reaching phase
 	if phaseStr == ReminderPhaseReaching && !r.eventTime.IsZero() && now.After(r.eventTime) {
-		InfoLog("[REMINDER-SCHEDULER] Event time passed\n")
+		w.StoreLog("[REMINDER-SCHEDULER] Event time passed\n")
 		// Don't auto-transition here; let Progress() handle it based on require_reaction
 	}
 }

@@ -596,7 +596,7 @@ func (w *Want) DumpStateForAgent(agentType string) {
 	}
 	w.stateMutex.Unlock()
 
-	fmt.Printf("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
+	w.StoreLog("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
 }
 
 // HasPendingAgentStateChanges returns true if there are pending agent state changes to dump

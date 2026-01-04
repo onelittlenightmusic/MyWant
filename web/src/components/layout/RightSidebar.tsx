@@ -10,6 +10,7 @@ interface RightSidebarProps {
   className?: string;
   backgroundStyle?: React.CSSProperties;
   headerActions?: React.ReactNode;
+  overflowHidden?: boolean;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -19,7 +20,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   children,
   className,
   backgroundStyle,
-  headerActions
+  headerActions,
+  overflowHidden = false
 }) => {
   return (
     <>
@@ -88,7 +90,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto h-full px-8 py-6 relative z-10">
+        <div className={`flex-1 h-full px-8 py-6 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </div>
       </div>

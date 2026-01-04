@@ -4,7 +4,9 @@ wantType:
     category: system
     pattern: independent
     description: System-level scheduler for managing scheduled Wants
-
+    title: Scheduler
+    version: '1.0'
+    
   parameters:
     - name: scan_interval
       description: Interval for scanning new scheduled Wants (seconds)

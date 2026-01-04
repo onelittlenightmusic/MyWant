@@ -25,7 +25,7 @@ func NewGmailWant(want *Want) *GmailWant {
 
 // Initialize prepares the Gmail want for execution
 func (g *GmailWant) Initialize() {
-	InfoLog("[GMAIL] Initializing Gmail want: %s\n", g.Metadata.Name)
+	g.StoreLog("[GMAIL] Initializing Gmail want: %s\n", g.Metadata.Name)
 
 	// Initialize locals
 	locals := &GmailLocals{}
@@ -72,7 +72,7 @@ func (g *GmailWant) Initialize() {
 
 	g.Locals = locals
 	g.StoreState("gmail_status", "initialized")
-	InfoLog("[GMAIL] Gmail want initialized with prompt: %s\n", prompt)
+	g.StoreLog("[GMAIL] Gmail want initialized with prompt: %s\n", prompt)
 }
 
 // IsAchieved returns true when the Gmail operation is complete or failed
@@ -169,7 +169,7 @@ func (g *GmailWant) Progress() {
 	// Provide result to output channels
 	g.Provide(resultMap)
 
-	InfoLog("[GMAIL] Gmail search completed for want: %s\n", g.Metadata.Name)
+	g.StoreLog("[GMAIL] Gmail search completed for want: %s\n", g.Metadata.Name)
 }
 
 // getLocals safely retrieves the locals struct

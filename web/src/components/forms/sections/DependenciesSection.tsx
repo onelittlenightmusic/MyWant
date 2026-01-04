@@ -243,7 +243,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
       sectionId="dependencies"
       title="Using"
       icon={<GitBranch className="w-5 h-5" />}
-      colorScheme="blue"
+      colorScheme="green"
       isCollapsed={isCollapsed}
       onToggleCollapse={onToggleCollapse}
       navigationCallbacks={navigationCallbacks}

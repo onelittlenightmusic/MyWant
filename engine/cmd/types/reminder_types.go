@@ -42,7 +42,7 @@ func NewReminderWant(want *Want) *ReminderWant {
 
 // Initialize prepares the reminder want for execution
 func (r *ReminderWant) Initialize() {
-	InfoLog("[REMINDER] Initializing reminder: %s\n", r.Metadata.Name)
+	r.StoreLog("[REMINDER] Initializing reminder: %s\n", r.Metadata.Name)
 
 	// Initialize locals
 	locals := &ReminderLocals{
@@ -147,7 +147,7 @@ func (r *ReminderWant) Initialize() {
 
 		// Check if event time is in the past
 		if eventTime.Before(time.Now()) {
-			InfoLog("[REMINDER] Event time is in the past, transitioning to reaching phase\n")
+			r.StoreLog("[REMINDER] Event time is in the past, transitioning to reaching phase\n")
 			locals.Phase = ReminderPhaseReaching
 		}
 	}
@@ -211,7 +211,7 @@ func (r *ReminderWant) Initialize() {
 		}
 	}
 
-	InfoLog("[REMINDER] Initialized reminder '%s' with phase=%s, require_reaction=%v\n",
+	r.StoreLog("[REMINDER] Initialized reminder '%s' with phase=%s, require_reaction=%v\n",
 		r.Metadata.Name, locals.Phase, requireReaction)
 
 	// Execute DoAgent to create reaction queue (synchronous)
@@ -294,7 +294,7 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 				if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
 					r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
 				} else {
-					InfoLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)
+					r.StoreLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)
 				}
 			}
 		}
