@@ -45,6 +45,11 @@ export const Dashboard: React.FC = () => {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeletingWant, setIsDeletingWant] = useState(false);
 
+  // Batch action confirmation state
+  const [showBatchConfirmation, setShowBatchConfirmation] = useState(false);
+  const [batchAction, setBatchAction] = useState<'start' | 'stop' | 'delete' | null>(null);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
   // Reminder reaction (approve/deny) confirmation state
   const [reactionWantState, setReactionWantState] = useState<Want | null>(null);
   const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
@@ -234,49 +239,54 @@ export const Dashboard: React.FC = () => {
     });
   };
 
-  const handleBatchStart = async () => {
-    setIsBatchProcessing(true);
-    try {
-      const promises = Array.from(selectedWantIds).map(id => startWant(id));
-      await Promise.all(promises);
-      showNotification(`Started ${selectedWantIds.size} wants`);
-    } catch (error) {
-      console.error('Batch start failed:', error);
-      showNotification('Failed to start some wants');
-    } finally {
-      setIsBatchProcessing(false);
-    }
+  const handleBatchStart = () => {
+    setBatchAction('start');
+    setShowBatchConfirmation(true);
   };
 
-  const handleBatchStop = async () => {
-    setIsBatchProcessing(true);
-    try {
-      const promises = Array.from(selectedWantIds).map(id => stopWant(id));
-      await Promise.all(promises);
-      showNotification(`Stopped ${selectedWantIds.size} wants`);
-    } catch (error) {
-      console.error('Batch stop failed:', error);
-      showNotification('Failed to stop some wants');
-    } finally {
-      setIsBatchProcessing(false);
-    }
+  const handleBatchStop = () => {
+    setBatchAction('stop');
+    setShowBatchConfirmation(true);
   };
 
-  const handleBatchDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedWantIds.size} wants?`)) return;
+  const handleBatchDelete = () => {
+    setBatchAction('delete');
+    setShowBatchConfirmation(true);
+  };
+
+  const handleBatchConfirm = async () => {
+    if (!batchAction || selectedWantIds.size === 0) return;
     
     setIsBatchProcessing(true);
     try {
-      const promises = Array.from(selectedWantIds).map(id => deleteWant(id));
-      await Promise.all(promises);
-      showNotification(`Deleted ${selectedWantIds.size} wants`);
-      setSelectedWantIds(new Set()); // Clear selection after delete
+      if (batchAction === 'start') {
+        const promises = Array.from(selectedWantIds).map(id => startWant(id));
+        await Promise.all(promises);
+        showNotification(`Started ${selectedWantIds.size} wants`);
+      } else if (batchAction === 'stop') {
+        const promises = Array.from(selectedWantIds).map(id => stopWant(id));
+        await Promise.all(promises);
+        showNotification(`Stopped ${selectedWantIds.size} wants`);
+      } else if (batchAction === 'delete') {
+        const promises = Array.from(selectedWantIds).map(id => deleteWant(id));
+        await Promise.all(promises);
+        showNotification(`Deleted ${selectedWantIds.size} wants`);
+        setSelectedWantIds(new Set()); // Clear selection after delete
+        sidebar.closeBatch();
+      }
+      setShowBatchConfirmation(false);
+      setBatchAction(null);
     } catch (error) {
-      console.error('Batch delete failed:', error);
-      showNotification('Failed to delete some wants');
+      console.error(`Batch ${batchAction} failed:`, error);
+      showNotification(`Failed to ${batchAction} some wants`);
     } finally {
       setIsBatchProcessing(false);
     }
+  };
+
+  const handleBatchCancel = () => {
+    setShowBatchConfirmation(false);
+    setBatchAction(null);
   };
 
   // Handlers
@@ -663,7 +673,9 @@ export const Dashboard: React.FC = () => {
 
   // Handle ESC key to close any open sidebar
   const handleEscapeKey = () => {
-    if (selectedWant) {
+    if (showBatchConfirmation) {
+      handleBatchCancel();
+    } else if (selectedWant) {
       // Remember the last selected want before deselecting
       const wantId = selectedWant.metadata?.id || selectedWant.id;
       if (wantId) {
@@ -812,22 +824,37 @@ export const Dashboard: React.FC = () => {
       {/* Main content area with sidebar-aware layout */}
       <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px] relative">
         {/* Confirmation Notification - Dashboard Right Layout */}
-        {(showDeleteConfirmation || showReactionConfirmation) && (
+        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation) && (
           <ConfirmationMessageNotification
             message={
               showDeleteConfirmation
                 ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
+                : showBatchConfirmation
+                ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
                 : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
             }
-            isVisible={showDeleteConfirmation || showReactionConfirmation}
+            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation}
             onDismiss={() => {
               setShowDeleteConfirmation(false);
               setShowReactionConfirmation(false);
+              setShowBatchConfirmation(false);
             }}
-            onConfirm={showDeleteConfirmation ? handleDeleteWantConfirm : handleReactionConfirm}
-            onCancel={showDeleteConfirmation ? handleDeleteWantCancel : handleReactionCancel}
-            loading={isDeletingWant || isSubmittingReaction}
-            title={showDeleteConfirmation ? "Delete Want" : "Confirm"}
+            onConfirm={
+              showDeleteConfirmation 
+                ? handleDeleteWantConfirm 
+                : showBatchConfirmation 
+                ? handleBatchConfirm 
+                : handleReactionConfirm
+            }
+            onCancel={
+              showDeleteConfirmation 
+                ? handleDeleteWantCancel 
+                : showBatchConfirmation 
+                ? handleBatchCancel 
+                : handleReactionCancel
+            }
+            loading={isDeletingWant || isSubmittingReaction || isBatchProcessing}
+            title={showDeleteConfirmation ? "Delete Want" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
             layout="dashboard-right"
           />
         )}
