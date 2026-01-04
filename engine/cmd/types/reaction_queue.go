@@ -1,8 +1,11 @@
 package types
 
 import (
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // ReactionData represents a user reaction to a reminder
@@ -13,65 +16,139 @@ type ReactionData struct {
 	Timestamp  time.Time `json:"timestamp"`
 }
 
-// ReactionQueue is a thread-safe in-memory queue for user reactions
-type ReactionQueue struct {
-	queue map[string]ReactionData
-	mutex sync.RWMutex
+// QueueMetadata contains basic information about a reaction queue
+type QueueMetadata struct {
+	QueueID      string    `json:"queue_id"`
+	CreatedAt    time.Time `json:"created_at"`
+	ReactionCount int       `json:"reaction_count"`
 }
 
-// NewReactionQueue creates a new reaction queue
-func NewReactionQueue() *ReactionQueue {
+// ReactionQueue represents a single reaction queue that can hold multiple reactions
+type ReactionQueue struct {
+	ID        string         `json:"id"`
+	reactions []ReactionData `json:"reactions"`
+	mutex     sync.RWMutex   `json:"-"`
+	CreatedAt time.Time      `json:"created_at"`
+}
+
+// NewReactionQueue creates a new reaction queue with the given ID
+func NewReactionQueue(id string) *ReactionQueue {
 	return &ReactionQueue{
-		queue: make(map[string]ReactionData),
+		ID:        id,
+		reactions: make([]ReactionData, 0),
+		CreatedAt: time.Now(),
 	}
 }
 
-// AddReaction adds a reaction to the queue
-func (rq *ReactionQueue) AddReaction(id string, approved bool, comment string) {
+// AddReaction adds a reaction to this queue (supports multiple reactions)
+func (rq *ReactionQueue) AddReaction(approved bool, comment string) (string, error) {
 	rq.mutex.Lock()
 	defer rq.mutex.Unlock()
 
-	rq.queue[id] = ReactionData{
-		ReactionID: id,
+	reactionID := uuid.New().String()
+	reaction := ReactionData{
+		ReactionID: reactionID,
 		Approved:   approved,
 		Comment:    comment,
 		Timestamp:  time.Now(),
 	}
+
+	rq.reactions = append(rq.reactions, reaction)
+	return reactionID, nil
 }
 
-// GetReaction retrieves a reaction from the queue (non-destructive)
-func (rq *ReactionQueue) GetReaction(id string) (ReactionData, bool) {
+// GetReactions retrieves all reactions from this queue (non-destructive)
+func (rq *ReactionQueue) GetReactions() []ReactionData {
 	rq.mutex.RLock()
 	defer rq.mutex.RUnlock()
 
-	reaction, exists := rq.queue[id]
-	return reaction, exists
-}
-
-// RemoveReaction removes a reaction from the queue after processing
-func (rq *ReactionQueue) RemoveReaction(id string) {
-	rq.mutex.Lock()
-	defer rq.mutex.Unlock()
-
-	delete(rq.queue, id)
-}
-
-// ListReactions returns all pending reactions (for debugging)
-func (rq *ReactionQueue) ListReactions() []ReactionData {
-	rq.mutex.RLock()
-	defer rq.mutex.RUnlock()
-
-	reactions := make([]ReactionData, 0, len(rq.queue))
-	for _, reaction := range rq.queue {
-		reactions = append(reactions, reaction)
-	}
+	// Return a copy to prevent external modifications
+	reactions := make([]ReactionData, len(rq.reactions))
+	copy(reactions, rq.reactions)
 	return reactions
 }
 
-// Size returns the current queue size
+// Size returns the number of reactions in this queue
 func (rq *ReactionQueue) Size() int {
 	rq.mutex.RLock()
 	defer rq.mutex.RUnlock()
 
-	return len(rq.queue)
+	return len(rq.reactions)
+}
+
+// ReactionQueueManager manages multiple reaction queues
+type ReactionQueueManager struct {
+	queues map[string]*ReactionQueue
+	mutex  sync.RWMutex
+}
+
+// NewReactionQueueManager creates a new reaction queue manager
+func NewReactionQueueManager() *ReactionQueueManager {
+	return &ReactionQueueManager{
+		queues: make(map[string]*ReactionQueue),
+	}
+}
+
+// CreateQueue creates a new reaction queue and returns its unique ID
+func (rqm *ReactionQueueManager) CreateQueue() (string, error) {
+	rqm.mutex.Lock()
+	defer rqm.mutex.Unlock()
+
+	queueID := uuid.New().String()
+	rqm.queues[queueID] = NewReactionQueue(queueID)
+
+	return queueID, nil
+}
+
+// GetQueue retrieves a queue by ID
+func (rqm *ReactionQueueManager) GetQueue(queueID string) (*ReactionQueue, error) {
+	rqm.mutex.RLock()
+	defer rqm.mutex.RUnlock()
+
+	queue, exists := rqm.queues[queueID]
+	if !exists {
+		return nil, fmt.Errorf("queue not found: %s", queueID)
+	}
+
+	return queue, nil
+}
+
+// DeleteQueue deletes a queue by ID
+func (rqm *ReactionQueueManager) DeleteQueue(queueID string) error {
+	rqm.mutex.Lock()
+	defer rqm.mutex.Unlock()
+
+	if _, exists := rqm.queues[queueID]; !exists {
+		return fmt.Errorf("queue not found: %s", queueID)
+	}
+
+	delete(rqm.queues, queueID)
+	return nil
+}
+
+// ListQueues returns metadata for all queues
+func (rqm *ReactionQueueManager) ListQueues() []QueueMetadata {
+	rqm.mutex.RLock()
+	defer rqm.mutex.RUnlock()
+
+	metadata := make([]QueueMetadata, 0, len(rqm.queues))
+	for queueID, queue := range rqm.queues {
+		metadata = append(metadata, QueueMetadata{
+			QueueID:       queueID,
+			CreatedAt:     queue.CreatedAt,
+			ReactionCount: queue.Size(),
+		})
+	}
+
+	return metadata
+}
+
+// AddReactionToQueue adds a reaction to a specific queue
+func (rqm *ReactionQueueManager) AddReactionToQueue(queueID string, approved bool, comment string) (string, error) {
+	queue, err := rqm.GetQueue(queueID)
+	if err != nil {
+		return "", err
+	}
+
+	return queue.AddReaction(approved, comment)
 }

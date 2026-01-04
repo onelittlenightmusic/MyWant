@@ -605,81 +605,14 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 
 // FlightMonitoringAgent implements BackgroundAgent for continuous flight status monitoring
 type FlightMonitoringAgent struct {
-	id      string
-	monitor *MonitorFlightAPI
-	ticker  *time.Ticker
-	done    chan struct{}
-	ctx     context.Context
-	cancel  context.CancelFunc
-	want    *Want
-}
-
-// ID returns the agent's unique identifier
-func (f *FlightMonitoringAgent) ID() string {
-	return f.id
-}
-
-// Start begins the flight monitoring goroutine
-func (f *FlightMonitoringAgent) Start(ctx context.Context, w *Want) error {
-	f.want = w
-	f.ctx, f.cancel = context.WithCancel(ctx)
-	f.ticker = time.NewTicker(10 * time.Second)
-	f.done = make(chan struct{})
-
-	go func() {
-		defer f.ticker.Stop()
-		defer close(f.done)
-
-		for {
-			select {
-			case <-f.ctx.Done():
-				return
-			case <-f.ticker.C:
-				// Monitor flight status
-				f.BeginProgressCycle()
-				f.monitor.Exec(f.ctx, f.want)
-				f.EndProgressCycle()
-			}
-		}
-	}()
-
-	return nil
-}
-
-// Stop gracefully stops the flight monitoring
-func (f *FlightMonitoringAgent) Stop() error {
-	if f.cancel != nil {
-		f.cancel()
-	}
-	if f.done != nil {
-		select {
-		case <-f.done:
-			// Already done
-		case <-time.After(1 * time.Second):
-			// Timeout waiting for goroutine to stop
-		}
-	}
-	return nil
-}
-
-// BeginProgressCycle wraps want execution for proper state management
-func (f *FlightMonitoringAgent) BeginProgressCycle() {
-	if f.want != nil {
-		f.want.BeginProgressCycle()
-	}
-}
-
-// EndProgressCycle dumps agent state changes to the want
-func (f *FlightMonitoringAgent) EndProgressCycle() {
-	if f.want != nil {
-		f.want.DumpStateForAgent("MonitorAgent")
-	}
+	BaseMonitoringAgent
 }
 
 // NewFlightMonitoringAgent creates a new flight monitoring background agent
 // Initializes MonitorFlightAPI internally with proper configuration
 func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent {
 	agentID := "flight-monitor-" + flightID
+
 	// Initialize MonitorFlightAPI with agent configuration
 	monitor := &MonitorFlightAPI{
 		MonitorAgent: MonitorAgent{
@@ -695,9 +628,13 @@ func NewFlightMonitoringAgent(flightID, serverURL string) *FlightMonitoringAgent
 		StatusChangeHistory: make([]StatusChange, 0),
 	}
 
+	pollFunc := func(ctx context.Context, w *Want) (bool, error) {
+		err := monitor.Exec(ctx, w)
+		return false, err // Flight monitoring usually continues until explicitly stopped
+	}
+
 	return &FlightMonitoringAgent{
-		id:      agentID,
-		monitor: monitor,
+		BaseMonitoringAgent: *NewBaseMonitoringAgent(agentID, 10*time.Second, "MonitorAgent", pollFunc),
 	}
 }
 

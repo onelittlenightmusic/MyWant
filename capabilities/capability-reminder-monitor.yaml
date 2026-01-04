@@ -1,0 +1,4 @@
+capabilities:
+  - name: reminder_monitoring
+    gives:
+      - reminder_monitoring

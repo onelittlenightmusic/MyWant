@@ -408,26 +408,44 @@ export const Dashboard: React.FC = () => {
 
     setIsSubmittingReaction(true);
     try {
-      const reactionId = reactionWantState.state?.reaction_id as string | undefined;
-      if (!reactionId) {
-        console.error('No reaction ID found');
+      const queueId = reactionWantState.state?.reaction_queue_id as string | undefined;
+      console.log('[DASHBOARD] Reaction submission starting...');
+      console.log('[DASHBOARD] Want state:', reactionWantState.state);
+      console.log('[DASHBOARD] Queue ID:', queueId);
+
+      if (!queueId) {
+        console.error('[DASHBOARD] No reaction queue ID found');
         return;
       }
 
-      const response = await fetch(`/api/v1/reactions/${reactionId}`, {
-        method: 'POST',
+      const requestBody = {
+        approved: reactionAction === 'approve',
+        comment: `User ${reactionAction === 'approve' ? 'approved' : 'denied'} reminder`
+      };
+      console.log('[DASHBOARD] Request body:', requestBody);
+
+      const url = `/api/v1/reactions/${queueId}`;
+      console.log('[DASHBOARD] Sending PUT request to:', url);
+
+      const response = await fetch(url, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          approved: reactionAction === 'approve',
-          comment: `User ${reactionAction === 'approve' ? 'approved' : 'denied'} reminder`
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('[DASHBOARD] Response status:', response.status);
+      console.log('[DASHBOARD] Response ok:', response.ok);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[DASHBOARD] Error response:', errorText);
         throw new Error(`Failed to submit reaction: ${response.statusText}`);
       }
+
+      const responseData = await response.json();
+      console.log('[DASHBOARD] Response data:', responseData);
 
       setShowReactionConfirmation(false);
       setReactionWantState(null);

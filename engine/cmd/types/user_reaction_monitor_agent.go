@@ -2,13 +2,55 @@ package types
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"time"
 	. "mywant/engine/src"
 )
 
-// UserReactionMonitorAgentFactory creates a MonitorAgent that monitors user reactions
-// It's a system-wide agent that monitors all reminders for user reactions
-func NewUserReactionMonitorAgent(reactionQueue *ReactionQueue) *MonitorAgent {
+// ReactionMonitoringAgent implements BackgroundAgent for continuous reaction monitoring
+// Inherits from BaseMonitoringAgent
+type ReactionMonitoringAgent struct {
+	BaseMonitoringAgent
+}
+
+// NewReactionMonitoringAgent creates a new reaction monitoring background agent
+func NewReactionMonitoringAgent(reminderID string) *ReactionMonitoringAgent {
+	agentID := "reaction-monitor-" + reminderID
+
+	pollFunc := func(ctx context.Context, w *Want) (bool, error) {
+		// Check if want is still in reaching phase
+		phase, exists := w.GetState("reminder_phase")
+		if !exists || phase != ReminderPhaseReaching {
+			return true, nil // Stop monitoring
+		}
+
+		// Monitor reaction status
+		err := monitorUserReactions(ctx, w)
+		if err != nil {
+			return false, err
+		}
+
+		// Check if reaction was received (non-empty)
+		if userReaction, exists := w.GetState("user_reaction"); exists && userReaction != nil {
+			if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
+				return true, nil // Stop monitoring
+			}
+		}
+
+		return false, nil
+	}
+
+	return &ReactionMonitoringAgent{
+		BaseMonitoringAgent: *NewBaseMonitoringAgent(agentID, 2*time.Second, "MonitorAgent", pollFunc),
+	}
+}
+
+// NewUserReactionMonitorAgent creates a MonitorAgent that monitors user reactions via HTTP API
+// This is used for registration in the agent registry
+// The actual continuous monitoring is handled by ReactionMonitoringAgent (BackgroundAgent)
+func NewUserReactionMonitorAgent() *MonitorAgent {
 	agent := &MonitorAgent{
 		BaseAgent: *NewBaseAgent(
 			"user_reaction_monitor",
@@ -19,14 +61,14 @@ func NewUserReactionMonitorAgent(reactionQueue *ReactionQueue) *MonitorAgent {
 	}
 
 	agent.Monitor = func(ctx context.Context, want *Want) error {
-		return monitorUserReactions(ctx, want, reactionQueue)
+		return monitorUserReactions(ctx, want)
 	}
 
 	return agent
 }
 
-// monitorUserReactions monitors a single want for user reactions
-func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *ReactionQueue) error {
+// monitorUserReactions monitors a single want for user reactions via HTTP API
+func monitorUserReactions(ctx context.Context, want *Want) error {
 	// Only process reminder wants in reaching phase
 	if want.Metadata.Type != "reminder" {
 		return nil
@@ -42,9 +84,12 @@ func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *Reacti
 		return nil
 	}
 
+	log.Printf("[MONITOR] Monitoring reminder want %s in reaching phase", want.Metadata.Name)
+
 	// Check if reaction is required
 	requireReaction, exists := want.GetState("require_reaction")
 	if !exists {
+		log.Printf("[MONITOR] No require_reaction state found for %s", want.Metadata.Name)
 		return nil
 	}
 
@@ -55,36 +100,78 @@ func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *Reacti
 
 	// If reaction not required, nothing to monitor
 	if !requireReactionBool {
+		log.Printf("[MONITOR] Reaction not required for %s, skipping", want.Metadata.Name)
 		return nil
 	}
 
-	// Get the reaction ID
-	reactionID, exists := want.GetState("reaction_id")
-	if !exists {
-		return fmt.Errorf("reaction_id not found in state")
-	}
-
-	reactionIDStr := fmt.Sprintf("%v", reactionID)
-
-	// Check if user reaction is available in the queue
-	reaction, found := reactionQueue.GetReaction(reactionIDStr)
-	if !found {
-		// No reaction yet, continue waiting
+	// Get the reaction queue ID (set by DoAgent when queue was created)
+	queueIDValue, exists := want.GetState("reaction_queue_id")
+	if !exists || queueIDValue == nil || queueIDValue == "" {
+		log.Printf("[MONITOR] No reaction_queue_id found for %s", want.Metadata.Name)
+		// Queue not created yet, nothing to monitor
 		return nil
 	}
+
+	queueID := fmt.Sprintf("%v", queueIDValue)
+	log.Printf("[MONITOR] Checking queue %s for reactions...", queueID)
+
+	// Get HTTP client for API calls
+	httpClient := want.GetHTTPClient()
+	if httpClient == nil {
+		log.Printf("[MONITOR] ERROR: HTTP client not available for want %s - cannot monitor reactions", want.Metadata.ID)
+		return nil
+	}
+
+	// Call GET /api/v1/reactions/{id} to retrieve reactions
+	path := fmt.Sprintf("/api/v1/reactions/%s", queueID)
+	log.Printf("[MONITOR] Sending GET request to: %s", path)
+	resp, err := httpClient.GET(path)
+	if err != nil {
+		// Queue might not exist yet or other error - just log and continue
+		log.Printf("[MONITOR] Failed to get reaction queue %s: %v", queueID, err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	log.Printf("[MONITOR] GET response status: %d", resp.StatusCode)
+
+	// Parse response
+	var result struct {
+		QueueID   string         `json:"queue_id"`
+		Reactions []ReactionData `json:"reactions"`
+		CreatedAt string         `json:"created_at"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("[MONITOR] Failed to decode reaction queue response: %v", err)
+		return nil
+	}
+
+	log.Printf("[MONITOR] Retrieved %d reactions from queue %s", len(result.Reactions), queueID)
+
+	// Check if there are any reactions
+	if len(result.Reactions) == 0 {
+		// No reactions yet, continue waiting
+		log.Printf("[MONITOR] No reactions yet in queue %s", queueID)
+		return nil
+	}
+
+	// Process the first reaction (FIFO order)
+	reaction := result.Reactions[0]
+	log.Printf("[MONITOR] Processing reaction: approved=%v, comment=%s", reaction.Approved, reaction.Comment)
 
 	// Convert reaction to state-compatible format
 	reactionData := map[string]any{
-		"approved": reaction.Approved,
-		"comment":  reaction.Comment,
+		"approved":  reaction.Approved,
+		"comment":   reaction.Comment,
 		"timestamp": reaction.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
 	}
 
-	// Write reaction to state
-	want.StoreState("user_reaction", reactionData)
+	// Write reaction to state (use StoreStateForAgent for BackgroundAgent)
+	want.StoreStateForAgent("user_reaction", reactionData)
 
 	// Write action by agent
-	want.StoreState("action_by_agent", "MonitorAgent")
+	want.StoreStateForAgent("action_by_agent", "MonitorAgent")
 
 	// Log the reaction
 	if reaction.Approved {
@@ -93,15 +180,15 @@ func monitorUserReactions(ctx context.Context, want *Want, reactionQueue *Reacti
 		want.StoreLog(fmt.Sprintf("User rejected reminder reaction (comment: %s)", reaction.Comment))
 	}
 
-	// Remove reaction from queue after processing
-	reactionQueue.RemoveReaction(reactionIDStr)
+	log.Printf("[INFO] MonitorAgent processed reaction %s from queue %s for want %s",
+		reaction.ReactionID, queueID, want.Metadata.ID)
 
 	return nil
 }
 
 // RegisterUserReactionMonitorAgent registers the user reaction monitor agent with the registry
-func RegisterUserReactionMonitorAgent(registry *AgentRegistry, reactionQueue *ReactionQueue) error {
-	agent := NewUserReactionMonitorAgent(reactionQueue)
+func RegisterUserReactionMonitorAgent(registry *AgentRegistry) error {
+	agent := NewUserReactionMonitorAgent()
 	registry.RegisterAgent(agent)
 	return nil
 }

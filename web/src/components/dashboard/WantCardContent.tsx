@@ -41,9 +41,9 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   // Reminder-specific state
   const isReminder = want.metadata?.type === 'reminder';
   const reminderPhase = want.state?.reminder_phase as string | undefined;
-  const reactionId = want.state?.reaction_id as string | undefined;
+  const queueId = want.state?.reaction_queue_id as string | undefined;
   const requireReaction = want.spec?.params?.require_reaction !== false; // Default to true
-  const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && reactionId && requireReaction;
+  const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && queueId && requireReaction;
 
   // Confirmation dialog state
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -85,24 +85,42 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   // Handler for confirmation dialog confirmation
   const handleReactionConfirm = async () => {
-    if (!reactionId || !confirmationAction) return;
+    if (!queueId || !confirmationAction) return;
+
+    console.log('[REACTION] Starting reaction submission...');
+    console.log('[REACTION] Queue ID:', queueId);
+    console.log('[REACTION] Action:', confirmationAction);
 
     setIsSubmittingReaction(true);
     try {
-      const response = await fetch(`/api/v1/reactions/${reactionId}`, {
-        method: 'POST',
+      const requestBody = {
+        approved: confirmationAction === 'approve',
+        comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} reminder`
+      };
+      console.log('[REACTION] Request body:', requestBody);
+
+      const url = `/api/v1/reactions/${queueId}`;
+      console.log('[REACTION] Sending PUT request to:', url);
+
+      const response = await fetch(url, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          approved: confirmationAction === 'approve',
-          comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} reminder`
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('[REACTION] Response status:', response.status);
+      console.log('[REACTION] Response ok:', response.ok);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[REACTION] Error response:', errorText);
         throw new Error(`Failed to submit reaction: ${response.statusText}`);
       }
+
+      const responseData = await response.json();
+      console.log('[REACTION] Response data:', responseData);
 
       // Success - close confirmation dialog
       setShowConfirmation(false);

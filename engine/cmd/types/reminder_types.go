@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-// Global reaction queue for reminder wants
-var globalReactionQueue *ReactionQueue
-
-// SetGlobalReactionQueue sets the global reaction queue
-func SetGlobalReactionQueue(queue *ReactionQueue) {
-	globalReactionQueue = queue
-}
-
 // ReminderPhase constants
 const (
 	ReminderPhaseWaiting   = "waiting"
@@ -33,7 +25,6 @@ type ReminderLocals struct {
 	RequireReaction  bool
 	ReactionType     string
 	Phase            string
-	ReactionID       string
 	TimeoutSeconds   int
 	LastCheckTime    time.Time
 }
@@ -176,15 +167,11 @@ func (r *ReminderWant) Initialize() {
 	}
 	locals.ReactionType = reactionType
 
-	// Generate reaction ID (UUID-like)
-	locals.ReactionID = fmt.Sprintf("reminder-%s-%d", r.Metadata.Name, time.Now().UnixNano())
-
 	// Store initial state
 	stateMap := map[string]any{
 		"reminder_phase":   locals.Phase,
 		"message":          locals.Message,
 		"ahead":            locals.Ahead,
-		"reaction_id":      locals.ReactionID,
 		"require_reaction": requireReaction,
 		"reaction_type":    reactionType,
 		"timeout":          300,
@@ -212,13 +199,29 @@ func (r *ReminderWant) Initialize() {
 		// Scheduler agent will be set up by the caller
 	}
 
-	// If reaction is required, set Spec.Requires to trigger MonitorAgent
+	// If reaction is required, set Spec.Requires to trigger MonitorAgent and DoAgent
 	if requireReaction {
-		r.Spec.Requires = []string{"reminder_monitoring"}
+		r.Spec.Requires = []string{
+			"reminder_monitoring",        // MonitorAgent reads reactions via HTTP API
+			"reminder_queue_management",  // DoAgent manages queue lifecycle (create/delete)
+		}
 	}
 
 	InfoLog("[REMINDER] Initialized reminder '%s' with phase=%s, require_reaction=%v\n",
 		r.Metadata.Name, locals.Phase, requireReaction)
+
+	// Execute DoAgent to create reaction queue (synchronous)
+	if len(r.Spec.Requires) > 0 {
+		if err := r.ExecuteAgents(); err != nil {
+			r.StoreLog(fmt.Sprintf("ERROR: Failed to execute agents: %v", err))
+			r.StoreState("reminder_phase", ReminderPhaseFailed)
+			r.StoreState("error_message", fmt.Sprintf("Agent execution failed: %v", err))
+			return
+		}
+
+		// Background monitoring agent will be started when transitioning to reaching phase
+		// (see handlePhaseWaiting)
+	}
 }
 
 // hasWhenSpec checks if this want has when specifications
@@ -275,6 +278,20 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 		r.StoreState("reminder_phase", ReminderPhaseReaching)
 		locals.Phase = ReminderPhaseReaching
 		r.updateLocals(locals)
+
+		// Start background monitoring agent when transitioning to reaching phase
+		if locals.RequireReaction {
+			queueIDValue, exists := r.GetState("reaction_queue_id")
+			if exists && queueIDValue != nil && queueIDValue != "" {
+				// Create and add background monitoring agent
+				monitorAgent := NewReactionMonitoringAgent(r.Metadata.ID)
+				if err := r.AddBackgroundAgent(monitorAgent); err != nil {
+					r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
+				} else {
+					InfoLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)
+				}
+			}
+		}
 	}
 }
 
@@ -282,27 +299,10 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 	// Check if user reaction is available
 	if locals.RequireReaction {
-		// First check the global reaction queue
-		if globalReactionQueue != nil {
-			reactionID, _ := r.GetState("reaction_id")
-			reactionIDStr := fmt.Sprintf("%v", reactionID)
+		// Background monitoring agent continuously polls HTTP API for reactions
+		// No need to call ExecuteAgents() here - monitoring runs in separate goroutine
 
-			if reaction, found := globalReactionQueue.GetReaction(reactionIDStr); found {
-				// Convert reaction to state-compatible format
-				reactionData := map[string]any{
-					"approved": reaction.Approved,
-					"comment":  reaction.Comment,
-					"timestamp": reaction.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
-				}
-				r.StoreLog(fmt.Sprintf("Reaction from queue: %v", reaction.Approved))
-				r.processReaction(locals, reactionData)
-				// Remove reaction from queue after processing
-				globalReactionQueue.RemoveReaction(reactionIDStr)
-				return
-			}
-		}
-
-		// Fall back to checking state
+		// Check state for user reaction (populated by MonitorAgent via HTTP API)
 		if userReaction, exists := r.GetState("user_reaction"); exists {
 			r.processReaction(locals, userReaction)
 			return
@@ -407,10 +407,6 @@ func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
 
 	if ahead, exists := r.GetState("ahead"); exists {
 		locals.Ahead = fmt.Sprintf("%v", ahead)
-	}
-
-	if reactionID, exists := r.GetState("reaction_id"); exists {
-		locals.ReactionID = fmt.Sprintf("%v", reactionID)
 	}
 
 	if reqReact, exists := r.GetState("require_reaction"); exists {

@@ -123,6 +123,9 @@ type ChainBuilder struct {
 	apiLogs      []APILogEntry // API operation logs
 	apiLogsMutex sync.RWMutex  // Protect concurrent access to logs
 	maxLogSize   int           // Maximum number of log entries to keep (default: 1000)
+
+	// HTTP client for internal API calls
+	httpClient *HTTPClient // HTTP client for agents to call internal APIs
 }
 
 // runtimeWant holds the runtime state of a want
@@ -306,6 +309,16 @@ func (cb *ChainBuilder) SetConfigInternal(config Config) {
 }
 func (cb *ChainBuilder) SetServerMode(isServer bool) {
 	cb.isServerMode = isServer
+}
+
+// SetHTTPClient sets the HTTP client for internal API calls
+func (cb *ChainBuilder) SetHTTPClient(client *HTTPClient) {
+	cb.httpClient = client
+}
+
+// GetHTTPClient returns the HTTP client for internal API calls
+func (cb *ChainBuilder) GetHTTPClient() *HTTPClient {
+	return cb.httpClient
 }
 
 // matchesSelector checks if want labels match the selector criteria

@@ -53,9 +53,9 @@ type Server struct {
 	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
 	wantTypeLoader *mywant.WantTypeLoader           // Want type definitions loader
 	errorHistory   []ErrorHistoryEntry              // Store error history
-	router         *mux.Router
-	globalLabels   map[string]map[string]bool // Globally registered labels (key -> value -> true)
-	reactionQueue  *types.ReactionQueue       // Reaction queue for reminder wants
+	router               *mux.Router
+	globalLabels         map[string]map[string]bool    // Globally registered labels (key -> value -> true)
+	reactionQueueManager *types.ReactionQueueManager   // Reaction queue manager for reminder wants
 }
 
 // WantExecution represents a running want execution
@@ -199,25 +199,30 @@ func NewServer(config ServerConfig) *Server {
 	types.RegisterExecutionAgents(agentRegistry)
 	types.RegisterMCPAgent(agentRegistry)
 
-	// Create and register reaction queue for reminders
-	reactionQueue := types.NewReactionQueue()
-	if err := types.RegisterUserReactionMonitorAgent(agentRegistry, reactionQueue); err != nil {
+	// Create reaction queue manager for reminders (multi-queue system)
+	reactionQueueManager := types.NewReactionQueueManager()
+
+	// Register reminder queue management agent (DoAgent for queue lifecycle)
+	if err := types.RegisterReminderQueueAgent(agentRegistry); err != nil {
+		log.Printf("[SERVER] Warning: Failed to register reminder queue agent: %v\n", err)
+	}
+
+	// Register user reaction monitor agent (MonitorAgent using HTTP API)
+	if err := types.RegisterUserReactionMonitorAgent(agentRegistry); err != nil {
 		log.Printf("[SERVER] Warning: Failed to register user reaction monitor agent: %v\n", err)
 	}
-	// Make reaction queue globally accessible to reminder wants
-	types.SetGlobalReactionQueue(reactionQueue)
 
 	return &Server{
-		config:         config,
-		wants:          make(map[string]*WantExecution),
-		globalBuilder:  globalBuilder,
-		agentRegistry:  agentRegistry,
-		recipeRegistry: recipeRegistry,
-		wantTypeLoader: wantTypeLoader,
-		errorHistory:   make([]ErrorHistoryEntry, 0),
-		router:         mux.NewRouter(),
-		globalLabels:   make(map[string]map[string]bool),
-		reactionQueue:  reactionQueue,
+		config:               config,
+		wants:                make(map[string]*WantExecution),
+		globalBuilder:        globalBuilder,
+		agentRegistry:        agentRegistry,
+		recipeRegistry:       recipeRegistry,
+		wantTypeLoader:       wantTypeLoader,
+		errorHistory:         make([]ErrorHistoryEntry, 0),
+		router:               mux.NewRouter(),
+		globalLabels:         make(map[string]map[string]bool),
+		reactionQueueManager: reactionQueueManager,
 	}
 }
 
@@ -328,12 +333,17 @@ func (s *Server) setupRoutes() {
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
 	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
 
-	// Reactions endpoints for reminder wants
+	// Reactions endpoints for reminder wants - multi-queue system
 	reactions := api.PathPrefix("/reactions").Subrouter()
-	reactions.HandleFunc("/{id}", s.createReaction).Methods("POST")
+	// Root path handlers - ORDER MATTERS: specific methods before OPTIONS
+	reactions.HandleFunc("/", s.createReactionQueue).Methods("POST")
+	reactions.HandleFunc("/", s.listReactionQueues).Methods("GET")
+	reactions.HandleFunc("/", s.handleOptions).Methods("OPTIONS")
+	// ID-based handlers
+	reactions.HandleFunc("/{id}", s.getReactionQueue).Methods("GET")
+	reactions.HandleFunc("/{id}", s.addReactionToQueue).Methods("PUT")
+	reactions.HandleFunc("/{id}", s.deleteReactionQueue).Methods("DELETE")
 	reactions.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
-	reactions.HandleFunc("", s.listReactions).Methods("GET")
-	reactions.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
 	// Health check endpoint
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
@@ -3139,62 +3149,166 @@ type ReactionRequest struct {
 	Comment  string `json:"comment,omitempty"`
 }
 
-// createReaction handles POST /api/v1/reactions/{id}
-func (s *Server) createReaction(w http.ResponseWriter, r *http.Request) {
+// createReactionQueue handles POST /api/v1/reactions/ - Create new reaction queue
+func (s *Server) createReactionQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract reaction ID from URL path
-	parts := strings.Split(r.URL.Path, "/")
-	var reactionID string
-	for i, part := range parts {
-		if part == "reactions" && i+1 < len(parts) {
-			reactionID = parts[i+1]
-			break
-		}
+	// Create new queue
+	queueID, err := s.reactionQueueManager.CreateQueue()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create queue: %v", err), http.StatusInternalServerError)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "error", http.StatusInternalServerError,
+			fmt.Sprintf("Failed to create queue: %v", err), "queue_creation_failed")
+		return
 	}
 
-	if reactionID == "" {
-		http.Error(w, "Missing reaction ID", http.StatusBadRequest)
+	// Return success response
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"queue_id":   queueID,
+		"created_at": time.Now().Format(time.RFC3339),
+	})
+
+	s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "success", http.StatusCreated,
+		fmt.Sprintf("Reaction queue created: %s", queueID), "queue_created")
+}
+
+// listReactionQueues handles GET /api/v1/reactions/ - List all reaction queues
+func (s *Server) listReactionQueues(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	queues := s.reactionQueueManager.ListQueues()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"count":  len(queues),
+		"queues": queues,
+	})
+
+	s.globalBuilder.LogAPIOperation("GET", r.URL.Path, "", "success", http.StatusOK,
+		fmt.Sprintf("Listed %d reaction queues", len(queues)), "queues_listed")
+}
+
+// getReactionQueue handles GET /api/v1/reactions/{id} - Read from queue (non-destructive)
+func (s *Server) getReactionQueue(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract queue ID from URL
+	vars := mux.Vars(r)
+	queueID := vars["id"]
+
+	InfoLog("[API:REACTION] GET request received for queue ID: %s\n", queueID)
+
+	if queueID == "" {
+		InfoLog("[API:REACTION] ERROR: Missing queue ID\n")
+		http.Error(w, "Missing queue ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get queue
+	queue, err := s.reactionQueueManager.GetQueue(queueID)
+	if err != nil {
+		InfoLog("[API:REACTION] ERROR: Queue not found: %s\n", queueID)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		s.globalBuilder.LogAPIOperation("GET", r.URL.Path, "", "error", http.StatusNotFound,
+			fmt.Sprintf("Queue not found: %s", queueID), "queue_not_found")
+		return
+	}
+
+	// Get all reactions from queue (non-destructive)
+	reactions := queue.GetReactions()
+	InfoLog("[API:REACTION] Returning %d reactions for queue %s\n", len(reactions), queueID)
+
+	// Return success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"queue_id":   queueID,
+		"reactions":  reactions,
+		"created_at": queue.CreatedAt.Format(time.RFC3339),
+	})
+
+	s.globalBuilder.LogAPIOperation("GET", r.URL.Path, "", "success", http.StatusOK,
+		fmt.Sprintf("Retrieved queue %s with %d reactions", queueID, len(reactions)), "queue_retrieved")
+}
+
+// addReactionToQueue handles PUT /api/v1/reactions/{id} - Add reaction to queue
+func (s *Server) addReactionToQueue(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract queue ID from URL
+	vars := mux.Vars(r)
+	queueID := vars["id"]
+
+	InfoLog("[API:REACTION] PUT request received for queue ID: %s\n", queueID)
+
+	if queueID == "" {
+		InfoLog("[API:REACTION] ERROR: Missing queue ID\n")
+		http.Error(w, "Missing queue ID", http.StatusBadRequest)
 		return
 	}
 
 	// Parse request body
 	var req ReactionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorMsg := "Invalid request format"
-		http.Error(w, errorMsg, http.StatusBadRequest)
+		InfoLog("[API:REACTION] ERROR: Failed to decode request: %v\n", err)
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
 		return
 	}
 
+	InfoLog("[API:REACTION] Parsed request - Approved: %v, Comment: %s\n", req.Approved, req.Comment)
+
 	// Add reaction to queue
-	s.reactionQueue.AddReaction(reactionID, req.Approved, req.Comment)
+	reactionID, err := s.reactionQueueManager.AddReactionToQueue(queueID, req.Approved, req.Comment)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		s.globalBuilder.LogAPIOperation("PUT", r.URL.Path, "", "error", http.StatusNotFound,
+			fmt.Sprintf("Failed to add reaction: %v", err), "reaction_add_failed")
+		return
+	}
 
 	// Return success response
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
+		"queue_id":    queueID,
 		"reaction_id": reactionID,
-		"approved":    req.Approved,
 		"timestamp":   time.Now().Format(time.RFC3339),
 	})
 
-	s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "success", http.StatusCreated,
-		fmt.Sprintf("Reaction created for %s", reactionID), "reaction_created")
+	s.globalBuilder.LogAPIOperation("PUT", r.URL.Path, "", "success", http.StatusOK,
+		fmt.Sprintf("Reaction added to queue %s: %s", queueID, reactionID), "reaction_added")
 }
 
-// listReactions handles GET /api/v1/reactions (debugging endpoint)
-func (s *Server) listReactions(w http.ResponseWriter, r *http.Request) {
+// deleteReactionQueue handles DELETE /api/v1/reactions/{id} - Delete queue
+func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	reactions := s.reactionQueue.ListReactions()
+	// Extract queue ID from URL
+	vars := mux.Vars(r)
+	queueID := vars["id"]
 
+	if queueID == "" {
+		http.Error(w, "Missing queue ID", http.StatusBadRequest)
+		return
+	}
+
+	// Delete queue
+	err := s.reactionQueueManager.DeleteQueue(queueID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		s.globalBuilder.LogAPIOperation("DELETE", r.URL.Path, "", "error", http.StatusNotFound,
+			fmt.Sprintf("Failed to delete queue: %v", err), "queue_deletion_failed")
+		return
+	}
+
+	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
-		"count":     len(reactions),
-		"reactions": reactions,
+		"queue_id": queueID,
+		"deleted":  true,
 	})
 
-	s.globalBuilder.LogAPIOperation("GET", r.URL.Path, "", "success", http.StatusOK,
-		fmt.Sprintf("Listed %d pending reactions", len(reactions)), "reactions_listed")
+	s.globalBuilder.LogAPIOperation("DELETE", r.URL.Path, "", "success", http.StatusOK,
+		fmt.Sprintf("Reaction queue deleted: %s", queueID), "queue_deleted")
 }
 
 func main() {
@@ -3246,6 +3360,13 @@ func main() {
 		InfoLog("ℹ️  Debug mode disabled - reduced logging (use 'debug' argument to enable)")
 	}
 	server := NewServer(config)
+
+	// Initialize HTTP client for internal API calls (agents use this to communicate with reaction queue API)
+	baseURL := fmt.Sprintf("http://%s:%d", host, port)
+	httpClient := mywant.NewHTTPClient(baseURL)
+	server.globalBuilder.SetHTTPClient(httpClient)
+	InfoLog(fmt.Sprintf("📡 HTTP client initialized with base URL: %s", baseURL))
+
 	if err := server.Start(); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}

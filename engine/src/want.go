@@ -1831,6 +1831,16 @@ func (w *Want) GetHiddenState() map[string]any {
 	return hiddenState
 }
 
+// GetHTTPClient returns the HTTP client for internal API calls
+// Returns nil if no global ChainBuilder is available
+func (w *Want) GetHTTPClient() *HTTPClient {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return nil
+	}
+	return cb.GetHTTPClient()
+}
+
 // Contains checks if a string slice contains a specific string value
 func Contains(slice []string, item string) bool {
 	for _, v := range slice {
