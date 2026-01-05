@@ -277,19 +277,34 @@ func (r *ReminderWant) Progress() {
 		r.handlePhaseReaching(locals)
 
 	case ReminderPhaseCompleted:
-		// Already completed, nothing to do
+		// Already completed, ensure completion packet is sent
+		r.emitCompletionPacket()
 		break
 
 	case ReminderPhaseFailed:
 		// Already failed, nothing to do
 		break
+// ... (rest of code)
 
-	default:
-		r.StoreLog(fmt.Sprintf("ERROR: Unknown phase: %s", locals.Phase))
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		locals.Phase = ReminderPhaseFailed
-		r.Status = "failed"
-		r.updateLocals(locals)
+// emitCompletionPacket sends a completion signal to connected users
+func (r *ReminderWant) emitCompletionPacket() {
+	// Check if already emitted
+	emitted, _ := r.GetStateBool("_completion_packet_emitted", false)
+	if emitted {
+		return
+	}
+
+	packet := map[string]any{
+		"reaction_type": "completion",
+		"source_want":   r.Metadata.Name,
+		"timestamp":     time.Now().Format(time.RFC3339),
+	}
+
+	if err := r.Provide(packet); err != nil {
+		r.StoreLog("ERROR: Failed to emit completion packet: %v", err)
+	} else {
+		r.StoreLog("[REMINDER] Emitted completion packet")
+		r.StoreState("_completion_packet_emitted", true)
 	}
 }
 
