@@ -217,14 +217,40 @@ func (r *ReminderWant) Initialize() {
 	// Execute DoAgent to create reaction queue (synchronous)
 	if len(r.Spec.Requires) > 0 {
 		if err := r.ExecuteAgents(); err != nil {
-			r.StoreLog(fmt.Sprintf("ERROR: Failed to execute agents: %v", err))
+			r.StoreLog("ERROR: Failed to execute agents: %v", err)
 			r.StoreState("reminder_phase", ReminderPhaseFailed)
 			r.StoreState("error_message", fmt.Sprintf("Agent execution failed: %v", err))
 			return
 		}
 
-		// Background monitoring agent will be started when transitioning to reaching phase
-		// (see handlePhaseWaiting)
+		// Ensure monitor is initialized before starting
+		if locals.monitor == nil {
+			locals.monitor = NewUserReactionMonitorAgent()
+		}
+
+		// Start background monitoring agent as soon as queue is created
+		r.startMonitoringIfNeeded(locals)
+	}
+}
+
+// startMonitoringIfNeeded starts the reaction monitor agent if not already running
+func (r *ReminderWant) startMonitoringIfNeeded(locals *ReminderLocals) {
+	if !locals.RequireReaction {
+		return
+	}
+
+	queueIDValue, exists := r.GetState("reaction_queue_id")
+	if exists && queueIDValue != nil && queueIDValue != "" {
+		agentName := "reaction-monitor-" + r.Metadata.ID
+		if _, exists := r.GetBackgroundAgent(agentName); !exists {
+			// Use pre-initialized monitor from locals
+			monitor := locals.monitor
+			if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
+				r.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+			} else {
+				r.StoreLog("[REMINDER] Started background monitoring for %s", r.Metadata.Name)
+			}
+		}
 	}
 }
 
@@ -283,26 +309,44 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 		locals.Phase = ReminderPhaseReaching
 		r.updateLocals(locals)
 
-		// Start background monitoring agent when transitioning to reaching phase
-		if locals.RequireReaction {
-			queueIDValue, exists := r.GetState("reaction_queue_id")
-			if exists && queueIDValue != nil && queueIDValue != "" {
-				// Use pre-initialized monitor from locals
-				agentName := "reaction-monitor-" + r.Metadata.ID
-				monitor := locals.monitor
+		// Emission logic moved to handlePhaseReaching or a helper to handle both cases
+	}
+}
 
-				if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
-					r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
-				} else {
-					r.StoreLog("[REMINDER] Started background monitoring for %s\n", r.Metadata.Name)
-				}
-			}
+// emitReactionPacketIfNeeded sends the reaction request packet to connected users
+func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
+	if !locals.RequireReaction {
+		return
+	}
+
+	// Check if already emitted in this state
+	emitted, _ := r.GetStateBool("_reaction_packet_emitted", false)
+	if emitted {
+		return
+	}
+
+	queueIDValue, exists := r.GetState("reaction_queue_id")
+	if exists && queueIDValue != nil && queueIDValue != "" {
+		// Emit reaction request packet to connected users (silencers)
+		packet := map[string]any{
+			"reaction_id":   queueIDValue,
+			"reaction_type": locals.ReactionType,
+			"source_want":   r.Metadata.Name,
+		}
+		if err := r.Provide(packet); err != nil {
+			r.StoreLog("ERROR: Failed to emit reaction request packet: %v", err)
+		} else {
+			r.StoreLog("[REMINDER] Emitted reaction request packet for %s", r.Metadata.Name)
+			r.StoreState("_reaction_packet_emitted", true)
 		}
 	}
 }
 
 // handlePhaseReaching handles the reaching phase
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
+	// Ensure packet is emitted (handles both transition and restart-while-reaching)
+	r.emitReactionPacketIfNeeded(locals)
+
 	// Check if user reaction is available
 	if locals.RequireReaction {
 		// Background monitoring agent continuously polls HTTP API for reactions
@@ -310,8 +354,31 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 
 		// Check state for user reaction (populated by MonitorAgent via HTTP API)
 		if userReaction, exists := r.GetState("user_reaction"); exists {
-			r.processReaction(locals, userReaction)
-			return
+			// Check if it's a non-empty reaction
+			if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
+				if _, ok := reactionMap["approved"].(bool); ok {
+					r.processReaction(locals, userReaction)
+					return
+				}
+			}
+		}
+
+		// Start background monitoring agent if not already running
+		// (This covers the case where we restarted while in reaching phase)
+		if locals.RequireReaction {
+			queueIDValue, exists := r.GetState("reaction_queue_id")
+			if exists && queueIDValue != nil && queueIDValue != "" {
+				agentName := "reaction-monitor-" + r.Metadata.ID
+				if _, exists := r.GetBackgroundAgent(agentName); !exists {
+					// Use pre-initialized monitor from locals
+					monitor := locals.monitor
+					if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
+						r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
+					} else {
+						r.StoreLog("[REMINDER] Started background monitoring for %s", r.Metadata.Name)
+					}
+				}
+			}
 		}
 
 		// Check for timeout
@@ -353,14 +420,20 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 		if approved, ok := reactionMap["approved"].(bool); ok {
 			if approved {
 				r.StoreLog("Reminder approved by user")
-				r.StoreState("reminder_phase", ReminderPhaseCompleted)
-				r.StoreState("reaction_result", "approved")
+				r.StoreStateMulti(map[string]any{
+					"reminder_phase":           ReminderPhaseCompleted,
+					"reaction_result":          "approved",
+					"_reaction_packet_emitted": false,
+				})
 				locals.Phase = ReminderPhaseCompleted
 				r.Status = "achieved"
 			} else {
 				r.StoreLog("Reminder rejected by user")
-				r.StoreState("reminder_phase", ReminderPhaseFailed)
-				r.StoreState("reaction_result", "rejected")
+				r.StoreStateMulti(map[string]any{
+					"reminder_phase":           ReminderPhaseFailed,
+					"reaction_result":          "rejected",
+					"_reaction_packet_emitted": false,
+				})
 				locals.Phase = ReminderPhaseFailed
 				r.Status = "failed"
 			}
@@ -373,14 +446,20 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	if locals.RequireReaction {
 		r.StoreLog("Reaction timeout - marking as failed (require_reaction=true)")
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("timeout", true)
+		r.StoreStateMulti(map[string]any{
+			"reminder_phase":            ReminderPhaseFailed,
+			"timeout":                   true,
+			"_reaction_packet_emitted": false,
+		})
 		locals.Phase = ReminderPhaseFailed
 		r.Status = "failed"
 	} else {
 		r.StoreLog("Reaction timeout - auto-completing (require_reaction=false)")
-		r.StoreState("reminder_phase", ReminderPhaseCompleted)
-		r.StoreState("auto_completed", true)
+		r.StoreStateMulti(map[string]any{
+			"reminder_phase":            ReminderPhaseCompleted,
+			"auto_completed":            true,
+			"_reaction_packet_emitted": false,
+		})
 		locals.Phase = ReminderPhaseCompleted
 		r.Status = "achieved"
 	}
@@ -431,6 +510,11 @@ func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
 		if etTime, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", etStr)); err == nil {
 			locals.EventTime = etTime
 		}
+	}
+
+	// Always ensure monitor is initialized
+	if locals.monitor == nil {
+		locals.monitor = NewUserReactionMonitorAgent()
 	}
 
 	return locals

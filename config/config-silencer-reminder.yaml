@@ -1,0 +1,19 @@
+wants:
+  - metadata:
+      name: my-reminder
+      type: reminder
+    spec:
+      params:
+        message: "Connect to silencer test"
+        duration_from_now: "10 seconds"
+        ahead: "5 seconds"
+        require_reaction: true
+  
+  - metadata:
+      name: my-silencer
+      type: silencer
+    spec:
+      params:
+        policy: all_true
+      using:
+        - reaction_requests: my-reminder

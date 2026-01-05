@@ -441,4 +441,9 @@ wantType:
   - Recurring schedule patterns
 
   require:
-    type: none
+    type: users
+    users:
+    - name: reaction_requests
+      type: want
+      description: Stream of reaction requests {reaction_id, reaction_type}
+

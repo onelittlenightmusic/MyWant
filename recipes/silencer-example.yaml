@@ -1,0 +1,48 @@
+# Silencer Example Recipe
+# This recipe demonstrates how a Silencer can automatically approve reactions from a Reminder
+
+recipe:
+  metadata:
+    name: "Silencer Example"
+    description: "Demonstrates automatic reminder approval using a Silencer want"
+    custom_type: "silencer_example"
+    category: "system"
+    version: "1.0.0"
+
+  parameters:
+    reminder_message: "This reminder will be automatically approved"
+    wait_duration: "15 seconds"
+    ahead_duration: "10 seconds"
+    silencer_policy: "all_true"
+
+  wants:
+    # The reminder that requires a reaction
+    - metadata:
+        name: auto_reminder
+        type: reminder
+        labels:
+          role: reminder
+      spec:
+        params:
+          message: reminder_message
+          duration_from_now: wait_duration
+          ahead: ahead_duration
+          require_reaction: true
+
+    # The silencer that listens to the reminder and approves it
+    - metadata:
+        name: auto_silencer
+        type: silencer
+      spec:
+        params:
+          policy: silencer_policy
+        using:
+          - role: reminder
+
+  result:
+    - want_name: "auto_reminder"
+      state_field: "reminder_phase"
+      description: "Final phase of the reminder (should be completed)"
+    - want_name: "auto_silencer"
+      state_field: "processed_count"
+      description: "Number of reactions handled by the silencer"

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	mywant "mywant/engine/src"
 )
@@ -63,13 +62,13 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 		if existingQueueID == "" {
 			queueID, err := createReactionQueue(httpClient)
 			if err != nil {
-				log.Printf("[ERROR] Failed to create reaction queue for want %s: %v", want.Metadata.ID, err)
+				want.StoreLog("[ERROR] Failed to create reaction queue for want %s: %v", want.Metadata.ID, err)
 				return err
 			}
 
 			// Store queue ID in want state
 			want.StoreState("reaction_queue_id", queueID)
-			log.Printf("[INFO] Created reaction queue %s for reminder want %s", queueID, want.Metadata.ID)
+			want.StoreLog("[INFO] Created reaction queue %s for reminder want %s", queueID, want.Metadata.ID)
 		}
 
 	case ReminderPhaseCompleted, ReminderPhaseFailed:
@@ -78,9 +77,9 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 			err := deleteReactionQueue(httpClient, existingQueueID)
 			if err != nil {
 				// Log error but don't fail - queue cleanup is not critical
-				log.Printf("[WARN] Failed to delete reaction queue %s for want %s: %v", existingQueueID, want.Metadata.ID, err)
+				want.StoreLog("[WARN] Failed to delete reaction queue %s for want %s: %v", existingQueueID, want.Metadata.ID, err)
 			} else {
-				log.Printf("[INFO] Deleted reaction queue %s for reminder want %s", existingQueueID, want.Metadata.ID)
+				want.StoreLog("[INFO] Deleted reaction queue %s for reminder want %s", existingQueueID, want.Metadata.ID)
 				// Clear queue ID from state
 				want.StoreState("reaction_queue_id", "")
 			}

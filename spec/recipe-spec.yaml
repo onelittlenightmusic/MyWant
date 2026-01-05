@@ -71,6 +71,14 @@ components:
           type: string
           description: Recipe type (travel, qnet, fibonacci, etc.)
           example: "travel"
+        custom_type:
+          type: string
+          description: Custom type identifier for the recipe
+          example: "wait time in queue system"
+        category:
+          type: string
+          description: Recipe category
+          example: "system"
       additionalProperties: false
     
     # Recipe want definition (flattened structure)
@@ -140,12 +148,15 @@ components:
       description: Specification for computing results from a specific want and stat
       required:
         - want_name
-        - stat_name
       properties:
         want_name:
           type: string
           description: Name of the want to collect results from
           example: "sink"
+        state_field:
+          type: string
+          description: Name of the state field to use for result computation
+          example: "reminder_phase"
         stat_name:
           type: string
           description: JSON path expression for extracting stat values. Use '.' for all stats, or '.field_name' for specific fields (e.g., '.' for all stats, '.average_wait_time' for specific field)

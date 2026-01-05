@@ -1110,7 +1110,7 @@ func (n *Want) addAggregatedLogHistory() {
 	lines := strings.Split(logsText, "\n")
 	for _, line := range lines {
 		if line != "" { // Skip empty lines
-			n.StoreLog("[%s] %s", n.Metadata.Name, line)
+			InfoLog("[%s] %s", n.Metadata.Name, line)
 		}
 	}
 }

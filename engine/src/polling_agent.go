@@ -40,6 +40,7 @@ func (p *PollingAgent) ID() string {
 
 // Start begins the monitoring goroutine.
 func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
+	InfoLog("[PollingAgent:%s] Starting for want %s\n", p.id, w.Metadata.Name)
 	p.want = w
 	p.ctx, p.cancel = context.WithCancel(ctx)
 	p.ticker = time.NewTicker(p.interval)
@@ -49,6 +50,7 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 		defer p.ticker.Stop()
 		defer close(p.done)
 
+		InfoLog("[PollingAgent:%s] Goroutine started for want %s\n", p.id, w.Metadata.Name)
 		p.want.StoreLog("[%s] Starting continuous monitoring for want %s\n", p.name, w.Metadata.Name)
 
 		for {

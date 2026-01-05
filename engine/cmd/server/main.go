@@ -214,6 +214,15 @@ func NewServer(config ServerConfig) *Server {
 		log.Printf("[SERVER] Warning: Failed to register user reaction monitor agent: %v\n", err)
 	}
 
+	// Register user reaction do agent
+	if err := types.RegisterUserReactionDoAgent(agentRegistry); err != nil {
+		log.Printf("[SERVER] Warning: Failed to register user reaction do agent: %v\n", err)
+	}
+
+	// Initialize internal HTTP client for agents
+	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
+	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))
+
 	return &Server{
 		config:               config,
 		wants:                make(map[string]*WantExecution),
@@ -2085,6 +2094,7 @@ func (s *Server) Start() error {
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	types.RegisterExecutionResultWantType(s.globalBuilder)
 	types.RegisterReminderWantType(s.globalBuilder)
+	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)

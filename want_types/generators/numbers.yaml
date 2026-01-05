@@ -4,7 +4,7 @@ wantType:
     title: Number Generator
     description: Generates a sequence of integers from start to count
     version: '1.0'
-    category: math
+    category: mathematics
     pattern: generator
   parameters:
   - name: start

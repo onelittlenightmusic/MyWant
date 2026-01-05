@@ -1,0 +1,34 @@
+wantType:
+  metadata:
+    name: silencer
+    title: Reaction Silencer
+    description: Automatically processes received reaction requests based on policy
+    version: '1.0'
+    category: system
+    pattern: processor
+  parameters:
+  - name: policy
+    description: Processing policy (e.g., 'all_true')
+    type: string
+    default: all_true
+    required: true
+    example: all_true
+  state:
+  - name: processed_count
+    description: Number of reactions processed
+    type: int
+    persistent: true
+    initialValue: 0
+  - name: last_processed_id
+    description: ID of the last processed reaction
+    type: string
+    persistent: true
+    initialValue: ""
+  require:
+    type: providers
+    providers:
+    - name: reaction_requests
+      type: want
+      description: Stream of reaction requests {reaction_id, reaction_type}
+      required: true
+      multiple: true
