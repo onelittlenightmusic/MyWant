@@ -248,7 +248,7 @@ func (q *Queue) Progress() {
 		q.State = make(map[string]any)
 	}
 
-	_, i, ok := q.Use(100) // Use 100ms timeout instead of forever
+	_, i, _, ok := q.Use(100) // Use 100ms timeout instead of forever
 	if !ok {
 		// No packet received (timeout) - skip this cycle
 		return
@@ -420,7 +420,7 @@ func (c *Combiner) Progress() {
 	}
 
 	// Receive from any input channel (wait for data from any source)
-	_, i, ok := c.UseForever()
+	_, i, _, ok := c.UseForever()
 	if !ok {
 		return
 	}
@@ -497,7 +497,7 @@ func (s *Sink) Progress() {
 	}
 
 	for {
-		_, i, ok := s.Use(100)
+		_, i, _, ok := s.Use(100)
 		if !ok {
 			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
 			// The timeout in Use helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.

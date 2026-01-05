@@ -182,7 +182,7 @@ func (c *CoordinatorWant) Progress() {
 
 	timeout := 2000
 	// time.Sleep(1000*time.Millisecond) Try to receive one data packet from any input channel
-	channelIndex, data, received := c.Use(timeout)
+	channelIndex, data, _, received := c.Use(timeout)
 	if received {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true

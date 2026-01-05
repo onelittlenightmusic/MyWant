@@ -265,9 +265,30 @@ func (r *ReminderWant) IsAchieved() bool {
 	return phase == ReminderPhaseCompleted
 }
 
+// CalculateAchievingPercentage returns the progress percentage
+func (r *ReminderWant) CalculateAchievingPercentage() int {
+	if r.IsAchieved() || r.Status == WantStatusAchieved || r.Status == WantStatusFailed {
+		return 100
+	}
+	phase, _ := r.GetState("reminder_phase")
+	switch phase {
+	case ReminderPhaseWaiting:
+		return 10
+	case ReminderPhaseReaching:
+		return 50
+	case ReminderPhaseCompleted, ReminderPhaseFailed:
+		return 100
+	default:
+		return 0
+	}
+}
+
 // Progress implements Progressable for ReminderWant
 func (r *ReminderWant) Progress() {
 	locals := r.getOrInitializeLocals()
+
+	// Update achieving percentage based on current phase
+	r.StoreState("achieving_percentage", r.CalculateAchievingPercentage())
 
 	switch locals.Phase {
 	case ReminderPhaseWaiting:
@@ -277,34 +298,19 @@ func (r *ReminderWant) Progress() {
 		r.handlePhaseReaching(locals)
 
 	case ReminderPhaseCompleted:
-		// Already completed, ensure completion packet is sent
-		r.emitCompletionPacket()
+		// Already completed, nothing to do
 		break
 
 	case ReminderPhaseFailed:
 		// Already failed, nothing to do
 		break
-// ... (rest of code)
 
-// emitCompletionPacket sends a completion signal to connected users
-func (r *ReminderWant) emitCompletionPacket() {
-	// Check if already emitted
-	emitted, _ := r.GetStateBool("_completion_packet_emitted", false)
-	if emitted {
-		return
-	}
-
-	packet := map[string]any{
-		"reaction_type": "completion",
-		"source_want":   r.Metadata.Name,
-		"timestamp":     time.Now().Format(time.RFC3339),
-	}
-
-	if err := r.Provide(packet); err != nil {
-		r.StoreLog("ERROR: Failed to emit completion packet: %v", err)
-	} else {
-		r.StoreLog("[REMINDER] Emitted completion packet")
-		r.StoreState("_completion_packet_emitted", true)
+	default:
+		r.StoreLog(fmt.Sprintf("ERROR: Unknown phase: %s", locals.Phase))
+		r.StoreState("reminder_phase", ReminderPhaseFailed)
+		locals.Phase = ReminderPhaseFailed
+		r.Status = "failed"
+		r.updateLocals(locals)
 	}
 }
 
@@ -407,11 +413,14 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// No reaction required, check if event time has passed
 		if !locals.EventTime.IsZero() && time.Now().After(locals.EventTime) {
 			r.StoreLog(fmt.Sprintf("Event time passed, completing reminder"))
-			r.StoreState("reminder_phase", ReminderPhaseCompleted)
-			r.StoreState("auto_completed", true)
+			r.StoreStateMulti(map[string]any{
+				"reminder_phase":           ReminderPhaseCompleted,
+				"auto_completed":           true,
+				"_reaction_packet_emitted": false,
+				"achieving_percentage":     100,
+			})
 			locals.Phase = ReminderPhaseCompleted
-			r.Status = "achieved"
-			r.updateLocals(locals)
+			r.ProvideDone()
 			return
 		}
 
@@ -419,11 +428,14 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// complete after 10 seconds of reaching
 		if now := time.Now(); now.After(locals.LastCheckTime.Add(10 * time.Second)) {
 			r.StoreLog("Completing reminder (no reaction required)")
-			r.StoreState("reminder_phase", ReminderPhaseCompleted)
-			r.StoreState("auto_completed", true)
+			r.StoreStateMulti(map[string]any{
+				"reminder_phase":           ReminderPhaseCompleted,
+				"auto_completed":           true,
+				"_reaction_packet_emitted": false,
+				"achieving_percentage":     100,
+			})
 			locals.Phase = ReminderPhaseCompleted
-			r.Status = "achieved"
-			r.updateLocals(locals)
+			r.ProvideDone()
 		}
 	}
 }
@@ -439,18 +451,19 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 					"reminder_phase":           ReminderPhaseCompleted,
 					"reaction_result":          "approved",
 					"_reaction_packet_emitted": false,
+					"achieving_percentage":     100,
 				})
 				locals.Phase = ReminderPhaseCompleted
-				r.Status = "achieved"
+				r.ProvideDone()
 			} else {
 				r.StoreLog("Reminder rejected by user")
 				r.StoreStateMulti(map[string]any{
 					"reminder_phase":           ReminderPhaseFailed,
 					"reaction_result":          "rejected",
 					"_reaction_packet_emitted": false,
+					"achieving_percentage":     100,
 				})
 				locals.Phase = ReminderPhaseFailed
-				r.Status = "failed"
 			}
 			r.updateLocals(locals)
 		}
@@ -465,18 +478,19 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 			"reminder_phase":            ReminderPhaseFailed,
 			"timeout":                   true,
 			"_reaction_packet_emitted": false,
+			"achieving_percentage":      100,
 		})
 		locals.Phase = ReminderPhaseFailed
-		r.Status = "failed"
 	} else {
 		r.StoreLog("Reaction timeout - auto-completing (require_reaction=false)")
 		r.StoreStateMulti(map[string]any{
 			"reminder_phase":            ReminderPhaseCompleted,
 			"auto_completed":            true,
 			"_reaction_packet_emitted": false,
+			"achieving_percentage":      100,
 		})
 		locals.Phase = ReminderPhaseCompleted
-		r.Status = "achieved"
+		r.ProvideDone()
 	}
 	r.updateLocals(locals)
 }

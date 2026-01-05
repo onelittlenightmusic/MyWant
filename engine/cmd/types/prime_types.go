@@ -155,7 +155,7 @@ func (f *PrimeSequence) Progress() {
 	}
 
 	// Try to receive one packet with timeout
-	_, i, ok := f.Use(5000) // 5000ms timeout per packet
+	_, i, _, ok := f.Use(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
 		return

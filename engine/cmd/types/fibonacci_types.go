@@ -2,6 +2,8 @@ package types
 
 import (
 	"fmt"
+	"log"
+	"time"
 
 	. "mywant/engine/src"
 )
@@ -55,9 +57,14 @@ func (g *FibonacciNumbers) Progress() {
 
 	if sentCount >= count {
 		// Send end signal
-		g.Provide(-1)
-		g.StoreState("final_result", fmt.Sprintf("Generated %d fibonacci numbers", count))
-		g.StoreState("achieving_percentage", 100)
+		g.ProvideDone()
+		time.Sleep(50 * time.Millisecond) // Give time for Done signal to propagate
+		g.StoreStateMulti(Dict{
+			"final_result":         fmt.Sprintf("Generated %d fibonacci numbers", count),
+			"achieving_percentage": 100,
+			"achieved":             true,
+			"completed":            true, // Explicitly set completed to true
+		})
 	}
 
 }
@@ -122,27 +129,28 @@ func (f *FibonacciFilter) Progress() {
 	}
 
 	// Try to receive one packet with timeout
-	_, i, ok := f.Use(5000) // 5000ms timeout per packet
+	_, i, done, ok := f.Use(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
 		return
 	}
 
-	if val, ok := i.(int); ok {
-		// Check for end signal
-		if val == -1 {
-			// End signal received - finalize and complete
-			f.StoreStateMulti(Dict{
-				"filtered":             locals.filtered,
-				"count":                len(locals.filtered),
-				"total_processed":      totalProcessed,
-				"achieved":             true,
-				"achieving_percentage": 100,
-				"final_result":         fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
-			})
-			return
-		}
+	// Check for end signal
+	if done {
+		log.Printf("[FIBONACCI-FILTER:%s] Received DONE signal. Finalizing...", f.Metadata.Name)
+		// End signal received - finalize and complete
+		f.StoreStateMulti(Dict{
+			"filtered":             locals.filtered,
+			"count":                len(locals.filtered),
+			"total_processed":      totalProcessed,
+			"achieved":             true,
+			"achieving_percentage": 100,
+			"final_result":         fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
+		})
+		return
+	}
 
+	if val, ok := i.(int); ok {
 		totalProcessed++
 		// Filter based on min/max values from parameters
 		minValue := f.GetIntParam("min_value", 0)

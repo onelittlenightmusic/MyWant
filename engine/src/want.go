@@ -252,6 +252,12 @@ type Want struct {
 	cacheMutex   sync.Mutex    `json:"-" yaml:"-"`
 }
 
+// TransportPacket wraps data sent over channels to include termination signals
+type TransportPacket struct {
+	Payload any
+	Done    bool
+}
+
 // CachedPacket holds a packet and its original channel index for the caching mechanism.
 type CachedPacket struct {
 	Packet        any
@@ -1264,10 +1270,17 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
+// Provide sends a data packet to all connected output channels
 func (n *Want) Provide(packet any) error {
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
+	}
+
+	// Wrap in TransportPacket
+	tp := TransportPacket{
+		Payload: packet,
+		Done:    false,
 	}
 
 	sentCount := 0
@@ -1276,12 +1289,12 @@ func (n *Want) Provide(packet any) error {
 			continue // Skip nil channels
 		}
 		select {
-		case pathInfo.Channel <- packet:
+		case pathInfo.Channel <- tp:
 			// Sent successfully
 			sentCount++
 		default:
 			// Channel is full, try blocking send
-			pathInfo.Channel <- packet
+			pathInfo.Channel <- tp
 			sentCount++
 		}
 	}
@@ -1292,6 +1305,48 @@ func (n *Want) Provide(packet any) error {
 	n.StoreState("provide_packet_sent_timestamp", getCurrentTimestamp())
 
 	// Trigger retrigger for each receiver that got the packet
+	cb := GetGlobalChainBuilder()
+	if cb != nil {
+		for _, pathInfo := range paths.Out {
+			if pathInfo.Channel == nil {
+				continue
+			}
+			targetWantName := pathInfo.TargetWantName
+			cb.RetriggerReceiverWant(targetWantName)
+		}
+	}
+
+	return nil
+}
+
+// ProvideDone sends a termination signal to all connected output channels
+func (n *Want) ProvideDone() error {
+	paths := n.GetPaths()
+	if paths == nil || len(paths.Out) == 0 {
+		return nil // No outputs to send to
+	}
+
+	// Wrap in TransportPacket with Done=true
+	tp := TransportPacket{
+		Payload: nil,
+		Done:    true,
+	}
+
+	sentCount := 0
+	for _, pathInfo := range paths.Out {
+		if pathInfo.Channel == nil {
+			continue // Skip nil channels
+		}
+		select {
+		case pathInfo.Channel <- tp:
+			sentCount++
+		default:
+			pathInfo.Channel <- tp
+			sentCount++
+		}
+	}
+
+	// Trigger retrigger for receivers
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		for _, pathInfo := range paths.Out {
@@ -1564,108 +1619,105 @@ func (n *Want) emitOwnerCompletionEventIfOwned() {
 //   - timeoutMilliseconds == 0: non-blocking (returns immediately if no data available)
 //   - timeoutMilliseconds > 0: wait up to specified milliseconds
 //
-// Returns: (channelIndex, data, ok)
+// Returns: (channelIndex, data, done, ok)
 //   - channelIndex: Index of the channel that provided data (-1 if no data available)
 //   - data: The data received (nil if ok is false)
+//   - done: True if the sender signalled completion
 //   - ok: True if data was successfully received, false if timeout or no channels
 //
 // Usage:
 //
-//	index, data, ok := w.Use(1000)  // Wait up to 1 second
+//	index, data, done, ok := w.Use(1000)
 //	if ok {
-//	    fmt.Printf("Received data from channel %d: %v\n", index, data)
+//	    if done { ... }
+//	    fmt.Printf("Received data: %v\n", data)
 //	}
-func (n *Want) Use(timeoutMilliseconds int) (int, any, bool) {
+func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
+	var rawPacket any
+	var originalIndex int
+	var received bool
+
 	// 1. Check internal cache first (filled by UnusedExists)
 	n.cacheMutex.Lock()
 	if n.cachedPacket != nil {
 		cached := n.cachedPacket
 		n.cachedPacket = nil // Consume from cache
-		n.cacheMutex.Unlock()
-		// Return the original index and packet from the cache
-		return cached.OriginalIndex, cached.Packet, true
+		rawPacket = cached.Packet
+		originalIndex = cached.OriginalIndex
+		received = true
 	}
 	n.cacheMutex.Unlock()
 
-	// Proceed with existing channel receive logic if cache is empty
-	if len(n.paths.In) == 0 {
-		return -1, nil, false
-	}
+	if !received {
+		// Proceed with existing channel receive logic if cache is empty
+		if len(n.paths.In) == 0 {
+			return -1, nil, false, false
+		}
 
-	inCount := len(n.paths.In)
-	cases := make([]reflect.SelectCase, 0, inCount+1)
-	channelIndexMap := make([]int, 0, inCount+1) // Maps case index -> original channel index
+		inCount := len(n.paths.In)
+		cases := make([]reflect.SelectCase, 0, inCount+1)
+		channelIndexMap := make([]int, 0, inCount+1) // Maps case index -> original channel index
 
-	for i := 0; i < inCount; i++ {
-		pathInfo := n.paths.In[i]
-		if pathInfo.Channel != nil {
+		for i := 0; i < inCount; i++ {
+			pathInfo := n.paths.In[i]
+			if pathInfo.Channel != nil {
+				cases = append(cases, reflect.SelectCase{
+					Dir:  reflect.SelectRecv,
+					Chan: reflect.ValueOf(pathInfo.Channel),
+				})
+				channelIndexMap = append(channelIndexMap, i) // Track which channel index this case corresponds to
+			}
+		}
+
+		// If no valid channels found, return immediately
+		if len(cases) == 0 {
+			return -1, nil, false, false
+		}
+
+		// Handle timeout:
+		if timeoutMilliseconds >= 0 {
+			timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
 			cases = append(cases, reflect.SelectCase{
-				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(pathInfo.Channel),
+				Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
 			})
-			channelIndexMap = append(channelIndexMap, i) // Track which channel index this case corresponds to
+			channelIndexMap = append(channelIndexMap, -1) // -1 for timeout case
+		}
+
+		chosen, recv, recvOK := reflect.Select(cases)
+
+		// If timeout case was chosen (last index in cases), no data available
+		if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
+			return -1, nil, false, false
+		}
+
+		// If we got here, data was received or a channel was closed.
+		if recvOK {
+			originalIndex = channelIndexMap[chosen]
+			rawPacket = recv.Interface()
+			received = true
+
+			// Store packet receive info for debugging
+			n.StoreState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
+			n.StoreState("last_packet_received_timestamp", getCurrentTimestamp())
+		} else {
+			// Channel was closed
+			return -1, nil, false, false
 		}
 	}
 
-	// If no valid channels found, return immediately
-	if len(cases) == 0 {
-		return -1, nil, false
+	// Unwrap TransportPacket if present
+	if tp, ok := rawPacket.(TransportPacket); ok {
+		return originalIndex, tp.Payload, tp.Done, true
 	}
 
-	// Handle timeout:
-	// - Negative timeout: infinite wait (no timeout case added)
-	// - Zero timeout: non-blocking (add immediate timeout)
-	// - Positive timeout: wait up to specified milliseconds
-	if timeoutMilliseconds >= 0 {
-		timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
-		cases = append(cases, reflect.SelectCase{
-			Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
-		})
-		channelIndexMap = append(channelIndexMap, -1) // -1 for timeout case
-	}
-
-	chosen, recv, recvOK := reflect.Select(cases)
-
-	// If timeout case was chosen (last index in cases), no data available
-	if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
-		return -1, nil, false
-	}
-
-	// If we got here, data was received or a channel was closed.
-	if recvOK {
-		originalIndex := channelIndexMap[chosen]
-
-		// Store packet receive info for debugging
-		n.StoreState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
-		n.StoreState("last_packet_received_timestamp", getCurrentTimestamp())
-
-		return originalIndex, recv.Interface(), true
-	}
-
-	// Channel was closed (recvOK is false)
-	// The original code returned channelIndexMap[chosen], nil, false
-	// Let's refine this to return -1 when channel is closed, to avoid confusion with valid channel index
-	return -1, nil, false // Indicates channel closed or error
+	// Legacy behavior or unwrapped packet (shouldn't happen with new Provide)
+	return originalIndex, rawPacket, false, true
 }
 
 // UseForever attempts to receive data from any available input channel,
 // blocking indefinitely until data arrives or all channels are closed.
 // This is a convenience wrapper around Use(-1) for infinite wait.
-//
-// Returns: (channelIndex, data, ok)
-//   - channelIndex: Index of the channel that provided data (-1 if channels closed)
-//   - data: The data received (nil if ok is false)
-//   - ok: True if data was successfully received, false if all channels are closed
-//
-// Usage:
-//
-//	index, data, ok := w.UseForever()
-//	if ok {
-//	    fmt.Printf("Received data from channel %d: %v\n", index, data)
-//	} else {
-//	    // All input channels are closed
-//	}
-func (n *Want) UseForever() (int, any, bool) {
+func (n *Want) UseForever() (int, any, bool, bool) {
 	return n.Use(-1)
 }
 

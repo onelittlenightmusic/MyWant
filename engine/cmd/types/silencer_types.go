@@ -41,22 +41,44 @@ func (s *SilencerWant) Initialize() {
 }
 
 // IsAchieved - Silencers are processors, they stay active to process stream
+// until they receive a completion signal
 func (s *SilencerWant) IsAchieved() bool {
-	return false
+	phase, _ := s.GetState("silencer_phase")
+	return phase == "completed"
+}
+
+// CalculateAchievingPercentage returns the progress percentage
+func (s *SilencerWant) CalculateAchievingPercentage() int {
+	if s.IsAchieved() || s.Status == WantStatusAchieved || s.Status == WantStatusFailed {
+		return 100
+	}
+	return 50 // In-progress processors stay at 50%
 }
 
 // Progress implements Progressable for SilencerWant
 func (s *SilencerWant) Progress() {
+	// Update achieving percentage
+	s.StoreState("achieving_percentage", s.CalculateAchievingPercentage())
+
+	s.StoreLog("[SILENCER] Checking for packets...")
 	// Try to get a packet from input channels
 	// Non-blocking check for packets
-	index, data, ok := s.Use(0)
+	index, data, done, ok := s.Use(0)
 	if !ok {
-		// Log occasionally or based on some condition if needed
+		return
+	}
+
+	if done {
+		s.StoreLog("[SILENCER] Received DONE signal. Finalizing...")
+		s.StoreStateMulti(map[string]any{
+			"silencer_phase":       "completed",
+			"achieving_percentage": 100,
+		})
 		return
 	}
 
 	s.StoreLog("[SILENCER] Received packet from channel %d: %v", index, data)
-	s.StoreLog("[SILENCER] Received packet for want %s from channel %d", s.Metadata.Name, index)
+	InfoLog("[SILENCER:%s] Received packet from channel %d: %v", s.Metadata.Name, index, data)
 
 	// Process the received packet
 	s.processPacket(data)
@@ -64,10 +86,12 @@ func (s *SilencerWant) Progress() {
 
 // processPacket handles the reaction request data
 func (s *SilencerWant) processPacket(data any) {
+	s.StoreLog("[SILENCER] Received packet data type: %T", data)
 	packet, ok := data.(map[string]any)
 	if !ok {
 		// Try to decode if it's a JSON string
 		if str, ok := data.(string); ok {
+			s.StoreLog("[SILENCER] Decoding JSON string packet")
 			if err := json.Unmarshal([]byte(str), &packet); err != nil {
 				s.StoreLog("[SILENCER] ERROR: Failed to parse packet string: %v", err)
 				return
@@ -78,15 +102,15 @@ func (s *SilencerWant) processPacket(data any) {
 		}
 	}
 
+	reactionType := "internal"
+	if rt, ok := packet["reaction_type"].(string); ok {
+		reactionType = rt
+	}
+
 	reactionID, ok := packet["reaction_id"].(string)
 	if !ok || reactionID == "" {
 		s.StoreLog("[SILENCER] ERROR: Missing or invalid reaction_id in packet")
 		return
-	}
-
-	reactionType := "internal"
-	if rt, ok := packet["reaction_type"].(string); ok {
-		reactionType = rt
 	}
 
 	s.StoreLog("[SILENCER] Processing reaction %s (type: %s)", reactionID, reactionType)
