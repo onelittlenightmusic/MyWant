@@ -24,6 +24,12 @@ wantType:
     type: string
     persistent: true
     initialValue: ""
+  - name: achieving_percentage
+    description: Progress percentage of the silencer
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 100
   require:
     type: providers
     providers:

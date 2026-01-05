@@ -170,6 +170,13 @@ wantType:
     initialValue: ''
     example: 'Invalid event_time format'
 
+  - name: achieving_percentage
+    description: Progress percentage of the reminder
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 50
+
   constraints:
   - description: Message parameter is required
     validation: message must not be empty

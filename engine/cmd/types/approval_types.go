@@ -107,6 +107,7 @@ func (e *EvidenceWant) Progress() {
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
+	e.ProvideDone()
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -202,6 +203,7 @@ func (d *DescriptionWant) Progress() {
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)
+	d.ProvideDone()
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
