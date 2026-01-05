@@ -16,7 +16,7 @@ import { ParametersSection } from './sections/ParametersSection';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
 import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
 import { addLabelToRegistry } from '@/utils/labelUtils';
-import { truncateText } from '@/utils/helpers';
+import { truncateText, classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -429,14 +429,14 @@ export const WantForm: React.FC<WantFormProps> = ({
       headerActions={headerAction}
       backgroundStyle={backgroundStyle}
     >
-      <form id="want-form" onSubmit={handleSubmit} className="space-y-3 focusable-container">
+      <form id="want-form" onSubmit={handleSubmit} className="space-y-3 focusable-container h-full flex flex-col">
 
         {editMode === 'form' ? (
           <>
             {/* Type/Recipe Selector */}
-            <div>
+            <div className={classNames(!selectedTypeId ? "flex-1 min-h-0 flex flex-col" : "flex-shrink-0")}>
               {!selectedTypeId && (
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex-shrink-0">
                   Select Want Type or Recipe *
                 </label>
               )}

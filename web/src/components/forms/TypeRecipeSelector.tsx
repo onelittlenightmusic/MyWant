@@ -277,10 +277,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
   // Expanded view - show all options
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Search Input with Icon */}
       {showSearch && (
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
             ref={searchInputRef}
@@ -326,7 +326,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
       {/* Category Filter - Toggle Buttons */}
       {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
           <button
             type="button"
             onClick={() => setSelectedCategory(null)}
@@ -356,7 +356,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+      <div className="space-y-2 flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white min-h-0">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
