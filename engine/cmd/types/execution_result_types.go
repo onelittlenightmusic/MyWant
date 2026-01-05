@@ -268,6 +268,7 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	// Store all results in batch
 	e.StoreStateMulti(stateUpdates)
 	e.updateLocals(locals)
+	e.ProvideDone()
 }
 
 // handlePhaseCompleted handles the completed phase

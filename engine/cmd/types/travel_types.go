@@ -108,6 +108,7 @@ func (b *BaseTravelWant) Progress() {
 	schedule := b.executor.generateSchedule(locals)
 	if schedule != nil && connectionAvailable {
 		b.Provide(schedule)
+		b.ProvideDone()
 	} else if schedule == nil {
 		b.StoreLog("ERROR: Failed to generate schedule")
 	} else if !connectionAvailable {
@@ -280,6 +281,7 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 	}
 
 	r.Want.StoreStateMulti(stateUpdates)
+	r.ProvideDone()
 }
 
 // generateRealisticRestaurantNameForTravel generates realistic restaurant names for travel summaries
@@ -597,6 +599,7 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 	}
 
 	b.Want.StoreStateMulti(stateUpdates)
+	b.ProvideDone()
 }
 
 // ============================================================================
@@ -1041,7 +1044,11 @@ func (f *FlightWant) Progress() {
 
 		// Booking failed - complete
 		f.StoreLog("Initial booking failed")
-		f.StoreState("_flight_phase", PhaseCompleted)
+		f.StoreStateMulti(Dict{
+			"_flight_phase":        PhaseCompleted,
+			"achieving_percentage": 100,
+		})
+		f.ProvideDone()
 		return
 
 	// === Phase 3: Monitoring ===
@@ -1070,7 +1077,11 @@ func (f *FlightWant) Progress() {
 		} else {
 			// Monitoring period expired - flight stable, complete
 			f.StoreLog("Monitoring completed successfully")
-			f.StoreState("_flight_phase", PhaseCompleted)
+			f.StoreStateMulti(Dict{
+				"_flight_phase":        PhaseCompleted,
+				"achieving_percentage": 100,
+			})
+			f.ProvideDone()
 			return
 		}
 
@@ -1363,6 +1374,7 @@ func (h *HotelWant) SetSchedule(schedule any) {
 	}
 
 	h.Want.StoreStateMulti(stateUpdates)
+	h.ProvideDone()
 
 	// No need to send output here anymore - handled directly in Exec method
 }

@@ -168,6 +168,7 @@ func (g *GmailWant) Progress() {
 
 	// Provide result to output channels
 	g.Provide(resultMap)
+	g.ProvideDone()
 
 	g.StoreLog("[GMAIL] Gmail search completed for want: %s\n", g.Metadata.Name)
 }
