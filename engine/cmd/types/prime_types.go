@@ -71,7 +71,7 @@ func (g *PrimeNumbers) Progress() {
 
 	if currentNumber >= end {
 		// Send end signal
-		g.Provide(-1)
+		g.ProvideDone()
 		g.StoreState("final_result", fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end))
 		g.StoreState("achieving_percentage", 100)
 	}
@@ -155,27 +155,27 @@ func (f *PrimeSequence) Progress() {
 	}
 
 	// Try to receive one packet with timeout
-	_, i, _, ok := f.Use(5000) // 5000ms timeout per packet
+	_, i, done, ok := f.Use(5000) // 5000ms timeout per packet
 	if !ok {
 		// No packet available, yield control
 		return
 	}
 
-	if val, ok := i.(int); ok {
-		// Check for end signal
-		if val == -1 {
-			// End signal received - finalize and complete
-			f.StoreStateMulti(Dict{
-				"foundPrimes":          locals.foundPrimes,
-				"primeCount":           len(locals.foundPrimes),
-				"total_processed":      totalProcessed,
-				"achieved":             true,
-				"achieving_percentage": 100,
-				"final_result":         fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
-			})
-			return
-		}
+	// Check for end signal
+	if done {
+		// End signal received - finalize and complete
+		f.StoreStateMulti(Dict{
+			"foundPrimes":          locals.foundPrimes,
+			"primeCount":           len(locals.foundPrimes),
+			"total_processed":      totalProcessed,
+			"achieved":             true,
+			"achieving_percentage": 100,
+			"final_result":         fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
+		})
+		return
+	}
 
+	if val, ok := i.(int); ok {
 		totalProcessed++
 		isPrime := true
 

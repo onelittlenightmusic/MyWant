@@ -127,10 +127,8 @@ func (g *Numbers) Progress() {
 
 	// Check if we're already done before generating more packets
 	if locals.currentCount >= paramCount {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending final end packet", locals.currentCount, paramCount))
-		endPacket := QueuePacket{Num: -1, Time: 0}
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
-		g.Provide(endPacket)
+		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending DONE signal", locals.currentCount, paramCount))
+		g.ProvideDone()
 		return
 	}
 
@@ -175,9 +173,7 @@ func (g *Numbers) Progress() {
 			"final_result":         fmt.Sprintf("Generated %d packets", paramCount),
 		})
 
-		endPacket := QueuePacket{Num: -1, Time: 0}
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Sending end packet: Num=%d, IsEnded=%v", endPacket.Num, endPacket.IsEnded()))
-		g.Provide(endPacket)
+		g.ProvideDone()
 	}
 }
 
@@ -248,28 +244,29 @@ func (q *Queue) Progress() {
 		q.State = make(map[string]any)
 	}
 
-	_, i, _, ok := q.Use(100) // Use 100ms timeout instead of forever
+	_, i, done, ok := q.Use(100) // Use 100ms timeout instead of forever
 	if !ok {
 		// No packet received (timeout) - skip this cycle
 		return
 	}
 
-	packet := i.(QueuePacket)
-	// Packet received - process it
-	if packet.IsEnded() {
+	// Check for end signal
+	if done {
 		// Always flush batch and store final state when terminating
 		q.flushBatch(locals)
 
 		// Trigger OnEnded callback
-		if err := q.OnEnded(&packet, locals); err != nil {
+		if err := q.OnEnded(nil, locals); err != nil {
 			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
-		q.Provide(packet)
+		q.ProvideDone()
 		q.StoreLog("[QUEUE-EXEC] Setting completed=true")
 		q.StoreState("completed", true)
 		return
 	}
+
+	packet := i.(QueuePacket)
 	arrivalTime := packet.Time
 	startServiceTime := math.Max(arrivalTime, locals.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
@@ -420,23 +417,23 @@ func (c *Combiner) Progress() {
 	}
 
 	// Receive from any input channel (wait for data from any source)
-	_, i, _, ok := c.UseForever()
+	_, i, done, ok := c.UseForever()
 	if !ok {
 		return
 	}
 
-	packet := i.(QueuePacket)
-	if packet.IsEnded() {
+	if done {
 		// Trigger OnEnded callback
-		if err := c.OnEnded(&packet, locals); err != nil {
+		if err := c.OnEnded(nil, locals); err != nil {
 			c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 		}
 		// Forward end signal to next want
-		c.Provide(packet)
+		c.ProvideDone()
 		c.StoreState("completed", true)
 		return
 	}
 
+	packet := i.(QueuePacket)
 	processed++
 	c.Provide(packet)
 
@@ -497,7 +494,7 @@ func (s *Sink) Progress() {
 	}
 
 	for {
-		_, i, _, ok := s.Use(100)
+		_, i, done, ok := s.Use(100)
 		if !ok {
 			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
 			// The timeout in Use helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
@@ -508,16 +505,17 @@ func (s *Sink) Progress() {
 			return
 		}
 
-		packet := i.(QueuePacket)
-		if packet.IsEnded() {
+		if done {
 			s.StoreState("completed", true)
 			// Trigger OnEnded callback
-			if err := s.OnEnded(&packet, locals); err != nil {
+			if err := s.OnEnded(nil, locals); err != nil {
 				s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
 			}
 			return
 		}
 
+		packet := i.(QueuePacket)
+		_ = packet // Currently just counting, but keeping for future use/consistency
 		locals.Received++
 		// Show partial progress while receiving
 		s.StoreState("achieving_percentage", 50)

@@ -170,20 +170,20 @@ func (c *CoordinatorWant) IsAchieved() bool {
 	return false
 }
 
-// Progress executes the coordinator logic using unified completion strategy Strategy: Each input channel must send at least one value. When all connected channels have sent at least one value, the coordinator completes. When a new channel is added, the coordinator automatically re-executes with the new channel.
-// Completion is determined by tracking which channels have sent data in the current execution cycle. This simple approach automatically handles topology changes without needing cache resets.
-// Uses dispatcher to route data to the appropriate handler based on data type.
+// Progress executes the coordinator logic using unified completion strategy
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
-	heardsCount := len(c.channelsHeard)
-	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ChannelsHeard=%d", inCount, heardsCount))
-
-	// Track which channels we've received data from in this execution cycle This is a local map - NOT persisted to state, only used for completion detection
+	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d", inCount))
 
 	timeout := 2000
-	// time.Sleep(1000*time.Millisecond) Try to receive one data packet from any input channel
-	channelIndex, data, _, received := c.Use(timeout)
-	if received {
+	channelIndex, data, done, ok := c.Use(timeout)
+	if !ok {
+		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
+	} else if done {
+		// DONE signal received from a channel
+		c.channelsHeard[channelIndex] = true
+		c.StoreLog(fmt.Sprintf("[Progress] Received DONE signal from channel %d (total heard: %d/%d)", channelIndex, len(c.channelsHeard), inCount))
+	} else {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true
 		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data))
@@ -192,8 +192,6 @@ func (c *CoordinatorWant) Progress() {
 		handler := c.DataHandlerDispatcher.SelectHandler(data)
 		c.StoreLog(fmt.Sprintf("[Progress] Selected handler: %T for data type %T", handler, data))
 		handler.ProcessData(c, channelIndex, data)
-	} else {
-		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 	}
 
 	// Calculate and store achieving_percentage based on actual received data
