@@ -9,6 +9,18 @@ import (
 	"time"
 )
 
+// TransportPacket wraps data sent over channels to include termination signals
+type TransportPacket struct {
+	Payload any
+	Done    bool
+}
+
+// CachedPacket holds a packet and its original channel index for the caching mechanism.
+type CachedPacket struct {
+	Packet        any
+	OriginalIndex int
+}
+
 // System-reserved state field names - automatically initialized and managed by the framework
 // These fields don't need to be explicitly defined in want type YAML specifications
 const (
@@ -250,18 +262,6 @@ type Want struct {
 	// Packet cache for non-consuming checks
 	cachedPacket *CachedPacket `json:"-" yaml:"-"`
 	cacheMutex   sync.Mutex    `json:"-" yaml:"-"`
-}
-
-// TransportPacket wraps data sent over channels to include termination signals
-type TransportPacket struct {
-	Payload any
-	Done    bool
-}
-
-// CachedPacket holds a packet and its original channel index for the caching mechanism.
-type CachedPacket struct {
-	Packet        any
-	OriginalIndex int
 }
 
 func (n *Want) SetStatus(status WantStatus) {

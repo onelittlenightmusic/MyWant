@@ -275,6 +275,7 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	c.CompletionChecker.OnCompletion(c)
 	c.StoreState(completionKey, true)
 	c.StoreState("achieving_percentage", 100)
+	c.ProvideDone()
 	c.StoreLog("[tryCompletion] Marked as complete, resetting channelsHeard for potential retrigger")
 	c.channelsHeard = make(map[int]bool)
 }

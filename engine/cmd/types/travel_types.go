@@ -1260,6 +1260,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 	}
 
 	f.StoreStateMulti(stateUpdates)
+	f.ProvideDone()
 }
 
 // ResetFlightState clears all flight-specific state information

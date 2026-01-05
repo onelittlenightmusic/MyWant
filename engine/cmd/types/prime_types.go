@@ -172,6 +172,7 @@ func (f *PrimeSequence) Progress() {
 			"achieving_percentage": 100,
 			"final_result":         fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
 		})
+		f.ProvideDone()
 		return
 	}
 

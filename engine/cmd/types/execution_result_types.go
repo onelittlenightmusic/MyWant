@@ -337,6 +337,7 @@ func RegisterExecutionResultWantType(builder *ChainBuilder) {
 			Metadata: metadata,
 			Spec:     spec,
 		}
+		want.Init() // Critical: Register for events
 		return NewExecutionResultWant(want)
 	})
 }

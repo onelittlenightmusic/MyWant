@@ -60,7 +60,6 @@ func (s *SilencerWant) Progress() {
 	// Update achieving percentage
 	s.StoreState("achieving_percentage", s.CalculateAchievingPercentage())
 
-	s.StoreLog("[SILENCER] Checking for packets...")
 	// Try to get a packet from input channels
 	// Non-blocking check for packets
 	index, data, done, ok := s.Use(0)
@@ -70,6 +69,7 @@ func (s *SilencerWant) Progress() {
 
 	if done {
 		s.StoreLog("[SILENCER] Received DONE signal. Finalizing...")
+		InfoLog("[SILENCER:%s] Received DONE signal. Finalizing...\n", s.Metadata.Name)
 		s.StoreStateMulti(map[string]any{
 			"silencer_phase":       "completed",
 			"achieving_percentage": 100,
@@ -150,6 +150,7 @@ func RegisterSilencerWantType(builder *ChainBuilder) {
 			Metadata: metadata,
 			Spec:     spec,
 		}
+		want.Init() // Critical: Register for events
 		return NewSilencerWant(want)
 	})
 }
