@@ -586,6 +586,9 @@ func (n *Want) StartProgressionLoop(
 					return
 				case ControlTriggerRestart:
 					n.SetSuspended(false)
+					if n.progressable != nil {
+						n.progressable.Initialize()
+					}
 				}
 			}
 

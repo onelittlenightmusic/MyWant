@@ -57,8 +57,15 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 
 	// Handle phase transitions
 	switch phase {
-	case ReminderPhaseWaiting:
-		// Create queue when entering waiting phase (only if not already created)
+	case ReminderPhaseWaiting, ReminderPhaseReaching:
+		// Create queue when entering waiting or reaching phase
+		// If we already have a queue ID, delete it first to ensure a new DIFFERENT one is created (avoid reuse)
+		if existingQueueID != "" && phase == ReminderPhaseWaiting {
+			want.StoreLog("[INFO] Deleting existing reaction queue %s before creating a new one for fresh start", existingQueueID)
+			_ = deleteReactionQueue(httpClient, existingQueueID)
+			existingQueueID = ""
+		}
+
 		if existingQueueID == "" {
 			queueID, err := createReactionQueue(httpClient)
 			if err != nil {
@@ -68,7 +75,7 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 
 			// Store queue ID in want state
 			want.StoreState("reaction_queue_id", queueID)
-			want.StoreLog("[INFO] Created reaction queue %s for reminder want %s", queueID, want.Metadata.ID)
+			want.StoreLog("[INFO] Created reaction queue %s for reminder want %s (phase: %s)", queueID, want.Metadata.ID, phase)
 		}
 
 	case ReminderPhaseCompleted, ReminderPhaseFailed:

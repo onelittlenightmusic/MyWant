@@ -170,12 +170,14 @@ func (r *ReminderWant) Initialize() {
 
 	// Store initial state
 	stateMap := map[string]any{
-		"reminder_phase":   locals.Phase,
-		"message":          locals.Message,
-		"ahead":            locals.Ahead,
-		"require_reaction": requireReaction,
-		"reaction_type":    reactionType,
-		"timeout":          300,
+		"reminder_phase":           locals.Phase,
+		"message":                  locals.Message,
+		"ahead":                    locals.Ahead,
+		"require_reaction":         requireReaction,
+		"reaction_type":            reactionType,
+		"timeout":                  300,
+		"reaction_queue_id":        "",    // ALWAYS clear on fresh initialization to ensure new queue
+		"_reaction_packet_emitted": false, // Reset emission flag for new cycle
 	}
 
 	// Add duration_from_now if it was provided
@@ -326,11 +328,19 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 	now := time.Now()
 	if now.After(locals.ReachingTime) {
 		r.StoreLog(fmt.Sprintf("Reaching time arrived: %s", locals.ReachingTime.Format(time.RFC3339)))
-		r.StoreState("reminder_phase", ReminderPhaseReaching)
+		
+		// Clear existing queue ID to force creation of a new one for this new cycle
+		r.StoreStateMulti(map[string]any{
+			"reminder_phase":           ReminderPhaseReaching,
+			"reaction_queue_id":        "", 
+			"_reaction_packet_emitted": false,
+		})
+		
 		locals.Phase = ReminderPhaseReaching
 		r.updateLocals(locals)
 
-		// Emission logic moved to handlePhaseReaching or a helper to handle both cases
+		// Trigger agent to create new queue immediately
+		r.ExecuteAgents()
 	}
 }
 
@@ -365,6 +375,12 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 
 // handlePhaseReaching handles the reaching phase
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
+	// If this is a recurring reminder and we are in reaching phase again, 
+	// we might need to reset the queue ID if the previous one was already processed.
+	// However, for recurring reminders triggered by scheduler, the want status 
+	// is reset to Idle then Reaching, which calls Initialize().
+	// But our test showed it might stay in reaching status.
+
 	// Ensure packet is emitted (handles both transition and restart-while-reaching)
 	r.emitReactionPacketIfNeeded(locals)
 
@@ -455,6 +471,9 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 				})
 				locals.Phase = ReminderPhaseCompleted
 				r.ProvideDone()
+
+				// Trigger agent to delete queue immediately
+				r.ExecuteAgents()
 			} else {
 				r.StoreLog("Reminder rejected by user")
 				r.StoreStateMulti(map[string]any{
@@ -464,6 +483,9 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 					"achieving_percentage":     100,
 				})
 				locals.Phase = ReminderPhaseFailed
+
+				// Trigger agent to delete queue immediately
+				r.ExecuteAgents()
 			}
 			r.updateLocals(locals)
 		}
@@ -481,6 +503,9 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 			"achieving_percentage":      100,
 		})
 		locals.Phase = ReminderPhaseFailed
+
+		// Trigger agent to delete queue immediately
+		r.ExecuteAgents()
 	} else {
 		r.StoreLog("Reaction timeout - auto-completing (require_reaction=false)")
 		r.StoreStateMulti(map[string]any{
@@ -491,6 +516,9 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 		})
 		locals.Phase = ReminderPhaseCompleted
 		r.ProvideDone()
+
+		// Trigger agent to delete queue immediately (if any existed)
+		r.ExecuteAgents()
 	}
 	r.updateLocals(locals)
 }
