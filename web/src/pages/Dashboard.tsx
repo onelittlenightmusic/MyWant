@@ -96,9 +96,13 @@ export const Dashboard: React.FC = () => {
     setNotificationMessage(null);
   };
 
-  // Use sidebar.selectedItem directly as the single source of truth for selection
-  // This prevents unwanted selection changes when the wants array is updated by polling
-  const selectedWant = sidebar.selectedItem;
+  // Use sidebar.selectedItem to get the ID, but find the latest version from the wants list
+  // This ensures the sidebar reflects live status updates from polling
+  const selectedWant = useMemo(() => {
+    if (!sidebar.selectedItem) return null;
+    const wantId = sidebar.selectedItem.metadata?.id || sidebar.selectedItem.id;
+    return wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId)) || sidebar.selectedItem;
+  }, [sidebar.selectedItem, wants]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');

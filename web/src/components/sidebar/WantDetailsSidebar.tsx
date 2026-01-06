@@ -98,25 +98,27 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     setAutoRefresh(prev => !prev);
   }, []);
 
-  // Control panel logic (use want for status since it comes from the live dashboard state)
-  const isRunning = want?.status === 'reaching';
-  const isSuspended = want?.status === 'suspended';
-  const isCompleted = want?.status === 'achieved';
-  const isStopped = want?.status === 'stopped' || want?.status === 'created' || want?.status === 'terminated';
-  const isFailed = want?.status === 'failed';
+  const wantDetails = selectedWantDetails || want;
 
-  // Ensure want exists before checking control states
-  const canStart = !!want && (isStopped || isCompleted || isFailed || isSuspended);
-  const canStop = !!want && isRunning && !isSuspended;
-  const canSuspend = !!want && isRunning && !isSuspended;
-  const canDelete = !!want;
+  // Control panel logic (use wantDetails for status since it includes updated state from polling)
+  const isRunning = wantDetails?.status === 'reaching';
+  const isSuspended = wantDetails?.status === 'suspended';
+  const isCompleted = wantDetails?.status === 'achieved';
+  const isStopped = wantDetails?.status === 'stopped' || wantDetails?.status === 'created' || wantDetails?.status === 'terminated';
+  const isFailed = wantDetails?.status === 'failed';
+
+  // Ensure wantDetails exists before checking control states
+  const canStart = !!wantDetails && (isStopped || isCompleted || isFailed || isSuspended);
+  const canStop = !!wantDetails && isRunning && !isSuspended;
+  const canSuspend = !!wantDetails && isRunning && !isSuspended;
+  const canDelete = !!wantDetails;
 
   const handleStartClick = () => {
-    if (want) {
+    if (wantDetails) {
       if (isSuspended && onResume) {
-        onResume(want);
+        onResume(wantDetails);
       } else if (canStart && onStart) {
-        onStart(want);
+        onStart(wantDetails);
       }
       // Immediately fetch updated details after starting execution
       if (wantId) {
@@ -129,15 +131,15 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   };
 
   const handleStopClick = () => {
-    if (want && canStop && onStop) onStop(want);
+    if (wantDetails && canStop && onStop) onStop(wantDetails);
   };
 
   const handleSuspendClick = () => {
-    if (want && canSuspend && onSuspend) onSuspend(want);
+    if (wantDetails && canSuspend && onSuspend) onSuspend(wantDetails);
   };
 
   const handleDeleteClick = () => {
-    if (want && canDelete && onDelete) onDelete(want);
+    if (wantDetails && canDelete && onDelete) onDelete(wantDetails);
   };
 
   // Fetch details when want ID changes (not on every want object change)
