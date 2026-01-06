@@ -2794,10 +2794,7 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 	}
 }
 
-// RetriggerReceiverWant directly retriggeres a receiver want by name
-// This is used when a sender transmits a packet to an achieved receiver
-// The receiver should be reset to Idle so it can re-execute with the new packet
-// NEW: Instead of checking GetStatus(), we now check if goroutine is actually running
+// RetriggerReceiverWant is called when a packet is provided to a receiver
 // This is more reliable because it directly reflects execution state
 func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	cb.reconcileMutex.RLock()
@@ -2814,9 +2811,6 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	// Use want's retrigger decision function to determine if retrigger is needed
 	// This encapsulates the logic: check goroutine state and pending packets
 	if want.ShouldRetrigger() {
-		InfoLog("[RETRIGGER-RECEIVER] '%s' should retrigger (decision function returned true)\n", wantName)
-		InfoLog("[RETRIGGER-RECEIVER] '%s' current status: %s\n", wantName, want.GetStatus())
-
 		// Restart the want's execution (sets status to Idle)
 		// The reconcile loop's startPhase() will detect the Idle status and restart the want
 		// This avoids duplicate execution and keeps retrigger logic in one place
@@ -2824,11 +2818,8 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 
 		if err := cb.TriggerReconcile(); err != nil {
 			InfoLog("[RETRIGGER-RECEIVER] WARNING: failed to trigger reconcile for '%s': %v\n", wantName, err)
-		} else {
-			InfoLog("[RETRIGGER-RECEIVER] '%s' reconcile triggered\n", wantName)
 		}
 	}
-	// No retrigger needed - goroutine is active or will process pending packets on next iteration
 }
 func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 
