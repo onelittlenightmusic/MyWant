@@ -184,6 +184,7 @@ func (r *ReminderWant) Initialize() {
 		"timeout":                  300,
 		"reaction_queue_id":        "",    // ALWAYS clear on fresh initialization to ensure new queue
 		"_reaction_packet_emitted": false, // Reset emission flag for new cycle
+		"user_reaction":            nil,   // Clear previous user reaction
 	}
 
 	// Add duration_from_now if it was provided
@@ -340,6 +341,7 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 			"reminder_phase":           ReminderPhaseReaching,
 			"reaction_queue_id":        "", 
 			"_reaction_packet_emitted": false,
+			"user_reaction":            nil, // Clear previous reaction
 		})
 		
 		locals.Phase = ReminderPhaseReaching
