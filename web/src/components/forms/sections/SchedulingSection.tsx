@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useMemo, forwardRef } from 'react';
+import React, { useState, useCallback, useMemo, forwardRef, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { CollapsibleFormSection } from '../CollapsibleFormSection';
 import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
-import { CommitInput } from '@/components/common/CommitInput';
+import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
 /**
  * Props for SchedulingSection
@@ -30,14 +30,28 @@ interface ScheduleDraft {
 }
 
 /**
- * Parse "every" string like "5 minutes" into value and unit
+ * Parse "every" string like "5 minutes" or "day" into value and unit
  */
 const parseEvery = (every: string): { value: string; unit: string } => {
+  if (!every) return { value: '', unit: 'seconds' };
+  
   const parts = every.trim().split(/\s+/);
   if (parts.length === 2) {
     return { value: parts[0], unit: parts[1] };
   }
-  return { value: every, unit: 'seconds' };
+  
+  // Handle single words like "day", "week"
+  const val = parts[0].toLowerCase();
+  if (['day', 'week', 'month', 'year'].includes(val)) {
+    return { value: '1', unit: val };
+  }
+  
+  // If it's just a number, assume seconds
+  if (!isNaN(Number(val))) {
+    return { value: val, unit: 'seconds' };
+  }
+  
+  return { value: '', unit: val || 'seconds' };
 };
 
 /**
@@ -68,9 +82,10 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
     everyUnit: 'seconds'
   });
 
-  // Refs for focus management
-  const headerRef = React.useRef<HTMLButtonElement>(null);
-  const firstInputRef = React.useRef<HTMLInputElement>(null);
+  // Refs for focus management and force commit
+  const headerRef = useRef<HTMLButtonElement>(null);
+  const firstInputRef = useRef<CommitInputHandle>(null);
+  const everyValueRef = useRef<CommitInputHandle>(null);
 
   // Merge forwarded ref with local headerRef
   React.useEffect(() => {
@@ -161,15 +176,19 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
    * Save the current schedule edit
    */
   const handleSave = useCallback(() => {
+    // Get latest values from refs (in case they haven't been committed via Enter)
+    const currentAt = firstInputRef.current?.getValue() ?? editingDraft.at;
+    const currentEveryValue = everyValueRef.current?.getValue() ?? editingDraft.everyValue;
+
     // Only update if draft has an every value
-    if (editingDraft.everyValue.trim()) {
+    if (currentEveryValue.trim()) {
       const newSchedules = [...schedules];
-      const every = formatEvery(editingDraft.everyValue, editingDraft.everyUnit);
+      const every = formatEvery(currentEveryValue, editingDraft.everyUnit);
 
       // Create new schedule object
       const newSchedule: { at?: string; every: string } = {
         every,
-        ...(editingDraft.at && { at: editingDraft.at })
+        ...(currentAt && { at: currentAt })
       };
 
       if (editingIndex !== null && editingIndex < schedules.length) {
@@ -225,6 +244,9 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
             if (e.key === 'Escape') {
               e.preventDefault();
               handleEscape();
+            } else if (e.key === 'Enter') {
+              // Commit this field and save the whole form
+              setTimeout(handleSave, 0);
             }
           }}
           className="w-full"
@@ -240,6 +262,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
         <div className="flex gap-2 items-end">
           <div className="flex-1">
             <CommitInput
+              ref={everyValueRef}
               type="number"
               value={editingDraft.everyValue}
               onChange={(val) => setEditingDraft(prev => ({ ...prev, everyValue: val }))}
@@ -247,6 +270,9 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
                 if (e.key === 'Escape') {
                   e.preventDefault();
                   handleEscape();
+                } else if (e.key === 'Enter') {
+                  // Commit this field and save the whole form
+                  setTimeout(handleSave, 0);
                 }
               }}
               className="w-full"

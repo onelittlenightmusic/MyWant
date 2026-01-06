@@ -564,6 +564,12 @@ const SettingsTab: React.FC<{
   const [isDependenciesCollapsed, setIsDependenciesCollapsed] = useState(true);
   const [isSchedulingCollapsed, setIsSchedulingCollapsed] = useState(true);
 
+  // Section editing states to prevent polling from overwriting user input
+  const [isEditingParameters, setIsEditingParameters] = useState(false);
+  const [isEditingLabels, setIsEditingLabels] = useState(false);
+  const [isEditingDependencies, setIsEditingDependencies] = useState(false);
+  const [isEditingScheduling, setIsEditingScheduling] = useState(false);
+
   // Form data states
   const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
   const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
@@ -582,6 +588,7 @@ const SettingsTab: React.FC<{
 
     const oldParams = params;
     setParams(newParams);
+    setIsEditingParameters(true);
 
     try {
       await updateWantParameters(want.metadata.id, want, newParams, updateWant);
@@ -589,8 +596,10 @@ const SettingsTab: React.FC<{
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update parameters');
       setParams(oldParams); // Revert on error
+    } finally {
+      setIsEditingParameters(false);
     }
-  }, [want.metadata?.id, want, params, updateWant, onWantUpdate, setLocalUpdateError]);
+  }, [want, params, updateWant, onWantUpdate]);
 
   // Handler for label changes - saves to API
   const handleLabelsChange = useCallback(async (newLabels: Record<string, string>) => {
@@ -598,6 +607,7 @@ const SettingsTab: React.FC<{
 
     const oldLabels = labels;
     setLabels(newLabels);
+    setIsEditingLabels(true);
 
     try {
       await updateWantLabels(want.metadata.id, oldLabels, newLabels);
@@ -605,8 +615,10 @@ const SettingsTab: React.FC<{
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update labels');
       setLabels(oldLabels); // Revert on error
+    } finally {
+      setIsEditingLabels(false);
     }
-  }, [want.metadata?.id, labels, onWantUpdate, setLocalUpdateError]);
+  }, [want.metadata?.id, labels, onWantUpdate]);
 
   // Handler for dependency changes - saves to API
   const handleDependenciesChange = useCallback(async (newUsing: Array<Record<string, string>>) => {
@@ -614,6 +626,7 @@ const SettingsTab: React.FC<{
 
     const oldUsing = using;
     setUsing(newUsing);
+    setIsEditingDependencies(true);
 
     try {
       await updateWantDependencies(want.metadata.id, oldUsing, newUsing);
@@ -621,8 +634,10 @@ const SettingsTab: React.FC<{
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependencies');
       setUsing(oldUsing); // Revert on error
+    } finally {
+      setIsEditingDependencies(false);
     }
-  }, [want.metadata?.id, using, onWantUpdate, setLocalUpdateError]);
+  }, [want.metadata?.id, using, onWantUpdate]);
 
   // Handler for scheduling changes - saves to API
   const handleSchedulingChange = useCallback(async (newWhen: Array<{ at?: string; every: string }>) => {
@@ -630,6 +645,7 @@ const SettingsTab: React.FC<{
 
     const oldWhen = when;
     setWhen(newWhen);
+    setIsEditingScheduling(true);
 
     try {
       await updateWantScheduling(want.metadata.id, want, newWhen, updateWant);
@@ -637,8 +653,10 @@ const SettingsTab: React.FC<{
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update scheduling');
       setWhen(oldWhen); // Revert on error
+    } finally {
+      setIsEditingScheduling(false);
     }
-  }, [want.metadata?.id, want, when, updateWant, onWantUpdate, setLocalUpdateError]);
+  }, [want, when, updateWant, onWantUpdate]);
 
   // Handle arrow key navigation for form fields based on DOM order
   const handleArrowKeyNavigation = useCallback((e: React.KeyboardEvent) => {
@@ -669,18 +687,26 @@ const SettingsTab: React.FC<{
     }
   }, []);
 
-  // Reset form state when want changes or metadata is updated (including labels/dependencies)
+  // Reset form state when want changes or metadata is updated
+  // Only update fields that are NOT currently being edited to avoid losing user input
   useEffect(() => {
-    setParams(want.spec?.params || {});
-    setLabels(want.metadata?.labels || {});
-    setUsing(want.spec?.using || []);
-    setWhen(want.spec?.when || []);
-    // Reset collapsed states
+    if (!isEditingParameters) setParams(want.spec?.params || {});
+    if (!isEditingLabels) setLabels(want.metadata?.labels || {});
+    if (!isEditingDependencies) setUsing(want.spec?.using || []);
+    if (!isEditingScheduling) setWhen(want.spec?.when || []);
+  }, [want.metadata?.id, want.metadata?.updatedAt, isEditingParameters, isEditingLabels, isEditingDependencies, isEditingScheduling]);
+
+  // Reset all states when switching to a different want
+  useEffect(() => {
+    setIsEditingParameters(false);
+    setIsEditingLabels(false);
+    setIsEditingDependencies(false);
+    setIsEditingScheduling(false);
     setIsParametersCollapsed(true);
     setIsLabelsCollapsed(true);
     setIsDependenciesCollapsed(true);
     setIsSchedulingCollapsed(true);
-  }, [want.metadata?.id, want.metadata?.updatedAt]);
+  }, [want.metadata?.id]);
 
   return (
     <div className="h-full flex flex-col">

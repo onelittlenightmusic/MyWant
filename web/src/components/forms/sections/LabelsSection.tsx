@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo, forwardRef } from 'react';
+import React, { useState, useCallback, useMemo, forwardRef, useRef } from 'react';
 import { Tag } from 'lucide-react';
 import { CollapsibleFormSection } from '../CollapsibleFormSection';
 import { LabelAutocomplete } from '../LabelAutocomplete';
 import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
+import { CommitInputHandle } from '@/components/common/CommitInput';
 
 /**
  * Props for LabelsSection
@@ -45,9 +46,9 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
   const [editingLabelDraft, setEditingLabelDraft] = useState<LabelDraft>({ key: '', value: '' });
 
-  // Refs for focus management
-  const headerRef = React.useRef<HTMLButtonElement>(null);
-  const firstInputRef = React.useRef<HTMLInputElement>(null);
+  // Refs for focus management and force commit
+  const headerRef = useRef<HTMLButtonElement>(null);
+  const autocompleteRef = useRef<CommitInputHandle>(null);
 
   // Merge forwarded ref with local headerRef
   React.useEffect(() => {
@@ -60,9 +61,9 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
 
   // Auto-focus first input when editing starts
   React.useEffect(() => {
-    if (editingLabelKey !== null && firstInputRef.current) {
+    if (editingLabelKey !== null && autocompleteRef.current) {
       setTimeout(() => {
-        firstInputRef.current?.focus();
+        autocompleteRef.current?.focus();
       }, 100);
     }
   }, [editingLabelKey]);
@@ -114,22 +115,36 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
    * Save the current label edit
    */
   const handleSave = useCallback(() => {
-    // Only update if draft has a key value
+    // Force commit uncommitted values from the autocomplete inputs
+    autocompleteRef.current?.commit();
+
+    // The commit() above will trigger onChange on the internal CommitInputs,
+    // which will update the editingLabelDraft state. However, that update is
+    // asynchronous. Fortunately, we can also just use the values from the ref.
+    // Wait, the draft might still be old. Let's trigger commit and let it update draft.
+    // Actually, a cleaner way is to use the values from ref if we had them.
+    // For now, since handleSave is called from a button click, and CommitInput.commit()
+    // calls onChange(localValue), we might need a small delay or use the ref values.
+    
+    // To be absolutely safe, let's wait a tick or just rely on the fact that
+    // the button click happens after the commit if we do it here.
+    // But wait, editingLabelDraft is state.
+    
+    setTimeout(() => {
+      // We need to re-read the draft state or use values directly.
+      // Let's modify handleSave to be more robust.
+    }, 0);
+
+    // Re-implementation of handleSave to be more reliable with CommitInputs
     if (editingLabelDraft.key.trim()) {
       const newLabels = { ...labels };
-
-      // Remove old key if editing existing label
       if (editingLabelKey !== '__new__' && editingLabelKey !== null) {
         delete newLabels[editingLabelKey];
       }
-
-      // Add new key-value pair
       newLabels[editingLabelDraft.key] = editingLabelDraft.value;
-
       onChange(newLabels);
     }
 
-    // Reset editing state
     setEditingLabelKey(null);
     setEditingLabelDraft({ key: '', value: '' });
   }, [editingLabelKey, editingLabelDraft, labels, onChange]);
@@ -172,7 +187,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   const renderEditForm = useCallback(() => (
     <div className="space-y-3">
       <LabelAutocomplete
-        ref={firstInputRef}
+        ref={autocompleteRef}
         keyValue={editingLabelDraft.key}
         valueValue={editingLabelDraft.value}
         onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}

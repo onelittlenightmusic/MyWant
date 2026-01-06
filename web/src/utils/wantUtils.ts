@@ -10,7 +10,11 @@ export async function updateWantParameters(
   updateWantFn: (id: string, request: UpdateWantRequest) => Promise<void>
 ): Promise<void> {
   await updateWantFn(wantId, {
-    metadata: want.metadata,
+    metadata: {
+      name: want.metadata?.name,
+      type: want.metadata?.type,
+      labels: want.metadata?.labels
+    },
     spec: {
       ...want.spec,
       params: newParams
@@ -28,7 +32,11 @@ export async function updateWantScheduling(
   updateWantFn: (id: string, request: UpdateWantRequest) => Promise<void>
 ): Promise<void> {
   await updateWantFn(wantId, {
-    metadata: want.metadata,
+    metadata: {
+      name: want.metadata?.name,
+      type: want.metadata?.type,
+      labels: want.metadata?.labels
+    },
     spec: {
       ...want.spec,
       when: newWhen

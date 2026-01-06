@@ -34,6 +34,7 @@ func (s *SilencerWant) Initialize() {
 	s.StoreStateMulti(map[string]any{
 		"processed_count":   0,
 		"last_processed_id": "",
+		"silencer_phase":    "active",
 	})
 
 	// Register required capability for processing reactions

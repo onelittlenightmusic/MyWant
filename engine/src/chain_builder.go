@@ -1267,6 +1267,11 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		return false
 	}
 
+	// Compare when (scheduling)
+	if fmt.Sprintf("%v", a.Spec.When) != fmt.Sprintf("%v", b.Spec.When) {
+		return false
+	}
+
 	return true
 }
 
@@ -1304,6 +1309,7 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 				StateSubscriptions:  copyStateSubscriptions(want.Spec.StateSubscriptions),
 				NotificationFilters: copyNotificationFilters(want.Spec.NotificationFilters),
 				Requires:            copyStringSlice(want.Spec.Requires),
+				When:                copyWhen(want.Spec.When),
 			},
 		}
 		copiedWants = append(copiedWants, copiedWant)
@@ -1313,6 +1319,15 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 }
 
 // Helper functions for deep copying
+func copyWhen(src []WhenSpec) []WhenSpec {
+	if src == nil {
+		return nil
+	}
+	dst := make([]WhenSpec, len(src))
+	copy(dst, src)
+	return dst
+}
+
 func copyStringMap(src map[string]string) map[string]string {
 	if src == nil {
 		return nil
@@ -1424,6 +1439,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					runtimeWant.want.Spec.Params = copyInterfaceMap(updatedConfigWant.Spec.Params)
 					runtimeWant.want.Spec.StateSubscriptions = copyStateSubscriptions(updatedConfigWant.Spec.StateSubscriptions)
 					runtimeWant.want.Spec.NotificationFilters = copyNotificationFilters(updatedConfigWant.Spec.NotificationFilters)
+					runtimeWant.want.Spec.When = copyWhen(updatedConfigWant.Spec.When)
 
 					// Sync metadata metadata is now part of want object, removed redundant copy
 					runtimeWant.want.Metadata.Labels = copyStringMap(updatedConfigWant.Metadata.Labels)
@@ -1774,9 +1790,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 
 	// Start execution if want is Progressable
 	if progressable, ok := want.function.(Progressable); ok {
-		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:PROGRESSABLE] '%s' is Progressable, starting goroutine\n", wantName)
-		}
 		want.want.SetStatus(WantStatusReaching)
 		InfoLog("[START-WANT] '%s' transitioned to Reaching status\n", wantName)
 		want.want.InitializeControlChannel()
@@ -1806,10 +1819,6 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 				cb.waitGroup.Done() // Signal completion
 			},
 		)
-	} else {
-		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:NOT-PROGRESSABLE] '%s' is NOT Progressable\n", wantName)
-		}
 	}
 }
 

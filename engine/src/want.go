@@ -563,6 +563,12 @@ func (n *Want) StartProgressionLoop(
 			n.progressable.Initialize()
 		}
 
+		// Drain existing output/input channels to remove stale packets from previous executions
+		// This prevents consumers from reading "Done" signals or data from a dead process
+		initialPaths := getPathsFunc()
+		n.DrainOutputChannels(initialPaths)
+		n.DrainInputChannels(initialPaths)
+
 		for {
 			// 1. Check stop channel
 			select {
@@ -1382,6 +1388,60 @@ func (n *Want) GetOutCount() int {
 }
 func (n *Want) GetPaths() *Paths {
 	return &n.paths
+}
+
+// DrainOutputChannels removes all pending packets from output channels
+// This is critical when restarting a want to ensure consumers don't read stale data (especially Done signals)
+func (n *Want) DrainOutputChannels(paths Paths) {
+	drainedCount := 0
+	for _, pathInfo := range paths.Out {
+		if pathInfo.Channel == nil {
+			continue
+		}
+
+		// Drain loop for this channel
+		for {
+			select {
+			case <-pathInfo.Channel:
+				drainedCount++
+			default:
+				// Channel is empty, move to next channel
+				goto NextChannel
+			}
+		}
+	NextChannel:
+	}
+
+	if drainedCount > 0 {
+		n.StoreLog("[DRAIN] Drained %d stale packets from output channels on restart\n", drainedCount)
+	}
+}
+
+// DrainInputChannels removes all pending packets from input channels
+// This is critical when restarting a want (like a processor) to ensure it doesn't read stale data
+func (n *Want) DrainInputChannels(paths Paths) {
+	drainedCount := 0
+	for _, pathInfo := range paths.In {
+		if pathInfo.Channel == nil {
+			continue
+		}
+
+		// Drain loop for this channel
+		for {
+			select {
+			case <-pathInfo.Channel:
+				drainedCount++
+			default:
+				// Channel is empty, move to next channel
+				goto NextChannel
+			}
+		}
+	NextChannel:
+	}
+
+	if drainedCount > 0 {
+		n.StoreLog("[DRAIN] Drained %d stale packets from input channels on restart\n", drainedCount)
+	}
 }
 
 // UnusedExists checks if there are unused packets in the cache or any input channel.

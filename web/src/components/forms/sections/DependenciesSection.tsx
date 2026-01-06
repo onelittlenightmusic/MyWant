@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo, forwardRef } from 'react';
+import React, { useState, useCallback, useMemo, forwardRef, useRef } from 'react';
 import { GitBranch } from 'lucide-react';
 import { CollapsibleFormSection } from '../CollapsibleFormSection';
 import { LabelSelectorAutocomplete } from '../LabelSelectorAutocomplete';
 import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
+import { CommitInputHandle } from '@/components/common/CommitInput';
 
 /**
  * Props for DependenciesSection
@@ -45,9 +46,9 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingDraft, setEditingDraft] = useState<DependencyDraft>({ key: '', value: '' });
 
-  // Refs for focus management
-  const headerRef = React.useRef<HTMLButtonElement>(null);
-  const firstInputRef = React.useRef<HTMLInputElement>(null);
+  // Refs for focus management and force commit
+  const headerRef = useRef<HTMLButtonElement>(null);
+  const autocompleteRef = useRef<CommitInputHandle>(null);
 
   // Merge forwarded ref with local headerRef
   React.useEffect(() => {
@@ -60,9 +61,9 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
 
   // Auto-focus first input when editing starts
   React.useEffect(() => {
-    if (editingIndex !== null && firstInputRef.current) {
+    if (editingIndex !== null && autocompleteRef.current) {
       setTimeout(() => {
-        firstInputRef.current?.focus();
+        autocompleteRef.current?.focus();
       }, 100);
     }
   }, [editingIndex]);
@@ -130,6 +131,9 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
    * Save the current dependency edit
    */
   const handleSave = useCallback(() => {
+    // Force commit uncommitted values from the autocomplete inputs
+    autocompleteRef.current?.commit();
+
     // Only update if draft has a key value
     if (editingDraft.key.trim()) {
       const newDependencies = [...dependencies];
@@ -190,7 +194,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
   const renderEditForm = useCallback(() => (
     <div className="space-y-3">
       <LabelSelectorAutocomplete
-        ref={firstInputRef}
+        ref={autocompleteRef}
         keyValue={editingDraft.key}
         valuValue={editingDraft.value}
         onKeyChange={(newKey) => setEditingDraft(prev => ({ ...prev, key: newKey }))}

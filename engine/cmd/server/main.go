@@ -241,8 +241,8 @@ func NewServer(config ServerConfig) *Server {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
@@ -253,8 +253,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 func (s *Server) handleOptions(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
 	w.WriteHeader(http.StatusOK)
 }
 func (s *Server) setupRoutes() {
@@ -1016,7 +1016,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	for i, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				log.Printf("[API:UPDATE] Found want in execution %d\n", i)
+				log.Printf("[API:UPDATE] Found want in execution %s\n", i)
 				targetExecution = execution
 				foundWant = want
 				for j, configWant := range execution.Config.Wants {
@@ -1027,39 +1027,46 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 				}
 				break
 			}
-		} else {
-			log.Printf("[API:UPDATE] Execution %d has nil builder\n", i)
 		}
 	}
 
 	if targetExecution == nil || foundWant == nil {
+		// If not found in executions, check global builder
+		if s.globalBuilder != nil {
+			if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+				foundWant = want
+				log.Printf("[API:UPDATE] Found want in global builder: %s\n", wantID)
+				// For global wants, we don't have a targetExecution in s.wants
+			}
+		}
+	}
+
+	if foundWant == nil {
 		errorMsg := "Want not found"
 		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
 		http.Error(w, errorMsg, http.StatusNotFound)
 		return
 	}
 
-	// Only allow updates if the execution is not currently running
-	if targetExecution.Status == "running" {
-		errorMsg := "Cannot update running want"
-		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusConflict, errorMsg, "want_running")
-		http.Error(w, errorMsg, http.StatusConflict)
+	// Read request body robustly
+	bodyData, err := io.ReadAll(r.Body)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to read request body: %v", err)
+		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
+
 	var updatedWant *mywant.Want
-
-	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		wantYAML := make([]byte, r.ContentLength)
-		r.Body.Read(wantYAML)
-
-		if err := yaml.Unmarshal(wantYAML, &updatedWant); err != nil {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "yaml") {
+		if err := yaml.Unmarshal(bodyData, &updatedWant); err != nil {
 			errorMsg := fmt.Sprintf("Invalid YAML want: %v", err)
 			s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "parsing_error")
 			http.Error(w, errorMsg, http.StatusBadRequest)
 			return
 		}
 	} else {
-		if err := json.NewDecoder(r.Body).Decode(&updatedWant); err != nil {
+		if err := json.Unmarshal(bodyData, &updatedWant); err != nil {
 			errorMsg := fmt.Sprintf("Invalid JSON want: %v", err)
 			s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "parsing_error")
 			http.Error(w, errorMsg, http.StatusBadRequest)
@@ -1073,6 +1080,10 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}
+
+	// Relaxed status check: allow updates even if reaching/running
+	// The ChainBuilder.UpdateWant method handles dynamic updates safely
+
 	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
 	if err := s.validateWantTypes(tempConfig); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
@@ -1093,19 +1104,24 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	// Preserve the original want ID
 	updatedWant.Metadata.ID = foundWant.Metadata.ID
 
-	// Update config
-	if targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
-		targetExecution.Config.Wants[targetWantIndex] = updatedWant
-	} else {
-		targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
+	// Update config in target execution if it exists
+	if targetExecution != nil {
+		if targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
+			targetExecution.Config.Wants[targetWantIndex] = updatedWant
+		} else {
+			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
+		}
+		
+		// Use execution's own builder
+		if targetExecution.Builder != nil {
+			targetExecution.Builder.UpdateWant(updatedWant)
+		}
+		targetExecution.Status = "updated"
+	} else if s.globalBuilder != nil {
+		// Fallback to global builder for wants not associated with a specific execution
+		s.globalBuilder.UpdateWant(updatedWant)
 	}
 
-	// Use ChainBuilder's UpdateWant API - automatically triggers reconciliation UpdateWant handles reconciliation internally via reconcileTrigger channel
-	if targetExecution.Builder != nil {
-		targetExecution.Builder.UpdateWant(updatedWant)
-	}
-
-	targetExecution.Status = "updated"
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updatedWant)

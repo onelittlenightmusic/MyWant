@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLabelHistoryStore } from '@/stores/labelHistoryStore';
 import { ChevronDown, X } from 'lucide-react';
-import { CommitInput } from '@/components/common/CommitInput';
+import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
 interface LabelSelectorAutocompleteProps {
   keyValue: string;
@@ -12,7 +12,7 @@ interface LabelSelectorAutocompleteProps {
   onLeftKey?: () => void;
 }
 
-export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, LabelSelectorAutocompleteProps>(({
+export const LabelSelectorAutocomplete = React.forwardRef<CommitInputHandle, LabelSelectorAutocompleteProps>(({
   keyValue,
   valuValue,
   onKeyChange,
@@ -26,19 +26,22 @@ export const LabelSelectorAutocomplete = React.forwardRef<HTMLInputElement, Labe
   const [filteredValues, setFilteredValues] = useState<string[]>([]);
   const [keySelectedIndex, setKeySelectedIndex] = useState(-1);
   const [valueSelectedIndex, setValueSelectedIndex] = useState(-1);
-  const keyInputRef = useRef<HTMLInputElement>(null);
-  const valueInputRef = useRef<HTMLInputElement>(null);
+  const keyInputRef = useRef<CommitInputHandle>(null);
+  const valueInputRef = useRef<CommitInputHandle>(null);
   const keyContainerRef = useRef<HTMLDivElement>(null);
   const valueContainerRef = useRef<HTMLDivElement>(null);
 
-  // Merge forwarded ref with local keyInputRef
-  React.useEffect(() => {
-    if (typeof ref === 'function') {
-      ref(keyInputRef.current);
-    } else if (ref) {
-      (ref as React.MutableRefObject<HTMLInputElement | null>).current = keyInputRef.current;
+  // Expose commit methods to parent
+  React.useImperativeHandle(ref, () => ({
+    commit: () => {
+      keyInputRef.current?.commit();
+      valueInputRef.current?.commit();
+    },
+    getValue: () => keyInputRef.current?.getValue() || '',
+    focus: () => {
+      keyInputRef.current?.focus();
     }
-  }, [ref]);
+  }));
 
   const { labelKeys, labelValues, fetchLabels } = useLabelHistoryStore();
 

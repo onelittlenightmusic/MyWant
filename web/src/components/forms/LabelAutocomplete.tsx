@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLabelHistoryStore } from '@/stores/labelHistoryStore';
 import { ChevronDown, X } from 'lucide-react';
-import { CommitInput } from '@/components/common/CommitInput';
+import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
 interface LabelAutocompleteProps {
   keyValue: string;
@@ -12,7 +12,7 @@ interface LabelAutocompleteProps {
   onLeftKey?: () => void;
 }
 
-export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocompleteProps>(({
+export const LabelAutocomplete = React.forwardRef<CommitInputHandle, LabelAutocompleteProps>(({
   keyValue,
   valueValue,
   onKeyChange,
@@ -24,19 +24,22 @@ export const LabelAutocomplete = React.forwardRef<HTMLInputElement, LabelAutocom
   const [valueOpen, setValueOpen] = useState(false);
   const [filteredKeys, setFilteredKeys] = useState<string[]>([]);
   const [filteredValues, setFilteredValues] = useState<string[]>([]);
-  const keyInputRef = useRef<HTMLInputElement>(null);
-  const valueInputRef = useRef<HTMLInputElement>(null);
+  const keyInputRef = useRef<CommitInputHandle>(null);
+  const valueInputRef = useRef<CommitInputHandle>(null);
   const keyContainerRef = useRef<HTMLDivElement>(null);
   const valueContainerRef = useRef<HTMLDivElement>(null);
 
-  // Merge forwarded ref with local keyInputRef
-  React.useEffect(() => {
-    if (typeof ref === 'function') {
-      ref(keyInputRef.current);
-    } else if (ref) {
-      (ref as React.MutableRefObject<HTMLInputElement | null>).current = keyInputRef.current;
+  // Expose commit methods to parent
+  React.useImperativeHandle(ref, () => ({
+    commit: () => {
+      keyInputRef.current?.commit();
+      valueInputRef.current?.commit();
+    },
+    getValue: () => keyInputRef.current?.getValue() || '',
+    focus: () => {
+      keyInputRef.current?.focus();
     }
-  }, [ref]);
+  }));
 
   const { labelKeys, labelValues, fetchLabels } = useLabelHistoryStore();
 

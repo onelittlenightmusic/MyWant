@@ -83,11 +83,26 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Focus the card when it's targeted by keyboard navigation
   useEffect(() => {
-    const isNavSelected = selectedWant?.metadata?.id === want.metadata?.id || selectedWant?.id === want.id;
+    const wantId = want.metadata?.id || want.id;
+    const selectedId = selectedWant?.metadata?.id || selectedWant?.id;
+    const isNavSelected = selectedId === wantId;
+
     if (isNavSelected && document.activeElement !== cardRef.current) {
-      cardRef.current?.focus();
+      // Don't steal focus if user is already interacting with an input or the sidebar
+      const target = document.activeElement as HTMLElement;
+      const isFocusInInput =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable;
+
+      const isFocusInSidebar = !!target?.closest('[role="complementary"]') ||
+                              !!target?.closest('.right-sidebar');
+
+      if (!isFocusInInput && !isFocusInSidebar) {
+        cardRef.current?.focus();
+      }
     }
-  }, [selectedWant, want.metadata?.id, want.id]);
+  }, [selectedWant?.metadata?.id, selectedWant?.id, want.metadata?.id, want.id]);
 
   // Trigger animation when expanded children section mounts
   useEffect(() => {

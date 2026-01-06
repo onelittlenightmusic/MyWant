@@ -11,7 +11,13 @@ interface CommitInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
  * An input component that only commits its value when the user presses Enter.
  * Highlights in yellow when there are uncommitted changes.
  */
-export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(({
+export interface CommitInputHandle {
+  commit: () => void;
+  getValue: () => string;
+  focus: () => void;
+}
+
+export const CommitInput = React.forwardRef<CommitInputHandle, CommitInputProps>(({
   value,
   onChange,
   className,
@@ -22,7 +28,7 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
 }, ref) => {
   const [localValue, setLocalValue] = useState<string>(String(value));
   const [isFocused, setIsFocused] = useState(false);
-  const internalRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync local value when prop value changes (unless focused)
   useEffect(() => {
@@ -32,6 +38,19 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
   }, [value, isFocused]);
 
   const hasChanges = localValue !== String(value);
+
+  // Expose methods to parent via ref
+  React.useImperativeHandle(ref, () => ({
+    commit: () => {
+      if (hasChanges) {
+        onChange(localValue);
+      }
+    },
+    getValue: () => localValue,
+    focus: () => {
+      inputRef.current?.focus();
+    }
+  }));
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -43,7 +62,7 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setLocalValue(String(value));
-      internalRef.current?.blur();
+      inputRef.current?.blur();
     }
 
     if (onKeyDown) {
@@ -53,13 +72,6 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
-    // Optional: revert on blur? The user said "Enter to confirm", 
-    // so maybe we should keep the yellow state until Enter or Escape?
-    // But usually blur reverts or commits.
-    // Given the requirement "Enterで確定", let's keep it yellow even on blur 
-    // if it has changes, but revert if requested. 
-    // Actually, let's just let it stay yellow.
-    
     if (onBlur) {
       onBlur(e);
     }
@@ -69,21 +81,11 @@ export const CommitInput = React.forwardRef<HTMLInputElement, CommitInputProps>(
     setIsFocused(true);
   };
 
-  // Merge refs
-  const setRefs = (node: HTMLInputElement | null) => {
-    (internalRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
-    if (typeof ref === 'function') {
-      ref(node);
-    } else if (ref) {
-      (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-    }
-  };
-
   return (
     <div className="relative flex-1">
       <input
         {...props}
-        ref={setRefs}
+        ref={inputRef}
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onKeyDown={handleKeyDown}
