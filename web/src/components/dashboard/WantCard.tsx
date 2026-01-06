@@ -14,6 +14,7 @@ const getStatusColor = (status: WantExecutionStatus): string => {
     case 'achieved':
       return '#10b981'; // Green
     case 'reaching':
+    case 'terminated':
       return '#9333ea'; // Purple
     case 'failed':
       return '#ef4444'; // Red

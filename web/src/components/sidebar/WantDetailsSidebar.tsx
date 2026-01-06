@@ -102,7 +102,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const isRunning = want?.status === 'reaching';
   const isSuspended = want?.status === 'suspended';
   const isCompleted = want?.status === 'achieved';
-  const isStopped = want?.status === 'stopped' || want?.status === 'created';
+  const isStopped = want?.status === 'stopped' || want?.status === 'created' || want?.status === 'terminated';
   const isFailed = want?.status === 'failed';
 
   // Ensure want exists before checking control states
