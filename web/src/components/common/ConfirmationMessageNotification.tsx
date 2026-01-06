@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bot, Check, X } from 'lucide-react';
 import { classNames, truncateText } from '@/utils/helpers';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -108,7 +109,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
   const isInlineHeader = layout === 'inline-header';
   const isDashboardRight = layout === 'dashboard-right';
 
-  return (
+  const content = (
     <div
       className={classNames(
         'flex items-center gap-0',
@@ -346,4 +347,12 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
       )}
     </div>
   );
+
+  // If inline-header, don't use portal as it needs to be relative to header
+  if (isInlineHeader) {
+    return content;
+  }
+
+  // Otherwise use portal to render at body level
+  return createPortal(content, document.body);
 };
