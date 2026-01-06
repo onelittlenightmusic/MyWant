@@ -44,6 +44,12 @@ func NewReminderWant(want *Want) *ReminderWant {
 func (r *ReminderWant) Initialize() {
 	r.StoreLog("[REMINDER] Initializing reminder: %s\n", r.Metadata.Name)
 
+	// CRITICAL: Stop any existing background agents (like monitor) before fresh start
+	// This ensures we don't have multiple goroutines monitoring different queue IDs
+	if err := r.StopAllBackgroundAgents(); err != nil {
+		r.StoreLog("ERROR: Failed to stop existing background agents: %v", err)
+	}
+
 	// Initialize locals
 	locals := &ReminderLocals{
 		Phase:          ReminderPhaseWaiting,

@@ -586,6 +586,10 @@ func (n *Want) StartProgressionLoop(
 					return
 				case ControlTriggerRestart:
 					n.SetSuspended(false)
+					// Stop background agents before re-initializing
+					if err := n.StopAllBackgroundAgents(); err != nil {
+						n.StoreLog("ERROR: Failed to stop background agents on restart: %v", err)
+					}
 					if n.progressable != nil {
 						n.progressable.Initialize()
 					}
