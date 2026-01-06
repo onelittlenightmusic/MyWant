@@ -353,8 +353,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     );
   }
 
-  const wantDetails = selectedWantDetails || want;
-
   const tabs = [
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'results' as TabType, label: 'Results', icon: Database },
