@@ -112,11 +112,11 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
     <div
       className={classNames(
         'flex items-center gap-0',
-        isDashboardRight ? 'fixed top-2 right-[480px] z-50 pointer-events-auto h-16 pr-6' : (
-          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto'
+        isDashboardRight ? 'fixed top-24 right-[500px] z-[100] h-auto pr-6' : (
+          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto'
         ),
-        !isDashboardRight && (isAnimating ? 'opacity-100' : 'opacity-0'),
-        !isDashboardRight && !isInlineHeader ? 'pointer-events-auto' : ''
+        isAnimating ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        !isDashboardRight && !isInlineHeader ? 'transition-opacity duration-300' : ''
       )}
     >
       {/* Layout 1: Bubble on left, Robot on right (for inline-header) */}
@@ -290,7 +290,7 @@ export const ConfirmationMessageNotification: React.FC<ConfirmationMessageNotifi
       {/* Layout 3: Dashboard right - Robot left, Bubble middle, Buttons right (full height) */}
       {isDashboardRight && (
         <div className={classNames(
-          'flex items-stretch gap-0 h-16 transition-all duration-300',
+          'flex items-stretch gap-0 transition-all duration-300',
           (isAnimatingRobot || isAnimatingBubble) ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
         )}>
           {/* Robot icon - left (header height) */}
