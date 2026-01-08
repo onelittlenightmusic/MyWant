@@ -1,0 +1,15 @@
+recipe:
+    metadata:
+        name: saved-empty-target-recipe-clean
+        description: Clean recipe saved from my-empty-target
+        version: 1.0.0
+    wants:
+        - metadata:
+            name: my-silencer
+            type: silencer
+            labels: {}
+          spec:
+            params:
+                policy: all_true
+            requires:
+                - reaction_auto_approval

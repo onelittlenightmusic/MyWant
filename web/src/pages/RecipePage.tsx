@@ -125,7 +125,7 @@ export default function RecipePage() {
 
   const handleDeployRecipeExample = async (recipe: GenericRecipe) => {
     try {
-      if (!recipe.recipe.example || !recipe.recipe.example.wants || recipe.recipe.example.wants.length === 0) {
+      if (!recipe.recipe.example || !recipe.recipe.example.wants || recipe.recipe.example.wants?.length === 0) {
         throw new Error('No example configuration available for this recipe');
       }
 

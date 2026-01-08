@@ -98,6 +98,12 @@ type OllamaRequest struct {
 	Stream bool   `json:"stream"`
 }
 
+// SaveRecipeFromWantRequest represents the request to create a recipe from an existing want
+type SaveRecipeFromWantRequest struct {
+	WantID   string                       `json:"wantId"`
+	Metadata mywant.GenericRecipeMetadata `json:"metadata"`
+}
+
 // OllamaResponse represents the response format from Ollama API
 type OllamaResponse struct {
 	Model              string `json:"model"`
@@ -312,8 +318,9 @@ func (s *Server) setupRoutes() {
 
 	// Recipe CRUD endpoints
 	recipes := api.PathPrefix("/recipes").Subrouter()
-	recipes.HandleFunc("", s.createRecipe).Methods("POST")
-	recipes.HandleFunc("", s.listRecipes).Methods("GET")
+	s.router.HandleFunc("/api/v1/recipes", s.createRecipe).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v1/recipes/from-want", s.saveRecipeFromWant).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/v1/recipes", s.listRecipes).Methods("GET", "OPTIONS")
 	recipes.HandleFunc("/{id}", s.getRecipe).Methods("GET")
 	recipes.HandleFunc("/{id}", s.updateRecipe).Methods("PUT")
 	recipes.HandleFunc("/{id}", s.deleteRecipe).Methods("DELETE")
@@ -1073,7 +1080,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+	
 	if updatedWant == nil {
 		errorMsg := "Want object is required"
 		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "validation")
@@ -2806,6 +2813,124 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":      recipeID,
 		"message": "Recipe created successfully",
+	})
+}
+
+// saveRecipeFromWant handles POST /api/v1/recipes/from-want
+func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var req SaveRecipeFromWantRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", "", "error", http.StatusBadRequest, "Invalid request format", "parsing_error")
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
+	}
+
+	if req.WantID == "" {
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", "", "error", http.StatusBadRequest, "wantId is required", "missing_id")
+		http.Error(w, "wantId is required", http.StatusBadRequest)
+		return
+	}
+
+	// Find the parent want
+	var parentWant *mywant.Want
+	var builder *mywant.ChainBuilder
+
+	// Search across all executions
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if wnt, _, found := execution.Builder.FindWantByID(req.WantID); found {
+				parentWant = wnt
+				builder = execution.Builder
+				break
+			}
+		}
+	}
+
+	// Also check global builder
+	if parentWant == nil && s.globalBuilder != nil {
+		if wnt, _, found := s.globalBuilder.FindWantByID(req.WantID); found {
+			parentWant = wnt
+			builder = s.globalBuilder
+		}
+	}
+
+	if parentWant == nil {
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", req.WantID, "error", http.StatusNotFound, "Want not found", "not_found")
+		http.Error(w, "Want not found", http.StatusNotFound)
+		return
+	}
+
+	// Find all child wants
+	allWants := builder.GetAllWantStates()
+	var childWants []mywant.RecipeWant
+
+	for _, wnt := range allWants {
+		isChild := false
+		for _, ownerRef := range wnt.Metadata.OwnerReferences {
+			if ownerRef.ID == req.WantID || (ownerRef.Name == parentWant.Metadata.Name && ownerRef.Kind == "Want") {
+				isChild = true
+				break
+			}
+		}
+
+		if isChild {
+			// Convert to RecipeWant and strip instance-specific IDs and references
+			metadata := wnt.Metadata
+			metadata.ID = ""              // Strip unique ID
+			metadata.OwnerReferences = nil // Strip specific owner references (Target will recreate them)
+
+			childWants = append(childWants, mywant.RecipeWant{
+				Metadata: metadata,
+				Spec:     wnt.Spec,
+			})
+		}
+	}
+
+	// Construct recipe
+	recipe := mywant.GenericRecipe{
+		Recipe: mywant.RecipeContent{
+			Metadata: req.Metadata,
+			Wants:    childWants,
+		},
+	}
+
+	if recipe.Recipe.Metadata.Name == "" {
+		recipe.Recipe.Metadata.Name = parentWant.Metadata.Name + "-recipe"
+	}
+
+	// Save to registry
+	recipeID := recipe.Recipe.Metadata.Name
+	if err := s.recipeRegistry.CreateRecipe(recipeID, &recipe); err != nil {
+		// If it exists, update it instead
+		_ = s.recipeRegistry.UpdateRecipe(recipeID, &recipe)
+	}
+
+	// Save to file in recipes/ directory
+	filename := fmt.Sprintf("recipes/%s.yaml", recipeID)
+	// Sanitize filename: replace spaces with hyphens
+	filename = strings.ReplaceAll(filename, " ", "-")
+	
+	yamlData, err := yaml.Marshal(recipe)
+	if err != nil {
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "error", http.StatusInternalServerError, err.Error(), "marshaling_error")
+		http.Error(w, fmt.Sprintf("Failed to marshal recipe: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if err := os.WriteFile(filename, yamlData, 0644); err != nil {
+		log.Printf("[SERVER] Warning: Failed to save recipe file %s: %v\n", filename, err)
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "success", http.StatusCreated, "", fmt.Sprintf("Recipe created from want with %d children", len(childWants)))
+	
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":      recipeID,
+		"message": "Recipe created successfully from want",
+		"file":    filename,
+		"wants":   len(childWants),
 	})
 }
 

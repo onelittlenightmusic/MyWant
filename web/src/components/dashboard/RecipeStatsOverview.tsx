@@ -48,7 +48,7 @@ export const RecipeStatsOverview: React.FC<RecipeStatsOverviewProps> = ({ recipe
 
   const stats = {
     total: recipes.length,
-    parameters: recipes.reduce((acc, recipe) => acc + Object.keys(recipe.recipe.parameters || {}).length, 0)
+    parameters: recipes.reduce((acc, recipe) => acc + (recipe.recipe?.parameters ? Object.keys(recipe.recipe.parameters).length : 0), 0)
   };
 
   const statCards = [

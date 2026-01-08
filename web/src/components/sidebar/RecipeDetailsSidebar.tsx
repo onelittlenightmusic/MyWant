@@ -320,7 +320,7 @@ const OverviewTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
           label="Parameters"
           value={recipe.recipe.parameters ? Object.keys(recipe.recipe.parameters).length : 0}
         />
-        <InfoRow label="Wants" value={recipe.recipe.wants.length} />
+        <InfoRow label="Wants" value={recipe.recipe.wants?.length || 0} />
         <InfoRow
           label="Results"
           value={recipe.recipe.result ? recipe.recipe.result.length : 0}

@@ -9,6 +9,7 @@ import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
+import { apiClient } from '@/api/client';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -22,6 +23,7 @@ import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
 import { MessageNotification } from '@/components/common/MessageNotification';
+import { DragOverlay } from '@/components/dashboard/DragOverlay';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -527,6 +529,23 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleSaveRecipeFromWant = async (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if (!wantId) return;
+
+    try {
+      const result = await apiClient.saveRecipeFromWant(wantId, {
+        name: `${want.metadata.name}-recipe`,
+        description: `Recipe saved from ${want.metadata.name}`,
+        version: '1.0.0'
+      });
+      showNotification(`✓ Recipe '${result.id}' saved successfully with ${result.wants} children`);
+    } catch (error) {
+      console.error('Failed to save recipe:', error);
+      showNotification(`✗ Failed to save recipe: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleCloseModals = () => {
     sidebar.closeForm();
     setEditingWant(null);
@@ -670,6 +689,59 @@ export const Dashboard: React.FC = () => {
     if (want) {
       sidebar.selectItem(want);
       setSidebarInitialTab('settings');
+    }
+  };
+
+  // Handler for when a want is dropped on a target want
+  const handleWantDropped = async (draggedWantId: string, targetWantId: string) => {
+    try {
+      const draggedWant = wants.find(w => (w.metadata?.id === draggedWantId) || (w.id === draggedWantId));
+      const targetWant = wants.find(w => (w.metadata?.id === targetWantId) || (w.id === targetWantId));
+
+      if (!draggedWant || !targetWant) {
+        showNotification('Want not found');
+        return;
+      }
+
+      // Check if already a child
+      const isAlreadyChild = draggedWant.metadata.ownerReferences?.some(ref => ref.id === targetWantId);
+      if (isAlreadyChild) {
+        showNotification(`${draggedWant.metadata.name} is already a child of ${targetWant.metadata.name}`);
+        return;
+      }
+
+      // Add owner reference
+      const ownerRef = {
+        apiVersion: 'mywant/v1',
+        kind: 'Want',
+        name: targetWant.metadata.name,
+        id: targetWantId,
+        controller: true,
+        blockOwnerDeletion: true
+      };
+
+      const updatedWant = {
+        ...draggedWant,
+        metadata: {
+          ...draggedWant.metadata,
+          ownerReferences: [
+            ...(draggedWant.metadata.ownerReferences || []),
+            ownerRef
+          ]
+        }
+      };
+
+      await apiClient.updateWant(draggedWantId, updatedWant);
+      showNotification(`✓ Added ${draggedWant.metadata.name} to ${targetWant.metadata.name}`);
+      
+      // Refresh wants list
+      await fetchWants();
+      
+      // Auto-expand the parent to show the new child
+      handleToggleExpand(targetWantId);
+    } catch (error) {
+      console.error('Failed to update want owner:', error);
+      showNotification(`✗ Failed to add child want: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -934,6 +1006,7 @@ export const Dashboard: React.FC = () => {
                 onToggleExpand={handleToggleExpand}
                 onCreateWant={handleCreateWant}
                 onLabelDropped={handleLabelDropped}
+                onWantDropped={handleWantDropped}
                 onShowReactionConfirmation={handleShowReactionConfirmation}
                 isSelectMode={isSelectMode}
                 selectedWantIds={selectedWantIds}
@@ -1271,6 +1344,7 @@ export const Dashboard: React.FC = () => {
             onSuspend={handleSuspendWant}
             onResume={handleResumeWant}
             onDelete={handleShowDeleteConfirmation}
+            onSaveRecipe={handleSaveRecipeFromWant}
           />
         )}
       </RightSidebar>
@@ -1282,12 +1356,24 @@ export const Dashboard: React.FC = () => {
         editingWant={editingWant}
       />
 
-      {/* Message Notification */}
-      <MessageNotification
-        message={notificationMessage}
-        isVisible={isNotificationVisible}
-        onDismiss={dismissNotification}
-      />
-    </Layout>
-  );
-};
+                  {/* Message Notification */}
+
+                  <MessageNotification
+
+                    message={notificationMessage}
+
+                    isVisible={isNotificationVisible}
+
+                    onDismiss={dismissNotification}
+
+                  />
+
+                </Layout>
+
+              );
+
+            };
+
+            
+
+      

@@ -1253,22 +1253,24 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		return false
 	}
 
-	// Compare labels
 	if !mapsEqual(a.Metadata.Labels, b.Metadata.Labels) {
 		return false
 	}
 
+	if !reflect.DeepEqual(a.Metadata.OwnerReferences, b.Metadata.OwnerReferences) {
+		return false
+	}
+
 	// Compare spec
-	if fmt.Sprintf("%v", a.Spec.Params) != fmt.Sprintf("%v", b.Spec.Params) {
+	if !reflect.DeepEqual(a.Spec.Params, b.Spec.Params) {
 		return false
 	}
 
-	if fmt.Sprintf("%v", a.Spec.Using) != fmt.Sprintf("%v", b.Spec.Using) {
+	if !reflect.DeepEqual(a.Spec.Using, b.Spec.Using) {
 		return false
 	}
 
-	// Compare when (scheduling)
-	if fmt.Sprintf("%v", a.Spec.When) != fmt.Sprintf("%v", b.Spec.When) {
+	if !reflect.DeepEqual(a.Spec.When, b.Spec.When) {
 		return false
 	}
 
@@ -1298,10 +1300,11 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 		// Deep copy the want
 		copiedWant := &Want{
 			Metadata: Metadata{
-				ID:     want.Metadata.ID,
-				Name:   want.Metadata.Name,
-				Type:   want.Metadata.Type,
-				Labels: copyStringMap(want.Metadata.Labels),
+				ID:              want.Metadata.ID,
+				Name:            want.Metadata.Name,
+				Type:            want.Metadata.Type,
+				Labels:          copyStringMap(want.Metadata.Labels),
+				OwnerReferences: copyOwnerReferences(want.Metadata.OwnerReferences),
 			},
 			Spec: WantSpec{
 				Params:              copyInterfaceMap(want.Spec.Params),
@@ -1367,6 +1370,15 @@ func copyStringSlice(src []string) []string {
 		return nil
 	}
 	dst := make([]string, len(src))
+	copy(dst, src)
+	return dst
+}
+
+func copyOwnerReferences(src []OwnerReference) []OwnerReference {
+	if src == nil {
+		return nil
+	}
+	dst := make([]OwnerReference, len(src))
 	copy(dst, src)
 	return dst
 }
@@ -1446,6 +1458,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					runtimeWant.want.Metadata.Name = updatedConfigWant.Metadata.Name
 					runtimeWant.want.Metadata.Type = updatedConfigWant.Metadata.Type
 					runtimeWant.want.Metadata.ID = updatedConfigWant.Metadata.ID
+					runtimeWant.want.Metadata.OwnerReferences = copyOwnerReferences(updatedConfigWant.Metadata.OwnerReferences)
 
 					// Reset status to Idle so want can be re-executed with new configuration
 					runtimeWant.want.RestartWant()

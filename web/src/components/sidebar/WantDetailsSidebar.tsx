@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -37,6 +37,7 @@ interface WantDetailsSidebarProps {
   onSuspend?: (want: Want) => void;
   onResume?: (want: Want) => void;
   onDelete?: (want: Want) => void;
+  onSaveRecipe?: (want: Want) => void;
 }
 
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
@@ -54,10 +55,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   onStop,
   onSuspend,
   onResume,
-  onDelete
+  onDelete,
+  onSaveRecipe
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
+
+  // Identify if this want is a Target (can have children)
+  const wantType = want?.metadata?.type?.toLowerCase() || '';
+  const isTargetWant = wantType.includes('target') || 
+                       wantType === 'owner' ||
+                       wantType.includes('approval');
 
   // Memoize wantId to avoid dependency array issues
   const wantId = want?.metadata?.id || want?.id;
@@ -112,6 +120,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const canStop = !!wantDetails && isRunning && !isSuspended;
   const canSuspend = !!wantDetails && isRunning && !isSuspended;
   const canDelete = !!wantDetails;
+  const canSaveRecipe = !!wantDetails && isTargetWant;
 
   const handleStartClick = () => {
     if (wantDetails) {
@@ -140,6 +149,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   const handleDeleteClick = () => {
     if (wantDetails && canDelete && onDelete) onDelete(wantDetails);
+  };
+
+  const handleSaveRecipeClick = () => {
+    if (wantDetails && canSaveRecipe && onSaveRecipe) onSaveRecipe(wantDetails);
   };
 
   // Fetch details when want ID changes (not on every want object change)
@@ -389,10 +402,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             onStop={handleStopClick}
             onSuspend={handleSuspendClick}
             onDelete={handleDeleteClick}
+            onSaveRecipe={handleSaveRecipeClick}
             canStart={canStart}
             canStop={canStop}
             canSuspend={canSuspend}
             canDelete={canDelete}
+            canSaveRecipe={canSaveRecipe}
             isSuspended={isSuspended}
             loading={loading}
           />

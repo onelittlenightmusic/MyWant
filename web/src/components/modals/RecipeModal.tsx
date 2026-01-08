@@ -252,7 +252,7 @@ export default function RecipeModal({
           version: recipe.recipe.metadata.version || '',
           custom_type: recipe.recipe.metadata.custom_type || '',
           parameters: recipe.recipe.parameters || {},
-          wants: recipe.recipe.wants.length > 0 ? recipe.recipe.wants.map(want => ({
+          wants: (recipe.recipe.wants && recipe.recipe.wants.length > 0) ? recipe.recipe.wants.map(want => ({
             type: want.type || want.metadata?.type || '',
             params: want.params || want.spec?.params || {},
             using: want.using || [],

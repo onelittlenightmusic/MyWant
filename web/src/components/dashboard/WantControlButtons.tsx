@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, Trash2 } from 'lucide-react';
+import { Play, Pause, Square, Trash2, BookOpen } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 export interface WantControlButtonsProps {
@@ -7,10 +7,12 @@ export interface WantControlButtonsProps {
   onStop?: () => void;
   onSuspend?: () => void;
   onDelete?: () => void;
+  onSaveRecipe?: () => void;
   canStart?: boolean;
   canStop?: boolean;
   canSuspend?: boolean;
   canDelete?: boolean;
+  canSaveRecipe?: boolean;
   isSuspended?: boolean;
   loading?: boolean;
   className?: string;
@@ -19,6 +21,7 @@ export interface WantControlButtonsProps {
     stop?: string;
     suspend?: string;
     delete?: string;
+    saveRecipe?: string;
   };
   showLabels?: boolean;
 }
@@ -28,10 +31,12 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
   onStop,
   onSuspend,
   onDelete,
+  onSaveRecipe,
   canStart = false,
   canStop = false,
   canSuspend = false,
   canDelete = false,
+  canSaveRecipe = false,
   isSuspended = false,
   loading = false,
   className = '',
@@ -39,7 +44,8 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
     start: 'Start',
     stop: 'Stop',
     suspend: 'Suspend',
-    delete: 'Delete'
+    delete: 'Delete',
+    saveRecipe: 'Save Recipe'
   },
   showLabels = false
 }) => {
@@ -95,6 +101,24 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
         <Square className="h-4 w-4" />
         {showLabels && <span className="text-sm font-medium">{labels.stop}</span>}
       </button>
+
+      {/* Save Recipe */}
+      {onSaveRecipe && (
+        <button
+          onClick={onSaveRecipe}
+          disabled={!canSaveRecipe || loading}
+          title={canSaveRecipe ? 'Save as recipe' : 'Only target wants can be saved as recipes'}
+          className={classNames(
+            'p-2 rounded-md transition-colors flex items-center gap-2',
+            canSaveRecipe && !loading
+              ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          )}
+        >
+          <BookOpen className="h-4 w-4" />
+          {showLabels && <span className="text-sm font-medium">{labels.saveRecipe}</span>}
+        </button>
+      )}
 
       {/* Delete */}
       <button

@@ -27,6 +27,7 @@ interface WantGridProps {
   onToggleExpand?: (wantId: string) => void;
   onCreateWant?: () => void;
   onLabelDropped?: (wantId: string) => void;
+  onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
   onSelectWant?: (wantId: string) => void;
@@ -50,6 +51,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onToggleExpand,
   onCreateWant,
   onLabelDropped,
+  onWantDropped,
   onShowReactionConfirmation,
   isSelectMode = false,
   selectedWantIds = new Set(),
@@ -267,6 +269,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               expandedParents={expandedParents}
               onToggleExpand={onToggleExpand}
               onLabelDropped={onLabelDropped}
+              onWantDropped={onWantDropped}
               onShowReactionConfirmation={onShowReactionConfirmation}
               isSelectMode={isSelectMode}
               selectedWantIds={selectedWantIds}

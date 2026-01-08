@@ -1,0 +1,23 @@
+recipe:
+    metadata:
+        name: saved-empty-target-recipe
+        description: Recipe saved from my-empty-target with children
+        version: 1.0.0
+    wants:
+        - metadata:
+            id: want-70082154-c7e2-48e6-95d5-7c85345f1ddb
+            name: my-silencer
+            type: silencer
+            labels: {}
+            ownerReferences:
+                - apiVersion: mywant/v1
+                  kind: Want
+                  name: my-empty-target
+                  id: want-c50eaca4-4ded-4fd2-b805-7ca7c3cd3bed
+                  controller: true
+                  blockOwnerDeletion: true
+          spec:
+            params:
+                policy: all_true
+            requires:
+                - reaction_auto_approval

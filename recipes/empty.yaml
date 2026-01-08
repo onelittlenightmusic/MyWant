@@ -1,0 +1,7 @@
+recipe:
+  metadata:
+    name: empty
+    custom_type: empty-target
+    description: "Empty target recipe"
+    version: "1.0.0"
+  wants: []

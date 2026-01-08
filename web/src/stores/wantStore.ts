@@ -11,6 +11,8 @@ interface WantStore {
   selectedWantResults: WantResults | null;
   loading: boolean;
   error: string | null;
+  draggingWant: string | null;
+  isOverTarget: boolean;
 
   // Actions
   fetchWants: () => Promise<void>;
@@ -31,6 +33,8 @@ interface WantStore {
   resumeWants: (ids: string[]) => Promise<void>;
   stopWants: (ids: string[]) => Promise<void>;
   startWants: (ids: string[]) => Promise<void>;
+  setDraggingWant: (wantId: string | null) => void;
+  setIsOverTarget: (isOver: boolean) => void;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -42,8 +46,13 @@ export const useWantStore = create<WantStore>()(
     selectedWantResults: null,
     loading: false,
     error: null,
+    draggingWant: null,
+    isOverTarget: false,
 
     // Actions
+    setDraggingWant: (wantId: string | null) => set({ draggingWant: wantId }),
+    setIsOverTarget: (isOver: boolean) => set({ isOverTarget: isOver }),
+
     fetchWants: async () => {
       set({ loading: true, error: null });
       try {

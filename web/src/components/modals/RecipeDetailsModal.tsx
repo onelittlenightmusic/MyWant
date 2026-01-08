@@ -113,10 +113,10 @@ export default function RecipeDetailsModal({
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
               <List className="h-5 w-5" />
-              Wants ({recipe.recipe.wants.length})
+              Wants ({recipe.recipe.wants?.length || 0})
             </h3>
             <div className="space-y-4">
-              {recipe.recipe.wants.map((want, index) => (
+              {recipe.recipe.wants?.map((want, index) => (
                 <div key={index} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-medium text-gray-900">

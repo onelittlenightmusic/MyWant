@@ -143,9 +143,6 @@ func (r *CustomTargetTypeRegistry) validateRecipe(recipe *GenericRecipe) error {
 	if recipe.Recipe.Metadata.Name == "" {
 		return fmt.Errorf("recipe name is required")
 	}
-	if len(recipe.Recipe.Wants) == 0 {
-		return fmt.Errorf("recipe must contain at least one want")
-	}
 
 	for i, want := range recipe.Recipe.Wants {
 		hasType := want.Type != "" || (want.Metadata.Type != "")

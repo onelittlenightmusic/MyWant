@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, CheckSquare, Square } from 'lucide-react';
+import { ChevronDown, CheckSquare, Square, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
+import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
 
 /**
@@ -40,6 +41,7 @@ interface WantCardProps {
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
   onLabelDropped?: (wantId: string) => void;
+  onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
 }
@@ -61,13 +63,21 @@ export const WantCard: React.FC<WantCardProps> = ({
   expandedParents,
   onToggleExpand,
   onLabelDropped,
+  onWantDropped,
   isSelectMode = false,
   selectedWantIds
 }) => {
   const wantId = want.metadata?.id || want.id;
+  const { setDraggingWant, setIsOverTarget } = useWantStore();
   // Use expandedParents from keyboard navigation if provided, otherwise use local state
   const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
+
+  // Identify if this want is a Target (can have children)
+  const wantType = want.metadata?.type?.toLowerCase() || '';
+  const isTargetWant = wantType.includes('target') || 
+                       wantType === 'owner' ||
+                       wantType.includes('approval');
 
   // Local state for managing expansion (fallback if expandedParents not provided)
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
@@ -79,6 +89,8 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // State for drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragOverWant, setIsDragOverWant] = useState(false);
+  const [draggedOverChildId, setDraggedOverChildId] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Focus the card when it's targeted by keyboard navigation
@@ -173,12 +185,46 @@ export const WantCard: React.FC<WantCardProps> = ({
     });
   };
 
+  // Handle drag start for the card itself
+  const handleDragStart = (e: React.DragEvent) => {
+    if (isSelectMode) return;
+    
+    const id = want.metadata?.id || want.id;
+    if (!id) return;
+
+    // Set dragging state in global store for target-side feedback
+    setDraggingWant(id);
+
+    e.dataTransfer.setData('application/mywant-id', id);
+    e.dataTransfer.setData('application/mywant-name', want.metadata?.name || '');
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggingWant(null);
+  };
+
   // Handle drag over
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-    setIsDragOver(true);
+    
+    const { draggingWant } = useWantStore.getState();
+    const isWantDrag = !!draggingWant || e.dataTransfer.types.includes('application/mywant-id');
+    
+    if (isWantDrag) {
+      setIsDragOver(false);
+      if (isTargetWant) {
+        e.dataTransfer.dropEffect = 'move';
+        if (!isDragOverWant) {
+          setIsDragOverWant(true);
+        }
+      }
+    } else {
+      setIsDragOverWant(false);
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    }
   };
 
   // Handle drag leave
@@ -186,6 +232,8 @@ export const WantCard: React.FC<WantCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
+    setIsDragOverWant(false);
+    setDraggedOverChildId(null);
   };
 
   // Handle drop
@@ -193,6 +241,22 @@ export const WantCard: React.FC<WantCardProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
+    setIsDragOverWant(false);
+    setDraggedOverChildId(null);
+    setDraggingWant(null); // Reset dragging state
+
+    const draggedWantId = e.dataTransfer.getData('application/mywant-id');
+    const targetWantId = want.metadata?.id || want.id;
+
+    if (draggedWantId && targetWantId && isTargetWant) {
+      // Don't drop on yourself
+      if (draggedWantId === targetWantId) return;
+      
+      if (onWantDropped) {
+        onWantDropped(draggedWantId, targetWantId);
+      }
+      return;
+    }
 
     try {
       const labelData = e.dataTransfer.getData('application/json');
@@ -261,6 +325,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       ref={cardRef}
+      draggable={!isSelectMode}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={handleCardClick}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -269,9 +336,10 @@ export const WantCard: React.FC<WantCardProps> = ({
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantId}
       className={classNames(
-        'card hover:shadow-md transition-shadow duration-200 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
+        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
-        isDragOver && 'border-green-500 border-2 bg-green-50',
+        // ALWAYS show blue for any valid drag over (labels or wants)
+        (isDragOverWant || isDragOver) && 'border-blue-500 border-2 bg-blue-50',
         parentBackgroundStyle.className,
         className || ''
       )}
@@ -283,6 +351,21 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       {/* Black overlay - covers remaining right portion */}
       <div style={blackOverlayStyle}></div>
+
+      {/* Want Drag Over Overlay (+ mark) - only for parent when not dragging over child */}
+      <div 
+        className={classNames(
+          "absolute inset-0 z-30 flex items-center justify-center bg-blue-600 transition-all duration-200 ease-out pointer-events-none",
+          isDragOverWant && isTargetWant ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
+        )}
+      >
+        <div className={classNames(
+          "bg-white p-4 rounded-full shadow-2xl border-2 border-blue-500 transform transition-all duration-200 ease-out",
+          isDragOverWant && isTargetWant ? "scale-100 opacity-100" : "scale-150 opacity-0"
+        )}>
+          <Plus className="w-12 h-12 text-blue-600" />
+        </div>
+      </div>
 
       {/* Selection Checkbox Overlay */}
       {isSelectMode && (
@@ -426,26 +509,65 @@ export const WantCard: React.FC<WantCardProps> = ({
                 pointerEvents: 'none' as const
               };
 
-              // Handle drag over for child card
-              const handleChildDragOver = (e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.dataTransfer.dropEffect = 'copy';
-                setIsDragOver(true);
-              };
+              // Identify if this child is also a Target
+              const isChildTarget = child.metadata?.type.toLowerCase().includes('target') || 
+                                    child.metadata?.type.toLowerCase() === 'owner' ||
+                                    child.metadata?.type.toLowerCase().includes('approval');
 
-              // Handle drag leave for child card
-              const handleChildDragLeave = (e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragOver(false);
-              };
+                  // Handle drag over for child card
+                  const handleChildDragOver = (e: React.DragEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const { draggingWant } = useWantStore.getState();
+                    const isWantDrag = !!draggingWant || e.dataTransfer.types.includes('application/mywant-id');
+                    
+                    if (isWantDrag) {
+                      setIsDragOver(false); // Ensure green border is OFF
+                      if (isChildTarget) {
+                        e.dataTransfer.dropEffect = 'move';
+                        setIsDragOverWant(true);
+                        setDraggedOverChildId(childId);
+                      } else {
+                        e.dataTransfer.dropEffect = 'none';
+                        setIsDragOverWant(false);
+                      }
+                    } else {
+                      // Label drag
+                      setIsDragOverWant(false);
+                      e.dataTransfer.dropEffect = 'copy';
+                      setIsDragOver(true);
+                    }
+                  };
 
-              // Handle drop for child card
-              const handleChildDrop = (e: React.DragEvent) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIsDragOver(false);
+                  // Handle drag leave for child card
+                  const handleChildDragLeave = (e: React.DragEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragOver(false);
+                    setIsDragOverWant(false);
+                    setDraggedOverChildId(null);
+                  };
+
+                  // Handle drop for child card
+                  const handleChildDrop = (e: React.DragEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragOver(false);
+                    setIsDragOverWant(false);
+                    setDraggedOverChildId(null);
+                    setDraggingWant(null); // Reset dragging state
+
+                const draggedWantId = e.dataTransfer.getData('application/mywant-id');
+                const targetWantId = child.metadata?.id || child.id;
+
+                if (draggedWantId && targetWantId && isChildTarget) {
+                  if (draggedWantId === targetWantId) return;
+                  if (onWantDropped) {
+                    onWantDropped(draggedWantId, targetWantId);
+                  }
+                  return;
+                }
 
                 try {
                   const labelData = e.dataTransfer.getData('application/json');
@@ -486,9 +608,10 @@ export const WantCard: React.FC<WantCardProps> = ({
                   data-keyboard-nav-id={childId}
                   tabIndex={0}
                   className={classNames(
-                    "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
+                    "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
-                    isDragOver && 'border-green-500 border-2 bg-green-50',
+                    // ALWAYS show blue for any valid drag over (labels or wants)
+                    (isDragOverWant || isDragOver) && 'border-blue-500 border-2 bg-blue-50',
                     childBackgroundStyle.className
                   )}
                   style={childBackgroundStyle.style}
@@ -513,6 +636,21 @@ export const WantCard: React.FC<WantCardProps> = ({
 
                   {/* Black overlay for child - covers remaining right portion */}
                   <div style={childBlackOverlayStyle}></div>
+
+                  {/* Want Drag Over Overlay for Child (+ mark) */}
+                  <div 
+                    className={classNames(
+                      "absolute inset-0 z-30 flex items-center justify-center bg-blue-600 transition-all duration-200 ease-out pointer-events-none",
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
+                    )}
+                  >
+                    <div className={classNames(
+                      "bg-white p-2 rounded-full shadow-xl border border-blue-500 transform transition-all duration-200 ease-out",
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "scale-100 opacity-100" : "scale-150 opacity-0"
+                    )}>
+                      <Plus className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
 
                   {/* Child want content using reusable component */}
                   <div className="p-4 w-full h-full relative z-10">

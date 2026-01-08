@@ -285,6 +285,11 @@ class MyWantApiClient {
     await this.client.delete(`/api/v1/recipes/${id}`);
   }
 
+  async saveRecipeFromWant(wantId: string, metadata: RecipeMetadata): Promise<{id: string, message: string, file: string, wants: number}> {
+    const response = await this.client.post('/api/v1/recipes/from-want', { wantId, metadata });
+    return response.data;
+  }
+
   // Want Type management
   async listWantTypes(category?: string, pattern?: string): Promise<WantTypeListResponse> {
     const params = new URLSearchParams();

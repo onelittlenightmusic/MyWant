@@ -30,7 +30,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   const recipeName = recipe.recipe.metadata.name || 'Unnamed Recipe';
   const description = recipe.recipe.metadata.description || '';
   const version = recipe.recipe.metadata.version || '';
-  const wantsCount = recipe.recipe.wants.length;
+  const wantsCount = recipe.recipe.wants?.length || 0;
   const parametersCount = recipe.recipe.parameters ? Object.keys(recipe.recipe.parameters).length : 0;
   const cardRef = React.useRef<HTMLDivElement>(null);
 
@@ -84,7 +84,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     }
   };
 
-  const hasExample = recipe.recipe.example && recipe.recipe.example.wants && recipe.recipe.example.wants.length > 0;
+  const hasExample = recipe.recipe.example?.wants && recipe.recipe.example.wants.length > 0;
 
   return (
     <div
