@@ -77,7 +77,10 @@ export const WantCard: React.FC<WantCardProps> = ({
   const wantType = want.metadata?.type?.toLowerCase() || '';
   const isTargetWant = wantType.includes('target') || 
                        wantType === 'owner' ||
-                       wantType.includes('approval');
+                       wantType.includes('approval') ||
+                       wantType.includes('system') ||
+                       wantType.includes('travel') ||
+                       hasChildren;
 
   // Local state for managing expansion (fallback if expandedParents not provided)
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
@@ -216,12 +219,13 @@ export const WantCard: React.FC<WantCardProps> = ({
       setIsDragOver(false);
       if (isTargetWant) {
         e.dataTransfer.dropEffect = 'move';
+        setIsOverTarget(true); // Always set true while over a target
         if (!isDragOverWant) {
           setIsDragOverWant(true);
-          setIsOverTarget(true);
         }
       } else {
-        setIsOverTarget(false);
+        // If we move from a target to a non-target, but still within the card group
+        // setIsOverTarget(false); // This might flicker, handled by individual card leave
       }
     } else {
       setIsDragOverWant(false);
@@ -341,11 +345,12 @@ export const WantCard: React.FC<WantCardProps> = ({
       tabIndex={0}
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantId}
+      data-is-target={isTargetWant}
       className={classNames(
         'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         // ALWAYS show blue for any valid drag over (labels or wants)
-        (isDragOverWant || isDragOver) && 'border-blue-500 border-2 bg-blue-50',
+        (isDragOverWant || isDragOver) && 'border-blue-600 border-2 bg-blue-100',
         parentBackgroundStyle.className,
         className || ''
       )}
@@ -361,15 +366,15 @@ export const WantCard: React.FC<WantCardProps> = ({
       {/* Want Drag Over Overlay (+ mark) - only for parent when not dragging over child */}
       <div 
         className={classNames(
-          "absolute inset-0 z-30 flex items-center justify-center bg-blue-600 transition-all duration-200 ease-out pointer-events-none",
-          isDragOverWant && isTargetWant && !draggedOverChildId ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
+          "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none",
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
         )}
       >
         <div className={classNames(
-          "bg-white p-4 rounded-full shadow-2xl border-2 border-blue-500 transform transition-all duration-200 ease-out",
-          isDragOverWant && isTargetWant && !draggedOverChildId ? "scale-100 opacity-100" : "scale-150 opacity-0"
+          "bg-white p-4 rounded-full shadow-2xl border-4 border-blue-600 transform transition-all duration-400 ease-out",
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
         )}>
-          <Plus className="w-12 h-12 text-blue-600" />
+          <Plus className="w-16 h-12 text-blue-700" />
         </div>
       </div>
 
@@ -632,7 +637,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
                     // ALWAYS show blue for any valid drag over (labels or wants)
-                    (isDragOverWant || isDragOver) && 'border-blue-500 border-2 bg-blue-50',
+                    (isDragOverWant || isDragOver) && 'border-blue-600 border-2 bg-blue-100',
                     childBackgroundStyle.className
                   )}
                   style={childBackgroundStyle.style}
@@ -661,15 +666,15 @@ export const WantCard: React.FC<WantCardProps> = ({
                   {/* Want Drag Over Overlay for Child (+ mark) */}
                   <div 
                     className={classNames(
-                      "absolute inset-0 z-30 flex items-center justify-center bg-blue-600 transition-all duration-200 ease-out pointer-events-none",
-                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
+                      "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none",
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
                     )}
                   >
                     <div className={classNames(
-                      "bg-white p-2 rounded-full shadow-xl border border-blue-500 transform transition-all duration-200 ease-out",
-                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "scale-100 opacity-100" : "scale-150 opacity-0"
+                      "bg-white p-2 rounded-full shadow-xl border-2 border-blue-600 transform transition-all duration-400 ease-out",
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
                     )}>
-                      <Plus className="w-6 h-6 text-blue-600" />
+                      <Plus className="w-6 h-6 text-blue-700" />
                     </div>
                   </div>
 
