@@ -4,7 +4,7 @@
 
 **Declarative chain programming with YAML configuration.** Express what you want to achieve, not how to do it.
 
-📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Examples](docs/agent-examples.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
+📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Examples](docs/agent-examples.md) | [CLI Guide](docs/WANT_CLI_USAGE.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Features
 
@@ -17,11 +17,23 @@
 
 ## Quick Start
 
-### Server Mode (with Web Dashboard)
+### CLI (want-cli) TL;DR
 
 ```bash
-make server  # Start server with web interface
+# Start backend and GUI together in background
+./want-cli gui start -D
+# List all active wants
+./want-cli wants list
+# Deploy a new want from file
+./want-cli wants create -f config.yaml
+# Stop servers
+./want-cli gui stop && ./want-cli server stop
 ```
+Check [Detailed CLI Usage Guide](docs/WANT_CLI_USAGE.md) for more commands.
+
+### Server Mode (legacy)
+
+
 
 ### Example: Queue Processing Pipeline
 

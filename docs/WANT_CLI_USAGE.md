@@ -1,0 +1,100 @@
+# want-cli Usage Guide
+
+`want-cli` is a powerful command-line tool to manage MyWant executions, recipes, agents, and the server itself.
+
+## Installation
+
+Build the CLI using the Makefile:
+
+```bash
+# Build the CLI with embedded GUI
+make release
+```
+
+## Core Commands
+
+### Server & GUI Management
+
+Start the backend and frontend easily.
+
+```bash
+# Start backend API server in background
+./want-cli server start --detach --port 8080
+
+# Start GUI (embedded mode) in background
+./want-cli gui start --detach --port 3000
+
+# Stop them
+./want-cli server stop
+./want-cli gui stop
+```
+
+### Want Management
+
+List, view, and manage lifecycle of wants.
+
+```bash
+# List all wants
+./want-cli wants list
+
+# Get detailed status of a specific want
+./want-cli wants get <WANT_ID>
+
+# Create/Deploy a new want from YAML file
+./want-cli wants create -f config.yaml
+
+# Delete a want
+./want-cli wants delete <WANT_ID>
+
+# Batch lifecycle operations
+./want-cli wants suspend <ID1> <ID2>
+./want-cli wants resume <ID1>
+./want-cli wants stop <ID1>
+./want-cli wants start <ID1>
+```
+
+### Recipe Management
+
+Handle reusable templates.
+
+```bash
+# List available recipes
+./want-cli recipes list
+
+# Create a new recipe from a file
+./want-cli recipes create -f recipe.yaml
+
+# Generate a recipe from an existing deployed want (and its children)
+./want-cli recipes from-want <WANT_ID> --name "my-new-recipe"
+```
+
+### System Inspection
+
+Explore available types and agents.
+
+```bash
+# List available want types (standard and custom)
+./want-cli types list
+
+# List registered agents and their capabilities
+./want-cli agents list
+
+# List capabilities
+./want-cli capabilities list
+```
+
+### Utilities
+
+```bash
+# View API operation logs
+./want-cli logs
+
+# Query the integrated LLM (Ollama)
+./want-cli llm query "Tell me about my system status"
+```
+
+## Global Flags
+
+- `--server`: Specify MyWant server URL (default: `http://localhost:8080`)
+- `--config`: Specify a custom CLI config file (default: `~/.want-cli.yaml`)
+- `-h, --help`: Show help for any command
