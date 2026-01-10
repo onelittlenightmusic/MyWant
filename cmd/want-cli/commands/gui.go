@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"mywant/pkg/server"
 
@@ -29,6 +30,30 @@ var guiStartCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		host, _ := cmd.Flags().GetString("host")
 		isDev, _ := cmd.Flags().GetBool("dev")
+
+		// 1. Guard: Check if already running (for detached mode)
+		if detach {
+			// Check PID file
+			data, err := os.ReadFile(guiPidFile)
+			if err == nil {
+				pid, err := strconv.Atoi(string(data))
+				if err == nil {
+					if process, err := os.FindProcess(pid); err == nil {
+						// Check if process is actually running
+						if err := process.Signal(syscall.Signal(0)); err == nil {
+							fmt.Printf("Error: MyWant GUI is already running (PID: %d). Stop it first.\n", pid)
+							os.Exit(1)
+						}
+					}
+				}
+			}
+
+			// Check Port
+			if isPortOpen(port) {
+				fmt.Printf("Error: Port %d is already in use. Stop the existing process or use a different port.\n", port)
+				os.Exit(1)
+			}
+		}
 
 		if isDev {
 			// Legacy development mode using npm run dev
@@ -53,6 +78,45 @@ var guiStartCmd = &cobra.Command{
 		if err := s.Start(); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
+		}
+	},
+}
+
+var guiPsCmd = &cobra.Command{
+	Use:   "ps",
+	Short: "Show GUI process status",
+	Run: func(cmd *cobra.Command, args []string) {
+		port, _ := cmd.Flags().GetInt("port")
+
+		running := false
+		pid := 0
+
+		// Check PID file
+		data, err := os.ReadFile(guiPidFile)
+		if err == nil {
+			p, err := strconv.Atoi(string(data))
+			if err == nil {
+				if process, err := os.FindProcess(p); err == nil {
+					if err := process.Signal(syscall.Signal(0)); err == nil {
+						running = true
+						pid = p
+					}
+				}
+			}
+		}
+
+		// Also check port
+		portInUse := isPortOpen(port)
+
+		fmt.Println("MyWant GUI Status:")
+		fmt.Printf("  Port:    %d\n", port)
+		if running {
+			fmt.Printf("  Status:  RUNNING (Background)\n")
+			fmt.Printf("  PID:     %d\n", pid)
+		} else if portInUse {
+			fmt.Printf("  Status:  RUNNING (Active on port but PID file missing or invalid)\n")
+		} else {
+			fmt.Printf("  Status:  STOPPED\n")
 		}
 	},
 }
@@ -103,7 +167,7 @@ func runDevMode(port int, detach bool) {
 func runGoServerDetached(port int, host string) {
 	executable, _ := os.Executable()
 	args := []string{"gui", "start", "--port", strconv.Itoa(port), "--host", host}
-	
+
 	os.MkdirAll("logs", 0755)
 	logFile, err := os.OpenFile(filepath.Join("logs", "gui.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
@@ -114,7 +178,7 @@ func runGoServerDetached(port int, host string) {
 	cmd := exec.Command(executable, args...)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	
+
 	// Set pgid to allow killing the whole group later
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -134,29 +198,33 @@ var guiStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the background frontend server",
 	Run: func(cmd *cobra.Command, args []string) {
+		port, _ := cmd.Flags().GetInt("port")
+
+		// 1. Try stopping via PID file
 		data, err := os.ReadFile(guiPidFile)
-		if err != nil {
-			fmt.Printf("Error: Could not read PID file (%s). Is the frontend running in background?\n", guiPidFile)
-			os.Exit(1)
-		}
+		if err == nil {
+			pid, _ := strconv.Atoi(string(data))
+			fmt.Printf("Stopping Frontend process group (PID: %d)...\n", pid)
 
-		pid, _ := strconv.Atoi(string(data))
-
-		// Find the process group to kill all sub-processes started by npm
-		// On Unix, the pgid is usually the same as pid of the leader
-		fmt.Printf("Stopping Frontend process group (PID: %d)...\n", pid)
-		
-		// Use negative PID to kill the entire process group
-		err = syscall.Kill(-pid, syscall.SIGTERM)
-		if err != nil {
-			// Fallback to single process kill if pgid kill fails
-			process, _ := os.FindProcess(pid)
-			if process != nil {
-				process.Signal(syscall.SIGTERM)
+			// Use negative PID to kill the entire process group
+			err = syscall.Kill(-pid, syscall.SIGTERM)
+			if err != nil {
+				// Fallback to single process kill if pgid kill fails
+				process, _ := os.FindProcess(pid)
+				if process != nil {
+					process.Signal(syscall.SIGTERM)
+				}
 			}
+			time.Sleep(1 * time.Second)
+			os.Remove(guiPidFile)
 		}
 
-		os.Remove(guiPidFile)
+		// 2. Fallback: Kill anything on the port
+		fmt.Printf("Ensuring port %d is free...\n", port)
+		if killed := killProcessOnPort(port); killed {
+			fmt.Printf("Terminated lingering process on port %d\n", port)
+		}
+
 		fmt.Println("Frontend stopped.")
 	},
 }
@@ -164,8 +232,11 @@ var guiStopCmd = &cobra.Command{
 func init() {
 	GuiCmd.AddCommand(guiStartCmd)
 	GuiCmd.AddCommand(guiStopCmd)
+	GuiCmd.AddCommand(guiPsCmd)
 
 	guiStartCmd.Flags().IntP("port", "p", 3000, "Port to listen on")
+	guiStopCmd.Flags().IntP("port", "p", 3000, "Port to stop")
+	guiPsCmd.Flags().IntP("port", "p", 3000, "Port to check")
 	guiStartCmd.Flags().StringP("host", "H", "localhost", "Host to bind to")
 	guiStartCmd.Flags().BoolP("detach", "D", false, "Run frontend in background")
 	guiStartCmd.Flags().Bool("dev", false, "Run in development mode (requires npm)")

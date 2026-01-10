@@ -15,16 +15,22 @@ make release
 
 ### Server & GUI Management
 
-Start the backend and frontend easily.
+Start, monitor, and stop the backend and frontend services.
 
 ```bash
 # Start backend API server in background
+# (Includes a guard to prevent multiple instances on the same port)
 ./want-cli server start --detach --port 8080
 
+# Check process status (PID, Port, and Run State)
+./want-cli server ps
+./want-cli gui ps
+
 # Start GUI (embedded mode) in background
+# (Includes a guard to prevent multiple instances on the same port)
 ./want-cli gui start --detach --port 3000
 
-# Stop them
+# Stop them (Robust cleanup: kills processes by PID and Port)
 ./want-cli server stop
 ./want-cli gui stop
 ```
@@ -91,6 +97,43 @@ Explore available types and agents.
 
 # Query the integrated LLM (Ollama)
 ./want-cli llm query "Tell me about my system status"
+```
+
+## Shell Completion
+
+`want-cli` supports generating shell completion scripts for Bash, Zsh, Fish, and PowerShell.
+
+### Zsh (Recommended)
+
+To enable completion in your current session:
+```zsh
+source <(./want-cli completion zsh)
+```
+
+To make it persistent, add the following to your `~/.zshrc`:
+```zsh
+source <(path/to/want-cli completion zsh)
+```
+
+Alternatively, you can add the completion script to your fpath:
+```zsh
+mkdir -p ~/.zsh/completions
+./want-cli completion zsh > ~/.zsh/completions/_want-cli
+# Then add these lines to ~/.zshrc if they aren't there:
+fpath=(~/.zsh/completions $fpath)
+autoload -U compinit; compinit
+```
+
+### Bash
+
+To enable completion in your current session:
+```bash
+source <(./want-cli completion bash)
+```
+
+To make it persistent, add the following to your `~/.bashrc`:
+```bash
+source <(path/to/want-cli completion bash)
 ```
 
 ## Global Flags

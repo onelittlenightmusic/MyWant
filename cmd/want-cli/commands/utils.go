@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"text/tabwriter"
 
 	"mywant/pkg/client"
@@ -11,6 +13,42 @@ import (
 	"github.com/spf13/viper"
 )
 
+// isPortOpen checks if a port is in use
+func isPortOpen(port int) bool {
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	output, err := cmd.Output()
+	return err == nil && len(output) > 0
+}
+
+// killProcessOnPort finds and kills processes listening on the given port
+func killProcessOnPort(port int) bool {
+	// Use lsof to find the PID
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	output, err := cmd.Output()
+	if err != nil || len(output) == 0 {
+		return false
+	}
+
+	pids := strings.Split(strings.TrimSpace(string(output)), "\n")
+	killedAny := false
+	for _, pidStr := range pids {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+
+		if pid == os.Getpid() {
+			continue // Don't kill ourselves
+		}
+
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			process.Kill()
+			killedAny = true
+		}
+	}
+	return killedAny
+}
 var LlmCmd = &cobra.Command{
 	Use:   "llm",
 	Short: "LLM utilities",
