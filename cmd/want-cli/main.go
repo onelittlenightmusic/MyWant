@@ -31,6 +31,8 @@ func main() {
 	rootCmd.AddCommand(commands.TypesCmd)
 	rootCmd.AddCommand(commands.LlmCmd)
 	rootCmd.AddCommand(commands.LogsCmd)
+	rootCmd.AddCommand(commands.ServerCmd)
+	rootCmd.AddCommand(commands.GuiCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

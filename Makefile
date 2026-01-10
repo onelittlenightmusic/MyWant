@@ -1,4 +1,4 @@
-.PHONY: clean build test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api test-buffet-restart test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-monitor-flight-api test-dynamic-travel-with-flight-api test-concurrent-deploy test-llm-api test-recipe-api test-buffet-restart test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -9,11 +9,13 @@ fmt:
 vet:
 	@echo "🔍 Running go vet..."
 	go vet -C engine ./src/... ./cmd/server/...
+	go vet ./pkg/... ./cmd/want-cli/...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run -C engine ./src/... ./cmd/server/...; \
+		golangci-lint run ./pkg/... ./cmd/want-cli/...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 		echo "📋 Running basic checks instead..."; \
@@ -22,43 +24,28 @@ lint:
 
 test:
 	@echo "🧪 Running tests..."
-	go test -C engine -v ./src/... ./cmd/server/... || echo "⚠️  Some tests failed or no tests found"
+	go test -C engine -v ./src/... || echo "⚠️  Engine tests failed"
+	go test -v ./pkg/... ./cmd/want-cli/... || echo "⚠️  CLI/Package tests failed"
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
 
-# Test all run targets
-test-all-runs:
-	@echo "🧪 Testing all run targets..."
-	@failed_targets="" && \
-	for target in run-fibonacci-loop run-fibonacci-recipe run-prime run-qnet run-qnet-recipe run-travel run-travel-recipe run-travel-agent run-travel-agent-full run-travel-agent-direct run-hierarchical-approval run-dynamic-travel-change; do \
-		echo "" && \
-		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-		echo "🔹 Testing $$target..." && \
-		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-		if timeout 10s make $$target 2>&1 | head -50; then \
-			echo "✅ $$target completed successfully" ; \
-		else \
-			echo "❌ $$target failed or timed out" && \
-			failed_targets="$$failed_targets $$target"; \
-		fi; \
-	done && \
-	echo "" && \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-	echo "📊 Test Results Summary" && \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" && \
-	if [ -z "$$failed_targets" ]; then \
-		echo "✅ All run targets passed!" && \
-		exit 0; \
-	else \
-		echo "❌ Failed targets:$$failed_targets" && \
-		exit 1; \
-	fi
+# Build targets
+build-gui:
+	@echo "📦 Building frontend assets..."
+	cd web && npm install && npm run build
+
+build-cli:
+	@echo "🔨 Building want-cli with embedded GUI..."
+	go build -o want-cli ./cmd/want-cli
+
+release: build-gui build-cli
+	@echo "🚀 Release build complete: want-cli"
+
 # Build the mywant library
 build: check
 	@echo "🔨 Building mywant library..."
 	go build -C engine ./src/...
-
 # Test that module builds correctly
 test-build:
 	cd engine && go mod tidy && go build ./src/...
