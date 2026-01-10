@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	. "mywant/engine/src"
 	"time"
@@ -91,11 +92,16 @@ func NewCoordinatorWant(
 		coordinatorType,
 	)
 
+	// Set connectivity requirements based on the number of 'using' selectors
+	// This ensures the coordinator doesn't start until all providers are connected
+	want.ConnectivityMetadata.RequiredInputs = len(spec.Using)
+
 	// Determine coordinator configuration based on want type
 	_, dataHandler, completionChecker := getCoordinatorConfig(coordinatorType, want)
 
-	// Create dispatcher with approval and travel handlers
-	approvalHandler := &ApprovalDataHandler{Level: 1}
+	// Create dispatcher with correct level handlers
+	coordinatorLevel := want.GetIntParam("coordinator_level", 1)
+	approvalHandler := &ApprovalDataHandler{Level: coordinatorLevel}
 	travelHandler := &TravelDataHandler{IsBuffet: false, CompletionTimeout: 0}
 	dispatcher := NewDataHandlerDispatcher(approvalHandler, travelHandler)
 
@@ -196,13 +202,8 @@ func (c *CoordinatorWant) Progress() {
 
 	// Calculate and store achieving_percentage based on actual received data
 	// Use data_by_channel to get the actual count of received packets
-	dataByChannelVal, _ := c.GetState("data_by_channel")
-	receivedCount := 0
-	if dataByChannel, ok := dataByChannelVal.(map[int]any); ok {
-		receivedCount = len(dataByChannel)
-	} else if dataByChannel, ok := dataByChannelVal.(map[string]any); ok {
-		receivedCount = len(dataByChannel)
-	}
+	dataByChannel := getChannelMap(&c.Want)
+	receivedCount := len(dataByChannel)
 
 	achievingPercentage := 0
 	if inCount > 0 {
@@ -228,26 +229,19 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	inCount := c.GetInCount()
 
 	// Calculate how many channels have EVER provided data (stored in persistent state)
-	dataByChannelVal, _ := c.GetState("data_by_channel")
-	everHeardCount := 0
-	if dataByChannel, ok := dataByChannelVal.(map[int]any); ok {
-		everHeardCount = len(dataByChannel)
-	} else if dataByChannel, ok := dataByChannelVal.(map[string]any); ok {
-		everHeardCount = len(dataByChannel)
-	}
+	dataByChannel := getChannelMap(&c.Want)
+	everHeardCount := len(dataByChannel)
 
-	// Logic change: If we have heard from everyone at least once ever,
-	// we can proceed to check timeout for any incremental updates.
-	// This prevents getting stuck waiting for "DONE" signals from already achieved upstreams.
+	// Logic: If we haven't heard from everyone at least once ever, we must wait.
 	if everHeardCount < inCount {
-		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for initial sync - heard %d/%d (ever: %d/%d)",
+		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for initial sync - heard %d/%d in this cycle (ever: %d/%d)",
 			len(channelsHeard), inCount, everHeardCount, inCount))
 		return // Still waiting for first data from some channels
 	}
 
 	c.StoreLog(fmt.Sprintf("[tryCompletion] Full data set available (%d/%d), checking timeout", everHeardCount, inCount))
 
-	// All channels have sent: record the first time (independent of timeout)
+	// All channels have sent at least once: record the first time if not already set
 	lastPacketTimeVal, exists := c.GetState("last_packet_time")
 	if !exists || lastPacketTimeVal == nil {
 		nowUnix := time.Now().Unix()
@@ -324,24 +318,41 @@ func (h *DefaultDataHandler) GetCompletionTimeout() time.Duration {
 
 // ============================================================================ Common Handler Utilities ============================================================================
 
-// processDefaultMapData is a helper function for processing generic map[string]any data
-func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap map[string]any) bool {
+// getChannelMap safely retrieves the channel data map from state, handling both map[int]any and map[string]any
+func getChannelMap(want *Want) map[string]any {
 	dataByChannelVal, _ := want.GetState("data_by_channel")
-	dataByChannel, ok := dataByChannelVal.(map[int]any)
-	if !ok {
-		if dataByChannelVal == nil {
-			dataByChannel = make(map[int]any)
+	if dataByChannelVal == nil {
+		return make(map[string]any)
+	}
+
+	// Always return as map[string]any for consistency (JSON unmarshaling friendly)
+	result := make(map[string]any)
+
+	switch m := dataByChannelVal.(type) {
+	case map[int]any:
+		for k, v := range m {
+			result[fmt.Sprintf("%d", k)] = v
+		}
+	case map[string]any:
+		for k, v := range m {
+			result[k] = v
 		}
 	}
 
-	dataByChannel[channelIndex] = packetMap
+	return result
+}
+
+// processDefaultMapData is a helper function for processing generic map[string]any data
+func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap map[string]any) bool {
+	dataByChannel := getChannelMap(&want.Want)
+	dataByChannel[fmt.Sprintf("%d", channelIndex)] = packetMap
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
-		"last_packet_time":       time.Now(),
+		"last_packet_time":       time.Now().Unix(),
 	})
 
 	// Extract and store common fields if present
@@ -379,22 +390,15 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		return false
 	}
 
-	dataByChannelVal, _ := want.GetState("data_by_channel")
-	dataByChannel, ok := dataByChannelVal.(map[int]any)
-	if !ok {
-		if dataByChannelVal == nil {
-			dataByChannel = make(map[int]any)
-		}
-	}
-
-	dataByChannel[channelIndex] = approvalData
+	dataByChannel := getChannelMap(&want.Want)
+	dataByChannel[fmt.Sprintf("%d", channelIndex)] = approvalData
 
 	// Store packet data and tracking
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
-		"last_packet_time":       time.Now(),
+		"last_packet_time":       time.Now().Unix(),
 	})
 
 	// Store evidence data if present
@@ -530,14 +534,18 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 		len(schedule.Events),
 		eventDetails))
 
-	dataByChannelVal, _ := want.GetState("data_by_channel")
-	dataByChannel, ok := dataByChannelVal.(map[int]any)
-	if !ok {
-		if dataByChannelVal == nil {
-			dataByChannel = make(map[int]any)
-		}
+	dataByChannel := getChannelMap(&want.Want)
+	
+	// Use path name as a stable key instead of dynamic channel index
+	paths := want.GetPaths()
+	if channelIndex >= 0 && channelIndex < len(paths.In) {
+		stableKey := paths.In[channelIndex].Name
+		dataByChannel[stableKey] = schedule
+		want.StoreLog(fmt.Sprintf("[PACKET-RECV] Coordinator stored TravelSchedule under stable key '%s'", stableKey))
+	} else {
+		// Fallback to index if path not found (safety)
+		dataByChannel[fmt.Sprintf("%d", channelIndex)] = schedule
 	}
-	dataByChannel[channelIndex] = schedule
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
@@ -546,44 +554,91 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	want.StoreStateMulti(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
+		"last_packet_time":       time.Now().Unix(),
 	})
-
-	// Only set last_packet_time if it hasn't been set yet
-	if lastPacketTimeVal, exists := want.GetState("last_packet_time"); !exists || lastPacketTimeVal == nil {
-		want.StoreState("last_packet_time", time.Now().Unix())
-	}
 
 	return true
 }
 
 func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]any {
 	// For travel coordinator, generate final itinerary from all channels
-	dataByChannelVal, _ := want.GetState("data_by_channel")
+	dataByChannel := getChannelMap(&want.Want)
 
 	stateUpdates := make(map[string]any)
-	allEvents := make([]TimeSlot, 0)
-	switch v := dataByChannelVal.(type) {
-	case map[int]any:
-		for _, data := range v {
-			if schedule, ok := data.(*TravelSchedule); ok {
-				allEvents = append(allEvents, schedule.Events...)
-			} else {
-				want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.GetStateUpdates: type assertion failed for channel data. Expected *TravelSchedule, got %T", data))
+	
+	// Use a map to deduplicate events by Type (e.g., flight, restaurant, hotel)
+	// This ensures that new packets for the same type (like rebooked flights) 
+	// overwrite the previous entry instead of accumulating.
+	latestEventsByType := make(map[string]TimeSlot)
+
+	processSchedules := func(chanKey string, data any) {
+		// Data might be *TravelSchedule or map[string]any (if unmarshaled)
+		var schedule *TravelSchedule
+		
+		switch v := data.(type) {
+		case *TravelSchedule:
+			schedule = v
+		case map[string]any:
+			// Manual conversion from map to TravelSchedule
+			// Use JSON marshal/unmarshal for the most robust conversion
+			jsonData, err := json.Marshal(v)
+			if err == nil {
+				var s TravelSchedule
+				if err := json.Unmarshal(jsonData, &s); err == nil {
+					schedule = &s
+				}
+			}
+			
+			// Fallback if JSON fails or produces empty events
+			if schedule == nil || len(schedule.Events) == 0 {
+				// Old manual logic as emergency fallback
+				schedule = &TravelSchedule{}
+				eventsVal, ok := v["events"]
+				if !ok { eventsVal, ok = v["Events"] }
+				if ok {
+					if events, ok := eventsVal.([]any); ok {
+						for _, e := range events {
+							if eventMap, ok := e.(map[string]any); ok {
+								ts := TimeSlot{}
+								getStr := func(m map[string]any, keys ...string) string {
+									for _, k := range keys {
+										if val, ok := m[k].(string); ok { return val }
+									}
+									return ""
+								}
+								startStr := getStr(eventMap, "start", "Start")
+								if startStr != "" { ts.Start, _ = time.Parse(time.RFC3339, startStr) }
+								endStr := getStr(eventMap, "end", "End")
+								if endStr != "" { ts.End, _ = time.Parse(time.RFC3339, endStr) }
+								ts.Type = getStr(eventMap, "type", "Type")
+								ts.Name = getStr(eventMap, "name", "Name")
+								if ts.Type != "" { schedule.Events = append(schedule.Events, ts) }
+							}
+						}
+					}
+				}
+			}
+		default:
+			want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.GetStateUpdates: unknown data type for channel %s: %T", chanKey, data))
+			return
+		}
+
+		if schedule != nil {
+			for _, event := range schedule.Events {
+				want.StoreLog(fmt.Sprintf("[DEBUG] GetStateUpdates: Stable key '%s' provided event type %s (%s)", chanKey, event.Type, event.Name))
+				latestEventsByType[event.Type] = event
 			}
 		}
-	case map[string]any:
-		for _, data := range v {
-			if schedule, ok := data.(*TravelSchedule); ok {
-				allEvents = append(allEvents, schedule.Events...)
-			} else {
-				want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.GetStateUpdates: type assertion failed for channel data. Expected *TravelSchedule, got %T", data))
-			}
-		}
-	default:
-		if dataByChannelVal != nil {
-			want.StoreLog(fmt.Sprintf("[ERROR] TravelDataHandler.GetStateUpdates: type assertion failed for data_by_channel. Expected map[int]any or map[string]any, got %T", dataByChannelVal))
-		}
-		return stateUpdates
+	}
+
+	for k, data := range dataByChannel {
+		processSchedules(k, data)
+	}
+
+	// Convert map back to slice
+	allEvents := make([]TimeSlot, 0, len(latestEventsByType))
+	for _, event := range latestEventsByType {
+		allEvents = append(allEvents, event)
 	}
 
 	if len(allEvents) > 0 {
