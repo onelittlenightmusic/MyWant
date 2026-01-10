@@ -58,7 +58,7 @@ type ItineraryEvent struct {
 func TestDynamicTravelChangeIntegration(t *testing.T) {
 	// --- 0. Pre-test Cleanup ---
 	t.Log("Cleaning up existing processes...")
-	cleanupCmd := exec.Command("./want-cli", "server", "stop")
+	cleanupCmd := exec.Command("./want-cli", "stop")
 	cleanupCmd.Dir = ".."
 	cleanupCmd.Run()
 	
@@ -68,7 +68,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 	rmCmd := exec.Command("rm", "-f", "engine/memory/*.yaml")
 	rmCmd.Dir = ".."
 	rmCmd.Run()
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// --- 1. Build binaries ---
 	t.Log("Building binaries...")
@@ -100,7 +100,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 
 	// --- 3. Start MyWant Server via want-cli ---
 	t.Log("Starting MyWant server via want-cli...")
-	startCmd := exec.Command("./want-cli", "server", "start", "-D", "--port", "8080")
+	startCmd := exec.Command("./want-cli", "start", "-D", "--port", "8080")
 	startCmd.Dir = ".."
 	if err := startCmd.Run(); err != nil {
 		t.Fatalf("Failed to start MyWant server: %v", err)
@@ -108,7 +108,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 	
 	defer func() {
 		t.Log("Stopping MyWant server via want-cli...")
-		stopServerCmd := exec.Command("./want-cli", "server", "stop")
+		stopServerCmd := exec.Command("./want-cli", "stop")
 		stopServerCmd.Dir = ".."
 		stopServerCmd.Run()
 	}()
