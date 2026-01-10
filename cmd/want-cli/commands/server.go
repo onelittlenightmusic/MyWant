@@ -1,10 +1,9 @@
 package commands
 
 import (
-        "strings"
-        "time"
-	"fmt"
-	"os"
+		"time"
+		"fmt"
+		"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -157,7 +156,8 @@ var serverPsCmd = &cobra.Command{
 	},
 }
 
-var serverStopCmd = &cobra.Command{	Use:   "stop",
+var serverStopCmd = &cobra.Command{
+	Use:   "stop",
 	Short: "Stop the background API server",
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
@@ -195,6 +195,8 @@ var serverStopCmd = &cobra.Command{	Use:   "stop",
 	},
 }
 
+func init() {
+	ServerCmd.AddCommand(serverStartCmd)
 	ServerCmd.AddCommand(serverStopCmd)
 	ServerCmd.AddCommand(serverPsCmd)
 
