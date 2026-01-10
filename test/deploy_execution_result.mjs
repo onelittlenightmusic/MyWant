@@ -11,7 +11,7 @@ async function deployExecutionResult() {
 
   try {
     console.log('Step 1: Navigating to MyWant Dashboard...');
-    await page.goto('http://localhost:3000/dashboard');
+    await page.goto('http://localhost:8080/dashboard');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 

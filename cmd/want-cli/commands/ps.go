@@ -76,6 +76,6 @@ func getProcessStatus(label string, pidFileName string, port int) (string, int, 
 
 func init() {
 	PsCmd.Flags().Int("server-port", 8080, "Backend server port")
-	PsCmd.Flags().Int("gui-port", 3000, "Frontend GUI port")
+	PsCmd.Flags().Int("gui-port", 8080, "Frontend GUI port")
 	PsCmd.Flags().Int("mock-port", 8081, "Mock flight server port")
 }

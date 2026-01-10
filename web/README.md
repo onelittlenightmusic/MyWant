@@ -47,7 +47,7 @@ npm run preview
 
 ### Development Server
 
-The development server runs on `http://localhost:3000` and proxies API requests to the MyWant backend at `http://localhost:8080`.
+The development server runs on `http://localhost:8080` and proxies API requests to the MyWant backend at `http://localhost:8080`.
 
 ### Project Structure
 

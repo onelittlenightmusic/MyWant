@@ -3,7 +3,7 @@
 This document outlines the keyboard shortcuts available in the application and provides guidance on how to use them for automated testing via Chrome MCP.
 
 ## Environment Details
-- **Frontend URL:** `http://localhost:3000`
+- **Frontend URL:** `http://localhost:8080`
 - **Backend API:** `http://localhost:8080` (Proxied via `/api` on frontend)
 
 ## Application Shortcuts
