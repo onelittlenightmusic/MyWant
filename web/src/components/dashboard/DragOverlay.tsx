@@ -3,8 +3,10 @@ import { useWantStore } from '@/stores/wantStore';
 import { classNames } from '@/utils/helpers';
 
 export const DragOverlay: React.FC = () => {
-  const { draggingWant, isOverTarget } = useWantStore();
+  const { wants, draggingWant, isOverTarget } = useWantStore();
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const want = wants.find(w => (w.metadata?.id === draggingWant) || (w.id === draggingWant));
 
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
@@ -21,7 +23,7 @@ export const DragOverlay: React.FC = () => {
     };
   }, [draggingWant]);
 
-  if (!draggingWant) return null;
+  if (!draggingWant || !want) return null;
 
   return (
     <div
@@ -37,9 +39,9 @@ export const DragOverlay: React.FC = () => {
         isOverTarget ? "opacity-90 border-blue-600" : "opacity-100"
       )}>
         <h4 className="text-sm font-bold text-gray-900 truncate">
-          {draggingWant.metadata?.name || 'Unnamed Want'}
+          {want.metadata?.name || 'Unnamed Want'}
         </h4>
-        <p className="text-xs text-gray-500">{draggingWant.metadata?.type || 'Unknown Type'}</p>
+        <p className="text-xs text-gray-500">{want.metadata?.type || 'Unknown Type'}</p>
       </div>
     </div>
   );

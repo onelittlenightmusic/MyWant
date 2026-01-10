@@ -76,9 +76,9 @@ export interface ConfigMetadata {
   labels?: Record<string, string>;
 }
 
-export type WantExecutionStatus = 'created' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped';
+export type WantExecutionStatus = 'created' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped' | 'terminated';
 
-export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'achieved' | 'failed' | 'stopped';
+export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'achieved' | 'failed' | 'stopped' | 'terminated';
 
 export interface WantDetails extends Want {
   execution_status?: WantExecutionStatus;

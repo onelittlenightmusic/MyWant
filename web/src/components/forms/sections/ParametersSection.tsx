@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, forwardRef } from 'react';
 import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { SectionNavigationCallbacks } from '@/types/formSection';
-import { CommitInput } from '@/components/common/CommitInput';
+import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
 /**
  * Parameter definition from want type
@@ -46,7 +46,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
 }, ref) => {
   const [showOptionalParams, setShowOptionalParams] = useState(false);
   const headerRef = useRef<HTMLButtonElement>(null);
-  const firstInputRef = useRef<HTMLInputElement>(null);
+  const firstInputRef = useRef<CommitInputHandle>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const wasCollapsedOnMouseDown = useRef<boolean>(false);
 

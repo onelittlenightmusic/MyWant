@@ -122,7 +122,7 @@ func (s *Server) setupRoutes() {
 	// Static files (embedded React GUI)
 	// In debug mode, we can still fall back to local files if needed, 
 	// but default to embedded for the single-binary experience.
-	s.router.PathPrefix("/").Handler(http.FileServer(web.GetFileSystem(true))).Methods("GET")
+	s.router.PathPrefix("/").Handler(http.FileServer(web.GetFileSystem(true))).Methods("GET", "HEAD")
 }
 
 // loadRecipeFilesIntoRegistry loads recipe YAML files into the recipe registry for the API
