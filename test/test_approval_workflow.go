@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -27,7 +28,7 @@ type WantSpec struct {
 	Params Record `json:"params"`
 }
 
-type Record map[string]interface{};
+type Record map[string]interface{}
 
 type Want struct {
 	Metadata WantMetadata `json:"metadata"`
@@ -99,75 +100,85 @@ func main() {
 	// The parent want ID might be the first in want_ids or we can find it by name later
 	fmt.Printf("✅ Want deployment queued. ID: %s\n", createResp.ID)
 
-	// 2. Wait for 10 seconds
-	fmt.Println("⏳ Waiting 10 seconds for child wants to be created and processed...")
-	time.Sleep(10 * time.Second)
-
-	// 3. Check if all child wants are achieved
-	fmt.Println("🔍 Checking status of parent and child wants...")
-	resp, err = http.Get(baseURL + "/api/v1/wants")
-	if err != nil {
-		fmt.Printf("❌ Failed to fetch wants: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	var listResp WantsListResponse
-	json.NewDecoder(resp.Body).Decode(&listResp)
-
+	// 2. Poll for completion
+	fmt.Println("⏳ Waiting for child wants to be created and processed (max 30s)...")
+	startWait := time.Now()
+	timeout := 30 * time.Second
 	var parentWant *Want
 	var childWants []*Want
+	allAchieved := false
 
-	// Find parent by name
-	for _, w := range listResp.Wants {
-		if w.Metadata.Name == wantName {
-			parentWant = w
-			break
+	for time.Since(startWait) < timeout {
+		resp, err = http.Get(baseURL + "/api/v1/wants")
+		if err != nil {
+			fmt.Printf("❌ Failed to fetch wants: %v\n", err)
+			return
 		}
-	}
+		
+		var listResp WantsListResponse
+		json.NewDecoder(resp.Body).Decode(&listResp)
+		resp.Body.Close()
 
-	if parentWant == nil {
-		fmt.Println("❌ Parent want not found in the list!")
-		return
-	}
+		parentWant = nil
+		childWants = []*Want{}
 
-	parentID := parentWant.Metadata.ID
-	fmt.Printf("📍 Parent Want: %s (ID: %s, Status: %s)\n", wantName, parentID, parentWant.Status)
-
-	// Find children by ownerReferences
-	for _, w := range listResp.Wants {
-		for _, ref := range w.Metadata.OwnerReferences {
-			if ref.ID == parentID || (ref.Name == wantName && ref.Kind == "Want") {
-				childWants = append(childWants, w)
+		// Find parent by name
+		for _, w := range listResp.Wants {
+			if w.Metadata.Name == wantName {
+				parentWant = w
 				break
 			}
 		}
+
+		if parentWant != nil {
+			parentID := parentWant.Metadata.ID
+			
+			// Find children by ownerReferences
+			for _, w := range listResp.Wants {
+				for _, ref := range w.Metadata.OwnerReferences {
+					if ref.ID == parentID || (ref.Name == wantName && ref.Kind == "Want") {
+						childWants = append(childWants, w)
+						break
+					}
+				}
+			}
+
+			// Check if all are achieved
+			if parentWant.Status == "achieved" && len(childWants) >= 4 {
+				allChildAchieved := true
+				for _, child := range childWants {
+					if child.Status != "achieved" {
+						allChildAchieved = false
+						break
+					}
+				}
+				if allChildAchieved {
+					allAchieved = true
+					break
+				}
+			}
+		}
+		
+		time.Sleep(2 * time.Second)
 	}
 
+	// 3. Final Result Report
+	fmt.Println("🔍 Final Status Check:")
+	if parentWant == nil {
+		fmt.Println("❌ Parent want not found!")
+		os.Exit(1)
+	}
+
+	fmt.Printf("📍 Parent Want: %s (ID: %s, Status: %s)\n", wantName, parentWant.Metadata.ID, parentWant.Status)
 	fmt.Printf("👶 Found %d child wants\n", len(childWants))
-	
-	allAchieved := true
-	if parentWant.Status != "achieved" {
-		allAchieved = false
-		fmt.Printf("❌ Parent status is %s, expected achieved\n", parentWant.Status)
-	}
-
 	for _, child := range childWants {
 		fmt.Printf("  - Child: %s (Type: %s, Status: %s)\n", child.Metadata.Name, child.Metadata.Type, child.Status)
-		if child.Status != "achieved" {
-			allAchieved = true // Changed my mind, level 2 approval might still be reaching
-			// Wait, the requirement was "確認するテストを...追加して" (add a test to verify...)
-			// Actually, "level 1 approval" has a child "level 2 approval" which might take more time or depend on others.
-			// But the user asked to check if all child wants are achieved after 10s.
-			allAchieved = false
-		}
 	}
 
-	if allAchieved && len(childWants) > 0 {
-		fmt.Println("🎉 PASS: All wants are achieved!")
-	} else if len(childWants) == 0 {
-		fmt.Println("⚠️  FAIL: No child wants found. Did the recipe instantiate correctly?")
+	if allAchieved {
+		fmt.Printf("🎉 PASS: All wants achieved in %v!\n", time.Since(startWait).Round(time.Second))
 	} else {
-		fmt.Println("❌ FAIL: Some wants are not achieved yet.")
+		fmt.Println("❌ FAIL: Timeout reached or some wants are not achieved.")
+		os.Exit(1)
 	}
 }
