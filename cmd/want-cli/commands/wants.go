@@ -66,7 +66,7 @@ var getWantCmd = &cobra.Command{
 		fmt.Printf("Name: %s\n", want.Metadata.Name)
 		fmt.Printf("Type: %s\n", want.Metadata.Type)
 		fmt.Printf("Status: %s\n", want.Status)
-		
+
 		fmt.Println("\nParams:")
 		printMap(want.Spec.Params)
 
@@ -79,37 +79,116 @@ var getWantCmd = &cobra.Command{
 
 var createWantCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create a new want from file",
+	Short: "Create a new want",
 	Run: func(cmd *cobra.Command, args []string) {
 		file, _ := cmd.Flags().GetString("file")
-		if file == "" {
-			fmt.Println("Error: --file flag is required")
+		wantType, _ := cmd.Flags().GetString("type")
+		useExample, _ := cmd.Flags().GetBool("example")
+
+		if file == "" && wantType == "" {
+			fmt.Println("Error: either --file or --type flag is required")
 			os.Exit(1)
 		}
 
-		data, err := os.ReadFile(file)
-		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
+		if useExample && wantType == "" {
+			fmt.Println("Error: --example flag requires --type flag")
 			os.Exit(1)
 		}
 
 		var config client.Config
-		// Try YAML first, then JSON
-		if err := yaml.Unmarshal(data, &config); err != nil {
-			if err := json.Unmarshal(data, &config); err != nil {
-				fmt.Printf("Error parsing file: %v\n", err)
+		c := client.NewClient(viper.GetString("server"))
+
+		if wantType != "" {
+			if useExample {
+				// Fetch example from server
+				// 1. Try exact recipe name match
+				recipe, err := c.GetRecipe(wantType)
+				if err != nil {
+					// 2. Try searching recipes for matching custom_type
+					recipes, rErr := c.ListRecipes()
+					if rErr == nil {
+						for _, r := range recipes {
+							if r.Recipe.Metadata.CustomType == wantType {
+								recipe = &r
+								err = nil
+								break
+							}
+						}
+					}
+				}
+
+				if err == nil && recipe.Recipe.Example != nil {
+					config = *recipe.Recipe.Example
+				} else {
+					// 3. Try to find in examples if it's a standard type
+					exResp, err := c.GetWantTypeExamples(wantType)
+					if err == nil {
+						if examples, ok := (*exResp)["examples"].([]any); ok && len(examples) > 0 {
+							// Use the first example
+							exampleBytes, _ := json.Marshal(examples[0])
+							var want client.Want
+							if err := json.Unmarshal(exampleBytes, &want); err == nil {
+								config = client.Config{Wants: []*client.Want{&want}}
+							}
+						}
+					}
+				}
+
+				if len(config.Wants) == 0 {
+					fmt.Printf("Error: No example found for type '%s'\n", wantType)
+					os.Exit(1)
+				}
+			} else {
+				// Create a simple want of that type
+				config = client.Config{
+					Wants: []*client.Want{
+						{
+							Metadata: client.Metadata{
+								Name: "new-" + wantType,
+								Type: wantType,
+							},
+							Spec: client.WantSpec{
+								Params: make(map[string]any),
+							},
+						},
+					},
+				}
+			}
+		} else {
+			// Create from file
+			data, err := os.ReadFile(file)
+			if err != nil {
+				fmt.Printf("Error reading file: %v\n", err)
 				os.Exit(1)
+			}
+
+			// Try YAML first, then JSON
+			if err := yaml.Unmarshal(data, &config); err != nil {
+				if err := json.Unmarshal(data, &config); err != nil {
+					// Fallback to single want
+					var newWant client.Want
+					if err2 := yaml.Unmarshal(data, &newWant); err2 == nil && newWant.Metadata.Type != "" {
+						config = client.Config{Wants: []*client.Want{&newWant}}
+					} else {
+						fmt.Printf("Error parsing file: %v\n", err)
+						os.Exit(1)
+					}
+				}
 			}
 		}
 
-		c := client.NewClient(viper.GetString("server"))
+		if len(config.Wants) == 0 {
+			fmt.Println("Error: No wants to create")
+			os.Exit(1)
+		}
+
 		resp, err := c.CreateWant(config)
 		if err != nil {
 			fmt.Printf("Error creating want: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Printf("Successfully created want execution %s with %d wants\n", resp.ID, resp.Wants)
+		fmt.Printf("Successfully created want execution %s with %d wants\n", resp.ID, len(resp.WantIDs))
 		for _, id := range resp.WantIDs {
 			fmt.Printf("- %s\n", id)
 		}
@@ -140,6 +219,8 @@ func init() {
 	WantsCmd.AddCommand(importWantsCmd)
 
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
+	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
+	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")
 	exportWantsCmd.Flags().StringP("output", "o", "", "Path to save exported YAML (stdout if not specified)")
 	importWantsCmd.Flags().StringP("file", "f", "", "Path to YAML file to import")
 
@@ -147,6 +228,57 @@ func init() {
 	WantsCmd.AddCommand(resumeWantsCmd)
 	WantsCmd.AddCommand(stopWantsCmd)
 	WantsCmd.AddCommand(startWantsCmd)
+}
+
+func printMap(m map[string]any) {
+	for k, v := range m {
+		fmt.Printf("  %s: %v\n", k, v)
+	}
+}
+
+func runBatchOperation(args []string, opName string, opFunc func(*client.Client, []string) error) {
+	c := client.NewClient(viper.GetString("server"))
+	if err := opFunc(c, args); err != nil {
+		fmt.Printf("Error during %s: %v\n", opName, err)
+		os.Exit(1)
+	}
+	fmt.Printf("Successfully queued %s for %d wants\n", opName, len(args))
+}
+
+var suspendWantsCmd = &cobra.Command{
+	Use:   "suspend [id]...",
+	Short: "Suspend want executions",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		runBatchOperation(args, "suspend", (*client.Client).SuspendWants)
+	},
+}
+
+var resumeWantsCmd = &cobra.Command{
+	Use:   "resume [id]...",
+	Short: "Resume want executions",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		runBatchOperation(args, "resume", (*client.Client).ResumeWants)
+	},
+}
+
+var stopWantsCmd = &cobra.Command{
+	Use:   "stop [id]...",
+	Short: "Stop want executions",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		runBatchOperation(args, "stop", (*client.Client).StopWants)
+	},
+}
+
+var startWantsCmd = &cobra.Command{
+	Use:   "start [id]...",
+	Short: "Start want executions",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		runBatchOperation(args, "start", (*client.Client).StartWants)
+	},
 }
 
 var exportWantsCmd = &cobra.Command{
@@ -198,55 +330,5 @@ var importWantsCmd = &cobra.Command{
 
 		fmt.Printf("Successfully imported execution %s with %d wants\n", resp.ID, resp.Wants)
 		fmt.Println(resp.Message)
-	},
-}
-
-func printMap(m map[string]any) {	for k, v := range m {
-		fmt.Printf("  %s: %v\n", k, v)
-	}
-}
-
-func runBatchOperation(args []string, opName string, opFunc func(*client.Client, []string) error) {
-	c := client.NewClient(viper.GetString("server"))
-	if err := opFunc(c, args); err != nil {
-		fmt.Printf("Error during %s: %v\n", opName, err)
-		os.Exit(1)
-	}
-	fmt.Printf("Successfully queued %s for %d wants\n", opName, len(args))
-}
-
-var suspendWantsCmd = &cobra.Command{
-	Use:   "suspend [id]...",
-	Short: "Suspend want executions",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "suspend", (*client.Client).SuspendWants)
-	},
-}
-
-var resumeWantsCmd = &cobra.Command{
-	Use:   "resume [id]...",
-	Short: "Resume want executions",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "resume", (*client.Client).ResumeWants)
-	},
-}
-
-var stopWantsCmd = &cobra.Command{
-	Use:   "stop [id]...",
-	Short: "Stop want executions",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "stop", (*client.Client).StopWants)
-	},
-}
-
-var startWantsCmd = &cobra.Command{
-	Use:   "start [id]...",
-	Short: "Start want executions",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "start", (*client.Client).StartWants)
 	},
 }
