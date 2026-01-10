@@ -14,6 +14,9 @@ import (
 	"github.com/spf13/viper"
 )
 
+const pidFile = "server.pid"
+const guiPidFile = "gui.pid"
+
 // isPortOpen checks if a port is in use
 func isPortOpen(port int) bool {
 	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
