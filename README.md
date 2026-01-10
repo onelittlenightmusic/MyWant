@@ -4,16 +4,17 @@
 
 **Declarative chain programming with YAML configuration.** Express what you want to achieve, not how to do it.
 
-📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Examples](docs/agent-examples.md) | [CLI Guide](docs/WANT_CLI_USAGE.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
+📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Agent Catalog](AGENTS.md) | [Examples](docs/agent-examples.md) | [CLI Guide](docs/WANT_CLI_USAGE.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Features
 
-- **YAML-Only Configuration**: No programming required
-- **Recipe-Based Templates**: Reusable component configurations
-- **Independent & Dependent Wants**: Parallel processing or sequential pipelines
-- **Web Dashboard**: Modern React interface for monitoring
-- **Dynamic Want Addition**: Runtime system modification
-- **Memory Reconciliation**: Persistent state across executions
+- 📝 **YAML-Driven Workflows**: Define complex logic and dependencies through simple declarative YAML.
+- 🤖 **Autonomous Agent Ecosystem**: Specialized agents (Do/Monitor) solve your "Wants" based on their "Capabilities".
+- 📦 **Modular Recipes**: Package reusable logic into Custom Want Types with flexible parameter support.
+- 💻 **Full-Stack CLI (`want-cli`)**: Manage the entire lifecycle—Server, GUI, Wants, and Recipes—from a single tool.
+- 🚀 **Zero-Install GUI**: Single-binary experience with React frontend assets embedded directly into the Go binary.
+- 📊 **Interactive Dashboard**: Real-time monitoring with intuitive drag-and-drop hierarchy and state visualization.
+- 💾 **Persistent Memory**: Continuous state reconciliation and memory recovery across system restarts.
 
 ## Quick Start
 

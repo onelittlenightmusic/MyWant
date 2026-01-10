@@ -5,6 +5,7 @@ bin/
 *.so
 *.dylib
 engine/cmd/server/mywant-server
+engine/mywant-server
 
 # Test artifacts
 test/
@@ -30,3 +31,8 @@ engine/memory/
 
 logs/
 tmp/
+*.log
+*.pid
+want-cli
+build_error.log
+drag_drop_success.png
