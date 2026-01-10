@@ -43,6 +43,12 @@ func New(config Config) *Server {
 		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
+	// Register mock server capability (ensure it exists before agent registration)
+	agentRegistry.RegisterCapability(mywant.Capability{
+		Name:  "mock_server_management",
+		Gives: []string{"mock_server_management"},
+	})
+
 	if err := agentRegistry.LoadAgents("agents/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
@@ -80,6 +86,11 @@ func New(config Config) *Server {
 	// Register reminder queue management agent (DoAgent for queue lifecycle)
 	if err := types.RegisterReminderQueueAgent(agentRegistry); err != nil {
 		log.Printf("[SERVER] Warning: Failed to register reminder queue agent: %v\n", err)
+	}
+
+	// Register mock server management agent (DoAgent for server lifecycle)
+	if err := types.RegisterMockServerAgent(agentRegistry); err != nil {
+		log.Printf("[SERVER] Warning: Failed to register mock server agent: %v\n", err)
 	}
 
 	// Register user reaction monitor agent (MonitorAgent using HTTP API)
@@ -138,6 +149,7 @@ func (s *Server) Start() error {
 	types.RegisterReminderWantType(s.globalBuilder)
 	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
+	types.RegisterFlightMockServerWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)

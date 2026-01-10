@@ -176,6 +176,12 @@ func NewServer(config ServerConfig) *Server {
 		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
+	// Register mock server capability (ensure it exists before agent registration)
+	agentRegistry.RegisterCapability(mywant.Capability{
+		Name:  "mock_server_management",
+		Gives: []string{"mock_server_management"},
+	})
+
 	if err := agentRegistry.LoadAgents("agents/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
@@ -213,6 +219,11 @@ func NewServer(config ServerConfig) *Server {
 	// Register reminder queue management agent (DoAgent for queue lifecycle)
 	if err := types.RegisterReminderQueueAgent(agentRegistry); err != nil {
 		log.Printf("[SERVER] Warning: Failed to register reminder queue agent: %v\n", err)
+	}
+
+	// Register mock server management agent (DoAgent for server lifecycle)
+	if err := types.RegisterMockServerAgent(agentRegistry); err != nil {
+		log.Printf("[SERVER] Warning: Failed to register mock server agent: %v\n", err)
 	}
 
 	// Register user reaction monitor agent (MonitorAgent using HTTP API)
@@ -456,21 +467,77 @@ func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error
 func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
 	// Override the generic implementations with specific ones for special agents
 	setupFlightAPIAgents(agentRegistry)
+	setupRestaurantAgents(agentRegistry)
+	setupHotelAgents(agentRegistry)
+	setupBuffetAgents(agentRegistry)
+}
+
+func setupRestaurantAgents(agentRegistry *mywant.AgentRegistry) {
+	if agent, exists := agentRegistry.GetAgent("agent_restaurant"); exists {
+		if doAgent, ok := agent.(*mywant.DoAgent); ok {
+			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
+				mywant.InfoLog("[AGENT] Generic restaurant booking for want: %s", want.Metadata.Name)
+				return nil
+			}
+		}
+	}
+}
+
+func setupHotelAgents(agentRegistry *mywant.AgentRegistry) {
+	if agent, exists := agentRegistry.GetAgent("agent_hotel"); exists {
+		if doAgent, ok := agent.(*mywant.DoAgent); ok {
+			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
+				mywant.InfoLog("[AGENT] Generic hotel booking for want: %s", want.Metadata.Name)
+				return nil
+			}
+		}
+	}
+}
+
+func setupBuffetAgents(agentRegistry *mywant.AgentRegistry) {
+	if agent, exists := agentRegistry.GetAgent("agent_buffet"); exists {
+		if doAgent, ok := agent.(*mywant.DoAgent); ok {
+			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
+				mywant.InfoLog("[AGENT] Generic buffet booking for want: %s", want.Metadata.Name)
+				return nil
+			}
+		}
+	}
 }
 
 func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
-	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
-		if doAgent, ok := agent.(*mywant.DoAgent); ok {
-			flightAgent := types.NewAgentFlightAPI(
-				"agent_flight_api",
-				[]string{"flight_api_agency"},
-				[]string{},
-				"http://localhost:8081",
-			)
-			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
-				_, err := flightAgent.Exec(ctx, want)
-				return err
+	// First, check if the agent is already loaded from YAML
+	agent, exists := agentRegistry.GetAgent("agent_flight_api")
+	
+	// If not found, manually register it
+	if !exists {
+		mywant.InfoLog("[SERVER] agent_flight_api not found in registry, registering manually")
+		flightAgent := types.NewAgentFlightAPI(
+			"agent_flight_api",
+			[]string{"flight_api_agency"},
+			[]string{},
+			"http://localhost:8081",
+		)
+		agentRegistry.RegisterAgent(flightAgent)
+		agent = flightAgent
+	}
+
+	// Set/Override the action implementation
+	if doAgent, ok := agent.(*mywant.DoAgent); ok {
+		// Create a separate instance for the execution logic if needed, 
+		// but using types.NewAgentFlightAPI is safe here.
+		flightExec := types.NewAgentFlightAPI(
+			"agent_flight_api",
+			[]string{"flight_api_agency"},
+			[]string{},
+			"http://localhost:8081",
+		)
+		doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
+			_, err := flightExec.Exec(ctx, want)
+			if err != nil {
+				mywant.ErrorLog("[AGENT] agent_flight_api.Exec failed for want %s: %v", want.Metadata.Name, err)
 			}
+			return err
 		}
 	}
 }
@@ -2119,6 +2186,7 @@ func (s *Server) Start() error {
 	types.RegisterReminderWantType(s.globalBuilder)
 	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
+	types.RegisterFlightMockServerWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
