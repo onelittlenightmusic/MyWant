@@ -469,6 +469,41 @@ func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"deleted": true})
 }
 
+// OpenAPI Spec
+func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
+	// Try to find openapi.yaml in the root or current directory
+	specPaths := []string{"openapi.yaml", "../openapi.yaml", "../../openapi.yaml"}
+	var data []byte
+	var err error
+
+	for _, path := range specPaths {
+		data, err = os.ReadFile(path)
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		http.Error(w, "OpenAPI specification not found", http.StatusNotFound)
+		return
+	}
+
+	// Determine content type based on request or default to yaml
+	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		// Convert YAML to JSON if requested
+		var body any
+		if err := yaml.Unmarshal(data, &body); err != nil {
+			http.Error(w, "Failed to parse specification", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(body)
+	} else {
+		w.Header().Set("Content-Type", "application/yaml")
+		w.Write(data)
+	}
+}
+
 // Error Logging Helper
 func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData any) {
 	entry := ErrorHistoryEntry{

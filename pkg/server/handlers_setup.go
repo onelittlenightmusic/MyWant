@@ -106,6 +106,9 @@ func (s *Server) setupRoutes() {
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
 	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
 
+	// OpenAPI Spec
+	api.HandleFunc("/spec", s.getSpec).Methods("GET")
+
 	// Reactions endpoints
 	reactions := api.PathPrefix("/reactions").Subrouter()
 	reactions.HandleFunc("/", s.createReactionQueue).Methods("POST")
