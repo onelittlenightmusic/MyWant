@@ -440,6 +440,632 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/recipes/from-want:
+    post:
+      summary: Create a recipe from an existing want
+      operationId: saveRecipeFromWant
+      tags:
+        - Recipes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveRecipeFromWantRequest'
+      responses:
+        '201':
+          description: Recipe created successfully
+        '400':
+          description: Invalid request
+
+  /api/v1/wants/validate:
+    post:
+      summary: Validate a want configuration
+      operationId: validateWant
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWantRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+
+  /api/v1/wants/export:
+    post:
+      summary: Export all wants as YAML
+      operationId: exportWants
+      tags:
+        - Wants
+      responses:
+        '200':
+          description: YAML export
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/v1/wants/import:
+    post:
+      summary: Import wants from YAML
+      operationId: importWants
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Config'
+      responses:
+        '201':
+          description: Wants imported successfully
+
+  /api/v1/wants/suspend:
+    post:
+      summary: Suspend multiple wants
+      operationId: suspendWants
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchOperationRequest'
+      responses:
+        '202':
+          description: Batch suspension queued
+
+  /api/v1/wants/resume:
+    post:
+      summary: Resume multiple wants
+      operationId: resumeWants
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchOperationRequest'
+      responses:
+        '202':
+          description: Batch resume queued
+
+  /api/v1/wants/stop:
+    post:
+      summary: Stop multiple wants
+      operationId: stopWants
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchOperationRequest'
+      responses:
+        '202':
+          description: Batch stop queued
+
+  /api/v1/wants/start:
+    post:
+      summary: Start multiple wants
+      operationId: startWants
+      tags:
+        - Wants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchOperationRequest'
+      responses:
+        '202':
+          description: Batch start queued
+
+  /api/v1/wants/{id}/suspend:
+    post:
+      summary: Suspend a want
+      operationId: suspendWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Suspension queued
+
+  /api/v1/wants/{id}/resume:
+    post:
+      summary: Resume a want
+      operationId: resumeWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Resume queued
+
+  /api/v1/wants/{id}/stop:
+    post:
+      summary: Stop a want
+      operationId: stopWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Stop queued
+
+  /api/v1/wants/{id}/start:
+    post:
+      summary: Start a want
+      operationId: startWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Start queued
+
+  /api/v1/wants/{id}/labels:
+    post:
+      summary: Add label to want
+      operationId: addLabelToWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelModificationRequest'
+      responses:
+        '202':
+          description: Label addition queued
+
+  /api/v1/wants/{id}/labels/{key}:
+    delete:
+      summary: Remove label from want
+      operationId: removeLabelFromWant
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Label removal queued
+
+  /api/v1/wants/{id}/using:
+    post:
+      summary: Add using dependency to want
+      operationId: addUsingDependency
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsingModificationRequest'
+      responses:
+        '202':
+          description: Dependency addition queued
+
+  /api/v1/wants/{id}/using/{key}:
+    delete:
+      summary: Remove using dependency from want
+      operationId: removeUsingDependency
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Dependency removal queued
+
+  /api/v1/agents:
+    get:
+      summary: List all agents
+      operationId: listAgents
+      tags:
+        - Agents
+      responses:
+        '200':
+          description: List of agents
+    post:
+      summary: Create an agent
+      operationId: createAgent
+      tags:
+        - Agents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Agent'
+      responses:
+        '201':
+          description: Agent created
+
+  /api/v1/agents/{name}:
+    get:
+      summary: Get agent details
+      operationId: getAgent
+      tags:
+        - Agents
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent details
+    delete:
+      summary: Delete an agent
+      operationId: deleteAgent
+      tags:
+        - Agents
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Agent deleted
+
+  /api/v1/capabilities:
+    get:
+      summary: List all capabilities
+      operationId: listCapabilities
+      tags:
+        - Capabilities
+      responses:
+        '200':
+          description: List of capabilities
+    post:
+      summary: Create a capability
+      operationId: createCapability
+      tags:
+        - Capabilities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Capability'
+      responses:
+        '201':
+          description: Capability created
+
+  /api/v1/capabilities/{name}:
+    get:
+      summary: Get capability details
+      operationId: getCapability
+      tags:
+        - Capabilities
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Capability details
+    delete:
+      summary: Delete a capability
+      operationId: deleteCapability
+      tags:
+        - Capabilities
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Capability deleted
+
+  /api/v1/capabilities/{name}/agents:
+    get:
+      summary: Find agents providing a capability
+      operationId: findAgentsByCapability
+      tags:
+        - Capabilities
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of agents
+
+  /api/v1/want-types:
+    get:
+      summary: List available want types
+      operationId: listWantTypes
+      tags:
+        - WantTypes
+      responses:
+        '200':
+          description: List of want types
+
+  /api/v1/want-types/{name}:
+    get:
+      summary: Get want type definition
+      operationId: getWantType
+      tags:
+        - WantTypes
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Want type definition
+
+  /api/v1/want-types/{name}/examples:
+    get:
+      summary: Get examples for a want type
+      operationId: getWantTypeExamples
+      tags:
+        - WantTypes
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Want type examples
+
+  /api/v1/labels:
+    get:
+      summary: List used labels
+      operationId: getLabels
+      tags:
+        - Labels
+      responses:
+        '200':
+          description: List of labels
+    post:
+      summary: Register a new label
+      operationId: addLabel
+      tags:
+        - Labels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelModificationRequest'
+      responses:
+        '201':
+          description: Label registered
+
+  /api/v1/llm/query:
+    post:
+      summary: Query LLM
+      operationId: queryLLM
+      tags:
+        - Utilities
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LLMRequest'
+      responses:
+        '200':
+          description: LLM response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LLMResponse'
+
+  /api/v1/logs:
+    get:
+      summary: Get system logs
+      operationId: getLogs
+      tags:
+        - Utilities
+      responses:
+        '200':
+          description: Logs content
+    delete:
+      summary: Clear system logs
+      operationId: clearLogs
+      tags:
+        - Utilities
+      responses:
+        '204':
+          description: Logs cleared
+
+  /api/v1/errors:
+    get:
+      summary: List error history
+      operationId: listErrorHistory
+      tags:
+        - Utilities
+      responses:
+        '200':
+          description: List of errors
+
+  /api/v1/errors/{id}:
+    get:
+      summary: Get error details
+      operationId: getErrorHistoryEntry
+      tags:
+        - Utilities
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Error details
+    put:
+      summary: Update error status
+      operationId: updateErrorHistoryEntry
+      tags:
+        - Utilities
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Error updated
+    delete:
+      summary: Delete error entry
+      operationId: deleteErrorHistoryEntry
+      tags:
+        - Utilities
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Error deleted
+
+  /api/v1/reactions/:
+    post:
+      summary: Create reaction queue
+      operationId: createReactionQueue
+      tags:
+        - Reactions
+      responses:
+        '201':
+          description: Queue created
+    get:
+      summary: List reaction queues
+      operationId: listReactionQueues
+      tags:
+        - Reactions
+      responses:
+        '200':
+          description: List of queues
+
+  /api/v1/reactions/{id}:
+    get:
+      summary: Get reaction queue details
+      operationId: getReactionQueue
+      tags:
+        - Reactions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Queue details
+    put:
+      summary: Add reaction to queue
+      operationId: addReactionToQueue
+      tags:
+        - Reactions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reaction added
+    delete:
+      summary: Delete reaction queue
+      operationId: deleteReactionQueue
+      tags:
+        - Reactions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Queue deleted
+
 components:
   schemas:
     HealthStatus:
@@ -1144,6 +1770,138 @@ components:
           example: 404
       required:
         - error
+
+    SaveRecipeFromWantRequest:
+      type: object
+      properties:
+        wantId:
+          type: string
+          description: ID of the want to create a recipe from
+        metadata:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            version:
+              type: string
+          required:
+            - name
+      required:
+        - wantId
+        - metadata
+
+    BatchOperationRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+          description: List of want IDs to operate on
+      required:
+        - ids
+
+    LabelModificationRequest:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+
+    UsingModificationRequest:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+
+    LLMRequest:
+      type: object
+      properties:
+        message:
+          type: string
+        model:
+          type: string
+      required:
+        - message
+
+    LLMResponse:
+      type: object
+      properties:
+        response:
+          type: string
+        model:
+          type: string
+        timestamp:
+          type: string
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        fatalErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationWarning'
+        wantCount:
+          type: integer
+        validatedAt:
+          type: string
+
+    ValidationError:
+      type: object
+      properties:
+        wantName:
+          type: string
+        errorType:
+          type: string
+        message:
+          type: string
+
+    ValidationWarning:
+      type: object
+      properties:
+        wantName:
+          type: string
+        warningType:
+          type: string
+        message:
+          type: string
+
+    Agent:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    Capability:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
 
 tags:
   - name: Health
