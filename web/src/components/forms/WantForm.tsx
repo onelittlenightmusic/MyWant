@@ -182,7 +182,11 @@ export const WantForm: React.FC<WantFormProps> = ({
       metadata: {
         name: name.trim(),
         type: type.trim(),
-        ...(Object.keys(labels).length > 0 && { labels })
+        ...(Object.keys(labels).length > 0 && { labels }),
+        // PRESERVE parent relationship when editing
+        ...(isEditing && editingWant?.metadata?.ownerReferences && { 
+          ownerReferences: editingWant.metadata.ownerReferences 
+        })
       },
       spec: {
         ...(Object.keys(params).length > 0 && { params }),

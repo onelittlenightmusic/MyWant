@@ -305,7 +305,13 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Preserve the original want ID
 	updatedWant.Metadata.ID = foundWant.Metadata.ID
+
+	// Safety: Preserve ownerReferences if not provided in the request
+	if updatedWant.Metadata.OwnerReferences == nil && len(foundWant.Metadata.OwnerReferences) > 0 {
+		updatedWant.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
+	}
 
 	if targetExecution != nil {
 		// Update config in execution
