@@ -19,6 +19,23 @@ var WantsCmd = &cobra.Command{
 	Long:  `List, create, update, and delete want executions.`,
 }
 
+// completion helper for wants
+func completeWantIDs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	c := client.NewClient(viper.GetString("server"))
+	resp, err := c.ListWants()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	var ids []string
+	for _, want := range resp.Wants {
+		ids = append(ids, fmt.Sprintf("%s\t%s (%s)", want.Metadata.ID, want.Metadata.Name, want.Metadata.Type))
+	}
+	return ids, cobra.ShellCompDirectiveNoFileComp
+}
+
 var listWantsCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all wants",
@@ -50,9 +67,10 @@ var listWantsCmd = &cobra.Command{
 }
 
 var getWantCmd = &cobra.Command{
-	Use:   "get [id]",
-	Short: "Get want details",
-	Args:  cobra.ExactArgs(1),
+	Use:               "get [id]",
+	Short:             "Get want details",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		want, err := c.GetWant(args[0])
@@ -101,10 +119,8 @@ var createWantCmd = &cobra.Command{
 		if wantType != "" {
 			if useExample {
 				// Fetch example from server
-				// 1. Try exact recipe name match
 				recipe, err := c.GetRecipe(wantType)
 				if err != nil {
-					// 2. Try searching recipes for matching custom_type
 					recipes, rErr := c.ListRecipes()
 					if rErr == nil {
 						for _, r := range recipes {
@@ -120,11 +136,9 @@ var createWantCmd = &cobra.Command{
 				if err == nil && recipe.Recipe.Example != nil {
 					config = *recipe.Recipe.Example
 				} else {
-					// 3. Try to find in examples if it's a standard type
 					exResp, err := c.GetWantTypeExamples(wantType)
 					if err == nil {
 						if examples, ok := (*exResp)["examples"].([]any); ok && len(examples) > 0 {
-							// Use the first example
 							exampleBytes, _ := json.Marshal(examples[0])
 							var want client.Want
 							if err := json.Unmarshal(exampleBytes, &want); err == nil {
@@ -139,7 +153,6 @@ var createWantCmd = &cobra.Command{
 					os.Exit(1)
 				}
 			} else {
-				// Create a simple want of that type
 				config = client.Config{
 					Wants: []*client.Want{
 						{
@@ -155,17 +168,14 @@ var createWantCmd = &cobra.Command{
 				}
 			}
 		} else {
-			// Create from file
 			data, err := os.ReadFile(file)
 			if err != nil {
 				fmt.Printf("Error reading file: %v\n", err)
 				os.Exit(1)
 			}
 
-			// Try YAML first, then JSON
 			if err := yaml.Unmarshal(data, &config); err != nil {
 				if err := json.Unmarshal(data, &config); err != nil {
-					// Fallback to single want
 					var newWant client.Want
 					if err2 := yaml.Unmarshal(data, &newWant); err2 == nil && newWant.Metadata.Type != "" {
 						config = client.Config{Wants: []*client.Want{&newWant}}
@@ -196,9 +206,10 @@ var createWantCmd = &cobra.Command{
 }
 
 var deleteWantCmd = &cobra.Command{
-	Use:   "delete [id]",
-	Short: "Delete a want",
-	Args:  cobra.ExactArgs(1),
+	Use:               "delete [id]",
+	Short:             "Delete a want",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		err := c.DeleteWant(args[0])
@@ -246,36 +257,40 @@ func runBatchOperation(args []string, opName string, opFunc func(*client.Client,
 }
 
 var suspendWantsCmd = &cobra.Command{
-	Use:   "suspend [id]...",
-	Short: "Suspend want executions",
-	Args:  cobra.MinimumNArgs(1),
+	Use:               "suspend [id]...",
+	Short:             "Suspend want executions",
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBatchOperation(args, "suspend", (*client.Client).SuspendWants)
 	},
 }
 
 var resumeWantsCmd = &cobra.Command{
-	Use:   "resume [id]...",
-	Short: "Resume want executions",
-	Args:  cobra.MinimumNArgs(1),
+	Use:               "resume [id]...",
+	Short:             "Resume want executions",
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBatchOperation(args, "resume", (*client.Client).ResumeWants)
 	},
 }
 
 var stopWantsCmd = &cobra.Command{
-	Use:   "stop [id]...",
-	Short: "Stop want executions",
-	Args:  cobra.MinimumNArgs(1),
+	Use:               "stop [id]...",
+	Short:             "Stop want executions",
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBatchOperation(args, "stop", (*client.Client).StopWants)
 	},
 }
 
 var startWantsCmd = &cobra.Command{
-	Use:   "start [id]...",
-	Short: "Start want executions",
-	Args:  cobra.MinimumNArgs(1),
+	Use:               "start [id]...",
+	Short:             "Start want executions",
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBatchOperation(args, "start", (*client.Client).StartWants)
 	},

@@ -19,6 +19,23 @@ var RecipesCmd = &cobra.Command{
 	Long:  `List, create, view, and generate recipes from wants.`,
 }
 
+// completion helper for recipes
+func completeRecipeIDs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if len(args) != 0 {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	c := client.NewClient(viper.GetString("server"))
+	recipes, err := c.ListRecipes()
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveError
+	}
+	var ids []string
+	for id, r := range recipes {
+		ids = append(ids, fmt.Sprintf("%s\t%s", id, r.Recipe.Metadata.Name))
+	}
+	return ids, cobra.ShellCompDirectiveNoFileComp
+}
+
 var listRecipesCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all recipes",
@@ -46,9 +63,10 @@ var listRecipesCmd = &cobra.Command{
 }
 
 var getRecipeCmd = &cobra.Command{
-	Use:   "get [id]",
-	Short: "Get recipe details",
-	Args:  cobra.ExactArgs(1),
+	Use:               "get [id]",
+	Short:             "Get recipe details",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeRecipeIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		recipe, err := c.GetRecipe(args[0])
@@ -96,10 +114,28 @@ var createRecipeCmd = &cobra.Command{
 	},
 }
 
+var deleteRecipeCmd = &cobra.Command{
+	Use:               "delete [id]",
+	Short:             "Delete a recipe",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeRecipeIDs,
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		err := c.DeleteRecipe(args[0])
+		if err != nil {
+			fmt.Printf("Error deleting recipe: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Recipe %s deleted\n", args[0])
+	},
+}
+
 var fromWantCmd = &cobra.Command{
 	Use:   "from-want [want-id]",
 	Short: "Create recipe from existing want",
 	Args:  cobra.ExactArgs(1),
+	// Complete want IDs from wants command helper
+	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		name, _ := cmd.Flags().GetString("name")
 		desc, _ := cmd.Flags().GetString("description")
@@ -136,10 +172,11 @@ func init() {
 	RecipesCmd.AddCommand(listRecipesCmd)
 	RecipesCmd.AddCommand(getRecipeCmd)
 	RecipesCmd.AddCommand(createRecipeCmd)
+	RecipesCmd.AddCommand(deleteRecipeCmd)
 	RecipesCmd.AddCommand(fromWantCmd)
 
 	createRecipeCmd.Flags().StringP("file", "f", "", "Path to recipe YAML/JSON file")
-	
+
 	fromWantCmd.Flags().StringP("name", "n", "", "Name of the new recipe")
 	fromWantCmd.Flags().StringP("description", "d", "", "Description of the recipe")
 	fromWantCmd.Flags().StringP("version", "v", "1.0.0", "Version of the recipe")
