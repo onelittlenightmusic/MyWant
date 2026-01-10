@@ -613,7 +613,6 @@ type FlightWantLocals struct {
 	DepartureDate       string // Departure date in YYYY-MM-DD format
 	monitoringStartTime time.Time
 	monitoringDuration  time.Duration     // How long to monitor for status changes
-	monitoringActive    bool              // Whether monitoring is currently active
 	lastLogTime         time.Time         // Track last monitoring log time to reduce spam
 	monitoringDone      chan struct{}     // Signal to stop monitoring goroutine
 	monitor             *MonitorFlightAPI // Monitoring agent instance

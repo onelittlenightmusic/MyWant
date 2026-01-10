@@ -597,12 +597,6 @@ func (t *Target) computeTemplateResult() {
 
 	t.StoreLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
-func (t *Target) addChildWantsToMemory() error {
-	// This is a placeholder - in a real implementation, this would interact with the ChainBuilder to add wants to the memory file For now, we'll assume the reconcile loop will pick up the wants
-	t.StoreLog("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
-	return nil
-}
-
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
 	BaseWant   any   // The original want (Generator, Queue, Sink, etc.)
@@ -755,13 +749,6 @@ func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
 		return oaw.Want.GetSpec()
 	}
 	return nil
-}
-
-func (oaw *OwnerAwareWant) setupStateNotifications(want *Want) {
-	if oaw.Want == nil {
-		oaw.Want = want
-	}
-	// For now, we'll rely on the child wants to call our notification method directly This is a placeholder for a more sophisticated hooking mechanism
 }
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder

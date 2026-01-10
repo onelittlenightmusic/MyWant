@@ -278,13 +278,6 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 	return want, nil
 }
 
-// generateLabels is deprecated - labels should be defined in recipe files This function is kept for legacy compatibility but should not be used for new recipes
-func (rl *RecipeLoader) generateLabels(wantType string, index int) map[string]string {
-	labels := make(map[string]string)
-	InfoLog("[RECIPE] ⚠️  DEPRECATED: generateLabels called for type %s - labels should be defined in recipe YAML\n", wantType)
-	return labels
-}
-
 // resolveParams resolves parameter values by looking them up in the recipe parameters
 func (rl *RecipeLoader) resolveParams(wantParams map[string]any, recipeParams map[string]any) map[string]any {
 	resolvedParams := make(map[string]any)
@@ -304,68 +297,6 @@ func (rl *RecipeLoader) resolveParams(wantParams map[string]any, recipeParams ma
 	}
 
 	return resolvedParams
-}
-
-// mergeDRYDefaults merges DRY recipe defaults with individual want specifications (legacy)
-func (rl *RecipeLoader) mergeDRYDefaults(dryWant DRYWantSpec, defaults *DRYRecipeDefaults, targetName string) WantRecipe {
-	wantRecipe := WantRecipe{
-		Metadata: struct {
-			Name   string            `yaml:"name"`
-			Type   string            `yaml:"type"`
-			Labels map[string]string `yaml:"labels"`
-		}{
-			Name:   dryWant.Name,
-			Type:   dryWant.Type,
-			Labels: make(map[string]string),
-		},
-		Spec: struct {
-			Params map[string]any      `yaml:"params"`
-			Using  []map[string]string `yaml:"using,omitempty"`
-		}{
-			Params: make(map[string]any),
-			Using:  dryWant.Using, // Copy using directly
-		},
-		TypeHints: make(map[string]string),
-	}
-
-	// Merge default labels first, then override with node-specific labels
-	if defaults != nil && defaults.Metadata.Labels != nil {
-		for key, value := range defaults.Metadata.Labels {
-			wantRecipe.Metadata.Labels[key] = value
-		}
-	}
-
-	// Override with node-specific labels
-	if dryWant.Labels != nil {
-		for key, value := range dryWant.Labels {
-			wantRecipe.Metadata.Labels[key] = value
-		}
-	}
-
-	// Merge default params first, then override with node-specific params
-	if defaults != nil && defaults.Spec.Params != nil {
-		for key, value := range defaults.Spec.Params {
-			wantRecipe.Spec.Params[key] = value
-		}
-	}
-
-	// Override with node-specific params
-	if dryWant.Params != nil {
-		for key, value := range dryWant.Params {
-			wantRecipe.Spec.Params[key] = value
-		}
-	}
-
-	// Copy type hints from DRY node
-	if dryWant.TypeHints != nil {
-		for key, value := range dryWant.TypeHints {
-			wantRecipe.TypeHints[key] = value
-		}
-	}
-
-	InfoLog("[DRY-MERGE] Merged want '%s' with defaults, final params: %+v\n", dryWant.Name, wantRecipe.Spec.Params)
-
-	return wantRecipe
 }
 
 // instantiateWantFromTemplate creates a single Want from a WantRecipe (simplified, no templating)

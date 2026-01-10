@@ -74,7 +74,6 @@ type CoordinatorWant struct {
 	DataHandlerDispatcher *DataHandlerDispatcher // Dispatcher for routing to type-specific handlers
 	CompletionChecker     CompletionChecker
 	CoordinatorType       string
-	paths                 Paths
 	channelsHeard         map[int]bool
 }
 

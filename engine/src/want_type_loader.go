@@ -3,7 +3,6 @@ package mywant
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -205,7 +204,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 
 // loadWantTypeFromFile loads a single want type YAML file
 func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinition, error) {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
@@ -401,7 +400,7 @@ func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[str
 
 // LoadWantTypeDefinition loads a single want type definition from a YAML file
 func LoadWantTypeDefinition(yamlPath string) (*WantTypeDefinition, error) {
-	content, err := ioutil.ReadFile(yamlPath)
+	content, err := os.ReadFile(yamlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", yamlPath, err)
 	}

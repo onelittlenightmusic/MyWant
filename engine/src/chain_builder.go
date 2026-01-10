@@ -130,7 +130,6 @@ type ChainBuilder struct {
 
 // runtimeWant holds the runtime state of a want
 type runtimeWant struct {
-	chain    chain.C_chain
 	function any
 	want     *Want
 }
@@ -609,20 +608,6 @@ func (cb *ChainBuilder) calculateFileHash(filename string) (string, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
-// hasMemoryFileChanged checks if memory file has changed
-func (cb *ChainBuilder) hasMemoryFileChanged() bool {
-	if cb.memoryPath == "" {
-		return false
-	}
-
-	currentHash, err := cb.calculateFileHash(cb.memoryPath)
-	if err != nil {
-		return false
-	}
-
-	return currentHash != cb.lastConfigHash
-}
-
 // hasConfigFileChanged checks if config file has changed Used in batch mode to detect updates to the original config file
 func (cb *ChainBuilder) hasConfigFileChanged() bool {
 	if cb.configPath == "" {
@@ -636,19 +621,6 @@ func (cb *ChainBuilder) hasConfigFileChanged() bool {
 
 	// Use a separate hash field for config file to avoid collision with memory file hash
 	return currentHash != cb.lastConfigFileHash
-}
-
-// loadMemoryConfig loads configuration from memory file or original config
-func (cb *ChainBuilder) loadMemoryConfig() (Config, error) {
-	// If memory path is configured and file exists, load from memory
-	if cb.memoryPath != "" {
-		if _, err := os.Stat(cb.memoryPath); err == nil {
-			return loadConfigFromYAML(cb.memoryPath)
-		}
-	}
-
-	// Otherwise, return the original config
-	return cb.config, nil
 }
 
 // reconcileLoop main reconcile loop that handles both initial config load and dynamic changes

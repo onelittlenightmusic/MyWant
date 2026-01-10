@@ -3,7 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -102,7 +102,7 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 
 
 func (r *AgentRegistry) loadCapabilityFile(filename string) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
@@ -177,7 +177,7 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 
 
 func (r *AgentRegistry) loadAgentFile(filename string) error {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}

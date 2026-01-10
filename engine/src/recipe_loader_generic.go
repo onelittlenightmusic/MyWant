@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -130,7 +129,7 @@ func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 // LoadRecipe loads and processes a recipe file with OpenAPI spec validation
 func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig, error) {
 	// Read recipe file
-	data, err := ioutil.ReadFile(recipePath)
+	data, err := os.ReadFile(recipePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read recipe file: %v", err)
 	}
@@ -235,7 +234,7 @@ func (grl *GenericRecipeLoader) ValidateRecipe(recipePath string) error {
 	return err
 }
 func (grl *GenericRecipeLoader) GetRecipeParameters(recipePath string) (map[string]any, error) {
-	data, err := ioutil.ReadFile(recipePath)
+	data, err := os.ReadFile(recipePath)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +273,7 @@ func (grl *GenericRecipeLoader) ListRecipes() ([]string, error) {
 	return recipes, err
 }
 func (grl *GenericRecipeLoader) GetRecipeMetadata(recipePath string) (GenericRecipeMetadata, error) {
-	data, err := ioutil.ReadFile(recipePath)
+	data, err := os.ReadFile(recipePath)
 	if err != nil {
 		return GenericRecipeMetadata{}, err
 	}
@@ -290,7 +289,7 @@ func (grl *GenericRecipeLoader) GetRecipeMetadata(recipePath string) (GenericRec
 // LoadRecipeWithConfig loads a recipe using a config file that references the recipe
 func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 	// Read config file
-	configData, err := ioutil.ReadFile(configPath)
+	configData, err := os.ReadFile(configPath)
 	if err != nil {
 		return Config{}, nil, fmt.Errorf("failed to read config file: %v", err)
 	}
@@ -364,7 +363,7 @@ func GetRecipeParameters(recipePath string) (map[string]any, error) {
 	return loader.GetRecipeParameters(recipePath)
 }
 func (grl *GenericRecipeLoader) GetRecipeResult(recipePath string) (*RecipeResult, error) {
-	data, err := ioutil.ReadFile(recipePath)
+	data, err := os.ReadFile(recipePath)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package mywant
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 )
@@ -133,107 +132,6 @@ func (mw *MonitorWant) Progress() {
 	}()
 
 	log.Printf("🔍 Monitor %s continuous monitoring started\n", mw.Want.Metadata.Name)
-}
-func (mw *MonitorWant) handleNotification(notification StateNotification) {
-	// Call base implementation first
-	mw.BaseNotifiableWant.handleNotification(notification)
-
-	// Custom monitoring logic
-	if threshold, exists := mw.AlertThresholds[notification.StateKey]; exists {
-		if mw.shouldAlert(notification.StateValue, threshold) {
-			mw.triggerAlert(notification, threshold)
-		}
-	}
-	mw.updateMonitoringStats(notification)
-}
-
-// shouldAlert determines if an alert should be triggered
-func (mw *MonitorWant) shouldAlert(value any, threshold any) bool {
-	valueFloat, valueOk := AsFloat(value)
-	thresholdFloat, thresholdOk := AsFloat(threshold)
-
-	if valueOk && thresholdOk {
-		return valueFloat > thresholdFloat
-	}
-
-	// For string comparison, use direct equality
-	return fmt.Sprintf("%v", value) == fmt.Sprintf("%v", threshold)
-}
-
-// triggerAlert creates and stores an alert
-func (mw *MonitorWant) triggerAlert(notification StateNotification, threshold any) {
-	alert := AlertRecord{
-		Timestamp:  time.Now(),
-		SourceWant: notification.SourceWantName,
-		StateKey:   notification.StateKey,
-		Value:      notification.StateValue,
-		Threshold:  threshold,
-		AlertType:  "threshold_exceeded",
-		Message: fmt.Sprintf("Alert: %s.%s (%v) exceeded threshold (%v)",
-			notification.SourceWantName, notification.StateKey,
-			notification.StateValue, threshold),
-	}
-	mw.Alerts = append(mw.Alerts, alert)
-	mw.Want.StoreState("last_alert", alert.Message)
-	mw.Want.StoreState("last_alert_time", alert.Timestamp)
-
-	// Update alert count
-	if count, ok := mw.Want.GetStateInt("alerts_triggered", 0); ok {
-		mw.Want.StoreState("alerts_triggered", count+1)
-	} else {
-		mw.Want.StoreState("alerts_triggered", 1)
-	}
-
-	// Log alert
-	log.Printf("🚨 ALERT: %s\n", alert.Message)
-
-	// Execute alert actions
-	mw.executeAlertActions(alert)
-}
-
-// executeAlertActions performs configured alert actions
-func (mw *MonitorWant) executeAlertActions(alert AlertRecord) {
-	for _, action := range mw.AlertActions {
-		switch action {
-		case "log":
-			log.Printf("📝 Alert logged: %s\n", alert.Message)
-		case "store":
-			// Alert is already stored in mw.Alerts
-		default:
-			log.Printf("⚠️  Unknown alert action: %s\n", action)
-		}
-	}
-}
-
-// updateMonitoringStats updates monitoring statistics
-func (mw *MonitorWant) updateMonitoringStats(notification StateNotification) {
-	// Track notifications per source
-	sourceKey := fmt.Sprintf("notifications_from_%s", notification.SourceWantName)
-	if count, ok := mw.Want.GetStateInt(sourceKey, 0); ok {
-		mw.Want.StoreState(sourceKey, count+1)
-	} else {
-		mw.Want.StoreState(sourceKey, 1)
-	}
-
-	// Track unique sources
-	sourcesKey := "monitored_sources"
-	var sources []string
-	if existingSources, exists := mw.Want.GetState(sourcesKey); exists {
-		if sourceList, ok := existingSources.([]string); ok {
-			sources = sourceList
-		}
-	}
-	found := false
-	for _, source := range sources {
-		if source == notification.SourceWantName {
-			found = true
-			break
-		}
-	}
-	if !found {
-		sources = append(sources, notification.SourceWantName)
-		mw.Want.StoreState(sourcesKey, sources)
-	}
 }
 func (mw *MonitorWant) GetAlerts() []AlertRecord {
 	return mw.Alerts

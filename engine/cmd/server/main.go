@@ -2645,13 +2645,6 @@ func (s *Server) logError(r *http.Request, status int, message, errorType, detai
 	}
 }
 
-// httpErrorWithLogging handles HTTP errors and logs them to error history
-func (s *Server) httpErrorWithLogging(w http.ResponseWriter, r *http.Request, status int, message, errorType string, requestData any) {
-	// Log the error to history
-	s.logError(r, status, message, errorType, "", requestData)
-	http.Error(w, message, status)
-}
-
 // listErrorHistory handles GET /api/v1/errors - lists all error history entries
 func (s *Server) listErrorHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

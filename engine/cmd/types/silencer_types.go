@@ -70,7 +70,6 @@ func (s *SilencerWant) Progress() {
 
 	if done {
 		s.StoreLog("[SILENCER] Received DONE signal. Finalizing...")
-		InfoLog("[SILENCER:%s] Received DONE signal. Finalizing...\n", s.Metadata.Name)
 		s.StoreStateMulti(map[string]any{
 			"silencer_phase":       "completed",
 			"achieving_percentage": 100,
@@ -79,7 +78,6 @@ func (s *SilencerWant) Progress() {
 	}
 
 	s.StoreLog("[SILENCER] Received packet from channel %d: %v", index, data)
-	InfoLog("[SILENCER:%s] Received packet from channel %d: %v", s.Metadata.Name, index, data)
 
 	// Process the received packet
 	s.processPacket(data)

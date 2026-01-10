@@ -22,8 +22,8 @@ var StartCmd = &cobra.Command{
 		debug, _ := cmd.Flags().GetBool("debug")
 		detach, _ := cmd.Flags().GetBool("detach")
 
-		// 1. Guard: Check if already running
-		if isPortOpen(port) {
+		// 1. Guard: Check if already running (only when starting a new detached process)
+		if detach && isPortOpen(port) {
 			fmt.Printf("Error: Port %d is already in use. Stop the existing process first.\n", port)
 			os.Exit(1)
 		}
