@@ -284,10 +284,10 @@ func (t *Target) CreateChildWants() []*Want {
 	parentType := t.Metadata.Type
 	for _, childWant := range config.Wants {
 		if childWant.Metadata.Type == parentType {
-			t.StoreLog(fmt.Sprintf("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
-				t.Metadata.Name, parentType, t.RecipePath))
-			t.StoreLog(fmt.Sprintf("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
-				childWant.Metadata.Type, parentType))
+			t.StoreLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
+				t.Metadata.Name, parentType, t.RecipePath)
+			t.StoreLog("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
+				childWant.Metadata.Type, parentType)
 			return []*Want{}
 		}
 	}
@@ -343,7 +343,7 @@ func (t *Target) Progress() {
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err))
+			t.StoreLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
 			return
 		}
 
@@ -414,14 +414,14 @@ func (t *Target) UpdateParameter(paramName string, paramValue any) {
 	// Push parameter change to child wants
 	t.PushParameterToChildren(paramName, paramValue)
 
-	t.StoreLog(fmt.Sprintf("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
-		t.Metadata.Name, paramName, paramValue))
+	t.StoreLog("[TARGET] 🎯 Target %s: Parameter %s updated to %v and pushed to children\n",
+		t.Metadata.Name, paramName, paramValue)
 }
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue any) {
-	t.StoreLog(fmt.Sprintf("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
-		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue))
+	t.StoreLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
+		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
 func (t *Target) GetParameterValue(paramName string) any {
@@ -444,8 +444,8 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue any) {
 				// Update the child's parameter
 				runtimeWant.want.UpdateParameter(childParamName, paramValue)
 
-				t.StoreLog(fmt.Sprintf("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
-					t.Metadata.Name, wantName, paramName, paramValue, childParamName))
+				t.StoreLog("[TARGET] 🔄 Target %s → Child %s: %s=%v (mapped to %s)\n",
+					t.Metadata.Name, wantName, paramName, paramValue, childParamName)
 			}
 		}
 	}
@@ -500,19 +500,19 @@ func (t *Target) computeTemplateResult() {
 	defer t.stateMutex.Unlock()
 
 	if t.recipeLoader == nil {
-		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name))
+		t.StoreLog("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err))
+		t.StoreLog("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
-		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name))
+		t.StoreLog("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -544,7 +544,7 @@ func (t *Target) computeTemplateResult() {
 	for name := range childWantsByName {
 		childNames = append(childNames, name)
 	}
-	t.StoreLog(fmt.Sprintf("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames))
+	t.StoreLog("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames)
 
 	// Stats are now stored in State - no separate initialization needed
 	var primaryResult any
@@ -562,9 +562,9 @@ func (t *Target) computeTemplateResult() {
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult))
+			t.StoreLog("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
 		} else {
-			t.StoreLog(fmt.Sprintf("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue))
+			t.StoreLog("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
 		}
 	}
 	for i, resultSpec := range *recipeResult {
@@ -584,11 +584,11 @@ func (t *Target) computeTemplateResult() {
 	}
 	t.childCount = len(childWantsByName)
 
-	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name))
+	t.StoreLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
 func (t *Target) addChildWantsToMemory() error {
 	// This is a placeholder - in a real implementation, this would interact with the ChainBuilder to add wants to the memory file For now, we'll assume the reconcile loop will pick up the wants
-	t.StoreLog(fmt.Sprintf("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants)))
+	t.StoreLog("[TARGET] 🔧 Adding %d child wants to memory configuration\n", len(t.childWants))
 	return nil
 }
 
@@ -776,7 +776,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		for name := range childWants {
 			availableNames = append(availableNames, name)
 		}
-		t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation (available: %v)\n", t.Metadata.Name, spec.WantName, availableNames))
+		t.StoreLog("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation (available: %v)\n", t.Metadata.Name, spec.WantName, availableNames)
 		return 0
 	}
 	statName := spec.StatName
@@ -813,7 +813,7 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		return value
 	}
 
-	t.StoreLog(fmt.Sprintf("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State))
+	t.StoreLog("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
 	return 0
 }
 
@@ -895,7 +895,7 @@ func (t *Target) computeFallbackResultUnsafe() {
 		}
 	}
 
-	t.StoreLog(fmt.Sprintf("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants)))
+	t.StoreLog("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
 
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
@@ -917,5 +917,5 @@ func (t *Target) computeFallbackResultUnsafe() {
 	}
 	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
-	t.StoreLog(fmt.Sprintf("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants)))
+	t.StoreLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 }

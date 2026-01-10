@@ -429,7 +429,7 @@ func (rl *RecipeLoader) matchesResultWant(want *Want, wantSelector string, targe
 	if wantSelector == "{{.targetName}}-queue" {
 		resolvedSelector = targetName + "-queue"
 	}
-	if want.Metadata.Name == resolvedSelector {
+	if want.Metadata.Name == resolvedSelector || want.Metadata.Type == resolvedSelector {
 		return true
 	}
 	for key, value := range want.Metadata.Labels {

@@ -657,7 +657,7 @@ func (n *Want) StartProgressionLoop(
 				n.SetStatus(WantStatusAchieved)
 				// Stop all background agents when want is achieved
 				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog(fmt.Sprintf("ERROR: Failed to stop background agents: %v", err))
+					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
 				}
 				return
 			}

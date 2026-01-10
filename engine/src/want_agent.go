@@ -455,7 +455,7 @@ func (w *Want) StopAllBackgroundAgents() error {
 	for agentID, agent := range w.backgroundAgents {
 		if err := agent.Stop(); err != nil {
 			lastErr = fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
-			w.StoreLog(fmt.Sprintf("ERROR: %v", lastErr))
+			w.StoreLog("ERROR: %v", lastErr)
 		}
 	}
 
@@ -508,8 +508,8 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	spec, exists := w.agentRegistry.GetAgentSpec(agentName)
 	if !exists || spec == nil {
 		// STRICT MODE: Agent has no specification - warn on all writes
-		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' has no tracked_status_fields specification, writing to field '%s'",
-			agentName, key))
+		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' has no tracked_status_fields specification, writing to field '%s'",
+			agentName, key)
 		return false
 	}
 
@@ -521,11 +521,11 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	// Key not allowed - log warning but allow write
 	description := spec.KeyDescriptions[key]
 	if description != "" {
-		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (%s)",
-			agentName, key, description))
+		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (%s)",
+			agentName, key, description)
 	} else {
-		w.StoreLog(fmt.Sprintf("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (not in tracked_status_fields)",
-			agentName, key))
+		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (not in tracked_status_fields)",
+			agentName, key)
 	}
 
 	return false // Validation failed, but write still allowed
