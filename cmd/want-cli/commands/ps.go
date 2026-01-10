@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"syscall"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
@@ -17,21 +18,26 @@ var PsCmd = &cobra.Command{
 		guiPort, _ := cmd.Flags().GetInt("gui-port")
 		mockPort, _ := cmd.Flags().GetInt("mock-port")
 
-		fmt.Println("MyWant Process Status:")
-		fmt.Println("----------------------")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "NAME\tPORT\tSTATUS\tPID")
 
 		// 1. Check Server
-		checkProcessStatus("Backend Server", pidFile, serverPort)
+		name, port, status, pid := getProcessStatus("Backend Server", pidFile, serverPort)
+		fmt.Fprintf(w, "%s\t%d\t%s\t%s\n", name, port, status, pid)
 
 		// 2. Check GUI
-		checkProcessStatus("Frontend GUI  ", guiPidFile, guiPort)
+		name, port, status, pid = getProcessStatus("Frontend GUI", guiPidFile, guiPort)
+		fmt.Fprintf(w, "%s\t%d\t%s\t%s\n", name, port, status, pid)
 
 		// 3. Check Mock Server
-		checkProcessStatus("Mock Flight   ", "", mockPort)
+		name, port, status, pid = getProcessStatus("Mock Flight", "", mockPort)
+		fmt.Fprintf(w, "%s\t%d\t%s\t%s\n", name, port, status, pid)
+
+		w.Flush()
 	},
 }
 
-func checkProcessStatus(label string, pidFileName string, port int) {
+func getProcessStatus(label string, pidFileName string, port int) (string, int, string, string) {
 	running := false
 	pid := 0
 
@@ -55,17 +61,17 @@ func checkProcessStatus(label string, pidFileName string, port int) {
 	// Also check port
 	portInUse := isPortOpen(port)
 
-	fmt.Printf("%s:\n", label)
-	fmt.Printf("  Port:    %d\n", port)
+	status := "STOPPED"
+	pidStr := "-"
+
 	if running {
-		fmt.Printf("  Status:  RUNNING (Background)\n")
-		fmt.Printf("  PID:     %d\n", pid)
+		status = "RUNNING"
+		pidStr = strconv.Itoa(pid)
 	} else if portInUse {
-		fmt.Printf("  Status:  RUNNING (Active on port)\n")
-	} else {
-		fmt.Printf("  Status:  STOPPED\n")
+		status = "RUNNING (Active)"
 	}
-	fmt.Println()
+
+	return label, port, status, pidStr
 }
 
 func init() {
