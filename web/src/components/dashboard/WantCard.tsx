@@ -218,10 +218,14 @@ export const WantCard: React.FC<WantCardProps> = ({
         e.dataTransfer.dropEffect = 'move';
         if (!isDragOverWant) {
           setIsDragOverWant(true);
+          setIsOverTarget(true);
         }
+      } else {
+        setIsOverTarget(false);
       }
     } else {
       setIsDragOverWant(false);
+      setIsOverTarget(false);
       e.dataTransfer.dropEffect = 'copy';
       setIsDragOver(true);
     }
@@ -233,6 +237,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     e.stopPropagation();
     setIsDragOver(false);
     setIsDragOverWant(false);
+    setIsOverTarget(false);
     setDraggedOverChildId(null);
   };
 
@@ -242,6 +247,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     e.stopPropagation();
     setIsDragOver(false);
     setIsDragOverWant(false);
+    setIsOverTarget(false);
     setDraggedOverChildId(null);
     setDraggingWant(null); // Reset dragging state
 
@@ -356,12 +362,12 @@ export const WantCard: React.FC<WantCardProps> = ({
       <div 
         className={classNames(
           "absolute inset-0 z-30 flex items-center justify-center bg-blue-600 transition-all duration-200 ease-out pointer-events-none",
-          isDragOverWant && isTargetWant ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "bg-opacity-40 opacity-100" : "bg-opacity-0 opacity-0"
         )}
       >
         <div className={classNames(
           "bg-white p-4 rounded-full shadow-2xl border-2 border-blue-500 transform transition-all duration-200 ease-out",
-          isDragOverWant && isTargetWant ? "scale-100 opacity-100" : "scale-150 opacity-0"
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "scale-100 opacity-100" : "scale-150 opacity-0"
         )}>
           <Plus className="w-12 h-12 text-blue-600" />
         </div>
@@ -523,18 +529,23 @@ export const WantCard: React.FC<WantCardProps> = ({
                     const isWantDrag = !!draggingWant || e.dataTransfer.types.includes('application/mywant-id');
                     
                     if (isWantDrag) {
-                      setIsDragOver(false); // Ensure green border is OFF
+                      setIsDragOver(false);
                       if (isChildTarget) {
                         e.dataTransfer.dropEffect = 'move';
                         setIsDragOverWant(true);
+                        setIsOverTarget(true);
                         setDraggedOverChildId(childId);
                       } else {
-                        e.dataTransfer.dropEffect = 'none';
-                        setIsDragOverWant(false);
+                        // If child is not a target, allow drop on the parent target
+                        e.dataTransfer.dropEffect = 'move';
+                        setIsDragOverWant(true);
+                        setIsOverTarget(true);
+                        setDraggedOverChildId(null); // Parent handles it
                       }
                     } else {
                       // Label drag
                       setIsDragOverWant(false);
+                      setIsOverTarget(false);
                       e.dataTransfer.dropEffect = 'copy';
                       setIsDragOver(true);
                     }
@@ -544,8 +555,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   const handleChildDragLeave = (e: React.DragEvent) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setIsDragOver(false);
-                    setIsDragOverWant(false);
+                    // Don't reset everything, just child ID
                     setDraggedOverChildId(null);
                   };
 
@@ -555,6 +565,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                     e.stopPropagation();
                     setIsDragOver(false);
                     setIsDragOverWant(false);
+                    setIsOverTarget(false);
                     setDraggedOverChildId(null);
                     setDraggingWant(null); // Reset dragging state
 
