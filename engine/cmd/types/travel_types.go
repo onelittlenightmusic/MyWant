@@ -34,17 +34,17 @@ type BuffetWantLocals struct {
 
 // TimeSlot represents a time period with start and end times
 type TimeSlot struct {
-	Start time.Time
-	End   time.Time
-	Type  string
-	Name  string
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
+	Type  string    `json:"type"`
+	Name  string    `json:"name"`
 }
 
 // TravelSchedule represents a complete travel schedule with multiple events
 type TravelSchedule struct {
-	Events    []TimeSlot
-	Date      time.Time
-	Completed bool
+	Events    []TimeSlot `json:"events"`
+	Date      time.Time  `json:"date"`
+	Completed bool       `json:"completed"`
 }
 
 // ScheduleConflict represents a scheduling conflict that needs resolution
@@ -1027,11 +1027,12 @@ func (f *FlightWant) Progress() {
 
 		agentResult, hasResult := f.GetState("agent_result")
 		if hasResult && agentResult != nil {
-			f.StoreLog("Initial booking succeeded")
+			f.StoreLog("Initial booking succeeded, sending packet")
 			agentSchedule := f.extractFlightSchedule(agentResult)
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
 				f.sendFlightPacket(out, agentSchedule, "Initial")
+				f.StoreLog("Initial flight packet sent to coordinator")
 
 				// Transition to monitoring phase
 				locals.monitoringStartTime = time.Now()
@@ -1042,13 +1043,8 @@ func (f *FlightWant) Progress() {
 			}
 		}
 
-		// Booking failed - complete
-		f.StoreLog("Initial booking failed")
-		f.StoreStateMulti(Dict{
-			"_flight_phase":        PhaseCompleted,
-			"achieving_percentage": 100,
-		})
-		f.ProvideDone()
+		// Booking failed - don't complete, let it retry or stay in booking phase
+		f.StoreLog("Initial booking failed - will retry")
 		return
 
 	// === Phase 3: Monitoring ===
