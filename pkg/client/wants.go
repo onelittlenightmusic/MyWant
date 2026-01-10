@@ -1,9 +1,9 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 )
-
 // ListWants retrieves all wants from the server
 func (c *Client) ListWants() (*APIDumpResponse, error) {
 	var result APIDumpResponse
@@ -62,4 +62,23 @@ func (c *Client) StopWants(ids []string) error {
 // StartWants starts multiple wants
 func (c *Client) StartWants(ids []string) error {
 	return c.Request("POST", "/api/v1/wants/start", BatchOperationRequest{IDs: ids}, nil)
+}
+
+// ExportWants exports all wants as YAML
+func (c *Client) ExportWants() ([]byte, error) {
+	return c.RawRequest("POST", "/api/v1/wants/export", nil, "application/json")
+}
+
+// ImportWants imports wants from YAML
+func (c *Client) ImportWants(yamlData []byte) (*ImportWantsResponse, error) {
+	var result ImportWantsResponse
+	respData, err := c.RawRequest("POST", "/api/v1/wants/import", yamlData, "application/yaml")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(respData, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return &result, nil
 }

@@ -46,6 +46,12 @@ type CreateWantResponse struct {
 	Message string   `json:"message"`
 }
 
+type ImportWantsResponse struct {
+	ID      string `json:"id"`
+	Status  string `json:"status"`
+	Wants   int    `json:"wants"`
+	Message string `json:"message"`
+}
 // ValidationResult represents validation response
 type ValidationResult struct {
 	Valid       bool                `json:"valid"`

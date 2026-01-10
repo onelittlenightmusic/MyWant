@@ -136,8 +136,12 @@ func init() {
 	WantsCmd.AddCommand(getWantCmd)
 	WantsCmd.AddCommand(createWantCmd)
 	WantsCmd.AddCommand(deleteWantCmd)
+	WantsCmd.AddCommand(exportWantsCmd)
+	WantsCmd.AddCommand(importWantsCmd)
 
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
+	exportWantsCmd.Flags().StringP("output", "o", "", "Path to save exported YAML (stdout if not specified)")
+	importWantsCmd.Flags().StringP("file", "f", "", "Path to YAML file to import")
 
 	WantsCmd.AddCommand(suspendWantsCmd)
 	WantsCmd.AddCommand(resumeWantsCmd)
@@ -145,8 +149,59 @@ func init() {
 	WantsCmd.AddCommand(startWantsCmd)
 }
 
-func printMap(m map[string]any) {
-	for k, v := range m {
+var exportWantsCmd = &cobra.Command{
+	Use:   "export",
+	Short: "Export all wants as YAML",
+	Run: func(cmd *cobra.Command, args []string) {
+		output, _ := cmd.Flags().GetString("output")
+		c := client.NewClient(viper.GetString("server"))
+		data, err := c.ExportWants()
+		if err != nil {
+			fmt.Printf("Error exporting wants: %v\n", err)
+			os.Exit(1)
+		}
+
+		if output != "" {
+			if err := os.WriteFile(output, data, 0644); err != nil {
+				fmt.Printf("Error writing to file: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Successfully exported wants to %s\n", output)
+		} else {
+			fmt.Println(string(data))
+		}
+	},
+}
+
+var importWantsCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import wants from YAML file",
+	Run: func(cmd *cobra.Command, args []string) {
+		file, _ := cmd.Flags().GetString("file")
+		if file == "" {
+			fmt.Println("Error: --file flag is required")
+			os.Exit(1)
+		}
+
+		data, err := os.ReadFile(file)
+		if err != nil {
+			fmt.Printf("Error reading file: %v\n", err)
+			os.Exit(1)
+		}
+
+		c := client.NewClient(viper.GetString("server"))
+		resp, err := c.ImportWants(data)
+		if err != nil {
+			fmt.Printf("Error importing wants: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Successfully imported execution %s with %d wants\n", resp.ID, resp.Wants)
+		fmt.Println(resp.Message)
+	},
+}
+
+func printMap(m map[string]any) {	for k, v := range m {
 		fmt.Printf("  %s: %v\n", k, v)
 	}
 }
