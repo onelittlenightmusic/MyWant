@@ -106,6 +106,7 @@ func main() {
 	timeout := 30 * time.Second
 	var parentWant *Want
 	var childWants []*Want
+	var listResp WantsListResponse
 	allAchieved := false
 
 	for time.Since(startWait) < timeout {
@@ -115,7 +116,7 @@ func main() {
 			return
 		}
 		
-		var listResp WantsListResponse
+		listResp = WantsListResponse{}
 		json.NewDecoder(resp.Body).Decode(&listResp)
 		resp.Body.Close()
 
@@ -170,15 +171,68 @@ func main() {
 	}
 
 	fmt.Printf("📍 Parent Want: %s (ID: %s, Status: %s)\n", wantName, parentWant.Metadata.ID, parentWant.Status)
-	fmt.Printf("👶 Found %d child wants\n", len(childWants))
-	for _, child := range childWants {
-		fmt.Printf("  - Child: %s (Type: %s, Status: %s)\n", child.Metadata.Name, child.Metadata.Type, child.Status)
-	}
+	
+	// Display all wants in a hierarchical tree
+	fmt.Println("🌳 Want Hierarchy:")
+	displayWantTree(listResp.Wants, parentWant.Metadata.ID, 1)
 
 	if allAchieved {
 		fmt.Printf("🎉 PASS: All wants achieved in %v!\n", time.Since(startWait).Round(time.Second))
 	} else {
 		fmt.Println("❌ FAIL: Timeout reached or some wants are not achieved.")
+		fmt.Println("\n📋 Logs for stuck wants:")
+		for _, w := range listResp.Wants {
+			if w.Status == "reaching" {
+				fmt.Printf("\n--- Logs for %s (%s) ---\n", w.Metadata.Name, w.Metadata.ID)
+				logs := fetchWantLogs(baseURL, w.Metadata.ID)
+				for _, logEntry := range logs {
+					fmt.Printf("[%d] %s\n", logEntry.Timestamp, logEntry.Logs)
+				}
+			}
+		}
 		os.Exit(1)
+	}
+}
+
+type LogEntry struct {
+	Timestamp int64  `json:"timestamp"`
+	Logs      string `json:"logs"`
+}
+
+func fetchWantLogs(baseURL, wantID string) []LogEntry {
+	resp, err := http.Get(baseURL + "/api/v1/wants/" + wantID)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var details struct {
+		History struct {
+			LogHistory []LogEntry `json:"logHistory"`
+		} `json:"history"`
+	}
+	json.NewDecoder(resp.Body).Decode(&details)
+	return details.History.LogHistory
+}
+
+func displayWantTree(allWants []*Want, parentID string, indent int) {
+	for _, w := range allWants {
+		isChild := false
+		for _, ref := range w.Metadata.OwnerReferences {
+			if ref.ID == parentID {
+				isChild = true
+				break
+			}
+		}
+
+		if isChild {
+			prefix := ""
+			for i := 0; i < indent; i++ {
+				prefix += "  "
+			}
+			fmt.Printf("%s- %s (Type: %s, Status: %s, ID: %s)\n", prefix, w.Metadata.Name, w.Metadata.Type, w.Status, w.Metadata.ID)
+			// Recursive call for grandchildren
+			displayWantTree(allWants, w.Metadata.ID, indent+1)
+		}
 	}
 }

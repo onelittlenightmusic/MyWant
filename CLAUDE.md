@@ -2,44 +2,97 @@
 
 ## Project Overview
 
-MyWant is a Go library for functional chain programming with channels. Uses **recipe-based configuration** where config YAML files reference reusable recipe templates.
+MyWant is a **declarative chain programming system** where you express "what you want" through YAML configuration. Autonomous **agents** (Do/Monitor types) collaborate to solve your Wants based on their Capabilities.
+
+**Key Features:**
+- 📝 YAML-driven workflows with recipe-based configuration
+- 🤖 Autonomous agent ecosystem (Do/Monitor agents)
+- 💻 Full-stack CLI (`want-cli`) for complete lifecycle management
+- 📊 Interactive dashboard with real-time monitoring
+- 💾 Persistent memory with continuous state reconciliation
 
 ## Documentation
 
-- [Keyboard Shortcuts & MCP Testing Guide](web/SHORTCUTS_AND_MCP_TESTING.md) - Shortcut keys and automated testing guide for the frontend.
+**Official Docs:**
+- [Want System](docs/want-system.md) - Core Want/Recipe concepts
+- [Agent System](docs/agent-system.md) - Agent architecture
+- [Agent Catalog](AGENTS.md) - Available agents and capabilities
+- [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete want-cli reference
+- [Examples](docs/agent-examples.md) - Agent usage examples
+- [Keyboard Shortcuts & MCP Testing](web/SHORTCUTS_AND_MCP_TESTING.md) - Frontend shortcuts
 
 ## Core Architecture
 
 **Main Components:**
-- `declarative.go` - Core Config/Want/Recipe types
+- `declarative.go` - Core Config/Want/Recipe/Agent types
 - `recipe_loader_generic.go` - Generic recipe loading
-- `*_types.go` - Want type implementations
+- `*_types.go` - Want type implementations (in `engine/cmd/types/`)
 - `engine/src/chain_builder.go` - Chain execution engine
+- `agents/` - Agent YAML definitions
 
 **Key Types:**
 - `Want` - Processing unit with Metadata, Spec, State, Status
 - `WantSpec` - Config with Params, Using selectors, Recipe reference
 - `ChainBuilder` - Builds and executes chains
+- `Agent` - Autonomous executor with Capabilities
 
 **Want Categories:**
 - **Independent** - Execute in parallel (travel planning: restaurant, hotel, buffet)
 - **Dependent** - Pipeline via `using` selectors (queue: generator→queue→sink)
 - **Coordinator** - Orchestrates other wants via input channels
 
+**Agent Types:**
+- **DoAgent** - Execute specific tasks once (e.g., book flight)
+- **MonitorAgent** - Continuously poll external state (e.g., flight status monitor)
+
 ## Essential Commands
 
-**Server Management:**
+**CLI Quick Start:**
+```sh
+# Build CLI with embedded GUI
+make release
+
+# Start backend and GUI in background
+./want-cli server start -D --port 8080
+./want-cli gui start -D --port 3000
+
+# Deploy a want from file
+./want-cli wants create -f config/config-travel.yaml
+
+# List all wants
+./want-cli wants list
+
+# Stop servers
+./want-cli gui stop && ./want-cli server stop
+```
+
+**Want-CLI Management:**
+```sh
+# Want lifecycle
+./want-cli wants get <WANT_ID>           # Get detailed status
+./want-cli wants delete <WANT_ID>        # Delete want
+./want-cli wants suspend/resume <ID>     # Lifecycle control
+
+# Recipe operations
+./want-cli recipes list                  # List available recipes
+./want-cli recipes create -f recipe.yaml # Create new recipe
+./want-cli recipes from-want <ID> --name "my-recipe"  # Generate from existing want
+
+# System inspection
+./want-cli types list                    # List want types
+./want-cli agents list                   # List registered agents
+./want-cli capabilities list             # List capabilities
+./want-cli logs                          # View operation logs
+```
+
+**Legacy Make Commands:**
 ```sh
 make restart-all             # Start servers: MyWant (8080) + Mock Flight (8081)
 make test-concurrent-deploy  # Test concurrent deployments with race detection
-curl -s http://localhost:8080/api/v1/wants | jq '.wants | length'  # Check status
+make run-travel-recipe       # Independent wants (restaurant, hotel, buffet)
+make run-queue-system-recipe # Pipeline (generator→queue→sink)
+make run-qnet-recipe         # Complex multi-stream system
 ```
-
-**Run Examples:**
-- `make run-travel-recipe` - Independent wants (restaurant, hotel, buffet)
-- `make run-queue-system-recipe` - Pipeline (generator→queue→sink)
-- `make run-qnet-recipe` - Complex multi-stream system
-- `make run-sample-owner` - Dynamic want creation
 
 **Important**: Never use `make build-server` directly; `make restart-all` includes building.
 
@@ -66,9 +119,12 @@ builder.AddDynamicNodes([]Want{})  // Add multiple
 
 - `config/` - Config YAML files (user interface)
 - `recipes/` - Recipe templates (reusable components)
+- `agents/` - Agent YAML definitions (Do/Monitor agents)
 - `engine/src/` - Core system: declarative.go, chain_builder.go
 - `engine/cmd/types/` - Want implementations: *_types.go files
 - `engine/cmd/server/` - HTTP server and API endpoints
+- `docs/` - Documentation (want-system.md, agent-system.md, etc.)
+- `web/` - React frontend (embedded in binary)
 
 ## Coding Rules
 
@@ -95,6 +151,44 @@ builder.AddDynamicNodes([]Want{})  // Add multiple
 - `providers` - Needs input connections (sinks, collectors)
 - `providers_and_users` - Needs both (pipelines: queue, processors)
 
+## Agent System
+
+**Agent Types:**
+- **DoAgent** - Executes specific tasks once and writes results to State
+  - Examples: `agent_flight_api` (flight booking), `execution_command` (shell commands)
+- **MonitorAgent** - Continuously polls external state and updates Want
+  - Examples: `monitor_flight_api` (flight status), `user_reaction_monitor` (approval monitoring)
+
+**Capabilities:**
+Agents declare what they can do via capabilities:
+- `flight_api_agency` - Flight API integration
+- `hotel_agency` - Hotel booking services
+- `command_execution` - Shell command execution
+- `mcp_gmail` - Gmail operations via MCP
+- `reminder_monitoring` - User reaction tracking
+
+**Agent Definition (YAML):**
+```yaml
+# agents/agent-example.yaml
+name: "agent_premium"
+type: "do"
+capabilities:
+  - "hotel_agency"
+  - "premium_services"
+description: "Handles luxury hotel bookings with automated upgrades."
+```
+
+**Common Agent Patterns:**
+1. **Monitor & Retrigger**: MonitorAgent detects state change (e.g., flight delay) → triggers Coordinator to replan
+2. **Silencer Pattern**: Auto-approval agent responds while user input is pending
+
+**Agent Management:**
+```sh
+./want-cli agents list           # Show registered agents
+./want-cli capabilities list     # Show available capabilities
+./want-cli wants get <ID> --history  # View agent execution history
+```
+
 ## Pending Improvements
 
 - Frontend recipe cards need deploy button for direct recipe launch
@@ -120,27 +214,27 @@ rag.close()
 
 **Resources**: See `tools/README_RAG.md` and `QUICKSTART_RAG.md` for details.
 
-## Completed Tasks (2025-12-13)
+## Completed Tasks
 
-### UI Improvements
+### 2026-01-10: Documentation Update
+✅ **Updated CLAUDE.md with latest system information**
+- Added Agent System documentation (DoAgent/MonitorAgent, Capabilities)
+- Integrated want-cli commands and usage patterns
+- Updated project overview to reflect declarative agent-based architecture
+- Added comprehensive CLI quick start and management commands
+- Documented agent patterns (Monitor & Retrigger, Silencer)
+- Updated file organization with agents/, docs/, web/ directories
+
+### 2025-12-13: UI and Coordinator Improvements
 ✅ **Fixed LabelSelectorAutocomplete keyboard navigation** (Commit 54e8484)
 - Added arrow key (Up/Down) navigation through dropdown options
 - Tab key now confirms selection and moves to next field
-- Enter key confirms selection from dropdown
-- Visual highlight (blue background) for selected option
-- Auto-focus management for smooth workflow
-- Full keyboard accessibility for dependency selector
+- Visual highlight and auto-focus management
 
-### Coordinator System Refactoring
-✅ **Verified Coordinator Unification**
-- Confirmed all recipes use unified `type: coordinator`
-- Generic `CoordinatorWant` handles all variations through handler interfaces
-- Approval and Travel coordinators fully unified in codebase
-
-✅ **Removed Legacy Backward-Compatibility Code** (Commit 3db770d)
-- Removed checks for old type names: `level1_coordinator`, `level2_coordinator`, `buffet_coordinator`
+✅ **Coordinator System Refactoring**
+- Unified all recipes to use `type: coordinator`
+- Removed legacy backward-compatibility code (Commit 3db770d)
 - Simplified `getCoordinatorConfig()` logic
-- Current implementation relies on parameters: `coordinator_type`, `coordinator_level`, `is_buffet`
 
 ## Pending Tasks
 None - all major refactoring complete!
