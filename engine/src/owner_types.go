@@ -306,6 +306,17 @@ func (t *Target) CreateChildWants() []*Want {
 			config.Wants[i].Metadata.Labels = make(map[string]string)
 		}
 		config.Wants[i].Metadata.Labels["owner"] = "child"
+		// Inject affinity label to namespace children of this target
+		config.Wants[i].Metadata.Labels["owner-name"] = t.Metadata.Name
+
+		// Inject the same affinity label into all 'using' selectors of the child
+		// This ensures sibling wants within the same target connect to each other
+		for j := range config.Wants[i].Spec.Using {
+			if config.Wants[i].Spec.Using[j] == nil {
+				config.Wants[i].Spec.Using[j] = make(map[string]string)
+			}
+			config.Wants[i].Spec.Using[j]["owner-name"] = t.Metadata.Name
+		}
 	}
 
 	t.childWants = config.Wants

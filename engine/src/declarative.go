@@ -44,6 +44,11 @@ type ParameterChangeListener interface {
 	OnParameterChange(notification StateNotification) error
 }
 
+// OnDeletable allows wants to perform cleanup when being deleted
+type OnDeletable interface {
+	OnDelete()
+}
+
 // StateSubscription defines what state changes to monitor
 type StateSubscription struct {
 	WantName   string   `json:"wantName" yaml:"wantName"`                         // Which want to monitor

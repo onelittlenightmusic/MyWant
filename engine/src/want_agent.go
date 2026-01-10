@@ -32,6 +32,14 @@ func (n *Want) SetAgentActivity(agentName string, activity string) {
 	}
 }
 
+func getAgentNames(agents []Agent) []string {
+	names := make([]string, len(agents))
+	for i, a := range agents {
+		names[i] = a.GetName()
+	}
+	return names
+}
+
 // ExecuteAgents finds and executes agents based on want requirements
 func (n *Want) ExecuteAgents() error {
 	if n.agentRegistry == nil {
@@ -44,6 +52,7 @@ func (n *Want) ExecuteAgents() error {
 
 	for _, requirement := range n.Spec.Requires {
 		var agents []Agent
+		n.StoreLog("🔍 Resolving requirement: '%s'", requirement)
 
 		// First, try to find agents by the requirement directly (if it's a "gives" value)
 		agents = n.agentRegistry.FindAgentsByGives(requirement)
@@ -60,6 +69,8 @@ func (n *Want) ExecuteAgents() error {
 
 		if len(agents) == 0 {
 			n.StoreLog("⚠️ WARNING: No agents found providing requirement '%s'", requirement)
+		} else {
+			n.StoreLog("✅ Found %d agent(s) for '%s': %v", len(agents), requirement, getAgentNames(agents))
 		}
 
 		for _, agent := range agents {

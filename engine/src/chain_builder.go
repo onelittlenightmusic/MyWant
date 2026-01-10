@@ -160,6 +160,18 @@ func (cb *ChainBuilder) GetConfig() Config {
 	return cb.config
 }
 
+// GetWants returns all runtime wants in the chain
+func (cb *ChainBuilder) GetWants() []*Want {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
+	wants := make([]*Want, 0, len(cb.wants))
+	for _, rw := range cb.wants {
+		wants = append(wants, rw.want)
+	}
+	return wants
+}
+
 // NewChainBuilderWithPaths creates a new builder with config and memory file paths
 func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	builder := &ChainBuilder{
@@ -1723,6 +1735,11 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 // deleteWant removes a want from runtime and signals its goroutines to stop
 func (cb *ChainBuilder) deleteWant(wantName string) {
 	if runtimeWant, exists := cb.wants[wantName]; exists {
+		// Call OnDelete() if the want implements OnDeletable interface
+		if deletable, ok := runtimeWant.function.(OnDeletable); ok {
+			deletable.OnDelete()
+		}
+
 		if runtimeWant.want.stopChannel == nil {
 			runtimeWant.want.stopChannel = make(chan struct{})
 		}

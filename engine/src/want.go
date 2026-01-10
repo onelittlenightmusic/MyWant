@@ -565,9 +565,10 @@ func (n *Want) StartProgressionLoop(
 
 		// Drain existing output/input channels to remove stale packets from previous executions
 		// This prevents consumers from reading "Done" signals or data from a dead process
-		initialPaths := getPathsFunc()
-		n.DrainOutputChannels(initialPaths)
-		n.DrainInputChannels(initialPaths)
+		// REMOVED: Draining here can cause valid new packets (like rebooked flights) to be lost if they arrive exactly during restart
+		// initialPaths := getPathsFunc()
+		// n.DrainOutputChannels(initialPaths)
+		// n.DrainInputChannels(initialPaths)
 
 		for {
 			// 1. Check stop channel
@@ -1302,6 +1303,9 @@ func (n *Want) Provide(packet any) error {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
 		}
+		
+		InfoLog("[PROVIDE] Want '%s' sending packet to '%s' on channel '%s'", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
+		
 		select {
 		case pathInfo.Channel <- tp:
 			// Sent successfully
