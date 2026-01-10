@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: true
+
+    - name: Get dependencies
+      run: go mod download
+
+    - name: Verify OpenAPI Spec
+      run: |
+        if [ ! -f openapi.yaml ]; then
+          echo "openapi.yaml is missing"
+          exit 1
+        fi
+
+    - name: Run Backend Tests
+      run: |
+        cd engine/cmd/server
+        go test -v .
+
+    - name: Run Client Tests
+      run: go test -v ./pkg/client/...
+
+    - name: Run CLI Tests
+      run: go test -v ./cmd/want-cli/...
