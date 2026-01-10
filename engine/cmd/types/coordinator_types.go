@@ -226,12 +226,26 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	}
 
 	inCount := c.GetInCount()
-	if len(channelsHeard) != inCount {
-		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for all channels - heard %d/%d", len(channelsHeard), inCount))
-		return // Still waiting for data from some channels
+
+	// Calculate how many channels have EVER provided data (stored in persistent state)
+	dataByChannelVal, _ := c.GetState("data_by_channel")
+	everHeardCount := 0
+	if dataByChannel, ok := dataByChannelVal.(map[int]any); ok {
+		everHeardCount = len(dataByChannel)
+	} else if dataByChannel, ok := dataByChannelVal.(map[string]any); ok {
+		everHeardCount = len(dataByChannel)
 	}
 
-	c.StoreLog(fmt.Sprintf("[tryCompletion] All channels heard (%d/%d), checking timeout", len(channelsHeard), inCount))
+	// Logic change: If we have heard from everyone at least once ever,
+	// we can proceed to check timeout for any incremental updates.
+	// This prevents getting stuck waiting for "DONE" signals from already achieved upstreams.
+	if everHeardCount < inCount {
+		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for initial sync - heard %d/%d (ever: %d/%d)",
+			len(channelsHeard), inCount, everHeardCount, inCount))
+		return // Still waiting for first data from some channels
+	}
+
+	c.StoreLog(fmt.Sprintf("[tryCompletion] Full data set available (%d/%d), checking timeout", everHeardCount, inCount))
 
 	// All channels have sent: record the first time (independent of timeout)
 	lastPacketTimeVal, exists := c.GetState("last_packet_time")
