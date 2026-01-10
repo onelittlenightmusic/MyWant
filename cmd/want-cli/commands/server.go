@@ -198,11 +198,9 @@ var serverStopCmd = &cobra.Command{
 func init() {
 	ServerCmd.AddCommand(serverStartCmd)
 	ServerCmd.AddCommand(serverStopCmd)
-	ServerCmd.AddCommand(serverPsCmd)
 
 	serverStartCmd.Flags().IntP("port", "p", 8080, "Port to listen on")
 	serverStopCmd.Flags().IntP("port", "p", 8080, "Port to stop")
-	serverPsCmd.Flags().IntP("port", "p", 8080, "Port to check")
 	serverStartCmd.Flags().StringP("host", "H", "localhost", "Host to bind to")
 	serverStartCmd.Flags().BoolP("debug", "d", false, "Enable debug mode")
 	serverStartCmd.Flags().BoolP("detach", "D", false, "Run server in background")

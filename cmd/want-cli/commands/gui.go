@@ -232,11 +232,9 @@ var guiStopCmd = &cobra.Command{
 func init() {
 	GuiCmd.AddCommand(guiStartCmd)
 	GuiCmd.AddCommand(guiStopCmd)
-	GuiCmd.AddCommand(guiPsCmd)
 
 	guiStartCmd.Flags().IntP("port", "p", 3000, "Port to listen on")
 	guiStopCmd.Flags().IntP("port", "p", 3000, "Port to stop")
-	guiPsCmd.Flags().IntP("port", "p", 3000, "Port to check")
 	guiStartCmd.Flags().StringP("host", "H", "localhost", "Host to bind to")
 	guiStartCmd.Flags().BoolP("detach", "D", false, "Run frontend in background")
 	guiStartCmd.Flags().Bool("dev", false, "Run in development mode (requires npm)")

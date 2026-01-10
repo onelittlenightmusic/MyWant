@@ -22,9 +22,8 @@ Start, monitor, and stop the backend and frontend services.
 # (Includes a guard to prevent multiple instances on the same port)
 ./want-cli server start --detach --port 8080
 
-# Check process status (PID, Port, and Run State)
-./want-cli server ps
-./want-cli gui ps
+# Check status of all processes (Server, GUI, and Mock Server)
+./want-cli ps
 
 # Start GUI (embedded mode) in background
 # (Includes a guard to prevent multiple instances on the same port)

@@ -30,10 +30,10 @@ func main() {
 	rootCmd.AddCommand(commands.CapabilitiesCmd)
 	rootCmd.AddCommand(commands.TypesCmd)
 	rootCmd.AddCommand(commands.LlmCmd)
-	rootCmd.AddCommand(commands.LogsCmd)
-	rootCmd.AddCommand(commands.ServerCmd)
-	rootCmd.AddCommand(commands.GuiCmd)
-
+	        rootCmd.AddCommand(commands.LogsCmd)
+	        rootCmd.AddCommand(commands.ServerCmd)
+	        rootCmd.AddCommand(commands.GuiCmd)
+	        rootCmd.AddCommand(commands.PsCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
