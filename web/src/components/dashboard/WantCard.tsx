@@ -325,7 +325,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       ref={cardRef}
-      draggable={!isSelectMode}
+      draggable={!isSelectMode && !isTargetWant}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
@@ -607,6 +607,16 @@ export const WantCard: React.FC<WantCardProps> = ({
                   data-keyboard-nav-selected={isChildSelected}
                   data-keyboard-nav-id={childId}
                   tabIndex={0}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    const id = child.metadata?.id || child.id;
+                    if (!id) return;
+                    setDraggingWant(id);
+                    e.dataTransfer.setData('application/mywant-id', id);
+                    e.dataTransfer.setData('application/mywant-name', child.metadata?.name || '');
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragEnd={() => setDraggingWant(null)}
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',

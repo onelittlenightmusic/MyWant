@@ -208,7 +208,7 @@ export default function RecipePage() {
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px]">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">

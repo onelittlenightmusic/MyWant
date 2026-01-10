@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className={classNames(
-      "bg-white border-b border-gray-200 px-6 py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out",
+      "bg-white border-b border-gray-200 px-6 py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out left-0",
       sidebarMinimized ? "lg:left-20" : "lg:left-44"
     )}>
       <div className="flex items-center justify-between gap-4">

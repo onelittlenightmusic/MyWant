@@ -745,6 +745,36 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Handler for when a child want is dragged out and dropped on the background
+  const handleUnparentWant = async (draggedWantId: string) => {
+    try {
+      const draggedWant = wants.find(w => (w.metadata?.id === draggedWantId) || (w.id === draggedWantId));
+      if (!draggedWant) return;
+
+      // If no owner references, nothing to do
+      if (!draggedWant.metadata.ownerReferences || draggedWant.metadata.ownerReferences.length === 0) {
+        return;
+      }
+
+      const updatedWant = {
+        ...draggedWant,
+        metadata: {
+          ...draggedWant.metadata,
+          ownerReferences: [] // Clear all owner references to make it a root want
+        }
+      };
+
+      await apiClient.updateWant(draggedWantId, updatedWant);
+      showNotification(`✓ Removed parent from ${draggedWant.metadata.name}`);
+      
+      // Refresh wants list
+      await fetchWants();
+    } catch (error) {
+      console.error('Failed to unparent want:', error);
+      showNotification(`✗ Failed to remove parent: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Use hierarchical keyboard navigation hook
   useHierarchicalKeyboardNavigation({
     items: hierarchicalWants,
@@ -908,7 +938,19 @@ export const Dashboard: React.FC = () => {
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 mr-[480px] relative">
+      <main 
+        className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative"
+        onDragOver={(e) => {
+          e.preventDefault();
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const draggedWantId = e.dataTransfer.getData('application/mywant-id');
+          if (draggedWantId) {
+            handleUnparentWant(draggedWantId);
+          }
+        }}
+      >
         {/* Confirmation Notification - Dashboard Right Layout */}
         {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation) && (
           <ConfirmationMessageNotification
