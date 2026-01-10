@@ -22,7 +22,10 @@ jobs:
         cache: true
 
     - name: Tidy dependencies
-      run: go mod tidy
+      run: |
+        go mod tidy
+        cd engine
+        go mod tidy
 
     - name: Verify OpenAPI Spec
       run: |
@@ -31,13 +34,17 @@ jobs:
           exit 1
         fi
 
+    - name: Create dummy frontend assets
+      run: |
+        mkdir -p web/dist
+        touch web/dist/index.html
+
     - name: Run Backend Tests
       run: go test -v ./pkg/server/...
 
     - name: Run Engine Tests
       run: |
         cd engine
-        go mod tidy
         go test -v ./src/...
 
     - name: Run Client Tests
