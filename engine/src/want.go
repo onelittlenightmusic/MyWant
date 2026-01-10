@@ -97,8 +97,8 @@ type WantHistory struct {
 
 // LogHistoryEntry represents a collection of log messages from a single Exec cycle
 type LogHistoryEntry struct {
-	Timestamp int64  `json:"timestamp" yaml:"timestamp"`
-	Logs      string `json:"logs" yaml:"logs"` // Multiple log lines concatenated
+	Timestamp time.Time `json:"timestamp" yaml:"timestamp"`
+	Logs      string    `json:"logs" yaml:"logs"` // Multiple log lines concatenated
 }
 
 // WantStatus represents the current state of a want
@@ -563,12 +563,8 @@ func (n *Want) StartProgressionLoop(
 			n.progressable.Initialize()
 		}
 
-		// Drain existing output/input channels to remove stale packets from previous executions
-		// This prevents consumers from reading "Done" signals or data from a dead process
 		// REMOVED: Draining here can cause valid new packets (like rebooked flights) to be lost if they arrive exactly during restart
 		// initialPaths := getPathsFunc()
-		// n.DrainOutputChannels(initialPaths)
-		// n.DrainInputChannels(initialPaths)
 
 		for {
 			// 1. Check stop channel
@@ -741,28 +737,6 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]any) bool {
 
 	// All changed fields are status-like
 	return true
-}
-func (n *Want) getSignificantStateChanges(oldState, newState map[string]any) map[string]any {
-	significantChanges := make(map[string]any)
-	for key, newVal := range newState {
-		// Skip status-like fields
-		isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
-		isMetadataField := key == "updated_at" || key == "last_poll_time" ||
-			key == "status_changed_at" || key == "status_changed" ||
-			key == "status_change_history_count"
-
-		if isStatusField || isMetadataField {
-			continue
-		}
-
-		// Include if it's a new key or has a different value
-		oldVal, exists := oldState[key]
-		if !exists || !n.valuesEqual(oldVal, newVal) {
-			significantChanges[key] = newVal
-		}
-	}
-
-	return significantChanges
 }
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
@@ -1106,7 +1080,7 @@ func (n *Want) addAggregatedLogHistory() {
 		logsText += log
 	}
 	entry := LogHistoryEntry{
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now(),
 		Logs:      logsText,
 	}
 
@@ -1136,17 +1110,6 @@ func (n *Want) addAggregatedLogHistory() {
 	}
 }
 
-// copyCurrentState creates a copy of the current state
-func (n *Want) copyCurrentState() map[string]any {
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-
-	stateCopy := make(map[string]any)
-	for key, value := range n.State {
-		stateCopy[key] = value
-	}
-	return stateCopy
-}
 func (n *Want) addToParameterHistory(paramName string, paramValue any, previousValue any) {
 	paramMap := Dict{
 		paramName: paramValue,
@@ -1392,60 +1355,6 @@ func (n *Want) GetOutCount() int {
 }
 func (n *Want) GetPaths() *Paths {
 	return &n.paths
-}
-
-// DrainOutputChannels removes all pending packets from output channels
-// This is critical when restarting a want to ensure consumers don't read stale data (especially Done signals)
-func (n *Want) DrainOutputChannels(paths Paths) {
-	drainedCount := 0
-	for _, pathInfo := range paths.Out {
-		if pathInfo.Channel == nil {
-			continue
-		}
-
-		// Drain loop for this channel
-		for {
-			select {
-			case <-pathInfo.Channel:
-				drainedCount++
-			default:
-				// Channel is empty, move to next channel
-				goto NextChannel
-			}
-		}
-	NextChannel:
-	}
-
-	if drainedCount > 0 {
-		n.StoreLog("[DRAIN] Drained %d stale packets from output channels on restart\n", drainedCount)
-	}
-}
-
-// DrainInputChannels removes all pending packets from input channels
-// This is critical when restarting a want (like a processor) to ensure it doesn't read stale data
-func (n *Want) DrainInputChannels(paths Paths) {
-	drainedCount := 0
-	for _, pathInfo := range paths.In {
-		if pathInfo.Channel == nil {
-			continue
-		}
-
-		// Drain loop for this channel
-		for {
-			select {
-			case <-pathInfo.Channel:
-				drainedCount++
-			default:
-				// Channel is empty, move to next channel
-				goto NextChannel
-			}
-		}
-	NextChannel:
-	}
-
-	if drainedCount > 0 {
-		n.StoreLog("[DRAIN] Drained %d stale packets from input channels on restart\n", drainedCount)
-	}
 }
 
 // UnusedExists checks if there are unused packets in the cache or any input channel.
