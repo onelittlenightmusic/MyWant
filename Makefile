@@ -368,13 +368,12 @@ help:
 
 all: build
 
-# Kill and restart frontend and backend processes using want-cli
+# Kill and restart processes using want-cli
 restart-all:
-	@echo "🔄 Restarting frontend, backend, and mock server (using want-cli)..."
+	@echo "🔄 Restarting MyWant server and mock server..."
 	@echo ""
 	@echo "🛑 Stopping existing processes..."
-	@./want-cli gui stop 2>/dev/null || echo "  GUI not running"
-	@./want-cli server stop 2>/dev/null || echo "  Server not running"
+	@./want-cli stop 2>/dev/null || echo "  Server not running"
 	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
 	@sleep 2
 	@echo ""
@@ -388,29 +387,23 @@ restart-all:
 	@echo "🏗️  Building mock flight server..."
 	@$(MAKE) build-mock
 	@echo ""
-	@echo "🚀 Starting backend via want-cli..."
-	@./want-cli server start -D --port 8080
+	@echo "🚀 Starting MyWant server via want-cli..."
+	@./want-cli start -D --port 8080
 	@sleep 2
-	@echo "✅ Backend started"
+	@echo "✅ Server started"
 	@echo ""
 	@echo "✈️  Starting mock flight server..."
 	@nohup ./bin/flight-server > ./logs/flight-server.log 2>&1 &
 	@sleep 1
 	@echo "✅ Mock server started (PID: $$(pgrep -f './bin/flight-server'))"
 	@echo ""
-	@echo "🌐 Starting frontend via want-cli..."
-	@./want-cli gui start -D --port 3000
-	@sleep 1
-	@echo "✅ Frontend started"
-	@echo ""
 	@echo "✅ All processes started!"
-	@echo "🌐 Frontend: http://localhost:3000"
-	@echo "🔧 Backend: http://localhost:8080"
+	@echo "🌐 URL: http://localhost:8080"
 	@echo "✈️  Mock Server: http://localhost:8081"
 	@echo ""
 	@echo "📋 Server management:"
-	@echo "  Stop all: ./want-cli gui stop && ./want-cli server stop"
-	@echo "  View status: ./want-cli wants list"
+	@echo "  Stop: ./want-cli stop"
+	@echo "  View status: ./want-cli ps"
 
 # Gmail MCP troubleshooting targets
 troubleshoot-mcp:
