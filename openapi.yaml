@@ -1618,7 +1618,7 @@ components:
                 type: object
                 properties:
                   metadata:
-                    $ref: '#/components/schemas/WantMetadata'
+                    $ref: '#/components/schemas/Metadata'
                   spec:
                     $ref: '#/components/schemas/WantSpec'
                   type:
@@ -1888,20 +1888,62 @@ components:
       properties:
         name:
           type: string
+          description: Unique name of the agent (e.g., "agent_flight_api")
+          example: "agent_flight_api"
         type:
           type: string
+          description: Type of agent ("do" or "monitor")
+          enum:
+            - do
+            - monitor
+          example: "do"
         capabilities:
           type: array
           items:
             type: string
+          description: List of capabilities this agent possesses (e.g., "flight_api_agency")
+          example: ["flight_api_agency"]
+      required:
+        - name
+        - type
+        - capabilities
+    
+    CapabilityYAML:
+      type: object
+      properties:
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+      required:
+        - capabilities
+
+    AgentYAML:
+      type: object
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/Agent'
+      required:
+        - agents
 
     Capability:
       type: object
       properties:
         name:
           type: string
-        description:
-          type: string
+          description: Name of the capability (e.g., "flight_api_agency")
+          example: "flight_api_agency"
+        gives:
+          type: array
+          items:
+            type: string
+          description: List of operations/actions this capability provides (e.g., "create_flight", "cancel_flight")
+          example: ["create_flight", "cancel_flight"]
+      required:
+        - name
+        - gives
 
 tags:
   - name: Health

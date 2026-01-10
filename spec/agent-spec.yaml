@@ -10,7 +10,7 @@ info:
 components:
   schemas:
     # Root capability configuration object
-    CapabilityConfig:
+    CapabilityYAML:
       type: object
       description: Root configuration object for capabilities
       required:
@@ -22,6 +22,9 @@ components:
           items:
             $ref: '#/components/schemas/Capability'
       additionalProperties: false
+
+    CapabilityConfig:
+      $ref: '#/components/schemas/CapabilityYAML'
 
     # Individual capability definition
     Capability:
@@ -62,7 +65,7 @@ components:
       additionalProperties: false
 
     # Root agent configuration object
-    AgentConfig:
+    AgentYAML:
       type: object
       description: Root configuration object for agents
       required:
@@ -74,6 +77,9 @@ components:
           items:
             $ref: '#/components/schemas/Agent'
       additionalProperties: false
+
+    AgentConfig:
+      $ref: '#/components/schemas/AgentYAML'
 
     # Individual agent definition
     Agent:

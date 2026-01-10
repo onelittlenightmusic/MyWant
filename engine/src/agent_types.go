@@ -128,6 +128,7 @@ func (r *AgentRegistry) RegisterCapability(cap Capability) {
 	defer r.mutex.Unlock()
 
 	r.capabilities[cap.Name] = cap
+	InfoLog("[REGISTRY] Registered capability: %s (gives: %v)", cap.Name, cap.Gives)
 
 	for _, gives := range cap.Gives {
 		if r.capabilityToAgents[gives] == nil {
@@ -141,13 +142,17 @@ func (r *AgentRegistry) RegisterAgent(agent Agent) {
 	defer r.mutex.Unlock()
 
 	r.agents[agent.GetName()] = agent
+	InfoLog("[REGISTRY] Registered agent: %s (type: %s, capabilities: %v)", agent.GetName(), agent.GetType(), agent.GetCapabilities())
 
 	for _, capName := range agent.GetCapabilities() {
 		if cap, exists := r.capabilities[capName]; exists {
 			for _, gives := range cap.Gives {
 				agentNames := r.capabilityToAgents[gives]
 				r.capabilityToAgents[gives] = append(agentNames, agent.GetName())
+				InfoLog("[REGISTRY] Linked agent '%s' to capability value '%s' (via %s)", agent.GetName(), gives, capName)
 			}
+		} else {
+			InfoLog("[REGISTRY] Agent '%s' refers to unknown capability '%s'", agent.GetName(), capName)
 		}
 	}
 }
