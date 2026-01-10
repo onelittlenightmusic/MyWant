@@ -31,10 +31,6 @@
 ```
 Check [Detailed CLI Usage Guide](docs/WANT_CLI_USAGE.md) for more commands.
 
-### Server Mode (legacy)
-
-
-
 ### Example: Queue Processing Pipeline
 
 **Create config** (`config/config-qnet.yaml`):
