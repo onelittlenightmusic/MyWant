@@ -41,11 +41,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
     }
   }, [selected]);
 
-  const formatParametersCount = (params?: Record<string, any>) => {
-    if (!params) return 0;
-    return Object.keys(params).length;
-  };
-
   const handleCardClick = () => {
     onSelect?.(recipe);
 

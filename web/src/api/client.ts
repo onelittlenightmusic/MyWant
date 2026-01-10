@@ -8,12 +8,10 @@ import {
   SuspendResumeResponse,
   WantStatusResponse
 } from '@/types/want';
-import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse, LogEntry, LogsResponse } from '@/types/api';
+import { HealthCheck, ApiError, ErrorHistoryEntry, ErrorHistoryResponse, LogsResponse } from '@/types/api';
 import {
-  Agent,
   AgentResponse,
   CreateAgentRequest,
-  Capability,
   CapabilityResponse,
   CreateCapabilityRequest,
   AgentsListResponse,

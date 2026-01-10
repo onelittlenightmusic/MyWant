@@ -1,5 +1,4 @@
-import React from 'react';
-import { Search, Filter, X, Bot, Monitor, Zap } from 'lucide-react';
+import { Search, Filter, X, Monitor, Zap } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
 type AgentType = 'do' | 'monitor';
