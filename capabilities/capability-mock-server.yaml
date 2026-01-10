@@ -1,0 +1,4 @@
+capabilities:
+  - name: mock_server_management
+    gives:
+      - mock_server_management

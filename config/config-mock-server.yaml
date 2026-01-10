@@ -1,0 +1,11 @@
+wants:
+  - metadata:
+      name: "Flight Mock Server"
+      type: flight_mock_server
+      labels:
+        service: mock
+        component: flight-api
+    spec:
+      params:
+        server_binary: "./bin/flight-server"
+        log_file: "logs/flight-server.log"
