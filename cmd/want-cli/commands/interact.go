@@ -57,7 +57,8 @@ var sendCmd = &cobra.Command{
 		sessionID := args[0]
 		message := args[1]
 
-		c := client.NewClient(viper.GetString("server"))
+		// Gooseの処理には時間がかかるため、3分のタイムアウトを設定
+		c := client.NewClientWithTimeout(viper.GetString("server"), 3*time.Minute)
 
 		// Get optional context flags
 		preferRecipes, _ := cmd.Flags().GetBool("prefer-recipes")
@@ -205,7 +206,8 @@ var endCmd = &cobra.Command{
 
 // runInteractiveShell は want-cli interact のメイン処理
 func runInteractiveShell(cmd *cobra.Command, args []string) {
-	c := client.NewClient(viper.GetString("server"))
+	// Gooseの処理には時間がかかるため、3分のタイムアウトを設定
+	c := client.NewClientWithTimeout(viper.GetString("server"), 3*time.Minute)
 
 	// セッション作成
 	session, err := c.CreateSession()
@@ -281,7 +283,26 @@ func runInteractiveShell(cmd *cobra.Command, args []string) {
 			Message: input,
 		}
 
+		fmt.Print("💭 Thinking")
+		// 処理中インジケーター（別goroutineで動かす）
+		done := make(chan bool)
+		go func() {
+			ticker := time.NewTicker(500 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-ticker.C:
+					fmt.Print(".")
+				}
+			}
+		}()
+
 		resp, err := c.SendMessage(sessionID, req)
+		done <- true
+		fmt.Println() // 改行
+
 		if err != nil {
 			fmt.Printf("❌ Error: %v\n\n", err)
 			continue

@@ -6,6 +6,7 @@ bin/
 *.dylib
 engine/cmd/server/mywant-server
 engine/mywant-server
+mcp/server/mywant-mcp-server
 
 # Test artifacts
 test/
@@ -28,6 +29,14 @@ Thumbs.db
 memory/
 engine/memory/
 **/memory-*.yaml
+
+# Secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+**/credentials.json
+**/auth.json
 
 logs/
 tmp/

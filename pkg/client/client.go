@@ -26,6 +26,16 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+// NewClientWithTimeout creates a new API client with custom timeout
+func NewClientWithTimeout(baseURL string, timeout time.Duration) *Client {
+	return &Client{
+		BaseURL: baseURL,
+		HTTPClient: &http.Client{
+			Timeout: timeout,
+		},
+	}
+}
+
 // Request performs an HTTP request and decodes JSON response
 func (c *Client) Request(method, path string, body any, result any) error {
 	resp, err := c.doRequest(method, path, body, "application/json")
