@@ -83,8 +83,7 @@ var StartCmd = &cobra.Command{
 			Debug: debug,
 		}
 
-		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...
-", host, port, debug)
+		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v).\n", host, port, debug)
 		s := server.New(cfg)
 		if err := s.Start(); err != nil {
 			fmt.Printf("Server error: %v\n", err)
