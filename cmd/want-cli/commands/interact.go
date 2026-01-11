@@ -233,11 +233,11 @@ func runInteractiveShell(cmd *cobra.Command, args []string) {
 	fmt.Println("╚═══════════════════════════════════════════╝")
 	fmt.Printf("Session ID: %s\n", sessionID)
 	fmt.Printf("Expires at: %s\n", session.ExpiresAt.Format("2006-01-02 15:04:05"))
-	fmt.Println("\nDescribe what you want in natural language.")
-	fmt.Println("Type 'quit' or press Ctrl+C to exit.\n")
-
-	scanner := bufio.NewScanner(os.Stdin)
-	var lastRecommendations []client.Recommendation
+			fmt.Println("\nDescribe what you want in natural language.")
+			fmt.Println("Type 'quit' or press Ctrl+C to exit.")
+	
+			scanner := bufio.NewScanner(os.Stdin)
+		var lastRecommendations []client.Recommendation
 
 	for {
 		fmt.Print("🤖 > ")
@@ -349,7 +349,7 @@ func runInteractiveShell(cmd *cobra.Command, args []string) {
 		fmt.Println("\n───────────────────────────────────────────")
 		if len(resp.Recommendations) > 0 {
 			fmt.Printf("💡 To deploy: type a number (1-%d)\n", len(resp.Recommendations))
-			fmt.Println("💬 Or continue the conversation...\n")
+			fmt.Println("💬 Or continue the conversation...")
 		}
 	}
 
