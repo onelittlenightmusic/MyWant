@@ -1,6 +1,7 @@
-import { X, BookOpen, Settings, List } from 'lucide-react';
+import { BookOpen, Settings, List, X } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { truncateText } from '@/utils/helpers';
+import { BaseModal } from './BaseModal';
 
 interface RecipeDetailsModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ export default function RecipeDetailsModal({
   onClose,
   recipe,
 }: RecipeDetailsModalProps) {
-  if (!isOpen || !recipe) return null;
+  if (!recipe) return null;
 
   const formatParameterValue = (value: any) => {
     if (typeof value === 'object') {
@@ -29,129 +30,125 @@ export default function RecipeDetailsModal({
     return JSON.stringify(params, null, 2);
   };
 
+  const footer = (
+    <div className="flex justify-end">
+      <button
+        onClick={onClose}
+        className="px-6 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+      >
+        Close
+      </button>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <BookOpen className="h-6 w-6 text-blue-600" />
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {recipe.recipe.metadata.name}
-                </h2>
-                {recipe.recipe.metadata.description && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {recipe.recipe.metadata.description}
-                  </p>
-                )}
-              </div>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={recipe.recipe.metadata.name}
+      footer={footer}
+      size="lg"
+    >
+      <div className="space-y-8 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+        {/* Metadata */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Settings className="h-5 w-5 text-blue-600" />
+            Metadata
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+              <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Name</dt>
+              <dd className="text-sm text-gray-900 font-mono">
+                {recipe.recipe.metadata.name}
+              </dd>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-5 w-5" />
-            </button>
+
+            {recipe.recipe.metadata.version && (
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Version</dt>
+                <dd className="text-sm text-gray-900 font-mono">
+                  {recipe.recipe.metadata.version}
+                </dd>
+              </div>
+            )}
+
+            {recipe.recipe.metadata.custom_type && (
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 sm:col-span-2">
+                <dt className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Custom Type</dt>
+                <dd className="text-sm text-gray-900 font-bold">
+                  {recipe.recipe.metadata.custom_type}
+                </dd>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="p-6 space-y-8">
-          {/* Metadata */}
+        {/* Parameters */}
+        {recipe.recipe.parameters && Object.keys(recipe.recipe.parameters).length > 0 && (
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Metadata
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <List className="h-5 w-5 text-green-600" />
+              Parameters
             </h3>
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <dt className="text-sm font-medium text-gray-500">Name</dt>
-                <dd className="text-sm text-gray-900 mt-1 font-mono">
-                  {recipe.recipe.metadata.name}
-                </dd>
-              </div>
-
-              {recipe.recipe.metadata.version && (
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Version</dt>
-                  <dd className="text-sm text-gray-900 mt-1 font-mono">
-                    {recipe.recipe.metadata.version}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(recipe.recipe.parameters).map(([key, value]) => (
+                <div key={key} className="border border-gray-100 rounded-xl p-4 bg-white shadow-sm">
+                  <dt className="text-sm font-bold text-gray-700 mb-2">{key}</dt>
+                  <dd className="text-xs text-blue-600 font-mono bg-blue-50 p-3 rounded-lg border border-blue-100 overflow-x-auto">
+                    {formatParameterValue(value)}
                   </dd>
                 </div>
-              )}
-
-              {recipe.recipe.metadata.custom_type && (
-                <div className="col-span-2">
-                  <dt className="text-sm font-medium text-gray-500">Custom Type</dt>
-                  <dd className="text-sm text-gray-900 mt-1">
-                    {recipe.recipe.metadata.custom_type}
-                  </dd>
-                </div>
-              )}
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Parameters */}
-          {recipe.recipe.parameters && Object.keys(recipe.recipe.parameters).length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Parameters</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(recipe.recipe.parameters).map(([key, value]) => (
-                  <div key={key} className="border border-gray-200 rounded-lg p-4">
-                    <dt className="text-sm font-medium text-gray-500 mb-2">{key}</dt>
-                    <dd className="text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded">
-                      {formatParameterValue(value)}
-                    </dd>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* Wants */}
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-purple-600" />
+            Wants ({recipe.recipe.wants?.length || 0})
+          </h3>
+          <div className="space-y-4">
+            {recipe.recipe.wants?.map((want, index) => (
+              <div key={index} className="border border-gray-100 rounded-2xl p-5 bg-gray-50">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-bold text-gray-900">
+                    Want {index + 1}
+                    {(want.metadata?.name || want.name) && (
+                      <span className="text-gray-400 font-medium ml-2 text-sm">
+                        ({want.metadata?.name || want.name})
+                      </span>
+                    )}
+                  </h4>
+                  <span className="text-xs font-bold bg-white text-blue-600 border border-blue-100 px-3 py-1 rounded-full shadow-sm">
+                    {want.type || want.metadata?.type || 'Unknown type'}
+                  </span>
+                </div>
 
-          {/* Wants */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-              <List className="h-5 w-5" />
-              Wants ({recipe.recipe.wants?.length || 0})
-            </h3>
-            <div className="space-y-4">
-              {recipe.recipe.wants?.map((want, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">
-                      Want {index + 1}
-                      {(want.metadata?.name || want.name) && (
-                        <span className="text-gray-500 font-normal ml-2">
-                          ({want.metadata?.name || want.name})
-                        </span>
-                      )}
-                    </h4>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                      {want.type || want.metadata?.type || 'Unknown type'}
-                    </span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Parameters */}
+                  <div>
+                    <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Parameters</h5>
+                    <pre className="text-xs text-gray-700 bg-white p-4 rounded-xl border border-gray-200 overflow-x-auto font-mono leading-relaxed shadow-inner">
+                      {formatWantParams(want.params || want.spec?.params)}
+                    </pre>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Parameters */}
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-500 mb-2">Parameters</h5>
-                      <pre className="text-xs text-gray-900 bg-gray-50 p-3 rounded border overflow-x-auto">
-                        {formatWantParams(want.params || want.spec?.params)}
-                      </pre>
-                    </div>
-
+                  {/* Right Column: Using, Labels, Requirements */}
+                  <div className="space-y-4">
                     {/* Using selectors */}
                     {want.using && want.using.length > 0 && (
                       <div>
-                        <h5 className="text-sm font-medium text-gray-500 mb-2">Using Selectors</h5>
-                        <div className="space-y-1">
+                        <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Using Selectors</h5>
+                        <div className="space-y-2">
                           {want.using.map((selector, selectorIndex) => (
-                            <div key={selectorIndex} className="text-xs bg-gray-50 p-2 rounded border">
+                            <div key={selectorIndex} className="text-xs bg-blue-50 p-2 rounded-lg border border-blue-100">
                               {Object.entries(selector).map(([key, value]) => (
-                                <div key={key} className="flex justify-between">
-                                  <span className="text-gray-600">{key}:</span>
-                                  <span className="text-gray-900 font-mono">{value}</span>
+                                <div key={key} className="flex justify-between py-0.5">
+                                  <span className="text-blue-700 font-medium">{key}</span>
+                                  <span className="text-blue-900 font-bold font-mono">{value}</span>
                                 </div>
                               ))}
                             </div>
@@ -164,29 +161,11 @@ export default function RecipeDetailsModal({
                     {((want.metadata?.labels && Object.keys(want.metadata.labels).length > 0) ||
                       (want.labels && Object.keys(want.labels).length > 0)) && (
                       <div>
-                        <h5 className="text-sm font-medium text-gray-500 mb-2">Labels</h5>
+                        <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Labels</h5>
                         <div className="flex flex-wrap gap-1">
-                          {Object.entries(want.metadata?.labels || want.labels || {}).map(([key, value]) => {
-                            const labelText = `${key}=${value}`;
-                            const displayText = truncateText(labelText, 20);
-                            return (
-                              <span key={key} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded" title={labelText.length > 20 ? labelText : undefined}>
-                                {displayText}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Requirements */}
-                    {want.requires && want.requires.length > 0 && (
-                      <div>
-                        <h5 className="text-sm font-medium text-gray-500 mb-2">Requirements</h5>
-                        <div className="flex flex-wrap gap-1">
-                          {want.requires.map((req, reqIndex) => (
-                            <span key={reqIndex} className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                              {req}
+                          {Object.entries(want.metadata?.labels || want.labels || {}).map(([key, value]) => (
+                            <span key={key} className="text-[10px] font-bold bg-green-100 text-green-700 border border-green-200 px-2 py-0.5 rounded-md shadow-sm">
+                              {truncateText(`${key}=${value}`, 25)}
                             </span>
                           ))}
                         </div>
@@ -194,52 +173,11 @@ export default function RecipeDetailsModal({
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Result Configuration */}
-          {recipe.recipe.result && recipe.recipe.result.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Result Configuration</h3>
-              <div className="space-y-2">
-                {recipe.recipe.result.map((result, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <dt className="text-xs font-medium text-gray-500">Want Name</dt>
-                        <dd className="text-sm text-gray-900 font-mono">{result.want_name}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-medium text-gray-500">Stat Name</dt>
-                        <dd className="text-sm text-gray-900 font-mono">{result.stat_name}</dd>
-                      </div>
-                      {result.description && (
-                        <div>
-                          <dt className="text-xs font-medium text-gray-500">Description</dt>
-                          <dd className="text-sm text-gray-900">{result.description}</dd>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-200">
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
-            >
-              Close
-            </button>
+            ))}
           </div>
         </div>
       </div>
-    </div>
+    </BaseModal>
   );
 }
