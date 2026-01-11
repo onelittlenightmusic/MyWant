@@ -22,13 +22,13 @@
 
 ```bash
 # Start backend and GUI together in background
-./want-cli gui start -D
+./want-cli start -D
 # List all active wants
 ./want-cli wants list
 # Deploy a new want from file
 ./want-cli wants create -f config.yaml
-# Stop servers
-./want-cli gui stop && ./want-cli server stop
+# Stop server
+./want-cli stop
 ```
 Check [Detailed CLI Usage Guide](docs/WANT_CLI_USAGE.md) for more commands.
 

@@ -15,23 +15,18 @@ make release
 
 ### Server & GUI Management
 
-Start, monitor, and stop the backend and frontend services.
+Start, monitor, and stop the integrated MyWant services (API and GUI).
 
 ```bash
-# Start backend API server in background
+# Start MyWant server (API and GUI) in background
 # (Includes a guard to prevent multiple instances on the same port)
-./want-cli server start --detach --port 8080
+./want-cli start --detach --port 8080
 
 # Check status of all processes (Server, GUI, and Mock Server)
 ./want-cli ps
 
-# Start GUI (embedded mode) in background
-# (Includes a guard to prevent multiple instances on the same port)
-./want-cli gui start --detach --port 3000
-
-# Stop them (Robust cleanup: kills processes by PID and Port)
-./want-cli server stop
-./want-cli gui stop
+# Stop the server (Robust cleanup: kills processes by PID and Port)
+./want-cli stop
 ```
 
 ### Want Management
@@ -56,6 +51,10 @@ List, view, and manage lifecycle of wants.
 ./want-cli wants resume <ID1>
 ./want-cli wants stop <ID1>
 ./want-cli wants start <ID1>
+
+# Export/Import wants
+./want-cli wants export --output backup.yaml
+./want-cli wants import --file backup.yaml
 ```
 
 ### Recipe Management
