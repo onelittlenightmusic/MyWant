@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, BarChart3, ListChecks } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
+import { InteractBubble } from '@/components/interact/InteractBubble';
 
 interface HeaderProps {
   onCreateWant: () => void;
@@ -14,6 +15,8 @@ interface HeaderProps {
   hideCreateButton?: boolean;
   showSelectMode?: boolean;
   onToggleSelectMode?: () => void;
+  onInteractSubmit?: (message: string) => void;
+  isInteractThinking?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,7 +30,9 @@ export const Header: React.FC<HeaderProps> = ({
   sidebarMinimized = false,
   hideCreateButton = false,
   showSelectMode = false,
-  onToggleSelectMode
+  onToggleSelectMode,
+  onInteractSubmit,
+  isInteractThinking = false
 }) => {
   return (
     <header className={classNames(
@@ -43,6 +48,16 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* InteractBubble - shown on desktop */}
+        {onInteractSubmit && (
+          <div className="hidden lg:flex items-center flex-1 justify-center max-w-md">
+            <InteractBubble
+              onSubmit={onInteractSubmit}
+              isThinking={isInteractThinking}
+            />
+          </div>
+        )}
 
         <div className="flex items-center space-x-3 flex-shrink-0">
           {onToggleSelectMode && (

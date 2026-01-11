@@ -9,6 +9,7 @@ import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { TypeRecipeSelector, TypeRecipeSelectorRef } from './TypeRecipeSelector';
+import { RecommendationSelector } from '@/components/interact/RecommendationSelector';
 import { LabelsSection } from './sections/LabelsSection';
 import { DependenciesSection } from './sections/DependenciesSection';
 import { SchedulingSection } from './sections/SchedulingSection';
@@ -22,18 +23,29 @@ import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { ApiError } from '@/types/api';
+import { Recommendation, ConfigModifications } from '@/types/interact';
 
 interface WantFormProps {
   isOpen: boolean;
   onClose: () => void;
   editingWant?: Want | null;
+  mode?: 'create' | 'edit' | 'recommendation';
+  recommendations?: Recommendation[];
+  selectedRecommendation?: Recommendation | null;
+  onRecommendationSelect?: (rec: Recommendation) => void;
+  onRecommendationDeploy?: (recId: string, modifications?: ConfigModifications) => void;
 }
 
 
 export const WantForm: React.FC<WantFormProps> = ({
   isOpen,
   onClose,
-  editingWant
+  editingWant,
+  mode = 'create',
+  recommendations = [],
+  selectedRecommendation = null,
+  onRecommendationSelect,
+  onRecommendationDeploy
 }) => {
   const { wants, createWant, updateWant, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
@@ -65,6 +77,10 @@ export const WantForm: React.FC<WantFormProps> = ({
     // All sections collapsed by default
     return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
   });
+
+  // Recommendation mode state
+  const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
+  const isRecommendationMode = mode === 'recommendation';
 
   // Handle Tab key from editing fields (Name or Sections) to focus Add button
   const handleFieldTab = () => {
@@ -338,6 +354,19 @@ export const WantForm: React.FC<WantFormProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Handle recommendation deployment differently
+      if (isRecommendationMode && selectedRecId && onRecommendationDeploy) {
+        const modifications: ConfigModifications = {
+          parameterOverrides: params,
+          disableWants: [] // Could add UI for this later
+        };
+        await onRecommendationDeploy(selectedRecId, modifications);
+        onClose();
+        resetForm();
+        setIsSubmitting(false);
+        return;
+      }
+
       let wantRequest: CreateWantRequest | UpdateWantRequest;
 
       console.log('handleSubmit - editMode:', editMode, 'form state using:', using, 'labels:', labels, 'params:', params);
@@ -412,7 +441,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         ) : (
           <>
             <Save className="w-3.5 h-3.5" />
-            {isEditing ? 'Update' : 'Add'}
+            {isRecommendationMode ? 'Deploy' : (isEditing ? 'Update' : 'Add')}
           </>
         )}
       </button>
@@ -437,48 +466,77 @@ export const WantForm: React.FC<WantFormProps> = ({
 
         {editMode === 'form' ? (
           <>
-            {/* Type/Recipe Selector */}
-            <div className={classNames(!selectedTypeId ? "flex-1 min-h-0 flex flex-col" : "flex-shrink-0")}>
-              {!selectedTypeId && (
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex-shrink-0">
-                  Select Want Type or Recipe *
-                </label>
-              )}
-              <TypeRecipeSelector
-                ref={typeSelectorRef}
-                wantTypes={wantTypes}
-                recipes={recipes}
-                selectedId={selectedTypeId}
-                showSearch={true}
-                onSelect={(id, itemType) => {
-                  setSelectedTypeId(id);
-                  setSelectedItemType(itemType);
-                  // Update type based on selection
-                  setType(id);
-                  // Auto-generate unique name that doesn't conflict with existing wants
-                  const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                  const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
-                  setName(generatedName);
+            {/* Type/Recipe Selector or Recommendation Selector */}
+            <div className={classNames(!selectedTypeId && !isRecommendationMode ? "flex-1 min-h-0 flex flex-col" : "flex-shrink-0")}>
+              {isRecommendationMode ? (
+                /* Recommendation Selector */
+                <RecommendationSelector
+                  recommendations={recommendations}
+                  selectedId={selectedRecId}
+                  onSelect={(rec) => {
+                    setSelectedRecId(rec.id);
+                    onRecommendationSelect?.(rec);
 
-                  // Auto-focus Want Name after selection
-                  setTimeout(() => {
-                    nameInputRef.current?.focus();
-                  }, 0);
-                }}
-                onClear={() => {
-                  setSelectedTypeId(null);
-                  setSelectedItemType(null);
-                  setType('');
-                  setName('');
-                }}
-                onGenerateName={(id, itemType, suffix) => {
-                  const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                  return generateUniqueWantName(id, itemType, existingNames, suffix);
-                }}
-                onArrowDown={() => {
-                  nameInputRef.current?.focus();
-                }}
-              />
+                    // Auto-populate form from recommendation
+                    // The first want in the recommendation's config will be used as the primary want
+                    if (rec.config.wants && rec.config.wants.length > 0) {
+                      const firstWant = rec.config.wants[0];
+                      // Populate form fields from the first want
+                      setName(firstWant.metadata?.name || '');
+                      setType(firstWant.metadata?.type || '');
+                      setLabels(firstWant.metadata?.labels || {});
+                      setParams(firstWant.spec?.params || {});
+                      setUsing(firstWant.spec?.using || []);
+                      setWhen(firstWant.spec?.when || []);
+                      setSelectedTypeId(firstWant.metadata?.type || null);
+                    }
+                  }}
+                />
+              ) : (
+                /* Normal Type/Recipe Selector */
+                <>
+                  {!selectedTypeId && (
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex-shrink-0">
+                      Select Want Type or Recipe *
+                    </label>
+                  )}
+                  <TypeRecipeSelector
+                    ref={typeSelectorRef}
+                    wantTypes={wantTypes}
+                    recipes={recipes}
+                    selectedId={selectedTypeId}
+                    showSearch={true}
+                    onSelect={(id, itemType) => {
+                      setSelectedTypeId(id);
+                      setSelectedItemType(itemType);
+                      // Update type based on selection
+                      setType(id);
+                      // Auto-generate unique name that doesn't conflict with existing wants
+                      const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                      const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
+                      setName(generatedName);
+
+                      // Auto-focus Want Name after selection
+                      setTimeout(() => {
+                        nameInputRef.current?.focus();
+                      }, 0);
+                    }}
+                    onClear={() => {
+                      setSelectedTypeId(null);
+                      setSelectedItemType(null);
+                      setType('');
+                      setName('');
+                    }}
+                    onGenerateName={(id, itemType, suffix) => {
+                      const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                      return generateUniqueWantName(id, itemType, existingNames, suffix);
+                    }}
+                    onArrowDown={() => {
+                      nameInputRef.current?.focus();
+                    }}
+                  />
+                </>
+              )}
             </div>
 
             {/* Show fields only when a want type or recipe is selected */}

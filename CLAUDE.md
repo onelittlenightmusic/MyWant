@@ -52,9 +52,11 @@ MyWant is a **declarative chain programming system** where you express "what you
 # Build CLI with embedded GUI
 make release
 
-# Start backend and GUI in background
-./want-cli server start -D --port 8080
-./want-cli gui start -D --port 3000
+# Start backend API and embedded GUI together (single command)
+./want-cli start -D --port 8080
+
+# Or run in development mode with hot reload
+./want-cli start --dev --port 8080
 
 # Deploy a want from file
 ./want-cli wants create -f config/config-travel.yaml
@@ -62,8 +64,11 @@ make release
 # List all wants
 ./want-cli wants list
 
-# Stop servers
-./want-cli gui stop && ./want-cli server stop
+# Check process status
+./want-cli ps
+
+# Stop server
+./want-cli stop --port 8080
 ```
 
 **Want-CLI Management:**

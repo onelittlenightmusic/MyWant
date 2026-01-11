@@ -31,6 +31,13 @@ import {
   WantTypeExamplesResponse,
   LabelsResponse,
 } from '@/types/wantType';
+import {
+  InteractSession,
+  InteractMessageRequest,
+  InteractMessageResponse,
+  InteractDeployRequest,
+  InteractDeployResponse,
+} from '@/types/interact';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -308,6 +315,40 @@ class MyWantApiClient {
 
   async getLabels(): Promise<LabelsResponse> {
     return this.deduplicatedGet<LabelsResponse>('/api/v1/labels');
+  }
+
+  // Interactive want creation
+  async createInteractSession(): Promise<InteractSession> {
+    const response = await this.client.post('/api/v1/interact');
+    return response.data;
+  }
+
+  async sendInteractMessage(
+    sessionId: string,
+    request: InteractMessageRequest
+  ): Promise<InteractMessageResponse> {
+    // Set timeout to 180s for Goose processing
+    const response = await this.client.post(
+      `/api/v1/interact/${sessionId}`,
+      request,
+      { timeout: 180000 }  // 3 minutes
+    );
+    return response.data;
+  }
+
+  async deployRecommendation(
+    sessionId: string,
+    request: InteractDeployRequest
+  ): Promise<InteractDeployResponse> {
+    const response = await this.client.post(
+      `/api/v1/interact/${sessionId}/deploy`,
+      request
+    );
+    return response.data;
+  }
+
+  async deleteInteractSession(sessionId: string): Promise<void> {
+    await this.client.delete(`/api/v1/interact/${sessionId}`);
   }
 }
 

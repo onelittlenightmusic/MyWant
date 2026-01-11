@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 import { apiClient } from '@/api/client';
+import { Recommendation, ConfigModifications } from '@/types/interact';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -85,6 +86,13 @@ export const Dashboard: React.FC = () => {
   // Message notification state
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
+
+  // Interact state
+  const [interactSessionId, setInteractSessionId] = useState<string | null>(null);
+  const [isInteractThinking, setIsInteractThinking] = useState(false);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
+  const [showRecommendationForm, setShowRecommendationForm] = useState(false);
 
   // Helper function to show notification message
   const showNotification = (message: string) => {
@@ -215,6 +223,26 @@ export const Dashboard: React.FC = () => {
     }
   }, [error, clearError]);
 
+  // Create interact session on mount, cleanup on unmount
+  useEffect(() => {
+    const initSession = async () => {
+      try {
+        const session = await apiClient.createInteractSession();
+        setInteractSessionId(session.session_id);
+      } catch (error) {
+        console.error('Failed to create interact session:', error);
+      }
+    };
+    initSession();
+
+    // Cleanup on unmount
+    return () => {
+      if (interactSessionId) {
+        apiClient.deleteInteractSession(interactSessionId).catch(console.error);
+      }
+    };
+  }, []);
+
   // Multi-select handlers
   const handleToggleSelectMode = () => {
     if (isSelectMode) {
@@ -306,6 +334,78 @@ export const Dashboard: React.FC = () => {
   const handleEditWant = (want: Want) => {
     setEditingWant(want);
     sidebar.openForm();
+  };
+
+  // Interact handlers
+  const handleInteractSubmit = async (message: string) => {
+    if (!interactSessionId) {
+      showNotification('Session not ready. Please try again.');
+      return;
+    }
+
+    setIsInteractThinking(true);
+    try {
+      const response = await apiClient.sendInteractMessage(interactSessionId, {
+        message
+      });
+
+      console.log('Interact response:', response);
+
+      // Validate response structure
+      if (!response || !Array.isArray(response.recommendations)) {
+        throw new Error('Invalid response format: recommendations array not found');
+      }
+
+      if (response.recommendations.length === 0) {
+        showNotification('No recommendations returned. Please try a different request.');
+        setIsInteractThinking(false);
+        return;
+      }
+
+      setRecommendations(response.recommendations);
+      setShowRecommendationForm(true);
+      setEditingWant(null);  // Clear any existing want being edited
+      sidebar.openForm();  // Open WantForm sidebar
+    } catch (error: any) {
+      console.error('Interact error:', error);
+      showNotification(`Failed to get recommendations: ${error.message}`);
+      // Reset state on error
+      setRecommendations([]);
+      setShowRecommendationForm(false);
+    } finally {
+      setIsInteractThinking(false);
+    }
+  };
+
+  const handleRecommendationSelect = (rec: Recommendation) => {
+    setSelectedRecommendation(rec);
+  };
+
+  const handleRecommendationDeploy = async (
+    recId: string,
+    modifications?: ConfigModifications
+  ) => {
+    if (!interactSessionId) return;
+
+    try {
+      const response = await apiClient.deployRecommendation(interactSessionId, {
+        recommendation_id: recId,
+        modifications
+      });
+
+      showNotification(`Deployed ${response.want_ids.length} want(s) successfully!`);
+
+      // Refresh wants list
+      await fetchWants();
+
+      // Close form and clear state
+      setShowRecommendationForm(false);
+      setRecommendations([]);
+      setSelectedRecommendation(null);
+      sidebar.closeForm();
+    } catch (error: any) {
+      showNotification(`Deployment failed: ${error.message}`);
+    }
   };
 
   const handleViewWant = (want: Want) => {
@@ -836,6 +936,11 @@ export const Dashboard: React.FC = () => {
       } else if (e.key === 'S' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleToggleSelectMode();
+      } else if (e.key === '/' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        // Focus interact input
+        const interactInput = document.querySelector('[data-interact-input]') as HTMLInputElement;
+        interactInput?.focus();
       }
     };
 
@@ -934,6 +1039,8 @@ export const Dashboard: React.FC = () => {
         sidebarMinimized={sidebarMinimized}
         showSelectMode={isSelectMode}
         onToggleSelectMode={handleToggleSelectMode}
+        onInteractSubmit={handleInteractSubmit}
+        isInteractThinking={isInteractThinking}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -1395,6 +1502,11 @@ export const Dashboard: React.FC = () => {
         isOpen={sidebar.showForm}
         onClose={handleCloseModals}
         editingWant={editingWant}
+        mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')}
+        recommendations={recommendations}
+        selectedRecommendation={selectedRecommendation}
+        onRecommendationSelect={handleRecommendationSelect}
+        onRecommendationDeploy={handleRecommendationDeploy}
       />
 
                   {/* Message Notification */}
