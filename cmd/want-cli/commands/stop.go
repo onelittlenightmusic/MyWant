@@ -11,8 +11,9 @@ import (
 )
 
 var StopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop the MyWant server",
+	Use:     "stop",
+	Aliases: []string{"st"},
+	Short:   "Stop the MyWant server",
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
 

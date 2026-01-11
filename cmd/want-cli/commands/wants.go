@@ -14,9 +14,10 @@ import (
 )
 
 var WantsCmd = &cobra.Command{
-	Use:   "wants",
-	Short: "Manage want executions",
-	Long:  `List, create, update, and delete want executions.`,
+	Use:     "wants",
+	Aliases: []string{"w"},
+	Short:   "Manage want executions",
+	Long:    `List, create, update, and delete want executions.`,
 }
 
 // completion helper for wants
@@ -37,8 +38,9 @@ func completeWantIDs(cmd *cobra.Command, args []string, toComplete string) ([]st
 }
 
 var listWantsCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all wants",
+	Use:     "list",
+	Aliases: []string{"l"},
+	Short:   "List all wants",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		resp, err := c.ListWants()
@@ -68,6 +70,7 @@ var listWantsCmd = &cobra.Command{
 
 var getWantCmd = &cobra.Command{
 	Use:               "get [id]",
+	Aliases:           []string{"g"},
 	Short:             "Get want details",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -96,8 +99,9 @@ var getWantCmd = &cobra.Command{
 }
 
 var createWantCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new want",
+	Use:     "create",
+	Aliases: []string{"c"},
+	Short:   "Create a new want",
 	Run: func(cmd *cobra.Command, args []string) {
 		file, _ := cmd.Flags().GetString("file")
 		wantType, _ := cmd.Flags().GetString("type")
@@ -207,6 +211,7 @@ var createWantCmd = &cobra.Command{
 
 var deleteWantCmd = &cobra.Command{
 	Use:               "delete [id]",
+	Aliases:           []string{"d"},
 	Short:             "Delete a want",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -258,6 +263,7 @@ func runBatchOperation(args []string, opName string, opFunc func(*client.Client,
 
 var suspendWantsCmd = &cobra.Command{
 	Use:               "suspend [id]...",
+	Aliases:           []string{"sus"},
 	Short:             "Suspend want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -268,6 +274,7 @@ var suspendWantsCmd = &cobra.Command{
 
 var resumeWantsCmd = &cobra.Command{
 	Use:               "resume [id]...",
+	Aliases:           []string{"res"},
 	Short:             "Resume want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -278,6 +285,7 @@ var resumeWantsCmd = &cobra.Command{
 
 var stopWantsCmd = &cobra.Command{
 	Use:               "stop [id]...",
+	Aliases:           []string{"st"},
 	Short:             "Stop want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -288,6 +296,7 @@ var stopWantsCmd = &cobra.Command{
 
 var startWantsCmd = &cobra.Command{
 	Use:               "start [id]...",
+	Aliases:           []string{"sta"},
 	Short:             "Start want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
@@ -297,8 +306,9 @@ var startWantsCmd = &cobra.Command{
 }
 
 var exportWantsCmd = &cobra.Command{
-	Use:   "export",
-	Short: "Export all wants as YAML",
+	Use:     "export",
+	Aliases: []string{"e"},
+	Short:   "Export all wants as YAML",
 	Run: func(cmd *cobra.Command, args []string) {
 		output, _ := cmd.Flags().GetString("output")
 		c := client.NewClient(viper.GetString("server"))
@@ -321,8 +331,9 @@ var exportWantsCmd = &cobra.Command{
 }
 
 var importWantsCmd = &cobra.Command{
-	Use:   "import",
-	Short: "Import wants from YAML file",
+	Use:     "import",
+	Aliases: []string{"i"},
+	Short:   "Import wants from YAML file",
 	Run: func(cmd *cobra.Command, args []string) {
 		file, _ := cmd.Flags().GetString("file")
 		if file == "" {

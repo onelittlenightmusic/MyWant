@@ -14,9 +14,10 @@ import (
 )
 
 var RecipesCmd = &cobra.Command{
-	Use:   "recipes",
-	Short: "Manage recipes",
-	Long:  `List, create, view, and generate recipes from wants.`,
+	Use:     "recipes",
+	Aliases: []string{"r"},
+	Short:   "Manage recipes",
+	Long:    `List, create, view, and generate recipes from wants.`,
 }
 
 // completion helper for recipes
@@ -37,8 +38,9 @@ func completeRecipeIDs(cmd *cobra.Command, args []string, toComplete string) ([]
 }
 
 var listRecipesCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all recipes",
+	Use:     "list",
+	Aliases: []string{"l"},
+	Short:   "List all recipes",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		recipes, err := c.ListRecipes()
@@ -64,6 +66,7 @@ var listRecipesCmd = &cobra.Command{
 
 var getRecipeCmd = &cobra.Command{
 	Use:               "get [id]",
+	Aliases:           []string{"g"},
 	Short:             "Get recipe details",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeRecipeIDs,
@@ -81,8 +84,9 @@ var getRecipeCmd = &cobra.Command{
 }
 
 var createRecipeCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new recipe from file",
+	Use:     "create",
+	Aliases: []string{"c"},
+	Short:   "Create a new recipe from file",
 	Run: func(cmd *cobra.Command, args []string) {
 		file, _ := cmd.Flags().GetString("file")
 		if file == "" {
@@ -116,6 +120,7 @@ var createRecipeCmd = &cobra.Command{
 
 var deleteRecipeCmd = &cobra.Command{
 	Use:               "delete [id]",
+	Aliases:           []string{"d"},
 	Short:             "Delete a recipe",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeRecipeIDs,
@@ -131,9 +136,10 @@ var deleteRecipeCmd = &cobra.Command{
 }
 
 var fromWantCmd = &cobra.Command{
-	Use:   "from-want [want-id]",
-	Short: "Create recipe from existing want",
-	Args:  cobra.ExactArgs(1),
+	Use:     "from-want [want-id]",
+	Aliases: []string{"fw"},
+	Short:   "Create recipe from existing want",
+	Args:    cobra.ExactArgs(1),
 	// Complete want IDs from wants command helper
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {

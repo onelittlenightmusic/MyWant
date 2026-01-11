@@ -13,9 +13,10 @@ import (
 )
 
 var StartCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start the MyWant server (API and GUI)",
-	Long:  `Start the MyWant backend API server and embedded React frontend from a single command.`,
+	Use:     "start",
+	Aliases: []string{"s"},
+	Short:   "Start the MyWant server (API and GUI)",
+	Long:    `Start the MyWant backend API server and embedded React frontend from a single command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		port, _ := cmd.Flags().GetInt("port")
 		host, _ := cmd.Flags().GetString("host")
@@ -82,7 +83,8 @@ var StartCmd = &cobra.Command{
 			Debug: debug,
 		}
 
-		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)
+		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...
+", host, port, debug)
 		s := server.New(cfg)
 		if err := s.Start(); err != nil {
 			fmt.Printf("Server error: %v\n", err)

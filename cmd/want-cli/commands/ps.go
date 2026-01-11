@@ -11,8 +11,9 @@ import (
 )
 
 var PsCmd = &cobra.Command{
-	Use:   "ps",
-	Short: "Show status of MyWant processes (Server, GUI, Mock)",
+	Use:     "ps",
+	Aliases: []string{"p"},
+	Short:   "Show status of MyWant processes (Server, GUI, Mock)",
 	Run: func(cmd *cobra.Command, args []string) {
 		serverPort, _ := cmd.Flags().GetInt("server-port")
 		guiPort, _ := cmd.Flags().GetInt("gui-port")

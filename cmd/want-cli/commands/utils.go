@@ -19,7 +19,7 @@ const guiPidFile = "gui.pid"
 
 // isPortOpen checks if a port is in use
 func isPortOpen(port int) bool {
-	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port)))
 	output, err := cmd.Output()
 	return err == nil && len(output) > 0
 }
@@ -27,7 +27,7 @@ func isPortOpen(port int) bool {
 // killProcessOnPort finds and kills processes listening on the given port
 func killProcessOnPort(port int) bool {
 	// Use lsof to find the PID
-	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port)))
 	output, err := cmd.Output()
 	if err != nil || len(output) == 0 {
 		return false
@@ -53,30 +53,11 @@ func killProcessOnPort(port int) bool {
 	}
 	return killedAny
 }
-var LlmCmd = &cobra.Command{
-	Use:   "llm",
-	Short: "LLM utilities",
-}
-
-var queryLlmCmd = &cobra.Command{
-	Use:   "query [prompt]",
-	Short: "Query the LLM",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		model, _ := cmd.Flags().GetString("model")
-		c := client.NewClient(viper.GetString("server"))
-		resp, err := c.QueryLLM(args[0], model)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println(resp.Response)
-	},
-}
 
 var LogsCmd = &cobra.Command{
-	Use:   "logs",
-	Short: "View system logs",
+	Use:     "logs",
+	Aliases: []string{"l"},
+	Short:   "View system logs",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		resp, err := c.GetLogs()
@@ -99,9 +80,4 @@ var LogsCmd = &cobra.Command{
 		}
 		w.Flush()
 	},
-}
-
-func init() {
-	LlmCmd.AddCommand(queryLlmCmd)
-	queryLlmCmd.Flags().StringP("model", "m", "", "Model to use")
 }

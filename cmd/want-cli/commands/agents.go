@@ -3,19 +3,20 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"mywant/pkg/client"
 	"os"
 	"strings"
 	"text/tabwriter"
-	"mywant/pkg/client"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var AgentsCmd = &cobra.Command{
-	Use:   "agents",
-	Short: "Manage agents",
-	Long:  `List and manage agents.`,
+	Use:     "agents",
+	Aliases: []string{"a"},
+	Short:   "Manage agents",
+	Long:    `List and manage agents.`,
 }
 
 // completion helper for agents
@@ -38,8 +39,9 @@ func completeAgentNames(cmd *cobra.Command, args []string, toComplete string) ([
 }
 
 var listAgentsCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all agents",
+	Use:     "list",
+	Aliases: []string{"l"},
+	Short:   "List all agents",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		resp, err := c.ListAgents()
@@ -66,6 +68,7 @@ var listAgentsCmd = &cobra.Command{
 
 var getAgentCmd = &cobra.Command{
 	Use:               "get [name]",
+	Aliases:           []string{"g"},
 	Short:             "Get agent details",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeAgentNames,
@@ -85,6 +88,7 @@ var getAgentCmd = &cobra.Command{
 
 var deleteAgentCmd = &cobra.Command{
 	Use:               "delete [name]",
+	Aliases:           []string{"d"},
 	Short:             "Delete an agent",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeAgentNames,
@@ -100,9 +104,10 @@ var deleteAgentCmd = &cobra.Command{
 }
 
 var CapabilitiesCmd = &cobra.Command{
-	Use:   "capabilities",
-	Short: "Manage capabilities",
-	Long:  `List and manage capabilities.`,
+	Use:     "capabilities",
+	Aliases: []string{"c"},
+	Short:   "Manage capabilities",
+	Long:    `List and manage capabilities.`,
 }
 
 // completion helper for capabilities
@@ -125,8 +130,9 @@ func completeCapabilityNames(cmd *cobra.Command, args []string, toComplete strin
 }
 
 var listCapabilitiesCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all capabilities",
+	Use:     "list",
+	Aliases: []string{"l"},
+	Short:   "List all capabilities",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		resp, err := c.ListCapabilities()
@@ -149,6 +155,7 @@ var listCapabilitiesCmd = &cobra.Command{
 
 var getCapabilityCmd = &cobra.Command{
 	Use:               "get [name]",
+	Aliases:           []string{"g"},
 	Short:             "Get capability details",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeCapabilityNames,
@@ -166,6 +173,7 @@ var getCapabilityCmd = &cobra.Command{
 
 var deleteCapabilityCmd = &cobra.Command{
 	Use:               "delete [name]",
+	Aliases:           []string{"d"},
 	Short:             "Delete a capability",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeCapabilityNames,
@@ -181,9 +189,10 @@ var deleteCapabilityCmd = &cobra.Command{
 }
 
 var TypesCmd = &cobra.Command{
-	Use:   "types",
-	Short: "Manage want types",
-	Long:  `List available want types.`,
+	Use:     "types",
+	Aliases: []string{"t"},
+	Short:   "Manage want types",
+	Long:    `List available want types.`,
 }
 
 // completion helper for types
@@ -204,8 +213,9 @@ func completeTypeNames(cmd *cobra.Command, args []string, toComplete string) ([]
 }
 
 var listTypesCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List available want types",
+	Use:     "list",
+	Aliases: []string{"l"},
+	Short:   "List available want types",
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		types, err := c.ListWantTypes()
@@ -226,6 +236,7 @@ var listTypesCmd = &cobra.Command{
 
 var getTypeCmd = &cobra.Command{
 	Use:               "get [name]",
+	Aliases:           []string{"g"},
 	Short:             "Get want type details",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeTypeNames,
