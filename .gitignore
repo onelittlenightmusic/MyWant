@@ -33,6 +33,6 @@ logs/
 tmp/
 *.log
 *.pid
-want-cli
+/want-cli
 build_error.log
 drag_drop_success.png
