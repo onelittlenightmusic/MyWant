@@ -389,8 +389,8 @@ func (s *Server) setupRoutes() {
 	// Interactive want creation endpoints
 	interact := api.PathPrefix("/interact").Subrouter()
 	// Session management
-	interact.HandleFunc("/", s.interactCreate).Methods("POST")
-	interact.HandleFunc("/", s.handleOptions).Methods("OPTIONS")
+	interact.HandleFunc("", s.interactCreate).Methods("POST")
+	interact.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 	// Session operations
 	interact.HandleFunc("/{id}", s.interactMessage).Methods("POST")
 	interact.HandleFunc("/{id}", s.interactDelete).Methods("DELETE")

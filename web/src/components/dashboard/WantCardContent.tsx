@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AlertTriangle, Bot, Pause, Clock, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
+import { ConfirmationBubble } from '@/components/notifications';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import styles from './WantCard.module.css';
 
@@ -380,7 +380,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       {/* Confirmation Message Notification */}
-      <ConfirmationMessageNotification
+      <ConfirmationBubble
         message={confirmationMessage}
         isVisible={showConfirmation}
         onDismiss={() => setShowConfirmation(false)}

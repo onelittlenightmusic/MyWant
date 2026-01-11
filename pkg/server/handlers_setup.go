@@ -106,6 +106,19 @@ func (s *Server) setupRoutes() {
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
 	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
 
+	// Interactive want creation endpoints
+	interact := api.PathPrefix("/interact").Subrouter()
+	// Session management
+	interact.HandleFunc("", s.interactCreate).Methods("POST")
+	interact.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	// Session operations
+	interact.HandleFunc("/{id}", s.interactMessage).Methods("POST")
+	interact.HandleFunc("/{id}", s.interactDelete).Methods("DELETE")
+	interact.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+	// Deployment
+	interact.HandleFunc("/{id}/deploy", s.interactDeploy).Methods("POST")
+	interact.HandleFunc("/{id}/deploy", s.handleOptions).Methods("OPTIONS")
+
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 

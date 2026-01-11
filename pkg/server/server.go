@@ -26,6 +26,7 @@ type Server struct {
 	router               *mux.Router
 	globalLabels         map[string]map[string]bool  // Globally registered labels (key -> value -> true)
 	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
+	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -107,6 +108,14 @@ func New(config Config) *Server {
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
 	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))
 
+	// Create interaction manager for interactive want creation
+	gooseManager, err := types.GetGooseManager(context.Background())
+	if err != nil {
+		log.Printf("[WARN] Failed to initialize GooseManager for InteractionManager: %v", err)
+		log.Printf("[WARN] Interactive want creation will not be available")
+	}
+	interactionManager := mywant.NewInteractionManager(wantTypeLoader, recipeRegistry, gooseManager)
+
 	GlobalDebugEnabled = config.Debug
 	mywant.DebugLoggingEnabled = config.Debug
 
@@ -121,6 +130,7 @@ func New(config Config) *Server {
 		router:               mux.NewRouter(),
 		globalLabels:         make(map[string]map[string]bool),
 		reactionQueueManager: reactionQueueManager,
+		interactionManager:   interactionManager,
 	}
 }
 

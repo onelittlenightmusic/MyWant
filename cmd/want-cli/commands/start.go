@@ -22,6 +22,7 @@ var StartCmd = &cobra.Command{
 		host, _ := cmd.Flags().GetString("host")
 		debug, _ := cmd.Flags().GetBool("debug")
 		detach, _ := cmd.Flags().GetBool("detach")
+		dev, _ := cmd.Flags().GetBool("dev")
 
 		// 1. Guard: Check if already running (only when starting a new detached process)
 		if detach && isPortOpen(port) {
@@ -46,6 +47,9 @@ var StartCmd = &cobra.Command{
 			newArgs = append(newArgs, "--host", host)
 			if debug {
 				newArgs = append(newArgs, "--debug")
+			}
+			if dev {
+				newArgs = append(newArgs, "--dev")
 			}
 
 			logFilePath := filepath.Join(logDir, "server.log")
@@ -72,9 +76,27 @@ var StartCmd = &cobra.Command{
 			}
 
 			fmt.Printf("MyWant Server started in background (PID: %d)\n", process.Process.Pid)
+			if dev {
+				fmt.Println("Frontend development server enabled (npm run dev)")
+			}
 			fmt.Printf("Logs: %s\n", logFilePath)
 			fmt.Printf("URL:  http://%s:%d\n", host, port)
 			os.Exit(0)
+		}
+
+		// Start frontend dev server if requested
+		if dev {
+			fmt.Println("Starting frontend development server (npm run dev)...")
+			npmCmd := exec.Command("npm", "run", "dev")
+			npmCmd.Dir = "web"
+			npmCmd.Stdout = os.Stdout
+			npmCmd.Stderr = os.Stderr
+
+			if err := npmCmd.Start(); err != nil {
+				fmt.Printf("Failed to start npm run dev: %v\n", err)
+			} else {
+				fmt.Printf("Frontend dev server started (PID: %d)\n", npmCmd.Process.Pid)
+			}
 		}
 
 		cfg := server.Config{
@@ -83,7 +105,7 @@ var StartCmd = &cobra.Command{
 			Debug: debug,
 		}
 
-		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v).\n", host, port, debug)
+		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)
 		s := server.New(cfg)
 		if err := s.Start(); err != nil {
 			fmt.Printf("Server error: %v\n", err)
@@ -97,4 +119,5 @@ func init() {
 	StartCmd.Flags().StringP("host", "H", "localhost", "Host to bind to")
 	StartCmd.Flags().BoolP("debug", "d", false, "Enable debug mode")
 	StartCmd.Flags().BoolP("detach", "D", false, "Run server in background")
+	StartCmd.Flags().Bool("dev", false, "Run frontend in development mode (npm run dev)")
 }

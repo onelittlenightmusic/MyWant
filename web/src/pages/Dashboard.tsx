@@ -21,8 +21,7 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
-import { ConfirmationMessageNotification } from '@/components/common/ConfirmationMessageNotification';
-import { MessageNotification } from '@/components/common/MessageNotification';
+import { ConfirmationBubble, Toast } from '@/components/notifications';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 
 export const Dashboard: React.FC = () => {
@@ -953,7 +952,7 @@ export const Dashboard: React.FC = () => {
       >
         {/* Confirmation Notification - Dashboard Right Layout */}
         {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation) && (
-          <ConfirmationMessageNotification
+          <ConfirmationBubble
             message={
               showDeleteConfirmation
                 ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
@@ -1400,7 +1399,7 @@ export const Dashboard: React.FC = () => {
 
                   {/* Message Notification */}
 
-                  <MessageNotification
+                  <Toast
 
                     message={notificationMessage}
 
