@@ -18,59 +18,65 @@
 
 ## Quick Start
 
-### CLI (want-cli) TL;DR
+### 1. Build and Install
+
+```bash
+# Build the integrated CLI with embedded GUI
+make release
+```
+
+### 2. Start the System
 
 ```bash
 # Start backend and GUI together in background
 ./want-cli start -D
-# List all active wants
-./want-cli wants list
-# Deploy a new want from file
-./want-cli wants create -f config.yaml
-# Stop server
-./want-cli stop
+# Check status
+./want-cli ps
 ```
-Check [Detailed CLI Usage Guide](docs/WANT_CLI_USAGE.md) for more commands.
 
-### Example: Queue Processing Pipeline
+### 3. Access the Dashboard
 
-**Create config** (`config/config-qnet.yaml`):
+Once started, the interactive dashboard is available at:
+**[http://localhost:8080](http://localhost:8080)**
+
+You can monitor want executions, visualize dependencies, and manage recipes through this intuitive web interface.
+
+### 4. Deploy an Example (Queue Processing Pipeline)
+
+**Config** (`config/config-qnet.yaml`):
 ```yaml
 wants:
-  - metadata:
-      name: generator
-      type: numbers
-      labels: {role: source}
-    spec:
-      params: {count: 1000, rate: 10.0}
+  - metadata: {name: generator, type: numbers, labels: {role: source}}
+    spec: {params: {count: 1000, rate: 10.0}}
 
-  - metadata:
-      name: processor
-      type: queue
-      labels: {role: processor}
+  - metadata: {name: processor, type: queue, labels: {role: processor}}
     spec:
       params: {service_time: 0.05}
-      using: [{role: source}]  # Connect to generator
+      using: [{role: source}]
 
-  - metadata:
-      name: collector
-      type: sink
-      labels: {role: collector}
-    spec:
-      using: [{role: processor}]  # Connect to processor
+  - metadata: {name: collector, type: sink, labels: {role: collector}}
+    spec: {using: [{role: processor}]}
 ```
 
 **Run:**
 ```bash
-make run-qnet
+./want-cli wants create -f config/config-qnet.yaml
 ```
+The new want execution will immediately appear on your dashboard.
 
-## API Examples
+## More Examples
+
+Explore more complex scenarios using pre-defined configurations:
 
 ```bash
-# Start server
-make server
+./want-cli wants create -f config/config-travel-recipe.yaml    # Travel planning
+./want-cli wants create -f config/config-fibonacci-recipe.yaml # Fibonacci sequence
+./want-cli wants create -f config/config-qnet-recipe.yaml      # Multi-stream processing
+```
 
+## API Usage
+
+```bash
 # Create wants via API
 curl -X POST http://localhost:8080/api/v1/wants \
   -H "Content-Type: application/yaml" \
@@ -80,15 +86,7 @@ curl -X POST http://localhost:8080/api/v1/wants \
 curl http://localhost:8080/api/v1/wants/{id}/status
 ```
 
-## More Examples
-
-```bash
-make run-travel-recipe    # Travel planning
-make run-fibonacci       # Fibonacci sequence
-make run-qnet-using-recipe # Multi-stream processing
-```
-
-## Usage
+## Go Library Usage
 
 ```go
 import "github.com/onelittlenightmusic/MyWant"
@@ -97,6 +95,27 @@ config, _ := mywant.LoadConfigFromYAML("config.yaml")
 builder := mywant.NewChainBuilder(config)
 builder.RegisterWantType("your-type", yourConstructor)
 builder.Execute()
+```
+
+## Development
+
+For developers contributing to MyWant, use the `Makefile` for common tasks:
+
+```bash
+# Show all available targets
+make help
+
+# Run all quality checks (fmt, vet, test)
+make check
+
+# Build the integrated want-cli (Production release)
+make release
+
+# Run the server in development mode (standalone binary)
+make run-server
+
+# Run the mock flight server for travel examples
+make run-mock
 ```
 
 ## Requirements
