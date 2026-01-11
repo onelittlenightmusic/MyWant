@@ -37,7 +37,7 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 
 	reactionID := fmt.Sprintf("%v", reactionIDVal)
 	want.StoreLog("[SILENCER:DO] Target reaction ID: %s", reactionID)
-	
+
 	httpClient := want.GetHTTPClient()
 	if httpClient == nil {
 		want.StoreLog("[SILENCER:DO] ERROR: HTTP client not available")
@@ -66,10 +66,10 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 	}
 
 	want.StoreLog("[SILENCER:DO] Successfully approved reaction %s", reactionID)
-	
+
 	// Clear the target reaction ID so we don't process it again
 	want.StoreState("_target_reaction_id", "")
-	
+
 	return nil
 }
 

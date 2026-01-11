@@ -56,7 +56,6 @@ func (a *BaseAgent) GetType() AgentType {
 	return a.Type
 }
 
-
 // DoAgent implements an agent that performs specific actions on wants.
 type DoAgent struct {
 	BaseAgent

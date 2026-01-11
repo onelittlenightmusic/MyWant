@@ -100,7 +100,6 @@ func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	return nil
 }
 
-
 func (r *AgentRegistry) loadCapabilityFile(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -174,7 +173,6 @@ func validateAgentWithSpec(yamlData []byte, filename string) error {
 	InfoLog("[VALIDATION] Agent '%s' validated successfully against OpenAPI spec\n", filename)
 	return nil
 }
-
 
 func (r *AgentRegistry) loadAgentFile(filename string) error {
 	data, err := os.ReadFile(filename)

@@ -132,7 +132,7 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-	var req struct{Key, Value string}
+	var req struct{ Key, Value string }
 	json.NewDecoder(r.Body).Decode(&req)
 
 	if err := s.globalBuilder.QueueWantAddLabel(wantID, req.Key, req.Value); err != nil {
@@ -156,7 +156,7 @@ func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-	var req struct{Key, Value string}
+	var req struct{ Key, Value string }
 	json.NewDecoder(r.Body).Decode(&req)
 
 	want, _, found := s.globalBuilder.FindWantByID(wantID)
@@ -169,7 +169,7 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 		want.Spec.Using = make([]map[string]string, 0)
 	}
 	want.Spec.Using = append(want.Spec.Using, map[string]string{req.Key: req.Value})
-	
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{"message": "added"})
 }
@@ -192,7 +192,7 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	want.Spec.Using = newUsing
-	
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{"message": "removed"})
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 )
+
 // ListWants retrieves all wants from the server
 func (c *Client) ListWants() (*APIDumpResponse, error) {
 	var result APIDumpResponse

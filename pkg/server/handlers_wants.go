@@ -243,7 +243,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[API:UPDATE] Found want in execution %s\n", i)
 				targetExecution = execution
 				foundWant = want
-				
+
 				for j, configWant := range execution.Config.Wants {
 					if configWant.Metadata.ID == wantID {
 						targetWantIndex = j
@@ -289,7 +289,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	if updatedWant == nil {
 		http.Error(w, "Want object required", http.StatusBadRequest)
 		return
@@ -320,7 +320,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		} else {
 			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
 		}
-		
+
 		if targetExecution.Builder != nil {
 			targetExecution.Builder.UpdateWant(updatedWant)
 		}
@@ -339,7 +339,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 
 	for executionID, execution := range s.wants {
 		var foundInBuilder bool
-		
+
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
@@ -355,12 +355,12 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 				execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
 				s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued")
 			}
-			
+
 			// Clean up config if empty
 			if len(execution.Config.Wants) == 0 {
 				delete(s.wants, executionID)
 			}
-			
+
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -417,7 +417,7 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, wantID, operation string) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	var err error
 	switch operation {
 	case "suspend":
@@ -434,7 +434,7 @@ func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, w
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	s.globalBuilder.LogAPIOperation("POST", fmt.Sprintf("/api/v1/wants/{id}/%s", operation), wantID, "success", http.StatusAccepted, "", operation+" queued")
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]any{
@@ -529,7 +529,7 @@ func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 func generateWantID() string {
 	uuid := make([]byte, 16)
 	rand.Read(uuid)
-	uuid[6] = (uuid[6] & 0x0f) | 0x40 
+	uuid[6] = (uuid[6] & 0x0f) | 0x40
 	uuid[8] = (uuid[8] & 0x3f) | 0x80
 	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])

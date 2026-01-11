@@ -48,16 +48,17 @@ type ErrorHistoryEntry struct {
 
 // Server represents the MyWant server
 type Server struct {
-	config         ServerConfig
-	wants          map[string]*WantExecution        // Store active want executions
-	globalBuilder  *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
-	agentRegistry  *mywant.AgentRegistry            // Agent and capability registry
-	recipeRegistry *mywant.CustomTargetTypeRegistry // Recipe registry
-	wantTypeLoader *mywant.WantTypeLoader           // Want type definitions loader
-	errorHistory   []ErrorHistoryEntry              // Store error history
+	config               ServerConfig
+	wants                map[string]*WantExecution        // Store active want executions
+	globalBuilder        *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
+	agentRegistry        *mywant.AgentRegistry            // Agent and capability registry
+	recipeRegistry       *mywant.CustomTargetTypeRegistry // Recipe registry
+	wantTypeLoader       *mywant.WantTypeLoader           // Want type definitions loader
+	errorHistory         []ErrorHistoryEntry              // Store error history
 	router               *mux.Router
-	globalLabels         map[string]map[string]bool    // Globally registered labels (key -> value -> true)
-	reactionQueueManager *types.ReactionQueueManager   // Reaction queue manager for reminder wants
+	globalLabels         map[string]map[string]bool  // Globally registered labels (key -> value -> true)
+	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
+	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
 }
 
 // WantExecution represents a running want execution
@@ -78,55 +79,68 @@ type WantResponseWithGroupedAgents struct {
 	State    map[string]any     `json:"state"`
 }
 
-// LLMRequest represents a request to the LLM inference API
-type LLMRequest struct {
-	Message string `json:"message"`
-	Model   string `json:"model,omitempty"`
-}
-
-// LLMResponse represents a response from the LLM inference API
-type LLMResponse struct {
-	Response  string `json:"response"`
-	Model     string `json:"model"`
-	Timestamp string `json:"timestamp"`
-}
-
-// OllamaRequest represents the request format for Ollama API
-type OllamaRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
 // SaveRecipeFromWantRequest represents the request to create a recipe from an existing want
 type SaveRecipeFromWantRequest struct {
 	WantID   string                       `json:"wantId"`
 	Metadata mywant.GenericRecipeMetadata `json:"metadata"`
 }
 
-// OllamaResponse represents the response format from Ollama API
-type OllamaResponse struct {
-	Model              string `json:"model"`
-	CreatedAt          string `json:"created_at"`
-	Response           string `json:"response"`
-	Done               bool   `json:"done"`
-	DoneReason         string `json:"done_reason,omitempty"`
-	Context            []int  `json:"context,omitempty"`
-	TotalDuration      int64  `json:"total_duration,omitempty"`
-	LoadDuration       int64  `json:"load_duration,omitempty"`
-	PromptEvalCount    int    `json:"prompt_eval_count,omitempty"`
-	PromptEvalDuration int64  `json:"prompt_eval_duration,omitempty"`
-	EvalCount          int    `json:"eval_count,omitempty"`
-	EvalDuration       int64  `json:"eval_duration,omitempty"`
+// ========= Interactive Want Creation API Types =========
+
+// InteractCreateResponse is returned when creating a new session
+type InteractCreateResponse struct {
+	SessionID string    `json:"session_id"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// InteractMessageRequest is the request to send a message to a session
+type InteractMessageRequest struct {
+	Message string           `json:"message"`
+	Context *InteractContext `json:"context,omitempty"`
+}
+
+// InteractContext provides optional context for message processing
+type InteractContext struct {
+	PreferRecipes bool     `json:"preferRecipes,omitempty"`
+	Categories    []string `json:"categories,omitempty"`
+}
+
+// InteractMessageResponse is returned after sending a message
+type InteractMessageResponse struct {
+	Recommendations     []mywant.Recommendation      `json:"recommendations"`
+	ConversationHistory []mywant.ConversationMessage `json:"conversation_history"`
+	Timestamp           time.Time                    `json:"timestamp"`
+}
+
+// InteractDeployRequest is the request to deploy a recommendation
+type InteractDeployRequest struct {
+	RecommendationID string               `json:"recommendation_id"`
+	Modifications    *ConfigModifications `json:"modifications,omitempty"`
+}
+
+// ConfigModifications allows modifying a recommendation before deployment
+type ConfigModifications struct {
+	ParameterOverrides map[string]interface{} `json:"parameterOverrides,omitempty"`
+	DisableWants       []string               `json:"disableWants,omitempty"`
+}
+
+// InteractDeployResponse is returned after deploying a recommendation
+type InteractDeployResponse struct {
+	ExecutionID string    `json:"execution_id"`
+	WantIDs     []string  `json:"want_ids"`
+	Status      string    `json:"status"`
+	Message     string    `json:"message"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
 // ValidationResult represents the complete validation response
 type ValidationResult struct {
-	Valid       bool                 `json:"valid"`
-	FatalErrors []ValidationError    `json:"fatalErrors"`
-	Warnings    []ValidationWarning  `json:"warnings"`
-	WantCount   int                  `json:"wantCount"`
-	ValidatedAt string               `json:"validatedAt"`
+	Valid       bool                `json:"valid"`
+	FatalErrors []ValidationError   `json:"fatalErrors"`
+	Warnings    []ValidationWarning `json:"warnings"`
+	WantCount   int                 `json:"wantCount"`
+	ValidatedAt string              `json:"validatedAt"`
 }
 
 // ValidationError represents a fatal validation error
@@ -198,6 +212,15 @@ func NewServer(config ServerConfig) *Server {
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}
+
+	// Create interaction manager for interactive want creation
+	gooseManager, err := types.GetGooseManager(context.Background())
+	if err != nil {
+		log.Printf("[WARN] Failed to initialize GooseManager for InteractionManager: %v", err)
+		log.Printf("[WARN] Interactive want creation will not be available")
+	}
+	interactionManager := mywant.NewInteractionManager(wantTypeLoader, recipeRegistry, gooseManager)
+
 	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
@@ -251,6 +274,7 @@ func NewServer(config ServerConfig) *Server {
 		router:               mux.NewRouter(),
 		globalLabels:         make(map[string]map[string]bool),
 		reactionQueueManager: reactionQueueManager,
+		interactionManager:   interactionManager,
 	}
 }
 
@@ -362,10 +386,18 @@ func (s *Server) setupRoutes() {
 	logs.HandleFunc("", s.clearLogs).Methods("DELETE")
 	logs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
-	// LLM inference endpoints
-	llm := api.PathPrefix("/llm").Subrouter()
-	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
-	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")
+	// Interactive want creation endpoints
+	interact := api.PathPrefix("/interact").Subrouter()
+	// Session management
+	interact.HandleFunc("/", s.interactCreate).Methods("POST")
+	interact.HandleFunc("/", s.handleOptions).Methods("OPTIONS")
+	// Session operations
+	interact.HandleFunc("/{id}", s.interactMessage).Methods("POST")
+	interact.HandleFunc("/{id}", s.interactDelete).Methods("DELETE")
+	interact.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+	// Deployment
+	interact.HandleFunc("/{id}/deploy", s.interactDeploy).Methods("POST")
+	interact.HandleFunc("/{id}/deploy", s.handleOptions).Methods("OPTIONS")
 
 	// Reactions endpoints for reminder wants - multi-queue system
 	reactions := api.PathPrefix("/reactions").Subrouter()
@@ -384,83 +416,6 @@ func (s *Server) setupRoutes() {
 
 	// Serve static files (for future web UI)
 	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/"))).Methods("GET")
-}
-
-// queryLLM handles POST /api/v1/llm/query - sends a query to the Ollama LLM
-func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	var req LLMRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorMsg := "Invalid request format"
-		s.logError(r, http.StatusBadRequest, errorMsg, "parse_error", err.Error(), "")
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", "", "error", http.StatusBadRequest, errorMsg, "invalid_json")
-		http.Error(w, errorMsg, http.StatusBadRequest)
-		return
-	}
-
-	// Use default model if not specified
-	model := req.Model
-	if model == "" {
-		model = "gpt-oss:20b"
-	}
-
-	// Call Ollama LLM
-	response, err := s.callOllamaLLM(model, req.Message)
-	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to query LLM: %v", err)
-		s.logError(r, http.StatusInternalServerError, errorMsg, "llm_error", err.Error(), "")
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", model, "error", http.StatusInternalServerError, errorMsg, "llm_query_failed")
-		http.Error(w, errorMsg, http.StatusInternalServerError)
-		return
-	}
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/llm/query", model, "success", http.StatusOK, "", "LLM query successful")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
-
-// callOllamaLLM calls the Ollama LLM API
-func (s *Server) callOllamaLLM(model string, prompt string) (*LLMResponse, error) {
-	ollamaURL := os.Getenv("GPT_BASE_URL")
-	if ollamaURL == "" {
-		ollamaURL = "localhost:11434"
-	}
-
-	// Ensure URL has proper protocol
-	if !strings.HasPrefix(ollamaURL, "http://") && !strings.HasPrefix(ollamaURL, "https://") {
-		ollamaURL = "http://" + ollamaURL
-	}
-	ollamaReq := OllamaRequest{
-		Model:  model,
-		Prompt: prompt,
-		Stream: false,
-	}
-
-	// Marshal request
-	reqBody, err := json.Marshal(ollamaReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Make HTTP request to Ollama
-	url := fmt.Sprintf("%s/api/generate", ollamaURL)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Ollama returned status %d: %s", resp.StatusCode, string(body))
-	}
-	var ollamaResp OllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return nil, fmt.Errorf("failed to decode Ollama response: %w", err)
-	}
-	return &LLMResponse{
-		Response:  ollamaResp.Response,
-		Model:     ollamaResp.Model,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-	}, nil
 }
 
 // registerDynamicAgents registers implementations for special agents loaded from YAML
@@ -1096,7 +1051,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	if updatedWant == nil {
 		errorMsg := "Want object is required"
 		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusBadRequest, errorMsg, "validation")
@@ -1134,7 +1089,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		} else {
 			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
 		}
-		
+
 		// Use execution's own builder
 		if targetExecution.Builder != nil {
 			targetExecution.Builder.UpdateWant(updatedWant)
@@ -2888,7 +2843,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		if isChild {
 			// Convert to RecipeWant and strip instance-specific IDs and references
 			metadata := wnt.Metadata
-			metadata.ID = ""              // Strip unique ID
+			metadata.ID = ""               // Strip unique ID
 			metadata.OwnerReferences = nil // Strip specific owner references (Target will recreate them)
 
 			childWants = append(childWants, mywant.RecipeWant{
@@ -2921,7 +2876,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	filename := fmt.Sprintf("recipes/%s.yaml", recipeID)
 	// Sanitize filename: replace spaces with hyphens
 	filename = strings.ReplaceAll(filename, " ", "-")
-	
+
 	yamlData, err := yaml.Marshal(recipe)
 	if err != nil {
 		s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "error", http.StatusInternalServerError, err.Error(), "marshaling_error")
@@ -2934,7 +2889,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "success", http.StatusCreated, "", fmt.Sprintf("Recipe created from want with %d children", len(childWants)))
-	
+
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
 		"id":      recipeID,
@@ -3568,6 +3523,227 @@ func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 
 	s.globalBuilder.LogAPIOperation("DELETE", r.URL.Path, "", "success", http.StatusOK,
 		fmt.Sprintf("Reaction queue deleted: %s", queueID), "queue_deleted")
+}
+
+// ========= Interactive Want Creation Handlers =========
+
+// interactCreate creates a new interactive session
+func (s *Server) interactCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Create new session
+	session := s.interactionManager.CreateSession()
+
+	// Build response
+	response := InteractCreateResponse{
+		SessionID: session.SessionID,
+		CreatedAt: session.CreatedAt,
+		ExpiresAt: session.ExpiresAt,
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/interact", session.SessionID, "success", http.StatusCreated,
+		fmt.Sprintf("Session created: %s", session.SessionID), "session_created")
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+}
+
+// interactMessage sends a message to an interactive session and returns recommendations
+func (s *Server) interactMessage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract session ID from URL
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+
+	if sessionID == "" {
+		http.Error(w, "Missing session ID", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "error", http.StatusBadRequest,
+			"Missing session ID", "missing_session_id")
+		return
+	}
+
+	// Parse request body
+	var req InteractMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", http.StatusBadRequest,
+			fmt.Sprintf("Invalid request: %v", err), "invalid_request")
+		return
+	}
+
+	if req.Message == "" {
+		http.Error(w, "Message is required", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", http.StatusBadRequest,
+			"Empty message", "empty_message")
+		return
+	}
+
+	// Send message and get recommendations
+	session, err := s.interactionManager.SendMessage(r.Context(), sessionID, req.Message)
+	if err != nil {
+		statusCode := http.StatusInternalServerError
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "expired") {
+			statusCode = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), statusCode)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", statusCode,
+			fmt.Sprintf("Failed to process message: %v", err), "message_processing_failed")
+		return
+	}
+
+	// Build response
+	response := InteractMessageResponse{
+		Recommendations:     session.Recommendations,
+		ConversationHistory: session.ConversationHistory,
+		Timestamp:           time.Now(),
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "success", http.StatusOK,
+		fmt.Sprintf("Generated %d recommendations", len(session.Recommendations)), "recommendations_generated")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
+
+// interactDelete deletes an interactive session
+func (s *Server) interactDelete(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract session ID from URL
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+
+	if sessionID == "" {
+		http.Error(w, "Missing session ID", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("DELETE", r.URL.Path, "", "error", http.StatusBadRequest,
+			"Missing session ID", "missing_session_id")
+		return
+	}
+
+	// Delete session
+	s.interactionManager.DeleteSession(sessionID)
+
+	s.globalBuilder.LogAPIOperation("DELETE", r.URL.Path, sessionID, "success", http.StatusNoContent,
+		fmt.Sprintf("Session deleted: %s", sessionID), "session_deleted")
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// interactDeploy deploys a recommendation from an interactive session
+func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract session ID from URL
+	vars := mux.Vars(r)
+	sessionID := vars["id"]
+
+	if sessionID == "" {
+		http.Error(w, "Missing session ID", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, "", "error", http.StatusBadRequest,
+			"Missing session ID", "missing_session_id")
+		return
+	}
+
+	// Parse request body
+	var req InteractDeployRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", http.StatusBadRequest,
+			fmt.Sprintf("Invalid request: %v", err), "invalid_request")
+		return
+	}
+
+	if req.RecommendationID == "" {
+		http.Error(w, "Recommendation ID is required", http.StatusBadRequest)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", http.StatusBadRequest,
+			"Missing recommendation ID", "missing_recommendation_id")
+		return
+	}
+
+	// Get recommendation from session
+	recommendation, err := s.interactionManager.GetRecommendation(sessionID, req.RecommendationID)
+	if err != nil {
+		statusCode := http.StatusNotFound
+		http.Error(w, err.Error(), statusCode)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", statusCode,
+			fmt.Sprintf("Failed to get recommendation: %v", err), "recommendation_not_found")
+		return
+	}
+
+	// Apply modifications if provided
+	config := recommendation.Config
+	if req.Modifications != nil {
+		// Apply parameter overrides
+		if req.Modifications.ParameterOverrides != nil {
+			for _, want := range config.Wants {
+				for key, value := range req.Modifications.ParameterOverrides {
+					if want.Spec.Params == nil {
+						want.Spec.Params = make(map[string]interface{})
+					}
+					want.Spec.Params[key] = value
+				}
+			}
+		}
+
+		// Filter out disabled wants
+		if len(req.Modifications.DisableWants) > 0 {
+			disabledSet := make(map[string]bool)
+			for _, name := range req.Modifications.DisableWants {
+				disabledSet[name] = true
+			}
+
+			var filteredWants []*mywant.Want
+			for _, want := range config.Wants {
+				if !disabledSet[want.Metadata.Name] {
+					filteredWants = append(filteredWants, want)
+				}
+			}
+			config.Wants = filteredWants
+		}
+	}
+
+	// Assign IDs to wants
+	for _, want := range config.Wants {
+		if want.Metadata.ID == "" {
+			want.Metadata.ID = generateWantID()
+		}
+	}
+
+	// Deploy wants using existing logic
+	executionID := generateWantID()
+	execution := &WantExecution{
+		ID:      executionID,
+		Config:  config,
+		Status:  "created",
+		Builder: s.globalBuilder,
+	}
+	s.wants[executionID] = execution
+
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	if err != nil {
+		delete(s.wants, executionID)
+		errorMsg := fmt.Sprintf("Failed to deploy wants: %v", err)
+		http.Error(w, errorMsg, http.StatusInternalServerError)
+		s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "error", http.StatusInternalServerError,
+			errorMsg, "deployment_failed")
+		return
+	}
+
+	// Build response
+	response := InteractDeployResponse{
+		ExecutionID: executionID,
+		WantIDs:     wantIDs,
+		Status:      "deployed",
+		Message:     fmt.Sprintf("Successfully deployed %d wants from recommendation %s", len(wantIDs), req.RecommendationID),
+		Timestamp:   time.Now(),
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", r.URL.Path, sessionID, "success", http.StatusOK,
+		fmt.Sprintf("Deployed recommendation %s: %d wants", req.RecommendationID, len(wantIDs)), "recommendation_deployed")
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
 }
 
 func main() {

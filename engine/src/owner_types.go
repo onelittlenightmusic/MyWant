@@ -597,6 +597,7 @@ func (t *Target) computeTemplateResult() {
 
 	t.StoreLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
 }
+
 // OwnerAwareWant wraps any want type to add parent notification capability
 type OwnerAwareWant struct {
 	BaseWant   any   // The original want (Generator, Queue, Sink, etc.)

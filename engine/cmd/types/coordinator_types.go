@@ -534,7 +534,7 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 		eventDetails))
 
 	dataByChannel := getChannelMap(&want.Want)
-	
+
 	// Use path name as a stable key instead of dynamic channel index
 	paths := want.GetPaths()
 	if channelIndex >= 0 && channelIndex < len(paths.In) {
@@ -564,16 +564,16 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]an
 	dataByChannel := getChannelMap(&want.Want)
 
 	stateUpdates := make(map[string]any)
-	
+
 	// Use a map to deduplicate events by Type (e.g., flight, restaurant, hotel)
-	// This ensures that new packets for the same type (like rebooked flights) 
+	// This ensures that new packets for the same type (like rebooked flights)
 	// overwrite the previous entry instead of accumulating.
 	latestEventsByType := make(map[string]TimeSlot)
 
 	processSchedules := func(chanKey string, data any) {
 		// Data might be *TravelSchedule or map[string]any (if unmarshaled)
 		var schedule *TravelSchedule
-		
+
 		switch v := data.(type) {
 		case *TravelSchedule:
 			schedule = v
@@ -587,13 +587,15 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]an
 					schedule = &s
 				}
 			}
-			
+
 			// Fallback if JSON fails or produces empty events
 			if schedule == nil || len(schedule.Events) == 0 {
 				// Old manual logic as emergency fallback
 				schedule = &TravelSchedule{}
 				eventsVal, ok := v["events"]
-				if !ok { eventsVal, ok = v["Events"] }
+				if !ok {
+					eventsVal, ok = v["Events"]
+				}
 				if ok {
 					if events, ok := eventsVal.([]any); ok {
 						for _, e := range events {
@@ -601,17 +603,25 @@ func (h *TravelDataHandler) GetStateUpdates(want *CoordinatorWant) map[string]an
 								ts := TimeSlot{}
 								getStr := func(m map[string]any, keys ...string) string {
 									for _, k := range keys {
-										if val, ok := m[k].(string); ok { return val }
+										if val, ok := m[k].(string); ok {
+											return val
+										}
 									}
 									return ""
 								}
 								startStr := getStr(eventMap, "start", "Start")
-								if startStr != "" { ts.Start, _ = time.Parse(time.RFC3339, startStr) }
+								if startStr != "" {
+									ts.Start, _ = time.Parse(time.RFC3339, startStr)
+								}
 								endStr := getStr(eventMap, "end", "End")
-								if endStr != "" { ts.End, _ = time.Parse(time.RFC3339, endStr) }
+								if endStr != "" {
+									ts.End, _ = time.Parse(time.RFC3339, endStr)
+								}
 								ts.Type = getStr(eventMap, "type", "Type")
 								ts.Name = getStr(eventMap, "name", "Name")
-								if ts.Type != "" { schedule.Events = append(schedule.Events, ts) }
+								if ts.Type != "" {
+									schedule.Events = append(schedule.Events, ts)
+								}
 							}
 						}
 					}

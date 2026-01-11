@@ -18,8 +18,8 @@ type ReactionData struct {
 
 // QueueMetadata contains basic information about a reaction queue
 type QueueMetadata struct {
-	QueueID      string    `json:"queue_id"`
-	CreatedAt    time.Time `json:"created_at"`
+	QueueID       string    `json:"queue_id"`
+	CreatedAt     time.Time `json:"created_at"`
 	ReactionCount int       `json:"reaction_count"`
 }
 

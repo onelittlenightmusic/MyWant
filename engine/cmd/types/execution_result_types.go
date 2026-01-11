@@ -168,9 +168,9 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
 	// Store command parameters in state for agent to read
 	e.StoreStateMulti(map[string]any{
-		"shell":              e.Locals.(*ExecutionResultWantLocals).Shell,
-		"timeout":            e.Locals.(*ExecutionResultWantLocals).Timeout,
-		"working_directory":  e.Locals.(*ExecutionResultWantLocals).WorkingDirectory,
+		"shell":             e.Locals.(*ExecutionResultWantLocals).Shell,
+		"timeout":           e.Locals.(*ExecutionResultWantLocals).Timeout,
+		"working_directory": e.Locals.(*ExecutionResultWantLocals).WorkingDirectory,
 	})
 
 	// Execute agents via framework

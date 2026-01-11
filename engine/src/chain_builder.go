@@ -49,24 +49,24 @@ type ChangeEvent struct {
 
 // APILogEntry represents a log entry for API operations
 type APILogEntry struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	Method      string      `json:"method"`      // POST, PUT, DELETE, etc.
-	Endpoint    string      `json:"endpoint"`    // /api/v1/wants, /api/v1/recipes, etc.
-	Resource    string      `json:"resource"`    // Want/Recipe name or ID
-	Status      string      `json:"status"`      // "success" or "error"
-	StatusCode  int         `json:"statusCode"`  // HTTP status code
-	ErrorMsg    string      `json:"errorMsg,omitempty"`
-	Details     string      `json:"details,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
+	Method     string    `json:"method"`     // POST, PUT, DELETE, etc.
+	Endpoint   string    `json:"endpoint"`   // /api/v1/wants, /api/v1/recipes, etc.
+	Resource   string    `json:"resource"`   // Want/Recipe name or ID
+	Status     string    `json:"status"`     // "success" or "error"
+	StatusCode int       `json:"statusCode"` // HTTP status code
+	ErrorMsg   string    `json:"errorMsg,omitempty"`
+	Details    string    `json:"details,omitempty"`
 }
 
 // WantOperation represents a unified operation request (add, delete, suspend, resume, etc.)
 type WantOperation struct {
-	Type       string             // "add", "delete", "suspend", "resume", "stop", "start", "update", "addLabel", "removeLabel", "addUsing", "removeUsing"
-	EntityType string             // "want", "recipe", "agent", "capability", "label"
-	Wants      []*Want            // For add/update operations
-	IDs        []string           // For delete/suspend/resume/stop/start operations (want/recipe IDs)
-	Data       map[string]any     // Additional operation parameters (labels, dependencies, etc.)
-	Callback   chan<- error       // Optional callback channel for completion notification (non-blocking)
+	Type       string         // "add", "delete", "suspend", "resume", "stop", "start", "update", "addLabel", "removeLabel", "addUsing", "removeUsing"
+	EntityType string         // "want", "recipe", "agent", "capability", "label"
+	Wants      []*Want        // For add/update operations
+	IDs        []string       // For delete/suspend/resume/stop/start operations (want/recipe IDs)
+	Data       map[string]any // Additional operation parameters (labels, dependencies, etc.)
+	Callback   chan<- error   // Optional callback channel for completion notification (non-blocking)
 }
 
 // ChainBuilder builds and executes chains from declarative configuration with reconcile loop

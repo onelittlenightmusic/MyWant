@@ -1248,6 +1248,7 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	}
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
+
 // Provide sends a data packet to all connected output channels
 func (n *Want) Provide(packet any) error {
 	paths := n.GetPaths()
@@ -1266,9 +1267,9 @@ func (n *Want) Provide(packet any) error {
 		if pathInfo.Channel == nil {
 			continue // Skip nil channels
 		}
-		
+
 		InfoLog("[PROVIDE] Want '%s' sending packet to '%s' on channel '%s'", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-		
+
 		select {
 		case pathInfo.Channel <- tp:
 			// Sent successfully

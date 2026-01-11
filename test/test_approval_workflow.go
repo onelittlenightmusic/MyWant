@@ -12,10 +12,10 @@ import (
 
 // Minimal types for the test
 type WantMetadata struct {
-	ID              string            `json:"id,omitempty"`
-	Name            string            `json:"name"`
-	Type            string            `json:"type"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty"`
+	ID              string           `json:"id,omitempty"`
+	Name            string           `json:"name"`
+	Type            string           `json:"type"`
+	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty"`
 }
 
 type OwnerReference struct {
@@ -96,7 +96,7 @@ func main() {
 
 	var createResp CreateWantResponse
 	json.NewDecoder(resp.Body).Decode(&createResp)
-	
+
 	// The parent want ID might be the first in want_ids or we can find it by name later
 	fmt.Printf("✅ Want deployment queued. ID: %s\n", createResp.ID)
 
@@ -115,7 +115,7 @@ func main() {
 			fmt.Printf("❌ Failed to fetch wants: %v\n", err)
 			return
 		}
-		
+
 		listResp = WantsListResponse{}
 		json.NewDecoder(resp.Body).Decode(&listResp)
 		resp.Body.Close()
@@ -133,7 +133,7 @@ func main() {
 
 		if parentWant != nil {
 			parentID := parentWant.Metadata.ID
-			
+
 			// Find children by ownerReferences
 			for _, w := range listResp.Wants {
 				for _, ref := range w.Metadata.OwnerReferences {
@@ -159,7 +159,7 @@ func main() {
 				}
 			}
 		}
-		
+
 		time.Sleep(2 * time.Second)
 	}
 
@@ -171,7 +171,7 @@ func main() {
 	}
 
 	fmt.Printf("📍 Parent Want: %s (ID: %s, Status: %s)\n", wantName, parentWant.Metadata.ID, parentWant.Status)
-	
+
 	// Display all wants in a hierarchical tree
 	fmt.Println("🌳 Want Hierarchy:")
 	displayWantTree(listResp.Wants, parentWant.Metadata.ID, 1)

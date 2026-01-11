@@ -17,17 +17,17 @@ const (
 
 // ReminderLocals holds type-specific local state for ReminderWant
 type ReminderLocals struct {
-	Message          string
-	Ahead            string
-	EventTime        time.Time
-	DurationFromNow  string
-	ReachingTime     time.Time
-	RequireReaction  bool
-	ReactionType     string
-	Phase            string
-	TimeoutSeconds   int
-	LastCheckTime    time.Time
-	monitor          *UserReactionMonitorAgent // Monitoring agent instance
+	Message         string
+	Ahead           string
+	EventTime       time.Time
+	DurationFromNow string
+	ReachingTime    time.Time
+	RequireReaction bool
+	ReactionType    string
+	Phase           string
+	TimeoutSeconds  int
+	LastCheckTime   time.Time
+	monitor         *UserReactionMonitorAgent // Monitoring agent instance
 }
 
 // ReminderWant represents a want that sends reminders at scheduled times
@@ -216,8 +216,8 @@ func (r *ReminderWant) Initialize() {
 	// If reaction is required, set Spec.Requires to trigger MonitorAgent and DoAgent
 	if requireReaction {
 		r.Spec.Requires = []string{
-			"reminder_monitoring",        // MonitorAgent reads reactions via HTTP API
-			"reminder_queue_management",  // DoAgent manages queue lifecycle (create/delete)
+			"reminder_monitoring",       // MonitorAgent reads reactions via HTTP API
+			"reminder_queue_management", // DoAgent manages queue lifecycle (create/delete)
 		}
 	}
 
@@ -336,16 +336,16 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 	now := time.Now()
 	if now.After(locals.ReachingTime) {
 		r.StoreLog(fmt.Sprintf("Reaching time arrived: %s", locals.ReachingTime.Format(time.RFC3339)))
-		
+
 		// Clear existing queue ID to force creation of a new one for this new cycle
 		r.StoreStateMulti(map[string]any{
 			"reminder_phase":           ReminderPhaseReaching,
-			"reaction_queue_id":        "", 
+			"reaction_queue_id":        "",
 			"_reaction_packet_emitted": false,
 			"user_reaction":            nil, // Clear previous reaction
 			"reaction_result":          "",  // Clear previous result
 		})
-		
+
 		locals.Phase = ReminderPhaseReaching
 		r.updateLocals(locals)
 
@@ -385,9 +385,9 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 
 // handlePhaseReaching handles the reaching phase
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
-	// If this is a recurring reminder and we are in reaching phase again, 
+	// If this is a recurring reminder and we are in reaching phase again,
 	// we might need to reset the queue ID if the previous one was already processed.
-	// However, for recurring reminders triggered by scheduler, the want status 
+	// However, for recurring reminders triggered by scheduler, the want status
 	// is reset to Idle then Reaching, which calls Initialize().
 	// But our test showed it might stay in reaching status.
 
@@ -507,10 +507,10 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	if locals.RequireReaction {
 		r.StoreLog("Reaction timeout - marking as failed (require_reaction=true)")
 		r.StoreStateMulti(map[string]any{
-			"reminder_phase":            ReminderPhaseFailed,
-			"timeout":                   true,
+			"reminder_phase":           ReminderPhaseFailed,
+			"timeout":                  true,
 			"_reaction_packet_emitted": false,
-			"achieving_percentage":      100,
+			"achieving_percentage":     100,
 		})
 		locals.Phase = ReminderPhaseFailed
 
@@ -519,10 +519,10 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	} else {
 		r.StoreLog("Reaction timeout - auto-completing (require_reaction=false)")
 		r.StoreStateMulti(map[string]any{
-			"reminder_phase":            ReminderPhaseCompleted,
-			"auto_completed":            true,
+			"reminder_phase":           ReminderPhaseCompleted,
+			"auto_completed":           true,
 			"_reaction_packet_emitted": false,
-			"achieving_percentage":      100,
+			"achieving_percentage":     100,
 		})
 		locals.Phase = ReminderPhaseCompleted
 		r.ProvideDone()

@@ -190,9 +190,97 @@ Steps:
 2. Extract the message ID from the response
 3. Return ONLY a JSON object with: {"status":"sent","messageId":"..."}`, to, subject, body)
 
+	case "interact_recommend":
+		message := params["message"].(string)
+		conversationHistory := ""
+		if hist, ok := params["conversation_history"].(string); ok {
+			conversationHistory = hist
+		}
+		return g.buildRecommendationPrompt(message, conversationHistory)
+
 	default:
 		return fmt.Sprintf("Execute MCP operation: %s with parameters: %v", operation, params)
 	}
+}
+
+// buildRecommendationPrompt constructs a prompt for interactive want recommendation
+func (g *GooseManager) buildRecommendationPrompt(message string, conversationHistory string) string {
+	return fmt.Sprintf(`You are a MyWant system architect with access to MyWant MCP tools.
+
+CONVERSATION HISTORY:
+%s
+
+LATEST USER REQUEST:
+"%s"
+
+AVAILABLE MCP TOOLS:
+- list_want_types: Get all available want types
+- search_want_types: Search by category or pattern
+- get_want_type: Get detailed type definition
+- list_recipes: Get all recipes
+- get_recipe: Get specific recipe details
+
+TASK:
+1. Use MCP tools to search for relevant want types and recipes based on the user's request
+2. Analyze the user's intent from the conversation history
+3. Generate 2-3 alternative approaches:
+   - Approach 1: Recipe-based solution (if a suitable recipe exists)
+   - Approach 2: Custom want composition (from individual want types)
+   - Approach 3: Hybrid approach (recipe + custom wants)
+
+For each recommendation, provide:
+- ID: Use "rec-1", "rec-2", "rec-3"
+- Title: A descriptive name for the approach
+- Approach: "recipe", "custom", or "hybrid"
+- Description: Explain why this solution fits the user's needs
+- Config: Complete YAML-like config structure with a "wants" array containing want definitions
+- Metadata:
+  - want_count: Number of wants in the configuration
+  - recipes_used: Array of recipe names (if using recipes)
+  - want_types_used: Array of want type names
+  - complexity: "low", "medium", or "high"
+  - pros_cons: Object with "pros" and "cons" arrays
+
+IMPORTANT:
+- Use MCP tools to discover what's available - don't assume or guess
+- Generate complete, valid want configurations
+- Each want in the config should have proper metadata (name, type, labels) and spec (params)
+
+Return ONLY this JSON structure (no markdown, no extra text):
+{
+  "recommendations": [
+    {
+      "id": "rec-1",
+      "title": "Example Solution",
+      "approach": "recipe",
+      "description": "This uses the travel-itinerary recipe because...",
+      "config": {
+        "wants": [
+          {
+            "metadata": {
+              "name": "example-want",
+              "type": "example",
+              "labels": {"role": "example"}
+            },
+            "spec": {
+              "params": {"key": "value"}
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "want_count": 1,
+        "recipes_used": ["travel-itinerary"],
+        "want_types_used": ["restaurant", "hotel"],
+        "complexity": "low",
+        "pros_cons": {
+          "pros": ["Pre-tested configuration", "Quick to deploy"],
+          "cons": ["Less flexible than custom"]
+        }
+      }
+    }
+  ]
+}`, conversationHistory, message)
 }
 
 // parseGooseResponse extracts and processes Goose JSON output
@@ -424,9 +512,9 @@ type MCPAgent struct {
 // NewMCPAgent creates an agent for MCP tool invocations
 func NewMCPAgent() *MCPAgent {
 	baseAgent := mywant.NewBaseAgent(
-		"mcp_tools",                    // Agent name
-		[]string{"mcp_gmail"},          // Capabilities
-		mywant.DoAgentType,             // Execute synchronously
+		"mcp_tools",           // Agent name
+		[]string{"mcp_gmail"}, // Capabilities
+		mywant.DoAgentType,    // Execute synchronously
 	)
 
 	agent := &MCPAgent{
@@ -511,13 +599,13 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		}
 
 		result = map[string]interface{}{
-			"operation":    "gmail_search",
-			"query":        queryStr,
-			"maxResults":   maxResultsInt,
-			"status":       "completed",
-			"emails":       emails,
-			"total":        len(emails),
-			"message":      "Gmail search executed via Goose + MCP",
+			"operation":  "gmail_search",
+			"query":      queryStr,
+			"maxResults": maxResultsInt,
+			"status":     "completed",
+			"emails":     emails,
+			"total":      len(emails),
+			"message":    "Gmail search executed via Goose + MCP",
 		}
 
 	case "gmail_read":
@@ -537,11 +625,11 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		}
 
 		result = map[string]interface{}{
-			"operation":  "gmail_read",
-			"messageID":  messageIDStr,
-			"status":     "completed",
-			"data":       readResult,
-			"message":    "Gmail message read via Goose + MCP",
+			"operation": "gmail_read",
+			"messageID": messageIDStr,
+			"status":    "completed",
+			"data":      readResult,
+			"message":   "Gmail message read via Goose + MCP",
 		}
 
 	case "gmail_send":

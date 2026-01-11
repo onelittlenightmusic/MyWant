@@ -61,7 +61,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 	cleanupCmd := exec.Command("./want-cli", "stop")
 	cleanupCmd.Dir = ".."
 	cleanupCmd.Run()
-	
+
 	exec.Command("pkill", "-9", "-f", "bin/mywant").Run()
 	exec.Command("pkill", "-9", "-f", "bin/flight-server").Run()
 	exec.Command("pkill", "-9", "-f", "want-cli").Run()
@@ -105,14 +105,14 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 	if err := startCmd.Run(); err != nil {
 		t.Fatalf("Failed to start MyWant server: %v", err)
 	}
-	
+
 	defer func() {
 		t.Log("Stopping MyWant server via want-cli...")
 		stopServerCmd := exec.Command("./want-cli", "stop")
 		stopServerCmd.Dir = ".."
 		stopServerCmd.Run()
 	}()
-	
+
 	time.Sleep(5 * time.Second)
 
 	// --- 4. Deploy Recipe ---
@@ -167,8 +167,8 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 				var listData struct {
 					Wants []struct {
 						Metadata struct {
-							ID   string `json:"id"`
-							Type string `json:"type"`
+							ID              string `json:"id"`
+							Type            string `json:"type"`
 							OwnerReferences []struct {
 								ID string `json:"id"`
 							} `json:"ownerReferences"`
@@ -200,7 +200,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 			}
 			body, _ := ioutil.ReadAll(detailResp.Body)
 			detailResp.Body.Close()
-			
+
 			var fullData map[string]any
 			if err := json.Unmarshal(body, &fullData); err != nil {
 				continue
@@ -215,7 +215,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 			if !ok {
 				itineraryRaw, ok = state["final_itinerary"]
 			}
-			
+
 			if !ok || itineraryRaw == nil {
 				continue
 			}
@@ -237,12 +237,12 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 			flightName := foundTypes["flight"]
 			hasFlight := flightName != ""
 
-			t.Logf("[MONITOR] Itinerary Events: %d | R:%v H:%v B:%v F:%v (%s)", 
+			t.Logf("[MONITOR] Itinerary Events: %d | R:%v H:%v B:%v F:%v (%s)",
 				len(foundTypes), hasRestaurant, hasHotel, hasBuffet, hasFlight, flightName)
 
 			// 終了条件: すべてのスケジュール(4種類)が揃っており、かつフライトが再予約済み(AA100A-E)であること
 			if hasRestaurant && hasHotel && hasBuffet && hasFlight &&
-			   containsAny(flightName, []string{"AA100A", "AA100B", "AA100C", "AA100D", "AA100E"}) {
+				containsAny(flightName, []string{"AA100A", "AA100B", "AA100C", "AA100D", "AA100E"}) {
 				t.Logf("✅ SUCCESS: Dynamic rebooking verified. Final flight: %s. All 4 schedules intact.", flightName)
 				return // テスト成功
 			}

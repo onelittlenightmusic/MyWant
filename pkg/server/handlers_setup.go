@@ -123,7 +123,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 
 	// Static files (embedded React GUI)
-	// In debug mode, we can still fall back to local files if needed, 
+	// In debug mode, we can still fall back to local files if needed,
 	// but default to embedded for the single-binary experience.
 	s.router.PathPrefix("/").Handler(http.FileServer(web.GetFileSystem(true))).Methods("GET", "HEAD")
 }

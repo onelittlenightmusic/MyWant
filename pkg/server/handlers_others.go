@@ -99,10 +99,10 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Implementation simplified for brevity - assume similar logic to main.go but utilizing helper methods if needed
 	// In a real refactor, we'd copy the full logic. For now, let's copy the core logic.
-	
+
 	// Find parent want
 	var parentWant *mywant.Want
 	var builder *mywant.ChainBuilder
@@ -164,7 +164,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	if recipe.Recipe.Metadata.Name == "" {
 		recipe.Recipe.Metadata.Name = parentWant.Metadata.Name + "-recipe"
 	}
-	
+
 	recipeID := recipe.Recipe.Metadata.Name
 	if err := s.recipeRegistry.CreateRecipe(recipeID, &recipe); err != nil {
 		s.recipeRegistry.UpdateRecipe(recipeID, &recipe)
@@ -192,7 +192,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		Capabilities []string `json:"capabilities"`
 	}
 	json.NewDecoder(r.Body).Decode(&data)
-	
+
 	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type)}
 	var agent mywant.Agent
 	if data.Type == "do" {
@@ -269,7 +269,9 @@ func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	agents := s.agentRegistry.FindAgentsByGives(mux.Vars(r)["name"])
-	if agents == nil { agents = []mywant.Agent{} }
+	if agents == nil {
+		agents = []mywant.Agent{}
+	}
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
 		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
@@ -280,19 +282,22 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 // Want Types
 func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if s.wantTypeLoader == nil { http.Error(w, "Loader not ready", 503); return }
-	
+	if s.wantTypeLoader == nil {
+		http.Error(w, "Loader not ready", 503)
+		return
+	}
+
 	defs := s.wantTypeLoader.GetAll()
 	// Filter logic omitted for brevity
-	
+
 	res := make([]map[string]any, len(defs))
 	for i, d := range defs {
 		res[i] = map[string]any{
-			"name": d.Metadata.Name,
-			"title": d.Metadata.Title,
+			"name":     d.Metadata.Name,
+			"title":    d.Metadata.Title,
 			"category": d.Metadata.Category,
-			"pattern": d.Metadata.Pattern,
-			"version": d.Metadata.Version,
+			"pattern":  d.Metadata.Pattern,
+			"version":  d.Metadata.Version,
 		}
 	}
 	json.NewEncoder(w).Encode(map[string]any{"wantTypes": res, "count": len(res)})
@@ -325,15 +330,19 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// Simplified implementation - just return global labels for now to verify integration
 	// Full implementation requires scanning all wants (omitted for brevity)
-	json.NewEncoder(w).Encode(map[string]any{"labelKeys": []string{}, "labelValues": map[string]any{}}) 
+	json.NewEncoder(w).Encode(map[string]any{"labelKeys": []string{}, "labelValues": map[string]any{}})
 }
 
 func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var req struct{Key, Value string}
+	var req struct{ Key, Value string }
 	json.NewDecoder(r.Body).Decode(&req)
-	if s.globalLabels == nil { s.globalLabels = make(map[string]map[string]bool) }
-	if s.globalLabels[req.Key] == nil { s.globalLabels[req.Key] = make(map[string]bool) }
+	if s.globalLabels == nil {
+		s.globalLabels = make(map[string]map[string]bool)
+	}
+	if s.globalLabels[req.Key] == nil {
+		s.globalLabels[req.Key] = make(map[string]bool)
+	}
 	s.globalLabels[req.Key][req.Value] = true
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Label registered"})
@@ -389,12 +398,16 @@ func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var logs []mywant.APILogEntry
-	if s.globalBuilder != nil { logs = s.globalBuilder.GetAPILogs() }
+	if s.globalBuilder != nil {
+		logs = s.globalBuilder.GetAPILogs()
+	}
 	json.NewEncoder(w).Encode(map[string]any{"logs": logs, "count": len(logs)})
 }
 
 func (s *Server) clearLogs(w http.ResponseWriter, r *http.Request) {
-	if s.globalBuilder != nil { s.globalBuilder.ClearAPILogs() }
+	if s.globalBuilder != nil {
+		s.globalBuilder.ClearAPILogs()
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -403,10 +416,12 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req LLMRequest
 	json.NewDecoder(r.Body).Decode(&req)
-	
+
 	model := req.Model
-	if model == "" { model = "gpt-oss:20b" }
-	
+	if model == "" {
+		model = "gpt-oss:20b"
+	}
+
 	resp, err := s.callOllamaLLM(model, req.Message)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -417,13 +432,17 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) callOllamaLLM(model, prompt string) (*LLMResponse, error) {
 	ollamaURL := os.Getenv("GPT_BASE_URL")
-	if ollamaURL == "" { ollamaURL = "http://localhost:11434" }
-	
+	if ollamaURL == "" {
+		ollamaURL = "http://localhost:11434"
+	}
+
 	reqBody, _ := json.Marshal(OllamaRequest{Model: model, Prompt: prompt})
 	resp, err := http.Post(ollamaURL+"/api/generate", "application/json", bytes.NewReader(reqBody))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
-	
+
 	var oResp OllamaResponse
 	json.NewDecoder(resp.Body).Decode(&oResp)
 	return &LLMResponse{Response: oResp.Response, Model: oResp.Model, Timestamp: time.Now().Format(time.RFC3339)}, nil
@@ -433,7 +452,10 @@ func (s *Server) callOllamaLLM(model, prompt string) (*LLMResponse, error) {
 func (s *Server) createReactionQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	id, err := s.reactionQueueManager.CreateQueue()
-	if err != nil { http.Error(w, err.Error(), 500); return }
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"queue_id": id})
 }
@@ -447,7 +469,10 @@ func (s *Server) listReactionQueues(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getReactionQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	queue, err := s.reactionQueueManager.GetQueue(mux.Vars(r)["id"])
-	if err != nil { http.Error(w, err.Error(), 404); return }
+	if err != nil {
+		http.Error(w, err.Error(), 404)
+		return
+	}
 	json.NewEncoder(w).Encode(map[string]any{"queue_id": queue.ID, "reactions": queue.GetReactions()})
 }
 
@@ -456,14 +481,18 @@ func (s *Server) addReactionToQueue(w http.ResponseWriter, r *http.Request) {
 	var req ReactionRequest
 	json.NewDecoder(r.Body).Decode(&req)
 	id, err := s.reactionQueueManager.AddReactionToQueue(mux.Vars(r)["id"], req.Approved, req.Comment)
-	if err != nil { http.Error(w, err.Error(), 404); return }
+	if err != nil {
+		http.Error(w, err.Error(), 404)
+		return
+	}
 	json.NewEncoder(w).Encode(map[string]string{"reaction_id": id})
 }
 
 func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := s.reactionQueueManager.DeleteQueue(mux.Vars(r)["id"]); err != nil {
-		http.Error(w, err.Error(), 404); return
+		http.Error(w, err.Error(), 404)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]bool{"deleted": true})
@@ -519,5 +548,7 @@ func (s *Server) logError(r *http.Request, status int, message, errorType, detai
 		UserAgent:   r.Header.Get("User-Agent"),
 	}
 	s.errorHistory = append(s.errorHistory, entry)
-	if len(s.errorHistory) > 1000 { s.errorHistory = s.errorHistory[len(s.errorHistory)-1000:] }
+	if len(s.errorHistory) > 1000 {
+		s.errorHistory = s.errorHistory[len(s.errorHistory)-1000:]
+	}
 }

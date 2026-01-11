@@ -10,14 +10,14 @@ import (
 // ReminderSchedulerAgent monitors time-based transitions for reminders
 // It implements the BackgroundAgent interface
 type ReminderSchedulerAgent struct {
-	id        string
-	wantName  string
+	id           string
+	wantName     string
 	reachingTime time.Time
 	eventTime    time.Time
-	ticker    *time.Ticker
-	done      chan struct{}
-	ctx       context.Context
-	cancel    context.CancelFunc
+	ticker       *time.Ticker
+	done         chan struct{}
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 // NewReminderSchedulerAgent creates a new reminder scheduler agent

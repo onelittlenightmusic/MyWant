@@ -118,7 +118,7 @@ func (s *SilencerWant) processPacket(data any) {
 	if reactionType == "internal" {
 		// Store target reaction ID for agents - use SetStateAtomic for immediate visibility
 		s.SetStateAtomic(map[string]any{"_target_reaction_id": reactionID})
-		
+
 		// If policy is all_true, trigger DoAgent for auto-approval
 		if locals.Policy == "all_true" {
 			s.Spec.Requires = []string{"reaction_auto_approval"}
@@ -133,7 +133,7 @@ func (s *SilencerWant) processPacket(data any) {
 				})
 			}
 		} else {
-			// Otherwise maybe use monitor? 
+			// Otherwise maybe use monitor?
 			// For now just log
 			s.StoreLog("[SILENCER] Policy '%s' not implemented for internal reaction type", locals.Policy)
 		}

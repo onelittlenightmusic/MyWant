@@ -19,13 +19,13 @@ func setupTestServer() *Server {
 	// Create dummy directories if they don't exist to avoid loader errors
 	os.MkdirAll("want_types", 0755)
 	os.MkdirAll("recipes", 0755)
-	
+
 	server := New(config)
 	server.setupRoutes()
-	
+
 	// Register built-in types for testing (normally done in Start)
 	types.RegisterQNetWantTypes(server.globalBuilder)
-	
+
 	return server
 }
 
@@ -38,7 +38,7 @@ func TestHealthCheck(t *testing.T) {
 	s.router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	
+
 	var resp map[string]any
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, "healthy", resp["status"])

@@ -17,10 +17,10 @@ type Config struct {
 
 // Want represents a single want definition
 type Want struct {
-	Metadata Metadata        `json:"metadata"`
-	Spec     WantSpec        `json:"spec"`
-	Status   string          `json:"status,omitempty"`
-	State    map[string]any  `json:"state,omitempty"`
+	Metadata Metadata       `json:"metadata"`
+	Spec     WantSpec       `json:"spec"`
+	Status   string         `json:"status,omitempty"`
+	State    map[string]any `json:"state,omitempty"`
 }
 
 // Metadata represents want metadata
@@ -33,7 +33,7 @@ type Metadata struct {
 
 // WantSpec represents want specification
 type WantSpec struct {
-	Params map[string]any `json:"params"`
+	Params map[string]any      `json:"params"`
 	Using  []map[string]string `json:"using,omitempty"`
 }
 
@@ -52,6 +52,7 @@ type ImportWantsResponse struct {
 	Wants   int    `json:"wants"`
 	Message string `json:"message"`
 }
+
 // ValidationResult represents validation response
 type ValidationResult struct {
 	Valid       bool                `json:"valid"`
@@ -70,11 +71,11 @@ type ValidationError struct {
 }
 
 type ValidationWarning struct {
-	WantName     string   `json:"wantName"`
-	WarningType  string   `json:"warningType"`
-	Field        string   `json:"field,omitempty"`
-	Message      string   `json:"message"`
-	Suggestion   string   `json:"suggestion,omitempty"`
+	WantName    string `json:"wantName"`
+	WarningType string `json:"warningType"`
+	Field       string `json:"field,omitempty"`
+	Message     string `json:"message"`
+	Suggestion  string `json:"suggestion,omitempty"`
 }
 
 // APIDumpResponse represents the response from list wants (dump format)
@@ -138,17 +139,6 @@ type WantTypeListResponse struct {
 	WantTypes []WantType `json:"wantTypes"`
 }
 
-type LLMRequest struct {
-	Message string `json:"message"`
-	Model   string `json:"model,omitempty"`
-}
-
-type LLMResponse struct {
-	Response  string `json:"response"`
-	Model     string `json:"model"`
-	Timestamp string `json:"timestamp"`
-}
-
 type APILogEntry struct {
 	Timestamp  string `json:"timestamp"`
 	Method     string `json:"method"`
@@ -163,4 +153,83 @@ type APILogsResponse struct {
 	Count     int           `json:"count"`
 	Logs      []APILogEntry `json:"logs"`
 	Timestamp string        `json:"timestamp"`
+}
+
+// InteractCreateResponse represents the response from creating a new session
+type InteractCreateResponse struct {
+	SessionID string    `json:"session_id"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// InteractMessageRequest represents a message sent to an interaction session
+type InteractMessageRequest struct {
+	Message string           `json:"message"`
+	Context *InteractContext `json:"context,omitempty"`
+}
+
+// InteractContext provides optional context for message processing
+type InteractContext struct {
+	PreferRecipes bool     `json:"preferRecipes"`
+	Categories    []string `json:"categories,omitempty"`
+}
+
+// InteractMessageResponse represents the response with recommendations
+type InteractMessageResponse struct {
+	Recommendations     []Recommendation      `json:"recommendations"`
+	ConversationHistory []ConversationMessage `json:"conversation_history"`
+	Timestamp           time.Time             `json:"timestamp"`
+}
+
+// ConversationMessage represents a single message in the conversation
+type ConversationMessage struct {
+	Role      string    `json:"role"` // "user" | "assistant"
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// Recommendation represents a recommended want configuration
+type Recommendation struct {
+	ID          string             `json:"id"` // rec-1, rec-2, rec-3
+	Title       string             `json:"title"`
+	Approach    string             `json:"approach"` // "recipe" | "custom" | "hybrid"
+	Description string             `json:"description"`
+	Config      Config             `json:"config"`
+	Metadata    RecommendationMeta `json:"metadata"`
+}
+
+// RecommendationMeta contains metadata about a recommendation
+type RecommendationMeta struct {
+	WantCount     int      `json:"want_count"`
+	RecipesUsed   []string `json:"recipes_used,omitempty"`
+	WantTypesUsed []string `json:"want_types_used"`
+	Complexity    string   `json:"complexity"` // "low" | "medium" | "high"
+	ProsCons      ProsCons `json:"pros_cons"`
+}
+
+// ProsCons lists pros and cons of a recommendation
+type ProsCons struct {
+	Pros []string `json:"pros"`
+	Cons []string `json:"cons"`
+}
+
+// InteractDeployRequest represents a request to deploy a recommendation
+type InteractDeployRequest struct {
+	RecommendationID string               `json:"recommendation_id"`
+	Modifications    *ConfigModifications `json:"modifications,omitempty"`
+}
+
+// ConfigModifications allows modifying a recommendation before deployment
+type ConfigModifications struct {
+	ParameterOverrides map[string]any `json:"parameterOverrides,omitempty"`
+	DisableWants       []string       `json:"disableWants,omitempty"`
+}
+
+// InteractDeployResponse represents the response from deploying a recommendation
+type InteractDeployResponse struct {
+	ExecutionID string    `json:"execution_id"`
+	WantIDs     []string  `json:"want_ids"`
+	Status      string    `json:"status"`
+	Message     string    `json:"message"`
+	Timestamp   time.Time `json:"timestamp"`
 }
