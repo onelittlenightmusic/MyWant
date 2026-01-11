@@ -19,11 +19,10 @@ func GetFileSystem(useEmbedded bool) http.FileSystem {
 			return http.Dir("web/dist")
 		}
 		return SpaFileSystem{http.FS(f)}
+	        }
+	        // 開発用：ローカルの web/dist ディレクトリを直接参照
+	        return SpaFileSystem{http.Dir("web/dist")}
 	}
-	// 開発用：ローカルの web ディレクトリを直接参照
-	return http.Dir("web")
-}
-
 // SpaFileSystem wraps a FileSystem to support SPA routing
 type SpaFileSystem struct {
 	base http.FileSystem
