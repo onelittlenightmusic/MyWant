@@ -14,22 +14,23 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
   onCancel,
   loading = false,
   title = 'Please confirm',
-  layout = 'bottom-center'
+  layout = 'bottom-center',
+  children
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const [displayMessage, setDisplayMessage] = useState<string | null>(null);
+  const [displayMessage, setDisplayMessage] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimatingRobot, setIsAnimatingRobot] = useState(false);
   const [isAnimatingBubble, setIsAnimatingBubble] = useState(false);
 
   useEffect(() => {
-    if (isVisible && message) {
-      setDisplayMessage(message);
+    if (isVisible) {
+      setDisplayMessage(true);
       setIsAnimating(true);
       setIsAnimatingRobot(false);
       setIsAnimatingBubble(false);
     }
-  }, [isVisible, message]);
+  }, [isVisible]);
 
   useEffect(() => {
     if (displayMessage && !isAnimatingRobot && !isAnimatingBubble) {
@@ -45,7 +46,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
   useEffect(() => {
     if (!isAnimating && displayMessage) {
       const fadeOutTimer = setTimeout(() => {
-        setDisplayMessage(null);
+        setDisplayMessage(false);
         onDismiss();
       }, 300);
 
@@ -136,9 +137,9 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                 <p className="text-xs font-semibold text-gray-900 inline">
                   {title}:&nbsp;
                 </p>
-                <p className="text-xs text-gray-700 inline truncate">
-                  {message ? truncateText(message, 40) : ''}
-                </p>
+                <div className="inline text-xs text-gray-700">
+                  {children || (message ? truncateText(message, 40) : '')}
+                </div>
               </div>
 
               <div className="flex gap-1 flex-shrink-0 ml-2">
@@ -183,7 +184,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             </div>
           </div>
 
-          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-md">
+          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-md min-w-[320px]">
             <div className="absolute left-0 bottom-3 transform -translate-x-2">
               <div
                 className="w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white"
@@ -191,17 +192,17 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-start gap-6">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900 mb-1">
+                <p className="text-sm font-bold text-gray-900 mb-2">
                   {title}
                 </p>
-                <p className="text-sm text-gray-600 leading-relaxed break-words">
-                  {message}
-                </p>
+                <div className="text-sm text-gray-600 leading-relaxed break-words">
+                  {children || message}
+                </div>
               </div>
 
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0 pt-1">
                 <button
                   onClick={handleCancel}
                   disabled={isLoading || loading}
@@ -244,17 +245,17 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
           'flex items-stretch gap-0 transition-all duration-300',
           (isAnimatingRobot || isAnimatingBubble) ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
         )}>
-          <div className="flex items-center justify-center flex-shrink-0 w-16 bg-blue-600 rounded-full shadow-lg">
+          <div className="flex items-center justify-center flex-shrink-0 w-16 h-16 bg-blue-600 rounded-full shadow-lg">
             <Bot className="h-9 w-9 text-white" />
           </div>
 
-          <div className="flex-1 ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex flex-col justify-center min-w-0">
+          <div className="flex-1 ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex flex-col justify-center min-w-[250px] max-w-sm">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {title}
             </p>
-            <p className="text-sm text-gray-700 truncate">
-              {truncateText(message || '', 50)}
-            </p>
+            <div className="text-sm text-gray-700">
+              {children || (message ? truncateText(message, 50) : '')}
+            </div>
           </div>
 
           <div className="flex gap-2 ml-3 h-full">

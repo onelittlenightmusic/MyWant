@@ -18,4 +18,5 @@ export interface ConfirmationProps extends BaseNotificationProps {
   onCancel: () => void;
   loading?: boolean;
   layout?: 'bottom-center' | 'inline-header' | 'dashboard-right';
+  children?: React.ReactNode;
 }
