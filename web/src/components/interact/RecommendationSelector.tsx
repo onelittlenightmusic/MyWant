@@ -52,9 +52,9 @@ export const RecommendationSelector: React.FC<RecommendationSelectorProps> = ({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 h-full flex flex-col">
       {/* Header with robot icon */}
-      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+      <div className="flex items-center gap-2 pb-2 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-600">
           <Bot className="h-5 w-5 text-white" />
         </div>
@@ -64,7 +64,7 @@ export const RecommendationSelector: React.FC<RecommendationSelectorProps> = ({
       </div>
 
       {/* Recommendation cards */}
-      <div className="space-y-2 max-h-96 overflow-y-auto">
+      <div className="space-y-2 flex-1 overflow-y-auto">
         {recommendations.map((rec, index) => (
           <button
             key={rec.id}
@@ -106,15 +106,18 @@ export const RecommendationSelector: React.FC<RecommendationSelectorProps> = ({
               <span className={getComplexityColor(rec.metadata?.complexity ?? 'medium')}>
                 Complexity: {rec.metadata?.complexity ?? 'medium'}
               </span>
-              {rec.metadata?.recipes_used && rec.metadata.recipes_used.length > 0 && (
+              {rec.metadata?.recipes_used && Array.isArray(rec.metadata.recipes_used) && rec.metadata.recipes_used.length > 0 && (
                 <span>Recipes: {rec.metadata.recipes_used.join(', ')}</span>
               )}
             </div>
 
             {/* Pros/Cons */}
-            {rec.metadata?.pros_cons && (rec.metadata.pros_cons.pros?.length > 0 || rec.metadata.pros_cons.cons?.length > 0) && (
+            {rec.metadata?.pros_cons && (
+              (Array.isArray(rec.metadata.pros_cons.pros) && rec.metadata.pros_cons.pros.length > 0) ||
+              (Array.isArray(rec.metadata.pros_cons.cons) && rec.metadata.pros_cons.cons.length > 0)
+            ) && (
               <div className="mt-3 space-y-1">
-                {rec.metadata.pros_cons.pros && rec.metadata.pros_cons.pros.length > 0 && (
+                {Array.isArray(rec.metadata.pros_cons.pros) && rec.metadata.pros_cons.pros.length > 0 && (
                   <div className="flex items-start gap-2 text-xs">
                     <CheckCircle2 className="h-3 w-3 text-green-600 mt-0.5 flex-shrink-0" />
                     <span className="text-gray-700">
@@ -122,7 +125,7 @@ export const RecommendationSelector: React.FC<RecommendationSelectorProps> = ({
                     </span>
                   </div>
                 )}
-                {rec.metadata.pros_cons.cons && rec.metadata.pros_cons.cons.length > 0 && (
+                {Array.isArray(rec.metadata.pros_cons.cons) && rec.metadata.pros_cons.cons.length > 0 && (
                   <div className="flex items-start gap-2 text-xs">
                     <AlertCircle className="h-3 w-3 text-yellow-600 mt-0.5 flex-shrink-0" />
                     <span className="text-gray-700">

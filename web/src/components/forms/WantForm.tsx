@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Plus, X, Code, Edit3, ChevronDown, Clock } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, ChevronDown, Clock, Bot } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -467,32 +467,64 @@ export const WantForm: React.FC<WantFormProps> = ({
         {editMode === 'form' ? (
           <>
             {/* Type/Recipe Selector or Recommendation Selector */}
-            <div className={classNames(!selectedTypeId && !isRecommendationMode ? "flex-1 min-h-0 flex flex-col" : "flex-shrink-0")}>
-              {isRecommendationMode ? (
-                /* Recommendation Selector */
-                <RecommendationSelector
-                  recommendations={recommendations}
-                  selectedId={selectedRecId}
-                  onSelect={(rec) => {
-                    setSelectedRecId(rec.id);
-                    onRecommendationSelect?.(rec);
+            {!selectedTypeId && (
+              <div className="flex-1 min-h-0 flex flex-col">
+                {isRecommendationMode ? (
+                  selectedRecId && selectedRecommendation ? (
+                    /* Collapsed view - show selected recommendation with Change button */
+                    <div className="flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRecId(null);
+                          setSelectedTypeId(null);
+                          setType('');
+                          setName('');
+                          setParams({});
+                          setLabels({});
+                          setUsing([]);
+                          setWhen([]);
+                        }}
+                        className="w-full flex items-center justify-between p-4 bg-white border-2 border-blue-300 rounded-lg hover:border-blue-400 transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Bot className="w-5 h-5 text-blue-500" />
+                          <div className="text-left">
+                            <h4 className="font-medium text-gray-900">{selectedRecommendation.title}</h4>
+                            <p className="text-xs text-gray-600 mt-1">{selectedRecommendation.approach}</p>
+                          </div>
+                        </div>
+                        <span className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-100 text-blue-700 transition-colors">
+                          Change
+                        </span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* Recommendation Selector */
+                    <RecommendationSelector
+                      recommendations={recommendations}
+                      selectedId={selectedRecId}
+                      onSelect={(rec) => {
+                        setSelectedRecId(rec.id);
+                        onRecommendationSelect?.(rec);
 
-                    // Auto-populate form from recommendation
-                    // The first want in the recommendation's config will be used as the primary want
-                    if (rec.config.wants && rec.config.wants.length > 0) {
-                      const firstWant = rec.config.wants[0];
-                      // Populate form fields from the first want
-                      setName(firstWant.metadata?.name || '');
-                      setType(firstWant.metadata?.type || '');
-                      setLabels(firstWant.metadata?.labels || {});
-                      setParams(firstWant.spec?.params || {});
-                      setUsing(firstWant.spec?.using || []);
-                      setWhen(firstWant.spec?.when || []);
-                      setSelectedTypeId(firstWant.metadata?.type || null);
-                    }
-                  }}
-                />
-              ) : (
+                        // Auto-populate form from recommendation
+                        // The first want in the recommendation's config will be used as the primary want
+                        if (rec.config && rec.config.wants && rec.config.wants.length > 0) {
+                          const firstWant = rec.config.wants[0];
+                          // Populate form fields from the first want
+                          setName(firstWant.metadata?.name || '');
+                          setType(firstWant.metadata?.type || '');
+                          setLabels(firstWant.metadata?.labels || {});
+                          setParams(firstWant.spec?.params || {});
+                          setUsing(firstWant.spec?.using || []);
+                          setWhen(firstWant.spec?.when || []);
+                          setSelectedTypeId(firstWant.metadata?.type || null);
+                        }
+                      }}
+                    />
+                  )
+                ) : (
                 /* Normal Type/Recipe Selector */
                 <>
                   {!selectedTypeId && (
@@ -536,8 +568,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                     }}
                   />
                 </>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Show fields only when a want type or recipe is selected */}
             {selectedTypeId && (

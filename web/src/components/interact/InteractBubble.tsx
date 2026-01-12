@@ -14,6 +14,7 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   disabled = false
 }) => {
   const [message, setMessage] = useState('');
+  const [isComposing, setIsComposing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const placeholders = [
@@ -41,10 +42,19 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Ignore Enter key press during IME composition (Japanese input)
+    if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
   };
 
   return (
@@ -79,6 +89,8 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               placeholder={placeholders[placeholderIndex]}
               disabled={disabled}
               className={classNames(
