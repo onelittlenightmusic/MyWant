@@ -190,6 +190,52 @@ Steps:
 2. Extract the message ID from the response
 3. Return ONLY a JSON object with: {"status":"sent","messageId":"..."}`, to, subject, body)
 
+	case "google_search":
+		query := params["query"].(string)
+		return fmt.Sprintf(`Please use the available search tools (like Google Search MCP) to find the latest information on the following topic.
+
+Query: "%s"
+
+Steps:
+1. Search for the query
+2. Extract key findings, dates, and source URLs
+3. Synthesize the findings into a list of "facts"
+4. Return ONLY a JSON object with a "facts" array, where each fact has "text", "date", and "url"
+
+Example output format:
+{"facts": [{"text": "Fact description", "date": "2025-01-01", "url": "https://..."}]}
+`, query)
+
+	case "knowledge_synthesize":
+		topic := params["topic"].(string)
+		existingContent := params["existing_content"].(string)
+		newFacts := params["new_facts"].(string)
+		depth := params["depth"].(string)
+
+		return fmt.Sprintf(`You are a knowledge synthesizer. Your task is to update a Markdown document with new information.
+
+TOPIC: %s
+DEPTH: %s
+
+EXISTING CONTENT:
+"""
+%s
+"""
+
+NEW FACTS TO INTEGRATE:
+"""
+%s
+"""
+
+INSTRUCTIONS:
+1. Review the existing content and new facts.
+2. If the new facts are already covered, maintain the existing content but perhaps improve clarity.
+3. If there are new facts, integrate them into the appropriate sections or create new sections.
+4. Use professional Markdown formatting (headers, lists, etc.).
+5. Include a "Sources" section at the end with URLs if provided.
+6. The output should be the COMPLETE Markdown document.
+7. Return ONLY the Markdown content, nothing else.`, topic, depth, existingContent, newFacts)
+
 	case "interact_recommend":
 		message := params["message"].(string)
 		conversationHistory := ""
@@ -318,7 +364,10 @@ func parseGooseResponse(output string) (interface{}, error) {
 	var isArray bool
 
 	if objIdx == -1 && arrIdx == -1 {
-		return nil, fmt.Errorf("no JSON found in response")
+		// No JSON found at all, return the whole output as text
+		return map[string]interface{}{
+			"text": output,
+		}, nil
 	} else if arrIdx != -1 && (objIdx == -1 || arrIdx < objIdx) {
 		// Array comes first (or object not found)
 		startIdx = arrIdx
@@ -362,7 +411,12 @@ func parseGooseResponse(output string) (interface{}, error) {
 						if content, ok := contentArr[0].(map[string]interface{}); ok {
 							if text, ok := content["text"].(string); ok {
 								// Try to extract JSON from the assistant's text response
-								return extractJSONFromText(text)
+								result, err := extractJSONFromText(text)
+								if err == nil {
+									return result, nil
+								}
+								// If extraction failed, return text as is
+								return map[string]interface{}{"text": text}, nil
 							}
 						}
 					}
@@ -399,7 +453,10 @@ func parseGooseResponse(output string) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("failed to parse JSON response")
+	// If all JSON parsing attempts failed, fall back to returning the whole output as text
+	return map[string]interface{}{
+		"text": output,
+	}, nil
 }
 
 // extractJSONFromText tries to extract JSON data from text content

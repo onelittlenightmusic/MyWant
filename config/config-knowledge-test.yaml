@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: my-ai-notes
+      type: knowledge
+    spec:
+      params:
+        topic: "Latest developments in Model Context Protocol (MCP) and AI Agents"
+        output_path: "notes/ai_mcp_updates.md"
+        refresh_interval: "1h"
+        depth: "comprehensive"

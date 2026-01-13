@@ -1,0 +1,74 @@
+wantType:
+  metadata:
+    name: knowledge
+    title: Knowledge Freshness Tracker
+    description: 'Maintains a Markdown file with the latest information on a specific topic.
+      Automatically searches for updates and synthesizes them into the document.
+      Essentially Ansible for knowledge - ensuring your notes reflect the latest reality.
+      '
+    version: '1.0'
+    category: information
+    pattern: independent
+  parameters:
+  - name: topic
+    description: The specific topic to track and summarize
+    type: string
+    required: true
+    example: "Generative AI Agent frameworks and MCP protocols"
+  - name: output_path
+    description: Local path to the Markdown file to maintain
+    type: string
+    required: true
+    example: "notes/ai_agents.md"
+  - name: depth
+    description: Detail level of the generated notes (basic, comprehensive)
+    type: string
+    default: comprehensive
+    validation:
+      enum:
+      - basic
+      - comprehensive
+  - name: refresh_interval
+    description: Minimum time between update checks
+    type: string
+    default: "24h"
+  state:
+  - name: last_sync_time
+    description: Last time the information was successfully updated
+    type: string
+    persistent: true
+    initialValue: ''
+  - name: content_hash
+    description: Hash of the file content to detect external changes
+    type: string
+    persistent: true
+    initialValue: ''
+  - name: knowledge_status
+    description: Current state of information (fresh, stale, updating)
+    type: string
+    persistent: true
+    initialValue: 'stale'
+  - name: discovered_updates
+    description: Temporary storage for new information found by monitor
+    type: array
+    persistent: false
+    initialValue: []
+  agents:
+  - name: KnowledgeMonitor
+    role: monitor
+    description: Searches the web for new information and compares with existing notes
+  - name: KnowledgeUpdater
+    role: action
+    description: Synthesizes new knowledge and updates the Markdown file
+  examples:
+  - name: AI News Tracker
+    description: Track latest news on AI Agents
+    want:
+      metadata:
+        name: ai-agent-tracker
+        type: knowledge
+      spec:
+        params:
+          topic: "Vite and React performance optimization"
+          output_path: "notes/web_dev.md"
+          refresh_interval: "12h"

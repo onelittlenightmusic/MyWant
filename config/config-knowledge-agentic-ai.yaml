@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: agentic-ai-foundation-tracker
+      type: knowledge
+    spec:
+      params:
+        topic: "Agentic AI Foundation latest news, organization updates, and roadmap"
+        output_path: "notes/agentic_ai_foundation.md"
+        refresh_interval: "1h"
+        depth: "comprehensive"

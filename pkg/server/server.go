@@ -104,6 +104,9 @@ func New(config Config) *Server {
 		log.Printf("[SERVER] Warning: Failed to register user reaction do agent: %v\n", err)
 	}
 
+	// Register knowledge management agent
+	types.RegisterKnowledgeAgents(agentRegistry)
+
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
 	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))
@@ -159,6 +162,7 @@ func (s *Server) Start() error {
 	types.RegisterReminderWantType(s.globalBuilder)
 	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
+	types.RegisterKnowledgeWantType(s.globalBuilder)
 	types.RegisterFlightMockServerWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
