@@ -164,6 +164,7 @@ func (s *Server) Start() error {
 	types.RegisterGmailWantType(s.globalBuilder)
 	types.RegisterKnowledgeWantType(s.globalBuilder)
 	types.RegisterFlightMockServerWantType(s.globalBuilder)
+	types.RegisterDraftWantType(s.globalBuilder)
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)

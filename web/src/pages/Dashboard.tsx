@@ -1255,7 +1255,7 @@ export const Dashboard: React.FC = () => {
             {/* Want Grid with integrated draft cards */}
             <div>
               <WantGrid
-                wants={wants}
+                wants={regularWants}
                 drafts={drafts}
                 activeDraftId={activeDraftId}
                 onDraftClick={handleDraftClick}

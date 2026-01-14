@@ -1,0 +1,82 @@
+wantType:
+  metadata:
+    name: draft
+    title: Draft Want
+    description: |
+      A temporary, persisted want representing a work-in-progress solution or a user request
+      waiting for recommendations to be generated and reviewed.
+
+      Draft wants are used by the interactive interface to store session state,
+      original messages, and AI-generated recommendations in the backend so they
+      survive browser restarts.
+
+      Once a recommendation from a draft is deployed, the draft is typically deleted.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters: {}
+
+  state:
+  - name: sessionId
+    description: The interactive session ID associated with this draft
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'sess-abc123'
+
+  - name: message
+    description: The user's original message that started this draft
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'リマインダがほしい'
+
+  - name: recommendations
+    description: Array of AI-generated recommendations (JSON)
+    type: array
+    persistent: true
+    initialValue: []
+    example: '[{"id": "rec-1", "title": "Example", "config": {"wants": []}}]'
+
+  - name: isThinking
+    description: Whether the AI is still generating recommendations
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+
+  - name: error
+    description: Error message if recommendation generation failed
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'AI service unavailable'
+
+  - name: createdAt
+    description: When the draft was created
+    type: string
+    persistent: true
+    initialValue: ''
+    example: '2026-01-14T07:38:06Z'
+
+  examples:
+  - name: Simple Draft
+    description: A draft want for a reminder request
+    expectedBehavior: |
+      1. Draft created when user sends message
+      2. AI generates recommendations and updates state.recommendations
+      3. User reviews recommendations in the dashboard
+      4. Deployment deletes this draft
+    want:
+      metadata:
+        name: draft_reminder
+        type: draft
+        labels:
+          __draft: "true"
+      spec:
+        params: {}
+      state:
+        sessionId: "sess-123"
+        message: "リマインダがほしい"
+        isThinking: true
