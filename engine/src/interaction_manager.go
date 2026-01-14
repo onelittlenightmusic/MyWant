@@ -311,8 +311,11 @@ func parseRecommendationsFromGoose(result interface{}) ([]Recommendation, error)
 		return nil, fmt.Errorf("no recommendations found in result")
 	}
 
+	// Fix "using" field format before unmarshaling
+	fixedRecsInterface := fixUsingFieldFormat(recsInterface)
+
 	// Convert to JSON and back to parse properly
-	recsJSON, err := json.Marshal(recsInterface)
+	recsJSON, err := json.Marshal(fixedRecsInterface)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal recommendations: %w", err)
 	}
@@ -323,6 +326,52 @@ func parseRecommendationsFromGoose(result interface{}) ([]Recommendation, error)
 	}
 
 	return recommendations, nil
+}
+
+// fixUsingFieldFormat recursively fixes "using" field format in recommendations
+// Converts object {"key": "value"} to array [{"key": "value"}]
+func fixUsingFieldFormat(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		// Recursively fix nested maps
+		fixed := make(map[string]interface{})
+		for key, val := range v {
+			if key == "using" {
+				// Fix the "using" field
+				fixed[key] = normalizeUsingField(val)
+			} else {
+				fixed[key] = fixUsingFieldFormat(val)
+			}
+		}
+		return fixed
+	case []interface{}:
+		// Recursively fix array elements
+		fixed := make([]interface{}, len(v))
+		for i, item := range v {
+			fixed[i] = fixUsingFieldFormat(item)
+		}
+		return fixed
+	default:
+		return data
+	}
+}
+
+// normalizeUsingField ensures "using" is an array of maps
+func normalizeUsingField(val interface{}) interface{} {
+	switch v := val.(type) {
+	case map[string]interface{}:
+		// Single object -> wrap in array
+		return []interface{}{v}
+	case []interface{}:
+		// Already an array, return as is
+		return v
+	case nil:
+		// Null -> return empty array
+		return []interface{}{}
+	default:
+		// Unknown type, return empty array
+		return []interface{}{}
+	}
 }
 
 // GetSession retrieves an existing session

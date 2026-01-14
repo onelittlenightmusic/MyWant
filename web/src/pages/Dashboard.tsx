@@ -11,6 +11,7 @@ import { classNames, truncateText } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 import { apiClient } from '@/api/client';
 import { Recommendation, ConfigModifications } from '@/types/interact';
+import { DraftWant, wantToDraft, isDraftWant } from '@/types/draft';
 
 // Components
 import { Layout } from '@/components/layout/Layout';
@@ -87,12 +88,31 @@ export const Dashboard: React.FC = () => {
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
 
-  // Interact state
-  const [interactSessionId, setInteractSessionId] = useState<string | null>(null);
-  const [isInteractThinking, setIsInteractThinking] = useState(false);
+  // Draft state - drafts are now stored in backend and extracted from wants list
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [deleteDraftState, setDeleteDraftState] = useState<DraftWant | null>(null);
+  const [showDeleteDraftConfirmation, setShowDeleteDraftConfirmation] = useState(false);
+
+  // Extract draft wants from the wants list (stored in backend for persistence)
+  const drafts = useMemo(() => {
+    return wants
+      .filter(isDraftWant)
+      .map(wantToDraft)
+      .filter((d): d is DraftWant => d !== null);
+  }, [wants]);
+
+  // Filter out draft wants from regular wants for display
+  const regularWants = useMemo(() => {
+    return wants.filter(w => !isDraftWant(w));
+  }, [wants]);
+
+  // Interact state (each draft has its own session for parallel processing)
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [showRecommendationForm, setShowRecommendationForm] = useState(false);
+
+  // Compute if any draft is thinking (for display only, doesn't disable input)
+  const hasThinkingDraft = drafts.some(d => d.isThinking);
 
   // Helper function to show notification message
   const showNotification = (message: string) => {
@@ -223,25 +243,7 @@ export const Dashboard: React.FC = () => {
     }
   }, [error, clearError]);
 
-  // Create interact session on mount, cleanup on unmount
-  useEffect(() => {
-    const initSession = async () => {
-      try {
-        const session = await apiClient.createInteractSession();
-        setInteractSessionId(session.session_id);
-      } catch (error) {
-        console.error('Failed to create interact session:', error);
-      }
-    };
-    initSession();
-
-    // Cleanup on unmount
-    return () => {
-      if (interactSessionId) {
-        apiClient.deleteInteractSession(interactSessionId).catch(console.error);
-      }
-    };
-  }, []);
+  // No longer needed: Each draft creates its own session for parallel processing
 
   // Multi-select handlers
   const handleToggleSelectMode = () => {
@@ -338,14 +340,40 @@ export const Dashboard: React.FC = () => {
 
   // Interact handlers
   const handleInteractSubmit = async (message: string) => {
-    if (!interactSessionId) {
-      showNotification('Session not ready. Please try again.');
+    // Create a new session for each draft to enable parallel recommendations
+    let draftSessionId: string;
+    try {
+      const session = await apiClient.createInteractSession();
+      draftSessionId = session.session_id;
+    } catch (error) {
+      console.error('Failed to create session for draft:', error);
+      showNotification('Failed to create session. Please try again.');
       return;
     }
 
-    setIsInteractThinking(true);
+    // Create draft in backend for persistence (survives browser refresh)
+    let draftId: string;
     try {
-      const response = await apiClient.sendInteractMessage(interactSessionId, {
+      const draftWant = await apiClient.createDraftWant({
+        sessionId: draftSessionId,
+        message,
+        isThinking: true,
+      });
+      draftId = draftWant.id || draftWant.metadata?.id || '';
+      console.log('[DEBUG] Draft created in backend:', draftId);
+    } catch (error) {
+      console.error('Failed to create draft in backend:', error);
+      showNotification('Failed to create draft. Please try again.');
+      return;
+    }
+
+    setActiveDraftId(draftId);
+
+    // Refresh wants to show the new draft
+    await fetchWants();
+
+    try {
+      const response = await apiClient.sendInteractMessage(draftSessionId, {
         message
       });
 
@@ -358,9 +386,20 @@ export const Dashboard: React.FC = () => {
 
       if (response.recommendations.length === 0) {
         showNotification('No recommendations returned. Please try a different request.');
-        setIsInteractThinking(false);
+        // Update draft in backend to not thinking state
+        await apiClient.updateDraftWant(draftId, { isThinking: false });
+        await fetchWants();
         return;
       }
+
+      // Update draft in backend with recommendations
+      await apiClient.updateDraftWant(draftId, {
+        recommendations: response.recommendations,
+        isThinking: false,
+      });
+
+      // Refresh wants to get updated draft
+      await fetchWants();
 
       setRecommendations(response.recommendations);
       setShowRecommendationForm(true);
@@ -369,11 +408,19 @@ export const Dashboard: React.FC = () => {
     } catch (error: any) {
       console.error('Interact error:', error);
       showNotification(`Failed to get recommendations: ${error.message}`);
+      // Update draft in backend with error
+      try {
+        await apiClient.updateDraftWant(draftId, {
+          error: error.message,
+          isThinking: false,
+        });
+        await fetchWants();
+      } catch (updateError) {
+        console.error('Failed to update draft with error:', updateError);
+      }
       // Reset state on error
       setRecommendations([]);
       setShowRecommendationForm(false);
-    } finally {
-      setIsInteractThinking(false);
     }
   };
 
@@ -381,21 +428,85 @@ export const Dashboard: React.FC = () => {
     setSelectedRecommendation(rec);
   };
 
+  // Draft handlers
+  const handleDraftClick = (draft: DraftWant) => {
+    // Set this draft as active
+    setActiveDraftId(draft.id);
+
+    // Restore recommendations and sidebar state
+    if (draft.recommendations.length > 0) {
+      setRecommendations(draft.recommendations);
+      setSelectedRecommendation(draft.selectedRecommendation);
+      setShowRecommendationForm(true);
+      setEditingWant(null);
+      sidebar.openForm();
+    }
+  };
+
+  const handleDraftDelete = (draft: DraftWant) => {
+    setDeleteDraftState(draft);
+    setShowDeleteDraftConfirmation(true);
+  };
+
+  const handleDeleteDraftConfirm = async () => {
+    if (!deleteDraftState) return;
+
+    try {
+      // Delete draft from backend
+      await apiClient.deleteDraftWant(deleteDraftState.id);
+
+      // If this was the active draft, clear related state
+      if (activeDraftId === deleteDraftState.id) {
+        setActiveDraftId(null);
+        setRecommendations([]);
+        setSelectedRecommendation(null);
+        setShowRecommendationForm(false);
+        sidebar.closeForm();
+      }
+
+      // Refresh wants to remove the draft from list
+      await fetchWants();
+    } catch (error) {
+      console.error('Failed to delete draft:', error);
+      showNotification('Failed to delete draft');
+    }
+
+    setShowDeleteDraftConfirmation(false);
+    setDeleteDraftState(null);
+  };
+
+  const handleDeleteDraftCancel = () => {
+    setShowDeleteDraftConfirmation(false);
+    setDeleteDraftState(null);
+  };
+
   const handleRecommendationDeploy = async (
     recId: string,
     modifications?: ConfigModifications
   ) => {
-    if (!interactSessionId) return;
+    // Get session ID from active draft
+    const activeDraft = drafts.find(d => d.id === activeDraftId);
+    if (!activeDraft) return;
 
     try {
-      const response = await apiClient.deployRecommendation(interactSessionId, {
+      const response = await apiClient.deployRecommendation(activeDraft.sessionId, {
         recommendation_id: recId,
         modifications
       });
 
       showNotification(`Deployed ${response.want_ids.length} want(s) successfully!`);
 
-      // Refresh wants list
+      // Delete the draft from backend after successful deployment
+      if (activeDraftId) {
+        try {
+          await apiClient.deleteDraftWant(activeDraftId);
+        } catch (deleteError) {
+          console.error('Failed to delete draft after deployment:', deleteError);
+        }
+        setActiveDraftId(null);
+      }
+
+      // Refresh wants list (will remove draft and show new wants)
       await fetchWants();
 
       // Close form and clear state
@@ -1040,7 +1151,7 @@ export const Dashboard: React.FC = () => {
         showSelectMode={isSelectMode}
         onToggleSelectMode={handleToggleSelectMode}
         onInteractSubmit={handleInteractSubmit}
-        isInteractThinking={isInteractThinking}
+        isInteractThinking={hasThinkingDraft}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -1058,37 +1169,44 @@ export const Dashboard: React.FC = () => {
         }}
       >
         {/* Confirmation Notification - Dashboard Right Layout */}
-        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation) && (
+        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
           <ConfirmationBubble
             message={
               showDeleteConfirmation
                 ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
+                : showDeleteDraftConfirmation
+                ? (deleteDraftState ? `ドラフト「${deleteDraftState.message}」を削除しますか？` : null)
                 : showBatchConfirmation
                 ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
                 : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
             }
-            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation}
+            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
             onDismiss={() => {
               setShowDeleteConfirmation(false);
               setShowReactionConfirmation(false);
               setShowBatchConfirmation(false);
+              setShowDeleteDraftConfirmation(false);
             }}
             onConfirm={
-              showDeleteConfirmation 
-                ? handleDeleteWantConfirm 
-                : showBatchConfirmation 
-                ? handleBatchConfirm 
+              showDeleteConfirmation
+                ? handleDeleteWantConfirm
+                : showDeleteDraftConfirmation
+                ? handleDeleteDraftConfirm
+                : showBatchConfirmation
+                ? handleBatchConfirm
                 : handleReactionConfirm
             }
             onCancel={
-              showDeleteConfirmation 
-                ? handleDeleteWantCancel 
-                : showBatchConfirmation 
-                ? handleBatchCancel 
+              showDeleteConfirmation
+                ? handleDeleteWantCancel
+                : showDeleteDraftConfirmation
+                ? handleDeleteDraftCancel
+                : showBatchConfirmation
+                ? handleBatchCancel
                 : handleReactionCancel
             }
             loading={isDeletingWant || isSubmittingReaction || isBatchProcessing}
-            title={showDeleteConfirmation ? "Delete Want" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
+            title={showDeleteConfirmation ? "Delete Want" : showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
             layout="dashboard-right"
           />
         )}
@@ -1134,10 +1252,14 @@ export const Dashboard: React.FC = () => {
             </div>
           )}
 
-            {/* Want Grid */}
+            {/* Want Grid with integrated draft cards */}
             <div>
               <WantGrid
                 wants={wants}
+                drafts={drafts}
+                activeDraftId={activeDraftId}
+                onDraftClick={handleDraftClick}
+                onDraftDelete={handleDraftDelete}
                 loading={loading}
                 searchQuery={searchQuery}
                 statusFilters={statusFilters}

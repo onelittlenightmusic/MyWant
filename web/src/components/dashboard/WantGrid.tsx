@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { Want, WantExecutionStatus } from '@/types/want';
+import { DraftWant } from '@/types/draft';
 import { WantCard } from './WantCard';
+import { DraftWantCard } from './DraftWantCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { classNames } from '@/utils/helpers';
 
@@ -10,6 +12,10 @@ interface WantWithChildren extends Want {
 
 interface WantGridProps {
   wants: Want[];
+  drafts?: DraftWant[];
+  activeDraftId?: string | null;
+  onDraftClick?: (draft: DraftWant) => void;
+  onDraftDelete?: (draft: DraftWant) => void;
   loading: boolean;
   searchQuery: string;
   statusFilters: WantExecutionStatus[];
@@ -35,6 +41,10 @@ interface WantGridProps {
 
 export const WantGrid: React.FC<WantGridProps> = ({
   wants,
+  drafts = [],
+  activeDraftId,
+  onDraftClick,
+  onDraftDelete,
   loading,
   searchQuery,
   statusFilters,
@@ -57,6 +67,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   selectedWantIds = new Set(),
   onSelectWant
 }) => {
+  console.log('[DEBUG WantGrid] Received drafts:', drafts);
+
   const hierarchicalWants = useMemo(() => {
     // First, build a map of all wants by name for efficient lookup
     const wantsByName = new Map<string, Want>();
@@ -157,7 +169,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }, [filteredWants, onGetFilteredWants]);
 
   // Calculate non-internal wants count (exclude internal wants prefixed with __)
-  const hasUserWants = hierarchicalWants.length > 0;
+  // Include drafts in the check so we show the grid if either exists
+  const hasUserWants = hierarchicalWants.length > 0 || drafts.length > 0;
 
   if (loading && !hasUserWants) {
     return (
@@ -201,7 +214,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
     );
   }
 
-  if (filteredWants.length === 0) {
+  if (filteredWants.length === 0 && drafts.length === 0) {
     return (
       <div className="text-center py-16">
         <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -278,7 +291,19 @@ export const WantGrid: React.FC<WantGridProps> = ({
         );
       })}
 
-      {/* Add Want Card - appears after last want */}
+      {/* Draft Want Cards - appear after regular wants */}
+      {drafts.map((draft) => (
+        <div key={draft.id}>
+          <DraftWantCard
+            draft={draft}
+            selected={activeDraftId === draft.id}
+            onClick={() => onDraftClick?.(draft)}
+            onDelete={() => onDraftDelete?.(draft)}
+          />
+        </div>
+      ))}
+
+      {/* Add Want Card - appears after drafts */}
       <button
         onClick={onCreateWant}
         className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[200px]"

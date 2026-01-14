@@ -38,6 +38,11 @@ import {
   InteractDeployRequest,
   InteractDeployResponse,
 } from '@/types/interact';
+import {
+  CreateDraftWantData,
+  UpdateDraftWantData,
+  DRAFT_WANT_LABEL,
+} from '@/types/draft';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -349,6 +354,58 @@ class MyWantApiClient {
 
   async deleteInteractSession(sessionId: string): Promise<void> {
     await this.client.delete(`/api/v1/interact/${sessionId}`);
+  }
+
+  // Draft want management
+  // Draft wants are regular wants with special labels, stored in backend for persistence
+
+  async createDraftWant(data: CreateDraftWantData): Promise<Want> {
+    const draftId = `draft-${Date.now()}`;
+    const want = {
+      metadata: {
+        id: draftId,
+        name: `Draft: ${data.message.substring(0, 30)}${data.message.length > 30 ? '...' : ''}`,
+        type: 'draft',
+        labels: {
+          [DRAFT_WANT_LABEL]: 'true',
+        },
+      },
+      spec: {
+        params: {},
+      },
+      state: {
+        sessionId: data.sessionId,
+        message: data.message,
+        recommendations: data.recommendations || [],
+        isThinking: data.isThinking ?? true,
+        error: data.error,
+        createdAt: new Date().toISOString(),
+      },
+    };
+
+    const response = await this.client.post('/api/v1/wants', want);
+    return response.data;
+  }
+
+  async updateDraftWant(id: string, updates: UpdateDraftWantData): Promise<Want> {
+    // First get the current want
+    const current = await this.getWant(id);
+
+    // Merge updates into state
+    const updatedWant = {
+      ...current,
+      state: {
+        ...current.state,
+        ...updates,
+      },
+    };
+
+    const response = await this.client.put(`/api/v1/wants/${id}`, updatedWant);
+    return response.data;
+  }
+
+  async deleteDraftWant(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/wants/${id}`);
   }
 }
 

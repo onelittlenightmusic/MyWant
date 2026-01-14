@@ -35,7 +35,8 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   }, []);
 
   const handleSubmit = () => {
-    if (message.trim() && !isThinking && !disabled) {
+    // Allow submission even when thinking (for parallel draft creation)
+    if (message.trim() && !disabled) {
       onSubmit(message.trim());
       setMessage('');
     }
@@ -76,40 +77,40 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
           <div className="absolute top-[1px] left-[2px] w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-white" />
         </div>
 
-        {isThinking ? (
-          <span className="text-gray-600 text-sm font-medium animate-pulse">
-            Thinking<span className="inline-block w-3">...</span>
-          </span>
-        ) : (
-          <>
-            <input
-              ref={inputRef}
-              data-interact-input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-              placeholder={placeholders[placeholderIndex]}
-              disabled={disabled}
-              className={classNames(
-                'bg-transparent border-none outline-none',
-                'text-sm placeholder-gray-400',
-                'w-64 focus:ring-0'
-              )}
-            />
-            {message && (
-              <button
-                onClick={handleSubmit}
-                disabled={disabled}
-                className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
-              >
-                <Send className="h-4 w-4" />
-              </button>
+        {/* Always show input field for parallel draft creation */}
+        <>
+          {isThinking && (
+            <span className="text-gray-600 text-xs animate-pulse mr-2">
+              処理中...
+            </span>
+          )}
+          <input
+            ref={inputRef}
+            data-interact-input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
+            placeholder={placeholders[placeholderIndex]}
+            disabled={disabled}
+            className={classNames(
+              'bg-transparent border-none outline-none',
+              'text-sm placeholder-gray-400',
+              'w-64 focus:ring-0'
             )}
-          </>
-        )}
+          />
+          {message && (
+            <button
+              onClick={handleSubmit}
+              disabled={disabled}
+              className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+        </>
       </div>
     </div>
   );
