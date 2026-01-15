@@ -38,8 +38,9 @@ func (d *DraftWant) CalculateAchievingPercentage() int {
 
 // RegisterDraftWantType registers the DraftWant type with the ChainBuilder from YAML
 func RegisterDraftWantType(builder *ChainBuilder) {
+	InfoLog("[INFO] Registering draft want type")
 	// Register the factory for the "draft" type
-	builder.RegisterWantTypeFromYAML("draft", func(metadata Metadata, spec WantSpec) Progressable {
+	err := builder.RegisterWantTypeFromYAML("draft", func(metadata Metadata, spec WantSpec) Progressable {
 		want := &Want{
 			Metadata: metadata,
 			Spec:     spec,
@@ -48,4 +49,9 @@ func RegisterDraftWantType(builder *ChainBuilder) {
 		want.Init()
 		return NewDraftWant(want)
 	}, "want_types/system/draft.yaml")
+	if err != nil {
+		ErrorLog("[ERROR] Failed to register draft want type: %v", err)
+	} else {
+		InfoLog("[INFO] Successfully registered draft want type")
+	}
 }

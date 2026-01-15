@@ -88,7 +88,7 @@ func (a *KnowledgeAgent) update(ctx context.Context, want *mywant.Want) error {
 	topic := want.Spec.Params["topic"].(string)
 	path := want.Spec.Params["output_path"].(string)
 	depth := want.Spec.Params["depth"].(string)
-	
+
 	updates, _ := want.GetState("discovered_updates")
 	updatesJSON, _ := json.MarshalIndent(updates, "", "  ")
 
@@ -109,10 +109,10 @@ func (a *KnowledgeAgent) update(ctx context.Context, want *mywant.Want) error {
 
 	// 2. Synthesize new content
 	synthResult, err := goose.ExecuteViaGoose(ctx, "knowledge_synthesize", map[string]interface{}{
-		"topic": topic,
+		"topic":            topic,
 		"existing_content": existingContent,
-		"new_facts": string(updatesJSON),
-		"depth": depth,
+		"new_facts":        string(updatesJSON),
+		"depth":            depth,
 	})
 	if err != nil {
 		return fmt.Errorf("synthesis failed: %w", err)
@@ -146,7 +146,7 @@ func (a *KnowledgeAgent) update(ctx context.Context, want *mywant.Want) error {
 	want.StoreState("knowledge_status", "fresh")
 	want.StoreState("last_sync_time", time.Now().Format(time.RFC3339))
 	want.StoreState("discovered_updates", nil) // Clear temporary data
-	
+
 	return nil
 }
 
@@ -169,6 +169,6 @@ func RegisterKnowledgeAgents(registry *mywant.AgentRegistry) {
 	// Register agent
 	agent := NewKnowledgeAgent()
 	registry.RegisterAgent(agent)
-	
+
 	fmt.Printf("[AGENT] KnowledgeAgent registered\n")
 }

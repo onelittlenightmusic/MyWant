@@ -180,9 +180,14 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	wantID := vars["id"]
 	groupBy := r.URL.Query().Get("groupBy")
 
-	for _, execution := range s.wants {
+	log.Printf("[DEBUG] getWant: Looking for want ID: %s\n", wantID)
+
+	// 1. Search in runtime wants across all executions
+	for i, execution := range s.wants {
+		// First try searching in the builder's internal state
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
+				log.Printf("[DEBUG] getWant: Found %s in runtime of execution %s\n", wantID, i)
 				wantCopy := &mywant.Want{
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
@@ -201,10 +206,27 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+
+		// Fallback: If not in runtime yet, check the execution's config wants
+		for j, want := range execution.Config.Wants {
+			if want.Metadata.ID == wantID {
+				log.Printf("[DEBUG] getWant: Found %s in config of execution %s at index %d\n", wantID, i, j)
+				// Return the config version (it's not running yet, so no status/history)
+				if groupBy != "" {
+					response := buildWantResponse(want, groupBy)
+					json.NewEncoder(w).Encode(response)
+					return
+				}
+				json.NewEncoder(w).Encode(want)
+				return
+			}
+		}
 	}
 
+	// 2. Search in global builder (runtime and config)
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			log.Printf("[DEBUG] getWant: Found %s in globalBuilder\n", wantID)
 			wantCopy := &mywant.Want{
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
@@ -224,6 +246,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Printf("[DEBUG] getWant: Want %s NOT FOUND in %d executions or globalBuilder\n", wantID, len(s.wants))
 	http.Error(w, "Want not found", http.StatusNotFound)
 }
 
@@ -252,6 +275,20 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 				}
 				break
 			}
+		}
+
+		// Fallback: search in config wants directly
+		for j, configWant := range execution.Config.Wants {
+			if configWant.Metadata.ID == wantID {
+				log.Printf("[API:UPDATE] Found want in config of execution %s\n", i)
+				targetExecution = execution
+				foundWant = configWant
+				targetWantIndex = j
+				break
+			}
+		}
+		if foundWant != nil {
+			break
 		}
 	}
 

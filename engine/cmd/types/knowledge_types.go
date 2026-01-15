@@ -67,7 +67,7 @@ func (k *KnowledgeWant) Initialize() {
 	locals.RefreshInterval = interval
 
 	k.Locals = locals
-	
+
 	// Initial state setup
 	if _, exists := k.GetState("knowledge_status"); !exists {
 		k.StoreState("knowledge_status", "stale")
@@ -127,7 +127,7 @@ func (k *KnowledgeWant) Progress() {
 	}
 
 	status, _ := k.GetState("knowledge_status")
-	
+
 	if status == "stale" {
 		k.runMonitor()
 	} else if status == "updating" {
@@ -157,7 +157,7 @@ func (k *KnowledgeWant) shouldRefresh() bool {
 func (k *KnowledgeWant) runMonitor() {
 	k.StoreLog("[KNOWLEDGE] Running KnowledgeMonitor to search for updates...")
 	k.Spec.Requires = []string{"knowledge_monitoring"}
-	
+
 	if err := k.ExecuteAgents(); err != nil {
 		k.StoreLog("ERROR: KnowledgeMonitor failed: %v", err)
 		return

@@ -11,6 +11,7 @@ export interface InteractMessageRequest {
   context?: {
     preferRecipes?: boolean;
     categories?: string[];
+    provider?: string;
   };
 }
 

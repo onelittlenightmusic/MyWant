@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	mywant "mywant/engine/src"
 )
@@ -57,83 +58,127 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 
 	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Starting per-request Goose process for: %s\n", operation)
 
-	// Create a new goose run process for this request
-	// Use context.Background() for the process itself (not the request context)
-	// so that it can run to completion
-	cmd := exec.CommandContext(context.Background(), "goose", "run", "-i", "-")
-	cmd.Env = os.Environ()
+	// Determine preferred provider
+	preferredProvider := ""
+	if p, ok := params["provider"].(string); ok && p != "" {
+		preferredProvider = p
+	}
+	if preferredProvider == "" {
+		preferredProvider = os.Getenv("MYWANT_GOOSE_PROVIDER")
+	}
 
-	// Set up pipes
-	stdin, err := cmd.StdinPipe()
+	args := []string{"run", "-i", "-"}
+	if preferredProvider != "" {
+		args = append(args, "--provider", preferredProvider)
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Using preferred provider: %s\n", preferredProvider)
+	}
+
+	// Try the first attempt
+	startTime := time.Now()
+	var fullOutput string
+	var err error
+	fullOutput, err = g.runGooseWithArgs(args, prompt)
+	duration := time.Since(startTime)
+	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt took %v\n", duration)
+
+	// Check if attempt failed
+	failed := err != nil || strings.Contains(fullOutput, "Ran into this error") || strings.Contains(fullOutput, "Request failed")
+
+	if failed {
+		// Determine fallback provider
+		fallbackProvider := "gemini-cli"
+		if preferredProvider == "gemini-cli" {
+			fallbackProvider = "claude-code"
+		}
+
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt failed (provider: %s, err: %v), trying fallback to %s...\n", 
+			preferredProvider, err, fallbackProvider)
+		
+		fallbackStartTime := time.Now()
+		fallbackArgs := []string{"run", "-i", "-", "--provider", fallbackProvider}
+		fallbackOutput, fallbackErr := g.runGooseWithArgs(fallbackArgs, prompt)
+		fallbackDuration := time.Since(fallbackStartTime)
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback attempt took %v\n", fallbackDuration)
+		
+		fallbackFailed := fallbackErr != nil || strings.Contains(fallbackOutput, "Ran into this error") || strings.Contains(fallbackOutput, "Request failed")
+		
+		if !fallbackFailed {
+			fullOutput = fallbackOutput
+			err = nil
+			fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback to %s succeeded!\n", fallbackProvider)
+		} else {
+			fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback to %s also failed: %v\n", fallbackProvider, fallbackErr)
+			// If both failed, return the error from the primary attempt if it exists, or a general error
+			if err == nil {
+				err = fmt.Errorf("both primary and fallback providers failed to generate a response")
+			}
+		}
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+		return nil, err
 	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	cmd.Stderr = os.Stderr
-
-	// Start the process
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Goose process: %w", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process started (PID: %d)\n", cmd.Process.Pid)
-
-	// Send the prompt to stdin
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Sending prompt to Goose:\n%s\n", prompt)
-	if _, err := io.WriteString(stdin, prompt+"\n"); err != nil {
-		cmd.Process.Kill()
-		cmd.Wait()
-		return nil, fmt.Errorf("failed to send prompt to Goose: %w", err)
-	}
-
-	// Close stdin to signal EOF - this tells Goose to process the input and finish
-	stdin.Close()
-
-	// Read the response
-	scanner := bufio.NewScanner(stdout)
-	var outputLines []string
-
-	// Read all output from Goose
-	for scanner.Scan() {
-		line := scanner.Text()
-		outputLines = append(outputLines, line)
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] stdout: %s\n", line)
-	}
-
-	if err := scanner.Err(); err != nil {
-		cmd.Process.Kill()
-		cmd.Wait()
-		return nil, fmt.Errorf("error reading Goose output: %w", err)
-	}
-
-	// Wait for the process to complete
-	if err := cmd.Wait(); err != nil {
-		// Don't fail on non-zero exit - Goose might exit with error codes
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process exited with error: %v\n", err)
-	}
-
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose process completed\n")
 
 	// Parse the response
-	fullOutput := strings.Join(outputLines, "\n")
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output (%d lines, %d chars):\n%s\n", len(outputLines), len(fullOutput), fullOutput[:minInt(len(fullOutput), 2000)])
-
-	// Debug: save full output to file
-	if err := os.WriteFile("/tmp/goose-output.txt", []byte(fullOutput), 0644); err == nil {
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Full output saved to /tmp/goose-output.txt\n")
-	}
-
 	result, err := parseGooseResponse(fullOutput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	return result, nil
+}
+
+// runGooseWithArgs is a helper to run goose with specific arguments and input
+func (g *GooseManager) runGooseWithArgs(args []string, prompt string) (string, error) {
+	cmd := exec.CommandContext(context.Background(), "goose", args...)
+	cmd.Env = os.Environ()
+
+	// Set up pipes
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	cmd.Stderr = os.Stderr
+
+	// Start the process
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start Goose process: %w", err)
+	}
+
+	// Send the prompt to stdin
+	if _, err := io.WriteString(stdin, prompt+"\n"); err != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+		return "", fmt.Errorf("failed to send prompt to Goose: %w", err)
+	}
+
+	// Close stdin to signal EOF
+	stdin.Close()
+
+	// Read the response
+	scanner := bufio.NewScanner(stdout)
+	var outputLines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		outputLines = append(outputLines, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+		return "", fmt.Errorf("error reading Goose output: %w", err)
+	}
+
+	// Wait for the process to complete
+	cmd.Wait()
+
+	return strings.Join(outputLines, "\n"), nil
 }
 
 // buildPrompt constructs natural language instructions for Goose

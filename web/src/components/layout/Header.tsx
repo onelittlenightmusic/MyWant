@@ -17,6 +17,8 @@ interface HeaderProps {
   onToggleSelectMode?: () => void;
   onInteractSubmit?: (message: string) => void;
   isInteractThinking?: boolean;
+  gooseProvider?: string;
+  onProviderChange?: (provider: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,7 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
   showSelectMode = false,
   onToggleSelectMode,
   onInteractSubmit,
-  isInteractThinking = false
+  isInteractThinking = false,
+  gooseProvider = 'claude-code',
+  onProviderChange
 }) => {
   return (
     <header className={classNames(
@@ -51,7 +55,15 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* InteractBubble - shown on desktop */}
         {onInteractSubmit && (
-          <div className="hidden lg:flex items-center flex-1 justify-center max-w-md">
+          <div className="hidden lg:flex items-center flex-1 justify-center max-w-xl gap-2">
+            <select
+              value={gooseProvider}
+              onChange={(e) => onProviderChange?.(e.target.value)}
+              className="text-xs border border-gray-300 rounded-md py-1.5 pl-2 pr-8 focus:ring-primary-500 focus:border-primary-500 bg-white"
+            >
+              <option value="claude-code">Claude</option>
+              <option value="gemini-cli">Gemini</option>
+            </select>
             <InteractBubble
               onSubmit={onInteractSubmit}
               isThinking={isInteractThinking}

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -21,6 +22,13 @@ type InteractionManager struct {
 	wantTypeLoader *WantTypeLoader
 	recipeRegistry *CustomTargetTypeRegistry
 	gooseExecutor  GooseExecutor
+}
+
+// InteractContext provides optional context for message processing
+type InteractContext struct {
+	PreferRecipes bool     `json:"preferRecipes,omitempty"`
+	Categories    []string `json:"categories,omitempty"`
+	Provider      string   `json:"provider,omitempty"`
 }
 
 // InteractionSession represents a conversational session for want creation
@@ -219,7 +227,7 @@ func (im *InteractionManager) CreateSession() *InteractionSession {
 }
 
 // SendMessage processes a user message and returns recommendations
-func (im *InteractionManager) SendMessage(ctx context.Context, sessionID string, message string) (*InteractionSession, error) {
+func (im *InteractionManager) SendMessage(ctx context.Context, sessionID string, message string, interactCtx *InteractContext) (*InteractionSession, error) {
 	// Get existing session
 	session, err := im.sessionCache.GetSession(sessionID)
 	if err != nil {
@@ -235,7 +243,7 @@ func (im *InteractionManager) SendMessage(ctx context.Context, sessionID string,
 	session.ConversationHistory = append(session.ConversationHistory, userMessage)
 
 	// Generate recommendations via Goose
-	recommendations, err := im.generateRecommendations(ctx, session.ConversationHistory)
+	recommendations, err := im.generateRecommendations(ctx, session.ConversationHistory, interactCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate recommendations: %w", err)
 	}
@@ -263,7 +271,7 @@ func (im *InteractionManager) SendMessage(ctx context.Context, sessionID string,
 }
 
 // generateRecommendations calls GooseManager to generate recommendations
-func (im *InteractionManager) generateRecommendations(ctx context.Context, history []ConversationMessage) ([]Recommendation, error) {
+func (im *InteractionManager) generateRecommendations(ctx context.Context, history []ConversationMessage, interactCtx *InteractContext) ([]Recommendation, error) {
 	// Get the latest user message
 	var latestMessage string
 	for i := len(history) - 1; i >= 0; i-- {
@@ -279,11 +287,24 @@ func (im *InteractionManager) generateRecommendations(ctx context.Context, histo
 		return nil, fmt.Errorf("failed to marshal conversation history: %w", err)
 	}
 
-	// Execute via Goose with MCP-based prompt
-	result, err := im.gooseExecutor.ExecuteViaGoose(ctx, "interact_recommend", map[string]interface{}{
+	params := map[string]interface{}{
 		"message":              latestMessage,
 		"conversation_history": string(historyJSON),
-	})
+	}
+
+	// Add context info if provided
+	if interactCtx != nil {
+		if interactCtx.Provider != "" {
+			params["provider"] = interactCtx.Provider
+		}
+		if len(interactCtx.Categories) > 0 {
+			params["categories"] = interactCtx.Categories
+		}
+		params["preferRecipes"] = interactCtx.PreferRecipes
+	}
+
+	// Execute via Goose with MCP-based prompt
+	result, err := im.gooseExecutor.ExecuteViaGoose(ctx, "interact_recommend", params)
 	if err != nil {
 		return nil, fmt.Errorf("Goose execution failed: %w", err)
 	}
@@ -308,7 +329,11 @@ func parseRecommendationsFromGoose(result interface{}) ([]Recommendation, error)
 	// Look for "recommendations" key
 	recsInterface, ok := resultMap["recommendations"]
 	if !ok {
-		return nil, fmt.Errorf("no recommendations found in result")
+		// If "text" exists, it might be an error message from Goose
+		if text, ok := resultMap["text"].(string); ok {
+			return nil, fmt.Errorf("no recommendations found in result. AI response: %s", text)
+		}
+		return nil, fmt.Errorf("no recommendations found in result (keys found: %v)", reflect.ValueOf(resultMap).MapKeys())
 	}
 
 	// Fix "using" field format before unmarshaling

@@ -15,7 +15,11 @@ wantType:
     category: system
     pattern: independent
 
-  parameters: {}
+  parameters:
+  - name: _dummy
+    description: Internal dummy parameter
+    type: string
+    required: false
 
   state:
   - name: sessionId

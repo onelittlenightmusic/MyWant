@@ -143,6 +143,7 @@ class MyWantApiClient {
   }
 
   async getWant(id: string): Promise<WantDetails> {
+    console.log('[DEBUG] apiClient.getWant called with ID:', id);
     return this.deduplicatedGet<WantDetails>(`/api/v1/wants/${id}`);
   }
 
@@ -332,11 +333,11 @@ class MyWantApiClient {
     sessionId: string,
     request: InteractMessageRequest
   ): Promise<InteractMessageResponse> {
-    // Set timeout to 180s for Goose processing
+    // Set timeout to 300s for Goose processing
     const response = await this.client.post(
       `/api/v1/interact/${sessionId}`,
       request,
-      { timeout: 180000 }  // 3 minutes
+      { timeout: 300000 }  // 5 minutes
     );
     return response.data;
   }
@@ -359,7 +360,7 @@ class MyWantApiClient {
   // Draft want management
   // Draft wants are regular wants with special labels, stored in backend for persistence
 
-  async createDraftWant(data: CreateDraftWantData): Promise<Want> {
+  async createDraftWant(data: CreateDraftWantData): Promise<{ id: string; execution_id: string }> {
     const draftId = `draft-${Date.now()}`;
     const want = {
       metadata: {
@@ -384,7 +385,11 @@ class MyWantApiClient {
     };
 
     const response = await this.client.post('/api/v1/wants', want);
-    return response.data;
+    // Return the actual want ID we created, and the backend's execution ID
+    return {
+      id: draftId,
+      execution_id: response.data.id
+    };
   }
 
   async updateDraftWant(id: string, updates: UpdateDraftWantData): Promise<Want> {

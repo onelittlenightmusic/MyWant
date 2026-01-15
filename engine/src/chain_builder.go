@@ -1655,6 +1655,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
 }
 func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
 	// First search in runtime wants
 	for wantName, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.ID == wantID {
@@ -1674,23 +1677,43 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 
 // UpdateWant updates an existing want's configuration (params, labels, using fields, etc.) Automatically triggers reconciliation to process topology changes Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
-	_, _, exists := cb.FindWantByID(wantConfig.Metadata.ID)
-	if !exists {
-		// Want not found, add as new
-		cb.addDynamicWantUnsafe(wantConfig)
-		return
-	}
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
 
-	// Only update config - runtime want will be synchronized in applyWantChanges() via compilePhase
-	configUpdated := false
-	for i, cfgWant := range cb.config.Wants {
-		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
-			cb.config.Wants[i] = wantConfig
-			configUpdated = true
+	InfoLog("[UPDATE-WANT] Updating want ID: %s (name: %s)\n", wantConfig.Metadata.ID, wantConfig.Metadata.Name)
+
+	// 1. Search in runtime wants first
+	foundInRuntime := false
+	for wantName, runtimeWant := range cb.wants {
+		if runtimeWant.want.Metadata.ID == wantConfig.Metadata.ID {
+			InfoLog("[UPDATE-WANT] Found in runtime: %s\n", wantName)
+			// Update the runtime want's configuration
+			runtimeWant.want.Spec = wantConfig.Spec
+			runtimeWant.want.Metadata.Labels = wantConfig.Metadata.Labels
+			runtimeWant.want.State = wantConfig.State // Sync state as well
+			foundInRuntime = true
 			break
 		}
 	}
-	if !configUpdated {
+	
+	// 2. Search in config wants (must do this regardless of foundInRuntime to keep config in sync)
+	foundInConfig := false
+	for i, cfgWant := range cb.config.Wants {
+		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
+			if !foundInConfig {
+				InfoLog("[UPDATE-WANT] Found in config at index %d\n", i)
+			}
+			cb.config.Wants[i] = wantConfig
+			foundInConfig = true
+			break
+		}
+	}
+
+	if !foundInRuntime && !foundInConfig {
+		InfoLog("[UPDATE-WANT] Not found in runtime or config, adding as new dynamic want\n")
+		// 3. Not found anywhere, add as new
+		cb.addDynamicWantUnsafe(wantConfig)
+		return
 	}
 
 	// Trigger immediate reconciliation via channel (unless already in reconciliation)

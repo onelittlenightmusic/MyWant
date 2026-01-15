@@ -23,14 +23,8 @@ type InteractCreateResponse struct {
 
 // InteractMessageRequest is the request to send a message to a session
 type InteractMessageRequest struct {
-	Message string           `json:"message"`
-	Context *InteractContext `json:"context,omitempty"`
-}
-
-// InteractContext provides optional context for message processing
-type InteractContext struct {
-	PreferRecipes bool     `json:"preferRecipes,omitempty"`
-	Categories    []string `json:"categories,omitempty"`
+	Message string                  `json:"message"`
+	Context *mywant.InteractContext `json:"context,omitempty"`
 }
 
 // InteractMessageResponse is returned after sending a message
@@ -116,7 +110,7 @@ func (s *Server) interactMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send message and get recommendations
-	session, err := s.interactionManager.SendMessage(r.Context(), sessionID, req.Message)
+	session, err := s.interactionManager.SendMessage(r.Context(), sessionID, req.Message, req.Context)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "expired") {

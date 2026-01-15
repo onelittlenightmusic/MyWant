@@ -110,6 +110,7 @@ export const Dashboard: React.FC = () => {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [showRecommendationForm, setShowRecommendationForm] = useState(false);
+  const [gooseProvider, setGooseProvider] = useState<string>('claude-code');
 
   // Compute if any draft is thinking (for display only, doesn't disable input)
   const hasThinkingDraft = drafts.some(d => d.isThinking);
@@ -354,13 +355,13 @@ export const Dashboard: React.FC = () => {
     // Create draft in backend for persistence (survives browser refresh)
     let draftId: string;
     try {
-      const draftWant = await apiClient.createDraftWant({
+      const result = await apiClient.createDraftWant({
         sessionId: draftSessionId,
         message,
         isThinking: true,
       });
-      draftId = draftWant.id || draftWant.metadata?.id || '';
-      console.log('[DEBUG] Draft created in backend:', draftId);
+      draftId = result.id;
+      console.log('[DEBUG] Draft created in backend with ID:', draftId);
     } catch (error) {
       console.error('Failed to create draft in backend:', error);
       showNotification('Failed to create draft. Please try again.');
@@ -374,7 +375,10 @@ export const Dashboard: React.FC = () => {
 
     try {
       const response = await apiClient.sendInteractMessage(draftSessionId, {
-        message
+        message,
+        context: {
+          provider: gooseProvider
+        }
       });
 
       console.log('Interact response:', response);
@@ -393,6 +397,7 @@ export const Dashboard: React.FC = () => {
       }
 
       // Update draft in backend with recommendations
+      console.log('[DEBUG] Updating draft with recommendations:', draftId, response.recommendations.length);
       await apiClient.updateDraftWant(draftId, {
         recommendations: response.recommendations,
         isThinking: false,
@@ -1152,6 +1157,8 @@ export const Dashboard: React.FC = () => {
         onToggleSelectMode={handleToggleSelectMode}
         onInteractSubmit={handleInteractSubmit}
         isInteractThinking={hasThinkingDraft}
+        gooseProvider={gooseProvider}
+        onProviderChange={setGooseProvider}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -1253,7 +1260,7 @@ export const Dashboard: React.FC = () => {
           )}
 
             {/* Want Grid with integrated draft cards */}
-            <div>
+            <div id="want-grid-container">
               <WantGrid
                 wants={regularWants}
                 drafts={drafts}
