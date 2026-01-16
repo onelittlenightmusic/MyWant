@@ -293,7 +293,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
       {/* Draft Want Cards - appear after regular wants */}
       {drafts.map((draft) => (
-        <div key={draft.id}>
+        <div key={draft.id} className="h-full">
           <DraftWantCard
             draft={draft}
             selected={activeDraftId === draft.id}
