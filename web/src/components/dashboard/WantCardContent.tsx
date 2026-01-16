@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Bot, Pause, Clock, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AlertTriangle, Bot, Pause, Clock, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -254,6 +254,20 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             >
               <StatusBadge status={want.status} size={sizes.statusSize} />
             </button>
+
+            {/* Delete Button - Common mechanism for all cards */}
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(want);
+                }}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all ml-1"
+                title="Delete"
+              >
+                <Trash2 className={sizes.iconSize} />
+              </button>
+            )}
 
           </div>
         </div>
