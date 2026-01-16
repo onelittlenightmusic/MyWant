@@ -296,157 +296,153 @@ INSTRUCTIONS:
 
 // buildRecommendationPrompt constructs a prompt for interactive want recommendation
 func (g *GooseManager) buildRecommendationPrompt(message string, conversationHistory string) string {
-	return fmt.Sprintf(`You are a MyWant system architect. Based on the user's request, generate 2-3 alternative solutions.
-
-CONVERSATION HISTORY:
-%s
-
-LATEST USER REQUEST:
-"%s"
-
-AVAILABLE WANT TYPES:
-- reminder: One-time or recurring reminders with optional user approval
-- silencer: Auto-approval agent that approves pending reminders automatically
-- gmail: Gmail operations via natural language
-- knowledge: Knowledge freshness tracker for monitoring topics
-- coordinator: Orchestrates multiple independent wants
-- execution_result: Execute shell commands and capture results
-- flight, hotel, restaurant, buffet: Travel-related wants
-- queue, sink, collector: Queue system components
-- numbers, prime_numbers, fibonacci_numbers: Mathematical generators
-
-KEY RECIPES:
-- "Silencer Example": Reminder with automatic approval (reminder + silencer pattern)
-- "Travel Agent System": Restaurant + Hotel + Buffet (parallel independent wants)
-- "Queue System": Generator → Queue → Sink (pipeline pattern)
-- "Command Execution Example": Shell command execution with result capture
-
-TASK:
-1. Analyze the user's intent from their request
-2. Generate 2-3 alternative approaches:
-   - Approach 1: Recipe-based solution (if a suitable recipe exists)
-   - Approach 2: Custom want composition (from individual want types)
-   - Approach 3: Alternative variation (different parameters or structure)
-
-For each recommendation, provide:
-- ID: Use "rec-1", "rec-2", "rec-3"
-- Title: A descriptive name in Japanese or English
-- Approach: "recipe", "custom", or "hybrid"
-- Description: Explain why this solution fits the user's needs (in Japanese if user message is Japanese)
-- Config: Complete config structure with a "wants" array
-- Metadata: want_count, recipes_used (if any), want_types_used, complexity, pros_cons
-
-EXAMPLES:
-
-Reminder request → Generate:
-1. Simple one-time reminder (reminder want)
-2. Auto-approved reminder (reminder + silencer, "Silencer Example" recipe)
-3. Recurring reminder with schedule (reminder with "when" field)
-
-Gmail request → Generate:
-1. Simple gmail want with natural language task
-2. Gmail + reminder combination for scheduled emails
-
-Travel request → Generate:
-1. Travel Agent System recipe (if matches)
-2. Custom combination of flight/hotel/restaurant wants
-
-IMPORTANT:
-- Generate complete, valid want configurations
-- Each want must have metadata (name, type, labels) and spec (params)
-- Use realistic parameter values
-- "using" field is OPTIONAL and ONLY needed for dependent wants (pipeline patterns)
-- If using "using" field, it must be an ARRAY of objects: [{"key": "value"}]
-- NEVER include empty "using" field - omit it completely if not needed
-- Return ONLY valid JSON, no markdown, no extra text
-
-Return ONLY this JSON structure:
-
-Example 1 - Simple reminder (NO using field):
-{
-  "recommendations": [
-    {
-      "id": "rec-1",
-      "title": "シンプルな1回限りリマインダ",
-      "approach": "custom",
-      "description": "最もシンプルなリマインダー構成。指定した時間にメッセージを表示...",
-      "config": {
-        "wants": [
-          {
-            "metadata": {
-              "name": "my_reminder",
-              "type": "reminder",
-              "labels": {"role": "reminder"}
-            },
-            "spec": {
-              "params": {
-                "message": "重要なタスクの時間です",
-                "duration_from_now": "30 minutes",
-                "ahead": "5 minutes",
-                "require_reaction": true,
-                "reaction_type": "internal"
-              }
-            }
-          }
-        ]
-      },
-      "metadata": {
-        "want_count": 1,
-        "want_types_used": ["reminder"],
-        "complexity": "low",
-        "pros_cons": {
-          "pros": ["最小構成で素早く動作", "設定が簡単"],
-          "cons": ["単発のみ（繰り返しなし）", "手動承認が必要"]
-        }
-      }
-    }
-  ]
-}
-
-Example 2 - Auto-approved reminder with silencer (WITH using field):
-{
-  "recommendations": [
-    {
-      "id": "rec-2",
-      "title": "自動承認リマインダ",
-      "approach": "recipe",
-      "description": "Silencerエージェントで自動承認されるリマインダー",
-      "config": {
-        "wants": [
-          {
-            "metadata": {"name": "auto_reminder", "type": "reminder"},
-            "spec": {
-              "params": {
-                "message": "自動承認されるリマインダー",
-                "duration_from_now": "15 seconds",
-                "ahead": "10 seconds",
-                "require_reaction": true
-              }
-            }
-          },
-          {
-            "metadata": {"name": "auto_silencer", "type": "silencer"},
-            "spec": {
-              "params": {"policy": "all_true"},
-              "using": [{"reaction_requests": "auto_reminder"}]
-            }
-          }
-        ]
-      },
-      "metadata": {
-        "want_count": 2,
-        "recipes_used": ["Silencer Example"],
-        "want_types_used": ["reminder", "silencer"],
-        "complexity": "medium",
-        "pros_cons": {
-          "pros": ["完全自動化", "手動承認不要"],
-          "cons": ["2つのwantが必要"]
-        }
-      }
-    }
-  ]
-}`, conversationHistory, message)
-}
+		return fmt.Sprintf(`You are a MyWant system architect. Based on the user's request, generate 2-3 alternative solutions.
+	
+	CONVERSATION HISTORY:
+	%s
+	
+	LATEST USER REQUEST:
+	"%s"
+	
+	AVAILABLE MCP TOOLS:
+	- list_want_types: Get all available want types
+	- search_want_types: Search by category or pattern
+	- get_want_type: Get detailed type definition including state and params
+	- list_recipes: Get all available recipes
+	- get_recipe: Get specific recipe details including its custom_type and parameters
+	
+	TASK:
+	1. MANDATORY: First, use the available MCP tools listed above to discover relevant want types and recipes based on the user's request.
+	2. Analyze the discovery results and user's intent.
+	3. Generate 2-3 alternative approaches:
+	   - Approach 1: Recipe-based solution (MUST use a single Want with "spec.recipe" and the correct "metadata.type" found in the recipe)
+	   - Approach 2: Custom want composition (using individual want types)
+	   - Approach 3: Alternative variation (different parameters or structure)
+	
+	IMPORTANT RULES:
+	- NEVER guess or hallucinate recipe names or want types. Always use the results from MCP tools.
+	- When using a recipe found via list_recipes:
+	  - Generate exactly ONE want in the "wants" array.
+	  - Put the exact name found in list_recipes into "spec.recipe".
+	  - Use the custom_type field defined in the recipe for the "metadata.type" field.
+	  - DO NOT list individual components of the recipe separately.
+	- For custom compositions (Approach 2), ensure all used types exist in list_want_types.
+	
+	For each recommendation, provide:
+	- ID: Use "rec-1", "rec-2", "rec-3"
+	- Title: A descriptive name in Japanese or English
+	- Approach: "recipe", "custom", or "hybrid"
+	- Description: Explain why this solution fits the user's needs (in Japanese if user message is Japanese)
+	- Config: Complete config structure with a "wants" array
+	- Metadata: want_count, recipes_used (if any), want_types_used, complexity, pros_cons
+	
+	EXAMPLES:
+	
+	Reminder request → Generate:
+	1. Simple one-time reminder (reminder want)
+	2. Auto-approved reminder (reminder + silencer, "Silencer Example" recipe)
+	3. Recurring reminder with schedule (reminder with "when" field)
+	
+	Gmail request → Generate:
+	1. Simple gmail want with natural language task
+	2. Gmail + reminder combination for scheduled emails
+	
+	Travel request → Generate:
+	1. Travel Agent System recipe (if matches)
+	2. Custom combination of flight/hotel/restaurant wants
+	
+	IMPORTANT:
+	- Generate complete, valid want configurations
+	- Each want must have metadata (name, type, labels) and spec (params)
+	- Use realistic parameter values
+	- "using" field is OPTIONAL and ONLY needed for dependent wants (pipeline patterns)
+	- If using "using" field, it must be an ARRAY of objects: [{"key": "value"}]
+	- NEVER include empty "using" field - omit it completely if not needed
+	- Return ONLY valid JSON, no markdown, no extra text
+	
+	Return ONLY this JSON structure:
+	
+	Example 1 - Simple reminder (NO using field):
+	{
+	  "recommendations": [
+	    {
+	      "id": "rec-1",
+	      "title": "シンプルな1回限りリマインダ",
+	      "approach": "custom",
+	      "description": "最もシンプルなリマインダー構成。指定した時間にメッセージを表示...",
+	      "config": {
+	        "wants": [
+	          {
+	            "metadata": {
+	              "name": "my_reminder",
+	              "type": "reminder",
+	              "labels": {"role": "reminder"}
+	            },
+	            "spec": {
+	              "params": {
+	                "message": "重要なタスクの時間です",
+	                "duration_from_now": "30 minutes",
+	                "ahead": "5 minutes",
+	                "require_reaction": true,
+	                "reaction_type": "internal"
+	              }
+	            }
+	          }
+	        ]
+	      },
+	      "metadata": {
+	        "want_count": 1,
+	        "want_types_used": ["reminder"],
+	        "complexity": "low",
+	        "pros_cons": {
+	          "pros": ["最小構成で素早く動作", "設定が簡単"],
+	          "cons": ["単発のみ（繰り返しなし）", "手動承認が必要"]
+	        }
+	      }
+	    }
+	  ]
+	}
+	
+	Example 2 - Auto-approved reminder using a recipe (Single Want with spec.recipe):
+	{
+	  "recommendations": [
+	    {
+	      "id": "rec-2",
+	      "title": "自動承認リマインダ (レシピ利用)",
+	      "approach": "recipe",
+	      "description": "「Silencer Example」レシピを使用した、自動承認されるリマインダーです。",
+	      "config": {
+	        "wants": [
+	          {
+	            "metadata": {
+	              "name": "auto_approved_reminder",
+	              "type": "silencer_example"
+	            },
+	            "spec": {
+	              "recipe": "Silencer Example",
+	              "params": {
+	                "message": "自動承認される通知",
+	                "duration_from_now": "1 hour"
+	              }
+	            }
+	          }
+	        ]
+	      },
+	      "metadata": {
+	        "want_count": 1,
+	        "recipes_used": ["Silencer Example"],
+	        "want_types_used": ["silencer_example"],
+	        "complexity": "medium",
+	        "pros_cons": {
+	          "pros": ["レシピにより検証済みの構成", "単一のWantで管理が容易"],
+	          "cons": ["内部構造のカスタマイズにはレシピの知識が必要"]
+	        }
+	      }
+	    }
+	  ]
+	}
+	`, conversationHistory, message)
+	}
 
 // parseGooseResponse extracts and processes Goose JSON output
 func parseGooseResponse(output string) (interface{}, error) {
