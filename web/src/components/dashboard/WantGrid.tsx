@@ -241,7 +241,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-6 items-start">
+    <div className="grid grid-cols-3 gap-6">
       {filteredWants.map((want, index) => {
         const wantId = want.metadata?.id || want.id;
         const isExpanded = expandedParents?.has(wantId || '') ?? false;
@@ -256,7 +256,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
             key={wantId || `want-${index}`}
             data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
             className={classNames(
-              'transition-all duration-300 ease-out',
+              'transition-all duration-300 ease-out h-full',
               isExpanded ? 'col-span-3' : ''
             )}
           >

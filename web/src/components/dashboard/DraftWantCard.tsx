@@ -67,7 +67,7 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
     <div
       onClick={onClick}
       className={classNames(
-        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
+        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         draft.error ? 'bg-red-50' : 'bg-white'
       )}
@@ -77,16 +77,17 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
       <div style={blackOverlayStyle}></div>
 
       {/* Content using the SAME component as regular WantCard */}
-      <div className="relative z-10 h-full flex flex-col">
+      <div className="relative z-10 flex-1">
         <WantCardContent
           want={pseudoWant}
           isChild={false}
           onView={() => onClick()}
           onDelete={() => onDelete()}
         />
+      </div>
 
-        {/* Draft-specific status information at the bottom area - pushing it to the bottom */}
-        <div className="mt-auto border-t border-gray-100 pt-4">
+      {/* Draft-specific status information at the bottom area - pushing it to the bottom */}
+      <div className="relative z-10 mt-auto border-t border-gray-100 pt-4">
           {draft.isThinking ? (
             <div className="flex items-center gap-2">
               <div className="flex gap-1">
@@ -108,7 +109,6 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
               </span>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

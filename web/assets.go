@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"net/http"
+	"strings" // Added
 )
 
 //go:embed dist
@@ -34,7 +35,13 @@ func (sfs SpaFileSystem) Open(name string) (http.File, error) {
 		return f, nil
 	}
 
-	// ファイルが見つからない場合は index.html を試す (SPA routing)
+	// If the file is not found and the request is for an asset (starts with /assets/),
+	// then it's a genuine 404 for the asset. Do not fall back to index.html.
+	if strings.HasPrefix(name, "/assets/") {
+		return nil, err // Return the original error
+	}
+
+	// For all other paths (potential client-side routes), fall back to index.html (SPA routing)
 	f, err = sfs.base.Open("index.html")
 	if err != nil {
 		return nil, err

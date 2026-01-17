@@ -347,7 +347,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       data-keyboard-nav-id={wantId}
       data-is-target={isTargetWant}
       className={classNames(
-        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden min-h-[200px] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
+        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         // ALWAYS show blue for any valid drag over (labels or wants)
         (isDragOverWant || isDragOver) && 'border-blue-600 border-2 bg-blue-100',
@@ -407,7 +407,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       {/* Children indicator at bottom */}
       {hasChildren && !displayIsExpanded && (
-        <div className="relative z-10 mt-4 pt-3 border-t border-gray-200">
+        <div className="relative z-10 mt-auto pt-3 border-t border-gray-200">
           <button
             onClick={(e) => {
               e.stopPropagation();
