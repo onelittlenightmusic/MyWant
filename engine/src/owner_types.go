@@ -188,9 +188,11 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 		tcs.target.StoreState("retrigger_requested", true)
 
-		// Call Progress() directly to send the packet immediately
-		// This ensures the packet reaches the coordinator before it times out
-		tcs.target.Progress()
+		// Call Progress() in a goroutine to avoid recursive lock deadlock
+		// This happens if OnEvent is triggered during reconciliation (which holds reconcileMutex)
+		// The new goroutine will wait for reconciliation to finish before acquiring the read lock in GetAllWantStates
+		go tcs.target.Progress()
+		
 		tcs.target.StoreState("progress_called_from_event", true)
 
 		// Also signal the target via channel (legacy support)
