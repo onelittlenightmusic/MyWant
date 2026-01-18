@@ -29,11 +29,27 @@ func (s *SchedulerWant) Progress() {
 		return // ChainBuilder not yet set
 	}
 
-	// Get all current Want states
-	allWants := s.builder.GetAllWantStates()
+	// Create a snapshot of wants while holding the lock to avoid concurrent map access
+	s.builder.reconcileMutex.RLock()
+	allWantsSnapshot := make(map[string]*runtimeWant)
+	for name, rw := range s.builder.wants {
+		allWantsSnapshot[name] = rw
+	}
+	s.builder.reconcileMutex.RUnlock()
 
 	// Scan each Want for scheduling requirements
-	for _, want := range allWants {
+	for name, rw := range allWantsSnapshot {
+		want := rw.want
+		// TARGET check: Target wants always need a progression loop even without a schedule
+		isTarget := want.Metadata.Type == "target" || want.Metadata.Type == "custom_target"
+		
+		if isTarget {
+			// For targets, we just need to ensure they are started
+			// The builder will handle starting the progression loop if not already active
+			s.builder.startWant(name, rw)
+			continue // No need to create a scheduler agent for targets
+		}
+
 		if len(want.Spec.When) == 0 {
 			continue // No schedule specified for this Want
 		}

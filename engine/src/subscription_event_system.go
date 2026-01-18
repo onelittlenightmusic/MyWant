@@ -192,8 +192,8 @@ func NewUnifiedSubscriptionSystem() *UnifiedSubscriptionSystem {
 	uss.SetProcessingMode(EventTypeStatusChange, ProcessSync)
 	uss.SetProcessingMode(EventTypeProcessEnd, ProcessSync)
 
-	// Group C: Blocking coordination
-	uss.SetProcessingMode(EventTypeOwnerCompletion, ProcessBlock)
+	// Group C: Blocking coordination - Changed to Async to prevent deadlocks
+	uss.SetProcessingMode(EventTypeOwnerCompletion, ProcessAsync)
 	uss.SetProcessingMode(EventTypeChannelSync, ProcessBlock)
 
 	return uss

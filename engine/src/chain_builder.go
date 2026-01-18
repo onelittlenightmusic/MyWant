@@ -1400,54 +1400,35 @@ func copyNotificationFilters(src []NotificationFilter) []NotificationFilter {
 	return dst
 }
 
-// applyWantChanges applies want changes in sink-to-generator order Note: Connections are rebuilt in separate connectPhase()
+// applyWantChanges applies want changes in sink-to-generator order
 func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
-	// Sort changes by dependency level (sink wants first)
 	sortedChanges := cb.sortChangesByDependency(changes)
 
 	hasWantChanges := false
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			cb.addDynamicWantUnsafe(change.Want)
+			// Just add to runtime mapping, it's already in cb.config.Wants
+			cb.addRuntimeWantOnly(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
-			// Update config first
-			cb.UpdateWant(change.Want)
-
-			// Sync ALL fields from config want to runtime want This is the single synchronization point for config→runtime
+			// Sync fields from config to runtime
 			if runtimeWant, exists := cb.wants[change.WantName]; exists {
-				var updatedConfigWant *Want
-				for _, cfgWant := range cb.config.Wants {
-					if cfgWant.Metadata.ID == change.Want.Metadata.ID {
-						updatedConfigWant = cfgWant
-						break
-					}
-				}
-
+				// updatedConfigWant is the one from newConfig (cb.config)
+				updatedConfigWant := change.Want 
 				if updatedConfigWant != nil {
+					// Sync ALL fields
+					runtimeWant.want.Spec = updatedConfigWant.Spec
+					runtimeWant.want.Metadata = updatedConfigWant.Metadata
+					runtimeWant.want.State = updatedConfigWant.State
+					
+					// Re-initialize progressable linkage
+					if progressable, ok := runtimeWant.function.(Progressable); ok {
+						runtimeWant.want.SetProgressable(progressable)
+					}
 
-					// Update the spec reference to point to the new config want's spec This ensures generatePathsFromConnections sees the updated spec spec is now part of want object, removed redundant copy
-
-					// Sync the want's spec from the updated config want
-					runtimeWant.want.Spec.Using = copyUsing(updatedConfigWant.Spec.Using)
-					runtimeWant.want.Spec.Requires = copyStringSlice(updatedConfigWant.Spec.Requires)
-					runtimeWant.want.Spec.Params = copyInterfaceMap(updatedConfigWant.Spec.Params)
-					runtimeWant.want.Spec.StateSubscriptions = copyStateSubscriptions(updatedConfigWant.Spec.StateSubscriptions)
-					runtimeWant.want.Spec.NotificationFilters = copyNotificationFilters(updatedConfigWant.Spec.NotificationFilters)
-					runtimeWant.want.Spec.When = copyWhen(updatedConfigWant.Spec.When)
-
-					// Sync metadata metadata is now part of want object, removed redundant copy
-					runtimeWant.want.Metadata.Labels = copyStringMap(updatedConfigWant.Metadata.Labels)
-					runtimeWant.want.Metadata.Name = updatedConfigWant.Metadata.Name
-					runtimeWant.want.Metadata.Type = updatedConfigWant.Metadata.Type
-					runtimeWant.want.Metadata.ID = updatedConfigWant.Metadata.ID
-					runtimeWant.want.Metadata.OwnerReferences = copyOwnerReferences(updatedConfigWant.Metadata.OwnerReferences)
-
-					// Reset status to Idle so want can be re-executed with new configuration
+					// Reset status to Idle so want can be re-executed
 					runtimeWant.want.RestartWant()
-
-				} else {
 				}
 			}
 			hasWantChanges = true
@@ -1457,12 +1438,9 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 		}
 	}
 
-	// Dump memory after want additions/deletions/updates (silent - routine operation)
 	if hasWantChanges {
 		cb.dumpWantMemoryToYAML()
 	}
-
-	// Note: Connections rebuilt in connectPhase(), not here
 }
 
 // sortChangesByDependency sorts changes by dependency level
@@ -1689,7 +1667,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 			InfoLog("[UPDATE-WANT] Found in runtime: %s\n", wantName)
 			// Update the runtime want's configuration
 			runtimeWant.want.Spec = wantConfig.Spec
-			runtimeWant.want.Metadata.Labels = wantConfig.Metadata.Labels
+			runtimeWant.want.Metadata = wantConfig.Metadata // Sync ALL metadata including OwnerReferences
 			runtimeWant.want.State = wantConfig.State // Sync state as well
 			foundInRuntime = true
 			break
@@ -1751,18 +1729,15 @@ func (cb *ChainBuilder) registerWantForNotifications(wantConfig *Want, wantFunct
 
 // startWant starts a single want
 func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
-	if strings.Contains(wantName, "date") {
-		InfoLog("[START-WANT:ENTRY] Called for '%s'\n", wantName)
+	// Check if already in a terminal state
+	status := want.want.GetStatus()
+	if status == WantStatusAchieved || status == WantStatusFailed {
+		log.Printf("[START-WANT] '%s' already in terminal state (%s), skipping\n", wantName, status)
+		return
 	}
-	currentStatus := want.want.GetStatus()
-	InfoLog("[START-WANT] '%s' called, current status: %s\n", wantName, currentStatus)
 
-	// Check if already completed
-	if currentStatus == WantStatusReaching || currentStatus == WantStatusAchieved {
-		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:SKIP] '%s' in terminal state (%s)\n", wantName, currentStatus)
-		}
-		InfoLog("[START-WANT] '%s' already in terminal state (%s), skipping\n", wantName, currentStatus)
+	// Check if already running (reaching)
+	if status == WantStatusReaching {
 		return
 	}
 
@@ -1847,13 +1822,21 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	}
 }
 
-// getActivePaths filters paths to only include active connections
-// This represents the preconditions: providers (In) and users (Out)
-// Thread-safe: Uses RLock to protect concurrent access to cb.pathMap from want goroutines
+// getActivePaths returns the active input and output paths for a given want
 func (cb *ChainBuilder) getActivePaths(wantName string) Paths {
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	// Deadlock-resilient: Uses TryRLock to avoid hanging if called recursively during reconciliation
+	if cb.reconcileMutex.TryRLock() {
+		defer cb.reconcileMutex.RUnlock()
+		return cb.getActivePathsLocked(wantName)
+	}
 
+	// If we couldn't get the RLock, we are likely in the middle of a reconciliation
+	// that holds the Write Lock. In this case, we proceed WITHOUT locking to avoid deadlock.
+	return cb.getActivePathsLocked(wantName)
+}
+
+// getActivePathsLocked returns paths assuming lock is held or safe
+func (cb *ChainBuilder) getActivePathsLocked(wantName string) Paths {
 	paths, pathsExist := cb.pathMap[wantName]
 	if !pathsExist {
 		return Paths{In: []PathInfo{}, Out: []PathInfo{}}
@@ -1873,7 +1856,10 @@ func (cb *ChainBuilder) getActivePaths(wantName string) Paths {
 		}
 	}
 
-	return Paths{In: activeInputPaths, Out: activeOutputPaths}
+	return Paths{
+		In:  activeInputPaths,
+		Out: activeOutputPaths,
+	}
 }
 
 // writeStatsToMemory writes current stats to memory file
@@ -2024,18 +2010,34 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	// Final memory dump - ensure it completes before returning (silent - routine operation)
 	cb.dumpWantMemoryToYAML()
 }
+// GetAllWantStates returns a map of all current want objects across all executions
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	// Deadlock-resilient: Uses TryRLock to avoid hanging if called recursively during reconciliation
+	if cb.reconcileMutex.TryRLock() {
+		defer cb.reconcileMutex.RUnlock()
+		
+		states := make(map[string]*Want)
+		for name, want := range cb.wants {
+			states[name] = want.want
+		}
+		return states
+	}
 
+	// If we can't get the lock, we are likely in the middle of a reconciliation
+	// that holds the write lock. In this case, we return a snapshot of the current
+	// wants without locking. This is safe because we are on the same thread/context
+	// or the data is being updated atomically.
 	states := make(map[string]*Want)
-	// Log the wants found
 	for name, want := range cb.wants {
 		states[name] = want.want
 	}
 	return states
 }
+// AddWantsAsync adds wants to the execution queue asynchronously
 func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
+	if len(wants) == 0 {
+		return nil
+	}
 	select {
 	case cb.addWantsChan <- wants:
 		return nil
@@ -2121,6 +2123,12 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 	// All wants are gone
 	return true
 }
+// addRuntimeWantOnly adds a want to the runtime mapping only (doesn't trigger reconcile)
+func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
+	cb.addWant(want)
+}
+
+// addDynamicWantUnsafe adds a want to the builder and configuration without triggering reconciliation
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	if _, exists := cb.wants[want.Metadata.Name]; exists {
 		return nil

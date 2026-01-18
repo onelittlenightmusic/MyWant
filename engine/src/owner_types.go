@@ -51,9 +51,8 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			State:    make(map[string]any),
 		},
 		MaxDisplay:             1000,
-		RecipePath:             "../recipes/queue-system.yaml", // Default recipe path
-		RecipeParams:           make(map[string]any),
-		parameterSubscriptions: make(map[string][]string),
+		RecipePath:             "recipes/empty.yaml", // Relative to project root
+		RecipeParams:           make(map[string]any),		parameterSubscriptions: make(map[string][]string),
 		childWants:             make([]*Want, 0),
 		completedChildren:      make(map[string]bool),
 		childrenDone:           make(chan bool, 1), // Signal channel for subscription system
@@ -113,85 +112,26 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
-	// Store debug info
-	tcs.target.StoreState("received_event_child", completionEvent.ChildName)
-	tcs.target.StoreState("received_event_target", completionEvent.TargetName)
-	tcs.target.StoreState("my_name", tcs.target.Metadata.Name)
-	tcs.target.StoreState("event_matches_target", completionEvent.TargetName == tcs.target.Metadata.Name)
-
-	// DEBUG: Log event reception
-	if strings.Contains(tcs.target.Metadata.Name, "approval") {
-		log.Printf("[ON-EVENT] Target %s received completion event for child %s (targetName=%s)\n",
-			tcs.target.Metadata.Name, completionEvent.ChildName, completionEvent.TargetName)
+	// GUARD: If target is already achieved, no need to process further completion events
+	if tcs.target.GetStatus() == WantStatusAchieved {
+		return EventResponse{Handled: true}
 	}
 
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
-		if strings.Contains(tcs.target.Metadata.Name, "approval") {
-			log.Printf("[ON-EVENT] Target %s IGNORING event - targetName %s doesn't match my name %s\n",
-				tcs.target.Metadata.Name, completionEvent.TargetName, tcs.target.Metadata.Name)
-		}
 		return EventResponse{Handled: false}
 	}
 
 	// Track child completion
 	tcs.target.childCompletionMutex.Lock()
-
-	// DEBUG: Log before adding to completed
-	if strings.Contains(tcs.target.Metadata.Name, "approval") {
-		log.Printf("[ON-EVENT] Target %s: completedChildren before adding child=%v\n",
-			tcs.target.Metadata.Name, len(tcs.target.completedChildren))
-	}
-
 	tcs.target.completedChildren[completionEvent.ChildName] = true
-	tcs.target.StoreState("added_to_completed", completionEvent.ChildName)
-
-	// DEBUG: Log after adding
-	if strings.Contains(tcs.target.Metadata.Name, "approval") {
-		log.Printf("[ON-EVENT] Target %s: completedChildren after adding child=%v\n",
-			tcs.target.Metadata.Name, len(tcs.target.completedChildren))
-		log.Printf("[ON-EVENT] Target %s: childWants count=%v\n",
-			tcs.target.Metadata.Name, len(tcs.target.childWants))
-		// Log all completed children names
-		completedNames := make([]string, 0)
-		for name := range tcs.target.completedChildren {
-			completedNames = append(completedNames, name)
-		}
-		log.Printf("[ON-EVENT] Target %s: completed children: %v\n",
-			tcs.target.Metadata.Name, completedNames)
-		// Log all expected children names
-		expectedNames := make([]string, 0)
-		for _, child := range tcs.target.childWants {
-			expectedNames = append(expectedNames, child.Metadata.Name)
-		}
-		log.Printf("[ON-EVENT] Target %s: expected children: %v\n",
-			tcs.target.Metadata.Name, expectedNames)
-	}
-
-	allComplete := tcs.target.checkAllChildrenComplete()
-	tcs.target.StoreState("all_complete_check_result", allComplete)
-
-	if strings.Contains(tcs.target.Metadata.Name, "approval") {
-		log.Printf("[ON-EVENT] Target %s: checkAllChildrenComplete() returned %v\n",
-			tcs.target.Metadata.Name, allComplete)
-	}
-
 	tcs.target.childCompletionMutex.Unlock()
 
-	// CRITICAL: If all children are now complete, trigger the target want to send packet
-	// The target's Progress() method checks allComplete and sends the packet
+	allComplete := tcs.target.checkAllChildrenComplete()
+
+	// CRITICAL: If all children are now complete, signal the progression loop
 	if allComplete {
-		if strings.Contains(tcs.target.Metadata.Name, "approval") {
-			log.Printf("[ON-EVENT] Target %s: ALL CHILDREN COMPLETE! Calling Progress() to send packet\n",
-				tcs.target.Metadata.Name)
-		}
-
 		tcs.target.StoreState("retrigger_requested", true)
-
-		// Call Progress() directly to send the packet immediately
-		// This ensures the packet reaches the coordinator before it times out
-		tcs.target.Progress()
-		tcs.target.StoreState("progress_called_from_event", true)
 
 		// Also signal the target via channel (legacy support)
 		select {
@@ -199,11 +139,6 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 			// Signal sent (legacy support)
 		default:
 			// Channel already has signal, ignore
-		}
-	} else {
-		if strings.Contains(tcs.target.Metadata.Name, "approval") {
-			log.Printf("[ON-EVENT] Target %s: Not all children complete yet, waiting for more events\n",
-				tcs.target.Metadata.Name)
 		}
 	}
 
@@ -213,22 +148,20 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	}
 }
 func (t *Target) checkAllChildrenComplete() bool {
-	// If we have no children yet AND no completions have arrived, we can't be complete (children are still being added asynchronously)
+	// If we have no children yet AND no completions have arrived, we can't be complete
 	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
 		return false
 	}
 
-	// If we have completed children but no childWants yet, they're still being added asynchronously
-	if len(t.childWants) == 0 && len(t.completedChildren) > 0 {
-		return false
-	}
-
+	// For targets with children (recipe or dynamic), all must be in completedChildren map
 	for _, child := range t.childWants {
 		if !t.completedChildren[child.Metadata.Name] {
 			return false
 		}
 	}
-	return true
+	
+	// If we reached here and have at least one child (dynamic or recipe), we are complete
+	return len(t.childWants) > 0
 }
 func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
@@ -350,6 +283,52 @@ func (t *Target) IsAchieved() bool {
 
 // Progress implements the Progressable interface for Target with direct execution
 func (t *Target) Progress() {
+	// Discovery Phase: Find wants that claim this target as owner
+	if t.builder != nil {
+		allWants := t.builder.GetAllWantStates()
+		log.Printf(">>> [PROGRESS] Target %s scanning %d wants for children\n", t.Metadata.Name, len(allWants))
+		
+		for _, want := range allWants {
+			// Debug specific want we are looking for
+			if want.Metadata.Name == "buffet-instance" {
+				log.Printf(">>> [PROGRESS] Found buffet-instance. OwnerRefs: %d\n", len(want.Metadata.OwnerReferences))
+			}
+
+			if t.isChildWant(want) {
+				// Ensure this want is in our childWants tracking list
+				exists := false
+				for _, existingChild := range t.childWants {
+					if existingChild.Metadata.ID == want.Metadata.ID {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					t.childWants = append(t.childWants, want)
+					t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+					log.Printf(">>> [ADOPT] Target %s adopted child %s\n", t.Metadata.Name, want.Metadata.Name)
+					
+					// If the newly adopted child is already achieved, mark it as completed
+					if want.Status == WantStatusAchieved {
+						t.childCompletionMutex.Lock()
+						t.completedChildren[want.Metadata.Name] = true
+						t.childCompletionMutex.Unlock()
+						
+						// Trigger completion check immediately after adoption if it was the only child
+						allComplete := t.checkAllChildrenComplete()
+						if allComplete {
+							// Signal that we might be done
+							select {
+							case t.childrenDone <- true:
+							default:
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
@@ -464,8 +443,19 @@ func (t *Target) PushParameterToChildren(paramName string, paramValue any) {
 
 // isChildWant checks if a want is a child of this target
 func (t *Target) isChildWant(want *Want) bool {
+	if want.Metadata.OwnerReferences == nil {
+		return false
+	}
 	for _, ownerRef := range want.Metadata.OwnerReferences {
-		if ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name {
+		match := ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name
+		
+		// Detailed debug log only for potential children
+		if ownerRef.Name == t.Metadata.Name {
+			log.Printf(">>> [CHECK] Comparing want %s ownerRef: Name=%s, Controller=%v, Kind=%v vs Target %s\n", 
+				want.Metadata.Name, ownerRef.Name, ownerRef.Controller, ownerRef.Kind, t.Metadata.Name)
+		}
+
+		if match {
 			return true
 		}
 	}

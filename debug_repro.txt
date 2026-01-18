@@ -1,0 +1,193 @@
+Starting MyWant Server on http://localhost:8080 (debug=false)...
+2026/01/16 22:18:15 [AGENT] Loading capabilities from: capabilities/
+2026/01/16 22:18:15 [AGENT] Found 8 capability files
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-buffet.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: buffet_agency (gives: [buffet_reservation])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: buffet_agency (gives: [buffet_reservation])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-buffet.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-flight.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: flight_agency (gives: [flight_booking])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: flight_agency (gives: [flight_booking])
+2026/01/16 22:18:15 [AGENT] Registering capability: flight_api_agency (gives: [create_flight cancel_flight])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: flight_api_agency (gives: [create_flight cancel_flight])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-flight.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-hotel.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: hotel_agency (gives: [hotel_reservation])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: hotel_agency (gives: [hotel_reservation])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-hotel.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-mock-server.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: mock_server_management (gives: [mock_server_management])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: mock_server_management (gives: [mock_server_management])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-mock-server.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-reminder-monitor.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: reminder_monitoring (gives: [reminder_monitoring])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: reminder_monitoring (gives: [reminder_monitoring])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-reminder-monitor.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-reminder-queue.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: reminder_queue_management (gives: [reminder_queue_management])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: reminder_queue_management (gives: [reminder_queue_management])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-reminder-queue.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-restaurant.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: restaurant_agency (gives: [restaurant_reservation])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: restaurant_agency (gives: [restaurant_reservation])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-restaurant.yaml
+2026/01/16 22:18:15 [VALIDATION] Capability 'capabilities/capability-silencer.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Registering capability: reaction_auto_approval (gives: [reaction_auto_approval])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: reaction_auto_approval (gives: [reaction_auto_approval])
+2026/01/16 22:18:15 [AGENT] Successfully loaded capability file: capabilities/capability-silencer.yaml
+2026/01/16 22:18:15 [REGISTRY] Registered capability: mock_server_management (gives: [mock_server_management])
+2026/01/16 22:18:15 [AGENT] Loading agents from: agents/
+2026/01/16 22:18:15 [AGENT] Found 5 agent files
+2026/01/16 22:18:15 [VALIDATION] Agent 'agents/agent-buffet.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [REGISTRY] Registered agent: agent_buffet_premium (type: do, capabilities: [buffet_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'agent_buffet_premium' to capability value 'buffet_reservation' (via buffet_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'agent_buffet_premium' with capabilities [buffet_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'agent_buffet_premium'
+2026/01/16 22:18:15 [REGISTRY] Registered agent: buffet_monitor (type: monitor, capabilities: [buffet_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'buffet_monitor' to capability value 'buffet_reservation' (via buffet_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'buffet_monitor' with capabilities [buffet_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'buffet_monitor'
+2026/01/16 22:18:15 [AGENT] Successfully loaded agent file: agents/agent-buffet.yaml
+2026/01/16 22:18:15 [VALIDATION] Agent 'agents/agent-flight.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [REGISTRY] Registered agent: agent_flight_api (type: do, capabilities: [flight_api_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'agent_flight_api' to capability value 'create_flight' (via flight_api_agency)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'agent_flight_api' to capability value 'cancel_flight' (via flight_api_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'agent_flight_api' with capabilities [flight_api_agency]
+2026/01/16 22:18:15 [REGISTRY] Registered agent: monitor_flight_api (type: monitor, capabilities: [flight_api_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'monitor_flight_api' to capability value 'create_flight' (via flight_api_agency)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'monitor_flight_api' to capability value 'cancel_flight' (via flight_api_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'monitor_flight_api' with capabilities [flight_api_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 12 tracked fields for agent 'monitor_flight_api'
+2026/01/16 22:18:15 [AGENT] Successfully loaded agent file: agents/agent-flight.yaml
+2026/01/16 22:18:15 [VALIDATION] Agent 'agents/agent-hotel.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [REGISTRY] Registered agent: agent_premium (type: do, capabilities: [hotel_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'agent_premium' to capability value 'hotel_reservation' (via hotel_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'agent_premium' with capabilities [hotel_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'agent_premium'
+2026/01/16 22:18:15 [REGISTRY] Registered agent: hotel_monitor (type: monitor, capabilities: [hotel_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'hotel_monitor' to capability value 'hotel_reservation' (via hotel_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'hotel_monitor' with capabilities [hotel_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'hotel_monitor'
+2026/01/16 22:18:15 [AGENT] Successfully loaded agent file: agents/agent-hotel.yaml
+2026/01/16 22:18:15 [VALIDATION] Agent 'agents/agent-mock-server.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [AGENT] Successfully loaded agent file: agents/agent-mock-server.yaml
+2026/01/16 22:18:15 [VALIDATION] Agent 'agents/agent-restaurant.yaml' validated successfully against OpenAPI spec
+2026/01/16 22:18:15 [REGISTRY] Registered agent: agent_restaurant_premium (type: do, capabilities: [restaurant_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'agent_restaurant_premium' to capability value 'restaurant_reservation' (via restaurant_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'agent_restaurant_premium' with capabilities [restaurant_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'agent_restaurant_premium'
+2026/01/16 22:18:15 [REGISTRY] Registered agent: restaurant_monitor (type: monitor, capabilities: [restaurant_agency])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'restaurant_monitor' to capability value 'restaurant_reservation' (via restaurant_agency)
+2026/01/16 22:18:15 [AGENT] Registered agent 'restaurant_monitor' with capabilities [restaurant_agency]
+2026/01/16 22:18:15 [AGENT SPEC] Registered 1 tracked fields for agent 'restaurant_monitor'
+2026/01/16 22:18:15 [AGENT] Successfully loaded agent file: agents/agent-restaurant.yaml
+2026/01/16 22:18:15 [RECIPE] 🔍 Scanning 15 recipes for custom types...
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'level 1 approval' in recipe approval-level-1.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'level 1 approval'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'level 2 approval' in recipe approval-level-2.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'level 2 approval'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'dynamic travel change' in recipe dynamic-travel-change.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'dynamic travel change'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'empty-target' in recipe empty.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'empty-target'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'execution result' in recipe execution-result-example.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'execution result'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'fibonacci sequence' in recipe fibonacci-sequence.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'fibonacci sequence'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'prime sieve' in recipe prime-sieve.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'prime sieve'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'qnet pipeline' in recipe qnet-pipeline.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'qnet pipeline'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'wait time in queue system' in recipe queue-system.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'wait time in queue system'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'silencer_example' in recipe silencer-example.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'silencer_example'
+2026/01/16 22:18:15 [RECIPE] 🎯 Found custom type 'agent travel system' in recipe travel-agent.yaml
+2026/01/16 22:18:15 [RECIPE] 🎯 Registered custom target type: 'agent travel system'
+2026/01/16 22:18:15 [RECIPE] ✅ Registered 11 custom types from recipes
+2026/01/16 22:18:15 [SERVER] Loading 15 recipe files into registry...
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Level 1 Approval'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Level 1 Approval
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Level 2 Approval'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Level 2 Approval
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Dynamic Travel Change with Flight API'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Dynamic Travel Change with Flight API
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'empty'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: empty
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Command Execution Example'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Command Execution Example
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Fibonacci Sequence'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Fibonacci Sequence
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Prime Sieve'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Prime Sieve
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'QNet Pipeline'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: QNet Pipeline
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Queue System'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Queue System
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'renamed-endpoint-test'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: renamed-endpoint-test
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'saved-empty-target-recipe-clean'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: saved-empty-target-recipe-clean
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'saved-empty-target-recipe'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: saved-empty-target-recipe
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Silencer Example'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Silencer Example
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'test-target-recipe'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: test-target-recipe
+2026/01/16 22:18:15 [RECIPE] 📝 Created recipe: 'Travel Agent System'
+2026/01/16 22:18:15 [SERVER] ✅ Loaded recipe: Travel Agent System
+2026/01/16 22:18:15 [SERVER] Successfully loaded 15/15 recipe files
+2026/01/16 22:18:15 [REGISTRY] Registered capability: command_execution (gives: [execute_shell_command])
+2026/01/16 22:18:15 [REGISTRY] Registered agent: execution_command (type: do, capabilities: [command_execution])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'execution_command' to capability value 'execute_shell_command' (via command_execution)
+2026/01/16 22:18:15 [AGENT] Registered ExecutionAgent with capability: command_execution
+2026/01/16 22:18:15 [REGISTRY] Registered capability: mcp_gmail (gives: [mcp_gmail_search mcp_gmail_read mcp_gmail_send])
+2026/01/16 22:18:15 [REGISTRY] Registered agent: mcp_tools (type: do, capabilities: [mcp_gmail])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'mcp_tools' to capability value 'mcp_gmail_search' (via mcp_gmail)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'mcp_tools' to capability value 'mcp_gmail_read' (via mcp_gmail)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'mcp_tools' to capability value 'mcp_gmail_send' (via mcp_gmail)
+[AGENT] MCPAgent registered with capabilities: mcp_gmail
+[AGENT] MCPAgent registered with capabilities: mcp_gmail
+2026/01/16 22:18:15 [REGISTRY] Registered agent: reminder_queue_manager (type: do, capabilities: [reminder_queue_management])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'reminder_queue_manager' to capability value 'reminder_queue_management' (via reminder_queue_management)
+2026/01/16 22:18:15 [REGISTRY] Registered agent: mock_server_manager (type: do, capabilities: [mock_server_management])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'mock_server_manager' to capability value 'mock_server_management' (via mock_server_management)
+2026/01/16 22:18:15 [REGISTRY] Registered agent: user_reaction_monitor (type: monitor, capabilities: [reminder_monitoring reaction_auto_approval])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'user_reaction_monitor' to capability value 'reminder_monitoring' (via reminder_monitoring)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'user_reaction_monitor' to capability value 'reaction_auto_approval' (via reaction_auto_approval)
+2026/01/16 22:18:15 [REGISTRY] Registered agent: user_reaction_do (type: do, capabilities: [reaction_auto_approval])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'user_reaction_do' to capability value 'reaction_auto_approval' (via reaction_auto_approval)
+2026/01/16 22:18:15 [REGISTRY] Registered capability: knowledge_monitoring (gives: [knowledge_monitoring])
+2026/01/16 22:18:15 [REGISTRY] Registered capability: knowledge_updating (gives: [knowledge_updating])
+2026/01/16 22:18:15 [REGISTRY] Registered agent: knowledge_agent (type: do, capabilities: [knowledge_monitoring knowledge_updating])
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'knowledge_agent' to capability value 'knowledge_monitoring' (via knowledge_monitoring)
+2026/01/16 22:18:15 [REGISTRY] Linked agent 'knowledge_agent' to capability value 'knowledge_updating' (via knowledge_updating)
+[AGENT] KnowledgeAgent registered
+[GOOSE-MANAGER] Creating new GooseManager
+[GOOSE-MANAGER] Initializing Goose manager (per-request mode with Gmail MCP)...
+[GOOSE-MANAGER] Goose manager ready for per-request execution
+[GOOSE-MANAGER] Gmail MCP extension will be loaded from ~/.config/goose/config.yaml
+[INFO] Registering flight_mock_server want type
+[INFO] Successfully registered flight_mock_server want type
+2026/01/16 22:18:15 [INFO] Registering draft want type
+2026/01/16 22:18:15 [INFO] Successfully registered draft want type
+2026/01/16 22:18:15 📊 Monitor want types registered
+2026/01/16 22:18:15 🚀 MyWant server starting on localhost:8080
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Waiting for reconcileMutex lock...
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Acquired reconcileMutex lock. Starting reconciliation phases...
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 1: COMPILE
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 2: CONNECT
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 3: START
+2026/01/16 22:18:15 [SYSTEM] System Scheduler Want initialized
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Completed all phases.
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Released reconcileMutex lock and finished reconciliation.
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Waiting for reconcileMutex lock...
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Acquired reconcileMutex lock. Starting reconciliation phases...
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 1: COMPILE
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 2: CONNECT
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Entering Phase 3: START
+2026/01/16 22:18:15 [START-WANT] 'system-scheduler' called, current status: idle
+2026/01/16 22:18:15 [START-WANT] 'system-scheduler' transitioned to Reaching status
+2026/01/16 22:18:15 [START-WANT] 'system-scheduler' goroutine marked as active, starting progression loop
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Completed all phases.
+2026/01/16 22:18:15 [DEBUG:RECONCILE] Released reconcileMutex lock and finished reconciliation.
