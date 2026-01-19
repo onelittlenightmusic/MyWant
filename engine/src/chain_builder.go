@@ -334,11 +334,16 @@ func (cb *ChainBuilder) GetHTTPClient() *HTTPClient {
 
 // matchesSelector checks if want labels match the selector criteria
 func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
+	InfoLog("[MATCH_SELECTOR:DEBUG] Comparing selector %v with wantLabels %v\n", selector, wantLabels)
 	for key, value := range selector {
-		if wantLabels[key] != value {
+		wantValue, exists := wantLabels[key]
+		InfoLog("[MATCH_SELECTOR:DEBUG]   - Checking key '%s': selector value '%s', wantLabel value '%s', exists: %v\n", key, value, wantValue, exists)
+		if !exists || wantValue != value {
+			InfoLog("[MATCH_SELECTOR:DEBUG]   - Mismatch detected for key '%s': !exists || wantValue != value is TRUE. Returning false.\n", key)
 			return false
 		}
 	}
+	InfoLog("[MATCH_SELECTOR:DEBUG] All selector keys matched. Returning true.\n")
 	return true
 }
 
