@@ -792,18 +792,52 @@ func (cb *ChainBuilder) connectPhase() error {
 	return nil
 }
 
-// notifyParentOfAdoption identifies the owner target of a want and triggers dynamic adoption
-func (cb *ChainBuilder) notifyParentOfAdoption(want *Want) {
-	for _, ownerRef := range want.Metadata.OwnerReferences {
-		if ownerRef.Controller && ownerRef.Kind == "Want" {
-			// Find the parent target in runtime
-			if parentRuntime, exists := cb.wants[ownerRef.Name]; exists {
+// notifyParentOfChanges identifies added or removed owners and notifies them
+func (cb *ChainBuilder) notifyParentOfChanges(want *Want, oldRefs, newRefs []OwnerReference) {
+	log.Printf("[DEBUG:PARENT-CHANGE] Processing changes for %s. OldRefs: %d, NewRefs: %d\n", want.Metadata.Name, len(oldRefs), len(newRefs))
+	// Map current owners for easy lookup
+	oldOwners := make(map[string]bool)
+	for _, ref := range oldRefs {
+		if ref.Controller && ref.Kind == "Want" {
+			oldOwners[ref.Name] = true
+		}
+	}
+
+	newOwners := make(map[string]bool)
+	for _, ref := range newRefs {
+		if ref.Controller && ref.Kind == "Want" {
+			newOwners[ref.Name] = true
+		}
+	}
+
+	// 1. Notify removed parents (Disown)
+	for name := range oldOwners {
+		if !newOwners[name] {
+			log.Printf("[DEBUG:PARENT-CHANGE] Notifying old parent %s to DISOWN %s\n", name, want.Metadata.Name)
+			if parentRuntime, exists := cb.wants[name]; exists {
+				if target, ok := parentRuntime.function.(*Target); ok {
+					target.DisownChild(want.Metadata.ID)
+				}
+			}
+		}
+	}
+
+	// 2. Notify added parents (Adopt)
+	for name := range newOwners {
+		if !oldOwners[name] {
+			log.Printf("[DEBUG:PARENT-CHANGE] Notifying new parent %s to ADOPT %s\n", name, want.Metadata.Name)
+			if parentRuntime, exists := cb.wants[name]; exists {
 				if target, ok := parentRuntime.function.(*Target); ok {
 					target.AdoptChild(want)
 				}
 			}
 		}
 	}
+}
+
+// notifyParentOfAdoption identifies the owner target of a want and triggers dynamic adoption (DEPRECATED: used by notifyParentOfChanges)
+func (cb *ChainBuilder) notifyParentOfAdoption(want *Want) {
+	cb.notifyParentOfChanges(want, nil, want.Metadata.OwnerReferences)
 }
 
 // processTargets processes all Target wants and builds their parameter subscriptions
@@ -1432,6 +1466,10 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 				// updatedConfigWant is the one from newConfig (cb.config)
 				updatedConfigWant := change.Want 
 				if updatedConfigWant != nil {
+					// Identify changed parents before syncing
+					oldOwnerRefs := copyOwnerReferences(runtimeWant.want.Metadata.OwnerReferences)
+					newOwnerRefs := updatedConfigWant.Metadata.OwnerReferences
+
 					// Sync ALL fields
 					runtimeWant.want.Spec = updatedConfigWant.Spec
 					runtimeWant.want.Metadata = updatedConfigWant.Metadata
@@ -1442,8 +1480,8 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 						runtimeWant.want.SetProgressable(progressable)
 					}
 
-					// Notify potential new parent
-					cb.notifyParentOfAdoption(updatedConfigWant)
+					// Notify parents of changes (adoption or disowning)
+					cb.notifyParentOfChanges(updatedConfigWant, oldOwnerRefs, newOwnerRefs)
 
 					// Reset status to Idle so want can be re-executed
 					runtimeWant.want.RestartWant()
@@ -1678,41 +1716,23 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 	InfoLog("[UPDATE-WANT] Updating want ID: %s (name: %s)\n", wantConfig.Metadata.ID, wantConfig.Metadata.Name)
 
-	// 1. Search in runtime wants first
-	foundInRuntime := false
-	for wantName, runtimeWant := range cb.wants {
-		if runtimeWant.want.Metadata.ID == wantConfig.Metadata.ID {
-			InfoLog("[UPDATE-WANT] Found in runtime: %s\n", wantName)
-			// Update the runtime want's configuration
-			runtimeWant.want.Spec = wantConfig.Spec
-			runtimeWant.want.Metadata = wantConfig.Metadata // Sync ALL metadata including OwnerReferences
-			runtimeWant.want.State = wantConfig.State // Sync state as well
-			foundInRuntime = true
-			break
-		}
-	}
-	
-	// 2. Search in config wants (must do this regardless of foundInRuntime to keep config in sync)
+	// Search in config wants and update
 	foundInConfig := false
 	for i, cfgWant := range cb.config.Wants {
 		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
-			if !foundInConfig {
-				InfoLog("[UPDATE-WANT] Found in config at index %d\n", i)
-			}
 			cb.config.Wants[i] = wantConfig
 			foundInConfig = true
 			break
 		}
 	}
 
-	if !foundInRuntime && !foundInConfig {
-		InfoLog("[UPDATE-WANT] Not found in runtime or config, adding as new dynamic want\n")
-		// 3. Not found anywhere, add as new
+	if !foundInConfig {
+		InfoLog("[UPDATE-WANT] Not found in config, adding as new dynamic want\n")
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
 
-	// Trigger immediate reconciliation via channel (unless already in reconciliation)
+	// Trigger immediate reconciliation via channel
 	if !cb.inReconciliation {
 		select {
 		case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:

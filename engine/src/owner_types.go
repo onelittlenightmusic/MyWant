@@ -281,6 +281,38 @@ func (t *Target) IsAchieved() bool {
 	return allComplete
 }
 
+// DisownChild removes a want from this target's tracking
+func (t *Target) DisownChild(wantID string) {
+	t.childCompletionMutex.Lock()
+	defer t.childCompletionMutex.Unlock()
+
+	newChildWants := make([]*Want, 0)
+	var removedName string
+	for _, child := range t.childWants {
+		if child.Metadata.ID == wantID {
+			removedName = child.Metadata.Name
+			continue
+		}
+		newChildWants = append(newChildWants, child)
+	}
+
+	if removedName != "" {
+		t.childWants = newChildWants
+		delete(t.completedChildren, removedName)
+		t.StoreLog("[TARGET] Disowned child: %s\n", removedName)
+		
+		// Update stats and check if status needs to change back from achieved
+		t.childCount = len(t.childWants)
+		t.StoreState("child_count", t.childCount)
+		
+		if t.Status == WantStatusAchieved {
+			// If we were achieved but lost a child (or now have none), re-evaluate or reset
+			// For now, simple reset to reaching to allow re-evaluation in next Progress()
+			t.SetStatus(WantStatusReaching)
+		}
+	}
+}
+
 // AdoptChild adds a single want as a child of this target if it's not already tracked
 func (t *Target) AdoptChild(want *Want) {
 	if !t.isChildWant(want) {
