@@ -911,10 +911,24 @@ export const Dashboard: React.FC = () => {
   const handleWantDropped = async (draggedWantId: string, targetWantId: string) => {
     try {
       const draggedWant = wants.find(w => (w.metadata?.id === draggedWantId) || (w.id === draggedWantId));
-      const targetWant = wants.find(w => (w.metadata?.id === targetWantId) || (w.id === targetWantId));
-
-      if (!draggedWant || !targetWant) {
+      if (!draggedWant) {
         showNotification('Want not found');
+        return;
+      }
+
+      // If targetWantId is empty, it means we are dragging out to the top level
+      if (!targetWantId) {
+        // If already top level, nothing to do
+        if (!draggedWant.metadata.ownerReferences || draggedWant.metadata.ownerReferences.length === 0) {
+          return;
+        }
+        await handleUnparentWant(draggedWantId);
+        return;
+      }
+
+      const targetWant = wants.find(w => (w.metadata?.id === targetWantId) || (w.id === targetWantId));
+      if (!targetWant) {
+        showNotification('Target want not found');
         return;
       }
 
@@ -1219,7 +1233,19 @@ export const Dashboard: React.FC = () => {
         )}
 
         {/* Left content area - main dashboard */}
-        <div className="flex-1 overflow-y-auto">
+        <div 
+          className="flex-1 overflow-y-auto"
+          onDragOver={(e) => {
+            e.preventDefault();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const draggedWantId = e.dataTransfer.getData('application/mywant-id');
+            if (draggedWantId) {
+              handleUnparentWant(draggedWantId);
+            }
+          }}
+        >
           <div className="p-6 pb-24">
             {/* Error message */}
             {error && (
