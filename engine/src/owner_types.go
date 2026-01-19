@@ -439,6 +439,7 @@ func (t *Target) Progress() {
 							t.StoreLog("[TARGET] Providing ApprovalData to %d output channels for '%s' (ID: %s)\n", t.GetOutCount(), t.Metadata.Name, t.Metadata.ID)
 							t.Provide(approvalData) // Use the constructed ApprovalData
 							t.ProvideDone()
+							time.Sleep(10 * time.Millisecond) // Add short sleep after providing
 				
 							// Compute and store recipe result (this part remains)
 							t.computeTemplateResult()
