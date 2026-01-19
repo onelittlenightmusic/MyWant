@@ -25,6 +25,7 @@ import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { ConfirmationBubble, Toast } from '@/components/notifications';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
+import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -1641,6 +1642,16 @@ export const Dashboard: React.FC = () => {
         selectedRecommendation={selectedRecommendation}
         onRecommendationSelect={handleRecommendationSelect}
         onRecommendationDeploy={handleRecommendationDeploy}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteConfirmation}
+        onClose={handleDeleteWantCancel}
+        onConfirm={handleDeleteWantConfirm}
+        want={deleteWantState}
+        loading={isDeletingWant}
+        title="Delete Want"
+        message={deleteWantState ? `Are you sure you want to delete the want "${deleteWantState.metadata?.name}"?` : 'Are you sure you want to delete this want?'}
       />
 
                   {/* Message Notification */}
