@@ -178,7 +178,11 @@ func (c *CoordinatorWant) IsAchieved() bool {
 // Progress executes the coordinator logic using unified completion strategy
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
-	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d", inCount))
+	activeInputChannels := c.GetPaths().In
+	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ActiveChannels=%d", inCount, len(activeInputChannels)))
+	for i, pathInfo := range activeInputChannels {
+		c.StoreLog(fmt.Sprintf("[Progress]   - Channel %d: Name=%s, Active=%v, Channel=%p", i, pathInfo.Name, pathInfo.Active, pathInfo.Channel))
+	}
 
 	timeout := 5000
 	channelIndex, data, done, ok := c.Use(timeout)
