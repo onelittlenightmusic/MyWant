@@ -397,23 +397,53 @@ func (t *Target) Progress() {
 				// Use StoreState() - never write directly to State map
 				t.StoreState("achieving_percentage", 100)
 
-				// Send completion packet to parent/upstream wants
-				packet := Dict{
-					"status":     "completed",
-					"name":       t.Metadata.Name,
-					"type":       t.Metadata.Type,
-					"childCount": t.childCount,
-				}
-				t.Provide(packet)
-
-				// Compute and store recipe result
-				t.computeTemplateResult()
-
-				// Mark the target as completed
-				// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
-				// This is part of the standard progression cycle completion pattern
-				t.SetStatus(WantStatusAchieved)
-			}
+							// Send completion packet to parent/upstream wants
+							// Construct ApprovalData for the parent coordinator
+							approvalID := t.GetStringParam("approval_id", t.Metadata.ID) // Assuming approval_id is a parameter or metadata
+				
+							// Extract relevant status from children (e.g., if level 2 approval passed or failed)
+							// For simplicity, let's assume it's "approved" if all children achieved
+							approvalStatus := "approved"
+							if t.Status == WantStatusFailed { // If target itself failed
+								approvalStatus = "failed"
+							}
+				
+							// Get the final result from the template result
+							var finalResultDescription string
+							if res, ok := t.State["result"].(string); ok {
+								finalResultDescription = res
+							} else {
+								finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
+							}
+							
+							// For complex structures, marshal to JSON and then to map[string]any if needed
+							var evidenceMap map[string]any
+							if ev, ok := t.State["final_itinerary"]; ok { // Example: if target computes an itinerary
+								if bytes, err := json.Marshal(ev); err == nil {
+									json.Unmarshal(bytes, &evidenceMap)
+								}
+							}
+							if evidenceMap == nil {
+								evidenceMap = map[string]any{"status": approvalStatus} // Default evidence
+							}
+				
+							approvalData := &ApprovalData{
+								ApprovalID:  approvalID,
+								Evidence:    evidenceMap, // Or more detailed evidence from children
+								Description: finalResultDescription,
+								Timestamp:   time.Now(),
+							}
+							
+							t.Provide(approvalData) // Use the constructed ApprovalData
+							t.ProvideDone()
+				
+							// Compute and store recipe result (this part remains)
+							t.computeTemplateResult()
+				
+							// Mark the target as completed
+							// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
+							// This is part of the standard progression cycle completion pattern
+							t.SetStatus(WantStatusAchieved)			}
 			return
 		}
 
