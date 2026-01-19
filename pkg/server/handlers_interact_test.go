@@ -245,7 +245,7 @@ func TestInteractDeploy_Success(t *testing.T) {
 
 	// Create session and generate recommendations via message
 	session := s.interactionManager.CreateSession()
-	_, msgErr := s.interactionManager.SendMessage(context.Background(), session.SessionID, "Book a hotel")
+	_, msgErr := s.interactionManager.SendMessage(context.Background(), session.SessionID, "Book a hotel", nil)
 	require.NoError(t, msgErr)
 
 	// Deploy
@@ -302,7 +302,7 @@ func TestInteractDeploy_WithModifications(t *testing.T) {
 
 	// Create session and generate recommendations
 	session := s.interactionManager.CreateSession()
-	_, msgErr := s.interactionManager.SendMessage(context.Background(), session.SessionID, "Book hotels")
+	_, msgErr := s.interactionManager.SendMessage(context.Background(), session.SessionID, "Book hotels", nil)
 	require.NoError(t, msgErr)
 
 	// Deploy with modifications
