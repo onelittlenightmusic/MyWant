@@ -794,7 +794,6 @@ func (cb *ChainBuilder) connectPhase() error {
 
 // notifyParentOfChanges identifies added or removed owners and notifies them
 func (cb *ChainBuilder) notifyParentOfChanges(want *Want, oldRefs, newRefs []OwnerReference) {
-	log.Printf("[DEBUG:PARENT-CHANGE] Processing changes for %s. OldRefs: %d, NewRefs: %d\n", want.Metadata.Name, len(oldRefs), len(newRefs))
 	// Map current owners for easy lookup
 	oldOwners := make(map[string]bool)
 	for _, ref := range oldRefs {
@@ -813,7 +812,6 @@ func (cb *ChainBuilder) notifyParentOfChanges(want *Want, oldRefs, newRefs []Own
 	// 1. Notify removed parents (Disown)
 	for name := range oldOwners {
 		if !newOwners[name] {
-			log.Printf("[DEBUG:PARENT-CHANGE] Notifying old parent %s to DISOWN %s\n", name, want.Metadata.Name)
 			if parentRuntime, exists := cb.wants[name]; exists {
 				if target, ok := parentRuntime.function.(*Target); ok {
 					target.DisownChild(want.Metadata.ID)
@@ -825,7 +823,6 @@ func (cb *ChainBuilder) notifyParentOfChanges(want *Want, oldRefs, newRefs []Own
 	// 2. Notify added parents (Adopt)
 	for name := range newOwners {
 		if !oldOwners[name] {
-			log.Printf("[DEBUG:PARENT-CHANGE] Notifying new parent %s to ADOPT %s\n", name, want.Metadata.Name)
 			if parentRuntime, exists := cb.wants[name]; exists {
 				if target, ok := parentRuntime.function.(*Target); ok {
 					target.AdoptChild(want)

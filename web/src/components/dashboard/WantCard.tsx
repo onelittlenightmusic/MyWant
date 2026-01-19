@@ -632,7 +632,6 @@ export const WantCard: React.FC<WantCardProps> = ({
                     e.dataTransfer.setData('application/mywant-id', id);
                     e.dataTransfer.setData('application/mywant-name', child.metadata?.name || '');
                     e.dataTransfer.effectAllowed = 'move';
-                    console.log('[DEBUG WantCard] Drag start child:', id);
                   }}
                   onDragEnd={(e) => {
                     e.stopPropagation();

@@ -1,0 +1,185 @@
+### Page state
+- Page URL: http://localhost:8080/dashboard
+- Page Title: MyWant Dashboard
+- Page Snapshot:
+```yaml
+- generic [ref=e4]:
+  - button [ref=e6] [cursor=pointer]:
+    - img [ref=e7]
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - heading "Menu" [level=2] [ref=e11]
+      - button [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - generic [ref=e16]:
+      - navigation [ref=e17]:
+        - link "Wants" [ref=e18] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e19]
+        - link "Agents" [ref=e21] [cursor=pointer]:
+          - /url: /agents
+          - img [ref=e22]
+      - generic [ref=e25]:
+        - heading "Adv" [level=3] [ref=e26]
+        - navigation [ref=e27]:
+          - link "Want Types" [ref=e28] [cursor=pointer]:
+            - /url: /want-types
+            - img [ref=e29]
+          - link "Recipes" [ref=e31] [cursor=pointer]:
+            - /url: /recipes
+            - img [ref=e32]
+          - link "Logs" [ref=e35] [cursor=pointer]:
+            - /url: /logs
+            - img [ref=e36]
+  - generic [ref=e39]:
+    - banner [ref=e40]:
+      - generic [ref=e41]:
+        - heading "MyWant Dashboard" [level=1] [ref=e43]
+        - generic [ref=e44]:
+          - button "Select" [ref=e45] [cursor=pointer]:
+            - img [ref=e46]
+            - text: Select
+          - button "Summary" [ref=e49] [cursor=pointer]:
+            - img [ref=e50]
+            - text: Summary
+          - button "Add Want" [ref=e52] [cursor=pointer]:
+            - img [ref=e53]
+            - text: Add Want
+    - main [ref=e54]:
+      - text: // ...
+      - generic [ref=e58]:
+        - generic [ref=e60] [cursor=pointer]:
+          - generic:
+            - generic:
+              - img
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - heading "target" [level=3] [ref=e65]
+              - paragraph [ref=e66]: retry-parent
+            - generic [ref=e67]:
+              - button "Click to view details" [ref=e68]:
+                - generic "achieved" [ref=e69]:
+                  - img [ref=e71]
+              - button "Delete" [ref=e74]:
+                - img [ref=e75]
+          - button "achieved 1 child want" [ref=e79]:
+            - generic [ref=e80]:
+              - generic "1 child want" [ref=e81]:
+                - generic "achieved" [ref=e82]
+              - generic [ref=e83]: 1 child want
+            - img [ref=e84]
+        - generic [ref=e87] [cursor=pointer]:
+          - generic:
+            - generic:
+              - img
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - heading "target" [level=3] [ref=e92]
+              - paragraph [ref=e93]: grid-debug-parent
+            - generic [ref=e94]:
+              - button "Click to view details" [ref=e95]:
+                - generic "reaching" [ref=e96]:
+                  - img [ref=e98]
+              - button "Delete" [ref=e100]:
+                - img [ref=e101]
+          - button "achieved 1 child want" [ref=e105]:
+            - generic [ref=e106]:
+              - generic "1 child want" [ref=e107]:
+                - generic "achieved" [ref=e108]
+              - generic [ref=e109]: 1 child want
+            - img [ref=e110]
+        - button "Add Want" [ref=e112] [cursor=pointer]:
+          - img [ref=e114]
+          - paragraph [ref=e116]: Add Want
+      - generic [ref=e117]:
+        - generic [ref=e118]:
+          - heading "Summary" [level=2] [ref=e120]
+          - button "Close sidebar" [ref=e122] [cursor=pointer]:
+            - img [ref=e123]
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - heading "Labels" [level=3] [ref=e130]
+              - button "Add label" [ref=e131] [cursor=pointer]:
+                - img [ref=e132]
+            - paragraph [ref=e135]: No labels found
+          - generic [ref=e136]:
+            - heading "Statistics" [level=3] [ref=e137]
+            - generic [ref=e139]:
+              - generic [ref=e141]:
+                - img [ref=e144]
+                - generic [ref=e147]:
+                  - paragraph [ref=e148]: Total Wants
+                  - paragraph [ref=e149]: "4"
+              - generic [ref=e151]:
+                - img [ref=e154]
+                - generic [ref=e156]:
+                  - paragraph [ref=e157]: Reaching
+                  - paragraph [ref=e158]: "1"
+              - generic [ref=e160]:
+                - img [ref=e163]
+                - generic [ref=e166]:
+                  - paragraph [ref=e167]: Achieved
+                  - paragraph [ref=e168]: "3"
+              - generic [ref=e170]:
+                - img [ref=e173]
+                - generic [ref=e175]:
+                  - paragraph [ref=e176]: Failed
+                  - paragraph [ref=e177]: "0"
+            - generic [ref=e178]:
+              - button "Export" [ref=e179] [cursor=pointer]:
+                - img [ref=e180]
+                - generic [ref=e183]: Export
+              - button "Import" [ref=e184] [cursor=pointer]:
+                - img [ref=e185]
+                - generic [ref=e188]: Import
+          - generic [ref=e189]:
+            - heading "Filters" [level=3] [ref=e190]
+            - generic [ref=e192]:
+              - generic [ref=e194]:
+                - img [ref=e195]
+                - textbox "Search wants by name, type, or labels..." [ref=e198]
+              - generic [ref=e199]:
+                - img [ref=e200]
+                - generic [ref=e202]: "Status:"
+                - generic [ref=e203]:
+                  - button "created" [ref=e204] [cursor=pointer]:
+                    - generic [ref=e206]: created
+                  - button "reaching" [ref=e207] [cursor=pointer]:
+                    - generic [ref=e209]: reaching
+                  - button "achieved" [ref=e210] [cursor=pointer]:
+                    - generic [ref=e212]: achieved
+                  - button "failed" [ref=e213] [cursor=pointer]:
+                    - generic [ref=e215]: failed
+                  - button "stopped" [ref=e216] [cursor=pointer]:
+                    - generic [ref=e218]: stopped
+    - generic [ref=e219]:
+      - button "Close sidebar" [ref=e222] [cursor=pointer]:
+        - img [ref=e223]
+      - generic [ref=e228]:
+        - img [ref=e229]
+        - paragraph [ref=e232]: Select a want to view details
+    - generic [ref=e233]:
+      - generic [ref=e234]:
+        - heading "New Want" [level=2] [ref=e236]
+        - generic [ref=e237]:
+          - generic [ref=e239]:
+            - generic [ref=e240]:
+              - button "Form" [ref=e241] [cursor=pointer]:
+                - img [ref=e242]
+                - text: Form
+              - button "Edit as YAML" [ref=e244] [cursor=pointer]:
+                - img [ref=e245]
+            - button "Add" [disabled] [ref=e248]:
+              - img [ref=e249]
+              - text: Add
+          - button "Close sidebar" [ref=e253] [cursor=pointer]:
+            - img [ref=e254]
+      - generic [ref=e259]:
+        - generic [ref=e260]: Select Want Type or Recipe *
+        - generic [ref=e261]:
+          - generic [ref=e262]:
+            - img
+            - textbox "Search by keyword (press \"/\")" [active] [ref=e263]
+          - paragraph [ref=e266]: No want types or recipes found matching ""
+```
