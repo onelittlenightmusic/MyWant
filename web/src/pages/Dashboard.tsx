@@ -987,7 +987,7 @@ export const Dashboard: React.FC = () => {
 
       // Get the parent IDs before unparenting
       const parentIds = draggedWant.metadata.ownerReferences
-        .filter(ref => ref.Controller && ref.Kind === 'Want')
+        .filter(ref => ref.controller && ref.kind === 'Want')
         .map(ref => ref.id)
         .filter((id): id is string => !!id);
 
