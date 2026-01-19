@@ -281,35 +281,36 @@ func (t *Target) IsAchieved() bool {
 	return allComplete
 }
 
-// AdoptChildren scans provided wants and adopts those that point to this target
-func (t *Target) AdoptChildren(allWants map[string]*Want) {
-	for _, want := range allWants {
-		if t.isChildWant(want) {
-			// Ensure this want is in our childWants tracking list
-			exists := false
-			for _, existingChild := range t.childWants {
-				if existingChild.Metadata.ID == want.Metadata.ID {
-					exists = true
-					break
-				}
-			}
-			if !exists {
-				t.childWants = append(t.childWants, want)
-				t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
-				
-				// If the newly adopted child is already achieved, mark it as completed
-				if want.Status == WantStatusAchieved {
-					t.childCompletionMutex.Lock()
-					t.completedChildren[want.Metadata.Name] = true
-					t.childCompletionMutex.Unlock()
-				}
-			}
+// AdoptChild adds a single want as a child of this target if it's not already tracked
+func (t *Target) AdoptChild(want *Want) {
+	if !t.isChildWant(want) {
+		return
+	}
+
+	// Ensure this want is in our childWants tracking list
+	exists := false
+	for _, existingChild := range t.childWants {
+		if existingChild.Metadata.ID == want.Metadata.ID {
+			exists = true
+			break
 		}
 	}
-	
-	// Update stats
-	t.childCount = len(t.childWants)
-	t.StoreState("child_count", t.childCount)
+
+	if !exists {
+		t.childWants = append(t.childWants, want)
+		t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+		
+		// If the newly adopted child is already achieved, mark it as completed
+		if want.Status == WantStatusAchieved {
+			t.childCompletionMutex.Lock()
+			t.completedChildren[want.Metadata.Name] = true
+			t.childCompletionMutex.Unlock()
+		}
+		
+		// Update stats
+		t.childCount = len(t.childWants)
+		t.StoreState("child_count", t.childCount)
+	}
 }
 
 // Progress implements the Progressable interface for Target with direct execution

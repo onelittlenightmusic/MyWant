@@ -792,19 +792,24 @@ func (cb *ChainBuilder) connectPhase() error {
 	return nil
 }
 
+// notifyParentOfAdoption identifies the owner target of a want and triggers dynamic adoption
+func (cb *ChainBuilder) notifyParentOfAdoption(want *Want) {
+	for _, ownerRef := range want.Metadata.OwnerReferences {
+		if ownerRef.Controller && ownerRef.Kind == "Want" {
+			// Find the parent target in runtime
+			if parentRuntime, exists := cb.wants[ownerRef.Name]; exists {
+				if target, ok := parentRuntime.function.(*Target); ok {
+					target.AdoptChild(want)
+				}
+			}
+		}
+	}
+}
+
 // processTargets processes all Target wants and builds their parameter subscriptions
 func (cb *ChainBuilder) processTargets() {
-	// Create a snapshot of all wants for adoption
-	allWants := make(map[string]*Want)
-	for name, rw := range cb.wants {
-		allWants[name] = rw.want
-	}
-
 	for _, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
-			// Trigger dynamic child adoption
-			target.AdoptChildren(allWants)
-
 			if target.RecipePath != "" && target.recipeLoader != nil {
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
 					log.Printf("[ERROR] Failed to build target parameter subscriptions: %v\n", err)
@@ -1419,6 +1424,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 		case ChangeEventAdd:
 			// Just add to runtime mapping, it's already in cb.config.Wants
 			cb.addRuntimeWantOnly(change.Want)
+			cb.notifyParentOfAdoption(change.Want)
 			hasWantChanges = true
 		case ChangeEventUpdate:
 			// Sync fields from config to runtime
@@ -1435,6 +1441,9 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					if progressable, ok := runtimeWant.function.(Progressable); ok {
 						runtimeWant.want.SetProgressable(progressable)
 					}
+
+					// Notify potential new parent
+					cb.notifyParentOfAdoption(updatedConfigWant)
 
 					// Reset status to Idle so want can be re-executed
 					runtimeWant.want.RestartWant()
