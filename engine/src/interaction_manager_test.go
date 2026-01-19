@@ -276,7 +276,7 @@ func TestInteractionManager_SendMessage(t *testing.T) {
 	session := manager.CreateSession()
 
 	// Send message
-	updatedSession, err := manager.SendMessage(context.Background(), session.SessionID, "Book a hotel")
+	updatedSession, err := manager.SendMessage(context.Background(), session.SessionID, "Book a hotel", nil)
 	require.NoError(t, err)
 
 	// Verify conversation history
