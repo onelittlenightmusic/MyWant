@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      name: parent-target
+      type: target
+    spec:
+      params: {}
+
+  - metadata:
+      name: child-want
+      type: target
+    spec:
+      params: {}

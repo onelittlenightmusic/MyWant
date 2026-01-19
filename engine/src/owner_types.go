@@ -159,7 +159,7 @@ func (t *Target) checkAllChildrenComplete() bool {
 			return false
 		}
 	}
-	
+
 	// If we reached here and have at least one child (dynamic or recipe), we are complete
 	return len(t.childWants) > 0
 }
@@ -266,6 +266,14 @@ func (t *Target) IsAchieved() bool {
 	// Check the Status field which was set by Progress() when all children completed
 	// This is more reliable than re-checking children completion, which can be slow or racy
 	if t.Status == WantStatusAchieved {
+		// CONSISTENCY CHECK: If achieved, achieving_percentage must be 100%
+		// This ensures data consistency even if old data has stale values
+		achievingPct, ok := t.State["achieving_percentage"]
+		if !ok || (ok && achievingPct != 100) {
+			// Directly update the state (synchronous) in addition to batching via StoreState
+			t.State["achieving_percentage"] = 100
+			t.StoreState("achieving_percentage", 100)
+		}
 		return true
 	}
 
@@ -386,7 +394,9 @@ func (t *Target) Progress() {
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
-				// Set achieving_percentage to 100 when all children are complete
+				// CONSISTENCY: Set achieving_percentage to 100 directly AND via StoreState
+				// Direct update ensures immediate consistency for API responses
+				t.State["achieving_percentage"] = 100
 				t.StoreState("achieving_percentage", 100)
 
 				// Send completion packet to parent/upstream wants
