@@ -44,7 +44,6 @@ interface WantCardProps {
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
-  isBeingProcessed?: boolean; // New prop for initializing/deleting states
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -66,8 +65,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   onLabelDropped,
   onWantDropped,
   isSelectMode = false,
-  selectedWantIds,
-  isBeingProcessed = false // Default to false
+  selectedWantIds
 }) => {
   const wantId = want.metadata?.id || want.id;
   const { setDraggingWant, setIsOverTarget } = useWantStore();
@@ -136,8 +134,6 @@ export const WantCard: React.FC<WantCardProps> = ({
   }, [displayIsExpanded]);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if (isBeingProcessed) return; // Prevent clicks when processing
-
     // Don't trigger view if clicking on interactive elements (buttons, menu, etc.)
     const target = e.target as HTMLElement;
 
@@ -175,8 +171,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Handler for child card clicks - passes child directly without closure
   const handleChildCardClick = (child: Want) => (e: React.MouseEvent) => {
-    if (isBeingProcessed) return; // Prevent clicks when processing
-
     if (e.defaultPrevented) return;
     e.preventDefault();
     e.stopPropagation();
@@ -196,7 +190,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Handle drag start for the card itself
   const handleDragStart = (e: React.DragEvent) => {
-    if (isSelectMode || isBeingProcessed) return; // Prevent dragging when processing
+    if (isSelectMode) return;
     
     const id = want.metadata?.id || want.id;
     if (!id) return;
@@ -215,8 +209,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Handle drag over
   const handleDragOver = (e: React.DragEvent) => {
-    if (isBeingProcessed) return; // Prevent drag over when processing
-
     e.preventDefault();
     e.stopPropagation();
     
@@ -245,8 +237,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Handle drag leave
   const handleDragLeave = (e: React.DragEvent) => {
-    if (isBeingProcessed) return; // Prevent drag leave when processing
-    
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -257,8 +247,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Handle drop
   const handleDrop = (e: React.DragEvent) => {
-    if (isBeingProcessed) return; // Prevent drop when processing
-
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
@@ -347,22 +335,22 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       ref={cardRef}
-      draggable={!isSelectMode && !isTargetWant && !isBeingProcessed} // Disable dragging when processing
+      draggable={!isSelectMode && !isTargetWant}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      tabIndex={isBeingProcessed ? -1 : 0} // Disable focus when processing
+      tabIndex={0}
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantId}
       data-is-target={isTargetWant}
       className={classNames(
-        'card hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
+        'card hover:shadow-md transition-all duration-300 cursor-pointer group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
-        (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100', // Apply drag styles only if not processing
-        isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed', // Visual feedback and disable interaction
+        // ALWAYS show blue for any valid drag over (labels or wants)
+        (isDragOverWant || isDragOver) && 'border-blue-600 border-2 bg-blue-100',
         parentBackgroundStyle.className,
         className || ''
       )}
@@ -379,12 +367,12 @@ export const WantCard: React.FC<WantCardProps> = ({
       <div 
         className={classNames(
           "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none",
-          isDragOverWant && isTargetWant && !draggedOverChildId && !isBeingProcessed ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
         )}
       >
         <div className={classNames(
           "bg-white p-4 rounded-full shadow-2xl border-4 border-blue-600 transform transition-all duration-400 ease-out",
-          isDragOverWant && isTargetWant && !draggedOverChildId && !isBeingProcessed ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
+          isDragOverWant && isTargetWant && !draggedOverChildId ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
         )}>
           <Plus className="w-16 h-12 text-blue-700" />
         </div>
@@ -431,11 +419,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                 setLocalIsExpanded(true);
               }
             }}
-            className={classNames(
-              "flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors",
-              isBeingProcessed && 'pointer-events-none' // Disable clicks when processing
-            )}
-            disabled={isBeingProcessed} // Disable button when processing
+            className="flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             <div className="flex items-center gap-3">
               {/* Status dots for each child want */}
@@ -478,11 +462,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   setLocalIsExpanded(false);
                 }
               }}
-              className={classNames(
-                "text-xs text-gray-500 hover:text-gray-700",
-                isBeingProcessed && 'pointer-events-none' // Disable clicks when processing
-              )}
-              disabled={isBeingProcessed} // Disable button when processing
+              className="text-xs text-gray-500 hover:text-gray-700"
             >
               Collapse
             </button>
@@ -547,8 +527,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
                   // Handle drag over for child card
                   const handleChildDragOver = (e: React.DragEvent) => {
-                    if (isBeingProcessed) return; // Prevent drag over when processing
-
                     e.preventDefault();
                     e.stopPropagation();
                     
@@ -580,8 +558,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
                   // Handle drag leave for child card
                   const handleChildDragLeave = (e: React.DragEvent) => {
-                    if (isBeingProcessed) return; // Prevent drag leave when processing
-
                     e.preventDefault();
                     e.stopPropagation();
                     // Don't reset everything, just child ID
@@ -590,8 +566,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
                   // Handle drop for child card
                   const handleChildDrop = (e: React.DragEvent) => {
-                    if (isBeingProcessed) return; // Prevent drop when processing
-
                     e.preventDefault();
                     e.stopPropagation();
                     setIsDragOver(false);
@@ -648,8 +622,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                   key={childId || `child-${index}`}
                   data-keyboard-nav-selected={isChildSelected}
                   data-keyboard-nav-id={childId}
-                  tabIndex={isBeingProcessed ? -1 : 0} // Disable focus when processing
-                  draggable={true && !isBeingProcessed} // Disable dragging when processing
+                  tabIndex={0}
+                  draggable={true}
                   onDragStart={(e) => {
                     e.stopPropagation();
                     const id = child.metadata?.id || child.id;
@@ -666,8 +640,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                   className={classNames(
                     "relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset",
                     isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 hover:border-gray-300',
-                    (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100', // Apply drag styles only if not processing
-                    isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed', // Visual feedback and disable interaction
+                    // ALWAYS show blue for any valid drag over (labels or wants)
+                    (isDragOverWant || isDragOver) && 'border-blue-600 border-2 bg-blue-100',
                     childBackgroundStyle.className
                   )}
                   style={childBackgroundStyle.style}
@@ -697,12 +671,12 @@ export const WantCard: React.FC<WantCardProps> = ({
                   <div 
                     className={classNames(
                       "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none",
-                      isDragOverWant && draggedOverChildId === childId && isChildTarget && !isBeingProcessed ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
                     )}
                   >
                     <div className={classNames(
                       "bg-white p-2 rounded-full shadow-xl border-2 border-blue-600 transform transition-all duration-400 ease-out",
-                      isDragOverWant && draggedOverChildId === childId && isChildTarget && !isBeingProcessed ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
+                      isDragOverWant && draggedOverChildId === childId && isChildTarget ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
                     )}>
                       <Plus className="w-6 h-6 text-blue-700" />
                     </div>

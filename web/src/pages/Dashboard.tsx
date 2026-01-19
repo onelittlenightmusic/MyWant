@@ -23,7 +23,7 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
-import { Toast } from '@/components/notifications';
+import { ConfirmationBubble, Toast } from '@/components/notifications';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 
