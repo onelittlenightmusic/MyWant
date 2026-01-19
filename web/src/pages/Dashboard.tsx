@@ -1193,7 +1193,6 @@ export const Dashboard: React.FC = () => {
         }}
       >
         {/* Confirmation Notification - Dashboard Right Layout */}
-// ...
         {/* Left content area - main dashboard */}
         <div 
           className="flex-1 overflow-y-auto"
