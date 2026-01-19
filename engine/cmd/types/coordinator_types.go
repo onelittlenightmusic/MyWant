@@ -184,6 +184,7 @@ func (c *CoordinatorWant) Progress() {
 	channelIndex, data, done, ok := c.Use(timeout)
 	if !ok {
 		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
+		time.Sleep(10 * time.Millisecond) // Short sleep to yield CPU
 	} else if done {
 		// DONE signal received from a channel
 		c.channelsHeard[channelIndex] = true
