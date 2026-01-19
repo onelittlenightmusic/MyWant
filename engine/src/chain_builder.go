@@ -425,6 +425,18 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	for wantName, pathsPtr := range pathMap {
 		result[wantName] = *pathsPtr
 	}
+
+	// DEBUG: Dump the entire pathMap after generation
+	for wantName, paths := range result {
+		InfoLog("[RECONCILE:PATHS:DEBUG] Final pathMap for '%s' (ID: %s):\n", wantName, cb.wants[wantName].want.Metadata.ID)
+		for i, inPath := range paths.In {
+			InfoLog("[RECONCILE:PATHS:DEBUG]   In Path %d: Name=%s, Active=%v, Channel=%p\n", i, inPath.Name, inPath.Active, inPath.Channel)
+		}
+		for i, outPath := range paths.Out {
+			InfoLog("[RECONCILE:PATHS:DEBUG]   Out Path %d: Name=%s, Active=%v, TargetWantName=%s, Channel=%p\n", i, outPath.Name, outPath.Active, outPath.TargetWantName, outPath.Channel)
+		}
+	}
+
 	return result
 }
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
