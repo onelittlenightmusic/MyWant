@@ -303,12 +303,12 @@ func TestInteractionManager_SendMessage_Conversational(t *testing.T) {
 	session := manager.CreateSession()
 
 	// First message
-	session1, err := manager.SendMessage(context.Background(), session.SessionID, "I want to travel")
+	session1, err := manager.SendMessage(context.Background(), session.SessionID, "I want to travel", nil)
 	require.NoError(t, err)
 	assert.Len(t, session1.ConversationHistory, 2) // user + assistant
 
 	// Second message
-	session2, err := manager.SendMessage(context.Background(), session.SessionID, "Add a hotel")
+	session2, err := manager.SendMessage(context.Background(), session.SessionID, "Add a hotel", nil)
 	require.NoError(t, err)
 	assert.Len(t, session2.ConversationHistory, 4) // 2 user + 2 assistant
 
