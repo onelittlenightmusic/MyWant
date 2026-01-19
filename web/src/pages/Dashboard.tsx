@@ -985,6 +985,12 @@ export const Dashboard: React.FC = () => {
         return;
       }
 
+      // Get the parent IDs before unparenting
+      const parentIds = draggedWant.metadata.ownerReferences
+        .filter(ref => ref.Controller && ref.Kind === 'Want')
+        .map(ref => ref.id)
+        .filter((id): id is string => !!id);
+
       const updatedWant = {
         ...draggedWant,
         metadata: {
@@ -995,9 +1001,18 @@ export const Dashboard: React.FC = () => {
 
       await apiClient.updateWant(draggedWantId, updatedWant);
       showNotification(`✓ Removed parent from ${draggedWant.metadata.name}`);
-      
+
       // Refresh wants list
       await fetchWants();
+
+      // Auto-collapse the parent if it no longer has children
+      setExpandedParents(prev => {
+        const newExpanded = new Set(prev);
+        parentIds.forEach(parentId => {
+          newExpanded.delete(parentId);
+        });
+        return newExpanded;
+      });
     } catch (error) {
       console.error('Failed to unparent want:', error);
       showNotification(`✗ Failed to remove parent: ${error instanceof Error ? error.message : 'Unknown error'}`);
