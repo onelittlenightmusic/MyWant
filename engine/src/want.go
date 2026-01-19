@@ -106,11 +106,13 @@ type WantStatus string
 
 const (
 	WantStatusIdle       WantStatus = "idle"
+	WantStatusInitializing WantStatus = "initializing"
 	WantStatusReaching   WantStatus = "reaching"
 	WantStatusSuspended  WantStatus = "suspended"
 	WantStatusAchieved   WantStatus = "achieved"
 	WantStatusFailed     WantStatus = "failed"
 	WantStatusTerminated WantStatus = "terminated"
+	WantStatusDeleting   WantStatus = "deleting"
 )
 
 // ControlTrigger represents a control command sent to a Want
@@ -1433,7 +1435,7 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
-	n.Status = WantStatusIdle
+	n.SetStatus(WantStatusInitializing) // Set to initializing first
 	n.State = make(map[string]any)
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
@@ -1442,6 +1444,8 @@ func (n *Want) Init() {
 	n.StoreState(StateFieldActionByAgent, "")
 	n.StoreState(StateFieldAchievingPercent, 0)
 	n.StoreState(StateFieldCompleted, false)
+
+	n.SetStatus(WantStatusIdle) // Transition to idle after initialization
 }
 
 // AddMonitoringAgent is a helper to easily create and add a polling-based monitoring agent
