@@ -600,16 +600,11 @@ func (w *Want) DumpStateForAgent(agentType string) {
 	w.agentStateChangesMutex.Unlock()
 
 	// Store the agent type for use in StateHistory recording
-	w.stateMutex.Lock()
-	if w.State == nil {
-		w.State = make(map[string]any)
-	}
-	// Store agent type for tracking in history
-	w.State["action_by_agent"] = agentType
+	// Use StoreState for single value, then batch the rest
+	w.StoreState("action_by_agent", agentType)
 	for key, value := range changesCopy {
-		w.State[key] = value
+		w.StoreState(key, value)
 	}
-	w.stateMutex.Unlock()
 
 	w.StoreLog("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
 }

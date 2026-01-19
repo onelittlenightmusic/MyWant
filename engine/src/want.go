@@ -314,38 +314,23 @@ func (n *Want) NotifyCompletion() {
 	// Note: Retrigger is triggered by Provide(), not here Only wants that send packets should trigger dependent want re-execution
 }
 
-// ReconcileStateFromConfig copies state from a config source atomically with proper mutex protection This method encapsulates all stateMutex access for state reconciliation, ensuring thread safety and preventing deadlocks from external callers
+// ReconcileStateFromConfig copies state from a config source using proper state batching
+// This method ensures state is restored with proper reconciliation tracking
 func (n *Want) ReconcileStateFromConfig(sourceState map[string]any) {
 	if sourceState == nil {
 		return
 	}
 
-	// CRITICAL: Protect State map access with stateMutex during reconciliation
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-	if n.State == nil {
-		n.State = make(map[string]any)
-	}
-
-	// Copy all state data atomically
-	for k, v := range sourceState {
-		n.State[k] = v
-	}
+	// Use StoreStateMulti to ensure proper batching and reconciliation
+	n.StoreStateMulti(sourceState)
 }
 func (n *Want) SetStateAtomic(stateData map[string]any) {
 	if stateData == nil {
 		return
 	}
 
-	// Acquire mutex to protect State map access
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-	if n.State == nil {
-		n.State = make(map[string]any)
-	}
-	for k, v := range stateData {
-		n.State[k] = v
-	}
+	// Use StoreStateMulti to ensure proper batching and mutex protection
+	n.StoreStateMulti(stateData)
 }
 
 // UpdateParameter updates a parameter and propagates the change to children
@@ -1453,10 +1438,10 @@ func (n *Want) Init() {
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 
-	// Initialize system-reserved state fields
-	n.State[StateFieldActionByAgent] = ""
-	n.State[StateFieldAchievingPercent] = 0
-	n.State[StateFieldCompleted] = false
+	// Initialize system-reserved state fields using StoreState
+	n.StoreState(StateFieldActionByAgent, "")
+	n.StoreState(StateFieldAchievingPercent, 0)
+	n.StoreState(StateFieldCompleted, false)
 }
 
 // AddMonitoringAgent is a helper to easily create and add a polling-based monitoring agent
@@ -1480,10 +1465,7 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 
 		// Initialize state field with initial value if provided
 		if stateDef.InitialValue != nil {
-			if n.State == nil {
-				n.State = make(map[string]any)
-			}
-			n.State[stateDef.Name] = stateDef.InitialValue
+			n.StoreState(stateDef.Name, stateDef.InitialValue)
 		}
 	}
 
@@ -1530,12 +1512,8 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 
 // count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
-	if n.State == nil {
-		n.State = make(map[string]any)
-	}
-
 	var newValue int
-	if val, exists := n.State[key]; exists {
+	if val, exists := n.GetState(key); exists {
 		if intVal, ok := val.(int); ok {
 			newValue = intVal + 1
 		} else {
@@ -1545,11 +1523,8 @@ func (n *Want) IncrementIntState(key string) int {
 		newValue = 1
 	}
 
-	n.State[key] = newValue
-	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]any)
-	}
-	n.pendingStateChanges[key] = newValue
+	// Use StoreState to ensure proper batching and tracking
+	n.StoreState(key, newValue)
 
 	return newValue
 }
