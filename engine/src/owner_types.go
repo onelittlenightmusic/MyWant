@@ -2,12 +2,14 @@ package mywant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"mywant/engine/src/chain"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 )
 
 // extractIntParam extracts an integer parameter with type conversion and default fallback
@@ -434,6 +436,7 @@ func (t *Target) Progress() {
 								Timestamp:   time.Now(),
 							}
 							
+							t.StoreLog("[TARGET] Providing ApprovalData to %d output channels for '%s' (ID: %s)\n", t.GetOutCount(), t.Metadata.Name, t.Metadata.ID)
 							t.Provide(approvalData) // Use the constructed ApprovalData
 							t.ProvideDone()
 				
@@ -647,6 +650,14 @@ func (t *Target) computeTemplateResult() {
 	t.childCount = len(childWantsByName)
 
 	t.StoreLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
+}
+
+// ApprovalData represents shared evidence and description data
+type ApprovalData struct {
+	ApprovalID  string
+	Evidence    any
+	Description string
+	Timestamp   time.Time
 }
 
 // OwnerAwareWant wraps any want type to add parent notification capability
