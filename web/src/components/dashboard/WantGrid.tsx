@@ -241,19 +241,23 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }
 
   return (
-    <div 
+    <div
       className="grid grid-cols-3 gap-6"
+      id="want-grid-container"
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
       }}
       onDrop={(e) => {
         // Check if drop happens on the grid gaps
+        console.log('[DEBUG WantGrid] Drop event - match:', e.target === e.currentTarget);
         if (e.target === e.currentTarget) {
           e.preventDefault();
           const draggedWantId = e.dataTransfer.getData('application/mywant-id');
+          console.log('[DEBUG WantGrid] Drop on grid container with want ID:', draggedWantId);
           if (draggedWantId && onWantDropped) {
-            onWantDropped(draggedWantId, ''); 
+            console.log('[DEBUG WantGrid] Calling onWantDropped with empty target');
+            onWantDropped(draggedWantId, '');
           }
         }
       }}
