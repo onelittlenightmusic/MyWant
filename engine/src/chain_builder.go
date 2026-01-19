@@ -373,7 +373,9 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 				if wantName == otherName {
 					continue // Skip self-matching
 				}
+					log.Printf("[RECONCILE:PATHS:DEBUG]     Comparing selector %v with otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
 				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
+					log.Printf("[RECONCILE:PATHS:DEBUG]     MATCH! Selector %v matched otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
 					matchCount++
 
 					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
