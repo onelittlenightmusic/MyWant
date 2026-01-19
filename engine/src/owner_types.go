@@ -270,8 +270,7 @@ func (t *Target) IsAchieved() bool {
 		// This ensures data consistency even if old data has stale values
 		achievingPct, ok := t.State["achieving_percentage"]
 		if !ok || (ok && achievingPct != 100) {
-			// Directly update the state (synchronous) in addition to batching via StoreState
-			t.State["achieving_percentage"] = 100
+			// Use StoreState() - never write directly to State map
 			t.StoreState("achieving_percentage", 100)
 		}
 		return true
@@ -394,9 +393,8 @@ func (t *Target) Progress() {
 		if allComplete {
 			// Only compute result once - check if already completed
 			if t.Status != WantStatusAchieved {
-				// CONSISTENCY: Set achieving_percentage to 100 directly AND via StoreState
-				// Direct update ensures immediate consistency for API responses
-				t.State["achieving_percentage"] = 100
+				// Set achieving_percentage to 100 when all children are complete
+				// Use StoreState() - never write directly to State map
 				t.StoreState("achieving_percentage", 100)
 
 				// Send completion packet to parent/upstream wants
