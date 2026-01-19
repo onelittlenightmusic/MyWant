@@ -1260,10 +1260,14 @@ func (n *Want) Provide(packet any) error {
 		select {
 		case pathInfo.Channel <- tp:
 			// Sent successfully
+			InfoLog("[PROVIDE] Want '%s' successfully sent packet to '%s' on channel '%s'\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
 			sentCount++
 		default:
 			// Channel is full, try blocking send
-			pathInfo.Channel <- tp
+			// Log this blocking attempt
+			InfoLog("[PROVIDE] Want '%s' attempting BLOCKING send to '%s' on channel '%s' (channel full)\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
+			pathInfo.Channel <- tp // This will block until received
+			InfoLog("[PROVIDE] Want '%s' successfully completed BLOCKING send to '%s' on channel '%s'\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
 			sentCount++
 		}
 	}
