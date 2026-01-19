@@ -29,7 +29,7 @@ func NewDataHandlerDispatcher(approvalHandler *ApprovalDataHandler, travelHandle
 	handlers := make(map[string]DataHandler)
 
 	// Register handlers by their data type names
-	handlers["*types.ApprovalData"] = approvalHandler
+	handlers["*mywant.ApprovalData"] = approvalHandler
 	handlers["*types.TravelSchedule"] = travelHandler
 
 	return &DataHandlerDispatcher{
@@ -180,7 +180,7 @@ func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d", inCount))
 
-	timeout := 2000
+	timeout := 5000
 	channelIndex, data, done, ok := c.Use(timeout)
 	if !ok {
 		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
