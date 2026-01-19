@@ -303,6 +303,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               onShowReactionConfirmation={onShowReactionConfirmation}
               isSelectMode={isSelectMode}
               selectedWantIds={selectedWantIds}
+              isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
             />
           </div>
         );

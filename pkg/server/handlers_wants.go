@@ -404,7 +404,10 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.globalBuilder != nil {
-		if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Immediately set status to deleting for quick UI feedback
+			want.SetStatus(mywant.WantStatusDeleting)
+
 			s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
 			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued from global builder")
 			w.WriteHeader(http.StatusNoContent)

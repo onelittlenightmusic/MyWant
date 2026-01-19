@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, CheckCircle, AlertCircle, Clock, RotateCw } from 'lucide-react';
+import { Play, Pause, Square, CheckCircle, AlertCircle, Clock, RotateCw, Trash2 } from 'lucide-react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
 
 export const formatDate = (dateString?: string): string => {
@@ -76,6 +76,10 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
       return 'red';
     case 'stopped':
       return 'yellow';
+    case 'deleting':
+      return 'red';
+    case 'terminated':
+        return 'gray';
     default:
       return 'gray';
   }
@@ -98,6 +102,10 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '❌';
     case 'stopped':
       return '⏹️';
+    case 'deleting':
+      return '🗑️';
+    case 'terminated':
+      return '🛑';
     default:
       return '❓';
   }
@@ -111,7 +119,7 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase):
     case 'pending':
       return React.createElement(Clock, iconProps);
     case 'initializing':
-      return React.createElement(RotateCw, iconProps);
+      return React.createElement(RotateCw, { ...iconProps, className: classNames(iconProps.className, 'animate-spin') });
     case 'reaching':
       return React.createElement(Play, iconProps);
     case 'suspended':
@@ -121,6 +129,10 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase):
     case 'failed':
       return React.createElement(AlertCircle, iconProps);
     case 'stopped':
+      return React.createElement(Square, iconProps);
+    case 'deleting':
+      return React.createElement(Trash2, iconProps);
+    case 'terminated':
       return React.createElement(Square, iconProps);
     default:
       return React.createElement(AlertCircle, iconProps);
