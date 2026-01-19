@@ -242,18 +242,17 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   return (
     <div 
-      className="grid grid-cols-3 gap-6 min-h-[400px]"
+      className="grid grid-cols-3 gap-6"
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
       }}
       onDrop={(e) => {
-        // Only handle if dropped directly on the grid background, not on a card
+        // Check if drop happens on the grid gaps
         if (e.target === e.currentTarget) {
           e.preventDefault();
           const draggedWantId = e.dataTransfer.getData('application/mywant-id');
           if (draggedWantId && onWantDropped) {
-            // Passing an empty target ID indicates unparenting/top-level move
             onWantDropped(draggedWantId, ''); 
           }
         }

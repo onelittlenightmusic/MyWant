@@ -1180,8 +1180,11 @@ export const Dashboard: React.FC = () => {
         className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative"
         onDragOver={(e) => {
           e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          // console.log('[DEBUG Dashboard] Drag over main');
         }}
         onDrop={(e) => {
+          // If dropped on the main container or empty space, unparent the want
           e.preventDefault();
           const draggedWantId = e.dataTransfer.getData('application/mywant-id');
           if (draggedWantId) {
@@ -1190,55 +1193,17 @@ export const Dashboard: React.FC = () => {
         }}
       >
         {/* Confirmation Notification - Dashboard Right Layout */}
-        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
-          <ConfirmationBubble
-            message={
-              showDeleteConfirmation
-                ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
-                : showDeleteDraftConfirmation
-                ? (deleteDraftState ? `ドラフト「${deleteDraftState.message}」を削除しますか？` : null)
-                : showBatchConfirmation
-                ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
-                : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
-            }
-            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
-            onDismiss={() => {
-              setShowDeleteConfirmation(false);
-              setShowReactionConfirmation(false);
-              setShowBatchConfirmation(false);
-              setShowDeleteDraftConfirmation(false);
-            }}
-            onConfirm={
-              showDeleteConfirmation
-                ? handleDeleteWantConfirm
-                : showDeleteDraftConfirmation
-                ? handleDeleteDraftConfirm
-                : showBatchConfirmation
-                ? handleBatchConfirm
-                : handleReactionConfirm
-            }
-            onCancel={
-              showDeleteConfirmation
-                ? handleDeleteWantCancel
-                : showDeleteDraftConfirmation
-                ? handleDeleteDraftCancel
-                : showBatchConfirmation
-                ? handleBatchCancel
-                : handleReactionCancel
-            }
-            loading={isDeletingWant || isSubmittingReaction || isBatchProcessing}
-            title={showDeleteConfirmation ? "Delete Want" : showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
-            layout="dashboard-right"
-          />
-        )}
-
+// ...
         {/* Left content area - main dashboard */}
         <div 
           className="flex-1 overflow-y-auto"
           onDragOver={(e) => {
+            // Necessary to allow dropping
             e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
           }}
           onDrop={(e) => {
+            // If dropped here (outside a specific target card), remove parent
             e.preventDefault();
             const draggedWantId = e.dataTransfer.getData('application/mywant-id');
             if (draggedWantId) {
