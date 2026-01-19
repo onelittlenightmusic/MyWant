@@ -1623,10 +1623,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if wantPtr == nil {
 		stateMap := make(map[string]any)
 		if wantConfig.State != nil {
-			// Copy all state data
-			for k, v := range wantConfig.State {
-				stateMap[k] = v
-			}
+	// Use StoreStateMulti for proper state batching
+	if len(wantConfig.State) > 0 {
+		wantPtr.StoreStateMulti(wantConfig.State)
+	}
 		}
 
 		// Copy History field from config
@@ -1655,12 +1655,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Merge state data if provided
 		if wantConfig.State != nil {
-			if wantPtr.State == nil {
-				wantPtr.State = make(map[string]any)
-			}
-			for k, v := range wantConfig.State {
-				wantPtr.State[k] = v
-			}
+	// Use StoreStateMulti for proper state batching
+	if len(wantConfig.State) > 0 {
+		wantPtr.StoreStateMulti(wantConfig.State)
+	}
 		}
 
 		// Update history
