@@ -374,17 +374,17 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		// }
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-			for otherName, otherWant := range cb.wants {
-				if wantName == otherName {
-					continue // Skip self-matching
-				}
-					log.Printf("[RECONCILE:PATHS:DEBUG]     Comparing selector %v with otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
-				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
-					log.Printf("[RECONCILE:PATHS:DEBUG]     MATCH! Selector %v matched otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
-					matchCount++
-
-					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
-
+						for otherName, otherWant := range cb.wants {
+							InfoLog("[RECONCILE:PATHS:DEBUG]       - Looping otherWant '%s' (ID: %s) with labels: %v\n", otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
+							if wantName == otherName {
+								continue // Skip self-matching
+							}
+							log.Printf("[RECONCILE:PATHS:DEBUG]     Comparing selector %v with otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
+							if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
+								log.Printf("[RECONCILE:PATHS:DEBUG]     MATCH! Selector %v matched otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
+								matchCount++
+			
+								pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
 					// Reuse existing channel if it exists, otherwise create a new one
 					var ch chain.Chan
 					if existingCh, exists := existingChannels[pathName]; exists {
