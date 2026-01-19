@@ -365,6 +365,7 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
+		InfoLog("[RECONCILE:PATHS:DEBUG] Want '%s' (ID: %s) has using selectors: %v\n", wantName, want.want.Metadata.ID, want.want.GetSpec().Using)
 		// }
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
