@@ -794,8 +794,17 @@ func (cb *ChainBuilder) connectPhase() error {
 
 // processTargets processes all Target wants and builds their parameter subscriptions
 func (cb *ChainBuilder) processTargets() {
+	// Create a snapshot of all wants for adoption
+	allWants := make(map[string]*Want)
+	for name, rw := range cb.wants {
+		allWants[name] = rw.want
+	}
+
 	for _, runtimeWant := range cb.wants {
 		if target, ok := runtimeWant.function.(*Target); ok {
+			// Trigger dynamic child adoption
+			target.AdoptChildren(allWants)
+
 			if target.RecipePath != "" && target.recipeLoader != nil {
 				if err := cb.buildTargetParameterSubscriptions(target); err != nil {
 					log.Printf("[ERROR] Failed to build target parameter subscriptions: %v\n", err)

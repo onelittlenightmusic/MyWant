@@ -281,54 +281,44 @@ func (t *Target) IsAchieved() bool {
 	return allComplete
 }
 
-// Progress implements the Progressable interface for Target with direct execution
-func (t *Target) Progress() {
-	// Discovery Phase: Find wants that claim this target as owner
-	if t.builder != nil {
-		allWants := t.builder.GetAllWantStates()
-		log.Printf(">>> [PROGRESS] Target %s scanning %d wants for children\n", t.Metadata.Name, len(allWants))
-		
-		for _, want := range allWants {
-			// Debug specific want we are looking for
-			if want.Metadata.Name == "buffet-instance" {
-				log.Printf(">>> [PROGRESS] Found buffet-instance. OwnerRefs: %d\n", len(want.Metadata.OwnerReferences))
-			}
-
-			if t.isChildWant(want) {
-				// Ensure this want is in our childWants tracking list
-				exists := false
-				for _, existingChild := range t.childWants {
-					if existingChild.Metadata.ID == want.Metadata.ID {
-						exists = true
-						break
-					}
+// AdoptChildren scans provided wants and adopts those that point to this target
+func (t *Target) AdoptChildren(allWants map[string]*Want) {
+	for _, want := range allWants {
+		if t.isChildWant(want) {
+			// Ensure this want is in our childWants tracking list
+			exists := false
+			for _, existingChild := range t.childWants {
+				if existingChild.Metadata.ID == want.Metadata.ID {
+					exists = true
+					break
 				}
-				if !exists {
-					t.childWants = append(t.childWants, want)
-					t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
-					log.Printf(">>> [ADOPT] Target %s adopted child %s\n", t.Metadata.Name, want.Metadata.Name)
-					
-					// If the newly adopted child is already achieved, mark it as completed
-					if want.Status == WantStatusAchieved {
-						t.childCompletionMutex.Lock()
-						t.completedChildren[want.Metadata.Name] = true
-						t.childCompletionMutex.Unlock()
-						
-						// Trigger completion check immediately after adoption if it was the only child
-						allComplete := t.checkAllChildrenComplete()
-						if allComplete {
-							// Signal that we might be done
-							select {
-							case t.childrenDone <- true:
-							default:
-							}
-						}
-					}
+			}
+			if !exists {
+				t.childWants = append(t.childWants, want)
+				t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
+				
+				// If the newly adopted child is already achieved, mark it as completed
+				if want.Status == WantStatusAchieved {
+					t.childCompletionMutex.Lock()
+					t.completedChildren[want.Metadata.Name] = true
+					t.childCompletionMutex.Unlock()
 				}
 			}
 		}
 	}
+	
+	// Update stats
+	t.childCount = len(t.childWants)
+	t.StoreState("child_count", t.childCount)
+}
 
+// Progress implements the Progressable interface for Target with direct execution
+func (t *Target) Progress() {
+	// GUARD: If already achieved, skip heavy processing
+	if t.Status == WantStatusAchieved {
+		return
+	}
+	
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
