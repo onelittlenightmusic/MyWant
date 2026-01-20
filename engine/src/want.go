@@ -3,7 +3,6 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 	"sync"

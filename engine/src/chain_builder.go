@@ -416,14 +416,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		result[wantName] = *pathsPtr
 	}
 
-	// DEBUG: Dump the entire pathMap after generation
-	for wantName, paths := range result {
-		for i, inPath := range paths.In {
-		}
-		for i, outPath := range paths.Out {
-		}
-	}
-
 	return result
 }
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
