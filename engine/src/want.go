@@ -1394,10 +1394,8 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 		cases = append(cases, defaultCase)
 	}
 
-	startTime := time.Now()
-
 	// 4. Perform the select.
-	chosen, recv, ok := reflect.Select(cases)
+	chosen, _, ok := reflect.Select(cases)
 
 	// 5. Process the result.
 	isTimeout := (timeoutMs > 0 && chosen == len(cases)-1)

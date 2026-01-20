@@ -3,7 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"log" // Added log package import
 	. "mywant/engine/src"
 	"time"
 )

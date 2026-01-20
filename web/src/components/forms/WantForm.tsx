@@ -526,49 +526,49 @@ export const WantForm: React.FC<WantFormProps> = ({
                 )}
               </div>
             ) : (
-              /* Normal Mode - TypeRecipeSelector only shown when no type selected */
-              !selectedTypeId && (
-                <div className="flex-1 min-h-0 flex flex-col">
+              /* Normal Mode - TypeRecipeSelector always shown */
+              <div className={selectedTypeId ? "flex-shrink-0" : "flex-1 min-h-0 flex flex-col"}>
+                {!selectedTypeId && (
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex-shrink-0">
                     Select Want Type or Recipe *
                   </label>
-                  <TypeRecipeSelector
-                    ref={typeSelectorRef}
-                    wantTypes={wantTypes}
-                    recipes={recipes}
-                    selectedId={selectedTypeId}
-                    showSearch={true}
-                    onSelect={(id, itemType) => {
-                      setSelectedTypeId(id);
-                      setSelectedItemType(itemType);
-                      // Update type based on selection
-                      setType(id);
-                      // Auto-generate unique name that doesn't conflict with existing wants
-                      const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                      const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
-                      setName(generatedName);
+                )}
+                <TypeRecipeSelector
+                  ref={typeSelectorRef}
+                  wantTypes={wantTypes}
+                  recipes={recipes}
+                  selectedId={selectedTypeId}
+                  showSearch={true}
+                  onSelect={(id, itemType) => {
+                    setSelectedTypeId(id);
+                    setSelectedItemType(itemType);
+                    // Update type based on selection
+                    setType(id);
+                    // Auto-generate unique name that doesn't conflict with existing wants
+                    const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                    const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
+                    setName(generatedName);
 
-                      // Auto-focus Want Name after selection
-                      setTimeout(() => {
-                        nameInputRef.current?.focus();
-                      }, 0);
-                    }}
-                    onClear={() => {
-                      setSelectedTypeId(null);
-                      setSelectedItemType(null);
-                      setType('');
-                      setName('');
-                    }}
-                    onGenerateName={(id, itemType, suffix) => {
-                      const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                      return generateUniqueWantName(id, itemType, existingNames, suffix);
-                    }}
-                    onArrowDown={() => {
+                    // Auto-focus Want Name after selection
+                    setTimeout(() => {
                       nameInputRef.current?.focus();
-                    }}
-                  />
-                </div>
-              )
+                    }, 0);
+                  }}
+                  onClear={() => {
+                    setSelectedTypeId(null);
+                    setSelectedItemType(null);
+                    setType('');
+                    setName('');
+                  }}
+                  onGenerateName={(id, itemType, suffix) => {
+                    const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+                    return generateUniqueWantName(id, itemType, existingNames, suffix);
+                  }}
+                  onArrowDown={() => {
+                    nameInputRef.current?.focus();
+                  }}
+                />
+              </div>
             )}
 
             {/* Show fields only when a want type or recipe is selected */}
