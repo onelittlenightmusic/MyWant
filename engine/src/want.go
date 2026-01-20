@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-var DebugLoggingEnabled bool
-
 // TransportPacket wraps data sent over channels to include termination signals
 type TransportPacket struct {
 	Payload any
@@ -466,15 +464,16 @@ func (n *Want) ShouldRetrigger() bool {
 	status := n.GetStatus()
 
 	// Retrigger if:
-	// 1. Goroutine is NOT running
-	// 2. OR want is already in terminal state (Achieved) but new packets arrived
-	if !isGoroutineActive || status == WantStatusAchieved {
+	// 1. Goroutine is NOT running (Idle, Suspended) AND has pending packets (check UnusedExists)
+	// 2. OR want is already in terminal state (Achieved) but new packets arrived (check UnusedExists)
+	// 3. OR want is currently reaching/running (isGoroutineActive == true) but has new packets (check UnusedExists)
+	if (!isGoroutineActive && (status == WantStatusIdle || status == WantStatusSuspended)) || status == WantStatusAchieved || (isGoroutineActive && status == WantStatusReaching) {
 		// Check for pending packets (non-blocking)
 		// Use 0 timeout since packet should already be in channel if we're called after Provide()
 		hasUnused := n.UnusedExists(0)
 		return hasUnused
 	}
-	// Goroutine is active and not terminal - it will handle packets in next iteration
+	// Goroutine is active and not terminal, and no unused packets
 	return false
 }
 
