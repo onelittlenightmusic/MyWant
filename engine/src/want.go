@@ -1677,6 +1677,17 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
 
 		chosen, recv, recvOK := reflect.Select(cases)
 
+		if DebugLoggingEnabled {
+			log.Printf("[USE] Want '%s' (ID: %s) reflect.Select chosen: %d, recvOK: %v\n", n.Metadata.Name, n.Metadata.ID, chosen, recvOK)
+			if chosen >= 0 && chosen < len(channelIndexMap) { // ensure chosen is valid index
+				log.Printf("[USE] Want '%s' (ID: %s) Selected channel original index: %d\n", n.Metadata.Name, n.Metadata.ID, channelIndexMap[chosen])
+			} else if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
+				log.Printf("[USE] Want '%s' (ID: %s) Select chose timeout case.\n", n.Metadata.Name, n.Metadata.ID)
+			} else {
+				log.Printf("[USE] Want '%s' (ID: %s) Select chose non-channel/non-timeout case.\n", n.Metadata.Name, n.Metadata.ID)
+			}
+		}
+
 		// If timeout case was chosen (last index in cases), no data available
 		if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
 			return -1, nil, false, false
