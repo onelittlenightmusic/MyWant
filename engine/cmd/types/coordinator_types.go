@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"log" // Added log package import
 	. "mywant/engine/src"
 	"time"
 )
@@ -179,41 +180,29 @@ func (c *CoordinatorWant) IsAchieved() bool {
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 	activeInputChannels := c.GetPaths().In
-	if DebugLoggingEnabled {
-		log.Printf("[Progress] Started - InCount=%d, ActiveChannels=%d", inCount, len(activeInputChannels))
-	}
+	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ActiveChannels=%d", inCount, len(activeInputChannels)))
 	for i, pathInfo := range activeInputChannels {
-		if DebugLoggingEnabled {
-			log.Printf("[Progress]   - Channel %d: Name=%s, Active=%v, Channel=%p", i, pathInfo.Name, pathInfo.Active, pathInfo.Channel)
-		}
+		c.StoreLog(fmt.Sprintf("[Progress]   - Channel %d: Name=%s, Active=%v, Channel=%p", i, pathInfo.Name, pathInfo.Active, pathInfo.Channel))
 	}
 
 	timeout := 5000
 	channelIndex, data, done, ok := c.Use(timeout)
 	if !ok {
-		if DebugLoggingEnabled {
-			log.Printf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount)
-		}
+		c.StoreLog(fmt.Sprintf("[Progress] No packet received within timeout (heard: %d/%d)", len(c.channelsHeard), inCount))
 		time.Sleep(GlobalExecutionInterval) // Short sleep to yield CPU
 		// REMOVED: return
 	} else if done {
 		// DONE signal received from a channel
 		c.channelsHeard[channelIndex] = true
-		if DebugLoggingEnabled {
-			log.Printf("[Progress] Received DONE signal from channel %d (total heard: %d/%d)", channelIndex, len(c.channelsHeard), inCount)
-		}
+		c.StoreLog(fmt.Sprintf("[Progress] Received DONE signal from channel %d (total heard: %d/%d)", channelIndex, len(c.channelsHeard), inCount))
 	} else {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true
-		if DebugLoggingEnabled {
-			log.Printf("[Progress] Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data)
-		}
+		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data))
 
 		// Use dispatcher to select appropriate handler based on data type
 		handler := c.DataHandlerDispatcher.SelectHandler(data)
-		if DebugLoggingEnabled {
-			log.Printf("[Progress] Selected handler: %T for data type %T", handler, data)
-		}
+		c.StoreLog(fmt.Sprintf("[Progress] Selected handler: %T for data type %T", handler, data))
 		handler.ProcessData(c, channelIndex, data)
 	}
 
