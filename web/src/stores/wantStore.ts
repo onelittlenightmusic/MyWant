@@ -111,6 +111,13 @@ export const useWantStore = create<WantStore>()(
 
     deleteWant: async (id: string) => {
       set({ loading: true, error: null });
+      // Optimistically update the status of the specific want to 'deleting'
+      set(state => ({
+        wants: state.wants.map(w =>
+          (w.metadata?.id === id || w.id === id) ? { ...w, status: 'deleting' } : w
+        ),
+      }));
+
       try {
         await apiClient.deleteWant(id);
         set(state => ({
@@ -121,16 +128,27 @@ export const useWantStore = create<WantStore>()(
           loading: false
         }));
       } catch (error) {
-        set({
+        // If deletion fails, revert the status or rely on next fetchWants to correct
+        set(state => ({
+          wants: state.wants.map(w =>
+            (w.metadata?.id === id || w.id === id) ? { ...w, status: 'failed' } : w // Revert to a 'failed' status on error
+          ),
           error: error instanceof Error ? error.message : 'Failed to delete want',
           loading: false
-        });
+        }));
         throw error;
       }
     },
 
     deleteWants: async (ids: string[]) => {
       set({ loading: true, error: null });
+      // Optimistically update the status of specific wants to 'deleting'
+      set(state => ({
+        wants: state.wants.map(w =>
+          (ids.includes(w.metadata?.id || w.id || '')) ? { ...w, status: 'deleting' } : w
+        ),
+      }));
+
       try {
         await apiClient.deleteWants(ids);
         set(state => ({
@@ -141,10 +159,14 @@ export const useWantStore = create<WantStore>()(
           loading: false
         }));
       } catch (error) {
-        set({
+        // If deletion fails, revert the status or rely on next fetchWants to correct
+        set(state => ({
+          wants: state.wants.map(w =>
+            (ids.includes(w.metadata?.id || w.id || '')) ? { ...w, status: 'failed' } : w // Revert to a 'failed' status on error
+          ),
           error: error instanceof Error ? error.message : 'Failed to delete wants',
           loading: false
-        });
+        }));
         throw error;
       }
     },

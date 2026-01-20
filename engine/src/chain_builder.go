@@ -334,16 +334,11 @@ func (cb *ChainBuilder) GetHTTPClient() *HTTPClient {
 
 // matchesSelector checks if want labels match the selector criteria
 func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
-	InfoLog("[MATCH_SELECTOR:DEBUG] Comparing selector %v with wantLabels %v\n", selector, wantLabels)
 	for key, value := range selector {
-		wantValue, exists := wantLabels[key]
-		InfoLog("[MATCH_SELECTOR:DEBUG]   - Checking key '%s': selector value '%s', wantLabel value '%s', exists: %v\n", key, value, wantValue, exists)
-		if !exists || wantValue != value {
-			InfoLog("[MATCH_SELECTOR:DEBUG]   - Mismatch detected for key '%s': !exists || wantValue != value is TRUE. Returning false.\n", key)
+		if wantLabels[key] != value {
 			return false
 		}
 	}
-	InfoLog("[MATCH_SELECTOR:DEBUG] All selector keys matched. Returning true.\n")
 	return true
 }
 
@@ -370,18 +365,13 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
-		InfoLog("[RECONCILE:PATHS:DEBUG] Want '%s' (ID: %s) has using selectors: %v\n", wantName, want.want.Metadata.ID, want.want.GetSpec().Using)
-		// }
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
 						for otherName, otherWant := range cb.wants {
-							InfoLog("[RECONCILE:PATHS:DEBUG]       - Looping otherWant '%s' (ID: %s) with labels: %v\n", otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
 							if wantName == otherName {
 								continue // Skip self-matching
 							}
-							log.Printf("[RECONCILE:PATHS:DEBUG]     Comparing selector %v with otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
 							if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
-								log.Printf("[RECONCILE:PATHS:DEBUG]     MATCH! Selector %v matched otherWant '%s' (ID: %s) labels: %v\n", usingSelector, otherName, otherWant.GetMetadata().ID, otherWant.GetMetadata().Labels)
 								matchCount++
 			
 								pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
@@ -428,12 +418,9 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 	// DEBUG: Dump the entire pathMap after generation
 	for wantName, paths := range result {
-		InfoLog("[RECONCILE:PATHS:DEBUG] Final pathMap for '%s' (ID: %s):\n", wantName, cb.wants[wantName].want.Metadata.ID)
 		for i, inPath := range paths.In {
-			InfoLog("[RECONCILE:PATHS:DEBUG]   In Path %d: Name=%s, Active=%v, Channel=%p\n", i, inPath.Name, inPath.Active, inPath.Channel)
 		}
 		for i, outPath := range paths.Out {
-			InfoLog("[RECONCILE:PATHS:DEBUG]   Out Path %d: Name=%s, Active=%v, TargetWantName=%s, Channel=%p\n", i, outPath.Name, outPath.Active, outPath.TargetWantName, outPath.Channel)
 		}
 	}
 
@@ -668,7 +655,6 @@ func (cb *ChainBuilder) reconcileLoop() {
 
 			// Only log retrigger types to reduce log spam
 			if trigger.Type == "check_completed_retrigger" {
-				InfoLog("[RETRIGGER:RECEIVED] Received check_completed_retrigger trigger\n")
 			}
 
 			switch trigger.Type {
@@ -1179,50 +1165,57 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
-		// Debug: Log all idle wants found
-		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusIdle && strings.Contains(wantName, "date") {
-				InfoLog("[START-PHASE:DEBUG] Found Idle want: '%s'\n", wantName)
-			}
-		}
-
-		// First pass: start idle wants (only if connectivity requirements are met)
-		for wantName, want := range cb.wants {
-			if want.want.GetStatus() == WantStatusIdle {
-				paths := cb.pathMap[wantName]
-				meta := want.want.GetConnectivityMetadata()
-				inCount := len(paths.In)
-				outCount := len(paths.Out)
-
-				// DEBUG: Log nested want startup
-				if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-					log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
-						wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-				}
-
-				// Log for coordinator startup
-				if wantName == "dynamic-travel-coordinator-5" {
-					InfoLog("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-				}
-
-				// Skip if required connections are not met
-				if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-					if wantName == "dynamic-travel-coordinator-5" {
-						InfoLog("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
+		        // Debug: Log all idle wants found
+				for wantName, want := range cb.wants {
+					if want.want.GetStatus() == WantStatusIdle && strings.Contains(wantName, "date") {
+						if DebugLoggingEnabled {
+							log.Printf("[START-PHASE:DEBUG] Found Idle want: '%s'\n", wantName)
+						}
 					}
-					// DEBUG: Log why nested wants are skipped
-					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-						log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
-					}
-					continue
 				}
-
-				if strings.Contains(wantName, "date") {
-					InfoLog("[START-PHASE:DEBUG] About to call startWant for '%s'\n", wantName)
-				}
-				cb.startWant(wantName, want)
-				startedCount++
-			}
+		
+				// First pass: start idle wants (only if connectivity requirements are met)
+				for wantName, want := range cb.wants {
+					if want.want.GetStatus() == WantStatusIdle {
+						paths := cb.pathMap[wantName]
+						meta := want.want.GetConnectivityMetadata()
+						inCount := len(paths.In)
+						outCount := len(paths.Out)
+		
+						// DEBUG: Log nested want startup
+						if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+							log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
+								wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+						}
+		
+						// Log for coordinator startup
+						if wantName == "dynamic-travel-coordinator-5" {
+							if DebugLoggingEnabled {
+								log.Printf("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+							}
+						}
+		
+						// Skip if required connections are not met
+						if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
+							if wantName == "dynamic-travel-coordinator-5" {
+								if DebugLoggingEnabled {
+									log.Printf("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
+								}
+							}
+							// DEBUG: Log why nested wants are skipped
+							if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+								log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
+							}
+							continue
+						}
+		
+						if strings.Contains(wantName, "date") {
+							if DebugLoggingEnabled {
+								log.Printf("[START-PHASE:DEBUG] About to call startWant for '%s'\n", wantName)
+							}
+						}
+						cb.startWant(wantName, want)
+						startedCount++			}
 		}
 
 		// NOTE: Second pass removed - no longer needed
@@ -1731,7 +1724,9 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
 
-	InfoLog("[UPDATE-WANT] Updating want ID: %s (name: %s)\n", wantConfig.Metadata.ID, wantConfig.Metadata.Name)
+	if DebugLoggingEnabled {
+		log.Printf("[UPDATE-WANT] Updating want ID: %s (name: %s)\n", wantConfig.Metadata.ID, wantConfig.Metadata.Name)
+	}
 
 	// Search in config wants and update
 	foundInConfig := false
@@ -1744,7 +1739,9 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	}
 
 	if !foundInConfig {
-		InfoLog("[UPDATE-WANT] Not found in config, adding as new dynamic want\n")
+		if DebugLoggingEnabled {
+			log.Printf("[UPDATE-WANT] Not found in config, adding as new dynamic want\n")
+		}
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
@@ -1807,7 +1804,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Check connectivity satisfaction
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:SKIP] '%s' - connectivity not satisfied\n", wantName)
+			if DebugLoggingEnabled {
+				log.Printf("[START-WANT:SKIP] '%s' - connectivity not satisfied\n", wantName)
+			}
 		}
 		want.want.RestartWant()
 		return
@@ -1818,7 +1817,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	paths, pathsExist := cb.pathMap[wantName]
 	if hasUsingSelectors && (!pathsExist || len(paths.In) == 0) {
 		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:SKIP] '%s' - using selectors but no paths\n", wantName)
+			if DebugLoggingEnabled {
+				log.Printf("[START-WANT:SKIP] '%s' - using selectors but no paths\n", wantName)
+			}
 		}
 		return
 	}
@@ -1826,7 +1827,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Double-check connectivity and trigger reconciliation if needed
 	if !cb.isConnectivitySatisfied(wantName, want, cb.pathMap) {
 		if strings.Contains(wantName, "date") {
-			InfoLog("[START-WANT:SKIP] '%s' - double-check connectivity failed\n", wantName)
+			if DebugLoggingEnabled {
+				log.Printf("[START-WANT:SKIP] '%s' - double-check connectivity failed\n", wantName)
+			}
 		}
 		want.want.RestartWant()
 		if err := cb.TriggerReconcile(); err != nil {
@@ -1846,7 +1849,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 	// Start execution if want is Progressable
 	if progressable, ok := want.function.(Progressable); ok {
 		want.want.SetStatus(WantStatusReaching)
-		InfoLog("[START-WANT] '%s' transitioned to Reaching status\n", wantName)
+		if DebugLoggingEnabled {
+			log.Printf("[START-WANT] '%s' transitioned to Reaching status\n", wantName)
+		}
 		want.want.InitializeControlChannel()
 
 		// Set the concrete progressable implementation on the want
@@ -1861,7 +1866,9 @@ func (cb *ChainBuilder) startWant(wantName string, want *runtimeWant) {
 		// Mark goroutine as active BEFORE starting it
 		// Want owns the goroutine state via SetGoroutineActive()
 		want.want.SetGoroutineActive(true)
-		InfoLog("[START-WANT] '%s' goroutine marked as active, starting progression loop\n", wantName)
+		if DebugLoggingEnabled {
+			log.Printf("[START-WANT] '%s' goroutine marked as active, starting progression loop\n", wantName)
+		}
 
 		// Manage goroutine lifecycle with waitGroup
 		cb.waitGroup.Add(1)

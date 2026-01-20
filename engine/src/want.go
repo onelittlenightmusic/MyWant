@@ -1256,27 +1256,13 @@ func (n *Want) Provide(packet any) error {
 
 		InfoLog("[PROVIDE] Want '%s' sending packet to '%s' on channel '%s'", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
 
-		if DebugLoggingEnabled {
-			log.Printf("[PROVIDE] Want '%s' sending packet to '%s' on channel '%s'\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-		}
-
 		select {
 		case pathInfo.Channel <- tp:
 			// Sent successfully
-			if DebugLoggingEnabled {
-				log.Printf("[PROVIDE] Want '%s' successfully sent packet to '%s' on channel '%s'\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-			}
 			sentCount++
 		default:
 			// Channel is full, try blocking send
-			// Log this blocking attempt
-			if DebugLoggingEnabled {
-				log.Printf("[PROVIDE] Want '%s' attempting BLOCKING send to '%s' on channel '%s' (channel full)\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-			}
-			pathInfo.Channel <- tp // This will block until received
-			if DebugLoggingEnabled {
-				log.Printf("[PROVIDE] Want '%s' successfully completed BLOCKING send to '%s' on channel '%s'\n", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-			}
+			pathInfo.Channel <- tp
 			sentCount++
 		}
 	}
@@ -1632,10 +1618,6 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
 		cases := make([]reflect.SelectCase, 0, inCount+1)
 		channelIndexMap := make([]int, 0, inCount+1) // Maps case index -> original channel index
 
-		if DebugLoggingEnabled {
-			log.Printf("[USE] Want '%s' (ID: %s) Preparing reflect.Select for %d input channels:\n", n.Metadata.Name, n.Metadata.ID, inCount)
-		}
-
 		for i := 0; i < inCount; i++ {
 			pathInfo := n.paths.In[i]
 			if pathInfo.Channel != nil {
@@ -1644,18 +1626,7 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
 					Chan: reflect.ValueOf(pathInfo.Channel),
 				})
 				channelIndexMap = append(channelIndexMap, i) // Track which channel index this case corresponds to
-				if DebugLoggingEnabled {
-					log.Printf("[USE] Want '%s' (ID: %s)   - Added In path %d: Name=%s, Active=%v, Channel=%p to select cases\n", n.Metadata.Name, n.Metadata.ID, i, pathInfo.Name, pathInfo.Active, pathInfo.Channel)
-				}
-			} else {
-				if DebugLoggingEnabled {
-					log.Printf("[USE] Want '%s' (ID: %s)   - Skipping In path %d: Name=%s (Channel is nil)\n", n.Metadata.Name, n.Metadata.ID, i, pathInfo.Name)
-				}
 			}
-		}
-
-		if DebugLoggingEnabled {
-			log.Printf("[USE] Want '%s' (ID: %s) reflect.Select cases count (excluding timeout/default): %d\n", n.Metadata.Name, n.Metadata.ID, len(cases))
 		}
 
 		// If no valid channels found, return immediately
@@ -1673,17 +1644,6 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
 		}
 
 		chosen, recv, recvOK := reflect.Select(cases)
-
-		if DebugLoggingEnabled {
-			log.Printf("[USE] Want '%s' (ID: %s) reflect.Select chosen: %d, recvOK: %v\n", n.Metadata.Name, n.Metadata.ID, chosen, recvOK)
-			if chosen >= 0 && chosen < len(channelIndexMap) { // ensure chosen is valid index
-				log.Printf("[USE] Want '%s' (ID: %s) Selected channel original index: %d\n", n.Metadata.Name, n.Metadata.ID, channelIndexMap[chosen])
-			} else if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
-				log.Printf("[USE] Want '%s' (ID: %s) Select chose timeout case.\n", n.Metadata.Name, n.Metadata.ID)
-			} else {
-				log.Printf("[USE] Want '%s' (ID: %s) Select chose non-channel/non-timeout case.\n", n.Metadata.Name, n.Metadata.ID)
-			}
-		}
 
 		// If timeout case was chosen (last index in cases), no data available
 		if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {

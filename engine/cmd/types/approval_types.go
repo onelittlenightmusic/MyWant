@@ -6,14 +6,6 @@ import (
 	"time"
 )
 
-// ApprovalData represents shared evidence and description data
-type ApprovalData struct {
-	ApprovalID  string
-	Evidence    any
-	Description string
-	Timestamp   time.Time
-}
-
 // ApprovalResult represents the outcome of an approval process
 type ApprovalResult struct {
 	ApprovalID   string
