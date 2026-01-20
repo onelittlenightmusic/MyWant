@@ -652,9 +652,6 @@ func (n *Want) StartProgressionLoop(
 			if n.HasPendingAgentStateChanges() {
 				n.DumpStateForAgent("DoAgent")
 			}
-
-			// 10. Sleep to prevent CPU spinning
-			time.Sleep(GlobalExecutionInterval)
 		}
 	}()
 }
