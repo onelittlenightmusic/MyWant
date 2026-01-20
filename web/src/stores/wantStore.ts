@@ -3,6 +3,12 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { Want, WantDetails, WantResults, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { apiClient } from '@/api/client';
 
+interface DraggingTemplate {
+  id: string;
+  type: 'want-type' | 'recipe';
+  name: string;
+}
+
 interface WantStore {
   // State
   wants: Want[];
@@ -12,6 +18,7 @@ interface WantStore {
   loading: boolean;
   error: string | null;
   draggingWant: string | null;
+  draggingTemplate: DraggingTemplate | null;
   isOverTarget: boolean;
 
   // Actions
@@ -34,6 +41,7 @@ interface WantStore {
   stopWants: (ids: string[]) => Promise<void>;
   startWants: (ids: string[]) => Promise<void>;
   setDraggingWant: (wantId: string | null) => void;
+  setDraggingTemplate: (template: DraggingTemplate | null) => void;
   setIsOverTarget: (isOver: boolean) => void;
 }
 
@@ -47,10 +55,12 @@ export const useWantStore = create<WantStore>()(
     loading: false,
     error: null,
     draggingWant: null,
+    draggingTemplate: null,
     isOverTarget: false,
 
     // Actions
     setDraggingWant: (wantId: string | null) => set({ draggingWant: wantId }),
+    setDraggingTemplate: (template: DraggingTemplate | null) => set({ draggingTemplate: template }),
     setIsOverTarget: (isOver: boolean) => set({ isOverTarget: isOver }),
 
     fetchWants: async () => {

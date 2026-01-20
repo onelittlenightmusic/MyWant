@@ -3,6 +3,7 @@ import { ChevronRight, Package, Zap, ChevronDown, Search, X } from 'lucide-react
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
+import { useWantStore } from '@/stores/wantStore';
 
 export interface TypeRecipeSelectorItem {
   id: string;
@@ -376,7 +377,27 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       if (el) itemRefs.current[globalIndex] = el;
                     }}
                     type="button"
+                    draggable
                     onClick={() => handleSelect(item)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'copy';
+                      const data = JSON.stringify({
+                        id: item.id,
+                        type: 'want-type',
+                        name: item.title
+                      });
+                      e.dataTransfer.setData('application/mywant-template', data);
+                      
+                      useWantStore.getState().setDraggingTemplate({
+                        id: item.id,
+                        type: 'want-type',
+                        name: item.title
+                      });
+                    }}
+                    onDragEnd={() => {
+                      console.log('[DEBUG TypeRecipeSelector] dragend - want-type:', item.title);
+                      useWantStore.getState().setDraggingTemplate(null);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -390,7 +411,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         ? 'border-blue-500 bg-blue-50'
                         : isFocused
                         ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 hover:border-gray-300 hover:cursor-move'
                     } ${backgroundStyle.className}`}
                     style={backgroundStyle.style}
                   >
@@ -433,7 +454,27 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       if (el) itemRefs.current[globalIndex] = el;
                     }}
                     type="button"
+                    draggable
                     onClick={() => handleSelect(item)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'copy';
+                      const data = JSON.stringify({
+                        id: item.id,
+                        type: 'recipe',
+                        name: item.title
+                      });
+                      e.dataTransfer.setData('application/mywant-template', data);
+                      
+                      useWantStore.getState().setDraggingTemplate({
+                        id: item.id,
+                        type: 'recipe',
+                        name: item.title
+                      });
+                    }}
+                    onDragEnd={() => {
+                      console.log('[DEBUG TypeRecipeSelector] dragend - recipe:', item.title);
+                      useWantStore.getState().setDraggingTemplate(null);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -447,7 +488,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         ? 'border-green-500 bg-green-50'
                         : isFocused
                         ? 'border-green-400 bg-green-50 ring-2 ring-green-300'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:cursor-move'
                     }`}
                   >
                   <div className="flex items-start justify-between">
