@@ -1416,17 +1416,8 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 	}
 
 	// 6. A packet was received. Get its original index and cache it.
-	originalIndex := channelIndexMap[chosen]
-	n.cacheMutex.Lock()
-	n.cachedPacket = &CachedPacket{
-		Packet:        recv.Interface(),
-		OriginalIndex: originalIndex,
-	}
-	n.cacheMutex.Unlock()
-
-	elapsed := time.Now().Sub(startTime).Milliseconds()
-	n.StoreLog("[UnusedExists] FOUND and CACHED packet from channel index %d in %dms\n", originalIndex, elapsed)
-
+	// UnusedExists should not cache; it only checks if there is something to read.
+	// The actual consumption is done by Use().
 	return true
 }
 
