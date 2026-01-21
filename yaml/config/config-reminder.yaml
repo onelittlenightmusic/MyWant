@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: coffee-break
+      type: reminder
+    spec:
+      params:
+        message: "Time for a coffee break! ☕"
+        duration_from_now: "15 minutes"
+        require_reaction: true
