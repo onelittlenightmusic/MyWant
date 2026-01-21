@@ -1,8 +1,0 @@
-=== Dynamic Travel Retrigger Test ===
-Start time: Tue Dec  2 00:10:44 JST 2025
-Results file: /Users/hiroyukiosaki/work/golang/MyWant/test_results/dynamic_travel_retrigger_20251202_001044.json
-
-[PHASE 1] Deploying...
-Deployment response: {"id":"want-f7e4f325-df46-482c-965a-03685ac83cb3","message":"Wants created and added to execution queue","status":"created","want_ids":["want-07819ea7-b8e2-43e8-bfe3-e0404760f875"],"wants":1}
-
-[PHASE 2] Waiting 15 seconds for initial execution...
