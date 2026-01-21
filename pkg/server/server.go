@@ -62,7 +62,7 @@ func New(config Config) *Server {
 	_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
 
 	// Load want type definitions
-	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
+	wantTypeLoader := mywant.NewWantTypeLoader(mywant.WantTypesDir)
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}

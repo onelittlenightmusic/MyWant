@@ -31,6 +31,7 @@ test/
 .claude/
 .gemini/
 .playwright-mcp/
+.mcp.json
 
 # OS
 .DS_Store

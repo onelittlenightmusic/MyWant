@@ -54,7 +54,15 @@ func (r *AgentRegistry) LoadCapabilities(path string) error {
 // loadAgentSpec loads the agent OpenAPI spec, trying multiple possible paths
 func loadAgentSpec() (*openapi3.T, error) {
 	loader := openapi3.NewLoader()
-	specPaths := []string{"spec/agent-spec.yaml", "../spec/agent-spec.yaml", "../../openapi.yaml", "openapi.yaml"}
+	specPaths := []string{
+		filepath.Join(SpecDir, "agent-spec.yaml"),
+		filepath.Join("..", SpecDir, "agent-spec.yaml"),
+		filepath.Join("../..", SpecDir, "agent-spec.yaml"),
+		"spec/agent-spec.yaml",    // Legacy
+		"../spec/agent-spec.yaml", // Legacy
+		"../../openapi.yaml",      // Legacy
+		"openapi.yaml",            // Legacy
+	}
 
 	var lastErr error
 	for _, specPath := range specPaths {

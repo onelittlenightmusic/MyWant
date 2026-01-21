@@ -407,10 +407,26 @@ func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, p
 	return want
 }
 func validateRecipeWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec for recipes Try to find the spec directory - check both "spec" and "../spec"
-	specPath := "spec/recipe-spec.yaml"
-	if _, err := os.Stat("spec"); os.IsNotExist(err) {
-		specPath = "../spec/recipe-spec.yaml"
+	// Load the OpenAPI spec for recipes
+	specPaths := []string{
+		filepath.Join(SpecDir, "recipe-spec.yaml"),
+		filepath.Join("..", SpecDir, "recipe-spec.yaml"),
+		filepath.Join("../..", SpecDir, "recipe-spec.yaml"),
+		"spec/recipe-spec.yaml",    // Legacy
+		"../spec/recipe-spec.yaml", // Legacy
+	}
+
+	var specPath string
+	for _, path := range specPaths {
+		if _, err := os.Stat(path); err == nil {
+			specPath = path
+			break
+		}
+	}
+
+	if specPath == "" {
+		// Fallback to error from last attempt or default
+		specPath = filepath.Join(SpecDir, "recipe-spec.yaml")
 	}
 
 	loader := openapi3.NewLoader()

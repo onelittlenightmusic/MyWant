@@ -2292,9 +2292,12 @@ func validateConfigWithSpec(yamlData []byte) error {
 	loader := openapi3.NewLoader()
 
 	specPaths := []string{
-		"../spec/want-spec.yaml",    // From engine directory
-		"spec/want-spec.yaml",       // From project root
-		"../../spec/want-spec.yaml", // From deeper subdirectories
+		filepath.Join(SpecDir, "want-spec.yaml"),
+		filepath.Join("..", SpecDir, "want-spec.yaml"),
+		filepath.Join("../..", SpecDir, "want-spec.yaml"),
+		"../spec/want-spec.yaml",    // Legacy engine directory
+		"spec/want-spec.yaml",       // Legacy project root
+		"../../spec/want-spec.yaml", // Legacy deeper subdirectories
 	}
 
 	var spec *openapi3.T

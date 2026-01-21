@@ -203,23 +203,27 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
           // Delete button
           if (canDelete) {
             e.preventDefault();
+            e.stopImmediatePropagation();
             handleDeleteClick();
           }
           break;
-        case 'p':
+        case 's':
           // Start/Resume button (if available), otherwise Suspend button
           if (canStart) {
             e.preventDefault();
+            e.stopImmediatePropagation();
             handleStartClick();
           } else if (canSuspend) {
             e.preventDefault();
+            e.stopImmediatePropagation();
             handleSuspendClick();
           }
           break;
-        case 'r':
+        case 'x':
           // Stop button (square icon - reset)
           if (canStop) {
             e.preventDefault();
+            e.stopImmediatePropagation();
             handleStopClick();
           }
           break;

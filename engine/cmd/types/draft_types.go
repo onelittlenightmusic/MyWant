@@ -2,6 +2,7 @@ package types
 
 import (
 	. "mywant/engine/src"
+	"path/filepath"
 )
 
 // DraftWant represents a temporary, persisted want for storing work-in-progress state.
@@ -48,7 +49,7 @@ func RegisterDraftWantType(builder *ChainBuilder) {
 		// Register for event system support if needed in the future
 		want.Init()
 		return NewDraftWant(want)
-	}, "want_types/system/draft.yaml")
+	}, filepath.Join(WantTypesDir, "system/draft.yaml"))
 	if err != nil {
 		ErrorLog("[ERROR] Failed to register draft want type: %v", err)
 	} else {

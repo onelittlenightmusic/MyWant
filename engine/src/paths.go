@@ -19,8 +19,11 @@ const (
 	// CapabilitiesDir contains capability definition files
 	CapabilitiesDir = "yaml/capabilities"
 
-	// WantTypesDir contains want type definition files (not moved)
-	WantTypesDir = "want_types"
+	// WantTypesDir contains want type definition files
+	WantTypesDir = "yaml/want_types"
+
+	// SpecDir contains OpenAPI specification files
+	SpecDir = "yaml/spec"
 
 	// MemoryDir contains memory persistence files (not moved)
 	MemoryDir = "engine/memory"

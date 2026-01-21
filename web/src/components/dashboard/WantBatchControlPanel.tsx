@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { XCircle } from 'lucide-react';
 import { WantControlButtons } from './WantControlButtons';
 
@@ -19,6 +19,50 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
   onBatchCancel,
   loading = false
 }) => {
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input/textarea
+      const target = e.target as HTMLElement;
+      const isInputElement =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      if (isInputElement) return;
+
+      switch (e.key.toLowerCase()) {
+        case 'd':
+          // Delete
+          if (selectedCount > 0 && !loading) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            onBatchDelete();
+          }
+          break;
+        case 's':
+          // Start
+          if (selectedCount > 0 && !loading) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            onBatchStart();
+          }
+          break;
+        case 'x':
+          // Stop
+          if (selectedCount > 0 && !loading) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            onBatchStop();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCount, loading, onBatchDelete, onBatchStart, onBatchStop]);
+
   return (
     <div className="h-full flex flex-col bg-white">
       {/* Header */}
