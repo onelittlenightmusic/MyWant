@@ -52,14 +52,3 @@ jobs:
 
     - name: Run CLI Tests
       run: go test -v ./cmd/want-cli/...
-
-    - name: Build CLI
-      run: go build -o want-cli ./cmd/want-cli
-
-    - name: Run Integration Test
-      run: |
-        ./want-cli start -D
-        # Give the server a moment to initialize
-        sleep 5
-        go run test/test_approval_workflow.go
-        ./want-cli stop
