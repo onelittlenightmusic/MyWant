@@ -145,9 +145,22 @@ export const Dashboard: React.FC = () => {
     setIsBatchProcessing(true);
     const ids = Array.from(selectedWantIds);
     try {
-      if (batchAction === 'start') { await apiClient.startWants(ids); showNotification(`Started ${ids.length} wants`); }
-      else if (batchAction === 'stop') { await apiClient.stopWants(ids); showNotification(`Stopped ${ids.length} wants`); }
-      else if (batchAction === 'delete') { await deleteWants(ids); showNotification(`Deleted ${ids.length} wants`); setSelectedWantIds(new Set()); sidebar.closeBatch(); }
+      if (batchAction === 'start') {
+        for (const id of ids) {
+          await startWant(id);
+        }
+        showNotification(`Started ${ids.length} wants`);
+      } else if (batchAction === 'stop') {
+        for (const id of ids) {
+          await stopWant(id);
+        }
+        showNotification(`Stopped ${ids.length} wants`);
+      } else if (batchAction === 'delete') {
+        await deleteWants(ids);
+        showNotification(`Deleted ${ids.length} wants`);
+        setSelectedWantIds(new Set());
+        sidebar.closeBatch();
+      }
       setShowBatchConfirmation(false); setBatchAction(null);
     } catch (e) { console.error(e); showNotification(`Failed to ${batchAction} some wants`); }
     finally { setIsBatchProcessing(false); }
