@@ -27,6 +27,7 @@ import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { Toast } from '@/components/notifications';
+import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 
@@ -167,6 +168,22 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleBatchCancel = () => { setShowBatchConfirmation(false); setBatchAction(null); };
+  const handleDeleteWantCancel = () => { setShowDeleteConfirmation(false); setDeleteWantState(null); };
+  const handleDeleteDraftConfirm = async () => {
+    if (deleteDraftState) {
+      try {
+        await apiClient.deleteDraftWant(deleteDraftState.id);
+        setShowDeleteDraftConfirmation(false);
+        setDeleteDraftState(null);
+        showNotification(`Deleted draft`);
+        await fetchWants();
+      } catch (e) {
+        showNotification('Failed to delete draft');
+      }
+    }
+  };
+  const handleDeleteDraftCancel = () => { setShowDeleteDraftConfirmation(false); setDeleteDraftState(null); };
+  const handleReactionCancel = () => { setShowReactionConfirmation(false); setReactionWantState(null); setReactionAction(null); };
   const handleCreateWant = () => { setEditingWant(null); sidebar.openForm(); };
   const handleEditWant = (w: Want) => { setEditingWant(w); sidebar.openForm(); };
 
@@ -511,13 +528,55 @@ export const Dashboard: React.FC = () => {
   return (
     <Layout sidebarMinimized={sidebarMinimized} onSidebarMinimizedChange={setSidebarMinimized}>
       <Header onCreateWant={handleCreateWant} showSummary={sidebar.showSummary} onSummaryToggle={sidebar.toggleSummary} sidebarMinimized={sidebarMinimized} showSelectMode={isSelectMode} onToggleSelectMode={handleToggleSelectMode} onInteractSubmit={handleInteractSubmit} isInteractThinking={hasThinkingDraft} gooseProvider={gooseProvider} onProviderChange={setGooseProvider} />
-      <main 
+      <main
         className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative"
         onDragEnter={handleGlobalDragEnter}
         onDragOver={handleGlobalDragOver}
         onDragLeave={handleGlobalDragLeave}
         onDrop={handleGlobalDrop}
       >
+        {/* Confirmation Notification - Dashboard Right Layout */}
+        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
+          <ConfirmationBubble
+            message={
+              showDeleteConfirmation
+                ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
+                : showDeleteDraftConfirmation
+                ? (deleteDraftState ? `Delete draft: ${deleteDraftState.message}` : null)
+                : showBatchConfirmation
+                ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
+                : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
+            }
+            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
+            onDismiss={() => {
+              setShowDeleteConfirmation(false);
+              setShowReactionConfirmation(false);
+              setShowBatchConfirmation(false);
+              setShowDeleteDraftConfirmation(false);
+            }}
+            onConfirm={
+              showDeleteConfirmation
+                ? handleDeleteWantConfirm
+                : showDeleteDraftConfirmation
+                ? handleDeleteDraftConfirm
+                : showBatchConfirmation
+                ? handleBatchConfirm
+                : handleReactionConfirm
+            }
+            onCancel={
+              showDeleteConfirmation
+                ? handleDeleteWantCancel
+                : showDeleteDraftConfirmation
+                ? handleDeleteDraftCancel
+                : showBatchConfirmation
+                ? handleBatchCancel
+                : handleReactionCancel
+            }
+            loading={isDeletingWant || isSubmittingReaction || isBatchProcessing}
+            title={showDeleteConfirmation ? "Delete Want" : showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
+            layout="dashboard-right"
+          />
+        )}
         <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 border-4 border-dashed border-blue-400 border-inset")}>
           <div className="p-6 pb-24 flex flex-col h-full min-h-screen">
             <React.Fragment>
@@ -539,7 +598,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </RightSidebar>
       </main>
-      <RightSidebar isOpen={!!selectedWant || sidebar.showBatch} onClose={() => { if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } else { sidebar.clearSelection(); } }} title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined)} backgroundStyle={!isSelectMode ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} headerActions={!isSelectMode ? headerActions : undefined}>{isSelectMode ? <WantBatchControlPanel selectedCount={selectedWantIds.size} onBatchStart={() => setBatchAction('start')} onBatchStop={() => setBatchAction('stop')} onBatchDelete={() => setBatchAction('delete')} onBatchCancel={handleToggleSelectMode} loading={isBatchProcessing} /> : <WantDetailsSidebar want={selectedWant} initialTab={sidebarInitialTab} onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} onHeaderStateChange={setHeaderState} onRegisterHeaderActions={sidebar.registerHeaderActions} onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onDelete={() => handleShowDeleteConfirmation(selectedWant!)} onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)} />}</RightSidebar>
+      <RightSidebar isOpen={!!selectedWant || sidebar.showBatch} onClose={() => { if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } else { sidebar.clearSelection(); } }} title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined)} backgroundStyle={!isSelectMode ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} headerActions={!isSelectMode ? headerActions : undefined}>{isSelectMode ? <WantBatchControlPanel selectedCount={selectedWantIds.size} onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }} onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }} onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }} onBatchCancel={handleToggleSelectMode} loading={isBatchProcessing} /> : <WantDetailsSidebar want={selectedWant} initialTab={sidebarInitialTab} onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} onHeaderStateChange={setHeaderState} onRegisterHeaderActions={sidebar.registerHeaderActions} onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onDelete={() => handleShowDeleteConfirmation(selectedWant!)} onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)} />}</RightSidebar>
       <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
       <ConfirmDeleteModal isOpen={showDeleteConfirmation} onClose={() => setShowDeleteConfirmation(false)} onConfirm={handleDeleteWantConfirm} want={deleteWantState} loading={isDeletingWant} title="Delete Want" message={deleteWantState ? `Are you sure you want to delete "${deleteWantState.metadata?.name}"?` : 'Are you sure?'} />
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
