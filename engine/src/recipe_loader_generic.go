@@ -115,7 +115,7 @@ type GenericRecipeLoader struct {
 // NewGenericRecipeLoader creates a new generic recipe loader
 func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 	if recipeDir == "" {
-		recipeDir = "recipes"
+		recipeDir = RecipesDir
 	}
 
 	loader := &GenericRecipeLoader{

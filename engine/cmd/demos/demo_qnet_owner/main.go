@@ -13,7 +13,7 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("other wants from the qnet-pipeline recipe at runtime.")
 	fmt.Println()
-	yamlFile := "config/config-qnet.yaml"
+	yamlFile := "yaml/config/config-qnet.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

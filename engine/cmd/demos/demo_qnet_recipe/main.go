@@ -17,7 +17,7 @@ func main() {
 	fmt.Println("- Final processing and collection")
 	fmt.Println("- All using connections defined in recipe YAML")
 	fmt.Println()
-	yamlFile := "config/config-qnet-recipe.yaml"
+	yamlFile := "yaml/config/config-qnet-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

@@ -5,7 +5,7 @@ wants:
       labels:
         role: qnet-target
     spec:
-      recipe: recipes/qnet-pipeline.yaml
+      recipe: yaml/recipes/qnet-pipeline.yaml
       params:
         prefix: "qnet"
         primary_count: 8000

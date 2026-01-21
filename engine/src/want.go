@@ -105,14 +105,14 @@ type LogHistoryEntry struct {
 type WantStatus string
 
 const (
-	WantStatusIdle       WantStatus = "idle"
+	WantStatusIdle         WantStatus = "idle"
 	WantStatusInitializing WantStatus = "initializing"
-	WantStatusReaching   WantStatus = "reaching"
-	WantStatusSuspended  WantStatus = "suspended"
-	WantStatusAchieved   WantStatus = "achieved"
-	WantStatusFailed     WantStatus = "failed"
-	WantStatusTerminated WantStatus = "terminated"
-	WantStatusDeleting   WantStatus = "deleting"
+	WantStatusReaching     WantStatus = "reaching"
+	WantStatusSuspended    WantStatus = "suspended"
+	WantStatusAchieved     WantStatus = "achieved"
+	WantStatusFailed       WantStatus = "failed"
+	WantStatusTerminated   WantStatus = "terminated"
+	WantStatusDeleting     WantStatus = "deleting"
 )
 
 // ControlTrigger represents a control command sent to a Want

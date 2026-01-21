@@ -85,7 +85,7 @@ wants:
 **Recipes** provide reusable component templates:
 
 ```yaml
-# recipes/data-pipeline.yaml
+# yaml/recipes/data-pipeline.yaml
 recipe:
   parameters:
     input_format: "csv"
@@ -188,7 +188,7 @@ wants:
 ```yaml
 # Recipe-Based Configuration
 recipe:
-  path: "recipes/etl-pipeline.yaml"
+  path: "yaml/recipes/etl-pipeline.yaml"
   parameters:
     input_file: "/data/sales-2024.csv"
     output_file: "/data/processed-sales.json"

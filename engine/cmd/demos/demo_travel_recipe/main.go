@@ -17,7 +17,7 @@ func main() {
 	fmt.Println("- Flight monitoring enables automatic rebooking on delay detection")
 	fmt.Println("- Demo runs for extended duration to observe complete cycle")
 	fmt.Println()
-	yamlFile := "config/config-travel-recipe.yaml"
+	yamlFile := "yaml/config/config-travel-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
@@ -48,7 +48,7 @@ func main() {
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities from YAML files (from project root, accounting for engine subdirectory) Try both relative paths since go run -C engine changes the working directory
-	capPaths := []string{"../capabilities/", "capabilities/"}
+	capPaths := []string{"../yaml/capabilities/", "yaml/capabilities/"}
 	var capPath string
 	for _, p := range capPaths {
 		fmt.Printf("  Trying to load capabilities from %s...\n", p)
@@ -70,10 +70,10 @@ func main() {
 	}
 
 	// Load agents from YAML files (optional - may fail due to spec validation paths)
-	agentPath := "agents/"
+	agentPath := "yaml/agents/"
 	if err := agentRegistry.LoadAgents(agentPath); err != nil {
 		// Try parent directory
-		if err := agentRegistry.LoadAgents("../agents/"); err != nil {
+		if err := agentRegistry.LoadAgents("../yaml/agents/"); err != nil {
 			fmt.Printf("⚠️  Could not load agents from YAML (may be due to spec path issues)\n")
 		}
 	}

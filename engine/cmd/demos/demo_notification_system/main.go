@@ -19,7 +19,7 @@ func main() {
 	fmt.Println()
 
 	// Load configuration
-	configPath := "config/config-notification-demo.yaml"
+	configPath := "yaml/config/config-notification-demo.yaml"
 	if len(os.Args) > 1 {
 		configPath = os.Args[1]
 	}

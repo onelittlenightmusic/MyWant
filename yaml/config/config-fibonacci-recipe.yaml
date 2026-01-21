@@ -5,7 +5,7 @@ wants:
       labels:
         category: fibonacci
     spec:
-      recipe: recipes/fibonacci-sequence.yaml
+      recipe: yaml/recipes/fibonacci-sequence.yaml
       params:
         count: 15
         min_value: 1

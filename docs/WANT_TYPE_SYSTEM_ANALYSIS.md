@@ -520,7 +520,7 @@ func (t *TravelCoordinatorWant) Exec(using []chain.Chan, outputs []chain.Chan) b
 ## 9. YAML CONFIGURATION STRUCTURE
 
 ### 9.1 Config File Format
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/config/config-travel-recipe.yaml`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/yaml/config/config-travel-recipe.yaml`
 
 ```yaml
 wants:
@@ -540,7 +540,7 @@ wants:
 ```
 
 ### 9.2 Recipe File Format
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/recipes/travel-itinerary.yaml`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/yaml/recipes/travel-itinerary.yaml`
 
 ```yaml
 recipe:

@@ -180,7 +180,7 @@ func NewServer(config ServerConfig) *Server {
 	agentRegistry := mywant.NewAgentRegistry()
 
 	// Load capabilities and agents from directories if they exist
-	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+	if err := agentRegistry.LoadCapabilities(mywant.CapabilitiesDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
@@ -190,16 +190,16 @@ func NewServer(config ServerConfig) *Server {
 		Gives: []string{"mock_server_management"},
 	})
 
-	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
 	// Load recipes from recipes/ directory as custom types
-	_ = mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry)
+	_ = mywant.ScanAndRegisterCustomTypes(mywant.RecipesDir, recipeRegistry)
 
 	// Also load the recipe files themselves into the recipe registry
-	_ = loadRecipeFilesIntoRegistry("recipes", recipeRegistry)
+	_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
 
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader("want_types")
@@ -2283,7 +2283,7 @@ func (s *Server) validateRecipeExists(recipePath string) error {
 	// Try with recipes/ prefix if not absolute
 	fullPath := recipePath
 	if !strings.HasPrefix(recipePath, "/") {
-		fullPath = fmt.Sprintf("recipes/%s", recipePath)
+		fullPath = fmt.Sprintf("%s/%s", mywant.RecipesDir, recipePath)
 	}
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -2872,7 +2872,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Save to file in recipes/ directory
-	filename := fmt.Sprintf("recipes/%s.yaml", recipeID)
+	filename := fmt.Sprintf("%s/%s.yaml", mywant.RecipesDir, recipeID)
 	// Sanitize filename: replace spaces with hyphens
 	filename = strings.ReplaceAll(filename, " ", "-")
 

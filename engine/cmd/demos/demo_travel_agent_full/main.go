@@ -35,11 +35,11 @@ func main() {
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities and agents
-	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+	if err := agentRegistry.LoadCapabilities("yaml/capabilities/"); err != nil {
 		fmt.Printf("Warning: Failed to load capabilities: %v\n", err)
 	}
 
-	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+	if err := agentRegistry.LoadAgents("yaml/agents/"); err != nil {
 		fmt.Printf("Warning: Failed to load agents: %v\n", err)
 	}
 

@@ -367,14 +367,14 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		paths := pathMap[wantName]
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-						for otherName, otherWant := range cb.wants {
-							if wantName == otherName {
-								continue // Skip self-matching
-							}
-							if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
-								matchCount++
-			
-								pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
+			for otherName, otherWant := range cb.wants {
+				if wantName == otherName {
+					continue // Skip self-matching
+				}
+				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
+					matchCount++
+
+					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
 					// Reuse existing channel if it exists, otherwise create a new one
 					var ch chain.Chan
 					if existingCh, exists := existingChannels[pathName]; exists {
@@ -1157,57 +1157,58 @@ func (cb *ChainBuilder) startPhase() {
 	if cb.running {
 		startedCount := 0
 
-		        // Debug: Log all idle wants found
-				for wantName, want := range cb.wants {
-					if want.want.GetStatus() == WantStatusIdle && strings.Contains(wantName, "date") {
-						if DebugLoggingEnabled {
-							log.Printf("[START-PHASE:DEBUG] Found Idle want: '%s'\n", wantName)
-						}
+		// Debug: Log all idle wants found
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusIdle && strings.Contains(wantName, "date") {
+				if DebugLoggingEnabled {
+					log.Printf("[START-PHASE:DEBUG] Found Idle want: '%s'\n", wantName)
+				}
+			}
+		}
+
+		// First pass: start idle wants (only if connectivity requirements are met)
+		for wantName, want := range cb.wants {
+			if want.want.GetStatus() == WantStatusIdle {
+				paths := cb.pathMap[wantName]
+				meta := want.want.GetConnectivityMetadata()
+				inCount := len(paths.In)
+				outCount := len(paths.Out)
+
+				// DEBUG: Log nested want startup
+				if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+					log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
+						wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+				}
+
+				// Log for coordinator startup
+				if wantName == "dynamic-travel-coordinator-5" {
+					if DebugLoggingEnabled {
+						log.Printf("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
 					}
 				}
-		
-				// First pass: start idle wants (only if connectivity requirements are met)
-				for wantName, want := range cb.wants {
-					if want.want.GetStatus() == WantStatusIdle {
-						paths := cb.pathMap[wantName]
-						meta := want.want.GetConnectivityMetadata()
-						inCount := len(paths.In)
-						outCount := len(paths.Out)
-		
-						// DEBUG: Log nested want startup
-						if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-							log.Printf("[RECONCILE:STARTUP] %s - inCount=%d (required=%d), outCount=%d (required=%d)\n",
-								wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
+
+				// Skip if required connections are not met
+				if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
+					if wantName == "dynamic-travel-coordinator-5" {
+						if DebugLoggingEnabled {
+							log.Printf("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
 						}
-		
-						// Log for coordinator startup
-						if wantName == "dynamic-travel-coordinator-5" {
-							if DebugLoggingEnabled {
-								log.Printf("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-							}
-						}
-		
-						// Skip if required connections are not met
-						if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-							if wantName == "dynamic-travel-coordinator-5" {
-								if DebugLoggingEnabled {
-									log.Printf("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
-								}
-							}
-							// DEBUG: Log why nested wants are skipped
-							if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
-								log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
-							}
-							continue
-						}
-		
-						if strings.Contains(wantName, "date") {
-							if DebugLoggingEnabled {
-								log.Printf("[START-PHASE:DEBUG] About to call startWant for '%s'\n", wantName)
-							}
-						}
-						cb.startWant(wantName, want)
-						startedCount++			}
+					}
+					// DEBUG: Log why nested wants are skipped
+					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
+						log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)
+					}
+					continue
+				}
+
+				if strings.Contains(wantName, "date") {
+					if DebugLoggingEnabled {
+						log.Printf("[START-PHASE:DEBUG] About to call startWant for '%s'\n", wantName)
+					}
+				}
+				cb.startWant(wantName, want)
+				startedCount++
+			}
 		}
 
 		// NOTE: Second pass removed - no longer needed
@@ -1468,7 +1469,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 			// Sync fields from config to runtime
 			if runtimeWant, exists := cb.wants[change.WantName]; exists {
 				// updatedConfigWant is the one from newConfig (cb.config)
-				updatedConfigWant := change.Want 
+				updatedConfigWant := change.Want
 				if updatedConfigWant != nil {
 					// Identify changed parents before syncing
 					oldOwnerRefs := copyOwnerReferences(runtimeWant.want.Metadata.OwnerReferences)
@@ -1478,7 +1479,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					runtimeWant.want.Spec = updatedConfigWant.Spec
 					runtimeWant.want.Metadata = updatedConfigWant.Metadata
 					runtimeWant.want.State = updatedConfigWant.State
-					
+
 					// Re-initialize progressable linkage
 					if progressable, ok := runtimeWant.function.(Progressable); ok {
 						runtimeWant.want.SetProgressable(progressable)
@@ -1630,10 +1631,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if wantPtr == nil {
 		stateMap := make(map[string]any)
 		if wantConfig.State != nil {
-	// Use StoreStateMulti for proper state batching
-	if len(wantConfig.State) > 0 {
-		wantPtr.StoreStateMulti(wantConfig.State)
-	}
+			// Use StoreStateMulti for proper state batching
+			if len(wantConfig.State) > 0 {
+				wantPtr.StoreStateMulti(wantConfig.State)
+			}
 		}
 
 		// Copy History field from config
@@ -1662,10 +1663,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Merge state data if provided
 		if wantConfig.State != nil {
-	// Use StoreStateMulti for proper state batching
-	if len(wantConfig.State) > 0 {
-		wantPtr.StoreStateMulti(wantConfig.State)
-	}
+			// Use StoreStateMulti for proper state batching
+			if len(wantConfig.State) > 0 {
+				wantPtr.StoreStateMulti(wantConfig.State)
+			}
 		}
 
 		// Update history
@@ -2064,12 +2065,13 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	// Final memory dump - ensure it completes before returning (silent - routine operation)
 	cb.dumpWantMemoryToYAML()
 }
+
 // GetAllWantStates returns a map of all current want objects across all executions
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	// Deadlock-resilient: Uses TryRLock to avoid hanging if called recursively during reconciliation
 	if cb.reconcileMutex.TryRLock() {
 		defer cb.reconcileMutex.RUnlock()
-		
+
 		states := make(map[string]*Want)
 		for name, want := range cb.wants {
 			states[name] = want.want
@@ -2087,6 +2089,7 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	}
 	return states
 }
+
 // AddWantsAsync adds wants to the execution queue asynchronously
 func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
 	if len(wants) == 0 {
@@ -2177,6 +2180,7 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 	// All wants are gone
 	return true
 }
+
 // addRuntimeWantOnly adds a want to the runtime mapping only (doesn't trigger reconcile)
 func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
 	cb.addWant(want)

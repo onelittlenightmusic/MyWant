@@ -14,7 +14,7 @@ func main() {
 	fmt.Println("- Recipe defines: prime_generator, prime_filter wants")
 	fmt.Println("- Target parent collects filtered prime results")
 	fmt.Println()
-	yamlFile := "config/config-prime-recipe.yaml"
+	yamlFile := "yaml/config/config-prime-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

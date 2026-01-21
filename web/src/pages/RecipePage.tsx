@@ -107,7 +107,7 @@ export default function RecipePage() {
           labels: {},
         },
         spec: {
-          recipe: `recipes/${recipeFileName}.yaml`,
+          recipe: `yaml/recipes/${recipeFileName}.yaml`,
           params: recipe.recipe.parameters || {},
         },
       });

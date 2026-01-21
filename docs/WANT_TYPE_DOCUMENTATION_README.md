@@ -220,8 +220,8 @@ For implementation, also refer to:
 - `/engine/src/chain_builder.go` - ChainBuilder and registration
 - `/engine/cmd/types/travel_types.go` - Reference implementations (5 types)
 - `/engine/cmd/types/qnet_types.go` - Reference implementations (4 types)
-- `/config/config-*.yaml` - Configuration examples
-- `/recipes/*.yaml` - Recipe examples
+- `/yaml/config/config-*.yaml` - Configuration examples
+- `/yaml/recipes/*.yaml` - Recipe examples
 
 ## Support for YAML-Based Want Type Definition System
 

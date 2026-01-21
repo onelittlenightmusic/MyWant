@@ -5,7 +5,7 @@ wants:
       labels:
         category: execution
     spec:
-      recipe: recipes/execution-result-example.yaml
+      recipe: yaml/recipes/execution-result-example.yaml
       params:
         simple_command: "echo 'Hello from ExecutionResult'"
         list_files_command: "ls -la /tmp | head -5"

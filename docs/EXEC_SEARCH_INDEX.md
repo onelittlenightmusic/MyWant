@@ -243,8 +243,8 @@ A: Each matched want creates a separate PathInfo and channel. The consumer's usi
 - **CLAUDE.md**: Project overview and architecture guide
 - **AUTOCONNECT_CODE_REFERENCE.md**: Auto-connection logic for coordinators
 - Approval system configuration files:
-  - `config/config-hierarchical-approval.yaml`
-  - `recipes/approval-level-1.yaml`
+  - `yaml/config/config-hierarchical-approval.yaml`
+  - `yaml/recipes/approval-level-1.yaml`
 
 ## Document Generation Info
 

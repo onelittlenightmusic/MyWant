@@ -117,7 +117,7 @@ func TestDynamicTravelChangeIntegration(t *testing.T) {
 
 	// --- 4. Deploy Recipe ---
 	t.Log("Deploying dynamic travel change recipe...")
-	configPath := "../config/config-dynamic-travel-change.yaml"
+	configPath := "../yaml/config/config-dynamic-travel-change.yaml"
 	content, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("Failed to read config file: %v", err)

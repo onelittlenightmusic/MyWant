@@ -13,7 +13,7 @@ func main() {
 	fmt.Println("This demo shows a target want that dynamically generates")
 	fmt.Println("travel wants from the travel-itinerary recipe at runtime.")
 	fmt.Println()
-	yamlFile := "config/config-travel-target.yaml"
+	yamlFile := "yaml/config/config-travel-target.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

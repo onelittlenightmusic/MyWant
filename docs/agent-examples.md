@@ -17,7 +17,7 @@ This document provides practical examples and patterns for implementing agents i
 **Use Case**: Making external API calls to perform actions.
 
 ```yaml
-# capabilities/capability-payment.yaml
+# yaml/capabilities/capability-payment.yaml
 capabilities:
   - name: payment_processing
     gives:
@@ -26,7 +26,7 @@ capabilities:
 ```
 
 ```yaml
-# agents/agent-payment.yaml
+# yaml/agents/agent-payment.yaml
 agents:
   - name: stripe_payment_agent
     type: do
@@ -69,7 +69,7 @@ func (r *AgentRegistry) stripePaymentAction(ctx context.Context, want *Want) err
 **Use Case**: Continuous monitoring of external resources.
 
 ```yaml
-# capabilities/capability-monitoring.yaml
+# yaml/capabilities/capability-monitoring.yaml
 capabilities:
   - name: system_monitoring
     gives:
@@ -78,7 +78,7 @@ capabilities:
 ```
 
 ```yaml
-# agents/agent-monitor.yaml
+# yaml/agents/agent-monitor.yaml
 agents:
   - name: health_monitor
     type: monitor
@@ -129,7 +129,7 @@ func (r *AgentRegistry) healthMonitorAction(ctx context.Context, want *Want) err
 Complete example showing multiple agents working together:
 
 ```yaml
-# capabilities/capability-ecommerce.yaml
+# yaml/capabilities/capability-ecommerce.yaml
 capabilities:
   - name: inventory_management
     gives:
@@ -145,7 +145,7 @@ capabilities:
 ```
 
 ```yaml
-# agents/agent-ecommerce.yaml
+# yaml/agents/agent-ecommerce.yaml
 agents:
   - name: inventory_agent
     type: do
@@ -175,7 +175,7 @@ agents:
 ```
 
 ```yaml
-# config/config-order-processing.yaml
+# yaml/config/config-order-processing.yaml
 wants:
   - metadata:
       name: customer-order-12345
@@ -203,7 +203,7 @@ wants:
 Example for managing cloud resources:
 
 ```yaml
-# capabilities/capability-cloud.yaml
+# yaml/capabilities/capability-cloud.yaml
 capabilities:
   - name: aws_ec2_management
     gives:
@@ -217,7 +217,7 @@ capabilities:
 ```
 
 ```yaml
-# agents/agent-cloud.yaml
+# yaml/agents/agent-cloud.yaml
 agents:
   - name: ec2_provisioner
     type: do

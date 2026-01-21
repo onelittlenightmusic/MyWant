@@ -150,8 +150,8 @@ MyWant/
 │       ├── qnet_types.go (4 want types)
 │       ├── fibonacci_types.go (2 want types)
 │       └── prime_types.go (3 want types)
-├── config/ (YAML config files)
-└── recipes/ (YAML recipe files)
+├── yaml/config/ (YAML config files)
+└── yaml/recipes/ (YAML recipe files)
 ```
 
 ## Recent Changes

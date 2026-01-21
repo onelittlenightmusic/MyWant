@@ -35,7 +35,7 @@ The MyWant Agent System provides capability-based, autonomous agents that can ex
 
 ## Configuration
 
-### Capability Definition (`capabilities/capability-*.yaml`)
+### Capability Definition (`yaml/capabilities/capability-*.yaml`)
 
 ```yaml
 capabilities:
@@ -47,7 +47,7 @@ capabilities:
     version: "1.2.0"
 ```
 
-### Agent Definition (`agents/agent-*.yaml`)
+### Agent Definition (`yaml/agents/agent-*.yaml`)
 
 ```yaml
 agents:
@@ -77,7 +77,7 @@ agents:
     version: "1.5.0"
 ```
 
-### Want Requirements (`config/config-*.yaml`)
+### Want Requirements (`yaml/config/config-*.yaml`)
 
 ```yaml
 wants:

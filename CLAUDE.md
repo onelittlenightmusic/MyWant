@@ -28,7 +28,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 - `recipe_loader_generic.go` - Generic recipe loading
 - `*_types.go` - Want type implementations (in `engine/cmd/types/`)
 - `engine/src/chain_builder.go` - Chain execution engine
-- `agents/` - Agent YAML definitions
+- `yaml/agents/` - Agent YAML definitions
 
 **Key Types:**
 - `Want` - Processing unit with Metadata, Spec, State, Status
@@ -59,7 +59,7 @@ make release
 ./want-cli start --dev --port 8080
 
 # Deploy a want from file
-./want-cli wants create -f config/config-travel.yaml
+./want-cli wants create -f yaml/config/config-travel.yaml
 
 # List all wants
 ./want-cli wants list
@@ -122,9 +122,9 @@ builder.AddDynamicNodes([]Want{})  // Add multiple
 
 ## File Organization
 
-- `config/` - Config YAML files (user interface)
-- `recipes/` - Recipe templates (reusable components)
-- `agents/` - Agent YAML definitions (Do/Monitor agents)
+- `yaml/config/` - Config YAML files (user interface)
+- `yaml/recipes/` - Recipe templates (reusable components)
+- `yaml/agents/` - Agent YAML definitions (Do/Monitor agents)
 - `engine/src/` - Core system: declarative.go, chain_builder.go
 - `engine/cmd/types/` - Want implementations: *_types.go files
 - `engine/cmd/server/` - HTTP server and API endpoints
@@ -174,7 +174,7 @@ Agents declare what they can do via capabilities:
 
 **Agent Definition (YAML):**
 ```yaml
-# agents/agent-example.yaml
+# yaml/agents/agent-example.yaml
 name: "agent_premium"
 type: "do"
 capabilities:

@@ -42,7 +42,7 @@ func (s *SchedulerWant) Progress() {
 		want := rw.want
 		// TARGET check: Target wants always need a progression loop even without a schedule
 		isTarget := want.Metadata.Type == "target" || want.Metadata.Type == "custom_target"
-		
+
 		if isTarget {
 			// For targets, we just need to ensure they are started
 			// The builder will handle starting the progression loop if not already active

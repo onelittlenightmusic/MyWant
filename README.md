@@ -43,7 +43,7 @@ You can monitor want executions, visualize dependencies, and manage recipes thro
 
 ### 4. Deploy an Example (Queue Processing Pipeline)
 
-**Config** (`config/config-qnet.yaml`):
+**Config** (`yaml/config/config-qnet.yaml`):
 ```yaml
 wants:
   - metadata: {name: generator, type: numbers, labels: {role: source}}
@@ -60,7 +60,7 @@ wants:
 
 **Run:**
 ```bash
-./want-cli wants create -f config/config-qnet.yaml
+./want-cli wants create -f yaml/config/config-qnet.yaml
 ```
 The new want execution will immediately appear on your dashboard.
 
@@ -69,9 +69,9 @@ The new want execution will immediately appear on your dashboard.
 Explore more complex scenarios using pre-defined configurations:
 
 ```bash
-./want-cli wants create -f config/config-travel-recipe.yaml    # Travel planning
-./want-cli wants create -f config/config-fibonacci-recipe.yaml # Fibonacci sequence
-./want-cli wants create -f config/config-qnet-recipe.yaml      # Multi-stream processing
+./want-cli wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
+./want-cli wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
+./want-cli wants create -f yaml/config/config-qnet-recipe.yaml      # Multi-stream processing
 ```
 
 ## API Usage
@@ -80,7 +80,7 @@ Explore more complex scenarios using pre-defined configurations:
 # Create wants via API
 curl -X POST http://localhost:8080/api/v1/wants \
   -H "Content-Type: application/yaml" \
-  --data-binary @config/config-qnet.yaml
+  --data-binary @yaml/config/config-qnet.yaml
 
 # Monitor status
 curl http://localhost:8080/api/v1/wants/{id}/status

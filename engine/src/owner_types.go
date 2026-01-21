@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"mywant/engine/src/chain"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -52,12 +53,12 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Status:   WantStatusIdle,
 			State:    make(map[string]any),
 		},
-		MaxDisplay:             1000,
-		RecipePath:             "recipes/empty.yaml", // Relative to project root
-		RecipeParams:           make(map[string]any),		parameterSubscriptions: make(map[string][]string),
-		childWants:             make([]*Want, 0),
-		completedChildren:      make(map[string]bool),
-		childrenDone:           make(chan bool, 1), // Signal channel for subscription system
+		MaxDisplay:   1000,
+		RecipePath:   filepath.Join(RecipesDir, "empty.yaml"), // Relative to project root
+		RecipeParams: make(map[string]any), parameterSubscriptions: make(map[string][]string),
+		childWants:        make([]*Want, 0),
+		completedChildren: make(map[string]bool),
+		childrenDone:      make(chan bool, 1), // Signal channel for subscription system
 	}
 
 	// Extract target-specific configuration from params
@@ -309,11 +310,11 @@ func (t *Target) DisownChild(wantID string) {
 		t.childWants = newChildWants
 		delete(t.completedChildren, removedName)
 		t.StoreLog("[TARGET] Disowned child: %s\n", removedName)
-		
+
 		// Update stats and check if status needs to change back from achieved
 		t.childCount = len(t.childWants)
 		t.StoreState("child_count", t.childCount)
-		
+
 		if t.Status == WantStatusAchieved {
 			// If we were achieved but lost a child (or now have none), re-evaluate or reset
 			// For now, simple reset to reaching to allow re-evaluation in next Progress()
@@ -340,14 +341,14 @@ func (t *Target) AdoptChild(want *Want) {
 	if !exists {
 		t.childWants = append(t.childWants, want)
 		t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
-		
+
 		// If the newly adopted child is already achieved, mark it as completed
 		if want.Status == WantStatusAchieved {
 			t.childCompletionMutex.Lock()
 			t.completedChildren[want.Metadata.Name] = true
 			t.childCompletionMutex.Unlock()
 		}
-		
+
 		// Update stats
 		t.childCount = len(t.childWants)
 		t.StoreState("child_count", t.childCount)
@@ -360,7 +361,7 @@ func (t *Target) Progress() {
 	if t.Status == WantStatusAchieved {
 		return
 	}
-	
+
 	// Phase 1: Create child wants (only once)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
@@ -399,54 +400,55 @@ func (t *Target) Progress() {
 				// Use StoreState() - never write directly to State map
 				t.StoreState("achieving_percentage", 100)
 
-							// Send completion packet to parent/upstream wants
-							// Construct ApprovalData for the parent coordinator
-							approvalID := t.GetStringParam("approval_id", t.Metadata.ID) // Assuming approval_id is a parameter or metadata
-				
-							// Extract relevant status from children (e.g., if level 2 approval passed or failed)
-							// For simplicity, let's assume it's "approved" if all children achieved
-							approvalStatus := "approved"
-							if t.Status == WantStatusFailed { // If target itself failed
-								approvalStatus = "failed"
-							}
-				
-							// Get the final result from the template result
-							var finalResultDescription string
-							if res, ok := t.State["result"].(string); ok {
-								finalResultDescription = res
-							} else {
-								finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
-							}
-							
-							// For complex structures, marshal to JSON and then to map[string]any if needed
-							var evidenceMap map[string]any
-							if ev, ok := t.State["final_itinerary"]; ok { // Example: if target computes an itinerary
-								if bytes, err := json.Marshal(ev); err == nil {
-									json.Unmarshal(bytes, &evidenceMap)
-								}
-							}
-							if evidenceMap == nil {
-								evidenceMap = map[string]any{"status": approvalStatus} // Default evidence
-							}
-				
-							approvalData := &ApprovalData{
-								ApprovalID:  approvalID,
-								Evidence:    evidenceMap, // Or more detailed evidence from children
-								Description: finalResultDescription,
-								Timestamp:   time.Now(),
-							}
-							
-							t.Provide(approvalData) // Use the constructed ApprovalData
-							t.ProvideDone()
-							time.Sleep(10 * time.Millisecond) // Add short sleep after providing
-				
-							// Compute and store recipe result (this part remains)
-							t.computeTemplateResult()
-				
-							// Mark the target as completed
-							// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
-							// This is part of the standard progression cycle completion pattern
-							t.SetStatus(WantStatusAchieved)			}
+				// Send completion packet to parent/upstream wants
+				// Construct ApprovalData for the parent coordinator
+				approvalID := t.GetStringParam("approval_id", t.Metadata.ID) // Assuming approval_id is a parameter or metadata
+
+				// Extract relevant status from children (e.g., if level 2 approval passed or failed)
+				// For simplicity, let's assume it's "approved" if all children achieved
+				approvalStatus := "approved"
+				if t.Status == WantStatusFailed { // If target itself failed
+					approvalStatus = "failed"
+				}
+
+				// Get the final result from the template result
+				var finalResultDescription string
+				if res, ok := t.State["result"].(string); ok {
+					finalResultDescription = res
+				} else {
+					finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
+				}
+
+				// For complex structures, marshal to JSON and then to map[string]any if needed
+				var evidenceMap map[string]any
+				if ev, ok := t.State["final_itinerary"]; ok { // Example: if target computes an itinerary
+					if bytes, err := json.Marshal(ev); err == nil {
+						json.Unmarshal(bytes, &evidenceMap)
+					}
+				}
+				if evidenceMap == nil {
+					evidenceMap = map[string]any{"status": approvalStatus} // Default evidence
+				}
+
+				approvalData := &ApprovalData{
+					ApprovalID:  approvalID,
+					Evidence:    evidenceMap, // Or more detailed evidence from children
+					Description: finalResultDescription,
+					Timestamp:   time.Now(),
+				}
+
+				t.Provide(approvalData) // Use the constructed ApprovalData
+				t.ProvideDone()
+				time.Sleep(10 * time.Millisecond) // Add short sleep after providing
+
+				// Compute and store recipe result (this part remains)
+				t.computeTemplateResult()
+
+				// Mark the target as completed
+				// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
+				// This is part of the standard progression cycle completion pattern
+				t.SetStatus(WantStatusAchieved)
+			}
 			return
 		}
 
@@ -512,10 +514,10 @@ func (t *Target) isChildWant(want *Want) bool {
 	}
 	for _, ownerRef := range want.Metadata.OwnerReferences {
 		match := ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name
-		
+
 		// Detailed debug log only for potential children
 		if ownerRef.Name == t.Metadata.Name {
-			log.Printf(">>> [CHECK] Comparing want %s ownerRef: Name=%s, Controller=%v, Kind=%v vs Target %s\n", 
+			log.Printf(">>> [CHECK] Comparing want %s ownerRef: Name=%s, Controller=%v, Kind=%v vs Target %s\n",
 				want.Metadata.Name, ownerRef.Name, ownerRef.Controller, ownerRef.Kind, t.Metadata.Name)
 		}
 
@@ -816,7 +818,7 @@ func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
 
 // RegisterOwnerWantTypes registers the owner-based want types with a ChainBuilder
 func RegisterOwnerWantTypes(builder *ChainBuilder) {
-	recipeLoader := NewGenericRecipeLoader("recipes")
+	recipeLoader := NewGenericRecipeLoader(RecipesDir)
 
 	// Register target type with recipe support
 	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) Progressable {

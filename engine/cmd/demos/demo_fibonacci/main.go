@@ -31,9 +31,9 @@ func main() {
 			// Find the recipe base directory by looking for recipes folder
 			recipeDir := ""
 			// Try ../ first (running from engine directory)
-			if _, err := os.Stat("../recipes"); err == nil {
+			if _, err := os.Stat("../yaml/recipes"); err == nil {
 				recipeDir = "../"
-			} else if _, err := os.Stat("./recipes"); err == nil {
+			} else if _, err := os.Stat("./yaml/recipes"); err == nil {
 				recipeDir = "./"
 			} else {
 				recipeDir = "../"

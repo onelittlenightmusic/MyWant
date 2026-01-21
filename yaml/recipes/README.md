@@ -394,7 +394,7 @@ Define:
 Create a new YAML file in this directory:
 
 ```bash
-recipes/my-new-recipe.yaml
+yaml/recipes/my-new-recipe.yaml
 ```
 
 ### Step 3: Define Structure
@@ -507,7 +507,7 @@ Check:
 1. YAML syntax is valid
 2. `metadata.name` is unique
 3. `metadata.custom_type` is set
-4. File is in `recipes/` directory
+4. File is in `yaml/recipes/` directory
 
 ### Wants Not Connecting
 

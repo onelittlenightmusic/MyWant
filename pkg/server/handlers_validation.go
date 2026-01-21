@@ -195,7 +195,7 @@ func (s *Server) validateWantType(want *mywant.Want) error {
 func (s *Server) validateRecipeExists(recipePath string) error {
 	fullPath := recipePath
 	if !strings.HasPrefix(recipePath, "/") {
-		fullPath = fmt.Sprintf("recipes/%s", recipePath)
+		fullPath = fmt.Sprintf("%s/%s", mywant.RecipesDir, recipePath)
 	}
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		return fmt.Errorf("recipe file not found: %s", fullPath)

@@ -49,10 +49,10 @@ MyWantには2つの主要なエージェント・タイプが存在します：
 
 ## エージェントの定義方法 (YAML)
 
-新しいエージェントは `agents/` ディレクトリにYAMLファイルを配置することで追加できます。
+新しいエージェントは `yaml/agents/` ディレクトリにYAMLファイルを配置することで追加できます。
 
 ```yaml
-# agents/agent-hotel-premium.yaml
+# yaml/agents/agent-hotel-premium.yaml
 name: "agent_premium"
 type: "do"
 capabilities:

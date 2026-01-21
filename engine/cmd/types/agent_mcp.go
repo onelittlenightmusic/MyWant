@@ -91,17 +91,17 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 			fallbackProvider = "claude-code"
 		}
 
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt failed (provider: %s, err: %v), trying fallback to %s...\n", 
+		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt failed (provider: %s, err: %v), trying fallback to %s...\n",
 			preferredProvider, err, fallbackProvider)
-		
+
 		fallbackStartTime := time.Now()
 		fallbackArgs := []string{"run", "-i", "-", "--provider", fallbackProvider}
 		fallbackOutput, fallbackErr := g.runGooseWithArgs(fallbackArgs, prompt)
 		fallbackDuration := time.Since(fallbackStartTime)
 		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback attempt took %v\n", fallbackDuration)
-		
+
 		fallbackFailed := fallbackErr != nil || strings.Contains(fallbackOutput, "Ran into this error") || strings.Contains(fallbackOutput, "Request failed")
-		
+
 		if !fallbackFailed {
 			fullOutput = fallbackOutput
 			err = nil
@@ -296,7 +296,7 @@ INSTRUCTIONS:
 
 // buildRecommendationPrompt constructs a prompt for interactive want recommendation
 func (g *GooseManager) buildRecommendationPrompt(message string, conversationHistory string) string {
-		return fmt.Sprintf(`You are a MyWant system architect. Based on the user's request, generate 2-3 alternative solutions.
+	return fmt.Sprintf(`You are a MyWant system architect. Based on the user's request, generate 2-3 alternative solutions.
 	
 	CONVERSATION HISTORY:
 	%s
@@ -442,7 +442,7 @@ func (g *GooseManager) buildRecommendationPrompt(message string, conversationHis
 	  ]
 	}
 	`, conversationHistory, message)
-	}
+}
 
 // parseGooseResponse extracts and processes Goose JSON output
 func parseGooseResponse(output string) (interface{}, error) {

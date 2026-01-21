@@ -40,7 +40,7 @@ func New(config Config) *Server {
 	agentRegistry := mywant.NewAgentRegistry()
 
 	// Load capabilities and agents from directories if they exist
-	if err := agentRegistry.LoadCapabilities("capabilities/"); err != nil {
+	if err := agentRegistry.LoadCapabilities(mywant.CapabilitiesDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
@@ -50,16 +50,16 @@ func New(config Config) *Server {
 		Gives: []string{"mock_server_management"},
 	})
 
-	if err := agentRegistry.LoadAgents("agents/"); err != nil {
+	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
 	// Load recipes from recipes/ directory as custom types
-	_ = mywant.ScanAndRegisterCustomTypes("recipes", recipeRegistry)
+	_ = mywant.ScanAndRegisterCustomTypes(mywant.RecipesDir, recipeRegistry)
 
 	// Also load the recipe files themselves into the recipe registry
-	_ = loadRecipeFilesIntoRegistry("recipes", recipeRegistry)
+	_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
 
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader("want_types")

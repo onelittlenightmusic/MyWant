@@ -32,7 +32,7 @@ func main() {
 	// Determine absolute path to recipes directory
 	// When running from demo: go run -C engine ../cmd/demos/demo_hierarchical_approval ../config/...
 	// Current directory is engine/, so recipes should be at ../recipes
-	recipePaths := []string{"../recipes", "recipes", "../../recipes"}
+	recipePaths := []string{"../yaml/recipes", "yaml/recipes", "../../yaml/recipes"}
 
 	// Also try absolute paths based on config path directory
 	configDir := filepath.Dir(configPath)
@@ -40,7 +40,7 @@ func main() {
 		wd, _ := os.Getwd()
 		configDir = filepath.Join(wd, configDir)
 	}
-	recipePathFromConfig := filepath.Join(filepath.Dir(configDir), "recipes")
+	recipePathFromConfig := filepath.Join(filepath.Dir(configDir), "yaml/recipes")
 	recipePaths = append(recipePaths, recipePathFromConfig)
 
 	var recipeErr error

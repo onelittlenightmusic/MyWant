@@ -17,7 +17,7 @@ func RunDemoQnetUsingRecipe() {
 	fmt.Println("- queue-final using: [role: merger]")
 	fmt.Println("- collector-end using: [role: processor, stage: final]")
 	fmt.Println()
-	yamlFile := "config/config-qnet-using-recipe.yaml"
+	yamlFile := "yaml/config/config-qnet-using-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}
