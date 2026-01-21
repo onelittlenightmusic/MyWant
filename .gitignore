@@ -8,6 +8,12 @@ engine/cmd/server/mywant-server
 engine/mywant-server
 mcp/server/mywant-mcp-server
 
+# Node.js dependencies
+node_modules/
+
+# Frontend build
+web/dist/
+
 # Test artifacts
 test/
 
@@ -20,6 +26,11 @@ test/
 .idea/
 *.swp
 *.swo
+
+# Development environment
+.claude/
+.gemini/
+.playwright-mcp/
 
 # OS
 .DS_Store
@@ -45,3 +56,9 @@ tmp/
 /want-cli
 build_error.log
 drag_drop_success.png
+
+# Root-level test results and debug files
+debug_repro.txt
+*_results.txt
+*_report.txt
+demo-restart.sh
