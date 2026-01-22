@@ -119,6 +119,9 @@ type ChainBuilder struct {
 	// Server mode flag
 	isServerMode bool // True when running as API server (globalBuilder), false for batch/CLI mode
 
+	// Initial load tracking
+	hasInitialized bool // True after initial config load phase completes
+
 	// API logging
 	apiLogs      []APILogEntry // API operation logs
 	apiLogsMutex sync.RWMutex  // Protect concurrent access to logs
@@ -737,7 +740,7 @@ func (cb *ChainBuilder) compilePhase() error {
 
 	// Use current config as source of truth during runtime Memory file is only loaded on initial startup
 	newConfig := cb.config
-	isInitialLoad := len(cb.lastConfig.Wants) == 0
+	isInitialLoad := !cb.hasInitialized
 
 	if isInitialLoad {
 		// For initial load, treat all wants as new additions
@@ -752,6 +755,9 @@ func (cb *ChainBuilder) compilePhase() error {
 		if len(newConfig.Wants) > 0 {
 			cb.dumpWantMemoryToYAML()
 		}
+
+		// Mark initial load as complete
+		cb.hasInitialized = true
 	} else {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
@@ -2183,6 +2189,10 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 
 // addRuntimeWantOnly adds a want to the runtime mapping only (doesn't trigger reconcile)
 func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
+	// Skip if want already exists in runtime to prevent double instantiation during config changes
+	if _, exists := cb.wants[want.Metadata.Name]; exists {
+		return
+	}
 	cb.addWant(want)
 }
 
