@@ -168,9 +168,14 @@ func (t *Target) checkAllChildrenComplete() bool {
 		return true
 	}
 
-	// For targets with children (recipe or dynamic), all must be in completedChildren map
+	// For targets with children (recipe or dynamic), check both map AND actual Status
+	// This matches the logic in Progress() and ensures consistency
 	for _, child := range t.childWants {
-		if !t.completedChildren[child.Metadata.Name] {
+		// A child is complete if either:
+		// 1. It's marked in completedChildren map, OR
+		// 2. Its actual Status is ACHIEVED
+		completed := t.completedChildren[child.Metadata.Name] || child.Status == WantStatusAchieved
+		if !completed {
 			return false
 		}
 	}
@@ -239,8 +244,17 @@ func (t *Target) CreateChildWants() []*Want {
 		return []*Want{}
 	}
 
+	// Create a copy of RecipeParams and add prefix for proper namespace isolation
+	paramsWithPrefix := make(map[string]any)
+	for k, v := range t.RecipeParams {
+		paramsWithPrefix[k] = v
+	}
+	// Use target name as prefix to ensure child wants are properly namespaced
+	// This ensures that each target instance's children have unique namespace prefixes
+	paramsWithPrefix["prefix"] = t.Metadata.Name
+
 	// Load child wants from recipe
-	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, t.RecipeParams)
+	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, paramsWithPrefix)
 	if err != nil {
 		return []*Want{}
 	}

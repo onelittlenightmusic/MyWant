@@ -407,7 +407,7 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					if strings.Contains(wantName, "coordinator") || strings.Contains(otherName, "approval") {
 						log.Printf("[RECONCILE:PATHS] Output path created: '%s' (labels: %v, ID: %s) -> '%s' (labels: %v, ID: %s) via %s. Selector: %v\n",
 							otherName, otherWant.GetMetadata().Labels, otherWant.GetMetadata().ID,
-							wantName, want.want.GetMetadata().Labels, want.want.GetMetadata().ID,
+							wantName, want.GetMetadata().Labels, want.GetMetadata().ID,
 							pathName, usingSelector)
 					}
 				}
