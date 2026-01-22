@@ -17,10 +17,11 @@ type Config struct {
 
 // Want represents a single want definition
 type Want struct {
-	Metadata Metadata       `json:"metadata"`
-	Spec     WantSpec       `json:"spec"`
-	Status   string         `json:"status,omitempty"`
-	State    map[string]any `json:"state,omitempty"`
+	Metadata  Metadata       `json:"metadata"`
+	Spec      WantSpec       `json:"spec"`
+	Status    string         `json:"status,omitempty"`
+	State     map[string]any `json:"state,omitempty"`
+	HiddenState map[string]any `json:"hidden_state,omitempty"`
 }
 
 // Metadata represents want metadata

@@ -95,7 +95,18 @@ var getWantCmd = &cobra.Command{
 			fmt.Println("\nState:")
 			printMap(want.State)
 		}
+
+		// Show hidden state if --hidden flag is set
+		showHidden, _ := cmd.Flags().GetBool("hidden")
+		if showHidden && len(want.HiddenState) > 0 {
+			fmt.Println("\nHiddenState:")
+			printMap(want.HiddenState)
+		}
 	},
+}
+
+func init() {
+	getWantCmd.Flags().BoolP("hidden", "H", false, "Show hidden state (for debugging)")
 }
 
 var createWantCmd = &cobra.Command{
