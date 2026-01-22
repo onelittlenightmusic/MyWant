@@ -64,6 +64,9 @@ func (e *EvidenceWant) IsAchieved() bool {
 }
 
 func (e *EvidenceWant) Progress() {
+	outCount := e.GetOutCount()
+	e.StoreLog("[EVIDENCE] Progress() called, OutCount=%d, Status=%s", outCount, e.Status)
+
 	locals, ok := e.Locals.(*EvidenceWantLocals)
 	if !ok {
 		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
@@ -71,10 +74,17 @@ func (e *EvidenceWant) Progress() {
 	}
 
 	provided, _ := e.GetStateBool("evidence_provided", false)
+	e.StoreLog("[EVIDENCE] evidence_provided=%v", provided)
 
 	if provided {
+		e.StoreLog("[EVIDENCE] Already provided, returning")
 		return
 	}
+
+	// NOTE: Framework ensures output connections exist before Progress() is called
+	// due to require: "users" in type-evidence.yaml
+
+	e.StoreLog("[EVIDENCE] Setting evidence_provided=true and sending data")
 	e.StoreState("evidence_provided", true)
 
 	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
@@ -94,12 +104,14 @@ func (e *EvidenceWant) Progress() {
 		"final_result":         evidence,
 	})
 
-	outCount := e.GetOutCount()
-	e.StoreLog(fmt.Sprintf("Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
+	e.StoreLog(fmt.Sprintf("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
 	e.ProvideDone()
+
+	// Mark evidence as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target
+	e.SetStatus(WantStatusAchieved)
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
@@ -159,6 +171,9 @@ func (d *DescriptionWant) IsAchieved() bool {
 }
 
 func (d *DescriptionWant) Progress() {
+	outCount := d.GetOutCount()
+	d.StoreLog("[DESCRIPTION] Progress() called, OutCount=%d, Status=%s", outCount, d.Status)
+
 	locals, ok := d.Locals.(*DescriptionWantLocals)
 	if !ok {
 		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")
@@ -166,10 +181,17 @@ func (d *DescriptionWant) Progress() {
 	}
 
 	provided, _ := d.GetStateBool("description_provided", false)
+	d.StoreLog("[DESCRIPTION] description_provided=%v", provided)
 
 	if provided {
+		d.StoreLog("[DESCRIPTION] Already provided, returning")
 		return
 	}
+
+	// NOTE: Framework ensures output connections exist before Progress() is called
+	// due to require: "users" in type-description.yaml
+
+	d.StoreLog("[DESCRIPTION] Setting description_provided=true and sending data")
 	d.StoreState("description_provided", true)
 
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
@@ -190,12 +212,14 @@ func (d *DescriptionWant) Progress() {
 		"final_result":            description,
 	})
 
-	outCount := d.GetOutCount()
-	d.StoreLog(fmt.Sprintf("Description provided: %s to %d coordinator(s)", description, outCount))
+	d.StoreLog(fmt.Sprintf("📦 Description provided: %s to %d coordinator(s)", description, outCount))
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)
 	d.ProvideDone()
+
+	// Mark description as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target
+	d.SetStatus(WantStatusAchieved)
 }
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
@@ -209,8 +233,21 @@ func (d *DescriptionWant) CalculateAchievingPercentage() int {
 
 // RegisterApprovalWantTypes registers all approval-related want types
 func RegisterApprovalWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("evidence", NewEvidenceWant)
-	builder.RegisterWantType("description", NewDescriptionWant)
-	// Coordinator type - handles all coordinator variations (approval, travel, buffet) Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
+	// Register evidence type with YAML definition that includes require: "users"
+	// This ensures evidence wants wait for output connections before providing data
+	if err := builder.RegisterWantTypeFromYAML("evidence", NewEvidenceWant, "yaml/agents/type-evidence.yaml"); err != nil {
+		// Fallback to basic registration if YAML fails
+		builder.RegisterWantType("evidence", NewEvidenceWant)
+	}
+
+	// Register description type with YAML definition that includes require: "users"
+	// This ensures description wants wait for output connections before providing data
+	if err := builder.RegisterWantTypeFromYAML("description", NewDescriptionWant, "yaml/agents/type-description.yaml"); err != nil {
+		// Fallback to basic registration if YAML fails
+		builder.RegisterWantType("description", NewDescriptionWant)
+	}
+
+	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
+	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
 	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }

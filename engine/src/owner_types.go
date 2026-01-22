@@ -130,7 +130,17 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	tcs.target.completedChildren[completionEvent.ChildName] = true
 	tcs.target.childCompletionMutex.Unlock()
 
+	// DEBUG: Log child completion tracking
+	tcs.target.StoreLog("[TARGET] 📍 Child completion event received: %s\n", completionEvent.ChildName)
+	tcs.target.StoreLog("[TARGET] 📍 Tracked completed children: %v\n", tcs.target.completedChildren)
+	tcs.target.StoreLog("[TARGET] 📍 Expected child wants (%d): ", len(tcs.target.childWants))
+	for i, child := range tcs.target.childWants {
+		tcs.target.StoreLog("%d=%s ", i, child.Metadata.Name)
+	}
+	tcs.target.StoreLog("\n")
+
 	allComplete := tcs.target.checkAllChildrenComplete()
+	tcs.target.StoreLog("[TARGET] 📍 All complete check result: %v\n", allComplete)
 
 	// CRITICAL: If all children are now complete, signal the progression loop
 	if allComplete {
@@ -166,6 +176,23 @@ func (t *Target) checkAllChildrenComplete() bool {
 	// If we reached here and have at least one child (dynamic or recipe), we are complete
 	return len(t.childWants) > 0
 }
+
+// EndProgressCycle overrides parent to enforce achieving_percentage = 100 when achieved
+func (t *Target) EndProgressCycle() {
+	// CRITICAL: Before ending cycle, if achieved, FORCE achieving_percentage = 100
+	if t.Status == WantStatusAchieved {
+		t.StoreLog("[TARGET] 🔒 EndProgressCycle: Status=ACHIEVED, forcing achieving_percentage = 100\n")
+		// Directly set in both pendingStateChanges AND State map to ensure it's saved
+		t.stateMutex.Lock()
+		t.pendingStateChanges["achieving_percentage"] = 100
+		t.State["achieving_percentage"] = 100 // Also write directly to State map
+		t.stateMutex.Unlock()
+	}
+
+	// Call parent implementation
+	t.Want.EndProgressCycle()
+}
+
 func (t *Target) SetBuilder(builder *ChainBuilder) {
 	t.builder = builder
 }
@@ -269,13 +296,10 @@ func (t *Target) IsAchieved() bool {
 	// Check the Status field which was set by Progress() when all children completed
 	// This is more reliable than re-checking children completion, which can be slow or racy
 	if t.Status == WantStatusAchieved {
-		// CONSISTENCY CHECK: If achieved, achieving_percentage must be 100%
-		// This ensures data consistency even if old data has stale values
-		achievingPct, ok := t.State["achieving_percentage"]
-		if !ok || (ok && achievingPct != 100) {
-			// Use StoreState() - never write directly to State map
-			t.StoreState("achieving_percentage", 100)
-		}
+		// CRITICAL: If achieved, achieving_percentage MUST be 100%
+		// Always enforce this consistency to ensure proper reporting
+		t.StoreLog("[TARGET] 💯 IsAchieved() enforcing achieving_percentage = 100\n")
+		t.StoreState("achieving_percentage", 100)
 		return true
 	}
 
@@ -357,8 +381,16 @@ func (t *Target) AdoptChild(want *Want) {
 
 // Progress implements the Progressable interface for Target with direct execution
 func (t *Target) Progress() {
-	// GUARD: If already achieved, skip heavy processing
+	// GUARD: If already achieved, ensure achieving_percentage is 100 and skip heavy processing
 	if t.Status == WantStatusAchieved {
+		// Consistency check: If achieved, achieving_percentage must be 100%
+		// Use both StoreState and direct State map write to ensure persistence
+		t.StoreLog("[TARGET] 💯 Progress() guard: Status=ACHIEVED, forcing achieving_percentage = 100\n")
+		t.StoreState("achieving_percentage", 100)
+		// Also directly update the State map to ensure immediate visibility
+		t.stateMutex.Lock()
+		t.State["achieving_percentage"] = 100
+		t.stateMutex.Unlock()
 		return
 	}
 
@@ -377,30 +409,45 @@ func (t *Target) Progress() {
 
 	// Phase 2: Check if all children have completed
 	if t.childrenCreated {
+		// CRITICAL: Hold lock during entire child completion check and achievement calculation
+		// to prevent race conditions where completedChildren is modified during iteration
 		t.childCompletionMutex.Lock()
 		allComplete := t.checkAllChildrenComplete()
-		t.childCompletionMutex.Unlock()
 
 		// Calculate achieving_percentage based on achieved children count
+		// This MUST be done while holding the lock to ensure consistent reads from completedChildren
 		if len(t.childWants) > 0 {
 			achievedCount := 0
+			t.StoreLog("[TARGET] 🔍 Progress check - Child completion status:\n")
 			for _, child := range t.childWants {
-				if t.completedChildren[child.Metadata.Name] {
+				// Check both completedChildren map AND actual child Status
+				// This handles cases where events might have been missed
+				completed := t.completedChildren[child.Metadata.Name] || child.Status == WantStatusAchieved
+				if completed {
 					achievedCount++
+					// Ensure it's in the map for next check
+					if !t.completedChildren[child.Metadata.Name] {
+						t.completedChildren[child.Metadata.Name] = true
+					}
 				}
+				t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
 			}
 			achievingPercentage := (achievedCount * 100) / len(t.childWants)
+			t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %d%%\n", achievedCount, len(t.childWants), achievingPercentage)
 			t.StoreState("achieving_percentage", achievingPercentage)
 		}
+		t.childCompletionMutex.Unlock()
 
 		if allComplete {
-			// Only compute result once - check if already completed
-			if t.Status != WantStatusAchieved {
-				// Set achieving_percentage to 100 when all children are complete
-				// Use StoreState() - never write directly to State map
-				t.StoreState("achieving_percentage", 100)
+			// Set achieving_percentage to 100 when all children are complete
+			// Use StoreState() - never write directly to State map
+			t.StoreLog("[TARGET] ✅ All children complete - setting achieving_percentage = 100\n")
+			t.StoreState("achieving_percentage", 100)
 
-				// Send completion packet to parent/upstream wants
+			// Send completion packet to parent/upstream wants (only once)
+			// Check if we've already sent the completion packet
+			alreadySent, _ := t.GetStateBool("completion_packet_sent", false)
+			if !alreadySent {
 				// Construct ApprovalData for the parent coordinator
 				approvalID := t.GetStringParam("approval_id", t.Metadata.ID) // Assuming approval_id is a parameter or metadata
 
@@ -439,15 +486,24 @@ func (t *Target) Progress() {
 
 				t.Provide(approvalData) // Use the constructed ApprovalData
 				t.ProvideDone()
-				time.Sleep(10 * time.Millisecond) // Add short sleep after providing
+				time.Sleep(10 * time.Millisecond)            // Add short sleep after providing
+				t.StoreState("completion_packet_sent", true) // Mark that we've sent the completion packet
 
-				// Compute and store recipe result (this part remains)
-				t.computeTemplateResult()
+				t.StoreLog("[TARGET] ✅ Target %s sent completion packet to parent coordinator\n", t.Metadata.Name)
+			}
 
-				// Mark the target as completed
-				// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
-				// This is part of the standard progression cycle completion pattern
+			// Compute and store recipe result (this part remains)
+			t.computeTemplateResult()
+
+			// Mark the target as completed
+			// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
+			// This is part of the standard progression cycle completion pattern
+			if t.Status != WantStatusAchieved {
+				// CRITICAL: Ensure achieving_percentage is 100 before marking as achieved
+				t.StoreLog("[TARGET] 🏁 Setting status to ACHIEVED and achieving_percentage = 100\n")
+				t.StoreState("achieving_percentage", 100)
 				t.SetStatus(WantStatusAchieved)
+				t.StoreLog("[TARGET] 🏁 Status set to ACHIEVED\n")
 			}
 			return
 		}

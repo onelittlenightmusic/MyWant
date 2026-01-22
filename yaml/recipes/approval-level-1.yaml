@@ -58,8 +58,6 @@ recipe:
         using:
           - role: evidence-provider
           - role: description-provider
-          - role: approval-target
-            approval_level: "2"
 
     # Level 2 Approval as child - created after Level 1 completes
     # This is a custom target type that will load approval-level-2.yaml recipe

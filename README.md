@@ -41,26 +41,24 @@ Once started, the interactive dashboard is available at:
 
 You can monitor want executions, visualize dependencies, and manage recipes through this intuitive web interface.
 
-### 4. Deploy an Example (Queue Processing Pipeline)
+### 4. Deploy an Example (Smart Reminder)
 
-**Config** (`yaml/config/config-qnet.yaml`):
+**Config** (`yaml/config/config-reminder.yaml`):
 ```yaml
 wants:
-  - metadata: {name: generator, type: numbers, labels: {role: source}}
-    spec: {params: {count: 1000, rate: 10.0}}
-
-  - metadata: {name: processor, type: queue, labels: {role: processor}}
+  - metadata:
+      name: coffee-break
+      type: reminder
     spec:
-      params: {service_time: 0.05}
-      using: [{role: source}]
-
-  - metadata: {name: collector, type: sink, labels: {role: collector}}
-    spec: {using: [{role: processor}]}
+      params:
+        message: "Time for a coffee break! ☕"
+        duration_from_now: "15 minutes"
+        require_reaction: true
 ```
 
 **Run:**
 ```bash
-./want-cli wants create -f yaml/config/config-qnet.yaml
+./want-cli wants create -f yaml/config/config-reminder.yaml
 ```
 The new want execution will immediately appear on your dashboard.
 
@@ -71,7 +69,7 @@ Explore more complex scenarios using pre-defined configurations:
 ```bash
 ./want-cli wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
 ./want-cli wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
-./want-cli wants create -f yaml/config/config-qnet-recipe.yaml      # Multi-stream processing
+./want-cli wants create -f yaml/config/config-reminder.yaml        # Simple reminder
 ```
 
 ## API Usage
@@ -80,7 +78,7 @@ Explore more complex scenarios using pre-defined configurations:
 # Create wants via API
 curl -X POST http://localhost:8080/api/v1/wants \
   -H "Content-Type: application/yaml" \
-  --data-binary @yaml/config/config-qnet.yaml
+  --data-binary @yaml/config/config-reminder.yaml
 
 # Monitor status
 curl http://localhost:8080/api/v1/wants/{id}/status

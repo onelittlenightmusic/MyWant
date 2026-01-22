@@ -179,7 +179,7 @@ func (c *CoordinatorWant) IsAchieved() bool {
 func (c *CoordinatorWant) Progress() {
 	inCount := c.GetInCount()
 	activeInputChannels := c.GetPaths().In
-	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ActiveChannels=%d", inCount, len(activeInputChannels)))
+	c.StoreLog(fmt.Sprintf("[Progress] Started - InCount=%d, ActiveChannels=%d, RequiredInputs=%d", inCount, len(activeInputChannels), c.ConnectivityMetadata.RequiredInputs))
 	for i, pathInfo := range activeInputChannels {
 		c.StoreLog(fmt.Sprintf("[Progress]   - Channel %d: Name=%s, Active=%v, Channel=%p", i, pathInfo.Name, pathInfo.Active, pathInfo.Channel))
 	}
@@ -197,12 +197,13 @@ func (c *CoordinatorWant) Progress() {
 	} else {
 		// Data received: mark channel as heard and process it
 		c.channelsHeard[channelIndex] = true
-		c.StoreLog(fmt.Sprintf("[Progress] Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data))
+		c.StoreLog(fmt.Sprintf("[Progress] 📦 Received packet from channel %d (total heard: %d/%d), data type: %T", channelIndex, len(c.channelsHeard), inCount, data))
 
 		// Use dispatcher to select appropriate handler based on data type
 		handler := c.DataHandlerDispatcher.SelectHandler(data)
-		c.StoreLog(fmt.Sprintf("[Progress] Selected handler: %T for data type %T", handler, data))
-		handler.ProcessData(c, channelIndex, data)
+		c.StoreLog(fmt.Sprintf("[Progress] 🔄 Selected handler: %T for data type %T", handler, data))
+		processed := handler.ProcessData(c, channelIndex, data)
+		c.StoreLog(fmt.Sprintf("[Progress] 💾 Handler processed=%v for channel %d", processed, channelIndex))
 	}
 
 	// Calculate and store achieving_percentage based on actual received data
@@ -239,8 +240,18 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 
 	// Logic: If we haven't heard from everyone at least once ever, we must wait.
 	if everHeardCount < inCount {
-		c.StoreLog(fmt.Sprintf("[tryCompletion] Waiting for initial sync - heard %d/%d in this cycle (ever: %d/%d)",
+		c.StoreLog(fmt.Sprintf("[tryCompletion] ⏳ Waiting for initial sync - heard %d/%d in this cycle (ever: %d/%d)",
 			len(channelsHeard), inCount, everHeardCount, inCount))
+		c.StoreLog(fmt.Sprintf("[tryCompletion] 📊 dataByChannel entries: %d\n", everHeardCount))
+		// Log which channels we're waiting for
+		for i := 0; i < inCount; i++ {
+			key := fmt.Sprintf("%d", i)
+			if _, exists := dataByChannel[key]; exists {
+				c.StoreLog(fmt.Sprintf("[tryCompletion]   - Channel %d: ✓ received\n", i))
+			} else {
+				c.StoreLog(fmt.Sprintf("[tryCompletion]   - Channel %d: ⏳ waiting\n", i))
+			}
+		}
 		return // Still waiting for first data from some channels
 	}
 
@@ -291,6 +302,10 @@ func (c *CoordinatorWant) tryCompletion(channelsHeard map[int]bool) {
 	c.ProvideDone()
 	c.StoreLog("[tryCompletion] Marked as complete, resetting channelsHeard for potential retrigger")
 	c.channelsHeard = make(map[int]bool)
+
+	// CRITICAL: Set status to achieved to emit OwnerCompletionEvent if this coordinator has a parent target
+	// This ensures parent targets can track child completion via subscription system
+	c.SetStatus(WantStatusAchieved)
 }
 
 // ============================================================================ Default Handler for Generic Map Data ============================================================================
@@ -473,8 +488,9 @@ func (h *ApprovalDataHandler) GetCompletionKey() string {
 }
 
 func (h *ApprovalDataHandler) GetCompletionTimeout() time.Duration {
-	// Approval coordinators complete immediately (no timeout needed)
-	return 0
+	// Allow 2 seconds timeout to handle late arrivals
+	// This ensures coordinator can complete even if not all channels provide data
+	return 2 * time.Second
 }
 
 // ApprovalCompletionChecker checks if approval data is complete In unified coordinator: completion is handled by checking if all connected channels have sent at least one value. This checker is now optional but kept for backward compatibility.

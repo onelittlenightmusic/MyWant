@@ -85,6 +85,9 @@ func (rw RecipeWant) ConvertToWant() *Want {
 		want.Metadata.Labels = make(map[string]string)
 	}
 
+	// Initialize the want to set up Status field and other required fields
+	want.Init()
+
 	return want
 }
 
