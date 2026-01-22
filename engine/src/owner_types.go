@@ -163,9 +163,9 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	}
 }
 func (t *Target) checkAllChildrenComplete() bool {
-	// If we have no children yet AND no completions have arrived, we can't be complete
-	if len(t.childWants) == 0 && len(t.completedChildren) == 0 {
-		return false
+	// If we have no children, target is immediately complete (nothing to do)
+	if len(t.childWants) == 0 {
+		return true
 	}
 
 	// For targets with children (recipe or dynamic), all must be in completedChildren map
@@ -175,8 +175,8 @@ func (t *Target) checkAllChildrenComplete() bool {
 		}
 	}
 
-	// If we reached here and have at least one child (dynamic or recipe), we are complete
-	return len(t.childWants) > 0
+	// All children are complete
+	return true
 }
 
 // EndProgressCycle overrides parent to enforce achieving_percentage = 100 when achieved
@@ -186,8 +186,8 @@ func (t *Target) EndProgressCycle() {
 		t.StoreLog("[TARGET] 🔒 EndProgressCycle: Status=ACHIEVED, forcing achieving_percentage = 100\n")
 		// Directly set in both pendingStateChanges AND State map to ensure it's saved
 		t.stateMutex.Lock()
-		t.pendingStateChanges["achieving_percentage"] = 100
-		t.State["achieving_percentage"] = 100 // Also write directly to State map
+		t.pendingStateChanges["achieving_percentage"] = 100.0
+		t.State["achieving_percentage"] = 100.0 // Also write directly to State map
 		t.stateMutex.Unlock()
 	}
 
@@ -301,7 +301,7 @@ func (t *Target) IsAchieved() bool {
 		// CRITICAL: If achieved, achieving_percentage MUST be 100%
 		// Always enforce this consistency to ensure proper reporting
 		t.StoreLog("[TARGET] 💯 IsAchieved() enforcing achieving_percentage = 100\n")
-		t.StoreState("achieving_percentage", 100)
+		t.StoreState("achieving_percentage", 100.0)
 		return true
 	}
 
@@ -388,10 +388,10 @@ func (t *Target) Progress() {
 		// Consistency check: If achieved, achieving_percentage must be 100%
 		// Use both StoreState and direct State map write to ensure persistence
 		t.StoreLog("[TARGET] 💯 Progress() guard: Status=ACHIEVED, forcing achieving_percentage = 100\n")
-		t.StoreState("achieving_percentage", 100)
+		t.StoreState("achieving_percentage", 100.0)
 		// Also directly update the State map to ensure immediate visibility
 		t.stateMutex.Lock()
-		t.State["achieving_percentage"] = 100
+		t.State["achieving_percentage"] = 100.0
 		t.stateMutex.Unlock()
 		return
 	}
@@ -440,16 +440,20 @@ func (t *Target) Progress() {
 				}
 				t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
 			}
-			achievingPercentage := (achievedCount * 100) / len(t.childWants)
-			t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %d%%\n", achievedCount, len(t.childWants), achievingPercentage)
+			achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
+			t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %.2f%%\n", achievedCount, len(t.childWants), achievingPercentage)
 			t.StoreState("achieving_percentage", achievingPercentage)
+		} else {
+			// No children - target is immediately complete at 100%
+			t.StoreLog("[TARGET] 🔍 No children - setting achieving_percentage = 100\n")
+			t.StoreState("achieving_percentage", 100.0)
 		}
 
 		if allComplete {
 			// Set achieving_percentage to 100 when all children are complete
 			// Use StoreState() - never write directly to State map
 			t.StoreLog("[TARGET] ✅ All children complete - setting achieving_percentage = 100\n")
-			t.StoreState("achieving_percentage", 100)
+			t.StoreState("achieving_percentage", 100.0)
 
 			// Send completion packet to parent/upstream wants (only once)
 			// Check if we've already sent the completion packet
@@ -508,7 +512,7 @@ func (t *Target) Progress() {
 			if t.Status != WantStatusAchieved {
 				// CRITICAL: Ensure achieving_percentage is 100 before marking as achieved
 				t.StoreLog("[TARGET] 🏁 Setting status to ACHIEVED and achieving_percentage = 100\n")
-				t.StoreState("achieving_percentage", 100)
+				t.StoreState("achieving_percentage", 100.0)
 				t.SetStatus(WantStatusAchieved)
 				t.StoreLog("[TARGET] 🏁 Status set to ACHIEVED\n")
 			}
@@ -646,6 +650,14 @@ func (t *Target) computeTemplateResult() {
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
+
+	// Check if builder is available (may be nil in test environments)
+	if t.builder == nil {
+		t.StoreLog("[TARGET] ⚠️  Target %s: No builder available for result computation, using fallback\n", t.Metadata.Name)
+		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
+		return
+	}
+
 	allWantStates := t.builder.GetAllWantStates()
 	childWantsByName := make(map[string]*Want)
 	for _, want := range allWantStates {
@@ -1008,6 +1020,12 @@ func (t *Target) toSnakeCase(str string) string {
 
 // computeFallbackResultUnsafe provides simple aggregation without mutex protection (caller must hold mutex)
 func (t *Target) computeFallbackResultUnsafe() {
+	// Check if builder is available (may be nil in test environments)
+	if t.builder == nil {
+		t.StoreLog("[TARGET] ⚠️  Target %s: No builder available for fallback result computation\n", t.Metadata.Name)
+		return
+	}
+
 	allWantStates := t.builder.GetAllWantStates()
 	var childWants []*Want
 
@@ -1044,4 +1062,31 @@ func (t *Target) computeFallbackResultUnsafe() {
 	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
 	t.StoreLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+}
+
+// === Test Helper Methods (for pkg/server tests) ===
+
+// GetChildWants returns the list of child wants (for testing purposes)
+func (t *Target) GetChildWants() []*Want {
+	return t.childWants
+}
+
+// SetChildWants sets the list of child wants (for testing purposes)
+func (t *Target) SetChildWants(wants []*Want) {
+	t.childWants = wants
+}
+
+// GetCompletedChildren returns the completed children map (for testing purposes)
+func (t *Target) GetCompletedChildren() map[string]bool {
+	return t.completedChildren
+}
+
+// SetCompletedChildren sets the completed children map (for testing purposes)
+func (t *Target) SetCompletedChildren(completed map[string]bool) {
+	t.completedChildren = completed
+}
+
+// SetChildrenCreated sets the childrenCreated flag (for testing purposes)
+func (t *Target) SetChildrenCreated(created bool) {
+	t.childrenCreated = created
 }
