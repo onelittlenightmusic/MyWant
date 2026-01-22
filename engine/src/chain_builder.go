@@ -368,8 +368,17 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
-		for _, usingSelector := range want.GetSpec().Using {
+		usingCount := len(want.GetSpec().Using)
+		if usingCount > 0 && strings.Contains(wantName, "coordinator") {
+			log.Printf("[PATHS] Coordinator '%s' has %d using selectors\n", wantName, usingCount)
+		}
+
+		for selectorIdx, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
+			if strings.Contains(wantName, "coordinator") {
+				log.Printf("[PATHS]   Selector %d: %v\n", selectorIdx, usingSelector)
+			}
+
 			for otherName, otherWant := range cb.wants {
 				if wantName == otherName {
 					continue // Skip self-matching
@@ -393,7 +402,11 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					}
 					paths.In = append(paths.In, inPath)
 
-					// Log connection details, especially for Flight want if strings.Contains(wantName, "flight") { InfoLog("[FLIGHT-CONNECT] Flight want '%s' receiving input from '%s' on channel: %s\n", wantName, otherName, inPath.Name) }
+					if strings.Contains(wantName, "coordinator") {
+						log.Printf("[PATHS]     ✓ MATCHED: '%s' (labels: %v) -> '%s'\n",
+							otherName, otherWant.GetMetadata().Labels, wantName)
+					}
+
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
 						Channel:        inPath.Channel, // Same channel, shared connection
@@ -402,15 +415,14 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						TargetWantName: wantName, // Set target want name for output path
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
-
-					// DEBUG: Log when creating output paths for coordinator wants
-					if strings.Contains(wantName, "coordinator") || strings.Contains(otherName, "approval") {
-						log.Printf("[RECONCILE:PATHS] Output path created: '%s' (labels: %v, ID: %s) -> '%s' (labels: %v, ID: %s) via %s. Selector: %v\n",
-							otherName, otherWant.GetMetadata().Labels, otherWant.GetMetadata().ID,
-							wantName, want.GetMetadata().Labels, want.GetMetadata().ID,
-							pathName, usingSelector)
-					}
+				} else if strings.Contains(wantName, "coordinator") && (strings.Contains(otherName, "evidence") || strings.Contains(otherName, "description")) {
+					log.Printf("[PATHS]     ✗ NO MATCH: '%s' (labels: %v) vs selector %v\n",
+						otherName, otherWant.GetMetadata().Labels, usingSelector)
 				}
+			}
+
+			if strings.Contains(wantName, "coordinator") && matchCount == 0 {
+				log.Printf("[PATHS]   ⚠️  WARNING: Selector %v matched 0 wants for coordinator '%s'\n", usingSelector, wantName)
 			}
 		}
 	}
