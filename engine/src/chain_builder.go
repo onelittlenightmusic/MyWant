@@ -672,7 +672,6 @@ func (cb *ChainBuilder) reconcileLoop() {
 			for _, want := range newWants {
 				// Allow multiple wants with the same name (they may be different instances)
 				cb.config.Wants = append(cb.config.Wants, want)
-				cb.addWant(want)
 			}
 			cb.reconcileMutex.Unlock()
 			// Trigger reconciliation to connect and start new wants
@@ -3288,7 +3287,6 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			cb.reconcileMutex.Lock()
 			for _, want := range op.Wants {
 				cb.config.Wants = append(cb.config.Wants, want)
-				cb.addWant(want)
 			}
 			cb.reconcileMutex.Unlock()
 			// Trigger reconciliation to connect and start new wants

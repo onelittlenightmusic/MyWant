@@ -377,6 +377,9 @@ restart-all:
 	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
 	@sleep 2
 	@echo ""
+	@echo "🧹 Cleaning logs..."
+	@rm -f logs/server.log
+	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
 	@echo ""
