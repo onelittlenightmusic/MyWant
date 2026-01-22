@@ -122,6 +122,8 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
+		tcs.target.StoreLog("[TARGET] ⏭️  Ignoring completion event for different target: TargetName=%s (expected %s, child=%s)\n",
+			completionEvent.TargetName, tcs.target.Metadata.Name, completionEvent.ChildName)
 		return EventResponse{Handled: false}
 	}
 
@@ -409,25 +411,31 @@ func (t *Target) Progress() {
 
 	// Phase 2: Check if all children have completed
 	if t.childrenCreated {
-		// CRITICAL: Hold lock during entire child completion check and achievement calculation
-		// to prevent race conditions where completedChildren is modified during iteration
 		t.childCompletionMutex.Lock()
 		allComplete := t.checkAllChildrenComplete()
 
-		// Calculate achieving_percentage based on achieved children count
-		// This MUST be done while holding the lock to ensure consistent reads from completedChildren
+		// Snapshot completedChildren state while holding lock to avoid race conditions
+		completedSnapshot := make(map[string]bool)
+		for k, v := range t.completedChildren {
+			completedSnapshot[k] = v
+		}
+		t.childCompletionMutex.Unlock()
+
+		// Calculate achieving_percentage based on achieved children count (outside of lock)
 		if len(t.childWants) > 0 {
 			achievedCount := 0
 			t.StoreLog("[TARGET] 🔍 Progress check - Child completion status:\n")
 			for _, child := range t.childWants {
-				// Check both completedChildren map AND actual child Status
+				// Check both snapshot AND actual child Status
 				// This handles cases where events might have been missed
-				completed := t.completedChildren[child.Metadata.Name] || child.Status == WantStatusAchieved
+				completed := completedSnapshot[child.Metadata.Name] || child.Status == WantStatusAchieved
 				if completed {
 					achievedCount++
-					// Ensure it's in the map for next check
-					if !t.completedChildren[child.Metadata.Name] {
+					// Update completedChildren map if we found a completed child not in snapshot
+					if !completedSnapshot[child.Metadata.Name] {
+						t.childCompletionMutex.Lock()
 						t.completedChildren[child.Metadata.Name] = true
+						t.childCompletionMutex.Unlock()
 					}
 				}
 				t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
@@ -436,7 +444,6 @@ func (t *Target) Progress() {
 			t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %d%%\n", achievedCount, len(t.childWants), achievingPercentage)
 			t.StoreState("achieving_percentage", achievingPercentage)
 		}
-		t.childCompletionMutex.Unlock()
 
 		if allComplete {
 			// Set achieving_percentage to 100 when all children are complete
