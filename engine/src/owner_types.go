@@ -328,9 +328,9 @@ func (t *Target) IsAchieved() bool {
 	if t.Status == WantStatusAchieved {
 		// CRITICAL: If achieved, achieving_percentage MUST be 100%
 		// Always enforce this consistency to ensure proper reporting
-		// Use MergeState to ensure value is persisted even in async context
+		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 		t.StoreLog("[TARGET] 💯 IsAchieved() enforcing achieving_percentage = 100\n")
-		t.MergeState(Dict{"achieving_percentage": 100.0})
+		t.StoreState("achieving_percentage", 100.0)
 		return true
 	}
 
@@ -415,9 +415,9 @@ func (t *Target) Progress() {
 	// GUARD: If already achieved, ensure achieving_percentage is 100 and skip heavy processing
 	if t.Status == WantStatusAchieved {
 		// Consistency check: If achieved, achieving_percentage must be 100%
-		// Use MergeState to ensure it's immediately visible to GetState() and persisted
+		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 		t.StoreLog("[TARGET] 💯 Progress() guard: Status=ACHIEVED, forcing achieving_percentage = 100\n")
-		t.MergeState(Dict{"achieving_percentage": 100.0})
+		t.StoreState("achieving_percentage", 100.0)
 		return
 	}
 

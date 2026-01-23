@@ -288,8 +288,9 @@ func (n *Want) SetStatus(status WantStatus) {
 		// Automatically notify ChainBuilder when want reaches achieved status This enables receiver wants (like Coordinators) to self-notify completion
 		if status == WantStatusAchieved {
 			// CRITICAL: When want achieves, always set achieving_percentage to 100%
-			// Use MergeState to ensure visibility in GetState() and persistence
-			n.MergeState(Dict{"achieving_percentage": 100.0})
+			// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
+			// MergeState adds to pendingStateChanges which can be overwritten by later StoreState calls
+			n.StoreState("achieving_percentage", 100.0)
 
 			n.NotifyCompletion()
 			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
