@@ -16,6 +16,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 **Official Docs:**
 - [Want System](docs/want-system.md) - Core Want/Recipe concepts
 - [Agent System](docs/agent-system.md) - Agent architecture
+- [Want Developer Guide](docs/WantDeveloperGuide.md) - Custom Want type development (state management, exec cycle, achieving_percentage)
 - [Agent Catalog](AGENTS.md) - Available agents and capabilities
 - [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete want-cli reference
 - [Examples](docs/agent-examples.md) - Agent usage examples
