@@ -362,14 +362,29 @@ func getChannelMap(want *Want) map[string]any {
 	return result
 }
 
+// getKeys returns the keys of a map[string]any as a slice of strings for logging
+func getKeys(m map[string]any) []string {
+	if len(m) == 0 {
+		return []string{}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // processDefaultMapData is a helper function for processing generic map[string]any data
+// Uses MergeState for safe async packet handling
 func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap map[string]any) bool {
 	dataByChannel := getChannelMap(&want.Want)
 	dataByChannel[fmt.Sprintf("%d", channelIndex)] = packetMap
 
 	// Track total packets received
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-	want.StoreStateMulti(Dict{
+
+	// Use MergeState for concurrent packet handling
+	want.MergeState(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
 		"last_packet_time":       time.Now().Unix(),
@@ -388,7 +403,7 @@ func processDefaultMapData(want *CoordinatorWant, channelIndex int, packetMap ma
 	}
 
 	if len(commonFields) > 0 {
-		want.StoreStateMulti(commonFields)
+		want.MergeState(commonFields)
 	}
 
 	return true
@@ -410,16 +425,49 @@ func (h *ApprovalDataHandler) ProcessData(want *CoordinatorWant, channelIndex in
 		return false
 	}
 
-	dataByChannel := getChannelMap(&want.Want)
-	dataByChannel[fmt.Sprintf("%d", channelIndex)] = approvalData
+	want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] Received data on channel %d: Evidence=%v, Description=%v",
+		channelIndex, approvalData.Evidence != nil, approvalData.Description != ""))
 
-	// Store packet data and tracking
+	// CRITICAL: Use MergeState for non-blocking async packet handling
+	// When Evidence and Description arrive concurrently:
+	//   Evidence goroutine:    MergeState({"0": evidence, ...}) → pending[0]=evidence
+	//   Description goroutine: MergeState({"1": description, ...}) → pending[1]=description
+	// GetState() reads from pending, so both see each other's updates
+	// EndProgressCycle() dumps all pending together
+	channelKey := fmt.Sprintf("%d", channelIndex)
+
+	want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] Recording packet on channel %d with MergeState (non-blocking)", channelIndex))
+
+	// Get current data_by_channel from pending or persisted state
+	currentData, _ := want.GetState("data_by_channel")
+	dataByChannel := make(map[string]any)
+
+	want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] Current data_by_channel type=%T, value=%v", currentData, currentData))
+
+	// Preserve existing entries
+	if currentMap, ok := currentData.(map[string]any); ok {
+		want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] Preserving %d existing entries", len(currentMap)))
+		for k, v := range currentMap {
+			dataByChannel[k] = v
+		}
+	}
+
+	// Add new entry
+	dataByChannel[channelKey] = approvalData
+	want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] After merge: dataByChannel has %d entries: %v",
+		len(dataByChannel), getKeys(dataByChannel)))
+
+	// Use MergeState for safe async operation
+	// This adds all updates to pending, which GetState will read from
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
-	want.StoreStateMulti(Dict{
+	want.MergeState(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPacketsVal + 1,
 		"last_packet_time":       time.Now().Unix(),
+		fmt.Sprintf("packet_received_from_channel_%d", channelIndex): time.Now().Unix(),
 	})
+
+	want.StoreLog(fmt.Sprintf("[ApprovalDataHandler] MergeState complete for channel %d", channelIndex))
 
 	// Store evidence data if present
 	if approvalData.Evidence != nil {
@@ -555,6 +603,9 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 		len(schedule.Events),
 		eventDetails))
 
+	// Use MergeState for safe async operation with concurrent travel schedules
+	// Each packet arrival (e.g., Restaurant, Hotel) can arrive concurrently
+	// MergeState ensures all are recorded without race conditions
 	dataByChannel := getChannelMap(&want.Want)
 
 	// Use path name as a stable key instead of dynamic channel index
@@ -572,7 +623,7 @@ func (h *TravelDataHandler) ProcessData(want *CoordinatorWant, channelIndex int,
 	totalPacketsVal, _ := want.GetStateInt("total_packets_received", 0)
 	totalPackets := totalPacketsVal + 1
 
-	want.StoreStateMulti(Dict{
+	want.MergeState(Dict{
 		"data_by_channel":        dataByChannel,
 		"total_packets_received": totalPackets,
 		"last_packet_time":       time.Now().Unix(),

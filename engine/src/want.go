@@ -797,6 +797,32 @@ func (n *Want) StoreState(key string, value any) {
 	sendStateNotifications(notification)
 }
 
+// MergeState safely merges new state updates into pending state changes for batch processing
+// CRITICAL: Designed for async operations (e.g., concurrent Coordinator packet processing)
+// Strategy: Each async call adds to pendingStateChanges without blocking
+// GetState() reads from pendingStateChanges first (sees latest pending updates)
+// EndProgressCycle() dumps all pending changes to disk together
+// This ensures all concurrent async calls are recorded without synchronization delays
+// Example: Evidence and Description handlers both call MergeState() concurrently
+//   Evidence:    MergeState({"0": evidence}) → pendingStateChanges[0]=evidence
+//   Description: MergeState({"1": description}) → pendingStateChanges[1]=description
+//   GetState("0") → reads from pending → returns evidence (immediately)
+//   GetState("1") → reads from pending → returns description (immediately)
+//   EndProgressCycle() → dumps all pending together → both recorded
+func (n *Want) MergeState(updates map[string]any) {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+
+	// Stage all updates in pending state changes for batch processing
+	// Multiple async calls each add their updates; all are preserved
+	if n.pendingStateChanges == nil {
+		n.pendingStateChanges = make(map[string]any)
+	}
+	for key, value := range updates {
+		n.pendingStateChanges[key] = value
+	}
+}
+
 // "description_received": true, "description_text": "some text", "description_provided": true, })
 func (n *Want) StoreStateMulti(updates map[string]any) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
@@ -861,6 +887,16 @@ func (n *Want) GetState(key string) (any, bool) {
 	n.stateMutex.RLock()
 	defer n.stateMutex.RUnlock()
 
+	// CRITICAL: Check pendingStateChanges first to see latest updates
+	// This ensures GetState returns values from concurrent MergeState() calls immediately
+	// without waiting for EndProgressCycle() to dump to disk
+	if n.pendingStateChanges != nil {
+		if value, exists := n.pendingStateChanges[key]; exists {
+			return value, true
+		}
+	}
+
+	// Fallback to persisted State if not in pending
 	if n.State == nil {
 		return nil, false
 	}

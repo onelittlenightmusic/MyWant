@@ -314,8 +314,9 @@ func (t *Target) IsAchieved() bool {
 	if t.Status == WantStatusAchieved {
 		// CRITICAL: If achieved, achieving_percentage MUST be 100%
 		// Always enforce this consistency to ensure proper reporting
+		// Use MergeState to ensure value is persisted even in async context
 		t.StoreLog("[TARGET] 💯 IsAchieved() enforcing achieving_percentage = 100\n")
-		t.StoreState("achieving_percentage", 100.0)
+		t.MergeState(Dict{"achieving_percentage": 100.0})
 		return true
 	}
 
@@ -400,13 +401,9 @@ func (t *Target) Progress() {
 	// GUARD: If already achieved, ensure achieving_percentage is 100 and skip heavy processing
 	if t.Status == WantStatusAchieved {
 		// Consistency check: If achieved, achieving_percentage must be 100%
-		// Use both StoreState and direct State map write to ensure persistence
+		// Use MergeState to ensure it's immediately visible to GetState() and persisted
 		t.StoreLog("[TARGET] 💯 Progress() guard: Status=ACHIEVED, forcing achieving_percentage = 100\n")
-		t.StoreState("achieving_percentage", 100.0)
-		// Also directly update the State map to ensure immediate visibility
-		t.stateMutex.Lock()
-		t.State["achieving_percentage"] = 100.0
-		t.stateMutex.Unlock()
+		t.MergeState(Dict{"achieving_percentage": 100.0})
 		return
 	}
 
@@ -465,9 +462,9 @@ func (t *Target) Progress() {
 
 		if allComplete {
 			// Set achieving_percentage to 100 when all children are complete
-			// Use StoreState() - never write directly to State map
+			// Use MergeState to ensure it's immediately visible and persisted
 			t.StoreLog("[TARGET] ✅ All children complete - setting achieving_percentage = 100\n")
-			t.StoreState("achieving_percentage", 100.0)
+			t.MergeState(Dict{"achieving_percentage": 100.0})
 
 			// Send completion packet to parent/upstream wants (only once)
 			// Check if we've already sent the completion packet
@@ -526,7 +523,7 @@ func (t *Target) Progress() {
 			if t.Status != WantStatusAchieved {
 				// CRITICAL: Ensure achieving_percentage is 100 before marking as achieved
 				t.StoreLog("[TARGET] 🏁 Setting status to ACHIEVED and achieving_percentage = 100\n")
-				t.StoreState("achieving_percentage", 100.0)
+				t.MergeState(Dict{"achieving_percentage": 100.0})
 				t.SetStatus(WantStatusAchieved)
 				t.StoreLog("[TARGET] 🏁 Status set to ACHIEVED\n")
 			}
