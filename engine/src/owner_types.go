@@ -192,17 +192,9 @@ func (t *Target) checkAllChildrenComplete() bool {
 	return true
 }
 
-// EndProgressCycle overrides parent to enforce achieving_percentage = 100 when achieved
+// EndProgressCycle calls parent implementation
+// (achieving_percentage = 100 is already set by SetStatus() when target is achieved)
 func (t *Target) EndProgressCycle() {
-	// CRITICAL: Before ending cycle, if achieved, FORCE achieving_percentage = 100
-	if t.Status == WantStatusAchieved {
-		// Directly set in both pendingStateChanges AND State map to ensure it's saved
-		t.stateMutex.Lock()
-		t.pendingStateChanges["achieving_percentage"] = 100.0
-		t.State["achieving_percentage"] = 100.0 // Also write directly to State map
-		t.stateMutex.Unlock()
-	}
-
 	// Call parent implementation
 	t.Want.EndProgressCycle()
 }
@@ -468,9 +460,8 @@ func (t *Target) Progress() {
 		}
 
 		if allComplete {
-			// All children complete: set achieving_percentage = 100 and Status = achieved at the same time
-			t.StoreLog("[TARGET] ✅ All children complete! Setting achieving_percentage = 100 and Status = ACHIEVED\n")
-			t.StoreState("achieving_percentage", 100.0)
+			// All children complete: SetStatus() will automatically set achieving_percentage = 100
+			t.StoreLog("[TARGET] ✅ All children complete! Setting Status = ACHIEVED\n")
 			t.SetStatus(WantStatusAchieved)
 
 			// Send completion packet to parent/upstream wants (only once)
