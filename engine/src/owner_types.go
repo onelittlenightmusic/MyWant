@@ -107,6 +107,7 @@ func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
 
 // OnEvent handles the OwnerCompletionEvent
 func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	fmt.Printf("[DEBUG OnEvent] Handler called for target %s\n", tcs.target.Metadata.Name)
 	completionEvent, ok := event.(*OwnerCompletionEvent)
 	if !ok {
 		return EventResponse{
@@ -141,23 +142,29 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	}
 	tcs.target.StoreLog("\n")
 
-	allComplete := tcs.target.checkAllChildrenComplete()
-	tcs.target.StoreLog("[TARGET] 📍 All complete check result: %v (from child %s)\n", allComplete, completionEvent.ChildName)
-
-	// CRITICAL: If all children are now complete, immediately set achieving_percentage = 100
-	// This ensures the percentage reflects the true state even if Progress() hasn't been called yet
-	if allComplete {
-		// IMPORTANT: Directly update State map (not MergeState/StoreState which use pending changes)
-		// Handler runs outside exec cycle, so pending changes would never be aggregated
-		tcs.target.stateMutex.Lock()
-		if tcs.target.State == nil {
-			tcs.target.State = make(map[string]any)
+	defer func() {
+		if r := recover(); r != nil {
+			tcs.target.StoreLog("[TARGET] ⚠️  PANIC in OnEvent: %v\n", r)
 		}
-		tcs.target.State["achieving_percentage"] = 100.0
-		tcs.target.stateMutex.Unlock()
-		tcs.target.StoreLog("[TARGET] ✅ All children complete! Set achieving_percentage = 100\n")
+	}()
 
-		tcs.target.StoreState("retrigger_requested", true)
+	tcs.target.StoreLog("[TARGET] 📍 Before checkAllChildrenComplete\n")
+	allComplete := tcs.target.checkAllChildrenComplete()
+	tcs.target.StoreLog("[TARGET] 📍 After checkAllChildrenComplete: %v (from child %s)\n", allComplete, completionEvent.ChildName)
+
+	// If all children are complete, trigger Progress() to execute and set achieving_percentage = 100 and Status = achieved
+	if allComplete {
+		tcs.target.StoreLog("[TARGET] ✅✅✅ ENTERING allComplete=true BLOCK ✅✅✅\n")
+
+		// Trigger the target's Progress() to be called again via ChainBuilder's retrigger mechanism
+		// This ensures achieving_percentage = 100 and Status = achieved are set in the same Progress() cycle
+		cb := GetGlobalChainBuilder()
+		if cb != nil {
+			cb.RetriggerReceiverWant(tcs.target.Metadata.Name)
+			tcs.target.StoreLog("[TARGET] ✅ Triggered Progress() retrigger via ChainBuilder\n")
+		} else {
+			tcs.target.StoreLog("[TARGET] ⚠️  WARNING: Could not get global ChainBuilder for retrigger\n")
+		}
 
 		// Also signal the target via channel (legacy support)
 		select {
@@ -471,10 +478,10 @@ func (t *Target) Progress() {
 		}
 
 		if allComplete {
-			// Set achieving_percentage to 100 when all children are complete
-			// Use MergeState to ensure it's immediately visible and persisted
-			t.StoreLog("[TARGET] ✅ All children complete - setting achieving_percentage = 100\n")
-			t.MergeState(Dict{"achieving_percentage": 100.0})
+			// All children complete: set achieving_percentage = 100 and Status = achieved at the same time
+			t.StoreLog("[TARGET] ✅ All children complete! Setting achieving_percentage = 100 and Status = ACHIEVED\n")
+			t.StoreState("achieving_percentage", 100.0)
+			t.SetStatus(WantStatusAchieved)
 
 			// Send completion packet to parent/upstream wants (only once)
 			// Check if we've already sent the completion packet
@@ -527,16 +534,6 @@ func (t *Target) Progress() {
 			// Compute and store recipe result (this part remains)
 			t.computeTemplateResult()
 
-			// Mark the target as completed
-			// SetStatus() will automatically emit OwnerCompletionEvent if this target has an owner
-			// This is part of the standard progression cycle completion pattern
-			if t.Status != WantStatusAchieved {
-				// CRITICAL: Ensure achieving_percentage is 100 before marking as achieved
-				t.StoreLog("[TARGET] 🏁 Setting status to ACHIEVED and achieving_percentage = 100\n")
-				t.MergeState(Dict{"achieving_percentage": 100.0})
-				t.SetStatus(WantStatusAchieved)
-				t.StoreLog("[TARGET] 🏁 Status set to ACHIEVED\n")
-			}
 			return
 		}
 
