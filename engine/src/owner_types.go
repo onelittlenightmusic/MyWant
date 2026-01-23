@@ -142,28 +142,25 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	}
 	tcs.target.StoreLog("\n")
 
-	defer func() {
-		if r := recover(); r != nil {
-			tcs.target.StoreLog("[TARGET] ⚠️  PANIC in OnEvent: %v\n", r)
-		}
-	}()
-
-	tcs.target.StoreLog("[TARGET] 📍 Before checkAllChildrenComplete\n")
 	allComplete := tcs.target.checkAllChildrenComplete()
-	tcs.target.StoreLog("[TARGET] 📍 After checkAllChildrenComplete: %v (from child %s)\n", allComplete, completionEvent.ChildName)
 
-	// If all children are complete, trigger Progress() to execute and set achieving_percentage = 100 and Status = achieved
+	// If all children are complete, set achieving_percentage = 100 and Status = achieved
 	if allComplete {
-		tcs.target.StoreLog("[TARGET] ✅✅✅ ENTERING allComplete=true BLOCK ✅✅✅\n")
+		// Directly set achieving_percentage = 100 in State
+		tcs.target.stateMutex.Lock()
+		if tcs.target.State == nil {
+			tcs.target.State = make(map[string]any)
+		}
+		tcs.target.State["achieving_percentage"] = 100.0
+		tcs.target.stateMutex.Unlock()
 
-		// Trigger the target's Progress() to be called again via ChainBuilder's retrigger mechanism
-		// This ensures achieving_percentage = 100 and Status = achieved are set in the same Progress() cycle
+		// Set Status to achieved
+		tcs.target.SetStatus(WantStatusAchieved)
+
+		// Trigger retrigger so Progress() can also process this state
 		cb := GetGlobalChainBuilder()
 		if cb != nil {
 			cb.RetriggerReceiverWant(tcs.target.Metadata.Name)
-			tcs.target.StoreLog("[TARGET] ✅ Triggered Progress() retrigger via ChainBuilder\n")
-		} else {
-			tcs.target.StoreLog("[TARGET] ⚠️  WARNING: Could not get global ChainBuilder for retrigger\n")
 		}
 
 		// Also signal the target via channel (legacy support)
