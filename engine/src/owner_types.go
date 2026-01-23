@@ -144,8 +144,12 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	allComplete := tcs.target.checkAllChildrenComplete()
 	tcs.target.StoreLog("[TARGET] 📍 All complete check result: %v\n", allComplete)
 
-	// CRITICAL: If all children are now complete, signal the progression loop
+	// CRITICAL: If all children are now complete, immediately set achieving_percentage = 100
+	// This ensures the percentage reflects the true state even if Progress() hasn't been called yet
 	if allComplete {
+		tcs.target.MergeState(Dict{"achieving_percentage": 100.0})
+		tcs.target.StoreLog("[TARGET] ✅ All children complete in handler - set achieving_percentage = 100\n")
+
 		tcs.target.StoreState("retrigger_requested", true)
 
 		// Also signal the target via channel (legacy support)
@@ -188,7 +192,6 @@ func (t *Target) checkAllChildrenComplete() bool {
 func (t *Target) EndProgressCycle() {
 	// CRITICAL: Before ending cycle, if achieved, FORCE achieving_percentage = 100
 	if t.Status == WantStatusAchieved {
-		t.StoreLog("[TARGET] 🔒 EndProgressCycle: Status=ACHIEVED, forcing achieving_percentage = 100\n")
 		// Directly set in both pendingStateChanges AND State map to ensure it's saved
 		t.stateMutex.Lock()
 		t.pendingStateChanges["achieving_percentage"] = 100.0
