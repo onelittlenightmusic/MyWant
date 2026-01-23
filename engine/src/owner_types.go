@@ -144,17 +144,10 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 	allComplete := tcs.target.checkAllChildrenComplete()
 
-	// If all children are complete, set achieving_percentage = 100 and Status = achieved
+	// If all children are complete, set Status to achieved
+	// SetStatus() will automatically set achieving_percentage = 100
 	if allComplete {
-		// Directly set achieving_percentage = 100 in State
-		tcs.target.stateMutex.Lock()
-		if tcs.target.State == nil {
-			tcs.target.State = make(map[string]any)
-		}
-		tcs.target.State["achieving_percentage"] = 100.0
-		tcs.target.stateMutex.Unlock()
-
-		// Set Status to achieved
+		// Set Status to achieved (this automatically sets achieving_percentage = 100)
 		tcs.target.SetStatus(WantStatusAchieved)
 
 		// Trigger retrigger so Progress() can also process this state
