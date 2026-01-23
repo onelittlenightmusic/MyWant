@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: silencer-target
+      type: silencer_example
+    spec:
+      params:
+        reminder_message: "Test reminder"
+        wait_duration: "5 seconds"
+        ahead_duration: "3 seconds"
+        silencer_policy: "all_true"

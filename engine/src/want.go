@@ -287,6 +287,10 @@ func (n *Want) SetStatus(status WantStatus) {
 
 		// Automatically notify ChainBuilder when want reaches achieved status This enables receiver wants (like Coordinators) to self-notify completion
 		if status == WantStatusAchieved {
+			// CRITICAL: When want achieves, always set achieving_percentage to 100%
+			// Use MergeState to ensure visibility in GetState() and persistence
+			n.MergeState(Dict{"achieving_percentage": 100.0})
+
 			n.NotifyCompletion()
 			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
 			// This is part of the standard progression cycle completion pattern
@@ -382,6 +386,16 @@ func (n *Want) EndProgressCycle() {
 	if !n.inExecCycle {
 		return
 	}
+
+	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
+	// This handles cases where SetStatus(achieved) was called in this cycle
+	// but Status update might race with earlier achieving_percentage calculations
+	if n.Status == WantStatusAchieved {
+		n.stateMutex.Lock()
+		n.pendingStateChanges["achieving_percentage"] = 100.0
+		n.stateMutex.Unlock()
+	}
+
 	n.stateMutex.Lock()
 	changeCount := len(n.pendingStateChanges)
 	n.stateMutex.Unlock()
