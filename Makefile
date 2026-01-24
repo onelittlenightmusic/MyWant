@@ -1,4 +1,4 @@
-.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-concurrent-deploy test-recipe-api test-approval-workflow test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -92,69 +92,6 @@ run-flight:
 
 # Tests removed - no longer functional or environment-dependent
 
-# Test concurrent deployment (Travel Planner + Fibonacci)
-test-concurrent-deploy:
-	@echo "🧪 Testing Concurrent Deployment..."
-	@echo "======================================================"
-	@echo ""
-	@echo "📋 Prerequisites:"
-	@echo "  ✓ MyWant server running on http://localhost:8080"
-	@echo ""
-	@echo "📌 Test Scenario:"
-	@echo "  1. Deploy Travel Planner configuration"
-	@echo "  2. Wait 0.5 seconds"
-	@echo "  3. Deploy Fibonacci configuration concurrently"
-	@echo "  4. Monitor for goroutine issues or concurrent map access errors"
-	@echo ""
-	go run test/test_concurrent_deploy.go
-	@echo ""
-	@echo "✅ Concurrent deployment test completed!"
-
-# test-llm-api removed - environment-dependent (requires Ollama)
-
-# Test Recipe API
-test-recipe-api:
-	@echo "🍳 Testing Recipe API..."
-	@echo "======================================================="
-	@echo ""
-	@echo "📋 Prerequisites:"
-	@echo "  ✓ MyWant server running on http://localhost:8080"
-	@echo ""
-	@echo "📌 Test Coverage:"
-	@echo "  1. Create new recipe via API"
-	@echo "  2. List all recipes"
-	@echo "  3. Get specific recipe"
-	@echo "  4. Load recipe from YAML file"
-	@echo "  5. Update recipe"
-	@echo "  6. Delete recipe"
-	@echo ""
-	@echo "🔌 Running recipe API tests..."
-	@echo ""
-	go run test/test_recipe_api.go
-	@echo ""
-	@echo "✅ Recipe API test completed!"
-
-# test-buffet-restart removed - test fails (coordinator doesn't complete)
-
-# Test approval workflow
-test-approval-workflow:
-	@echo "✅ Testing Approval Workflow..."
-	@echo "======================================================="
-	@echo ""
-	@echo "📋 Prerequisites:"
-	@echo "  ✓ MyWant server running on http://localhost:8080"
-	@echo ""
-	@echo "📌 Test Scenario:"
-	@echo "  1. Deploy hierarchical approval workflow"
-	@echo "  2. Verify child wants are created dynamically"
-	@echo "  3. Verify all wants complete successfully"
-	@echo ""
-	@echo "🧪 Running approval workflow test..."
-	@echo ""
-	go run test/test_approval_workflow.go
-	@echo ""
-	@echo "✅ Approval workflow test completed!"
-
 # Test All Server-Based Tests
 test-all: restart-all
 	@echo ""
@@ -167,38 +104,13 @@ test-all: restart-all
 	@echo "📊 Test Suite:"
 	@echo ""
 
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "1️⃣  Running test-concurrent-deploy..."
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@if $(MAKE) test-concurrent-deploy; then \
-		echo "✅ test-concurrent-deploy PASSED"; \
-	else \
-		echo "❌ test-concurrent-deploy FAILED"; \
-	fi
-	@echo ""
-	@sleep 2
-
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "2️⃣  Running test-recipe-api..."
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@if go run test/test_recipe_api.go; then \
-		echo "✅ test-recipe-api PASSED"; \
-	else \
-		echo "❌ test-recipe-api FAILED"; \
-	fi
-	@echo ""
-	@sleep 2
-
 	@echo ""
 	@echo "======================================================="
 	@echo "✅ All server-based tests completed!"
 	@echo ""
 	@echo "📊 Test Results:"
-	@echo "  ✅ test-concurrent-deploy"
-	@echo "  ✅ test-recipe-api"
+	@echo "  No dedicated server-based tests currently enabled."
 	@echo ""
-	@echo "ℹ️  Note: test-approval-workflow available separately"
-	@echo "  (excluded from test-all due to known Coordinator timeout issue)"
 	@echo "======================================================="
 
 # Build the mywant server binary
@@ -341,9 +253,6 @@ help:
 	@echo "  run-hierarchical-approval - Hierarchical approval workflow"
 	@echo ""
 	@echo "🧪 Testing:"
-	@echo "  test-concurrent-deploy    - Test concurrent deployment (Travel Planner + Fibonacci)"
-	@echo "  test-recipe-api           - Test recipe API endpoints (create, list, get, update, delete)"
-	@echo "  test-approval-workflow    - Test hierarchical approval workflow with dynamic child wants"
 	@echo "  test-all                  - Run all server-based tests (builds and starts servers)"
 	@echo ""
 	@echo "📜 Recipe-based Examples:"

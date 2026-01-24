@@ -43,9 +43,9 @@ const (
 
 // ChangeEvent represents a configuration change
 type ChangeEvent struct {
-	Type     ChangeEventType
-	WantName string
-	Want     *Want
+	Type   ChangeEventType
+	WantID string
+	Want   *Want
 }
 
 // APILogEntry represents a log entry for API operations
@@ -882,12 +882,28 @@ func (cb *ChainBuilder) compilePhase() error {
 	} else {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
-		if len(changes) == 0 {
-			return nil
+
+		// Apply changes if any
+		if len(changes) > 0 {
+			// Apply changes in reverse dependency order (sink to generator)
+			cb.applyWantChanges(changes)
 		}
 
-		// Apply changes in reverse dependency order (sink to generator)
-		cb.applyWantChanges(changes)
+		// CRITICAL FIX: Ensure all wants in newConfig.Wants exist in cb.wants
+		// This handles wants added via addWantsChan which are already in cb.config.Wants
+		// but might have been missed by detectConfigChanges due to timing/aliasing
+		for _, wantConfig := range newConfig.Wants {
+			exists := false
+			for _, rw := range cb.wants {
+				if rw.want.Metadata.ID == wantConfig.Metadata.ID {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				cb.addWant(wantConfig)
+			}
+		}
 	}
 
 	// Update last config and hash IMPORTANT: Make a deep copy to avoid reference aliasing issues When both lastConfig and config point to the same Want objects, updates to one appear to update both, breaking change detection
@@ -1359,38 +1375,37 @@ func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []Chang
 	var changes []ChangeEvent
 	oldWants := make(map[string]*Want)
 	for _, want := range oldConfig.Wants {
-		oldWants[want.Metadata.Name] = want
+		oldWants[want.Metadata.ID] = want
 	}
 
 	newWants := make(map[string]*Want)
 	for _, want := range newConfig.Wants {
-		newWants[want.Metadata.Name] = want
+		newWants[want.Metadata.ID] = want
 	}
-	for name, newWant := range newWants {
-		if oldWant, exists := oldWants[name]; exists {
+	for id, newWant := range newWants {
+		if oldWant, exists := oldWants[id]; exists {
 			if !cb.wantsEqual(oldWant, newWant) {
 				changes = append(changes, ChangeEvent{
-					Type:     ChangeEventUpdate,
-					WantName: name,
-					Want:     newWant,
+					Type:   ChangeEventUpdate,
+					WantID: id,
+					Want:   newWant,
 				})
-			} else {
 			}
 		} else {
 			// New want
 			changes = append(changes, ChangeEvent{
-				Type:     ChangeEventAdd,
-				WantName: name,
-				Want:     newWant,
+				Type:   ChangeEventAdd,
+				WantID: id,
+				Want:   newWant,
 			})
 		}
 	}
-	for name := range oldWants {
-		if _, exists := newWants[name]; !exists {
+	for id := range oldWants {
+		if _, exists := newWants[id]; !exists {
 			changes = append(changes, ChangeEvent{
-				Type:     ChangeEventDelete,
-				WantName: name,
-				Want:     nil,
+				Type:   ChangeEventDelete,
+				WantID: id,
+				Want:   nil,
 			})
 		}
 	}
@@ -1582,7 +1597,16 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 			hasWantChanges = true
 		case ChangeEventUpdate:
 			// Sync fields from config to runtime
-			if runtimeWant, exists := cb.wants[change.WantName]; exists {
+			// Find runtime want by ID
+			var runtimeWant *runtimeWant
+			for _, rw := range cb.wants {
+				if rw.want.Metadata.ID == change.WantID {
+					runtimeWant = rw
+					break
+				}
+			}
+
+			if runtimeWant != nil {
 				// updatedConfigWant is the one from newConfig (cb.config)
 				updatedConfigWant := change.Want
 				if updatedConfigWant != nil {
@@ -1609,7 +1633,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 			}
 			hasWantChanges = true
 		case ChangeEventDelete:
-			cb.deleteWant(change.WantName)
+			cb.deleteWantByID(change.WantID)
 			hasWantChanges = true
 		}
 	}
@@ -1631,8 +1655,8 @@ func (cb *ChainBuilder) sortChangesByDependency(changes []ChangeEvent) []ChangeE
 	// Simple sort by dependency level
 	for i := 0; i < len(sortedChanges)-1; i++ {
 		for j := i + 1; j < len(sortedChanges); j++ {
-			levelI := depLevels[sortedChanges[i].WantName]
-			levelJ := depLevels[sortedChanges[j].WantName]
+			levelI := depLevels[sortedChanges[i].WantID]
+			levelJ := depLevels[sortedChanges[j].WantID]
 			if levelI < levelJ {
 				sortedChanges[i], sortedChanges[j] = sortedChanges[j], sortedChanges[i]
 			}
@@ -1648,9 +1672,10 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 	visited := make(map[string]bool)
 
 	// Calculate dependency levels using topological ordering
-	for name := range cb.wants {
-		if !visited[name] {
-			cb.calculateDependencyLevel(name, levels, visited, make(map[string]bool))
+	for _, rw := range cb.wants {
+		id := rw.want.Metadata.ID
+		if !visited[id] {
+			cb.calculateDependencyLevel(id, levels, visited, make(map[string]bool))
 		}
 	}
 
@@ -1658,41 +1683,47 @@ func (cb *ChainBuilder) calculateDependencyLevels() map[string]int {
 }
 
 // calculateDependencyLevel recursively calculates dependency level for a want
-func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[string]int, visited, inProgress map[string]bool) int {
-	if inProgress[wantName] {
+func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[string]int, visited, inProgress map[string]bool) int {
+	if inProgress[wantID] {
 		return 0 // Break cycles by assigning level 0
 	}
-	if visited[wantName] {
-		return levels[wantName]
+	if visited[wantID] {
+		return levels[wantID]
 	}
 
-	inProgress[wantName] = true
+	inProgress[wantID] = true
 	var wantConfig *Want
-	if want, exists := cb.wants[wantName]; exists {
-		wantConfig = want.want
-	} else {
-		found := false
+	// Find in runtime first
+	for _, rw := range cb.wants {
+		if rw.want.Metadata.ID == wantID {
+			wantConfig = rw.want
+			break
+		}
+	}
+
+	// Then find in config if not in runtime
+	if wantConfig == nil {
 		for _, configWant := range cb.config.Wants {
-			if configWant.Metadata.Name == wantName {
+			if configWant.Metadata.ID == wantID {
 				wantConfig = configWant
-				found = true
 				break
 			}
 		}
-		if !found {
-			// Unknown want, assign level 0
-			levels[wantName] = 0
-			visited[wantName] = true
-			delete(inProgress, wantName)
-			return 0
-		}
+	}
+
+	if wantConfig == nil {
+		// Unknown want, assign level 0
+		levels[wantID] = 0
+		visited[wantID] = true
+		delete(inProgress, wantID)
+		return 0
 	}
 
 	maxDependencyLevel := 0
 	for _, usingSelector := range wantConfig.Spec.Using {
 		for _, configWant := range cb.config.Wants {
 			if cb.matchesSelector(configWant.Metadata.Labels, usingSelector) {
-				depLevel := cb.calculateDependencyLevel(configWant.Metadata.Name, levels, visited, inProgress)
+				depLevel := cb.calculateDependencyLevel(configWant.Metadata.ID, levels, visited, inProgress)
 				if depLevel >= maxDependencyLevel {
 					maxDependencyLevel = depLevel + 1
 				}
@@ -1701,9 +1732,9 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantName string, levels map[str
 	}
 
 	// Assign level based on dependencies
-	levels[wantName] = maxDependencyLevel
-	visited[wantName] = true
-	delete(inProgress, wantName)
+	levels[wantID] = maxDependencyLevel
+	visited[wantID] = true
+	delete(inProgress, wantID)
 
 	return maxDependencyLevel
 }
@@ -1819,7 +1850,21 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		function: wantFunction,
 		want:     wantPtr,
 	}
-	cb.wants[wantConfig.Metadata.Name] = runtimeWant
+
+	// Safely add to wants map, avoiding accidental overwrites of existing wants with same name but different ID
+	// Use unique name if necessary, but ideally we should transition cb.wants to use ID as key
+	if existing, exists := cb.wants[wantConfig.Metadata.Name]; exists {
+		if existing.want.Metadata.ID != wantConfig.Metadata.ID {
+			// Name collision between different wants - use ID-suffixed name as temporary measure
+			uniqueName := fmt.Sprintf("%s-%s", wantConfig.Metadata.Name, wantConfig.Metadata.ID)
+			cb.wants[uniqueName] = runtimeWant
+		} else {
+			// Same want, safe to update
+			cb.wants[wantConfig.Metadata.Name] = runtimeWant
+		}
+	} else {
+		cb.wants[wantConfig.Metadata.Name] = runtimeWant
+	}
 
 	// Register want for notification system
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
@@ -1883,20 +1928,27 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	}
 }
 
-// deleteWant removes a want from runtime and signals its goroutines to stop
-func (cb *ChainBuilder) deleteWant(wantName string) {
-	if runtimeWant, exists := cb.wants[wantName]; exists {
-		// Call OnDelete() if the want implements OnDeletable interface
-		if deletable, ok := runtimeWant.function.(OnDeletable); ok {
-			deletable.OnDelete()
-		}
+// deleteWantByID removes a want from runtime and signals its goroutines to stop
+func (cb *ChainBuilder) deleteWantByID(wantID string) {
+	var targetWantName string
+	for name, rw := range cb.wants {
+		if rw.want.Metadata.ID == wantID {
+			targetWantName = name
+			// Call OnDelete() if the want implements OnDeletable interface
+			if deletable, ok := rw.function.(OnDeletable); ok {
+				deletable.OnDelete()
+			}
 
-		if runtimeWant.want.stopChannel == nil {
-			runtimeWant.want.stopChannel = make(chan struct{})
+			if rw.want.stopChannel == nil {
+				rw.want.stopChannel = make(chan struct{})
+			}
+			close(rw.want.stopChannel)
+			break
 		}
-		close(runtimeWant.want.stopChannel)
 	}
-	delete(cb.wants, wantName)
+	if targetWantName != "" {
+		delete(cb.wants, targetWantName)
+	}
 }
 
 // registerWantForNotifications registers a want with the notification system
@@ -2317,16 +2369,22 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 // addRuntimeWantOnly adds a want to the runtime mapping only (doesn't trigger reconcile)
 func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
 	// Skip if want already exists in runtime to prevent double instantiation during config changes
-	if _, exists := cb.wants[want.Metadata.Name]; exists {
-		return
+	// Check by ID to be safe
+	for _, rw := range cb.wants {
+		if rw.want.Metadata.ID == want.Metadata.ID {
+			return
+		}
 	}
 	cb.addWant(want)
 }
 
 // addDynamicWantUnsafe adds a want to the builder and configuration without triggering reconciliation
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
-	if _, exists := cb.wants[want.Metadata.Name]; exists {
-		return nil
+	// Check by ID to be safe
+	for _, rw := range cb.wants {
+		if rw.want.Metadata.ID == want.Metadata.ID {
+			return nil
+		}
 	}
 	cb.config.Wants = append(cb.config.Wants, want)
 	cb.addWant(want)
@@ -2895,43 +2953,42 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 
 // DeleteWantByID removes a want from runtime by its ID If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
-	// Phase 1: Find the want name by ID (with lock held briefly)
-	cb.reconcileMutex.Lock()
-
-	var wantName string
-	wantsCopy := make([]string, 0, len(cb.wants))
-
-	// Collect all want names first
-	for name := range cb.wants {
-		wantsCopy = append(wantsCopy, name)
-	}
-	cb.reconcileMutex.Unlock()
-
-	// Search through the collected names for the target want
+	// Phase 1: Identify if parent want exists
 	cb.reconcileMutex.RLock()
-	for _, name := range wantsCopy {
-		if runtimeWant, exists := cb.wants[name]; exists {
-			if runtimeWant.want.Metadata.ID == wantID {
-				wantName = name
-				break
-			}
+	var found bool
+	for _, rw := range cb.wants {
+		if rw.want.Metadata.ID == wantID {
+			found = true
+			break
 		}
 	}
 	cb.reconcileMutex.RUnlock()
 
-	if wantName == "" {
-		return fmt.Errorf("want with ID %s not found in runtime", wantID)
+	if !found {
+		// Also check config if not in runtime
+		cb.reconcileMutex.RLock()
+		for _, cfgWant := range cb.config.Wants {
+			if cfgWant.Metadata.ID == wantID {
+				found = true
+				break
+			}
+		}
+		cb.reconcileMutex.RUnlock()
+	}
+
+	if !found {
+		return fmt.Errorf("want with ID %s not found", wantID)
 	}
 
 	// Phase 2: Find all children first (cascade deletion) with read lock
-	var childrenToDelete []string
+	var childrenIDsToDelete []string
 
 	cb.reconcileMutex.RLock()
-	for name, runtimeWant := range cb.wants {
+	for _, runtimeWant := range cb.wants {
 		if runtimeWant.want.Metadata.OwnerReferences != nil {
 			for _, ownerRef := range runtimeWant.want.Metadata.OwnerReferences {
 				if ownerRef.ID == wantID {
-					childrenToDelete = append(childrenToDelete, name)
+					childrenIDsToDelete = append(childrenIDsToDelete, runtimeWant.want.Metadata.ID)
 					break
 				}
 			}
@@ -2940,29 +2997,25 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.RUnlock()
 
 	// Phase 3: Delete children first (with write lock for each deletion)
-	for _, childName := range childrenToDelete {
+	for _, childID := range childrenIDsToDelete {
 		cb.reconcileMutex.Lock()
-		cb.deleteWant(childName)
+		cb.deleteWantByID(childID)
 
-		// Also remove child from config to keep it in sync with cb.wants Use ID-based comparison to avoid name collisions
-		if runtimeChild, exists := cb.wants[childName]; exists {
-			childID := runtimeChild.want.Metadata.ID
-			for i, cfgWant := range cb.config.Wants {
-				if cfgWant.Metadata.ID == childID {
-					cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
-					break
-				}
+		// Also remove child from config to keep it in sync with cb.wants
+		for i, cfgWant := range cb.config.Wants {
+			if cfgWant.Metadata.ID == childID {
+				cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
+				break
 			}
 		}
-
 		cb.reconcileMutex.Unlock()
 	}
 
 	// Phase 4: Delete the parent want (with write lock)
 	cb.reconcileMutex.Lock()
-	cb.deleteWant(wantName)
+	cb.deleteWantByID(wantID)
 
-	// Also remove from config so detectConfigChanges sees the deletion Use ID-based comparison to ensure we delete only the correct want
+	// Also remove from config so detectConfigChanges sees the deletion
 	for i, cfgWant := range cb.config.Wants {
 		if cfgWant.Metadata.ID == wantID {
 			cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
