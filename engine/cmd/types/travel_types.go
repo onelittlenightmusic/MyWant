@@ -1413,7 +1413,6 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }
 
 // RegisterTravelWantTypesWithAgents registers travel want types with agent system support
@@ -1443,4 +1442,6 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 		result := NewBuffetWant(metadata, spec)
 		bw := result.(*BuffetWant)
 		bw.SetAgentRegistry(agentRegistry)
+		return result
+	})
 }

@@ -376,7 +376,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
-		usingCount := len(want.GetSpec().Using)
 		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
 
