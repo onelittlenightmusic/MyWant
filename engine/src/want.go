@@ -3,7 +3,9 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"mywant/engine/src/pubsub"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -834,6 +836,38 @@ func (n *Want) MergeState(updates map[string]any) {
 		n.pendingStateChanges = make(map[string]any)
 	}
 	for key, value := range updates {
+		// CRITICAL FIX: Deep merge for map[string]any values
+		// If the new value is a map and existing pending value is also a map, merge them
+		// This prevents race conditions where concurrent packets overwrite each other's data
+		if valueMap, isMap := value.(map[string]any); isMap {
+			// Check pending state first, then fall back to persisted State
+			var existingMap map[string]any
+			if existingVal, exists := n.pendingStateChanges[key]; exists {
+				if pendingMap, ok := existingVal.(map[string]any); ok {
+					existingMap = pendingMap
+				}
+			} else if stateVal, exists := n.State[key]; exists {
+				// Read from persisted State if not in pending
+				if persistedMap, ok := stateVal.(map[string]any); ok {
+					existingMap = persistedMap
+				}
+			}
+
+			// If we found an existing map, merge it
+			if existingMap != nil {
+				// Deep merge: combine existing and new map entries
+				merged := make(map[string]any, len(existingMap)+len(valueMap))
+				for k, v := range existingMap {
+					merged[k] = v
+				}
+				for k, v := range valueMap {
+					merged[k] = v
+				}
+				n.pendingStateChanges[key] = merged
+				continue
+			}
+		}
+		// For non-map values or when no existing value, just set directly
 		n.pendingStateChanges[key] = value
 	}
 }
@@ -1285,8 +1319,52 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
+// serializeLabels converts label map to deterministic topic name for PubSub routing.
+// Ensures consistent topic names across publisher and subscribers.
+// Example: {role: "processor", stage: "final"} → "role=processor,stage=final"
+func serializeLabels(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+
+	// Sort keys for deterministic output
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Build comma-separated key=value pairs
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = fmt.Sprintf("%s=%s", k, labels[k])
+	}
+	return strings.Join(parts, ",")
+}
+
 // Provide sends a data packet to all connected output channels
+// If want has labels, also publishes to PubSub topic for late subscribers
 func (n *Want) Provide(packet any) error {
+	cb := GetGlobalChainBuilder()
+
+	// Label-based routing via PubSub (for dynamic want discovery)
+	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
+		topic := serializeLabels(n.Metadata.Labels)
+		msg := &pubsub.Message{
+			Payload:   packet,
+			Timestamp: time.Now(),
+			Done:      false,
+		}
+
+		if err := cb.pubsub.Publish(topic, msg); err != nil {
+			ErrorLog("[PubSub] Failed to publish packet from '%s' to topic '%s': %v",
+				n.Metadata.Name, topic, err)
+		}
+
+		// Also log PubSub routing
+		InfoLog("[PROVIDE] Want '%s' published packet to PubSub topic '%s'",
+			n.Metadata.Name, topic)
+	}
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
@@ -1323,7 +1401,6 @@ func (n *Want) Provide(packet any) error {
 	n.StoreState("provide_packet_sent_timestamp", getCurrentTimestamp())
 
 	// Trigger retrigger for each receiver that got the packet
-	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		for _, pathInfo := range paths.Out {
 			if pathInfo.Channel == nil {
@@ -1338,7 +1415,28 @@ func (n *Want) Provide(packet any) error {
 }
 
 // ProvideDone sends a termination signal to all connected output channels
+// If want has labels, also publishes Done signal to PubSub topic
 func (n *Want) ProvideDone() error {
+	cb := GetGlobalChainBuilder()
+
+	// Label-based routing via PubSub (for dynamic want discovery)
+	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
+		topic := serializeLabels(n.Metadata.Labels)
+		msg := &pubsub.Message{
+			Payload:   nil,
+			Timestamp: time.Now(),
+			Done:      true,
+		}
+
+		if err := cb.pubsub.Publish(topic, msg); err != nil {
+			ErrorLog("[PubSub] Failed to publish Done signal from '%s' to topic '%s': %v",
+				n.Metadata.Name, topic, err)
+		}
+
+		InfoLog("[PROVIDE_DONE] Want '%s' published Done signal to PubSub topic '%s'",
+			n.Metadata.Name, topic)
+	}
+
 	paths := n.GetPaths()
 	if paths == nil || len(paths.Out) == 0 {
 		return nil // No outputs to send to
@@ -1365,7 +1463,6 @@ func (n *Want) ProvideDone() error {
 	}
 
 	// Trigger retrigger for receivers
-	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		for _, pathInfo := range paths.Out {
 			if pathInfo.Channel == nil {

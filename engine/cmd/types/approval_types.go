@@ -65,7 +65,12 @@ func (e *EvidenceWant) IsAchieved() bool {
 
 func (e *EvidenceWant) Progress() {
 	outCount := e.GetOutCount()
-	e.StoreLog("[EVIDENCE] Progress() called, OutCount=%d, Status=%s", outCount, e.Status)
+	paths := e.GetPaths()
+	pathsOutLen := 0
+	if paths != nil {
+		pathsOutLen = len(paths.Out)
+	}
+	e.StoreLog("[EVIDENCE] Progress() called, OutCount=%d, paths.Out len=%d, Status=%s", outCount, pathsOutLen, e.Status)
 
 	locals, ok := e.Locals.(*EvidenceWantLocals)
 	if !ok {
@@ -172,7 +177,12 @@ func (d *DescriptionWant) IsAchieved() bool {
 
 func (d *DescriptionWant) Progress() {
 	outCount := d.GetOutCount()
-	d.StoreLog("[DESCRIPTION] Progress() called, OutCount=%d, Status=%s", outCount, d.Status)
+	paths := d.GetPaths()
+	pathsOutLen := 0
+	if paths != nil {
+		pathsOutLen = len(paths.Out)
+	}
+	d.StoreLog("[DESCRIPTION] Progress() called, OutCount=%d, paths.Out len=%d, Status=%s", outCount, pathsOutLen, d.Status)
 
 	locals, ok := d.Locals.(*DescriptionWantLocals)
 	if !ok {

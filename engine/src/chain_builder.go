@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"mywant/engine/src/chain"
+	"mywant/engine/src/pubsub"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -129,6 +130,9 @@ type ChainBuilder struct {
 
 	// HTTP client for internal API calls
 	httpClient *HTTPClient // HTTP client for agents to call internal APIs
+
+	// PubSub system for label-based packet delivery
+	pubsub pubsub.PubSub // PubSub system for asynchronous packet delivery via labels
 }
 
 // runtimeWant holds the runtime state of a want
@@ -204,6 +208,10 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 	}
 
 	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes() This avoids duplicate scanning logs when multiple ChainBuilder instances are created Recipe registry is passed via the environment during server initialization
+
+	// Initialize PubSub system for label-based packet delivery
+	builder.pubsub = pubsub.NewInMemoryPubSub()
+	log.Printf("[ChainBuilder] Initialized PubSub system for label-based packet delivery")
 
 	// Auto-register owner want types for target system support
 	RegisterOwnerWantTypes(builder)
@@ -426,12 +434,134 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 			}
 		}
 	}
+	// Add PubSub subscription-backed paths for labeled wants
+	cb.addPubSubPaths(pathMap)
+
 	result := make(map[string]Paths)
 	for wantName, pathsPtr := range pathMap {
 		result[wantName] = *pathsPtr
 	}
 
 	return result
+}
+
+// addPubSubPaths adds PubSub subscription-backed input paths for wants that use labeled selectors.
+// This enables late-arriving wants (e.g., Coordinators added after Providers) to receive packets.
+// IMPORTANT: Only adds PubSub paths if a direct path doesn't already exist for the same provider.
+// This prevents path duplication in nested recipes.
+func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
+	// For each want that has using selectors, subscribe to matching PubSub topics
+	for wantName, want := range cb.wants {
+		paths := pathMap[wantName]
+
+		for selectorIdx, selector := range want.GetSpec().Using {
+			if len(selector) == 0 {
+				continue // Skip empty selectors
+			}
+
+			// Find matching provider wants
+			matchCount := 0
+			for providerName, providerWant := range cb.wants {
+				if wantName == providerName {
+					continue // Skip self
+				}
+
+				// Check if provider's labels match this selector
+				if cb.matchesSelector(providerWant.GetMetadata().Labels, selector) {
+					matchCount++
+
+					// CRITICAL: Check if a direct path already exists for this provider
+					// In nested recipes, paths are generated in TWO phases:
+					// Phase 1: Direct paths (Evidence/Description → Coordinator)
+					// Phase 2: PubSub paths (for late-arriving wants)
+					// We must avoid duplicating paths from the same provider
+					directPathExists := false
+					expectedDirectPathName := fmt.Sprintf("%s_to_%s", providerName, wantName)
+					for _, existingPath := range paths.In {
+						if existingPath.Name == expectedDirectPathName {
+							directPathExists = true
+							log.Printf("[PubSub] Direct path already exists for '%s' -> '%s', skipping PubSub path",
+								providerName, wantName)
+							break
+						}
+					}
+
+					// Only add PubSub path if direct path doesn't exist
+					// This prevents coordinator from seeing the same packet twice
+					if directPathExists {
+						continue // Skip PubSub subscription for this provider
+					}
+
+					// Subscribe to PubSub topic for this provider's labels
+					topic := serializeLabels(providerWant.GetMetadata().Labels)
+					sub, err := cb.pubsub.Subscribe(topic, wantName)
+					if err != nil {
+						log.Printf("[PubSub] Failed to subscribe %s to topic %s: %v",
+							wantName, topic, err)
+						continue
+					}
+
+					// Create adapter channel that converts PubSub messages to TransportPackets
+					adaptedChan := cb.adaptPubSubChannel(sub.Chan())
+
+					pubsubPath := PathInfo{
+						Channel: adaptedChan,
+						Name:    fmt.Sprintf("pubsub_%s_to_%s", topic, wantName),
+						Active:  true,
+					}
+
+					// Add to input paths (might be duplicated if multiple selectors match same provider)
+					// Only add if not already present (check by name)
+					isDuplicate := false
+					for _, existingPath := range paths.In {
+						if existingPath.Name == pubsubPath.Name {
+							isDuplicate = true
+							break
+						}
+					}
+
+					if !isDuplicate {
+						paths.In = append(paths.In, pubsubPath)
+						log.Printf("[PubSub] Want '%s' subscribed to topic '%s' (selector %d), auto-replayed cached messages (no direct path found)",
+							wantName, topic, selectorIdx)
+					}
+				}
+			}
+
+			if matchCount == 0 && len(want.GetMetadata().Labels) == 0 {
+				// No match yet - want might be added later dynamically
+				// This is expected for late-arriving wants like Coordinators
+				log.Printf("[PubSub] Want '%s' has selector %v but no matching providers yet (will auto-connect on discovery)",
+					wantName, selector)
+			}
+		}
+	}
+}
+
+// adaptPubSubChannel converts a PubSub message channel to a TransportPacket channel.
+// Runs in a goroutine to bridge the two channel types.
+func (cb *ChainBuilder) adaptPubSubChannel(msgChan <-chan *pubsub.Message) chain.Chan {
+	adapted := make(chain.Chan, 30) // Same buffer size as PubSub consumer buffer
+
+	go func() {
+		for msg := range msgChan {
+			tp := TransportPacket{
+				Payload: msg.Payload,
+				Done:    msg.Done,
+			}
+
+			select {
+			case adapted <- tp:
+				// Message sent successfully
+			default:
+				// Adapted channel full, drop message
+				log.Printf("[PubSub] Adapter channel full, dropping message (seq=%d)", msg.Sequence)
+			}
+		}
+		close(adapted)
+	}()
+
+	return adapted
 }
 func (cb *ChainBuilder) validateConnections(pathMap map[string]Paths) {
 	for wantName, want := range cb.wants {
@@ -1698,6 +1828,24 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		}
 	}
 	wantPtr.InitializeSubscriptionSystem()
+
+	// CRITICAL FIX: Load ConnectivityMetadata from registry
+	// This ensures require field from YAML is properly applied
+	if meta, exists := cb.connectivityRegistry[wantConfig.Metadata.Type]; exists {
+		wantPtr.ConnectivityMetadata = meta
+		log.Printf("[ADD-WANT] Want '%s' (type: %s): Applied ConnectivityMetadata RequiredInputs=%d, RequiredOutputs=%d",
+			wantConfig.Metadata.Name, wantConfig.Metadata.Type, meta.RequiredInputs, meta.RequiredOutputs)
+	} else {
+		// No connectivity metadata found - use defaults (no requirements)
+		wantPtr.ConnectivityMetadata = ConnectivityMetadata{
+			RequiredInputs:  0,
+			MaxInputs:       -1,
+			RequiredOutputs: 0,
+			MaxOutputs:      -1,
+			WantType:        wantConfig.Metadata.Type,
+			Description:     "No connectivity requirements",
+		}
+	}
 
 	runtimeWant := &runtimeWant{
 		function: wantFunction,

@@ -247,7 +247,7 @@ wantType:
   - Coordinator pattern documentation
   - Independent wants execution
   require:
-    type: providers_and_users
+    type: providers
     providers:
     - name: data_packets
       type: want
@@ -255,7 +255,3 @@ wantType:
         approval: evidence/description)'
       required: false
       multiple: true
-    users:
-    - name: coordinated_result
-      type: state
-      description: Final coordinated data stored in state
