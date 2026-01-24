@@ -257,7 +257,4 @@ func RegisterApprovalWantTypes(builder *ChainBuilder) {
 		builder.RegisterWantType("description", NewDescriptionWant)
 	}
 
-	// Coordinator type - handles all coordinator variations (approval, travel, buffet)
-	// Configuration is determined by type name and params (coordinator_type, coordinator_level, is_buffet, required_inputs)
-	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }

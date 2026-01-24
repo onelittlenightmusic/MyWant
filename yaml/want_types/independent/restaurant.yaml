@@ -236,8 +236,4 @@ wantType:
   - AgentRestaurant implementation
   - MonitorRestaurant implementation
   require:
-    type: users
-    users:
-    - name: schedule
-      type: state
-      description: Restaurant schedule and reservation details
+    type: none

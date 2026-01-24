@@ -42,32 +42,8 @@ recipe:
           description_format: "Level 2 Approval: %s"
           approval_id: approval_id
 
-    # Level 2 Coordinator
-    - metadata:
-        type: coordinator
-        labels:
-          role: coordinator
-          category: approval-coordinator
-          component: level2-coordinator
-          approval_level: "2"
-      spec:
-        params:
-          approval_id: approval_id
-          coordinator_type: "approval"
-          coordinator_level: 2
-          level2_authority: level2_authority
-        using:
-          - role: evidence-provider
-          - role: description-provider
-
   # Recipe result definition
-  result:
-    - want_name: "coordinator"
-      state_field: ".coordinator_result"
-      description: "Level 2 approval coordinator result with inputs"
-    - want_name: "coordinator"
-      state_field: ".approval_status"
-      description: "Level 2 approval status"
+  result: []
   # Example deployment - one-click deployment configuration
   example:
     wants:

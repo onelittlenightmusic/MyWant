@@ -1443,8 +1443,4 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 		result := NewBuffetWant(metadata, spec)
 		bw := result.(*BuffetWant)
 		bw.SetAgentRegistry(agentRegistry)
-		return result
-	})
-
-	builder.RegisterWantType("coordinator", NewCoordinatorWant)
 }

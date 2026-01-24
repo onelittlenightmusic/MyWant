@@ -66,26 +66,8 @@ recipe:
         requires:
           - buffet_reservation
 
-    # Travel coordinator that combines all schedules
-    - metadata:
-        type: coordinator
-        labels:
-          role: coordinator
-      spec:
-        params:
-          display_name: display_name
-          required_inputs: 3
-        using:
-          - role: scheduler
-
   # Recipe result definition - specifies how to compute travel planning results
-  result:
-    - want_name: "coordinator"
-      state_field: ".coordinator_result"
-      description: "Travel coordinator result with inputs"
-    - want_name: "coordinator"
-      state_field: ".final_result"
-      description: "Travel itinerary summary timeline"
+  result: []
   # Example deployment - one-click deployment configuration
   example:
     wants:

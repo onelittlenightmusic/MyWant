@@ -377,15 +377,8 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 	for wantName, want := range cb.wants {
 		paths := pathMap[wantName]
 		usingCount := len(want.GetSpec().Using)
-		if usingCount > 0 && strings.Contains(wantName, "coordinator") {
-			log.Printf("[PATHS] Coordinator '%s' has %d using selectors\n", wantName, usingCount)
-		}
-
-		for selectorIdx, usingSelector := range want.GetSpec().Using {
+		for _, usingSelector := range want.GetSpec().Using {
 			matchCount := 0
-			if strings.Contains(wantName, "coordinator") {
-				log.Printf("[PATHS]   Selector %d: %v\n", selectorIdx, usingSelector)
-			}
 
 			for otherName, otherWant := range cb.wants {
 				if wantName == otherName {
@@ -410,11 +403,6 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 					}
 					paths.In = append(paths.In, inPath)
 
-					if strings.Contains(wantName, "coordinator") {
-						log.Printf("[PATHS]     ✓ MATCHED: '%s' (labels: %v) -> '%s'\n",
-							otherName, otherWant.GetMetadata().Labels, wantName)
-					}
-
 					otherPaths := pathMap[otherName]
 					outPath := PathInfo{
 						Channel:        inPath.Channel, // Same channel, shared connection
@@ -423,14 +411,7 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 						TargetWantName: wantName, // Set target want name for output path
 					}
 					otherPaths.Out = append(otherPaths.Out, outPath)
-				} else if strings.Contains(wantName, "coordinator") && (strings.Contains(otherName, "evidence") || strings.Contains(otherName, "description")) {
-					log.Printf("[PATHS]     ✗ NO MATCH: '%s' (labels: %v) vs selector %v\n",
-						otherName, otherWant.GetMetadata().Labels, usingSelector)
 				}
-			}
-
-			if strings.Contains(wantName, "coordinator") && matchCount == 0 {
-				log.Printf("[PATHS]   ⚠️  WARNING: Selector %v matched 0 wants for coordinator '%s'\n", usingSelector, wantName)
 			}
 		}
 	}
@@ -1327,20 +1308,8 @@ func (cb *ChainBuilder) startPhase() {
 						wantName, inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
 				}
 
-				// Log for coordinator startup
-				if wantName == "dynamic-travel-coordinator-5" {
-					if DebugLoggingEnabled {
-						log.Printf("[RECONCILE:STARTUP] Coordinator Idle→Running: inCount=%d (required=%d), outCount=%d (required=%d)\n", inCount, meta.RequiredInputs, outCount, meta.RequiredOutputs)
-					}
-				}
-
 				// Skip if required connections are not met
 				if inCount < meta.RequiredInputs || outCount < meta.RequiredOutputs {
-					if wantName == "dynamic-travel-coordinator-5" {
-						if DebugLoggingEnabled {
-							log.Printf("[RECONCILE:STARTUP] Coordinator SKIPPED - connectivity not met\n")
-						}
-					}
 					// DEBUG: Log why nested wants are skipped
 					if strings.Contains(wantName, "level 2 approval") || strings.Contains(wantName, "evidence") || strings.Contains(wantName, "description") {
 						log.Printf("[RECONCILE:STARTUP] %s - SKIPPED (inCount < required or outCount < required)\n", wantName)

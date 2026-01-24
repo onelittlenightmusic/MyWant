@@ -38,20 +38,3 @@ wants:
     spec:
       params:
         buffet_type: "international"
-
-  # Travel coordinator (parent want) - "get one day travel"
-  - metadata:
-      name: get one day travel
-      type: coordinator
-      labels:
-        role: coordinator
-        category: travel
-        priority: critical
-        template: travel_itinerary
-    spec:
-      params:
-        template: "One Day Travel Itinerary"
-        completion_timeout: 2
-      using:
-        - role: scheduler
-          template: travel_itinerary

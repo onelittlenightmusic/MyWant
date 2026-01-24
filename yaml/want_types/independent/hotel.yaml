@@ -211,13 +211,9 @@ wantType:
   - Travel coordinator pattern for independent wants
   - Agent system documentation for hotel booking
   require:
-    type: users
+    type: providers
     providers:
     - name: existing_schedule
       type: want
       description: Optional existing travel schedule to check for conflicts
       required: false
-    users:
-    - name: travel_schedule
-      type: want
-      description: Hotel reservation as TravelSchedule with check-in/check-out times

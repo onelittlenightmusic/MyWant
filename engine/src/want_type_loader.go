@@ -31,7 +31,7 @@ type WantTypeMetadata struct {
 	Description string `json:"description" yaml:"description"`
 	Version     string `json:"version" yaml:"version"`
 	Category    string `json:"category" yaml:"category"`
-	Pattern     string `json:"pattern" yaml:"pattern"` // generator, processor, sink, coordinator, independent
+	Pattern     string `json:"pattern" yaml:"pattern"` // generator, processor, sink, independent
 }
 
 // ParameterDef defines a parameter for want type configuration
@@ -124,7 +124,7 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		definitions:     make(map[string]*WantTypeDefinition),
 		byCategory:      make(map[string][]*WantTypeDefinition),
 		byPattern:       make(map[string][]*WantTypeDefinition),
-		validPatterns:   []string{"generator", "processor", "sink", "coordinator", "independent"},
+		validPatterns:   []string{"generator", "processor", "sink", "independent"},
 		validCategories: make(map[string]bool),
 	}
 }

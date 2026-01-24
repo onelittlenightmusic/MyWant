@@ -202,13 +202,9 @@ wantType:
   - Delay monitoring and auto-rebooking
   - Travel coordinator flight integration
   require:
-    type: users
+    type: providers
     providers:
     - name: existing_schedule
       type: want
       description: Optional existing travel schedule for conflict checking
       required: false
-    users:
-    - name: travel_schedule
-      type: want
-      description: Flight booking as TravelSchedule

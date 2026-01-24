@@ -214,13 +214,9 @@ wantType:
   - Independent wants pattern for parallel execution
   - Travel coordinator for schedule integration
   require:
-    type: users
+    type: providers
     providers:
     - name: existing_schedule
       type: want
       description: Optional existing travel schedule to check for conflicts
       required: false
-    users:
-    - name: travel_schedule
-      type: want
-      description: Buffet reservation as TravelSchedule with start/end times

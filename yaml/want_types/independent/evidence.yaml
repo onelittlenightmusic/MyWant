@@ -143,9 +143,4 @@ wantType:
   - Evidence trail and audit compliance
   - Multi-level coordinator system
   require:
-    type: users
-    users:
-    - name: evidence_data
-      type: want
-      description: ApprovalData containing evidence for approval coordinator
-      multiple: true
+    type: none

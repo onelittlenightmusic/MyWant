@@ -142,9 +142,4 @@ wantType:
   - Multi-level approval workflows
   - Description-evidence pairing patterns
   require:
-    type: users
-    users:
-    - name: description_data
-      type: want
-      description: ApprovalData containing description for approval coordinator
-      multiple: true
+    type: none

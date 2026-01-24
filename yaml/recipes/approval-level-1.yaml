@@ -42,23 +42,6 @@ recipe:
           description_format: "Level 1 Approval: %s"
           approval_id: approval_id
 
-    # Level 1 Coordinator - connects to evidence, description, and level 2 approval result
-    - metadata:
-        type: coordinator
-        labels:
-          role: coordinator
-          category: approval-coordinator
-          component: level1-coordinator
-          approval_level: "1"
-      spec:
-        params:
-          approval_id: approval_id
-          coordinator_type: "approval"
-          coordinator_level: 1
-        using:
-          - role: evidence-provider
-          - role: description-provider
-
     # Level 2 Approval as child - created after Level 1 completes
     # This is a custom target type that will load approval-level-2.yaml recipe
     - metadata:
@@ -76,15 +59,6 @@ recipe:
 
   # Recipe result definition
   result:
-    - want_name: "coordinator"
-      state_field: ".final_result"
-      description: "Level 1 approval coordinator result with inputs"
-    - want_name: "coordinator"
-      state_field: ".approval_status"
-      description: "Level 1 approval status"
-    - want_name: "level2_approval"
-      state_field: ".coordinator_result"
-      description: "Level 2 approval coordinator result with inputs"
     - want_name: "level2_approval"
       state_field: ".approval_status"
       description: "Level 2 approval status"
