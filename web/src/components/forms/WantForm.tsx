@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, Plus, X, Code, Edit3, ChevronDown, Clock, Bot } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -127,6 +127,11 @@ export const WantForm: React.FC<WantFormProps> = ({
       }
     }
   }, [isOpen, wantTypes.length, recipes.length, fetchWantTypes, fetchRecipes]);
+
+  // Filter out system want types (custom_target, draft, owner)
+  const userFacingWantTypes = useMemo(() => {
+    return wantTypes.filter(wt => !wt.system_type);
+  }, [wantTypes]);
 
   // Keyboard shortcut: / to focus search
   useEffect(() => {
@@ -535,7 +540,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                 )}
                 <TypeRecipeSelector
                   ref={typeSelectorRef}
-                  wantTypes={wantTypes}
+                  wantTypes={userFacingWantTypes}
                   recipes={recipes}
                   selectedId={selectedTypeId}
                   showSearch={true}

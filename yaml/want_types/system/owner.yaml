@@ -17,6 +17,7 @@ wantType:
     version: '1.0'
     category: system
     pattern: independent
+    system_type: true
   parameters:
   - name: owner_id
     description: Unique identifier for the owner

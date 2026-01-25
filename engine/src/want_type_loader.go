@@ -29,12 +29,13 @@ type WantTypeDefinition struct {
 
 // WantTypeMetadata contains want type identity and classification
 type WantTypeMetadata struct {
-	Name        string `json:"name" yaml:"name"`
-	Title       string `json:"title" yaml:"title"`
+	Name       string `json:"name" yaml:"name"`
+	Title      string `json:"title" yaml:"title"`
 	Description string `json:"description" yaml:"description"`
-	Version     string `json:"version" yaml:"version"`
-	Category    string `json:"category" yaml:"category"`
-	Pattern     string `json:"pattern" yaml:"pattern"` // generator, processor, sink, independent
+	Version    string `json:"version" yaml:"version"`
+	Category   string `json:"category" yaml:"category"`
+	Pattern    string `json:"pattern" yaml:"pattern"` // generator, processor, sink, independent
+	SystemType bool   `json:"system_type,omitempty" yaml:"system_type,omitempty"` // If true, hide from user-facing want type selector
 }
 
 // ParameterDef defines a parameter for want type configuration

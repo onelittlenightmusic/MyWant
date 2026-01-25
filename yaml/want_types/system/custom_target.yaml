@@ -20,6 +20,7 @@ wantType:
     version: '1.0'
     category: system
     pattern: independent
+    system_type: true
   parameters:
   - name: target_name
     description: Name/identifier of the custom target

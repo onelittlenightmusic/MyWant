@@ -293,11 +293,12 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	res := make([]map[string]any, len(defs))
 	for i, d := range defs {
 		res[i] = map[string]any{
-			"name":     d.Metadata.Name,
-			"title":    d.Metadata.Title,
-			"category": d.Metadata.Category,
-			"pattern":  d.Metadata.Pattern,
-			"version":  d.Metadata.Version,
+			"name":        d.Metadata.Name,
+			"title":       d.Metadata.Title,
+			"category":    d.Metadata.Category,
+			"pattern":     d.Metadata.Pattern,
+			"version":     d.Metadata.Version,
+			"system_type": d.Metadata.SystemType,
 		}
 	}
 	json.NewEncoder(w).Encode(map[string]any{"wantTypes": res, "count": len(res)})

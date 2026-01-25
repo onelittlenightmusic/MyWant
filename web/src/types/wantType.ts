@@ -7,6 +7,7 @@ export interface WantTypeMetadata {
   version: string;
   category: string;
   pattern: 'generator' | 'processor' | 'sink' | 'coordinator' | 'independent';
+  system_type?: boolean; // If true, hide from user-facing want type selector
 }
 
 export interface ParameterDef {
@@ -114,6 +115,7 @@ export interface WantTypeListItem {
   category: string;
   pattern: string;
   version: string;
+  system_type?: boolean; // If true, hide from user-facing want type selector
 }
 
 export interface WantTypeListResponse {
