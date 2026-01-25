@@ -133,6 +133,10 @@ type ChainBuilder struct {
 	// PubSub system for label-based packet delivery
 	pubsub pubsub.PubSub // PubSub system for asynchronous packet delivery via labels
 
+	// Managed PubSub adapter channels (topic + consumerID -> channel)
+	pubsubChannels map[string]chain.Chan
+	pubsubMutex    sync.RWMutex
+
 	// Global Label Registry
 	labelRegistry      map[string]map[string]bool // key -> value -> true
 	labelRegistryMutex sync.RWMutex               // Protects labelRegistry
@@ -208,6 +212,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		controlStop:            make(chan bool),
 		apiLogs:                make([]APILogEntry, 0),
 		maxLogSize:             1000,
+		pubsubChannels:         make(map[string]chain.Chan),
 		labelRegistry:          make(map[string]map[string]bool),
 	}
 
@@ -371,56 +376,9 @@ func (cb *ChainBuilder) generatePathsFromConnections() map[string]Paths {
 		}
 	}
 
-	// Create a lookup map for existing paths by connection name for channel reuse
-	existingChannels := make(map[string]chain.Chan)
-	for _, oldPaths := range cb.pathMap {
-		for _, outPath := range oldPaths.Out {
-			if outPath.Channel != nil {
-				existingChannels[outPath.Name] = outPath.Channel
-			}
-		}
-	}
-
-	for wantName, want := range cb.wants {
-		paths := pathMap[wantName]
-		for _, usingSelector := range want.GetSpec().Using {
-			matchCount := 0
-
-			for otherName, otherWant := range cb.wants {
-				if wantName == otherName {
-					continue // Skip self-matching
-				}
-				if cb.matchesSelector(otherWant.GetMetadata().Labels, usingSelector) {
-					matchCount++
-
-					pathName := fmt.Sprintf("%s_to_%s", otherName, wantName)
-					// Reuse existing channel if it exists, otherwise create a new one
-					var ch chain.Chan
-					if existingCh, exists := existingChannels[pathName]; exists {
-						ch = existingCh
-					} else {
-						ch = make(chain.Chan, 100)
-					}
-
-					inPath := PathInfo{
-						Channel: ch,
-						Name:    pathName,
-						Active:  true,
-					}
-					paths.In = append(paths.In, inPath)
-
-					otherPaths := pathMap[otherName]
-					outPath := PathInfo{
-						Channel:        inPath.Channel, // Same channel, shared connection
-						Name:           inPath.Name,
-						Active:         true,
-						TargetWantName: wantName, // Set target want name for output path
-					}
-					otherPaths.Out = append(otherPaths.Out, outPath)
-				}
-			}
-		}
-	}
+	// Phase 3: Direct channel path creation removed
+	// All connections now established via PubSub subscriptions in addPubSubPaths()
+	// Using selectors are matched against provider labels via PubSub topics
 	// Add PubSub subscription-backed paths for labeled wants
 	cb.addPubSubPaths(pathMap)
 
@@ -462,22 +420,11 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 					// Phase 1: Direct paths (Evidence/Description → Coordinator)
 					// Phase 2: PubSub paths (for late-arriving wants)
 					// We must avoid duplicating paths from the same provider
-					directPathExists := false
-					expectedDirectPathName := fmt.Sprintf("%s_to_%s", providerName, wantName)
-					for _, existingPath := range paths.In {
-						if existingPath.Name == expectedDirectPathName {
-							directPathExists = true
-							log.Printf("[PubSub] Direct path already exists for '%s' -> '%s', skipping PubSub path",
-								providerName, wantName)
-							break
-						}
-					}
 
-					// Only add PubSub path if direct path doesn't exist
-					// This prevents coordinator from seeing the same packet twice
-					if directPathExists {
-						continue // Skip PubSub subscription for this provider
-					}
+					// Always subscribe to PubSub regardless of direct path
+					// Phase 1 of PubSub unification: Remove exclusive logic
+					// Direct paths will be deprecated in Phase 2
+
 
 					// Subscribe to PubSub topic for this provider's labels
 					topic := serializeLabels(providerWant.GetMetadata().Labels)
@@ -488,8 +435,20 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 						continue
 					}
 
-					// Create adapter channel that converts PubSub messages to TransportPackets
-					adaptedChan := cb.adaptPubSubChannel(sub.Chan())
+					// Reuse existing adapter channel if available
+					adapterKey := fmt.Sprintf("%s:%s", topic, wantName)
+					cb.pubsubMutex.RLock()
+					adaptedChan, exists := cb.pubsubChannels[adapterKey]
+					cb.pubsubMutex.RUnlock()
+
+					if !exists {
+						// Create adapter channel that converts PubSub messages to TransportPackets
+						adaptedChan = cb.adaptPubSubChannel(sub.Chan())
+						cb.pubsubMutex.Lock()
+						cb.pubsubChannels[adapterKey] = adaptedChan
+						cb.pubsubMutex.Unlock()
+						log.Printf("[PubSub] Created NEW adapter channel for '%s' on topic '%s'", wantName, topic)
+					}
 
 					pubsubPath := PathInfo{
 						Channel: adaptedChan,
@@ -509,8 +468,8 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 
 					if !isDuplicate {
 						paths.In = append(paths.In, pubsubPath)
-						log.Printf("[PubSub] Want '%s' subscribed to topic '%s' (selector %d), auto-replayed cached messages (no direct path found)",
-							wantName, topic, selectorIdx)
+						log.Printf("[PubSub] Want '%s' subscribed to topic '%s' (selector %d), paths.In count: %d",
+							wantName, topic, selectorIdx, len(paths.In))
 					}
 				}
 			}
@@ -537,13 +496,9 @@ func (cb *ChainBuilder) adaptPubSubChannel(msgChan <-chan *pubsub.Message) chain
 				Done:    msg.Done,
 			}
 
-			select {
-			case adapted <- tp:
-				// Message sent successfully
-			default:
-				// Adapted channel full, drop message
-				log.Printf("[PubSub] Adapter channel full, dropping message (seq=%d)", msg.Sequence)
-			}
+			// Blocking send - do not drop messages
+			// PubSub already handles backpressure, adapter should preserve all messages
+			adapted <- tp
 		}
 		close(adapted)
 	}()

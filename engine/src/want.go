@@ -1347,12 +1347,11 @@ func serializeLabels(labels map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-// Provide sends a data packet to all connected output channels
-// If want has labels, also publishes to PubSub topic for late subscribers
+// Provide sends a data packet to PubSub topic for subscribers
 func (n *Want) Provide(packet any) error {
 	cb := GetGlobalChainBuilder()
 
-	// Label-based routing via PubSub (for dynamic want discovery)
+	// communication now flows through PubSub topic subscriptions
 	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
 		topic := serializeLabels(n.Metadata.Labels)
 		msg := &pubsub.Message{
@@ -1370,61 +1369,15 @@ func (n *Want) Provide(packet any) error {
 		InfoLog("[PROVIDE] Want '%s' published packet to PubSub topic '%s'",
 			n.Metadata.Name, topic)
 	}
-	paths := n.GetPaths()
-	if paths == nil || len(paths.Out) == 0 {
-		return nil // No outputs to send to
-	}
-
-	// Wrap in TransportPacket
-	tp := TransportPacket{
-		Payload: packet,
-		Done:    false,
-	}
-
-	sentCount := 0
-	for _, pathInfo := range paths.Out {
-		if pathInfo.Channel == nil {
-			continue // Skip nil channels
-		}
-
-		InfoLog("[PROVIDE] Want '%s' sending packet to '%s' on channel '%s'", n.Metadata.Name, pathInfo.TargetWantName, pathInfo.Name)
-
-		select {
-		case pathInfo.Channel <- tp:
-			// Sent successfully
-			sentCount++
-		default:
-			// Channel is full, try blocking send
-			pathInfo.Channel <- tp
-			sentCount++
-		}
-	}
-
-	// Store packet send info for debugging
-	n.StoreState("last_provide_sent_count", sentCount)
-	n.StoreState("last_provide_paths_out_count", len(paths.Out))
-	n.StoreState("provide_packet_sent_timestamp", getCurrentTimestamp())
-
-	// Trigger retrigger for each receiver that got the packet
-	if cb != nil {
-		for _, pathInfo := range paths.Out {
-			if pathInfo.Channel == nil {
-				continue
-			}
-			targetWantName := pathInfo.TargetWantName
-			cb.RetriggerReceiverWant(targetWantName)
-		}
-	}
 
 	return nil
 }
 
-// ProvideDone sends a termination signal to all connected output channels
-// If want has labels, also publishes Done signal to PubSub topic
+// ProvideDone sends a termination signal to PubSub topic
 func (n *Want) ProvideDone() error {
 	cb := GetGlobalChainBuilder()
 
-	// Label-based routing via PubSub (for dynamic want discovery)
+	// DONE signal now flows exclusively through PubSub
 	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
 		topic := serializeLabels(n.Metadata.Labels)
 		msg := &pubsub.Message{
@@ -1440,42 +1393,6 @@ func (n *Want) ProvideDone() error {
 
 		InfoLog("[PROVIDE_DONE] Want '%s' published Done signal to PubSub topic '%s'",
 			n.Metadata.Name, topic)
-	}
-
-	paths := n.GetPaths()
-	if paths == nil || len(paths.Out) == 0 {
-		return nil // No outputs to send to
-	}
-
-	// Wrap in TransportPacket with Done=true
-	tp := TransportPacket{
-		Payload: nil,
-		Done:    true,
-	}
-
-	sentCount := 0
-	for _, pathInfo := range paths.Out {
-		if pathInfo.Channel == nil {
-			continue // Skip nil channels
-		}
-		select {
-		case pathInfo.Channel <- tp:
-			sentCount++
-		default:
-			pathInfo.Channel <- tp
-			sentCount++
-		}
-	}
-
-	// Trigger retrigger for receivers
-	if cb != nil {
-		for _, pathInfo := range paths.Out {
-			if pathInfo.Channel == nil {
-				continue
-			}
-			targetWantName := pathInfo.TargetWantName
-			cb.RetriggerReceiverWant(targetWantName)
-		}
 	}
 
 	return nil

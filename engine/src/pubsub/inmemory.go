@@ -168,9 +168,10 @@ func (ps *InMemoryPubSub) Subscribe(topic string, consumerID string) (Subscripti
 			replayedCount++
 		default:
 			// Channel full, stop replay (consumer will process what was sent)
-			break
+			goto replayDone
 		}
 	}
+replayDone:
 
 	t.Consumers[consumerID] = consumer
 	log.Printf("[PubSub] Subscribed consumer '%s' to topic '%s', replayed %d cached messages",
