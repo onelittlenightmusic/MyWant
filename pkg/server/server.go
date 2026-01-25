@@ -24,7 +24,6 @@ type Server struct {
 	wantTypeLoader       *mywant.WantTypeLoader           // Want type definitions loader
 	errorHistory         []ErrorHistoryEntry              // Store error history
 	router               *mux.Router
-	globalLabels         map[string]map[string]bool  // Globally registered labels (key -> value -> true)
 	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
 }
@@ -131,7 +130,6 @@ func New(config Config) *Server {
 		wantTypeLoader:       wantTypeLoader,
 		errorHistory:         make([]ErrorHistoryEntry, 0),
 		router:               mux.NewRouter(),
-		globalLabels:         make(map[string]map[string]bool),
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
 	}

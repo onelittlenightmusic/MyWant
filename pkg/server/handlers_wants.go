@@ -127,7 +127,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	wantsByID := make(map[string]*mywant.Want)
 
 	for _, execution := range s.wants {
-		if execution.Builder != nil {
+		if execution.Builder != nil && execution.Builder != s.globalBuilder { // Avoid duplicate if globalBuilder is also in s.wants
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
 				wantCopy := &mywant.Want{
@@ -143,7 +143,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(wantsByID) == 0 && s.globalBuilder != nil {
+	// Always include global builder wants
+	if s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
 			wantCopy := &mywant.Want{

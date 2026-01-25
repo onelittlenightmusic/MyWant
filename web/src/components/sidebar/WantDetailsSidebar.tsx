@@ -16,6 +16,7 @@ import { ParametersSection } from '@/components/forms/sections/ParametersSection
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
 import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
 import { SchedulingSection } from '@/components/forms/sections/SchedulingSection';
+import { SummarySidebarContent } from './SummarySidebarContent';
 import {
   DetailsSidebar,
   TabContent,
@@ -38,6 +39,29 @@ interface WantDetailsSidebarProps {
   onResume?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSaveRecipe?: (want: Want) => void;
+  
+  // Summary related props (added for non-want state)
+  summaryProps?: {
+    wants: Want[];
+    loading: boolean;
+    searchQuery: string;
+    onSearchChange: (query: string) => void;
+    statusFilters: any[];
+    onStatusFilter: (filters: any[]) => void;
+    allLabels: Map<string, Set<string>>;
+    onLabelClick: (key: string, value: string) => void;
+    selectedLabel: { key: string; value: string } | null;
+    onClearSelectedLabel: () => void;
+    labelOwners: Want[];
+    labelUsers: Want[];
+    onViewWant: (want: Want) => void;
+    onExportWants: () => void;
+    onImportWants: () => void;
+    isExporting: boolean;
+    isImporting: boolean;
+    fetchLabels: () => Promise<void>;
+    fetchWants: () => Promise<void>;
+  };
 }
 
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
@@ -56,7 +80,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   onSuspend,
   onResume,
   onDelete,
-  onSaveRecipe
+  onSaveRecipe,
+  summaryProps
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -360,6 +385,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }, [wantId]);
 
   if (!want) {
+    if (summaryProps) {
+      return (
+        <div className="p-8">
+          <SummarySidebarContent {...summaryProps} />
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">

@@ -1,0 +1,13 @@
+wants:
+  # Level 1 Approval Target - for comparison with Level 2
+  - metadata:
+      name: level1_approval_test
+      type: "level 1 approval"  # Matches custom_type in approval-level-1.yaml
+      labels:
+        role: approval-target
+        approval_level: "1"
+    spec:
+      params:
+        approval_id: "test-approval-003"
+        coordinator_type: "level1"
+        level2_authority: "senior_manager"

@@ -1,0 +1,21 @@
+wants:
+  - metadata:
+      name: auto_reminder
+      type: reminder
+      labels:
+        role: reminder
+    spec:
+      params:
+        message: "This reminder will be automatically approved"
+        duration_from_now: "15 seconds"
+        ahead: "10 seconds"
+        require_reaction: true
+
+  - metadata:
+      name: auto_silencer
+      type: silencer
+    spec:
+      params:
+        policy: all_true
+      using:
+        - role: reminder

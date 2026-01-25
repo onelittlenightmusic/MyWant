@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: evidence
-    title: Approval Evidence Provider
+    title: Evidence
     description: 'Independent want that provides evidence data for multi-level approval
 
       processes. Generates and outputs evidence artifacts that support

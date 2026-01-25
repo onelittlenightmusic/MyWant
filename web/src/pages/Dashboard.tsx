@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Download, Upload, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -20,11 +20,10 @@ import { DraftWant, wantToDraft, isDraftWant } from '@/types/draft';
 import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
-import { StatsOverview } from '@/components/dashboard/StatsOverview';
-import { WantFilters } from '@/components/dashboard/WantFilters';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
+import { SummarySidebarContent } from '@/components/sidebar/SummarySidebarContent';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { Toast } from '@/components/notifications';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
@@ -54,10 +53,7 @@ export const Dashboard: React.FC = () => {
   const [sidebarMinimized, setSidebarMinimized] = useState(true);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
-  const [showAddLabelForm, setShowAddLabelForm] = useState(false);
-  const [newLabel, setNewLabel] = useState<{ key: string; value: string }>({ key: '', value: '' });
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
-  const [expandedLabels, setExpandedLabels] = useState(false);
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
   const [labelUsers, setLabelUsers] = useState<Want[]>([]);
   const [allLabels, setAllLabels] = useState<Map<string, Set<string>>>(new Map());
@@ -110,7 +106,12 @@ export const Dashboard: React.FC = () => {
         if (data.labelValues) {
           for (const [key, valuesArray] of Object.entries(data.labelValues)) {
             if (!labelsMap.has(key)) labelsMap.set(key, new Set());
-            if (Array.isArray(valuesArray)) (valuesArray as any[]).forEach(item => { const v = typeof item === 'string' ? item : item.value; if (v) labelsMap.get(key)!.add(v); });
+            if (Array.isArray(valuesArray)) {
+              (valuesArray as any[]).forEach(item => {
+                const v = typeof item === 'string' ? item : item.value;
+                if (v) labelsMap.get(key)!.add(v);
+              });
+            }
           }
         }
         setAllLabels(labelsMap);
@@ -247,7 +248,13 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleLabelClick = async (key: string, value: string) => {
-    setSelectedLabel({ key, value }); setLabelOwners([]); setLabelUsers([]);
+    setSelectedLabel({ key, value });
+    setLabelOwners([]);
+    setLabelUsers([]);
+    
+    // Trigger highlight animation on cards
+    useWantStore.getState().setHighlightedLabel({ key, value });
+
     try {
       const r = await fetch('http://localhost:8080/api/v1/labels');
       if (!r.ok) return;
@@ -589,16 +596,64 @@ export const Dashboard: React.FC = () => {
             </React.Fragment>
           </div>
         </div>
-        <RightSidebar isOpen={sidebar.showSummary} onClose={sidebar.closeSummary} title="Summary">
-          <div className="space-y-6">
-            <div><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold text-gray-900">Labels</h3><button onClick={() => setShowAddLabelForm(!showAddLabelForm)} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors" title="Add label"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg></button></div>{showAddLabelForm && <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg"><div className="space-y-3"><div className="flex gap-2"><input type="text" placeholder="Key" value={newLabel.key} onChange={(e) => setNewLabel(prev => ({ ...prev, key: e.target.value }))} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" /><input type="text" placeholder="Value" value={newLabel.value} onChange={(e) => setNewLabel(prev => ({ ...prev, value: e.target.value }))} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" /></div><div className="flex gap-2"><button onClick={() => { setNewLabel({ key: '', value: '' }); setShowAddLabelForm(false); }} className="flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors">Cancel</button><button onClick={async () => { if (newLabel.key.trim() && newLabel.value.trim()) { const s = await addLabelToRegistry(newLabel.key, newLabel.value); if (s) { await fetchLabels(); fetchWants(); setNewLabel({ key: '', value: '' }); setShowAddLabelForm(false); } } }} disabled={!newLabel.key.trim() || !newLabel.value.trim()} className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">Add</button></div></div></div>}<div className={classNames('overflow-hidden transition-all duration-300 ease-in-out', expandedLabels ? 'max-h-none' : 'max-h-[200px]')}>{allLabels.size === 0 ? <p className="text-sm text-gray-500">No labels found</p> : <div className={classNames('flex flex-wrap gap-2', !expandedLabels && 'overflow-y-auto pr-2')}>{Array.from(allLabels.entries()).map(([k, vs]) => Array.from(vs).map((v) => <div key={`${k}-${v}`} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'copy'; e.dataTransfer.setData('application/json', JSON.stringify({ key: k, value: v })); }} onClick={() => handleLabelClick(k, v)} className={classNames('inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium cursor-pointer hover:shadow-md transition-all select-none', selectedLabel?.key === k && selectedLabel?.value === v ? 'bg-blue-500 text-white shadow-md' : 'bg-blue-100 text-blue-800 hover:bg-blue-200')}>{truncateText(`${k}: ${v}`, 20)}</div>))}</div>}</div>{allLabels.size > 0 && <div className="flex justify-center mt-3 w-full"><button onClick={() => setExpandedLabels(!expandedLabels)} className="w-full flex justify-center py-2 px-4 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"><ChevronDown className={classNames('w-4 h-4 transition-transform', expandedLabels && 'rotate-180')} /></button></div>}</div>
-            {selectedLabel && <div><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold text-gray-900">{selectedLabel.key}: {selectedLabel.value}</h3><button onClick={() => { setSelectedLabel(null); setLabelOwners([]); setLabelUsers([]); }} className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button></div>{labelOwners.length > 0 && <div className="mb-4"><h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase">Owners</h4><div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">{labelOwners.map((w) => <div key={w.metadata?.id || w.id} onClick={() => handleViewWant(w)} className="p-2 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 cursor-pointer transition-colors text-center truncate text-xs font-medium">{w.metadata?.name || w.id}</div>)}</div></div>}{labelUsers.length > 0 && <div><h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase">Users</h4><div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">{labelUsers.map((w) => <div key={w.metadata?.id || w.id} onClick={() => handleViewWant(w)} className="p-2 bg-green-50 border border-green-200 rounded hover:bg-green-100 cursor-pointer transition-colors text-center truncate text-xs font-medium">{w.metadata?.name || w.id}</div>)}</div></div>}</div>}
-            <div><h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3><StatsOverview wants={wants} loading={loading} layout="vertical" /><div className="mt-6 flex gap-3"><button onClick={handleExportWants} disabled={isExporting || wants.length === 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"><Download className="h-4 w-4" /><span>{isExporting ? 'Exporting...' : 'Export'}</span></button><button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"><Upload className="h-4 w-4" /><span>{isImporting ? 'Importing...' : 'Import'}</span></button><input ref={fileInputRef} type="file" accept=".yaml,.yml" onChange={handleFileInputChange} className="hidden" /></div></div>
-            <div><h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3><WantFilters searchQuery={searchQuery} onSearchChange={setSearchQuery} selectedStatuses={statusFilters} onStatusFilter={setStatusFilters} /></div>
-          </div>
-        </RightSidebar>
       </main>
-      <RightSidebar isOpen={!!selectedWant || sidebar.showBatch} onClose={() => { if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } else { sidebar.clearSelection(); } }} title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : undefined)} backgroundStyle={!isSelectMode ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} headerActions={!isSelectMode ? headerActions : undefined}>{isSelectMode ? <WantBatchControlPanel selectedCount={selectedWantIds.size} onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }} onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }} onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }} onBatchCancel={handleToggleSelectMode} loading={isBatchProcessing} /> : <WantDetailsSidebar want={selectedWant} initialTab={sidebarInitialTab} onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} onHeaderStateChange={setHeaderState} onRegisterHeaderActions={sidebar.registerHeaderActions} onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')} onDelete={() => handleShowDeleteConfirmation(selectedWant!)} onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)} />}</RightSidebar>
+      <RightSidebar 
+        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showBatch} 
+        onClose={() => { 
+          if (sidebar.showSummary) sidebar.closeSummary();
+          else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } 
+          else { sidebar.clearSelection(); } 
+        }} 
+        title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')} 
+        backgroundStyle={!isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} 
+        headerActions={!isSelectMode && selectedWant ? headerActions : undefined}
+      >
+        {isSelectMode ? (
+          <WantBatchControlPanel 
+            selectedCount={selectedWantIds.size} 
+            onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }} 
+            onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }} 
+            onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }} 
+            onBatchCancel={handleToggleSelectMode} 
+            loading={isBatchProcessing} 
+          />
+        ) : (
+          <WantDetailsSidebar 
+            want={selectedWant} 
+            initialTab={sidebarInitialTab} 
+            onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} 
+            onHeaderStateChange={setHeaderState} 
+            onRegisterHeaderActions={sidebar.registerHeaderActions} 
+            onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
+            onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
+            onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
+            onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
+            onDelete={() => handleShowDeleteConfirmation(selectedWant!)} 
+            onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)} 
+            summaryProps={{
+              wants,
+              loading,
+              searchQuery,
+              onSearchChange: setSearchQuery,
+              statusFilters,
+              onStatusFilter: setStatusFilters,
+              allLabels,
+              onLabelClick: handleLabelClick,
+              selectedLabel,
+              onClearSelectedLabel: () => { setSelectedLabel(null); setLabelOwners([]); setLabelUsers([]); },
+              labelOwners,
+              labelUsers,
+              onViewWant: handleViewWant,
+              onExportWants: handleExportWants,
+              onImportWants: () => fileInputRef.current?.click(),
+              isExporting,
+              isImporting,
+              fetchLabels,
+              fetchWants
+            }}
+          />
+        )}
+      </RightSidebar>
       <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
       <ConfirmDeleteModal isOpen={showDeleteConfirmation} onClose={() => setShowDeleteConfirmation(false)} onConfirm={handleDeleteWantConfirm} want={deleteWantState} loading={isDeletingWant} title="Delete Want" message={deleteWantState ? `Are you sure you want to delete "${deleteWantState.metadata?.name}"?` : 'Are you sure?'} />
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />

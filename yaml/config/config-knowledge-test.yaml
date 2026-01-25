@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: my-ai-notes
-      type: knowledge
+      type: fresh knowledge
     spec:
       params:
         topic: "Latest developments in Model Context Protocol (MCP) and AI Agents"

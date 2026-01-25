@@ -329,24 +329,123 @@ func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 // Labels
 func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	// Simplified implementation - just return global labels for now to verify integration
-	// Full implementation requires scanning all wants (omitted for brevity)
-	json.NewEncoder(w).Encode(map[string]any{"labelKeys": []string{}, "labelValues": map[string]any{}})
+
+	if s.globalBuilder == nil {
+		http.Error(w, "Global builder not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// 1. Get all registered labels from the persistent registry in ChainBuilder
+	keys, rawValues := s.globalBuilder.GetRegisteredLabels()
+
+	// 2. Prepare the response structure with owner/user info
+	values := make(map[string][]map[string]any)
+
+	for _, k := range keys {
+		vStrings := rawValues[k]
+		vList := make([]map[string]any, 0, len(vStrings))
+
+		for _, v := range vStrings {
+			// Find current owners and users for this specific label value in the active graph
+			ownerMap := make(map[string]bool)
+			userMap := make(map[string]bool)
+
+			findOwnersUsers := func(builder *mywant.ChainBuilder) {
+				if builder == nil {
+					return
+				}
+				// Check active wants in this builder
+				states := builder.GetAllWantStates()
+				for _, want := range states {
+					// Check if want PROVIDES this label
+					if val, ok := want.Metadata.Labels[k]; ok && val == v {
+						ownerMap[want.Metadata.ID] = true
+					}
+					// Check if want USES this label (via 'using' in spec)
+					for _, u := range want.Spec.Using {
+						if uv, ok := u[k]; ok && uv == v {
+							userMap[want.Metadata.ID] = true
+						}
+					}
+				}
+			}
+
+			// Track processed builders to avoid redundant scanning
+			processedBuilders := make(map[*mywant.ChainBuilder]bool)
+
+			if s.globalBuilder != nil {
+				findOwnersUsers(s.globalBuilder)
+				processedBuilders[s.globalBuilder] = true
+			}
+
+			for _, exec := range s.wants {
+				if exec.Builder != nil && !processedBuilders[exec.Builder] {
+					findOwnersUsers(exec.Builder)
+					processedBuilders[exec.Builder] = true
+				}
+			}
+
+			// Convert deduplicated maps to sorted slices
+			owners := make([]string, 0, len(ownerMap))
+			for id := range ownerMap {
+				owners = append(owners, id)
+			}
+			sort.Strings(owners)
+
+			users := make([]string, 0, len(userMap))
+			for id := range userMap {
+				users = append(users, id)
+			}
+			sort.Strings(users)
+
+			vList = append(vList, map[string]any{
+				"value":  v,
+				"owners": owners,
+				"users":  users,
+			})
+		}
+		values[k] = vList
+	}
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"labelKeys":   keys,
+		"labelValues": values,
+	})
 }
 
 func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var req struct{ Key, Value string }
-	json.NewDecoder(r.Body).Decode(&req)
-	if s.globalLabels == nil {
-		s.globalLabels = make(map[string]map[string]bool)
+	var req struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
 	}
-	if s.globalLabels[req.Key] == nil {
-		s.globalLabels[req.Key] = make(map[string]bool)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		fmt.Printf("[SERVER-ERROR] Failed to decode addLabel request: %v\n", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
-	s.globalLabels[req.Key][req.Value] = true
+
+	fmt.Printf("[SERVER-DEBUG] addLabel request: Key=%s, Value=%s\n", req.Key, req.Value)
+
+	if req.Key == "" || req.Value == "" {
+		http.Error(w, "Key and Value are required", http.StatusBadRequest)
+		return
+	}
+
+	if s.globalBuilder != nil {
+		s.globalBuilder.AddLabelToRegistry(req.Key, req.Value)
+		fmt.Printf("[SERVER-INFO] Registered global label via builder: %s=%s\n", req.Key, req.Value)
+	} else {
+		fmt.Printf("[SERVER-WARN] Global builder not available for label registration\n")
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Label registered"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Label registered (v2-verified)",
+		"key":     req.Key,
+		"value":   req.Value,
+		"status":  "success",
+	})
 }
 
 // Errors & Logs

@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: flight
-    title: Flight Booking Reservation
+    title: Flight Reservation
     description: 'Flight booking want type for travel planning. Books flights with
       configurable
 

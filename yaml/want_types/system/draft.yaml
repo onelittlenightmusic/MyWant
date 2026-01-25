@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: draft
-    title: Draft Want
+    title: Draft
     description: |
       A temporary, persisted want representing a work-in-progress solution or a user request
       waiting for recommendations to be generated and reviewed.

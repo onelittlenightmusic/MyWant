@@ -1,16 +1,9 @@
 wantType:
   metadata:
     name: execution_result
-    title: Command Execution Result
-    description: |
-      Executes shell commands on the backend system and captures output.
+    title: Execution Result
+    description: 'Standard want type representing the result of a command execution.
 
-      This want type runs arbitrary shell commands with timeout support,
-      capturing stdout, stderr, and exit codes. Results are persisted in state
-      for query and analysis.
-
-      Useful for executing MacOS shortcuts, scripts, or system commands
-      as part of larger workflows.
     version: '1.0'
     category: system
     pattern: independent

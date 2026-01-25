@@ -280,25 +280,19 @@ all: build
 # Kill and restart processes using want-cli
 restart-all:
 	@echo "🔄 Restarting MyWant server and mock server..."
-	@echo ""
 	@echo "🛑 Stopping existing processes..."
 	@./want-cli stop 2>/dev/null || echo "  Server not running"
 	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
-	@sleep 2
-	@echo ""
 	@echo "🧹 Cleaning logs..."
 	@rm -f logs/server.log
 	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
-	@echo ""
 	@$(MAKE) build-server
-	@echo ""
 	@$(MAKE) build-cli
-	@echo ""
+	@$(MAKE) build-gui
 	@mkdir -p logs
 	@$(MAKE) build-mock
-	@echo ""
 	@echo "🚀 Starting MyWant server via want-cli..."
 	@nohup ./want-cli start -D --port 8080 > /dev/null 2>&1 &
 	@sleep 2
@@ -308,7 +302,6 @@ restart-all:
 	@nohup ./bin/flight-server > ./logs/flight-server.log 2>&1 &
 	@sleep 1
 	@echo "✅ Mock server started (PID: $$(pgrep -f './bin/flight-server'))"
-	@echo ""
 	@echo "✅ All processes started!"
 	@echo "🌐 URL: http://localhost:8080"
 	@echo "✈️  Mock Server: http://localhost:8081"

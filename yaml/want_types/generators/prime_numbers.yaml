@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: prime numbers
-    title: Prime Number Range Generator
+    title: prime numbers
     description: 'Generator that produces all numbers within a specified range. Output
       values
 

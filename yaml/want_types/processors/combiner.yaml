@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: combiner
-    title: Stream Combiner
+    title: combiner
     description: 'Processor that combines multiple input streams into a single output
       stream.
 

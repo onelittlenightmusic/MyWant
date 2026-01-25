@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: "prime-sieve-test"
+      type: "prime sieve"
+      labels:
+        recipe: "Prime Sieve"
+    spec:
+      params:
+        start_number: 2
+        end_number: 50

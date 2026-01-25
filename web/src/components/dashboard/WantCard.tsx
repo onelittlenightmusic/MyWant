@@ -70,9 +70,14 @@ export const WantCard: React.FC<WantCardProps> = ({
   isBeingProcessed = false // Default to false
 }) => {
   const wantId = want.metadata?.id || want.id;
-  const { setDraggingWant, setIsOverTarget } = useWantStore();
+  const { setDraggingWant, setIsOverTarget, highlightedLabel } = useWantStore();
   const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
+
+  // Check if this want is highlighted by label selection
+  const isHighlighted = highlightedLabel && 
+                        want.metadata?.labels && 
+                        want.metadata.labels[highlightedLabel.key] === highlightedLabel.value;
 
   // Identify if this want is a Target (can have children)
   const wantType = want.metadata?.type?.toLowerCase() || '';
@@ -287,6 +292,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         'card hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100',
+        isHighlighted && styles.highlighted,
         isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed',
         parentBackgroundStyle.className,
         className || ''

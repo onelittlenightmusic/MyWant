@@ -1,19 +1,10 @@
 wantType:
-  metadata:
-    name: owner
-    title: Owner Reference Want
-    description: 'System want type for managing owner-based relationships and lifecycle
-
-      management. Used to define parent-child relationships where one want
-
-      owns or manages other wants.
-
-
-      Enables hierarchical want organization and owner-referenced lifecycle
-
-      management for complex multi-want deployments.
-
-      '
+    metadata:
+      name: owner
+      title: Owner
+      description: |
+        Defines an owner reference for want instances.
+  
     version: '1.0'
     category: system
     pattern: independent

@@ -192,7 +192,7 @@ func (k *KnowledgeWant) getLocals() *KnowledgeLocals {
 
 // RegisterKnowledgeWantType registers the knowledge want type with the builder
 func RegisterKnowledgeWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("knowledge", func(metadata Metadata, spec WantSpec) Progressable {
+	builder.RegisterWantType("fresh knowledge", func(metadata Metadata, spec WantSpec) Progressable {
 		want := &Want{
 			Metadata: metadata,
 			Spec:     spec,

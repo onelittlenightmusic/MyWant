@@ -131,15 +131,15 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
    * Save the current dependency edit
    */
   const handleSave = useCallback(() => {
-    // Force commit uncommitted values from the autocomplete inputs
-    autocompleteRef.current?.commit();
+    // Get latest uncommitted values directly from refs
+    const latestValues = (autocompleteRef.current as any)?.getValues?.() || editingDraft;
 
     // Only update if draft has a key value
-    if (editingDraft.key.trim()) {
+    if (latestValues.key.trim()) {
       const newDependencies = [...dependencies];
 
       // Create new dependency object with single key-value pair
-      const newDependency = { [editingDraft.key]: editingDraft.value };
+      const newDependency = { [latestValues.key]: latestValues.value };
 
       if (editingIndex !== null && editingIndex < dependencies.length) {
         // Replace existing dependency

@@ -132,6 +132,10 @@ type ChainBuilder struct {
 
 	// PubSub system for label-based packet delivery
 	pubsub pubsub.PubSub // PubSub system for asynchronous packet delivery via labels
+
+	// Global Label Registry
+	labelRegistry      map[string]map[string]bool // key -> value -> true
+	labelRegistryMutex sync.RWMutex               // Protects labelRegistry
 }
 
 // runtimeWant holds the runtime state of a want
@@ -204,6 +208,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		controlStop:            make(chan bool),
 		apiLogs:                make([]APILogEntry, 0),
 		maxLogSize:             1000,
+		labelRegistry:          make(map[string]map[string]bool),
 	}
 
 	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes() This avoids duplicate scanning logs when multiple ChainBuilder instances are created Recipe registry is passed via the environment during server initialization
@@ -214,6 +219,9 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 
 	// Auto-register owner want types for target system support
 	RegisterOwnerWantTypes(builder)
+
+	// Auto-register scheduler want types
+	RegisterSchedulerWantTypes(builder)
 
 	return builder
 }
@@ -1885,6 +1893,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	// Register want for notification system
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
+
+	// Automatically register labels in the global registry
+	cb.registerLabelsFromWant(wantConfig)
 }
 func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	cb.reconcileMutex.RLock()
@@ -1933,6 +1944,9 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 		cb.addDynamicWantUnsafe(wantConfig)
 		return
 	}
+
+	// Update label registry
+	cb.registerLabelsFromWant(wantConfig)
 
 	// Trigger immediate reconciliation via channel
 	if !cb.inReconciliation {
@@ -3435,6 +3449,7 @@ func (cb *ChainBuilder) QueueWantAddLabel(wantID, key, value string) error {
 	if wantID == "" || key == "" {
 		return fmt.Errorf("want ID and label key cannot be empty")
 	}
+	cb.AddLabelToRegistry(key, value)
 	return cb.QueueOperation(&WantOperation{
 		Type:       "addLabel",
 		EntityType: "want",
@@ -3597,3 +3612,52 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 	// Send success (nil error) to callback
 	sendError(nil)
 }
+
+// AddLabelToRegistry explicitly registers a label in the global registry
+func (cb *ChainBuilder) AddLabelToRegistry(key, value string) {
+	cb.labelRegistryMutex.Lock()
+	defer cb.labelRegistryMutex.Unlock()
+
+	if cb.labelRegistry == nil {
+		cb.labelRegistry = make(map[string]map[string]bool)
+	}
+	if cb.labelRegistry[key] == nil {
+		cb.labelRegistry[key] = make(map[string]bool)
+	}
+	cb.labelRegistry[key][value] = true
+}
+
+// registerLabelsFromWant extracts all labels from a want and registers them
+func (cb *ChainBuilder) registerLabelsFromWant(want *Want) {
+	if want == nil || want.Metadata.Labels == nil {
+		return
+	}
+
+	for k, v := range want.Metadata.Labels {
+		cb.AddLabelToRegistry(k, v)
+	}
+}
+
+// GetRegisteredLabels returns a snapshot of all registered labels (both manual and from wants)
+func (cb *ChainBuilder) GetRegisteredLabels() (keys []string, values map[string][]string) {
+	cb.labelRegistryMutex.RLock()
+	defer cb.labelRegistryMutex.RUnlock()
+
+	keys = make([]string, 0, len(cb.labelRegistry))
+	values = make(map[string][]string)
+
+	for k, vals := range cb.labelRegistry {
+		keys = append(keys, k)
+		vList := make([]string, 0, len(vals))
+		for v := range vals {
+			vList = append(vList, v)
+		}
+		sort.Strings(vList)
+		values[k] = vList
+	}
+	sort.Strings(keys)
+
+	return keys, values
+}
+
+// Queue methods for labels

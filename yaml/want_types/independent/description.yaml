@@ -1,8 +1,8 @@
 wantType:
   metadata:
     name: description
-    title: Approval Request Description
-    description: 'Independent want that provides description data for multi-level
+    title: Description
+    description: 'Independent want that provides descriptive information for multi-level
       approval
 
       processes. Generates human-readable descriptions of approval requests

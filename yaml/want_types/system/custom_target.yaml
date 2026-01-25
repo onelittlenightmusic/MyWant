@@ -1,22 +1,10 @@
 wantType:
-  metadata:
-    name: custom_target
-    title: Custom Target Definition
-    description: 'System want type for defining custom execution targets and goal
-      states.
-
-      Allows defining arbitrary targets that wants should reach or satisfy
-
-      during execution.
-
-
-      Enables flexible goal definition independent of specific want types,
-
-      supporting general-purpose want behavior configuration and custom
-
-      execution criteria.
-
-      '
+    metadata:
+      name: custom_target
+      title: Custom Target
+      description: |
+        Custom Target want type for executing external tools or scripts.
+  
     version: '1.0'
     category: system
     pattern: independent

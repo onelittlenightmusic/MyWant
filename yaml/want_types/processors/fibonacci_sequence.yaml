@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: fibonacci sequence
-    title: Fibonacci Number Sequence Filter
+    title: fibonacci sequence
     description: 'Processor that filters Fibonacci numbers based on value range constraints.
 
       Accepts a stream of Fibonacci numbers and outputs only those that fall

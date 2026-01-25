@@ -1,9 +1,9 @@
 wantType:
   metadata:
     name: buffet
-    title: Breakfast Buffet Reservation
-    description: 'Breakfast buffet reservation want type for travel planning. Schedules
-      buffet
+    title: Buffet Reservation
+    description: |
+
 
       experiences with configurable types (continental, full, asian, vegetarian).
 

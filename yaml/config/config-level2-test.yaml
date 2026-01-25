@@ -1,0 +1,13 @@
+wants:
+  # Level 2 Approval Target - direct deployment to test child want creation
+  - metadata:
+      name: level2_approval_test
+      type: "level 2 approval"  # Matches custom_type in approval-level-2.yaml
+      labels:
+        role: approval-target
+        approval_level: "2"
+    spec:
+      params:
+        approval_id: "test-approval-002"
+        coordinator_type: "level2"
+        level2_authority: "senior_manager"

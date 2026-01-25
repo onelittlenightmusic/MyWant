@@ -2,7 +2,7 @@ wantType:
   metadata:
     name: restaurant
     title: Restaurant Reservation
-    description: Finds and books a restaurant reservation based on type and preferences
+    description: |
     version: '1.0'
     category: travel
     pattern: independent

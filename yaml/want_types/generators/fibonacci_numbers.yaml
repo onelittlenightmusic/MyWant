@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: fibonacci numbers
-    title: Fibonacci Number Generator
+    title: fibonacci numbers
     description: 'Generator that produces Fibonacci sequence numbers. Generates a
       configurable
 

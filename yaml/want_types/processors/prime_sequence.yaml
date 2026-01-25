@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: prime sequence
-    title: Prime Sequence Sieve
+    title: prime sequence
     description: 'Processor that filters numbers to identify primes using the Sieve
       of
 

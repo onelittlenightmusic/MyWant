@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: queue
-    title: Queue Processor
+    title: Queue
     description: FIFO queue with configurable service time for processing items
     version: '1.0'
     category: queue

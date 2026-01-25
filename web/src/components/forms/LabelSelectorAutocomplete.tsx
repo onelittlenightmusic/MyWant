@@ -38,6 +38,10 @@ export const LabelSelectorAutocomplete = React.forwardRef<CommitInputHandle, Lab
       valueInputRef.current?.commit();
     },
     getValue: () => keyInputRef.current?.getValue() || '',
+    getValues: () => ({
+      key: keyInputRef.current?.getValue() || '',
+      value: valueInputRef.current?.getValue() || ''
+    }),
     focus: () => {
       keyInputRef.current?.focus();
     }

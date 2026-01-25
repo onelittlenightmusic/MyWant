@@ -1,10 +1,14 @@
 wantType:
   metadata:
     name: silencer
-    title: Reaction Silencer
-    description: Automatically processes received reaction requests based on policy
+    title: silencer
+    description: |
+      Automatically processes reaction requests (approvals/denials) based on a policy.
+      Typically used with Reminder wants to provide auto-approval capabilities
+      when certain conditions are met, allowing for agentic automation of
+      human-in-the-loop tasks.
     version: '1.0'
-    category: system
+    category: processor
     pattern: processor
   parameters:
   - name: policy

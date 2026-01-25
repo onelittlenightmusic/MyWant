@@ -20,6 +20,7 @@ interface WantStore {
   draggingWant: string | null;
   draggingTemplate: DraggingTemplate | null;
   isOverTarget: boolean;
+  highlightedLabel: { key: string; value: string } | null;
 
   // Actions
   fetchWants: () => Promise<void>;
@@ -43,6 +44,7 @@ interface WantStore {
   setDraggingWant: (wantId: string | null) => void;
   setDraggingTemplate: (template: DraggingTemplate | null) => void;
   setIsOverTarget: (isOver: boolean) => void;
+  setHighlightedLabel: (label: { key: string; value: string } | null) => void;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -57,11 +59,21 @@ export const useWantStore = create<WantStore>()(
     draggingWant: null,
     draggingTemplate: null,
     isOverTarget: false,
+    highlightedLabel: null,
 
     // Actions
     setDraggingWant: (wantId: string | null) => set({ draggingWant: wantId }),
     setDraggingTemplate: (template: DraggingTemplate | null) => set({ draggingTemplate: template }),
     setIsOverTarget: (isOver: boolean) => set({ isOverTarget: isOver }),
+    setHighlightedLabel: (label: { key: string; value: string } | null) => {
+      set({ highlightedLabel: label });
+      // Automatically clear after a short delay so the animation can be re-triggered
+      if (label) {
+        setTimeout(() => {
+          set({ highlightedLabel: null });
+        }, 2000);
+      }
+    },
 
     fetchWants: async () => {
       set({ loading: true, error: null });
