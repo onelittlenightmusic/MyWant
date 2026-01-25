@@ -1,4 +1,5 @@
 capabilities:
   - name: reaction_auto_approval
     gives:
+      -
       - reaction_auto_approval

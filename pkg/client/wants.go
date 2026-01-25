@@ -16,9 +16,13 @@ func (c *Client) ListWants() (*APIDumpResponse, error) {
 }
 
 // GetWant retrieves a specific want by ID
-func (c *Client) GetWant(id string) (*Want, error) {
+func (c *Client) GetWant(id string, connectivityMetadata bool) (*Want, error) {
 	var result Want
-	err := c.Request("GET", fmt.Sprintf("/api/v1/wants/%s", id), nil, &result)
+	path := fmt.Sprintf("/api/v1/wants/%s", id)
+	if connectivityMetadata {
+		path += "?connectivityMetadata=true"
+	}
+	err := c.Request("GET", path, nil, &result)
 	if err != nil {
 		return nil, err
 	}

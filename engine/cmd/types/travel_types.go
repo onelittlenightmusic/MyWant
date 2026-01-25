@@ -989,8 +989,7 @@ func (f *FlightWant) Progress() {
 
 	out, connectionAvailable := f.GetFirstOutputChannel()
 	if !connectionAvailable {
-		f.StoreLog("[DEBUG-EXEC] NO OUTPUT CHANNELS AVAILABLE - Returning complete")
-		return
+		// No output channel is acceptable for standalone or sink wants
 	}
 
 	phaseVal, _ := f.GetState("_flight_phase")
@@ -1030,8 +1029,12 @@ func (f *FlightWant) Progress() {
 			agentSchedule := f.extractFlightSchedule(agentResult)
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
-				f.sendFlightPacket(out, agentSchedule, "Initial")
-				f.StoreLog("Initial flight packet sent to coordinator")
+				if connectionAvailable {
+					f.sendFlightPacket(out, agentSchedule, "Initial")
+					f.StoreLog("Initial flight packet sent to coordinator")
+				} else {
+					f.StoreLog("No output channel available, skipping packet send")
+				}
 
 				// Transition to monitoring phase
 				locals.monitoringStartTime = time.Now()
@@ -1419,29 +1422,33 @@ func RegisterTravelWantTypes(builder *ChainBuilder) {
 func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
 	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewFlightWant(metadata, spec)
-		fw := result.(*FlightWant)
-		fw.SetAgentRegistry(agentRegistry)
+		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
+			wantObj.SetAgentRegistry(agentRegistry)
+		}
 		return result
 	})
 
 	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewRestaurantWant(metadata, spec)
-		rw := result.(*RestaurantWant)
-		rw.SetAgentRegistry(agentRegistry)
+		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
+			wantObj.SetAgentRegistry(agentRegistry)
+		}
 		return result
 	})
 
 	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewHotelWant(metadata, spec)
-		hw := result.(*HotelWant)
-		hw.SetAgentRegistry(agentRegistry)
+		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
+			wantObj.SetAgentRegistry(agentRegistry)
+		}
 		return result
 	})
 
 	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) Progressable {
 		result := NewBuffetWant(metadata, spec)
-		bw := result.(*BuffetWant)
-		bw.SetAgentRegistry(agentRegistry)
+		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
+			wantObj.SetAgentRegistry(agentRegistry)
+		}
 		return result
 	})
 }

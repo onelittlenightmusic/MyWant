@@ -2,8 +2,11 @@ package types
 
 import (
 	"fmt"
-	. "mywant/engine/src"
+	"log"
 	"time"
+
+	. "mywant/engine/src"
+	mywant "mywant/engine/src"
 )
 
 // MockServerPhase constants
@@ -38,7 +41,7 @@ func NewFlightMockServerWant(want *Want) *FlightMockServerWant {
 
 // Initialize prepares the mock server want for execution
 func (m *FlightMockServerWant) Initialize() {
-	fmt.Printf("[MOCK_SERVER] Initialize() called for %s\n", m.Metadata.Name)
+	log.Printf("[MOCK_SERVER] Initialize() called for %s\n", m.Metadata.Name)
 	m.StoreLog("[MOCK_SERVER] Initializing flight mock server: %s", m.Metadata.Name)
 
 	// Initialize locals
@@ -248,14 +251,10 @@ func (m *FlightMockServerWant) updateLocals(locals *MockServerLocals) {
 	m.Locals = locals
 }
 
-// RegisterFlightMockServerWantType registers the FlightMockServerWant type with the ChainBuilder
-func RegisterFlightMockServerWantType(builder *ChainBuilder) {
-	if builder == nil {
-		fmt.Println("[ERROR] ChainBuilder is nil when registering flight_mock_server")
-		return
-	}
-	fmt.Println("[INFO] Registering flight_mock_server want type")
-	builder.RegisterWantType("flight_mock_server", func(metadata Metadata, spec WantSpec) Progressable {
+// RegisterFlightMockServerWantType registers the flight mock server want type
+func RegisterFlightMockServerWantType(builder *mywant.ChainBuilder) {
+	log.Println("[INFO] Registering flight_mock_server want type")
+	builder.RegisterWantType("flight_mock_server", func(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
 		want := &Want{
 			Metadata: metadata,
 			Spec:     spec,
@@ -263,5 +262,5 @@ func RegisterFlightMockServerWantType(builder *ChainBuilder) {
 		want.Init() // Critical: Register for events
 		return NewFlightMockServerWant(want)
 	})
-	fmt.Println("[INFO] Successfully registered flight_mock_server want type")
+	log.Println("[INFO] Successfully registered flight_mock_server want type")
 }

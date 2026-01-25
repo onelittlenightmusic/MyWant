@@ -17,11 +17,22 @@ type Config struct {
 
 // Want represents a single want definition
 type Want struct {
-	Metadata  Metadata       `json:"metadata"`
-	Spec      WantSpec       `json:"spec"`
-	Status    string         `json:"status,omitempty"`
-	State     map[string]any `json:"state,omitempty"`
-	HiddenState map[string]any `json:"hidden_state,omitempty"`
+	Metadata             Metadata              `json:"metadata"`
+	Spec                 WantSpec              `json:"spec"`
+	Status               string                `json:"status,omitempty"`
+	State                map[string]any        `json:"state,omitempty"`
+	HiddenState          map[string]any        `json:"hidden_state,omitempty"`
+	ConnectivityMetadata *ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
+}
+
+// ConnectivityMetadata defines want connectivity requirements and constraints
+type ConnectivityMetadata struct {
+	RequiredInputs  int    `json:"required_inputs"`
+	RequiredOutputs int    `json:"required_outputs"`
+	MaxInputs       int    `json:"max_inputs"`
+	MaxOutputs      int    `json:"max_outputs"`
+	WantType        string `json:"want_type"`
+	Description     string `json:"description"`
 }
 
 // Metadata represents want metadata

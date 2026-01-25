@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -140,7 +141,7 @@ func (n *Want) executeAgent(agent Agent) error {
 			}
 
 			if r := recover(); r != nil {
-				fmt.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
+				log.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
 				// Update agent execution record with panic info
 				for i := range n.History.AgentHistory {
 					if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
@@ -159,7 +160,7 @@ func (n *Want) executeAgent(agent Agent) error {
 
 		shouldStop, err := agent.Exec(ctx, n)
 		if err != nil {
-			fmt.Printf("Agent %s failed: %v\n", agent.GetName(), err)
+			log.Printf("Agent %s failed: %v\n", agent.GetName(), err)
 			// Update agent execution record with error
 			for i := range n.History.AgentHistory {
 				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
@@ -203,7 +204,7 @@ func (n *Want) StopAllAgents() {
 	}
 
 	for agentName, cancel := range n.runningAgents {
-		fmt.Printf("Stopping agent: %s\n", agentName)
+		log.Printf("Stopping agent: %s\n", agentName)
 		cancel()
 
 		// Update agent execution records
@@ -230,7 +231,7 @@ func (n *Want) StopAgent(agentName string) {
 	}
 
 	if cancel, exists := n.runningAgents[agentName]; exists {
-		fmt.Printf("Stopping agent: %s\n", agentName)
+		log.Printf("Stopping agent: %s\n", agentName)
 		cancel()
 		delete(n.runningAgents, agentName)
 
@@ -328,7 +329,7 @@ func (n *Want) CommitStateChanges() {
 	n.History.StateHistory = append(n.History.StateHistory, historyEntry)
 	n.stateMutex.Unlock()
 
-	fmt.Printf("💾 Committed %d state changes for want %s in single batch\n",
+	log.Printf("💾 Committed %d state changes for want %s in single batch\n",
 		changeCount, n.Metadata.Name)
 }
 func (n *Want) GetStagedChanges() map[string]any {

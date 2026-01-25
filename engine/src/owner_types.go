@@ -107,7 +107,7 @@ func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
 
 // OnEvent handles the OwnerCompletionEvent
 func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event WantEvent) EventResponse {
-	fmt.Printf("[DEBUG OnEvent] Handler called for target %s\n", tcs.target.Metadata.Name)
+	log.Printf("[DEBUG OnEvent] Handler called for target %s\n", tcs.target.Metadata.Name)
 	completionEvent, ok := event.(*OwnerCompletionEvent)
 	if !ok {
 		return EventResponse{
@@ -420,7 +420,7 @@ func (t *Target) Progress() {
 	}
 
 	// Phase 1: Create child wants (only once)
-	t.StoreLog("[TARGET] 🔍 Progress Phase 1 check: childrenCreated=%v, builder!=nil=%v, recipeLoader!=nil=%v\n", t.childrenCreated, t.builder != nil, t.recipeLoader != nil)
+	// t.StoreLog("[TARGET] 🔍 Progress Phase 1 check: childrenCreated=%v, builder!=nil=%v, recipeLoader!=nil=%v\n", t.childrenCreated, t.builder != nil, t.recipeLoader != nil)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
@@ -448,7 +448,7 @@ func (t *Target) Progress() {
 		// Calculate achieving_percentage based on achieved children count (outside of lock)
 		if len(t.childWants) > 0 {
 			achievedCount := 0
-			t.StoreLog("[TARGET] 🔍 Progress check - Child completion status:\n")
+			// t.StoreLog("[TARGET] 🔍 Progress check - Child completion status:\n")
 			for _, child := range t.childWants {
 				// Check both snapshot AND actual child Status
 				// This handles cases where events might have been missed
@@ -462,10 +462,10 @@ func (t *Target) Progress() {
 						t.childCompletionMutex.Unlock()
 					}
 				}
-				t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
+				// t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
 			}
 			achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
-			t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %.2f%%\n", achievedCount, len(t.childWants), achievingPercentage)
+			// t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %.2f%%\n", achievedCount, len(t.childWants), achievingPercentage)
 			t.StoreState("achieving_percentage", achievingPercentage)
 		} else {
 			// No children - target is immediately complete at 100%

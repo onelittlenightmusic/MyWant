@@ -292,15 +292,15 @@ restart-all:
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
 	@echo ""
-	@echo "🏗️  Building want-cli with embedded GUI..."
-	@$(MAKE) release
+	@$(MAKE) build-server
+	@echo ""
+	@$(MAKE) build-cli
 	@echo ""
 	@mkdir -p logs
-	@echo "🏗️  Building mock flight server..."
 	@$(MAKE) build-mock
 	@echo ""
 	@echo "🚀 Starting MyWant server via want-cli..."
-	@./want-cli start -D --port 8080
+	@nohup ./want-cli start -D --port 8080 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
 	@echo ""

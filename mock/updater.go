@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -61,7 +61,7 @@ func (u *StatusUpdater) ScheduleUpdates(reservationID string) {
 	// Only schedule status transitions for the base flight AA100
 	// Skip transitions for rebooked flights (AA100A, AA100B, AA100C, etc.)
 	if reservation.FlightNumber != "AA100" {
-		fmt.Printf("[StatusUpdater] Flight %s (%s): Skipping status transitions (not base flight AA100)\n", reservationID, reservation.FlightNumber)
+		log.Printf("[StatusUpdater] Flight %s (%s): Skipping status transitions (not base flight AA100)\n", reservationID, reservation.FlightNumber)
 		u.timers[reservationID] = []*time.Timer{}
 		return
 	}
@@ -78,7 +78,7 @@ func (u *StatusUpdater) ScheduleUpdates(reservationID string) {
 
 	// Store timers for this reservation
 	u.timers[reservationID] = []*time.Timer{timer1, timer2}
-	fmt.Printf("[StatusUpdater] Flight %s (AA100): Scheduled status transitions (details_changed@20s, delayed@40s)\n", reservationID)
+	log.Printf("[StatusUpdater] Flight %s (AA100): Scheduled status transitions (details_changed@20s, delayed@40s)\n", reservationID)
 }
 
 // CancelUpdates cancels all scheduled updates for a reservation
@@ -107,7 +107,7 @@ func (u *StatusUpdater) updateToDetailsChanged(reservationID string) {
 	reservation.UpdatedAt = time.Now()
 
 	u.store.Update(reservation)
-	fmt.Printf("[StatusUpdater] Flight %s: Status changed to DETAILS_CHANGED\n", reservationID)
+	log.Printf("[StatusUpdater] Flight %s: Status changed to DETAILS_CHANGED\n", reservationID)
 }
 
 // updateToDelayed updates flight status to delayed
@@ -125,7 +125,7 @@ func (u *StatusUpdater) updateToDelayed(reservationID string) {
 	reservation.UpdatedAt = time.Now()
 
 	u.store.Update(reservation)
-	fmt.Printf("[StatusUpdater] Flight %s: Status changed to DELAYED_ONE_DAY\n", reservationID)
+	log.Printf("[StatusUpdater] Flight %s: Status changed to DELAYED_ONE_DAY\n", reservationID)
 
 	// Clean up timers for this reservation
 	u.mu.Lock()

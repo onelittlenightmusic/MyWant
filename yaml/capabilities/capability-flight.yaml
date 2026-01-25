@@ -1,8 +1,10 @@
 capabilities:
   - name: flight_agency
     gives:
+      -
       - flight_booking
   - name: flight_api_agency
     gives:
+      -
       - create_flight
       - cancel_flight

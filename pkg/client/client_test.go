@@ -45,6 +45,22 @@ func TestGetWant(t *testing.T) {
 		assert.Equal(t, "/api/v1/wants/test-id", r.URL.Path)
 		assert.Equal(t, "GET", r.Method)
 
+		if r.URL.Query().Get("connectivityMetadata") == "true" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintln(w, `{
+				"metadata": {"id": "test-id", "name": "test-want", "type": "target"},
+				"spec": {"params": {"count": 10}},
+				"status": "active",
+				"connectivity_metadata": {
+					"required_inputs": 1,
+					"required_outputs": 1,
+					"want_type": "target",
+					"description": "Test target"
+				}
+			}`)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, `{
 			"metadata": {"id": "test-id", "name": "test-want", "type": "target"},
@@ -55,11 +71,19 @@ func TestGetWant(t *testing.T) {
 	defer ts.Close()
 
 	c := NewClient(ts.URL)
-	want, err := c.GetWant("test-id")
 
+	// Test without connectivity metadata
+	want, err := c.GetWant("test-id", false)
 	assert.NoError(t, err)
 	assert.Equal(t, "test-id", want.Metadata.ID)
 	assert.Equal(t, float64(10), want.Spec.Params["count"])
+	assert.Nil(t, want.ConnectivityMetadata)
+
+	// Test with connectivity metadata
+	want, err = c.GetWant("test-id", true)
+	assert.NoError(t, err)
+	assert.NotNil(t, want.ConnectivityMetadata)
+	assert.Equal(t, 1, want.ConnectivityMetadata.RequiredInputs)
 }
 
 func TestCreateWant(t *testing.T) {

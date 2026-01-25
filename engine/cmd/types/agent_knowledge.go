@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -170,5 +171,5 @@ func RegisterKnowledgeAgents(registry *mywant.AgentRegistry) {
 	agent := NewKnowledgeAgent()
 	registry.RegisterAgent(agent)
 
-	fmt.Printf("[AGENT] KnowledgeAgent registered\n")
+	log.Printf("[AGENT] KnowledgeAgent registered\n")
 }

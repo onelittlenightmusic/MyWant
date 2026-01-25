@@ -2,7 +2,6 @@ package mywant
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -237,7 +236,7 @@ func (uss *UnifiedSubscriptionSystem) Unsubscribe(eventType EventType, subscribe
 		if sub.GetSubscriberName() == subscriberName {
 			uss.subscriptions[eventType] = append(subs[:i], subs[i+1:]...)
 			if uss.enableLogging {
-				fmt.Printf("[SUBSCRIPTION] %s unsubscribed from %s events\n",
+				log.Printf("[SUBSCRIPTION] %s unsubscribed from %s events\n",
 					subscriberName, eventType)
 			}
 			return
@@ -291,7 +290,7 @@ func (uss *UnifiedSubscriptionSystem) emitAsync(ctx context.Context, event WantE
 		go func(s EventSubscription) {
 			response := s.OnEvent(ctx, event)
 			if response.Error != nil && uss.enableLogging {
-				fmt.Printf("[SUBSCRIPTION ERROR] Async handler %s failed: %v\n",
+				log.Printf("[SUBSCRIPTION ERROR] Async handler %s failed: %v\n",
 					s.GetSubscriberName(), response.Error)
 			}
 		}(sub)
@@ -305,7 +304,7 @@ func (uss *UnifiedSubscriptionSystem) emitSync(ctx context.Context, event WantEv
 		response := sub.OnEvent(ctx, event)
 		responses = append(responses, response)
 		if response.Error != nil && uss.enableLogging {
-			fmt.Printf("[SUBSCRIPTION ERROR] Sync handler %s failed: %v\n",
+			log.Printf("[SUBSCRIPTION ERROR] Sync handler %s failed: %v\n",
 				sub.GetSubscriberName(), response.Error)
 		}
 	}
@@ -319,7 +318,7 @@ func (uss *UnifiedSubscriptionSystem) emitBlock(ctx context.Context, event WantE
 		response := sub.OnEvent(ctx, event)
 		responses = append(responses, response)
 		if response.Error != nil && uss.enableLogging {
-			fmt.Printf("[SUBSCRIPTION ERROR] Block handler %s failed: %v\n",
+			log.Printf("[SUBSCRIPTION ERROR] Block handler %s failed: %v\n",
 				sub.GetSubscriberName(), response.Error)
 		}
 	}

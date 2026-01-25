@@ -162,6 +162,8 @@ wantType:
       spec:
         params:
           buffet_type: continental
+        requires:
+          - AgentBuffet
   - name: Full Breakfast with Premium Service
     description: Complete breakfast buffet with attended service and champagne
     expectedBehavior: '1. Buffet want creates premium breakfast reservation
@@ -183,6 +185,8 @@ wantType:
       spec:
         params:
           buffet_type: full
+        requires:
+          - AgentBuffet
   - name: Buffet with Conflict Resolution
     description: Breakfast buffet that resolves timing conflicts with hotel check-in
     expectedBehavior: '1. Buffet receives existing schedule with hotel check-out
@@ -204,6 +208,8 @@ wantType:
       spec:
         params:
           buffet_type: full
+        requires:
+          - AgentBuffet
   relatedTypes:
   - restaurant
   - hotel
@@ -213,10 +219,5 @@ wantType:
   - Travel Itinerary recipe documentation
   - Independent wants pattern for parallel execution
   - Travel coordinator for schedule integration
-  require:
-    type: providers
-    providers:
-    - name: existing_schedule
-      type: want
-      description: Optional existing travel schedule to check for conflicts
-      required: false
+  connect:
+    type: none

@@ -179,8 +179,9 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 	groupBy := r.URL.Query().Get("groupBy")
+	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 
-	log.Printf("[DEBUG] getWant: Looking for want ID: %s\n", wantID)
+	log.Printf("[DEBUG] getWant: Looking for want ID: %s (includeConnectivity=%v)\n", wantID, includeConnectivity)
 
 	// 1. Search in runtime wants across all executions
 	for i, execution := range s.wants {
@@ -188,13 +189,27 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				log.Printf("[DEBUG] getWant: Found %s in runtime of execution %s\n", wantID, i)
-				wantCopy := &mywant.Want{
-					Metadata:    want.Metadata,
-					Spec:        want.Spec,
-					Status:      want.GetStatus(),
-					History:     want.History,
-					State:       want.GetExplicitState(),
-					HiddenState: want.GetHiddenState(),
+
+				var wantCopy *mywant.Want
+				if includeConnectivity {
+					wantCopy = &mywant.Want{
+						Metadata:             want.Metadata,
+						Spec:                 want.Spec,
+						Status:               want.GetStatus(),
+						History:              want.History,
+						State:                want.GetExplicitState(),
+						HiddenState:          want.GetHiddenState(),
+						ConnectivityMetadata: want.ConnectivityMetadata,
+					}
+				} else {
+					wantCopy = &mywant.Want{
+						Metadata:    want.Metadata,
+						Spec:        want.Spec,
+						Status:      want.GetStatus(),
+						History:     want.History,
+						State:       want.GetExplicitState(),
+						HiddenState: want.GetHiddenState(),
+					}
 				}
 
 				if groupBy != "" {
@@ -227,13 +242,27 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			log.Printf("[DEBUG] getWant: Found %s in globalBuilder\n", wantID)
-			wantCopy := &mywant.Want{
-				Metadata:    want.Metadata,
-				Spec:        want.Spec,
-				Status:      want.GetStatus(),
-				History:     want.History,
-				State:       want.GetExplicitState(),
-				HiddenState: want.GetHiddenState(),
+
+			var wantCopy *mywant.Want
+			if includeConnectivity {
+				wantCopy = &mywant.Want{
+					Metadata:             want.Metadata,
+					Spec:                 want.Spec,
+					Status:               want.GetStatus(),
+					History:              want.History,
+					State:                want.GetExplicitState(),
+					HiddenState:          want.GetHiddenState(),
+					ConnectivityMetadata: want.ConnectivityMetadata,
+				}
+			} else {
+				wantCopy = &mywant.Want{
+					Metadata:    want.Metadata,
+					Spec:        want.Spec,
+					Status:      want.GetStatus(),
+					History:     want.History,
+					State:       want.GetExplicitState(),
+					HiddenState: want.GetHiddenState(),
+				}
 			}
 
 			if groupBy != "" {

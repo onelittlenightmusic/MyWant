@@ -159,6 +159,8 @@ wantType:
       spec:
         params:
           hotel_type: standard
+        requires:
+          - AgentHotel
   - name: Luxury Hotel with Premium Service
     description: High-end hotel booking with concierge service
     expectedBehavior: '1. Hotel want creates premium reservation
@@ -180,6 +182,8 @@ wantType:
       spec:
         params:
           hotel_type: luxury
+        requires:
+          - AgentHotel
   - name: Budget Hotel with Conflict Resolution
     description: Cost-effective booking that resolves timing conflicts
     expectedBehavior: '1. Hotel receives existing schedule from coordinator
@@ -201,6 +205,8 @@ wantType:
       spec:
         params:
           hotel_type: budget
+        requires:
+          - AgentHotel
   relatedTypes:
   - restaurant
   - buffet
@@ -210,10 +216,5 @@ wantType:
   - Travel Itinerary recipe documentation
   - Travel coordinator pattern for independent wants
   - Agent system documentation for hotel booking
-  require:
-    type: providers
-    providers:
-    - name: existing_schedule
-      type: want
-      description: Optional existing travel schedule to check for conflicts
-      required: false
+  connect:
+    type: none

@@ -156,7 +156,7 @@ func (s *Server) Start() error {
 	types.RegisterQNetWantTypes(s.globalBuilder)
 	types.RegisterFibonacciWantTypes(s.globalBuilder)
 	types.RegisterPrimeWantTypes(s.globalBuilder)
-	types.RegisterTravelWantTypes(s.globalBuilder)
+	types.RegisterTravelWantTypesWithAgents(s.globalBuilder, s.agentRegistry)
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	types.RegisterExecutionResultWantType(s.globalBuilder)
 	types.RegisterReminderWantType(s.globalBuilder)

@@ -91,12 +91,12 @@ type Consumer struct {
 // Topic represents a single topic with its cache and consumers.
 type Topic struct {
 	Name        string
-	Cache       []*Message              // FIFO message cache (bounded)
-	Consumers   map[string]*Consumer    // Consumer ID -> Consumer
-	Sequence    int64                   // Next sequence number to assign
-	Mutex       sync.RWMutex            // Protects Cache, Consumers, Sequence
-	CacheSize   int                     // Maximum cache size (default 10)
-	ConsumerBuf int                     // Output channel buffer size (default 30)
+	Cache       []*Message           // FIFO message cache (bounded)
+	Consumers   map[string]*Consumer // Consumer ID -> Consumer
+	Sequence    int64                // Next sequence number to assign
+	Mutex       sync.RWMutex         // Protects Cache, Consumers, Sequence
+	CacheSize   int                  // Maximum cache size (default 10)
+	ConsumerBuf int                  // Output channel buffer size (default 30)
 }
 
 // SubscriptionImpl implements the Subscription interface.

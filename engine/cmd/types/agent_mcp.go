@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -32,14 +33,14 @@ var (
 
 // NewGooseManager creates a GooseManager instance (mostly a no-op for per-request model)
 func NewGooseManager(ctx context.Context) (*GooseManager, error) {
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Initializing Goose manager (per-request mode with Gmail MCP)...\n")
+	log.Printf("[GOOSE-MANAGER] Initializing Goose manager (per-request mode with Gmail MCP)...\n")
 
 	manager := &GooseManager{
 		running: true,
 	}
 
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Goose manager ready for per-request execution\n")
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Gmail MCP extension will be loaded from ~/.config/goose/config.yaml\n")
+	log.Printf("[GOOSE-MANAGER] Goose manager ready for per-request execution\n")
+	log.Printf("[GOOSE-MANAGER] Gmail MCP extension will be loaded from ~/.config/goose/config.yaml\n")
 	return manager, nil
 }
 
@@ -56,7 +57,7 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 	// Build natural language prompt for Goose
 	prompt := g.buildPrompt(operation, params)
 
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Starting per-request Goose process for: %s\n", operation)
+	log.Printf("[GOOSE-MANAGER] Starting per-request Goose process for: %s\n", operation)
 
 	// Determine preferred provider
 	preferredProvider := ""
@@ -70,7 +71,7 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 	args := []string{"run", "-i", "-"}
 	if preferredProvider != "" {
 		args = append(args, "--provider", preferredProvider)
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Using preferred provider: %s\n", preferredProvider)
+		log.Printf("[GOOSE-MANAGER] Using preferred provider: %s\n", preferredProvider)
 	}
 
 	// Try the first attempt
@@ -79,7 +80,7 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 	var err error
 	fullOutput, err = g.runGooseWithArgs(args, prompt)
 	duration := time.Since(startTime)
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt took %v\n", duration)
+	log.Printf("[GOOSE-MANAGER] Primary attempt took %v\n", duration)
 
 	// Check if attempt failed
 	failed := err != nil || strings.Contains(fullOutput, "Ran into this error") || strings.Contains(fullOutput, "Request failed")
@@ -91,23 +92,23 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 			fallbackProvider = "claude-code"
 		}
 
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Primary attempt failed (provider: %s, err: %v), trying fallback to %s...\n",
+		log.Printf("[GOOSE-MANAGER] Primary attempt failed (provider: %s, err: %v), trying fallback to %s...\n",
 			preferredProvider, err, fallbackProvider)
 
 		fallbackStartTime := time.Now()
 		fallbackArgs := []string{"run", "-i", "-", "--provider", fallbackProvider}
 		fallbackOutput, fallbackErr := g.runGooseWithArgs(fallbackArgs, prompt)
 		fallbackDuration := time.Since(fallbackStartTime)
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback attempt took %v\n", fallbackDuration)
+		log.Printf("[GOOSE-MANAGER] Fallback attempt took %v\n", fallbackDuration)
 
 		fallbackFailed := fallbackErr != nil || strings.Contains(fallbackOutput, "Ran into this error") || strings.Contains(fallbackOutput, "Request failed")
 
 		if !fallbackFailed {
 			fullOutput = fallbackOutput
 			err = nil
-			fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback to %s succeeded!\n", fallbackProvider)
+			log.Printf("[GOOSE-MANAGER] Fallback to %s succeeded!\n", fallbackProvider)
 		} else {
-			fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Fallback to %s also failed: %v\n", fallbackProvider, fallbackErr)
+			log.Printf("[GOOSE-MANAGER] Fallback to %s also failed: %v\n", fallbackProvider, fallbackErr)
 			// If both failed, return the error from the primary attempt if it exists, or a general error
 			if err == nil {
 				err = fmt.Errorf("both primary and fallback providers failed to generate a response")
@@ -447,9 +448,9 @@ func (g *GooseManager) buildRecommendationPrompt(message string, conversationHis
 // parseGooseResponse extracts and processes Goose JSON output
 func parseGooseResponse(output string) (interface{}, error) {
 	// Debug: log raw input
-	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Raw input (%d chars, %d lines)\n", len(output), strings.Count(output, "\n")+1)
-	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] First 500 chars: %s\n", output[:minInt(len(output), 500)])
-	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Last 500 chars: %s\n", output[maxInt(0, len(output)-500):])
+	log.Printf("[GOOSE-PARSER] Raw input (%d chars, %d lines)\n", len(output), strings.Count(output, "\n")+1)
+	log.Printf("[GOOSE-PARSER] First 500 chars: %s\n", output[:minInt(len(output), 500)])
+	log.Printf("[GOOSE-PARSER] Last 500 chars: %s\n", output[maxInt(0, len(output)-500):])
 
 	// Remove Goose session information lines
 	lines := strings.Split(output, "\n")
@@ -508,7 +509,7 @@ func parseGooseResponse(output string) (interface{}, error) {
 	jsonStr := output[startIdx : endIdx+1]
 
 	// Debug: log the extracted JSON string
-	fmt.Fprintf(os.Stderr, "[GOOSE-PARSER] Extracted JSON (%d chars):\n%s\n", len(jsonStr), jsonStr[:minInt(len(jsonStr), 500)])
+	log.Printf("[GOOSE-PARSER] Extracted JSON (%d chars):\n%s\n", len(jsonStr), jsonStr[:minInt(len(jsonStr), 500)])
 
 	// First, try to parse as Goose conversation format (with "messages" key)
 	var gooseFormat map[string]interface{}
@@ -645,7 +646,7 @@ func (g *GooseManager) Close() error {
 	defer g.mu.Unlock()
 
 	g.running = false
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] GooseManager closed (no persistent process)\n")
+	log.Printf("[GOOSE-MANAGER] GooseManager closed (no persistent process)\n")
 	return nil
 }
 
@@ -658,12 +659,12 @@ func GetGooseManager(ctx context.Context) (*GooseManager, error) {
 
 	// Check if we already have a running manager
 	if gooseManager != nil && gooseManager.running {
-		fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Reusing existing GooseManager\n")
+		log.Printf("[GOOSE-MANAGER] Reusing existing GooseManager\n")
 		return gooseManager, nil
 	}
 
 	// Create a new GooseManager instance
-	fmt.Fprintf(os.Stderr, "[GOOSE-MANAGER] Creating new GooseManager\n")
+	log.Printf("[GOOSE-MANAGER] Creating new GooseManager\n")
 	manager, err := NewGooseManager(ctx)
 	if err != nil {
 		return nil, err
@@ -850,7 +851,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 // RegisterMCPAgent registers the MCP agent with the agent registry
 func RegisterMCPAgent(registry *mywant.AgentRegistry) {
 	if registry == nil {
-		fmt.Println("Warning: No agent registry found, skipping MCPAgent registration")
+		log.Println("Warning: No agent registry found, skipping MCPAgent registration")
 		return
 	}
 
@@ -865,6 +866,5 @@ func RegisterMCPAgent(registry *mywant.AgentRegistry) {
 	agent := NewMCPAgent()
 	registry.RegisterAgent(agent)
 
-	fmt.Fprintf(os.Stderr, "[AGENT] MCPAgent registered with capabilities: mcp_gmail\n")
-	fmt.Println("[AGENT] MCPAgent registered with capabilities: mcp_gmail")
+	log.Printf("[AGENT] MCPAgent registered with capabilities: mcp_gmail\n")
 }

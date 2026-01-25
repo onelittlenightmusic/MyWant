@@ -2,11 +2,13 @@ package mywant
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 // WantTypeDefinition represents a complete want type definition
@@ -15,8 +17,9 @@ type WantTypeDefinition struct {
 	Parameters   []ParameterDef   `json:"parameters" yaml:"parameters"`
 	State        []StateDef       `json:"state" yaml:"state"`
 	Connectivity ConnectivityDef  `json:"connectivity" yaml:"connectivity"`
-	Require      *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`       // Structured connectivity requirement
-	UsageLimit   *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use require instead
+	Connect      *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`       // New connectivity requirement field
+	Require      *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`       // Structured connectivity requirement (deprecated)
+	UsageLimit   *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use connect instead
 	Agents       []AgentDef       `json:"agents" yaml:"agents"`
 	Constraints  []ConstraintDef  `json:"constraints" yaml:"constraints"`
 	Examples     []ExampleDef     `json:"examples" yaml:"examples"`
@@ -191,7 +194,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 	if len(loadErrors) > 0 {
 		// Log errors but don't fail if at least some files loaded
 		for _, err := range loadErrors {
-			fmt.Printf("Warning: %v\n", err)
+			log.Printf("Warning: %v\n", err)
 		}
 	}
 

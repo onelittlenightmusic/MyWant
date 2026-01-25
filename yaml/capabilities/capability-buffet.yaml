@@ -1,4 +1,5 @@
 capabilities:
   - name: buffet_agency
     gives:
+      -
       - buffet_reservation

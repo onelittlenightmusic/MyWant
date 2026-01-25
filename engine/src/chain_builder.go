@@ -35,8 +35,7 @@ const (
 	GlobalExecutionInterval = 10 * time.Millisecond
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
-	GlobalReconcileInterval = 50 * time.Millisecond
-
+	GlobalReconcileInterval = 100 * time.Millisecond
 	// GlobalStatsInterval defines the frequency of stats writing to memory file (YAML serialization and file I/O)
 	GlobalStatsInterval = 1 * time.Second
 )
@@ -246,8 +245,11 @@ func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFa
 		cb.connectivityRegistry = make(map[string]ConnectivityMetadata)
 	}
 
-	// Use require field if available, otherwise fall back to usageLimit
-	if def.Require != nil {
+	// Use connect field if available, then require, otherwise fall back to usageLimit
+	if def.Connect != nil {
+		// Convert RequireSpec to ConnectivityMetadata
+		cb.connectivityRegistry[wantType] = def.Connect.ToConnectivityMetadata(wantType)
+	} else if def.Require != nil {
 		// Convert RequireSpec to ConnectivityMetadata
 		cb.connectivityRegistry[wantType] = def.Require.ToConnectivityMetadata(wantType)
 	} else if def.UsageLimit != nil {
@@ -279,9 +281,12 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		cb.connectivityRegistry = make(map[string]ConnectivityMetadata)
 	}
 
-	// Use require field if available, otherwise fall back to usageLimit
+	// Use connect field if available, then require, otherwise fall back to usageLimit
 	metadata := func() ConnectivityMetadata {
-		if def.Require != nil {
+		if def.Connect != nil {
+			// Convert RequireSpec to ConnectivityMetadata
+			return def.Connect.ToConnectivityMetadata(wantType)
+		} else if def.Require != nil {
 			// Convert RequireSpec to ConnectivityMetadata
 			return def.Require.ToConnectivityMetadata(wantType)
 		} else if def.UsageLimit != nil {
@@ -754,7 +759,7 @@ func (cb *ChainBuilder) reconcileLoop() {
 	// Initial configuration load
 	cb.reconcileWants()
 
-	// Use GlobalReconcileInterval (50ms) for config file change detection and reconciliation
+	// Use GlobalReconcileInterval (100ms) for config file change detection and reconciliation
 	// Use GlobalStatsInterval (1 second) for stats writing to reduce I/O overhead
 	ticker := time.NewTicker(GlobalReconcileInterval)
 	statsTicker := time.NewTicker(GlobalStatsInterval)
@@ -1828,9 +1833,27 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	}
 	wantPtr.InitializeSubscriptionSystem()
 
+	// Inject agent registry if available
+	if cb.agentRegistry != nil {
+		wantPtr.SetAgentRegistry(cb.agentRegistry)
+	}
+
 	// CRITICAL FIX: Load ConnectivityMetadata from registry
 	// This ensures require field from YAML is properly applied
-	if meta, exists := cb.connectivityRegistry[wantConfig.Metadata.Type]; exists {
+	// Special handling for custom target types: they manage their own children and should have no connectivity requirements
+	if cb.customRegistry != nil && cb.customRegistry.IsCustomType(wantConfig.Metadata.Type) {
+		// Custom target types (prime sieve, level 1 approval, etc.) don't need connectivity requirements
+		wantPtr.ConnectivityMetadata = ConnectivityMetadata{
+			RequiredInputs:  0,
+			MaxInputs:       -1,
+			RequiredOutputs: 0,
+			MaxOutputs:      -1,
+			WantType:        wantConfig.Metadata.Type,
+			Description:     "Custom target (manages child wants)",
+		}
+		log.Printf("[ADD-WANT] Want '%s' (type: %s): Custom target - ConnectivityMetadata RequiredInputs=0, RequiredOutputs=0",
+			wantConfig.Metadata.Name, wantConfig.Metadata.Type)
+	} else if meta, exists := cb.connectivityRegistry[wantConfig.Metadata.Type]; exists {
 		wantPtr.ConnectivityMetadata = meta
 		log.Printf("[ADD-WANT] Want '%s' (type: %s): Applied ConnectivityMetadata RequiredInputs=%d, RequiredOutputs=%d",
 			wantConfig.Metadata.Name, wantConfig.Metadata.Type, meta.RequiredInputs, meta.RequiredOutputs)

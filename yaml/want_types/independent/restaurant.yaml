@@ -235,5 +235,5 @@ wantType:
   - travel domain agents
   - AgentRestaurant implementation
   - MonitorRestaurant implementation
-  require:
+  connect:
     type: none

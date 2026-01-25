@@ -921,12 +921,36 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-	groupBy := r.URL.Query().Get("groupBy") // "name" or "type"
+	groupBy := r.URL.Query().Get("groupBy")                                    // "name" or "type"
+	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true" // Whether to include ConnectivityMetadata
 
 	// Search for the want by metadata.id across all executions using universal search
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
+				// Create response based on whether connectivity metadata is requested
+				if includeConnectivity {
+					// Include ConnectivityMetadata
+					wantCopy := &mywant.Want{
+						Metadata:             want.Metadata,
+						Spec:                 want.Spec,
+						Status:               want.GetStatus(),
+						History:              want.History,
+						State:                want.GetExplicitState(),
+						HiddenState:          want.GetHiddenState(),
+						ConnectivityMetadata: want.ConnectivityMetadata,
+					}
+					// If groupBy is specified, return response with grouped agent history
+					if groupBy != "" {
+						response := buildWantResponse(wantCopy, groupBy)
+						json.NewEncoder(w).Encode(response)
+						return
+					}
+					json.NewEncoder(w).Encode(wantCopy)
+					return
+				}
+
+				// Default response without ConnectivityMetadata
 				wantCopy := &mywant.Want{
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
@@ -951,6 +975,29 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	// If not found in executions, also search in global builder (for wants loaded from memory file)
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			// Create response based on whether connectivity metadata is requested
+			if includeConnectivity {
+				// Include ConnectivityMetadata
+				wantCopy := &mywant.Want{
+					Metadata:             want.Metadata,
+					Spec:                 want.Spec,
+					Status:               want.GetStatus(),
+					History:              want.History,
+					State:                want.GetExplicitState(),
+					HiddenState:          want.GetHiddenState(),
+					ConnectivityMetadata: want.ConnectivityMetadata,
+				}
+				// If groupBy is specified, return response with grouped agent history
+				if groupBy != "" {
+					response := buildWantResponse(wantCopy, groupBy)
+					json.NewEncoder(w).Encode(response)
+					return
+				}
+				json.NewEncoder(w).Encode(wantCopy)
+				return
+			}
+
+			// Default response without ConnectivityMetadata
 			wantCopy := &mywant.Want{
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
@@ -2080,8 +2127,8 @@ func (s *Server) Start() error {
 	// Register all want types on global builder before starting reconcile loop Note: Registration order no longer matters - OwnerAware wrapping happens automatically at creation time
 	types.RegisterQNetWantTypes(s.globalBuilder)
 	types.RegisterFibonacciWantTypes(s.globalBuilder)
+	types.RegisterTravelWantTypesWithAgents(s.globalBuilder, s.agentRegistry)
 	types.RegisterPrimeWantTypes(s.globalBuilder)
-	types.RegisterTravelWantTypes(s.globalBuilder)
 	types.RegisterApprovalWantTypes(s.globalBuilder)
 	types.RegisterExecutionResultWantType(s.globalBuilder)
 	types.RegisterReminderWantType(s.globalBuilder)

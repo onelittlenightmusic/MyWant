@@ -1,4 +1,5 @@
 capabilities:
   - name: hotel_agency
     gives:
+      -
       - hotel_reservation

@@ -64,7 +64,7 @@ func (bnw *BaseNotifiableWant) StopNotificationProcessing() {
 	close(bnw.NotificationBuffer)
 }
 func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification) {
-	fmt.Printf("[NOTIFICATION] %s received: %s.%s = %v (type: %s)\n",
+	DebugLog("[NOTIFICATION] %s received: %s.%s = %v (type: %s)\n",
 		bnw.Want.Metadata.Name, notification.SourceWantName,
 		notification.StateKey, notification.StateValue, notification.NotificationType)
 	notificationKey := fmt.Sprintf("last_notification_%s_%s", notification.SourceWantName, notification.StateKey)

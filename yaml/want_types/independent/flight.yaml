@@ -108,10 +108,10 @@ wantType:
     example: created
     initialValue: ''
   agents:
-  - name: AgentFlight
+  - name: agent_flight_api
     role: action
     description: Books flights and handles cancellations/modifications
-    example: AgentFlight communicates with flight API for bookings
+    example: agent_flight_api communicates with flight API for bookings
   constraints:
   - description: Flight type must be valid
     validation: flight_type in [economy, business, first]
@@ -119,92 +119,77 @@ wantType:
     validation: duration_hours > 0
   - description: Duration must be realistic
     validation: duration_hours <= 24
-  examples:
-  - name: Economy Flight
-    description: Book economy class flight
-    expectedBehavior: '1. Flight want books economy class
-
-      2. Schedules departure on specified date
-
-      3. Estimates 10 hour flight duration
-
-      4. Assigns flight number and times
-
-      5. Monitors for status changes
-
-      6. Can auto-rebook if delayed
-
-      '
-    want:
-      metadata:
-        name: economy-flight
-        type: flight
-        labels: {}
-      spec:
-        params:
-          flight_type: economy
-          duration_hours: 10.0
-          departure_date: '2024-12-25'
-  - name: Business Class Flight
-    description: Premium business class booking
-    expectedBehavior: '1. Flight want books business class
-
-      2. Applies premium amenities and services
-
-      3. Priority boarding included
-
-      4. Monitors actively for delays
-
-      5. Auto-rebook to next available if delayed
-
-      '
-    want:
-      metadata:
-        name: business-class-flight
-        type: flight
-        labels: {}
-      spec:
-        params:
-          flight_type: business
-          duration_hours: 8.5
-          departure_date: '2024-12-24'
-  - name: First Class Long Haul
-    description: First class international flight
-    expectedBehavior: '1. Flight want books first class
-
-      2. Premium seating and meals included
-
-      3. Dedicated concierge support
-
-      4. Monitors with shorter check intervals
-
-      5. Immediate rebooking on any delay
-
-      '
-    want:
-      metadata:
-        name: first-class-long-haul
-        type: flight
-        labels: {}
-      spec:
-        params:
-          flight_type: first
-          duration_hours: 15.0
-          departure_date: '2025-01-01'
-  relatedTypes:
-  - flight_alt
-  - hotel
-  - restaurant
-  - buffet
-  - travel_coordinator
-  seeAlso:
-  - Flight booking API integration
-  - Delay monitoring and auto-rebooking
-  - Travel coordinator flight integration
-  require:
-    type: providers
-    providers:
-    - name: existing_schedule
-      type: want
-      description: Optional existing travel schedule for conflict checking
-      required: false
+    examples:
+    - name: Economy Flight
+      description: Book economy class flight
+      expectedBehavior: '1. Flight want books economy class
+        2. Schedules departure on specified date
+        3. Estimates 10 hour flight duration
+        4. Assigns flight number and times
+        5. Monitors for status changes
+        6. Can auto-rebook if delayed
+        '
+      want:
+        metadata:
+          name: economy-flight
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: economy
+            duration_hours: 10.0
+            departure_date: '2024-12-25'
+          requires:
+            - agent_flight_api
+    - name: Business Class Flight
+      description: Premium business class booking
+      expectedBehavior: '1. Flight want books business class
+        2. Applies premium amenities and services
+        3. Priority boarding included
+        4. Monitors actively for delays
+        5. Auto-rebook to next available if delayed
+        '
+      want:
+        metadata:
+          name: business-class-flight
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: business
+            duration_hours: 8.5
+            departure_date: '2024-12-24'
+          requires:
+            - agent_flight_api
+    - name: First Class Long Haul
+      description: First class international flight
+      expectedBehavior: '1. Flight want books first class
+        2. Premium seating and meals included
+        3. Dedicated concierge support
+        4. Monitors with shorter check intervals
+        5. Immediate rebooking on any delay
+        '
+      want:
+        metadata:
+          name: first-class-long-haul
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: first
+            duration_hours: 15.0
+            departure_date: '2025-01-01'
+          requires:
+            - agent_flight_api
+    relatedTypes:
+    - flight_alt
+    - hotel
+    - restaurant
+    - buffet
+    - travel_coordinator
+    seeAlso:
+    - Flight booking API integration
+    - Delay monitoring and auto-rebooking
+    - Travel coordinator flight integration
+    connect:
+      type: none

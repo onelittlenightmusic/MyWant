@@ -144,14 +144,10 @@ wantType:
   - Sieve of Eratosthenes algorithm
   - Prime identification patterns
   - Memoization in sieves
-  require:
-    type: providers_and_users
+  connect:
+    type: providers
     providers:
     - name: number_stream
       type: want
       description: Stream of numbers to test for primality
       required: true
-    users:
-    - name: prime_stream
-      type: want
-      description: Stream of identified prime numbers

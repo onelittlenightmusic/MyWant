@@ -2,7 +2,6 @@ package mywant
 
 import (
 	"context"
-	"fmt"
 	"sync"
 )
 
@@ -81,7 +80,7 @@ func sendParameterNotifications(notification StateNotification) {
 	}
 	wantRegistryMutex.RUnlock()
 	for _, childWant := range childWants {
-		fmt.Printf("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
+		DebugLog("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
 			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
 		childWant.RestartWant()
 	}

@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
 	"mywant/engine/src/pubsub"
 	"reflect"
 	"sort"
@@ -246,7 +247,7 @@ type Want struct {
 	// Fields for eliminating duplicate methods in want types
 	WantType             string               `json:"-" yaml:"-"`
 	paths                Paths                `json:"-" yaml:"-"`
-	ConnectivityMetadata ConnectivityMetadata `json:"-" yaml:"-"`
+	ConnectivityMetadata ConnectivityMetadata `json:"connectivity_metadata,omitempty" yaml:"-"`
 
 	// Want type definition and state field management
 	WantTypeDefinition  *WantTypeDefinition `json:"-" yaml:"-"`
@@ -668,6 +669,9 @@ func (n *Want) StartProgressionLoop(
 			if n.HasPendingAgentStateChanges() {
 				n.DumpStateForAgent("DoAgent")
 			}
+
+			// 10. Throttle execution to avoid busy-waiting
+			time.Sleep(GlobalExecutionInterval)
 		}
 	}()
 }
@@ -821,11 +825,12 @@ func (n *Want) StoreState(key string, value any) {
 // EndProgressCycle() dumps all pending changes to disk together
 // This ensures all concurrent async calls are recorded without synchronization delays
 // Example: Evidence and Description handlers both call MergeState() concurrently
-//   Evidence:    MergeState({"0": evidence}) → pendingStateChanges[0]=evidence
-//   Description: MergeState({"1": description}) → pendingStateChanges[1]=description
-//   GetState("0") → reads from pending → returns evidence (immediately)
-//   GetState("1") → reads from pending → returns description (immediately)
-//   EndProgressCycle() → dumps all pending together → both recorded
+//
+//	Evidence:    MergeState({"0": evidence}) → pendingStateChanges[0]=evidence
+//	Description: MergeState({"1": description}) → pendingStateChanges[1]=description
+//	GetState("0") → reads from pending → returns evidence (immediately)
+//	GetState("1") → reads from pending → returns description (immediately)
+//	EndProgressCycle() → dumps all pending together → both recorded
 func (n *Want) MergeState(updates map[string]any) {
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
@@ -1202,7 +1207,7 @@ func (n *Want) addToParameterHistory(paramName string, paramValue any, previousV
 		n.History.ParameterHistory = n.History.ParameterHistory[len(n.History.ParameterHistory)-maxHistorySize:]
 	}
 
-	fmt.Printf("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
+	DebugLog("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
 		n.Metadata.Name, paramName, previousValue, paramValue)
 }
 func (n *Want) GetParameter(paramName string) (any, bool) {
@@ -1229,7 +1234,7 @@ func (n *Want) migrateAgentHistoryFromState() {
 	if n.State != nil {
 		if _, exists := n.State["agent_history"]; exists {
 			delete(n.State, "agent_history")
-			fmt.Printf("[MIGRATION] Removed agent_history from state for want %s\n", n.Metadata.Name)
+			log.Printf("[MIGRATION] Removed agent_history from state for want %s\n", n.Metadata.Name)
 		}
 	}
 }

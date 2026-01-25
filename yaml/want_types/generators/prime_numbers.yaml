@@ -148,9 +148,10 @@ wantType:
   - Sieve of Eratosthenes algorithm documentation
   - Generator pattern for data production
   - Prime number mathematical properties
-  require:
+  connect:
     type: users
     users:
     - name: number_stream
       type: want
       description: Stream of integers from start to end
+      required: false

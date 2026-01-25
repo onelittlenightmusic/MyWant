@@ -1,7 +1,7 @@
 package mywant
 
 import (
-	"fmt"
+	"log"
 	"mywant/engine/src/chain"
 	"time"
 )
@@ -146,7 +146,7 @@ func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	}
 
 	if migratedCount > 0 {
-		fmt.Printf("[MIGRATION] Agent history migration completed for %d wants\n", migratedCount)
+		log.Printf("[MIGRATION] Agent history migration completed for %d wants\n", migratedCount)
 	}
 }
 
@@ -196,12 +196,12 @@ func (p *Paths) GetActiveOutCount() int {
 
 // ConnectivityMetadata defines want connectivity requirements and constraints
 type ConnectivityMetadata struct {
-	RequiredInputs  int
-	RequiredOutputs int
-	MaxInputs       int // -1 for unlimited
-	MaxOutputs      int // -1 for unlimited
-	WantType        string
-	Description     string
+	RequiredInputs  int    `json:"required_inputs"`
+	RequiredOutputs int    `json:"required_outputs"`
+	MaxInputs       int    `json:"max_inputs"`  // -1 for unlimited
+	MaxOutputs      int    `json:"max_outputs"` // -1 for unlimited
+	WantType        string `json:"want_type"`
+	Description     string `json:"description"`
 }
 
 // RequirePolicy defines connectivity requirements as an enum
@@ -236,34 +236,33 @@ func (r *RequireSpec) ToConnectivityMetadata(wantType string) ConnectivityMetada
 	}
 
 	requiredInputs := 0
+	for _, p := range r.Providers {
+		if p.Required {
+			requiredInputs++
+		}
+	}
+
 	requiredOutputs := 0
-
-	// Check providers (inputs)
-	if len(r.Providers) > 0 {
-		// If providers is specified, at least one input is required
-		requiredInputs = 1
+	for _, u := range r.Users {
+		if u.Required {
+			requiredOutputs++
+		}
 	}
 
-	// Check users (outputs)
-	if len(r.Users) > 0 {
-		// If users is specified, at least one output is required
-		requiredOutputs = 1
-	}
-
-	// Also check type field for backward compatibility
-	switch r.Type {
-	case "providers":
-		requiredInputs = 1
-		requiredOutputs = 0
-	case "users":
-		requiredInputs = 0
-		requiredOutputs = 1
-	case "providers_and_users":
-		requiredInputs = 1
-		requiredOutputs = 1
-	case "none":
-		requiredInputs = 0
-		requiredOutputs = 0
+	// Handle legacy 'type' field for backward compatibility
+	// ONLY apply default "1" if no structured lists are provided at all
+	if len(r.Providers) == 0 && len(r.Users) == 0 {
+		switch r.Type {
+		case "providers":
+			requiredInputs = 1
+			requiredOutputs = 0
+		case "users":
+			requiredInputs = 0
+			requiredOutputs = 1
+		case "providers_and_users":
+			requiredInputs = 1
+			requiredOutputs = 1
+		}
 	}
 
 	description := "No connectivity requirements"

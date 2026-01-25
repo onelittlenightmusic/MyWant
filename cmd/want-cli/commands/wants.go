@@ -76,7 +76,8 @@ var getWantCmd = &cobra.Command{
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
-		want, err := c.GetWant(args[0])
+		showHidden, _ := cmd.Flags().GetBool("hidden")
+		want, err := c.GetWant(args[0], showHidden)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
@@ -97,10 +98,20 @@ var getWantCmd = &cobra.Command{
 		}
 
 		// Show hidden state if --hidden flag is set
-		showHidden, _ := cmd.Flags().GetBool("hidden")
-		if showHidden && len(want.HiddenState) > 0 {
-			fmt.Println("\nHiddenState:")
-			printMap(want.HiddenState)
+		if showHidden {
+			if len(want.HiddenState) > 0 {
+				fmt.Println("\nHiddenState:")
+				printMap(want.HiddenState)
+			}
+			if want.ConnectivityMetadata != nil {
+				fmt.Println("\nConnectivityMetadata:")
+				fmt.Printf("  RequiredInputs: %d\n", want.ConnectivityMetadata.RequiredInputs)
+				fmt.Printf("  RequiredOutputs: %d\n", want.ConnectivityMetadata.RequiredOutputs)
+				fmt.Printf("  MaxInputs: %d\n", want.ConnectivityMetadata.MaxInputs)
+				fmt.Printf("  MaxOutputs: %d\n", want.ConnectivityMetadata.MaxOutputs)
+				fmt.Printf("  WantType: %s\n", want.ConnectivityMetadata.WantType)
+				fmt.Printf("  Description: %s\n", want.ConnectivityMetadata.Description)
+			}
 		}
 	},
 }
