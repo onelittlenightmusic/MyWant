@@ -131,19 +131,26 @@ func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 
 // LoadRecipe loads and processes a recipe file with OpenAPI spec validation
 func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig, error) {
+	DebugLog("[RECIPE-LOADER] Loading recipe from path: %s\n", recipePath)
+
 	// Read recipe file
 	data, err := os.ReadFile(recipePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read recipe file: %v", err)
 	}
+	DebugLog("[RECIPE-LOADER] Successfully read recipe file: %s\n", recipePath)
+
 	err = validateRecipeWithSpec(data)
 	if err != nil {
-		return nil, fmt.Errorf("recipe validation failed: %w", err)
+		return nil, fmt.Errorf("recipe validation failed for %s: %w", recipePath, err)
 	}
+	DebugLog("[RECIPE-LOADER] Recipe %s validated successfully against OpenAPI spec\n", recipePath)
+
 	var processedRecipe GenericRecipe
 	if err := yaml.Unmarshal(data, &processedRecipe); err != nil {
-		return nil, fmt.Errorf("failed to parse recipe: %v", err)
+		return nil, fmt.Errorf("failed to parse recipe %s: %v", recipePath, err)
 	}
+	DebugLog("[RECIPE-LOADER] Successfully parsed recipe YAML for %s\n", recipePath)
 
 	// Extract recipe content
 	recipeContent := processedRecipe.Recipe
@@ -156,6 +163,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	for k, v := range params {
 		mergedParams[k] = v
 	}
+	DebugLog("[RECIPE-LOADER] Merged parameters for %s: %+v\n", recipePath, mergedParams)
 
 	// Perform parameter substitution on wants
 	for i := range recipeContent.Wants {
@@ -163,6 +171,8 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		recipeContent.Wants[i].Params = grl.substituteParams(recipeContent.Wants[i].Params, mergedParams)
 		recipeContent.Wants[i].Spec.Params = grl.substituteParams(recipeContent.Wants[i].Spec.Params, mergedParams)
 	}
+	DebugLog("[RECIPE-LOADER] Parameters substituted in wants for %s\n", recipePath)
+
 	config := Config{
 		Wants: make([]*Want, 0),
 	}
@@ -173,41 +183,59 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 				prefix = prefixStr
 			}
 		}
+		DebugLog("[RECIPE-LOADER] Processing %d wants with prefix '%s' for recipe %s\n", len(recipeContent.Wants), prefix, recipePath)
 
 		for i, recipeWant := range recipeContent.Wants {
 			want := recipeWant.ConvertToWant()
+			DebugLog("[RECIPE-LOADER] Converted recipe want %d (type: %s) to Want struct\n", i+1, want.Metadata.Type)
 
 			// Generate name if missing
 			if want.Metadata.Name == "" {
 				want.Metadata.Name = fmt.Sprintf("%s-%s-%d", prefix, want.Metadata.Type, i+1)
+				DebugLog("[RECIPE-LOADER] Generated want name: %s\n", want.Metadata.Name)
 			}
 
 			// Generate ID if missing
 			if want.Metadata.ID == "" {
 				want.Metadata.ID = generateUUID()
+				DebugLog("[RECIPE-LOADER] Generated want ID: %s\n", want.Metadata.ID)
 			}
 
 			// Namespace labels and using selectors with prefix to isolate child wants
 			grl.namespaceWantConnections(want, prefix)
+			DebugLog("[RECIPE-LOADER] Namespaced connections for want %s\n", want.Metadata.Name)
+
 			if recipeWant.RecipeAgent {
 				want = grl.autoConnect(want, recipeContent.Wants, mergedParams)
+				DebugLog("[RECIPE-LOADER] Applied auto-connect for RecipeAgent want %s\n", want.Metadata.Name)
 			}
 
 			config.Wants = append(config.Wants, want)
+			DebugLog("[RECIPE-LOADER] Added want %s to recipe config\n", want.Metadata.Name)
 		}
+	} else {
+		DebugLog("[RECIPE-LOADER] Recipe %s contains no wants.\n", recipePath)
 	}
 
 	// Validate recipe results if present
 	// Note: Full validation requires want type definitions which may not be available at this point
 	// We perform basic validation (non-blocking) and log warnings
 	if recipeContent.Result != nil && len(*recipeContent.Result) > 0 {
-		for _, resultSpec := range *recipeContent.Result {
+		DebugLog("[RECIPE-LOADER] Recipe %s has %d result definitions.\n", recipePath, len(*recipeContent.Result))
+		for i, resultSpec := range *recipeContent.Result {
 			if resultSpec.StateField != "" {
-				DebugLog("[RECIPE] Result will use state_field '%s' from want '%s'\n", resultSpec.StateField, resultSpec.WantName)
+				DebugLog("[RECIPE] Result[%d] will use state_field '%s' from want '%s' (%s)\n",
+					i, resultSpec.StateField, resultSpec.WantName, resultSpec.Description)
 			} else if resultSpec.StatName != "" {
-				DebugLog("[RECIPE] Warning: result for want '%s' uses deprecated stat_name '%s' (use state_field instead)\n", resultSpec.WantName, resultSpec.StatName)
+				InfoLog("[RECIPE] ⚠️  Warning: result[%d] for want '%s' uses deprecated stat_name '%s' (use state_field instead)\n",
+					i, resultSpec.WantName, resultSpec.StatName)
+			} else {
+				InfoLog("[RECIPE] ⚠️  Warning: result[%d] for want '%s' has no state_field or stat_name defined\n",
+					i, resultSpec.WantName)
 			}
 		}
+	} else {
+		DebugLog("[RECIPE-LOADER] Recipe %s has no result definitions (empty or null).\n", recipePath)
 	}
 
 	return &GenericRecipeConfig{
@@ -552,8 +580,9 @@ func validateRecipeResultStructure(result any) error {
 	// Try new format first (flat array)
 	if resultArray, ok := AsArray(result); ok {
 		// New format: validate as array of result specs
+		// Empty array is valid - some recipes may not define results
 		if len(resultArray) == 0 {
-			return fmt.Errorf("result array cannot be empty")
+			return nil // Empty result array is acceptable
 		}
 		for i, spec := range resultArray {
 			err := validateRecipeResultSpec(spec, fmt.Sprintf("result[%d]", i))
@@ -667,10 +696,12 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 // Returns validation errors if any state_field is not defined in the corresponding want type
 func (grl *GenericRecipeLoader) ValidateRecipeResults(recipeResults *RecipeResult, wantTypeDefs map[string]*WantTypeDefinition) error {
 	if recipeResults == nil || len(*recipeResults) == 0 {
+		DebugLog("[RECIPE-VALIDATION] No results to validate (empty or null)\n")
 		return nil
 	}
 
-	for _, resultSpec := range *recipeResults {
+	DebugLog("[RECIPE-VALIDATION] Validating %d result specifications\n", len(*recipeResults))
+	for i, resultSpec := range *recipeResults {
 		// If state_field is not specified, fall back to stat_name (backward compatibility)
 		stateField := resultSpec.StateField
 		if stateField == "" {
@@ -686,6 +717,7 @@ func (grl *GenericRecipeLoader) ValidateRecipeResults(recipeResults *RecipeResul
 		// Find the want type definition
 		wantTypeDef, exists := wantTypeDefs[resultSpec.WantName]
 		if !exists {
+			InfoLog("[RECIPE-VALIDATION] ❌ ERROR: Result[%d] references unknown want type '%s'\n", i, resultSpec.WantName)
 			return fmt.Errorf("validation error: result references unknown want type '%s'", resultSpec.WantName)
 		}
 
@@ -694,15 +726,19 @@ func (grl *GenericRecipeLoader) ValidateRecipeResults(recipeResults *RecipeResul
 		for _, stateDef := range wantTypeDef.State {
 			if stateDef.Name == stateField {
 				fieldFound = true
+				DebugLog("[RECIPE-VALIDATION] ✓ Result[%d]: state_field '%s' found in want type '%s'\n",
+					i, stateField, resultSpec.WantName)
 				break
 			}
 		}
 
 		if !fieldFound {
 			availableFields := make([]string, len(wantTypeDef.State))
-			for i, sd := range wantTypeDef.State {
-				availableFields[i] = sd.Name
+			for j, sd := range wantTypeDef.State {
+				availableFields[j] = sd.Name
 			}
+			InfoLog("[RECIPE-VALIDATION] ❌ ERROR: Result[%d]: state_field '%s' not found in want type '%s'. Available fields: %v\n",
+				i, stateField, resultSpec.WantName, availableFields)
 			return fmt.Errorf("validation error: state_field '%s' not found in want type '%s'. Available fields: %v",
 				stateField, resultSpec.WantName, availableFields)
 		}

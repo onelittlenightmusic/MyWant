@@ -67,7 +67,16 @@ recipe:
           - buffet_reservation
 
   # Recipe result definition - specifies how to compute travel planning results
-  result: []
+  result:
+    - want_name: "restaurant-1"
+      state_field: "final_result"
+      description: "Restaurant reservation result"
+    - want_name: "hotel-2"
+      state_field: "final_result"
+      description: "Hotel booking result"
+    - want_name: "buffet-3"
+      state_field: "final_result"
+      description: "Buffet reservation result"
   # Example deployment - one-click deployment configuration
   example:
     wants:

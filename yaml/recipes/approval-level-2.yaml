@@ -43,7 +43,13 @@ recipe:
           approval_id: approval_id
 
   # Recipe result definition
-  result: []
+  result:
+    - want_name: "evidence-1"
+      state_field: "evidence_provided"
+      description: "Evidence has been provided"
+    - want_name: "description-2"
+      state_field: "description_provided"
+      description: "Description has been provided"
   # Example deployment - one-click deployment configuration
   example:
     wants:

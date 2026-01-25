@@ -238,8 +238,10 @@ func (t *Target) resolveRecipeParameters() {
 	t.RecipeParams = resolvedParams
 }
 func (t *Target) CreateChildWants() []*Want {
+	t.StoreLog("[TARGET] 🛠️  CreateChildWants() called for %s (RecipePath: %s)\n", t.Metadata.Name, t.RecipePath)
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
+		t.StoreLog("[TARGET] ❌ ERROR: Recipe loader is nil for target %s\n", t.Metadata.Name)
 		return []*Want{}
 	}
 
@@ -251,12 +253,15 @@ func (t *Target) CreateChildWants() []*Want {
 	// Use target name as prefix to ensure child wants are properly namespaced
 	// This ensures that each target instance's children have unique namespace prefixes
 	paramsWithPrefix["prefix"] = t.Metadata.Name
+	t.StoreLog("[TARGET] Parameters with prefix for %s: %+v\n", t.Metadata.Name, paramsWithPrefix)
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, paramsWithPrefix)
 	if err != nil {
+		t.StoreLog("[TARGET] ❌ ERROR: Failed to load config from recipe %s: %v\n", t.RecipePath, err)
 		return []*Want{}
 	}
+	t.StoreLog("[TARGET] Successfully loaded %d wants from recipe %s\n", len(config.Wants), t.RecipePath)
 
 	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
@@ -270,6 +275,12 @@ func (t *Target) CreateChildWants() []*Want {
 		}
 	}
 	for i := range config.Wants {
+		// Ensure ID is generated if not present
+		if config.Wants[i].Metadata.ID == "" {
+			config.Wants[i].Metadata.ID = generateUUID()
+			t.StoreLog("[TARGET] Generated ID %s for child want %s\n", config.Wants[i].Metadata.ID, config.Wants[i].Metadata.Name)
+		}
+
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
 			{
 				APIVersion:         "mywant/v1",
@@ -295,9 +306,11 @@ func (t *Target) CreateChildWants() []*Want {
 			}
 			config.Wants[i].Spec.Using[j]["owner-name"] = t.Metadata.Name
 		}
+		t.StoreLog("[TARGET] Configured owner references and labels for child want %s (ID: %s)\n", config.Wants[i].Metadata.Name, config.Wants[i].Metadata.ID)
 	}
 
 	t.childWants = config.Wants
+	t.StoreLog("[TARGET] Returning %d child wants for %s\n", len(t.childWants), t.Metadata.Name)
 	return t.childWants
 }
 
@@ -407,6 +420,7 @@ func (t *Target) Progress() {
 	}
 
 	// Phase 1: Create child wants (only once)
+	t.StoreLog("[TARGET] 🔍 Progress Phase 1 check: childrenCreated=%v, builder!=nil=%v, recipeLoader!=nil=%v\n", t.childrenCreated, t.builder != nil, t.recipeLoader != nil)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
