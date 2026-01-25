@@ -23,29 +23,33 @@ recipe:
 
   wants:
     # Prime number generator - generates consecutive numbers
-    - type: prime numbers
-      labels:
-        role: generator
-        component: source
-      params:
-        start: start_number
-        end: end_number
+    - metadata:
+        type: prime numbers
+        labels:
+          role: generator
+          component: source
+      spec:
+        params:
+          start: start_number
+          end: end_number
 
-    # Prime sequence - filters out non-prime numbers using sieve algorithm  
-    - type: prime sequence
-      labels:
-        role: filter
-        component: processor
-      params: {}
-      using:
-        - role: generator
+    # Prime sequence - filters out non-prime numbers using sieve algorithm
+    - metadata:
+        type: prime sequence
+        labels:
+          role: filter
+          component: processor
+      spec:
+        params: {}
+        using:
+          - role: generator
 
   # Recipe result definition - specifies how to compute prime sieve results
   result:
-    - want_name: "prime sequence"
+    - want_name: "prime sequence-2"
       state_field: "foundPrimes"
       description: "List of prime numbers found"
-    - want_name: "prime sequence"
+    - want_name: "prime sequence-2"
       state_field: "primeCount"
       description: "Count of prime numbers found"
   # Example deployment - one-click deployment configuration
