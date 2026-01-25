@@ -52,19 +52,6 @@ recipe:
         using:
           - category: queue-producer  # Connect to generator via recipe-defined label
 
-    # Sink want - explicitly define all labels in recipe
-    - metadata:
-        type: qnet sink
-        labels:
-          role: collector           # Explicitly defined, not auto-generated
-          category: result-display  # Recipe-specific semantic label
-          component: final-sink     # Additional semantic label
-      spec:
-        params:
-          display_format: "Number: %d"
-        using:
-          - role: processor         # Connect to queue via recipe-defined label
-
   # Recipe result definition - specifies which want and state field to use for result
   result:
     - want_name: "queue"

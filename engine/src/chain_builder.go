@@ -304,18 +304,12 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 	case "queue":
 		// Queue type can be referenced as "qnet queue" in code
 		aliases = []string{"qnet queue"}
-	case "sink":
-		// Sink type can be referenced as "qnet sink" in code
-		aliases = []string{"qnet sink"}
 	case "combiner":
 		// Combiner type can be referenced as "qnet combiner" in code
 		aliases = []string{"qnet combiner"}
 	case "numbers":
 		// Numbers type can be referenced as "qnet numbers" in code
 		aliases = []string{"qnet numbers"}
-	case "collector":
-		// Collector type can be referenced as "qnet collector" in code
-		aliases = []string{"qnet collector"}
 	}
 
 	// Store definitions and metadata under all aliases

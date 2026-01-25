@@ -33,11 +33,6 @@ type CombinerLocals struct {
 	Operation string
 }
 
-// SinkLocals holds type-specific local state for Sink want
-type SinkLocals struct {
-	Received int
-}
-
 // QueuePacket represents data flowing through the chain
 type QueuePacket struct {
 	mywant.BasePacket
@@ -454,110 +449,9 @@ func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	return nil
 }
 
-// Sink collects and terminates the packet stream
-type Sink struct {
-	mywant.Want
-}
-
-// Goal creates a new sink want
-func Goal(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	return &Sink{*mywant.NewWantWithLocals(
-		metadata,
-		spec,
-		&SinkLocals{},
-		"sink",
-	)}
-}
-
-// Initialize resets state before execution begins
-func (s *Sink) Initialize() {
-	// No state reset needed for queue wants
-}
-
-// IsAchieved checks if sink is complete (end signal received)
-func (s *Sink) IsAchieved() bool {
-	completed, _ := s.GetStateBool("completed", false)
-	return completed
-}
-
-// Progress executes the sink directly
-func (s *Sink) Progress() {
-	locals, ok := s.Locals.(*SinkLocals)
-	if !ok {
-		s.StoreLog("ERROR: Failed to access SinkLocals from Want.Locals")
-		return
-	}
-
-	completed, _ := s.GetStateBool("completed", false)
-	if completed {
-		return
-	}
-
-	for {
-		_, i, done, ok := s.Use(100)
-		if !ok {
-			// No packet received, but we don't want to end the sink. The sink should wait until a termination packet is received. We return to continue the execution loop. If we return with completed=true, the sink will be marked as completed and will not process any more packets.
-			// The timeout in Use helps to not block the execution loop forever. if the timeout is reached, the loop will continue to the next iteration.
-			// Show progress while streaming
-			if locals.Received > 0 {
-				s.StoreState("achieving_percentage", 50)
-			}
-			return
-		}
-
-		if done {
-			s.StoreState("completed", true)
-			// Trigger OnEnded callback
-			if err := s.OnEnded(nil, locals); err != nil {
-				s.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
-			}
-			return
-		}
-
-		packet := i.(QueuePacket)
-		_ = packet // Currently just counting, but keeping for future use/consistency
-		locals.Received++
-		// Show partial progress while receiving
-		s.StoreState("achieving_percentage", 50)
-	}
-}
-
-// OnEnded implements PacketHandler interface for Sink termination callbacks
-func (s *Sink) OnEnded(packet mywant.Packet, locals *SinkLocals) error {
-	s.StoreStateMulti(mywant.Dict{
-		"total_processed":      locals.Received,
-		"average_wait_time":    0.0, // Sinks don't add wait time
-		"total_wait_time":      0.0,
-		"achieving_percentage": 100,
-		"final_result":         fmt.Sprintf("Collected %d packets", locals.Received),
-	})
-
-	return nil
-}
-
-// CalculateAchievingPercentage calculates the progress toward completion for Sink Returns 100 when all packets have been collected (completion)
-func (s *Sink) CalculateAchievingPercentage() int {
-	locals, ok := s.Locals.(*SinkLocals)
-	if !ok {
-		return 0
-	}
-	completed, _ := s.GetStateBool("completed", false)
-	if completed {
-		return 100
-	}
-	// While streaming, indicate partial progress
-	if locals.Received > 0 {
-		return 50
-	}
-	return 0
-}
-
 // RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder
 func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
 	builder.RegisterWantType("qnet numbers", PacketNumbers)
 	builder.RegisterWantType("qnet queue", NewQueue)
 	builder.RegisterWantType("qnet combiner", NewCombiner)
-	builder.RegisterWantType("qnet sink", Goal)
-	// Register collector type (alias for sink)
-	builder.RegisterWantType("qnet collector", Goal)
 }

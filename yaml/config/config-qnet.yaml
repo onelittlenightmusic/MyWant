@@ -24,14 +24,3 @@ wants:
         service_time: 0.05
       using:
         - role: source
-
-  # Final collector
-  - metadata:
-      name: sink main
-      type: qnet sink
-      labels:
-        role: terminal
-    spec:
-      params: {}
-      using:
-        - role: processor

@@ -290,7 +290,6 @@ func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
     builder.RegisterWantType("qnet numbers", PacketNumbers)
     builder.RegisterWantType("qnet queue", NewQueue)
     builder.RegisterWantType("qnet combiner", NewCombiner)
-    builder.RegisterWantType("qnet sink", Goal)
 }
 ```
 
@@ -598,7 +597,7 @@ recipe:
 - Requires input (`RequiredInputs: 1`)
 - No outputs (`RequiredOutputs: 0`)
 - Terminal node
-- Examples: Sink, PrimeSink
+- Examples: Collector
 
 ### Pattern 4: Coordinator/Hub
 **Characteristics**:
@@ -815,13 +814,13 @@ wants:
 
 **Queue/Network Domain**:
 - `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/qnet_types.go`
-  - Numbers (generator), Queue (processor), Combiner, Sink
+  - Numbers (generator), Queue (processor), Combiner
 
 **Mathematical Domain**:
 - `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/fibonacci_types.go`
   - FibonacciNumbers, FibonacciSequence
 - `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/prime_types.go`
-  - PrimeNumbers, PrimeSequence, PrimeSink
+  - PrimeNumbers, PrimeSequence
 
 **System Domain**:
 - `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`

@@ -222,38 +222,6 @@ func (f *PrimeSequence) Progress() {
 	// Yield control - will be called again for next packet
 }
 
-// // PrimeSink collects and displays results type PrimeSink struct { Want Received int
-// paths    Paths }
-
-// // NewPrimeSink creates a new prime sink want func NewPrimeSink(metadata Metadata, spec WantSpec) any { sink := &PrimeSink{ Want:     Want{},
-// Received: 0, }
-
-// // Initialize base Want fields sink.Init(metadata, spec)
-
-// // Set fields for base Want methods sink.WantType = "prime sink" sink.ConnectivityMetadata = nil // ConnectivityMetadata loaded from YAML
-
-// func (s *PrimeSink) GetWant() any { return &s.Want }
-
-// // Exec returns the generalized chain function for the sink func (s *PrimeSink) Exec() { // Validate input channel is available in, connectionAvailable := s.GetFirstInputChannel()
-// if !connectionAvailable { return true }
-
-// // Check if already achieved using persistent state achieved, _ := s.GetStateBool("achieved", false) if achieved { return true
-// 	}
-
-// // Mark as achieved in persistent state s.StoreState("achieved", true)
-
-// // Use persistent state for received count received, _ := s.State["received"].(int)
-
-// primes := make([]int, 0) for val := range in { if prime, ok := val.(int); ok { primes = append(primes, prime)
-// received++ } }
-
-// // Update persistent state s.State["received"] = received
-
-// // Store collected primes in state s.StoreStateMulti(map[string]any{ "primes":         primes, "total_received": received,
-// 	})
-
-// if s.State == nil { s.State = make(map[string]any) } s.State["total_processed"] = received
-
 // RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
 func RegisterPrimeWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("prime numbers", NewPrimeNumbers)

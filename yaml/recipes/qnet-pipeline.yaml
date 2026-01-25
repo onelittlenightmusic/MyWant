@@ -118,19 +118,6 @@ recipe:
         using:
           - role: merger
 
-    # Final collector - connects to final processor
-    - metadata:
-        name: "collector-end"
-        type: qnet sink
-        labels:
-          role: terminal
-          stage: end
-      spec:
-        params: {}
-        using:
-          - role: processor
-            stage: final
-
   # Recipe result definition - specifies which want and stat to use for final result
   result:
       - want_name: "queue-primary"
