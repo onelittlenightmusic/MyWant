@@ -62,8 +62,9 @@ func (s *SilencerWant) Progress() {
 	s.StoreState("achieving_percentage", s.CalculateAchievingPercentage())
 
 	// Try to get a packet from input channels
-	// Non-blocking check for packets
-	index, data, done, ok := s.Use(0)
+	// Use blocking wait (infinite) for stream processing
+	// Processor wants should continuously wait for packets from stream
+	index, data, done, ok := s.UseForever()
 	if !ok {
 		return
 	}
