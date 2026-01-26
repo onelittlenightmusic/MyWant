@@ -2,92 +2,149 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
 	"sync"
+
+	"github.com/ThreeDotsLabs/watermill"
+	"github.com/ThreeDotsLabs/watermill/message"
+	"github.com/ThreeDotsLabs/watermill/pubsub/gochannel"
 )
 
-// SimpleInMemPubSub is a high-performance, mutex-protected in-memory PubSub
-// specifically designed for high-concurrency pointer preservation without context overhead.
-type SimpleInMemPubSub struct {
-	mu            sync.RWMutex
-	topics        map[string][]*Message
-	subscribers   map[string][]chan *Message
-	maxCache      int
-	ctx           context.Context
-	cancel        context.CancelFunc
+// WatermillPubSub wraps Watermill's pub/sub functionality with an in-memory pointer cache
+// to preserve type information and support late-subscriber replay.
+type WatermillPubSub struct {
+	publisher  message.Publisher
+	subscriber message.Subscriber
+	logger     watermill.LoggerAdapter
+	ctx        context.Context
+	cancel     context.CancelFunc
+	
+	// pointerMap stores the original Message objects indexed by Watermill UUID
+	// to preserve type information across the bridge.
+	pointerMap map[string]*Message
+	// topicCache stores sequence of IDs per topic for replay support
+	topicCache map[string][]string 
+	cacheMu    sync.RWMutex
+	maxCache   int
+
+	// Track active subscriptions
+	subscriptions map[string]context.CancelFunc
+	subMu         sync.Mutex
 }
 
-// NewInMemoryPubSub creates a new lightweight PubSub system.
-func NewInMemoryPubSub() *SimpleInMemPubSub {
+// NewInMemoryPubSub creates a new Watermill-backed PubSub with pointer preservation.
+func NewInMemoryPubSub() *WatermillPubSub {
+	logger := watermill.NewStdLogger(false, false)
+	
+	pubSub := gochannel.NewGoChannel(
+		gochannel.Config{
+			BlockPublishUntilSubscriberAck: false,
+		},
+		logger,
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
-	return &SimpleInMemPubSub{
-		topics:      make(map[string][]*Message),
-		subscribers: make(map[string][]chan *Message),
-		maxCache:    10000,
-		ctx:         ctx,
-		cancel:      cancel,
+
+	return &WatermillPubSub{
+		publisher:     pubSub,
+		subscriber:    pubSub,
+		logger:        logger,
+		ctx:           ctx,
+		cancel:        cancel,
+		pointerMap:    make(map[string]*Message),
+		topicCache:    make(map[string][]string),
+		maxCache:      10000,
+		subscriptions: make(map[string]context.CancelFunc),
 	}
 }
 
-// Publish publishes a message to all current subscribers and adds to cache.
-func (ps *SimpleInMemPubSub) Publish(topic string, msg *Message) error {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-
-	// 1. Add to cache
-	cache := ps.topics[topic]
-	cache = append(cache, msg)
-	if len(cache) > ps.maxCache {
-		cache = cache[1:]
+// Publish publishes a message.
+func (ps *WatermillPubSub) Publish(topic string, msg *Message) error {
+	msgID := watermill.NewUUID()
+	
+	ps.cacheMu.Lock()
+	// Add to correlation map
+	ps.pointerMap[msgID] = msg
+	// Add to topic replay cache
+	ps.topicCache[topic] = append(ps.topicCache[topic], msgID)
+	
+	// Cleanup old entries
+	if len(ps.topicCache[topic]) > ps.maxCache {
+		oldID := ps.topicCache[topic][0]
+		ps.topicCache[topic] = ps.topicCache[topic][1:]
+		delete(ps.pointerMap, oldID)
 	}
-	ps.topics[topic] = cache
+	ps.cacheMu.Unlock()
 
-	// 2. Broadcast to subscribers
-	if subs, ok := ps.subscribers[topic]; ok {
-		for _, ch := range subs {
-			select {
-			case ch <- msg:
-			default:
-				// Buffer full, message dropped for this subscriber
-			}
-		}
+	wMsg := message.NewMessage(msgID, []byte(msgID))
+	if err := ps.publisher.Publish(topic, wMsg); err != nil {
+		return fmt.Errorf("watermill publish failed: %w", err)
 	}
 
 	return nil
 }
 
-// Subscribe joins a topic and replays cached messages.
-func (ps *SimpleInMemPubSub) Subscribe(topic string, consumerID string) (Subscription, error) {
+// Subscribe subscribes to a topic and replays cached messages.
+func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscription, error) {
 	subCtx, subCancel := context.WithCancel(ps.ctx)
 	
-	// Create buffered channel for this subscriber
+	key := consumerID + ":" + topic
+	ps.subMu.Lock()
+	if oldCancel, exists := ps.subscriptions[key]; exists {
+		oldCancel()
+	}
+	ps.subscriptions[key] = subCancel
+	ps.subMu.Unlock()
+
+	messages, err := ps.subscriber.Subscribe(subCtx, topic)
+	if err != nil {
+		subCancel()
+		return nil, fmt.Errorf("watermill subscribe failed: %w", err)
+	}
+
 	outChan := make(chan *Message, 2000)
 
-	ps.mu.Lock()
-	// Replay cache
-	if cache, ok := ps.topics[topic]; ok {
-		for _, msg := range cache {
-			select {
-			case outChan <- msg:
-			default:
+	// Replay existing cache
+	ps.cacheMu.RLock()
+	if ids, ok := ps.topicCache[topic]; ok {
+		for _, id := range ids {
+			if m, exists := ps.pointerMap[id]; exists {
+				select {
+				case outChan <- m:
+				default:
+				}
 			}
 		}
 	}
-	// Register subscriber
-	ps.subscribers[topic] = append(ps.subscribers[topic], outChan)
-	ps.mu.Unlock()
+	ps.cacheMu.RUnlock()
 
-	// Cleanup on context cancellation
 	go func() {
-		<-subCtx.Done()
-		ps.mu.Lock()
-		defer ps.mu.Unlock()
-		
-		subs := ps.subscribers[topic]
-		for i, ch := range subs {
-			if ch == outChan {
-				ps.subscribers[topic] = append(subs[:i], subs[i+1:]...)
-				close(outChan)
-				break
+		defer close(outChan)
+		for {
+			select {
+			case <-subCtx.Done():
+				return
+			case wMsg, ok := <-messages:
+				if !ok {
+					return
+				}
+				
+				ps.cacheMu.RLock()
+				// Use the actual Watermill Message ID to find the correct pointer
+				foundMsg, exists := ps.pointerMap[wMsg.UUID]
+				ps.cacheMu.RUnlock()
+
+				if exists {
+					select {
+					case outChan <- foundMsg:
+						wMsg.Ack()
+					case <-subCtx.Done():
+						return
+					}
+				} else {
+					// Fallback for expired cache entries
+					wMsg.Ack()
+				}
 			}
 		}
 	}()
@@ -99,13 +156,22 @@ func (ps *SimpleInMemPubSub) Subscribe(topic string, consumerID string) (Subscri
 	}, nil
 }
 
-// Unsubscribe is handled by the subscription's Close/Cancel.
-func (ps *SimpleInMemPubSub) Unsubscribe(topic string, consumerID string) error {
-	return nil // Handled via subscription Close
+// Unsubscribe stops a subscription.
+func (ps *WatermillPubSub) Unsubscribe(topic string, consumerID string) error {
+	ps.subMu.Lock()
+	defer ps.subMu.Unlock()
+	
+	key := consumerID + ":" + topic
+	if cancel, exists := ps.subscriptions[key]; exists {
+		cancel()
+		delete(ps.subscriptions, key)
+	}
+	
+	return nil
 }
 
 // Close closes the entire PubSub system.
-func (ps *SimpleInMemPubSub) Close() error {
+func (ps *WatermillPubSub) Close() error {
 	ps.cancel()
-	return nil
+	return ps.publisher.Close()
 }
