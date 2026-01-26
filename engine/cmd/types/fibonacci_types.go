@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	"log"
-	"time"
 
 	. "mywant/engine/src"
 )
@@ -58,7 +57,6 @@ func (g *FibonacciNumbers) Progress() {
 	if sentCount >= count {
 		// Send end signal
 		g.ProvideDone()
-		time.Sleep(50 * time.Millisecond) // Give time for Done signal to propagate
 		g.StoreStateMulti(Dict{
 			"final_result":         fmt.Sprintf("Generated %d fibonacci numbers", count),
 			"achieving_percentage": 100,
@@ -128,10 +126,10 @@ func (f *FibonacciFilter) Progress() {
 		}
 	}
 
-	// Try to receive one packet with timeout
-	_, i, done, ok := f.Use(5000) // 5000ms timeout per packet
+	// Try to receive one packet - wait forever until packet or DONE signal arrives
+	_, i, done, ok := f.UseForever()
 	if !ok {
-		// No packet available, yield control
+		// Channel closed or error
 		return
 	}
 

@@ -358,7 +358,8 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 				states := builder.GetAllWantStates()
 				for _, want := range states {
 					// Check if want PROVIDES this label
-					if val, ok := want.Metadata.Labels[k]; ok && val == v {
+					labels := want.GetLabels()
+					if val, ok := labels[k]; ok && val == v {
 						ownerMap[want.Metadata.ID] = true
 					}
 					// Check if want USES this label (via 'using' in spec)

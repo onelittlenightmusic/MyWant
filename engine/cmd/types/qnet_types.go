@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"time"
 	mywant "mywant/engine/src"
 )
 
@@ -127,6 +128,12 @@ func (g *Numbers) Progress() {
 		return
 	}
 
+	// Initial delay for the very first packet to ensure subscribers (Queues) are connected
+	if locals.currentCount == 0 {
+		time.Sleep(1000 * time.Millisecond)
+		g.StoreLog("[NUMBERS-EXEC] Starting generation after initial sync delay")
+	}
+
 	locals.currentCount++
 
 	if useDeterministic {
@@ -243,6 +250,15 @@ func (q *Queue) Progress() {
 	if !ok {
 		// No packet received (timeout) - skip this cycle
 		return
+	}
+
+	if done {
+		q.StoreLog("[QUEUE-EXEC] Received DONE signal")
+	} else if i != nil {
+		packet := i.(QueuePacket)
+		if packet.Num % locals.batchUpdateInterval == 0 || packet.Num <= 5 {
+			q.StoreLog(fmt.Sprintf("[QUEUE-EXEC] Received packet #%d, time=%.2f", packet.Num, packet.Time))
+		}
 	}
 
 	// Check for end signal

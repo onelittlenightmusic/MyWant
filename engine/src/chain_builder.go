@@ -154,9 +154,9 @@ func (rw *runtimeWant) GetSpec() *WantSpec {
 	}
 	return rw.want.GetSpec()
 }
-func (rw *runtimeWant) GetMetadata() *Metadata {
+func (rw *runtimeWant) GetMetadata() Metadata {
 	if rw == nil || rw.want == nil {
-		return nil
+		return Metadata{}
 	}
 	return rw.want.GetMetadata()
 }
@@ -412,7 +412,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 				}
 
 				// Check if provider's labels match this selector
-				if cb.matchesSelector(providerWant.GetMetadata().Labels, selector) {
+				if cb.matchesSelector(providerWant.want.Metadata.Labels, selector) {
 					matchCount++
 
 					// CRITICAL: Check if a direct path already exists for this provider
@@ -427,7 +427,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 
 
 					// Subscribe to PubSub topic for this provider's labels
-					topic := serializeLabels(providerWant.GetMetadata().Labels)
+					topic := serializeLabels(providerWant.want.Metadata.Labels)
 					sub, err := cb.pubsub.Subscribe(topic, wantName)
 					if err != nil {
 						log.Printf("[PubSub] Failed to subscribe %s to topic %s: %v",
@@ -1074,8 +1074,9 @@ func (cb *ChainBuilder) processAutoConnections() {
 
 // hasRecipeAgent checks if a want has RecipeAgent functionality enabled
 func (cb *ChainBuilder) hasRecipeAgent(want *Want) bool {
-	if want.Metadata.Labels != nil {
-		if role, ok := want.Metadata.Labels["role"]; ok && role == "coordinator" {
+	labels := want.GetLabels()
+	if len(labels) > 0 {
+		if role, ok := labels["role"]; ok && role == "coordinator" {
 			return true
 		}
 	}
@@ -1113,8 +1114,9 @@ func (cb *ChainBuilder) extractApprovalID(want *Want) string {
 	}
 
 	// Fall back to labels
-	if want.Metadata.Labels != nil {
-		if approvalID, ok := want.Metadata.Labels["approval_id"]; ok && approvalID != "" {
+	labels := want.GetLabels()
+	if len(labels) > 0 {
+		if approvalID, ok := labels["approval_id"]; ok && approvalID != "" {
 			return approvalID
 		}
 	}
@@ -1147,11 +1149,12 @@ func (cb *ChainBuilder) tryAutoConnectToWant(want *Want, otherWant *Want) {
 
 // isDataProviderWant checks if a want is a data provider (evidence or description)
 func (cb *ChainBuilder) isDataProviderWant(want *Want) bool {
-	if want.Metadata.Labels == nil {
+	labels := want.GetLabels()
+	if len(labels) == 0 {
 		return false
 	}
 
-	role := want.Metadata.Labels["role"]
+	role := labels["role"]
 	return role == "evidence-provider" || role == "description-provider"
 }
 
@@ -1179,7 +1182,8 @@ func (cb *ChainBuilder) buildConnectionSelector(want *Want, otherWant *Want, con
 		selector[labelKey] = want.Metadata.Name
 	} else {
 		// Fallback to role-based selector
-		role := otherWant.Metadata.Labels["role"]
+		labels := otherWant.GetLabels()
+		role := labels["role"]
 		selector["role"] = role
 	}
 
@@ -1211,6 +1215,7 @@ func (cb *ChainBuilder) selectorsMatch(selector1, selector2 map[string]string) b
 	return true
 }
 func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want) {
+	sourceWant.metadataMutex.Lock()
 	if sourceWant.Metadata.Labels == nil {
 		sourceWant.Metadata.Labels = make(map[string]string)
 	}
@@ -1222,19 +1227,21 @@ func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want)
 		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
 		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
 	}
+	sourceWant.metadataMutex.Unlock()
 }
 
 // generateConnectionKey creates a unique key based on consumer want characteristics
 func (cb *ChainBuilder) generateConnectionKey(consumerWant *Want) string {
 	// Try to extract meaningful identifier from labels first
-	if consumerWant.Metadata.Labels != nil {
-		if level, ok := consumerWant.Metadata.Labels["approval_level"]; ok {
+	labels := consumerWant.GetLabels()
+	if len(labels) > 0 {
+		if level, ok := labels["approval_level"]; ok {
 			return fmt.Sprintf("level%s", level)
 		}
-		if component, ok := consumerWant.Metadata.Labels["component"]; ok {
+		if component, ok := labels["component"]; ok {
 			return component
 		}
-		if category, ok := consumerWant.Metadata.Labels["category"]; ok {
+		if category, ok := labels["category"]; ok {
 			return category
 		}
 	}
@@ -1382,7 +1389,7 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		return false
 	}
 
-	if !mapsEqual(a.Metadata.Labels, b.Metadata.Labels) {
+	if !mapsEqual(a.GetLabels(), b.GetLabels()) {
 		return false
 	}
 
@@ -1432,7 +1439,7 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 				ID:              want.Metadata.ID,
 				Name:            want.Metadata.Name,
 				Type:            want.Metadata.Type,
-				Labels:          copyStringMap(want.Metadata.Labels),
+				Labels:          want.GetLabels(),
 				OwnerReferences: copyOwnerReferences(want.Metadata.OwnerReferences),
 			},
 			Spec: WantSpec{
@@ -1578,7 +1585,9 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 
 					// Sync ALL fields
 					runtimeWant.want.Spec = updatedConfigWant.Spec
+					runtimeWant.want.metadataMutex.Lock()
 					runtimeWant.want.Metadata = updatedConfigWant.Metadata
+					runtimeWant.want.metadataMutex.Unlock()
 					runtimeWant.want.State = updatedConfigWant.State
 
 					// Re-initialize progressable linkage
@@ -1684,7 +1693,7 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[strin
 	maxDependencyLevel := 0
 	for _, usingSelector := range wantConfig.Spec.Using {
 		for _, configWant := range cb.config.Wants {
-			if cb.matchesSelector(configWant.Metadata.Labels, usingSelector) {
+			if cb.matchesSelector(configWant.GetLabels(), usingSelector) {
 				depLevel := cb.calculateDependencyLevel(configWant.Metadata.ID, levels, visited, inProgress)
 				if depLevel >= maxDependencyLevel {
 					maxDependencyLevel = depLevel + 1
@@ -1765,7 +1774,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		}
 	} else {
 		// Update the extracted Want with metadata and config info
+		wantPtr.metadataMutex.Lock()
 		wantPtr.Metadata = wantConfig.Metadata
+		wantPtr.metadataMutex.Unlock()
 		wantPtr.Spec = wantConfig.Spec
 		wantPtr.SetStatus(WantStatusIdle)
 
@@ -2135,7 +2146,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			runtimeWant.want.stateMutex.RUnlock()
 
 			wantConfig := &Want{
-				Metadata: *runtimeWant.GetMetadata(),
+				Metadata: runtimeWant.GetMetadata(),
 				Spec:     *runtimeWant.GetSpec(),
 				// Stats field removed - data now in State
 				Status:  runtimeWant.want.Status,
@@ -2640,7 +2651,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 
 		// Use runtime spec to preserve using, but want state for stats/status
 		want := &Want{
-			Metadata: *runtimeWant.GetMetadata(),
+			Metadata: runtimeWant.GetMetadata(),
 			Spec:     *runtimeWant.GetSpec(), // This preserves using
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
@@ -3163,8 +3174,8 @@ func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []strin
 	}
 
 	completedWant := runtimeWant.want
-	labels := completedWant.Metadata.Labels
-	if labels == nil {
+	labels := completedWant.GetLabels()
+	if len(labels) == 0 {
 		return []string{}
 	}
 
@@ -3527,10 +3538,12 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			}
 
 			if want, _, found := cb.FindWantByID(wantID); found && want != nil {
+				want.metadataMutex.Lock()
 				if want.Metadata.Labels == nil {
 					want.Metadata.Labels = make(map[string]string)
 				}
 				want.Metadata.Labels[key] = value
+				want.metadataMutex.Unlock()
 				want.Metadata.UpdatedAt = time.Now().Unix()
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
@@ -3550,9 +3563,11 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			}
 
 			if want, _, found := cb.FindWantByID(wantID); found && want != nil {
+				want.metadataMutex.Lock()
 				if want.Metadata.Labels != nil {
 					delete(want.Metadata.Labels, key)
 				}
+				want.metadataMutex.Unlock()
 				want.Metadata.UpdatedAt = time.Now().Unix()
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
@@ -3584,11 +3599,15 @@ func (cb *ChainBuilder) AddLabelToRegistry(key, value string) {
 
 // registerLabelsFromWant extracts all labels from a want and registers them
 func (cb *ChainBuilder) registerLabelsFromWant(want *Want) {
-	if want == nil || want.Metadata.Labels == nil {
+	if want == nil {
+		return
+	}
+	labels := want.GetLabels()
+	if len(labels) == 0 {
 		return
 	}
 
-	for k, v := range want.Metadata.Labels {
+	for k, v := range labels {
 		cb.AddLabelToRegistry(k, v)
 	}
 }

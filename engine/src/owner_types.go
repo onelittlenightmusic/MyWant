@@ -291,12 +291,19 @@ func (t *Target) CreateChildWants() []*Want {
 				BlockOwnerDeletion: true,
 			},
 		}
+		config.Wants[i].metadataMutex.Lock()
 		if config.Wants[i].Metadata.Labels == nil {
 			config.Wants[i].Metadata.Labels = make(map[string]string)
 		}
 		config.Wants[i].Metadata.Labels["owner"] = "child"
 		// Inject affinity label to namespace children of this target
-		config.Wants[i].Metadata.Labels["owner-name"] = t.Metadata.Name
+		// Use both name and ID to ensure uniqueness across redeployments
+		instanceID := t.Metadata.Name
+		if t.Metadata.ID != "" {
+			instanceID = fmt.Sprintf("%s-%s", t.Metadata.Name, t.Metadata.ID)
+		}
+		config.Wants[i].Metadata.Labels["owner-name"] = instanceID
+		config.Wants[i].metadataMutex.Unlock()
 
 		// Inject the same affinity label into all 'using' selectors of the child
 		// This ensures sibling wants within the same target connect to each other
@@ -304,7 +311,7 @@ func (t *Target) CreateChildWants() []*Want {
 			if config.Wants[i].Spec.Using[j] == nil {
 				config.Wants[i].Spec.Using[j] = make(map[string]string)
 			}
-			config.Wants[i].Spec.Using[j]["owner-name"] = t.Metadata.Name
+			config.Wants[i].Spec.Using[j]["owner-name"] = instanceID
 		}
 		t.StoreLog("[TARGET] Configured owner references and labels for child want %s (ID: %s)\n", config.Wants[i].Metadata.Name, config.Wants[i].Metadata.ID)
 	}
@@ -891,11 +898,11 @@ func (oaw *OwnerAwareWant) GetFirstOutputChannel() (chain.Chan, bool) {
 	}
 	return nil, true
 }
-func (oaw *OwnerAwareWant) GetMetadata() *Metadata {
+func (oaw *OwnerAwareWant) GetMetadata() Metadata {
 	if oaw.Want != nil {
 		return oaw.Want.GetMetadata()
 	}
-	return nil
+	return Metadata{}
 }
 func (oaw *OwnerAwareWant) GetSpec() *WantSpec {
 	if oaw.Want != nil {

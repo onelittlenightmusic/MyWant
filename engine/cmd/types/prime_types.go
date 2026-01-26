@@ -72,8 +72,12 @@ func (g *PrimeNumbers) Progress() {
 	if currentNumber >= end {
 		// Send end signal
 		g.ProvideDone()
-		g.StoreState("final_result", fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end))
-		g.StoreState("achieving_percentage", 100)
+		g.StoreStateMulti(Dict{
+			"final_result":         fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end),
+			"achieving_percentage": 100,
+			"achieved":             true,
+			"completed":            true, // Explicitly set completed to true
+		})
 	}
 }
 
@@ -154,10 +158,10 @@ func (f *PrimeSequence) Progress() {
 		}
 	}
 
-	// Try to receive one packet with timeout
-	_, i, done, ok := f.Use(5000) // 5000ms timeout per packet
+	// Try to receive one packet - wait forever until packet or DONE signal arrives
+	_, i, done, ok := f.UseForever()
 	if !ok {
-		// No packet available, yield control
+		// Channel closed or error
 		return
 	}
 

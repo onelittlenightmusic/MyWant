@@ -1119,6 +1119,29 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
     <div className="p-8 h-full overflow-y-auto">
       {hasState || hasHiddenState ? (
         <div className="space-y-2">
+          {/* Execution Result Metadata */}
+          <div className={SECTION_CONTAINER_CLASS}>
+            <h4 className="text-base font-medium text-gray-900 mb-4">Execution Result</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-sm">Name:</span>
+                <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-sm">Type:</span>
+                <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-sm">Status:</span>
+                <span className="font-medium text-sm">{want.status || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-sm">ID:</span>
+                <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
           {hasState && (
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>

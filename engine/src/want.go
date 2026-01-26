@@ -267,6 +267,9 @@ type Want struct {
 	// Packet cache for non-consuming checks
 	cachedPacket *CachedPacket `json:"-" yaml:"-"`
 	cacheMutex   sync.Mutex    `json:"-" yaml:"-"`
+
+	// Metadata protection
+	metadataMutex sync.RWMutex `json:"-" yaml:"-"`
 }
 
 func (n *Want) SetStatus(status WantStatus) {
@@ -1328,7 +1331,7 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 // Ensures consistent topic names across publisher and subscribers.
 // Example: {role: "processor", stage: "final"} → "role=processor,stage=final"
 func serializeLabels(labels map[string]string) string {
-	if len(labels) == 0 {
+	if labels == nil || len(labels) == 0 {
 		return ""
 	}
 
@@ -1352,8 +1355,17 @@ func (n *Want) Provide(packet any) error {
 	cb := GetGlobalChainBuilder()
 
 	// communication now flows through PubSub topic subscriptions
-	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
-		topic := serializeLabels(n.Metadata.Labels)
+	n.metadataMutex.RLock()
+	hasLabels := len(n.Metadata.Labels) > 0
+	var topic string
+	var wantName string
+	if hasLabels {
+		topic = serializeLabels(n.Metadata.Labels)
+		wantName = n.Metadata.Name
+	}
+	n.metadataMutex.RUnlock()
+
+	if cb != nil && cb.pubsub != nil && hasLabels {
 		msg := &pubsub.Message{
 			Payload:   packet,
 			Timestamp: time.Now(),
@@ -1362,12 +1374,12 @@ func (n *Want) Provide(packet any) error {
 
 		if err := cb.pubsub.Publish(topic, msg); err != nil {
 			ErrorLog("[PubSub] Failed to publish packet from '%s' to topic '%s': %v",
-				n.Metadata.Name, topic, err)
+				wantName, topic, err)
 		}
 
 		// Also log PubSub routing
 		InfoLog("[PROVIDE] Want '%s' published packet to PubSub topic '%s'",
-			n.Metadata.Name, topic)
+			wantName, topic)
 	}
 
 	return nil
@@ -1378,8 +1390,17 @@ func (n *Want) ProvideDone() error {
 	cb := GetGlobalChainBuilder()
 
 	// DONE signal now flows exclusively through PubSub
-	if cb != nil && cb.pubsub != nil && len(n.Metadata.Labels) > 0 {
-		topic := serializeLabels(n.Metadata.Labels)
+	n.metadataMutex.RLock()
+	hasLabels := len(n.Metadata.Labels) > 0
+	var topic string
+	var wantName string
+	if hasLabels {
+		topic = serializeLabels(n.Metadata.Labels)
+		wantName = n.Metadata.Name
+	}
+	n.metadataMutex.RUnlock()
+
+	if cb != nil && cb.pubsub != nil && hasLabels {
 		msg := &pubsub.Message{
 			Payload:   nil,
 			Timestamp: time.Now(),
@@ -1388,11 +1409,11 @@ func (n *Want) ProvideDone() error {
 
 		if err := cb.pubsub.Publish(topic, msg); err != nil {
 			ErrorLog("[PubSub] Failed to publish Done signal from '%s' to topic '%s': %v",
-				n.Metadata.Name, topic, err)
+				wantName, topic, err)
 		}
 
 		InfoLog("[PROVIDE_DONE] Want '%s' published Done signal to PubSub topic '%s'",
-			n.Metadata.Name, topic)
+			wantName, topic)
 	}
 
 	return nil
@@ -1517,7 +1538,12 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 	if typeDef == nil {
 		return
 	}
+	n.metadataMutex.Lock()
 	n.WantTypeDefinition = typeDef
+	n.metadataMutex.Unlock()
+
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
 
 	// Extract provided state field names and initialize with default values
 	n.ProvidedStateFields = make([]string, 0, len(typeDef.State))
@@ -1526,10 +1552,13 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 
 		// Initialize state field with initial value if provided
 		if stateDef.InitialValue != nil {
-			n.StoreState(stateDef.Name, stateDef.InitialValue)
+			// Using direct map access as we hold the lock
+			if n.State == nil {
+				n.State = make(map[string]any)
+			}
+			n.State[stateDef.Name] = stateDef.InitialValue
 		}
 	}
-
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {
@@ -1595,11 +1624,43 @@ func (w *Want) GetSpec() *WantSpec {
 	}
 	return &w.Spec
 }
-func (w *Want) GetMetadata() *Metadata {
+func (w *Want) GetMetadata() Metadata {
 	if w == nil {
-		return nil
+		return Metadata{}
 	}
-	return &w.Metadata
+	w.metadataMutex.RLock()
+	defer w.metadataMutex.RUnlock()
+
+	// Deep copy metadata to ensure thread safety
+	meta := w.Metadata
+	if w.Metadata.Labels != nil {
+		meta.Labels = make(map[string]string, len(w.Metadata.Labels))
+		for k, v := range w.Metadata.Labels {
+			meta.Labels[k] = v
+		}
+	}
+	if w.Metadata.OwnerReferences != nil {
+		meta.OwnerReferences = make([]OwnerReference, len(w.Metadata.OwnerReferences))
+		copy(meta.OwnerReferences, w.Metadata.OwnerReferences)
+	}
+	return meta
+}
+
+// GetLabels returns a copy of the want's labels map in a thread-safe way
+func (n *Want) GetLabels() map[string]string {
+	n.metadataMutex.RLock()
+	defer n.metadataMutex.RUnlock()
+
+	if n.Metadata.Labels == nil {
+		return make(map[string]string)
+	}
+
+	// Return a deep copy to prevent external modification
+	copy := make(map[string]string, len(n.Metadata.Labels))
+	for k, v := range n.Metadata.Labels {
+		copy[k] = v
+	}
+	return copy
 }
 
 // emitOwnerCompletionEventIfOwned emits an OwnerCompletionEvent if this want has an owner

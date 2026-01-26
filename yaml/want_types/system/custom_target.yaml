@@ -1,10 +1,8 @@
 wantType:
-    metadata:
-      name: custom_target
-      title: Custom Target
-      description: |
-        Custom Target want type for executing external tools or scripts.
-  
+  metadata:
+    name: custom_target
+    title: Custom Target
+    description: Custom Target want type for executing external tools or scripts.
     version: '1.0'
     category: system
     pattern: independent

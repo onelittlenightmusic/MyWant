@@ -1,4 +1,4 @@
-package main
+package demos_moved
 
 import (
 	"context"
