@@ -30,16 +30,18 @@ type PubSub interface {
 
 // SubscriptionImpl implements the Subscription interface.
 type SubscriptionImpl struct {
-	msgChan chan *Message
-	ctx     context.Context
-	cancel  context.CancelFunc
+	MsgChan <-chan *Message
+	Ctx     context.Context
+	Cancel  context.CancelFunc
 }
 
 func (s *SubscriptionImpl) Chan() <-chan *Message {
-	return s.msgChan
+	return s.MsgChan
 }
 
 func (s *SubscriptionImpl) Close() error {
-	s.cancel()
+	if s.Cancel != nil {
+		s.Cancel()
+	}
 	return nil
 }

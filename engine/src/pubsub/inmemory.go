@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -30,7 +31,14 @@ type WatermillPubSub struct {
 
 	// Track active subscriptions
 	subscriptions map[string]context.CancelFunc
+	chanMap       map[string]Subscription
 	subMu         sync.Mutex
+}
+
+type TopicStats struct {
+	MessageCount  int
+	ConsumerCount int
+	CacheSize     int
 }
 
 // NewInMemoryPubSub creates a new Watermill-backed PubSub with pointer preservation.
@@ -57,13 +65,8 @@ func NewInMemoryPubSub() *WatermillPubSub {
 		maxCache:      10000,
 		consumerBuf:   2000,
 		subscriptions: make(map[string]context.CancelFunc),
+		chanMap:       make(map[string]Subscription),
 	}
-}
-
-type TopicStats struct {
-	MessageCount  int
-	ConsumerCount int
-	CacheSize     int
 }
 
 func (ps *WatermillPubSub) SetCacheSize(size int) {
@@ -100,7 +103,7 @@ func (ps *WatermillPubSub) GetStats(topic string) (TopicStats, error) {
 	return TopicStats{
 		MessageCount:  msgCount,
 		ConsumerCount: consumerCount,
-		CacheSize:     msgCount, // In this implementation, CacheSize is same as MessageCount
+		CacheSize:     msgCount,
 	}, nil
 }
 
@@ -132,13 +135,18 @@ func (ps *WatermillPubSub) Publish(topic string, msg *Message) error {
 
 // Subscribe subscribes to a topic and replays cached messages.
 func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscription, error) {
-	subCtx, subCancel := context.WithCancel(ps.ctx)
-	
 	key := consumerID + ":" + topic
 	ps.subMu.Lock()
-	if oldCancel, exists := ps.subscriptions[key]; exists {
-		oldCancel()
+	// Idempotency: return existing subscription
+	if sub, exists := ps.chanMap[key]; exists {
+		ps.subMu.Unlock()
+		return sub, nil
 	}
+	ps.subMu.Unlock()
+
+	subCtx, subCancel := context.WithCancel(ps.ctx)
+	
+	ps.subMu.Lock()
 	ps.subscriptions[key] = subCancel
 	ps.subMu.Unlock()
 
@@ -156,20 +164,29 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 	ps.cacheMu.RUnlock()
 	outChan := make(chan *Message, bufSize)
 
-	// Replay existing cache
+	// Phase 1: Replay existing cache
 	ps.cacheMu.RLock()
+	var replayMsgs []*Message
 	if ids, ok := ps.topicCache[topic]; ok {
 		for _, id := range ids {
 			if m, exists := ps.pointerMap[id]; exists {
-				select {
-				case outChan <- m:
-				default:
-				}
+				replayMsgs = append(replayMsgs, m)
 			}
 		}
 	}
 	ps.cacheMu.RUnlock()
 
+	for _, m := range replayMsgs {
+		select {
+		case outChan <- m:
+		case <-subCtx.Done():
+			return nil, subCtx.Err()
+		case <-time.After(100 * time.Millisecond):
+			// Don't block forever if consumer is not reading
+		}
+	}
+
+	// Phase 2: Start real-time delivery
 	go func() {
 		defer close(outChan)
 		for {
@@ -182,7 +199,6 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 				}
 				
 				ps.cacheMu.RLock()
-				// Use the actual Watermill Message ID to find the correct pointer
 				foundMsg, exists := ps.pointerMap[wMsg.UUID]
 				ps.cacheMu.RUnlock()
 
@@ -194,18 +210,23 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 						return
 					}
 				} else {
-					// Fallback for expired cache entries
 					wMsg.Ack()
 				}
 			}
 		}
 	}()
 
-	return &SubscriptionImpl{
-		msgChan: outChan,
-		ctx:     subCtx,
-		cancel:  subCancel,
-	}, nil
+	sub := &SubscriptionImpl{
+		MsgChan: outChan,
+		Ctx:     subCtx,
+		Cancel:  subCancel,
+	}
+
+	ps.subMu.Lock()
+	ps.chanMap[key] = sub
+	ps.subMu.Unlock()
+
+	return sub, nil
 }
 
 // IsSubscribed checks if a consumer is already subscribed to a topic.
@@ -226,6 +247,7 @@ func (ps *WatermillPubSub) Unsubscribe(topic string, consumerID string) error {
 	if cancel, exists := ps.subscriptions[key]; exists {
 		cancel()
 		delete(ps.subscriptions, key)
+		delete(ps.chanMap, key)
 	}
 	
 	return nil
