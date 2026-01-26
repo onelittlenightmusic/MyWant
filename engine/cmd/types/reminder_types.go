@@ -374,12 +374,9 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 			"reaction_type": locals.ReactionType,
 			"source_want":   r.Metadata.Name,
 		}
-		if err := r.Provide(packet); err != nil {
-			r.StoreLog("ERROR: Failed to emit reaction request packet: %v", err)
-		} else {
-			r.StoreLog("[REMINDER] Emitted reaction request packet for %s", r.Metadata.Name)
-			r.StoreState("_reaction_packet_emitted", true)
-		}
+		r.Provide(packet)
+		r.StoreLog("[REMINDER] Emitted reaction request packet for %s", r.Metadata.Name)
+		r.StoreState("_reaction_packet_emitted", true)
 	}
 }
 

@@ -24,6 +24,7 @@ type PubSub interface {
 	Publish(topic string, message *Message) error
 	Subscribe(topic string, consumerID string) (Subscription, error)
 	Unsubscribe(topic string, consumerID string) error
+	IsSubscribed(topic string, consumerID string) bool
 	Close() error
 }
 

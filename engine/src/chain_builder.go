@@ -415,33 +415,24 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 				if cb.matchesSelector(providerWant.want.Metadata.Labels, selector) {
 					matchCount++
 
-					// CRITICAL: Check if a direct path already exists for this provider
-					// In nested recipes, paths are generated in TWO phases:
-					// Phase 1: Direct paths (Evidence/Description → Coordinator)
-					// Phase 2: PubSub paths (for late-arriving wants)
-					// We must avoid duplicating paths from the same provider
-
-					// Always subscribe to PubSub regardless of direct path
-					// Phase 1 of PubSub unification: Remove exclusive logic
-					// Direct paths will be deprecated in Phase 2
-
-
 					// Subscribe to PubSub topic for this provider's labels
 					topic := serializeLabels(providerWant.want.Metadata.Labels)
-					sub, err := cb.pubsub.Subscribe(topic, wantName)
-					if err != nil {
-						log.Printf("[PubSub] Failed to subscribe %s to topic %s: %v",
-							wantName, topic, err)
-						continue
-					}
-
-					// Reuse existing adapter channel if available
 					adapterKey := fmt.Sprintf("%s:%s", topic, wantName)
+
 					cb.pubsubMutex.RLock()
 					adaptedChan, exists := cb.pubsubChannels[adapterKey]
+					isSubscribed := cb.pubsub.IsSubscribed(topic, wantName)
 					cb.pubsubMutex.RUnlock()
 
-					if !exists {
+					if !exists || !isSubscribed {
+						// Create new subscription if it doesn't exist
+						sub, err := cb.pubsub.Subscribe(topic, wantName)
+						if err != nil {
+							log.Printf("[PubSub] Failed to subscribe %s to topic %s: %v",
+								wantName, topic, err)
+							continue
+						}
+
 						// Create adapter channel that converts PubSub messages to TransportPackets
 						adaptedChan = cb.adaptPubSubChannel(sub.Chan())
 						cb.pubsubMutex.Lock()
@@ -456,8 +447,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 						Active:  true,
 					}
 
-					// Add to input paths (might be duplicated if multiple selectors match same provider)
-					// Only add if not already present (check by name)
+					// Add to input paths if not already present
 					isDuplicate := false
 					for _, existingPath := range paths.In {
 						if existingPath.Name == pubsubPath.Name {
@@ -476,7 +466,6 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 
 			if matchCount == 0 && len(want.GetMetadata().Labels) == 0 {
 				// No match yet - want might be added later dynamically
-				// This is expected for late-arriving wants like Coordinators
 				log.Printf("[PubSub] Want '%s' has selector %v but no matching providers yet (will auto-connect on discovery)",
 					wantName, selector)
 			}

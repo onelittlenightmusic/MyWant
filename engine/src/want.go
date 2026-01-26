@@ -1351,27 +1351,25 @@ func serializeLabels(labels map[string]string) string {
 }
 
 // Provide sends a data packet to PubSub topic for subscribers
-func (n *Want) Provide(packet any) error {
+func (n *Want) Provide(payload any) {
 	cb := GetGlobalChainBuilder()
 
-	// communication now flows through PubSub topic subscriptions
 	n.metadataMutex.RLock()
+	topic := n.Metadata.Name // Fallback to name if no labels
 	hasLabels := len(n.Metadata.Labels) > 0
-	var topic string
-	var wantName string
+	wantName := n.Metadata.Name
+
 	if hasLabels {
 		topic = serializeLabels(n.Metadata.Labels)
-		wantName = n.Metadata.Name
 	}
 	n.metadataMutex.RUnlock()
 
 	if cb != nil && cb.pubsub != nil && hasLabels {
 		msg := &pubsub.Message{
-			Payload:   packet,
+			Payload:   payload,
 			Timestamp: time.Now(),
 			Done:      false,
 		}
-
 		if err := cb.pubsub.Publish(topic, msg); err != nil {
 			ErrorLog("[PubSub] Failed to publish packet from '%s' to topic '%s': %v",
 				wantName, topic, err)
@@ -1381,22 +1379,19 @@ func (n *Want) Provide(packet any) error {
 		InfoLog("[PROVIDE] Want '%s' published packet to PubSub topic '%s'",
 			wantName, topic)
 	}
-
-	return nil
 }
 
 // ProvideDone sends a termination signal to PubSub topic
-func (n *Want) ProvideDone() error {
+func (n *Want) ProvideDone() {
 	cb := GetGlobalChainBuilder()
 
-	// DONE signal now flows exclusively through PubSub
 	n.metadataMutex.RLock()
+	topic := n.Metadata.Name
 	hasLabels := len(n.Metadata.Labels) > 0
-	var topic string
-	var wantName string
+	wantName := n.Metadata.Name
+
 	if hasLabels {
 		topic = serializeLabels(n.Metadata.Labels)
-		wantName = n.Metadata.Name
 	}
 	n.metadataMutex.RUnlock()
 
@@ -1406,17 +1401,13 @@ func (n *Want) ProvideDone() error {
 			Timestamp: time.Now(),
 			Done:      true,
 		}
-
 		if err := cb.pubsub.Publish(topic, msg); err != nil {
 			ErrorLog("[PubSub] Failed to publish Done signal from '%s' to topic '%s': %v",
 				wantName, topic, err)
 		}
-
 		InfoLog("[PROVIDE_DONE] Want '%s' published Done signal to PubSub topic '%s'",
 			wantName, topic)
 	}
-
-	return nil
 }
 func (n *Want) GetType() string {
 	return n.WantType
@@ -1661,6 +1652,16 @@ func (n *Want) GetLabels() map[string]string {
 		copy[k] = v
 	}
 	return copy
+}
+
+// matchesSelector checks if want labels match the selector criteria
+func (n *Want) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
+	for key, value := range selector {
+		if wantLabels[key] != value {
+			return false
+		}
+	}
+	return true
 }
 
 // emitOwnerCompletionEventIfOwned emits an OwnerCompletionEvent if this want has an owner

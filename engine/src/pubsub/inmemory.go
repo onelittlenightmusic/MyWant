@@ -26,6 +26,7 @@ type WatermillPubSub struct {
 	topicCache map[string][]string 
 	cacheMu    sync.RWMutex
 	maxCache   int
+	consumerBuf int
 
 	// Track active subscriptions
 	subscriptions map[string]context.CancelFunc
@@ -54,8 +55,53 @@ func NewInMemoryPubSub() *WatermillPubSub {
 		pointerMap:    make(map[string]*Message),
 		topicCache:    make(map[string][]string),
 		maxCache:      10000,
+		consumerBuf:   2000,
 		subscriptions: make(map[string]context.CancelFunc),
 	}
+}
+
+type TopicStats struct {
+	MessageCount  int
+	ConsumerCount int
+	CacheSize     int
+}
+
+func (ps *WatermillPubSub) SetCacheSize(size int) {
+	ps.cacheMu.Lock()
+	defer ps.cacheMu.Unlock()
+	ps.maxCache = size
+}
+
+func (ps *WatermillPubSub) SetConsumerBuf(size int) {
+	ps.cacheMu.Lock()
+	defer ps.cacheMu.Unlock()
+	ps.consumerBuf = size
+}
+
+func (ps *WatermillPubSub) GetStats(topic string) (TopicStats, error) {
+	ps.cacheMu.RLock()
+	defer ps.cacheMu.RUnlock()
+	ps.subMu.Lock()
+	defer ps.subMu.Unlock()
+
+	msgCount := 0
+	if ids, ok := ps.topicCache[topic]; ok {
+		msgCount = len(ids)
+	}
+
+	consumerCount := 0
+	for key := range ps.subscriptions {
+		// key is "consumerID:topic"
+		if len(key) > len(topic) && key[len(key)-len(topic)-1:] == ":"+topic {
+			consumerCount++
+		}
+	}
+
+	return TopicStats{
+		MessageCount:  msgCount,
+		ConsumerCount: consumerCount,
+		CacheSize:     msgCount, // In this implementation, CacheSize is same as MessageCount
+	}, nil
 }
 
 // Publish publishes a message.
@@ -99,10 +145,16 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 	messages, err := ps.subscriber.Subscribe(subCtx, topic)
 	if err != nil {
 		subCancel()
+		ps.subMu.Lock()
+		delete(ps.subscriptions, key)
+		ps.subMu.Unlock()
 		return nil, fmt.Errorf("watermill subscribe failed: %w", err)
 	}
 
-	outChan := make(chan *Message, 2000)
+	ps.cacheMu.RLock()
+	bufSize := ps.consumerBuf
+	ps.cacheMu.RUnlock()
+	outChan := make(chan *Message, bufSize)
 
 	// Replay existing cache
 	ps.cacheMu.RLock()
@@ -154,6 +206,15 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 		ctx:     subCtx,
 		cancel:  subCancel,
 	}, nil
+}
+
+// IsSubscribed checks if a consumer is already subscribed to a topic.
+func (ps *WatermillPubSub) IsSubscribed(topic string, consumerID string) bool {
+	ps.subMu.Lock()
+	defer ps.subMu.Unlock()
+	key := consumerID + ":" + topic
+	_, exists := ps.subscriptions[key]
+	return exists
 }
 
 // Unsubscribe stops a subscription.
