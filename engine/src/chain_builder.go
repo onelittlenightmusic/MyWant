@@ -1710,6 +1710,14 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[strin
 	return maxDependencyLevel
 }
 func (cb *ChainBuilder) addWant(wantConfig *Want) {
+	// Check for duplicate name
+	if existingWant, exists := cb.wants[wantConfig.Metadata.Name]; exists {
+		// Duplicate name detected - reject the new want to protect existing one
+		InfoLog("[WARN] Rejecting want '%s' (ID: %s): name already exists (existing ID: %s)\n",
+			wantConfig.Metadata.Name, wantConfig.Metadata.ID, existingWant.want.Metadata.ID)
+		return
+	}
+
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
 		wantPtr := &Want{
@@ -2293,6 +2301,19 @@ func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, erro
 		}
 		ids[i] = want.Metadata.ID
 	}
+
+	// Pre-check: Verify no duplicate names in existing wants
+	cb.reconcileMutex.RLock()
+	for _, newWant := range wants {
+		for _, rw := range cb.wants {
+			if rw.want.Metadata.Name == newWant.Metadata.Name {
+				cb.reconcileMutex.RUnlock()
+				return nil, fmt.Errorf("want with name '%s' already exists", newWant.Metadata.Name)
+			}
+		}
+	}
+	cb.reconcileMutex.RUnlock()
+
 	if err := cb.AddWantsAsync(wants); err != nil {
 		return nil, err
 	}
