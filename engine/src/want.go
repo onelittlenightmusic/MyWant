@@ -205,7 +205,7 @@ type Want struct {
 	State       map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
 	HiddenState map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
 	History     WantHistory    `json:"history" yaml:"history"`
-	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, key state fields, status)
+	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
@@ -2003,30 +2003,20 @@ func Contains(slice []string, item string) bool {
 	return false
 }
 
-// CalculateWantHash computes a hash of want's metadata, spec, key state fields, and status
+// CalculateWantHash computes a hash of want's metadata, spec, all state fields, and status
 // This hash is used for change detection to avoid unnecessary frontend re-renders
 func CalculateWantHash(w *Want) string {
-	// Build hash data structure with only relevant fields
+	// Build hash data structure with all relevant fields
 	hashData := struct {
 		Metadata Metadata       `json:"metadata"`
 		Spec     WantSpec       `json:"spec"`
 		Status   WantStatus     `json:"status"`
-		State    map[string]any `json:"state"` // Only final_result and achieving_percentage
+		State    map[string]any `json:"state"` // All state fields
 	}{
 		Metadata: w.Metadata,
 		Spec:     w.Spec,
 		Status:   w.Status,
-		State:    make(map[string]any),
-	}
-
-	// Extract only final_result and achieving_percentage from state
-	if w.State != nil {
-		if finalResult, ok := w.State["final_result"]; ok {
-			hashData.State["final_result"] = finalResult
-		}
-		if achievingPercentage, ok := w.State["achieving_percentage"]; ok {
-			hashData.State["achieving_percentage"] = achievingPercentage
-		}
+		State:    w.State, // Include all state fields
 	}
 
 	// Serialize to JSON

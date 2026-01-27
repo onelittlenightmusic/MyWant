@@ -11,7 +11,7 @@ export interface Want {
   builder?: unknown; // ChainBuilder reference (not serialized)
   current_agent?: string; // Name of the agent currently executing for this want
   running_agents?: string[]; // Array of all currently running agent names
-  hash?: string; // Hash for change detection (metadata, spec, key state fields, status)
+  hash?: string; // Hash for change detection (metadata, spec, all state fields, status)
 }
 
 export interface WantConfig {
