@@ -475,7 +475,7 @@ export const Dashboard: React.FC = () => {
   const handleEscapeKey = () => { if (showBatchConfirmation) setShowBatchConfirmation(false); else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); } else if (sidebar.showSummary) sidebar.closeSummary(); else if (sidebar.showForm) sidebar.closeForm(); else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); setIsSelectMode(false); } };
   useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode });
 
-  // Keyboard shortcuts: a (add), s (summary), Shift+S (select)
+  // Keyboard shortcuts: a (add), s (summary), Shift+S (select), Ctrl+A (select all in select mode)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept if user is typing in an input
@@ -488,7 +488,20 @@ export const Dashboard: React.FC = () => {
       if (isInputElement) return;
 
       // Handle shortcuts
-      if (e.key === 'a' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // IMPORTANT: Check Ctrl+A / Cmd+A FIRST before simple 'a' to prevent conflicts
+      if (e.key === 'a' && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        // Ctrl+A (or Cmd+A on Mac) - Select all wants in select mode
+        // Must preventDefault BEFORE checking isSelectMode to block browser default
+        e.preventDefault();
+        e.stopPropagation();
+        if (isSelectMode) {
+          const allWantIds = new Set(filteredWants.map(w => w.metadata?.id || w.id || '').filter(id => id !== ''));
+          setSelectedWantIds(allWantIds);
+          if (allWantIds.size > 0) {
+            sidebar.openBatch();
+          }
+        }
+      } else if (e.key === 'a' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleCreateWant();
       } else if (e.key === 's' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -507,7 +520,7 @@ export const Dashboard: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCreateWant, handleToggleSelectMode, sidebar]);
+  }, [handleCreateWant, handleToggleSelectMode, sidebar, isSelectMode, filteredWants]);
 
   const getWantBackgroundImage = (type?: string) => {
     if (!type) return undefined;

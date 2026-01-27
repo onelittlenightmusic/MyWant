@@ -47,7 +47,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   onRecommendationSelect,
   onRecommendationDeploy
 }) => {
-  const { wants, createWant, updateWant, loading, error } = useWantStore();
+  const { wants, createWant, updateWant, fetchWants, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
   const { recipes, fetchRecipes } = useRecipeStore();
 
@@ -408,6 +408,20 @@ export const WantForm: React.FC<WantFormProps> = ({
         await updateWant(editingWant.metadata.id, wantRequest as UpdateWantRequest);
       } else {
         await createWant(wantRequest as CreateWantRequest);
+
+        // Immediately refresh want list to capture initial state
+        fetchWants().catch(console.error);
+
+        // Refresh again after short delay to capture status transition (Idle -> Reaching)
+        // This helps show the updated status faster than waiting for the 5-second polling interval
+        setTimeout(() => {
+          fetchWants().catch(console.error);
+        }, 300);
+
+        // One more refresh to ensure we catch the transition if backend was slow
+        setTimeout(() => {
+          fetchWants().catch(console.error);
+        }, 800);
       }
 
       onClose();

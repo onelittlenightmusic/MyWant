@@ -14,6 +14,7 @@ This document outlines the keyboard shortcuts available in the application and p
 | `a` | Add Want | Opens the "New Want" form sidebar. |
 | `s` | Toggle Summary | Opens/Closes the Summary sidebar. |
 | `Shift + S` | Toggle Select Mode | Enters/Exits batch selection mode. |
+| `Ctrl + A` (or `Cmd + A`) | Select All | In Select Mode: selects all visible wants for batch operations. |
 | `Escape` | Close/Cancel | Closes open sidebars (Form, Summary, Details) or exits Select Mode. |
 
 ### Want Form (Sidebar)
