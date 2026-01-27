@@ -33,12 +33,6 @@ wantType:
       - vegetarian
     example: full
   state:
-  - name: attempted
-    description: Whether buffet reservation attempt has been made
-    type: bool
-    persistent: true
-    example: true
-    initialValue: false
   - name: total_processed
     description: Count of successful buffet reservations
     type: int

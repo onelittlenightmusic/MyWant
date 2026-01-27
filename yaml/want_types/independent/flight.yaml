@@ -45,12 +45,6 @@ wantType:
     required: false
     example: '2024-12-25'
   state:
-  - name: attempted
-    description: Whether flight booking has been attempted
-    type: bool
-    persistent: true
-    example: true
-    initialValue: false
   - name: flight_type
     description: Class of flight booked
     type: string
@@ -90,12 +84,6 @@ wantType:
     type: string
     persistent: true
     initialValue: ''
-  - name: monitoring_active
-    description: Whether monitoring flight for status changes
-    type: bool
-    persistent: false
-    example: false
-    initialValue: false
   - name: flight_action
     description: Pending flight action (book_flight, cancel_flight, modify_flight)
     type: string

@@ -177,6 +177,13 @@ wantType:
     initialValue: 0
     example: 50
 
+  - name: time_remaining
+    description: Time remaining until the next event (formatted as human-readable string like "5m30s", "2h15m")
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "5m30s"
+
   constraints:
   - description: Message parameter is required
     validation: message must not be empty

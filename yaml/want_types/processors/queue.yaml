@@ -34,40 +34,60 @@ wantType:
       - fifo
       - priority
   state:
-  - name: queued_items
-    description: Current number of items waiting in queue
-    type: int
-    persistent: true
-    initialValue: 0
-    example: 42
   - name: processed_count
     description: Total items processed since startup
     type: int
     persistent: true
     initialValue: 0
     example: 1000
-  - name: discarded_count
-    description: Items discarded due to max_queue_size limit
-    type: int
-    persistent: true
-    initialValue: 0
-    example: 0
-  - name: current_item
-    description: Item currently being processed
-    type: interface{}
-    persistent: false
-    initialValue: null
   - name: avg_wait_time
+    description: Average time items wait in queue (alias for average_wait_time)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 0.5
+  - name: average_wait_time
     description: Average time items wait in queue
     type: float64
     persistent: true
     initialValue: 0.0
     example: 0.5
-  - name: queue_start_time
-    description: When queue processing started
-    type: string
+  - name: total_processed
+    description: Total items processed (same as processed_count)
+    type: int
     persistent: true
-    initialValue: ""
+    initialValue: 0
+    example: 1000
+  - name: total_wait_time
+    description: Total accumulated wait time
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 50.0
+  - name: last_packet_wait_time
+    description: Wait time of the last processed packet
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 0.1
+  - name: current_server_free_time
+    description: Current server free time
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 1.5
+  - name: completed
+    description: Whether queue processing has completed
+    type: bool
+    persistent: true
+    initialValue: false
+    example: true
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 100
   agents: []
   constraints:
   - description: Service time must be positive

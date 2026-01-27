@@ -68,62 +68,106 @@ wantType:
       - expensive
       - luxury
   state:
-  - name: reservation_status
-    description: Current reservation status (pending, confirmed, cancelled, completed)
+  - name: completed
+    description: Whether reservation has been completed
+    type: bool
+    persistent: true
+    example: true
+    initialValue: false
+  - name: total_processed
+    description: Count of successful reservations
+    type: int
+    persistent: true
+    example: 1
+    initialValue: 0
+  - name: reservation_type
+    description: Type of restaurant reserved
     type: string
     persistent: true
-    example: confirmed
+    example: fine dining
     initialValue: ''
-  - name: restaurant_name
-    description: Name of the reserved restaurant
-    type: string
-    persistent: true
-    example: The French Laundry
-    initialValue: ''
-  - name: booking_time
-    description: Confirmed booking time in HH:MM format
+  - name: reservation_start_time
+    description: Reservation start time in HH:MM format
     type: string
     persistent: true
     example: '19:30'
     initialValue: ''
-  - name: reservation_id
-    description: Unique reservation identifier from booking system
+  - name: reservation_end_time
+    description: Reservation end time in HH:MM format
     type: string
     persistent: true
-    example: RES-2024-001234
+    example: '21:30'
     initialValue: ''
-  - name: confirmation_number
-    description: Confirmation number for the reservation
-    type: string
-    persistent: true
-    example: CONF-ABC123
-    initialValue: ''
-  - name: address
-    description: Restaurant address
-    type: string
-    persistent: true
-    example: 123 Main St, San Francisco, CA 94102
-    initialValue: ''
-  - name: contact_number
-    description: Restaurant phone number
-    type: string
-    persistent: true
-    example: +1-415-000-1234
-    initialValue: ''
-  - name: duration_minutes
-    description: Expected duration of dining experience
-    type: int
-    persistent: true
-    example: 120
-    initialValue: 0
-  - name: estimated_cost_per_person
-    description: Estimated cost per person in USD
+  - name: reservation_duration_hours
+    description: Duration of reservation in hours
     type: float64
     persistent: true
-    example: 85.5
+    example: 2.0
     initialValue: 0.0
-  - name: booking_timestamp
-    description: When the reservation was made
+  - name: reservation_name
+    description: Human-readable name of the reservation
+    type: string
+    persistent: true
+    example: The French Laundry - Party of 2 at fine dining restaurant
+    initialValue: ''
+  - name: schedule_date
+    description: Date of the reservation in YYYY-MM-DD format
+    type: string
+    persistent: true
+    example: '2024-01-15'
+    initialValue: ''
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    example: 100
+    initialValue: 0
+  - name: final_result
+    description: Final result summary
+    type: string
+    persistent: true
+    example: The French Laundry - Party of 2 at fine dining restaurant
+    initialValue: ''
+  - name: execution_source
+    description: Source of execution (monitor or agent)
+    type: string
+    persistent: true
+    example: agent
+    initialValue: ''
+  - name: premium_processed
+    description: Whether premium features were applied
+    type: bool
+    persistent: true
+    example: false
+    initialValue: false
+  - name: premium_level
+    description: Premium tier if applicable
+    type: string
+    persistent: true
+    example: platinum
+    initialValue: ''
+  - name: service_tier
+    description: Service tier selected
+    type: string
+    persistent: true
+    example: concierge
+    initialValue: ''
+  - name: premium_amenities
+    description: Array of premium amenities included
+    type: '[]string'
+    persistent: true
+    example:
+    - priority seating
+    - sommelier service
+    initialValue: []
+  - name: agent_execution_status
+    description: Status of agent execution (completed, failed, pending)
+    type: string
+    persistent: true
+    example: completed
+    initialValue: ''
+  - name: agent_execution_error
+    description: Error message if agent execution failed
     type: string
     persistent: true
     initialValue: ''

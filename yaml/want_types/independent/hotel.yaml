@@ -33,12 +33,6 @@ wantType:
       - boutique
     example: luxury
   state:
-  - name: attempted
-    description: Whether reservation attempt has been made
-    type: bool
-    persistent: true
-    example: true
-    initialValue: false
   - name: total_processed
     description: Count of successful reservations
     type: int

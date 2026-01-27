@@ -40,19 +40,40 @@ wantType:
     initialValue: "pending"
     example: "completed"
 
-  - name: claude_output
-    description: Full output text from Claude Code execution
-    type: string
-    persistent: true
-    initialValue: ''
-    example: "Found 3 emails from boss@company.com..."
-
   - name: error
     description: Error message if the operation failed
     type: string
     persistent: true
     initialValue: ''
-    example: "claude command not found"
+    example: "MCP operation failed"
+
+  - name: mcp_operation
+    description: MCP operation being performed (search_emails, read_email, send_email)
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "search_emails"
+
+  - name: mcp_query
+    description: Search query for MCP search operations
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "from:boss@company.com is:unread"
+
+  - name: mcp_max_results
+    description: Maximum number of results to return for search operations
+    type: int
+    persistent: true
+    initialValue: 10
+    example: 10
+
+  - name: final_result
+    description: Final result from the Gmail operation
+    type: string
+    persistent: true
+    initialValue: ''
+    example: "Found 3 emails from boss@company.com"
 
   constraints:
   - description: Prompt parameter is required

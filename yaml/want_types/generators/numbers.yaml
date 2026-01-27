@@ -24,23 +24,48 @@ wantType:
       min: 1
     example: 100
   state:
-  - name: current
-    description: Current number being generated
+  - name: current_count
+    description: Current count of numbers generated
     type: int
     persistent: true
     initialValue: 0
     example: 42
-  - name: generated_count
+  - name: total_processed
     description: Total numbers generated so far
     type: int
     persistent: true
     initialValue: 0
-    example: 50
-  - name: completion_time
-    description: When generation was completed
+    example: 100
+  - name: average_wait_time
+    description: Average wait time for generating numbers
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 0.001
+  - name: total_wait_time
+    description: Total accumulated wait time
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 0.1
+  - name: current_time
+    description: Current simulation time
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    example: 1.5
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 100
+  - name: final_result
+    description: Final result summary
     type: string
     persistent: true
-    initialValue: ""
+    initialValue: ''
+    example: 'Generated 100 numbers from 0 to 99'
   agents: []
   constraints:
   - description: Count must be positive
