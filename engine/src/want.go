@@ -2,6 +2,9 @@ package mywant
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"mywant/engine/src/pubsub"
@@ -202,6 +205,7 @@ type Want struct {
 	State       map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
 	HiddenState map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
 	History     WantHistory    `json:"history" yaml:"history"`
+	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, key state fields, status)
 
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
@@ -1997,4 +2001,42 @@ func Contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// CalculateWantHash computes a hash of want's metadata, spec, key state fields, and status
+// This hash is used for change detection to avoid unnecessary frontend re-renders
+func CalculateWantHash(w *Want) string {
+	// Build hash data structure with only relevant fields
+	hashData := struct {
+		Metadata Metadata       `json:"metadata"`
+		Spec     WantSpec       `json:"spec"`
+		Status   WantStatus     `json:"status"`
+		State    map[string]any `json:"state"` // Only final_result and achieving_percentage
+	}{
+		Metadata: w.Metadata,
+		Spec:     w.Spec,
+		Status:   w.Status,
+		State:    make(map[string]any),
+	}
+
+	// Extract only final_result and achieving_percentage from state
+	if w.State != nil {
+		if finalResult, ok := w.State["final_result"]; ok {
+			hashData.State["final_result"] = finalResult
+		}
+		if achievingPercentage, ok := w.State["achieving_percentage"]; ok {
+			hashData.State["achieving_percentage"] = achievingPercentage
+		}
+	}
+
+	// Serialize to JSON
+	jsonData, err := json.Marshal(hashData)
+	if err != nil {
+		// If marshaling fails, return empty string
+		return ""
+	}
+
+	// Compute SHA256 hash
+	hash := sha256.Sum256(jsonData)
+	return hex.EncodeToString(hash[:])
 }

@@ -21,6 +21,7 @@ interface WantStore {
   draggingTemplate: DraggingTemplate | null;
   isOverTarget: boolean;
   highlightedLabel: { key: string; value: string } | null;
+  isInitialLoad: boolean; // Track if this is the first load
 
   // Actions
   fetchWants: () => Promise<void>;
@@ -60,6 +61,7 @@ export const useWantStore = create<WantStore>()(
     draggingTemplate: null,
     isOverTarget: false,
     highlightedLabel: null,
+    isInitialLoad: true,
 
     // Actions
     setDraggingWant: (wantId: string | null) => set({ draggingWant: wantId }),
@@ -76,7 +78,13 @@ export const useWantStore = create<WantStore>()(
     },
 
     fetchWants: async () => {
-      set({ loading: true, error: null });
+      const currentState = useWantStore.getState();
+
+      // Only show loading on initial load
+      if (currentState.isInitialLoad) {
+        set({ loading: true, error: null });
+      }
+
       try {
         const wants = await apiClient.listWants();
         // Sort deterministically by ID to ensure consistent ordering across fetches
@@ -85,11 +93,34 @@ export const useWantStore = create<WantStore>()(
           const idB = b.metadata?.id || b.id || '';
           return idA.localeCompare(idB);
         });
-        set({ wants: sortedWants, loading: false });
+
+        // Compare hashes to detect changes
+        const currentWants = currentState.wants;
+        const hasChanges = sortedWants.length !== currentWants.length ||
+          sortedWants.some((newWant, index) => {
+            const oldWant = currentWants[index];
+            // Check if hash exists and differs
+            return !oldWant || newWant.hash !== oldWant.hash;
+          });
+
+        // Only update state if there are actual changes
+        if (hasChanges || currentState.isInitialLoad) {
+          set({
+            wants: sortedWants,
+            loading: false,
+            isInitialLoad: false
+          });
+        } else {
+          // No changes, just update loading state if it was set
+          if (currentState.isInitialLoad) {
+            set({ loading: false, isInitialLoad: false });
+          }
+        }
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch wants',
-          loading: false
+          loading: false,
+          isInitialLoad: false
         });
       }
     },

@@ -657,6 +657,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
+			// Calculate hash for change detection
+			wantCopy.Hash = mywant.CalculateWantHash(wantCopy)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -673,6 +675,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
+			// Calculate hash for change detection
+			wantCopy.Hash = mywant.CalculateWantHash(wantCopy)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -715,6 +719,8 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
+			// Calculate hash for change detection
+			wantCopy.Hash = mywant.CalculateWantHash(wantCopy)
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
