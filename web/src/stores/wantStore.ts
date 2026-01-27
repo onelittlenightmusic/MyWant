@@ -94,13 +94,28 @@ export const useWantStore = create<WantStore>()(
           return idA.localeCompare(idB);
         });
 
-        // Compare hashes to detect changes
+        // Compare hashes to detect changes (ID-based comparison)
         const currentWants = currentState.wants;
+
+        // Build a map of current wants by ID for efficient lookup
+        const currentWantsMap = new Map(
+          currentWants.map(w => [w.metadata?.id || w.id || '', w])
+        );
+
+        // Check if there are any changes
         const hasChanges = sortedWants.length !== currentWants.length ||
-          sortedWants.some((newWant, index) => {
-            const oldWant = currentWants[index];
-            // Check if hash exists and differs
-            return !oldWant || newWant.hash !== oldWant.hash;
+          sortedWants.some((newWant) => {
+            const wantId = newWant.metadata?.id || newWant.id || '';
+            const oldWant = currentWantsMap.get(wantId);
+
+            // If old want doesn't exist, it's a new want
+            if (!oldWant) return true;
+
+            // If either hash is missing/empty, consider it as changed
+            if (!newWant.hash || !oldWant.hash) return true;
+
+            // Compare hashes
+            return newWant.hash !== oldWant.hash;
           });
 
         // Only update state if there are actual changes
