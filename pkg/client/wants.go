@@ -5,13 +5,27 @@ import (
 	"fmt"
 )
 
-// ListWants retrieves all wants from the server, optionally filtered by type
-func (c *Client) ListWants(wantType string) (*APIDumpResponse, error) {
+// ListWants retrieves all wants from the server, optionally filtered by type and labels
+func (c *Client) ListWants(wantType string, labels []string) (*APIDumpResponse, error) {
 	var result APIDumpResponse
 	path := "/api/v1/wants"
+
+	// Build query parameters
+	params := []string{}
 	if wantType != "" {
-		path += fmt.Sprintf("?type=%s", wantType)
+		params = append(params, fmt.Sprintf("type=%s", wantType))
 	}
+	for _, label := range labels {
+		params = append(params, fmt.Sprintf("label=%s", label))
+	}
+
+	if len(params) > 0 {
+		path += "?" + fmt.Sprintf("%s", params[0])
+		for i := 1; i < len(params); i++ {
+			path += "&" + params[i]
+		}
+	}
+
 	err := c.Request("GET", path, nil, &result)
 	if err != nil {
 		return nil, err

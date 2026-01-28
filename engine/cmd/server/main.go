@@ -646,6 +646,15 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	// Parse type query parameter for filtering by want type
 	wantTypeFilter := r.URL.Query().Get("type")
 
+	// Parse label query parameters for filtering by labels (format: key=value)
+	labelFilters := make(map[string]string)
+	for _, label := range r.URL.Query()["label"] {
+		parts := strings.SplitN(label, "=", 2)
+		if len(parts) == 2 {
+			labelFilters[parts[0]] = parts[1]
+		}
+	}
+
 	// Collect all wants from all executions in memory dump format Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
@@ -692,6 +701,24 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		// Filter by want type if specified
 		if wantTypeFilter != "" && want.Metadata.Type != wantTypeFilter {
 			continue
+		}
+		// Filter by labels if specified
+		if len(labelFilters) > 0 {
+			matchesAllLabels := true
+			for key, value := range labelFilters {
+				if want.Metadata.Labels == nil {
+					matchesAllLabels = false
+					break
+				}
+				labelValue, exists := want.Metadata.Labels[key]
+				if !exists || labelValue != value {
+					matchesAllLabels = false
+					break
+				}
+			}
+			if !matchesAllLabels {
+				continue
+			}
 		}
 		allWants = append(allWants, want)
 	}
