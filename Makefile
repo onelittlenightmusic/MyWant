@@ -289,8 +289,8 @@ restart-all:
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
 	@$(MAKE) build-server
-	@$(MAKE) build-cli
 	@$(MAKE) build-gui
+	@$(MAKE) build-cli
 	@mkdir -p logs
 	@$(MAKE) build-mock
 	@echo "🚀 Starting MyWant server via want-cli..."
