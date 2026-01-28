@@ -300,6 +300,10 @@ func (r *ReminderWant) Progress() {
 	// Update achieving percentage based on current phase
 	r.StoreState("achieving_percentage", r.CalculateAchievingPercentage())
 
+	// Calculate and store time remaining
+	timeRemaining := r.calculateTimeRemaining(locals)
+	r.StoreState("time_remaining", timeRemaining)
+
 	switch locals.Phase {
 	case ReminderPhaseWaiting:
 		r.handlePhaseWaiting(locals)
@@ -322,6 +326,77 @@ func (r *ReminderWant) Progress() {
 		r.Status = "failed"
 		r.updateLocals(locals)
 	}
+}
+
+// calculateTimeRemaining calculates the time remaining until the next event
+func (r *ReminderWant) calculateTimeRemaining(locals *ReminderLocals) string {
+	now := time.Now()
+
+	switch locals.Phase {
+	case ReminderPhaseWaiting:
+		// Time until reaching_time
+		if !locals.ReachingTime.IsZero() {
+			duration := locals.ReachingTime.Sub(now)
+			if duration < 0 {
+				return "0s"
+			}
+			return formatDuration(duration)
+		}
+		return ""
+
+	case ReminderPhaseReaching:
+		// Time until event_time
+		if !locals.EventTime.IsZero() {
+			duration := locals.EventTime.Sub(now)
+			if duration < 0 {
+				return "0s"
+			}
+			return formatDuration(duration)
+		}
+		return ""
+
+	case ReminderPhaseCompleted, ReminderPhaseFailed:
+		// No time remaining for completed or failed reminders
+		return "0s"
+
+	default:
+		return ""
+	}
+}
+
+// formatDuration formats a duration into a human-readable string
+func formatDuration(d time.Duration) string {
+	if d < 0 {
+		return "0s"
+	}
+
+	// Round to seconds
+	d = d.Round(time.Second)
+
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		if seconds == 0 {
+			return fmt.Sprintf("%dm", minutes)
+		}
+		return fmt.Sprintf("%dm%ds", minutes, seconds)
+	}
+
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+
+	if minutes == 0 && seconds == 0 {
+		return fmt.Sprintf("%dh", hours)
+	}
+	if seconds == 0 {
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
 }
 
 // handlePhaseWaiting waits for the reaching time

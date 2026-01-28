@@ -43,6 +43,14 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle Escape key to unfocus input
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      console.log('[InteractBubble] Escape pressed, blurring input');
+      inputRef.current?.blur();
+      return;
+    }
+
     // Ignore Enter key press during IME composition (Japanese input)
     if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
       e.preventDefault();

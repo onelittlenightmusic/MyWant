@@ -8,14 +8,27 @@ This document outlines the keyboard shortcuts available in the application and p
 
 ## Application Shortcuts
 
+## Dashboard Modes
+
+The dashboard operates in different modes that affect shortcut availability:
+
+- **Normal Mode**: Default mode with all shortcuts enabled
+- **Select Mode** (`Shift + S`): Batch operations enabled, all shortcuts available including `Ctrl+A` for select all
+- **Add Mode** (New Want form open): **All dashboard shortcuts are DISABLED** - only form-specific shortcuts work
+- **Summary Mode**: Summary panel open, all dashboard shortcuts remain enabled
+
 ### Global (Dashboard)
+**Note**: All dashboard shortcuts below are **disabled** when in Add Mode (New Want form is open).
+
 | Key | Action | Description |
 | :--- | :--- | :--- |
-| `a` | Add Want | Opens the "New Want" form sidebar. |
-| `s` | Toggle Summary | Opens/Closes the Summary sidebar. |
-| `Shift + S` | Toggle Select Mode | Enters/Exits batch selection mode. |
-| `Ctrl + A` (or `Cmd + A`) | Select All | In Select Mode: selects all visible wants for batch operations. |
-| `Escape` | Close/Cancel | Closes open sidebars (Form, Summary, Details) or exits Select Mode. |
+| `a` | Add Want | Opens the "New Want" form sidebar. Disabled in Add Mode. |
+| `s` | Toggle Summary | Opens/Closes the Summary sidebar. Disabled in Add Mode. |
+| `Shift + S` | Toggle Select Mode | Enters/Exits batch selection mode. Disabled in Add Mode. |
+| `Ctrl + A` (or `Cmd + A`) | Select All | In Select Mode: selects all visible wants for batch operations. Disabled in Add Mode. |
+| `q` | Focus Suggestion Input | Focuses the Suggestion textbox to enter natural language requests. Disabled in Add Mode. |
+| `Arrow Keys` | Navigate Wants | Navigate through want cards. Disabled in Add Mode. |
+| `Escape` | Close/Cancel | Unfocuses Suggestion input if focused, otherwise closes open sidebars (Form, Summary, Details) or exits Select Mode. |
 
 ### Want Form (Sidebar)
 | Key | Action | Description |

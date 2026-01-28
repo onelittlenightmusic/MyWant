@@ -470,14 +470,57 @@ export const Dashboard: React.FC = () => {
     if (file && (file.name.endsWith('.yaml') || file.name.endsWith('.yml'))) handleImportWants(file);
   };
 
+  // ============================================================
+  // Dashboard Modes:
+  // - Normal Mode: Default mode with all shortcuts enabled
+  // - Select Mode: Shift+S to enter, batch operations enabled (isSelectMode=true)
+  // - Add Mode: New Want form open, all dashboard shortcuts disabled (sidebar.showForm=true)
+  // - Summary Mode: Summary panel open, all shortcuts enabled (sidebar.showSummary=true)
+  // ============================================================
+
   useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm && filteredWants.length > 0 });
 
-  const handleEscapeKey = () => { if (showBatchConfirmation) setShowBatchConfirmation(false); else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); } else if (sidebar.showSummary) sidebar.closeSummary(); else if (sidebar.showForm) sidebar.closeForm(); else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); setIsSelectMode(false); } };
+  const handleEscapeKey = () => {
+    // Otherwise, handle other escape scenarios
+    if (showBatchConfirmation) setShowBatchConfirmation(false);
+    else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
+    else if (sidebar.showSummary) sidebar.closeSummary();
+    else if (sidebar.showForm) sidebar.closeForm();
+    else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); setIsSelectMode(false); }
+  };
   useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode });
 
-  // Keyboard shortcuts: a (add), s (summary), Shift+S (select), Ctrl+A (select all in select mode)
+  // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
+  // Use capture phase to catch the event before other handlers
+  useEffect(() => {
+    const handleInteractInputEscape = (e: KeyboardEvent) => {
+      console.log('[Dashboard] Escape handler triggered, key:', e.key, 'activeElement:', document.activeElement);
+      if (e.key === 'Escape') {
+        const interactInput = document.querySelector('[data-interact-input]') as HTMLInputElement;
+        console.log('[Dashboard] interactInput element:', interactInput, 'matches activeElement:', interactInput === document.activeElement);
+        if (interactInput && document.activeElement === interactInput) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('[Dashboard] Escape pressed on interact input, blurring');
+          interactInput.blur();
+        }
+      }
+    };
+
+    // Use capture phase (true) to catch event before it reaches other handlers
+    window.addEventListener('keydown', handleInteractInputEscape, true);
+    return () => window.removeEventListener('keydown', handleInteractInputEscape, true);
+  }, []);
+
+  // Keyboard shortcuts: a (add), s (summary), Shift+S (select), Ctrl+A (select all in select mode), q (focus suggestion input)
+  // NOTE: All dashboard shortcuts are DISABLED when in Add Mode (sidebar.showForm=true)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // CRITICAL: Disable all dashboard shortcuts when New Want form is open (Add Mode)
+      if (sidebar.showForm) {
+        return;
+      }
+
       // Don't intercept if user is typing in an input
       const target = e.target as HTMLElement;
       const isInputElement =
@@ -510,17 +553,36 @@ export const Dashboard: React.FC = () => {
       } else if (e.key === 'S' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleToggleSelectMode();
-      } else if (e.key === '/' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (e.key === 'q' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        // Focus interact input
-        const interactInput = document.querySelector('[data-interact-input]') as HTMLInputElement;
-        interactInput?.focus();
+        console.log('[Dashboard] q key pressed, attempting to focus interact input');
+        // Focus interact input (Suggestion textbox)
+        // Use requestAnimationFrame to ensure DOM is ready and visible
+        requestAnimationFrame(() => {
+          const interactInput = document.querySelector('[data-interact-input]') as HTMLInputElement;
+          console.log('[Dashboard] interactInput element:', interactInput);
+          if (interactInput) {
+            // Check if element is visible
+            const isVisible = interactInput.offsetParent !== null;
+            console.log('[Dashboard] interactInput isVisible:', isVisible);
+            if (isVisible) {
+              interactInput.focus();
+              console.log('[Dashboard] Focus set, activeElement:', document.activeElement);
+              // Scroll into view if needed
+              interactInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+              console.warn('[Dashboard] Interact input exists but is not visible (may be hidden on mobile)');
+            }
+          } else {
+            console.warn('[Dashboard] Interact input not found in DOM');
+          }
+        });
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCreateWant, handleToggleSelectMode, sidebar, isSelectMode, filteredWants]);
+  }, [handleCreateWant, handleToggleSelectMode, sidebar, sidebar.showForm, isSelectMode, filteredWants]);
 
   const getWantBackgroundImage = (type?: string) => {
     if (!type) return undefined;
