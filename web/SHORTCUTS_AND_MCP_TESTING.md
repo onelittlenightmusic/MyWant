@@ -170,3 +170,20 @@ This script simulates a "power user" flow relying entirely on keyboard shortcuts
   ```bash
   node test/deploy_via_shortcuts.mjs
   ```
+
+---
+
+## want-cli Command Options
+
+This section provides a quick reference for common `want-cli` commands and their options.
+
+### `want-cli wants list`
+
+Lists all wants currently managed by the `mywant` server. This command supports filtering to help you find specific wants.
+
+| Option | Alias | Description | Example Usage |
+| :----- | :---- | :---------- | :------------ |
+| `--type` | `-t` | Filter wants by their type (e.g., `reminder`, `flight`, `queue`). | `want-cli wants list --type reminder` |
+| `--label` | `-l` | Filter wants by specific labels. Can be specified multiple times for multiple label filters. | `want-cli wants list -l env=dev -l project=my-app` |
+| `--using` | `-u` | Filter wants by "using" selectors. These selectors are used to match wants based on their dependencies or other internal properties. Can be specified multiple times. | `want-cli wants list -u agent=my-agent -u data=processed` |
+
