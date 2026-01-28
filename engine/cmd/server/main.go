@@ -643,6 +643,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
 	}
 
+	// Parse type query parameter for filtering by want type
+	wantTypeFilter := r.URL.Query().Get("type")
+
 	// Collect all wants from all executions in memory dump format Use map to deduplicate wants by ID (same want may exist across multiple executions)
 	wantsByID := make(map[string]*mywant.Want)
 
@@ -684,6 +687,10 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	for _, want := range wantsByID {
 		// Filter out system wants if includeSystemWants is false
 		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		// Filter by want type if specified
+		if wantTypeFilter != "" && want.Metadata.Type != wantTypeFilter {
 			continue
 		}
 		allWants = append(allWants, want)

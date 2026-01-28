@@ -5,10 +5,14 @@ import (
 	"fmt"
 )
 
-// ListWants retrieves all wants from the server
-func (c *Client) ListWants() (*APIDumpResponse, error) {
+// ListWants retrieves all wants from the server, optionally filtered by type
+func (c *Client) ListWants(wantType string) (*APIDumpResponse, error) {
 	var result APIDumpResponse
-	err := c.Request("GET", "/api/v1/wants", nil, &result)
+	path := "/api/v1/wants"
+	if wantType != "" {
+		path += fmt.Sprintf("?type=%s", wantType)
+	}
+	err := c.Request("GET", path, nil, &result)
 	if err != nil {
 		return nil, err
 	}
