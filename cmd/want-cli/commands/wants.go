@@ -26,7 +26,7 @@ func completeWantIDs(cmd *cobra.Command, args []string, toComplete string) ([]st
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 	c := client.NewClient(viper.GetString("server"))
-	resp, err := c.ListWants("", []string{}) // No filters for completion
+	resp, err := c.ListWants("", []string{}, []string{}) // No filters for completion
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -45,7 +45,8 @@ var listWantsCmd = &cobra.Command{
 		c := client.NewClient(viper.GetString("server"))
 		wantType, _ := cmd.Flags().GetString("type")
 		labels, _ := cmd.Flags().GetStringSlice("label")
-		resp, err := c.ListWants(wantType, labels)
+		using, _ := cmd.Flags().GetStringSlice("using")
+		resp, err := c.ListWants(wantType, labels, using)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
@@ -260,6 +261,7 @@ func init() {
 
 	listWantsCmd.Flags().StringP("type", "t", "", "Filter wants by type (e.g., reminder, flight, queue)")
 	listWantsCmd.Flags().StringSliceP("label", "l", []string{}, "Filter wants by labels (format: key=value, can be specified multiple times)")
+	listWantsCmd.Flags().StringSliceP("using", "u", []string{}, "Filter wants by using selectors (format: key=value, can be specified multiple times)")
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
 	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")

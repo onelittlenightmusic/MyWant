@@ -2030,3 +2030,65 @@ func CalculateWantHash(w *Want) string {
 	hash := sha256.Sum256(jsonData)
 	return hex.EncodeToString(hash[:])
 }
+
+// WantFilters contains filter criteria for want list queries
+type WantFilters struct {
+	Type         string            // Filter by want type
+	Labels       map[string]string // Filter by labels (key=value pairs, AND logic)
+	UsingFilters map[string]string // Filter by using selectors (key=value pairs, AND logic)
+}
+
+// MatchesFilters checks if a want matches all specified filters
+// Returns true if the want passes all filters (AND logic)
+func (w *Want) MatchesFilters(filters WantFilters) bool {
+	// Filter by type if specified
+	if filters.Type != "" && w.Metadata.Type != filters.Type {
+		return false
+	}
+
+	// Filter by labels if specified
+	if len(filters.Labels) > 0 {
+		for key, value := range filters.Labels {
+			if w.Metadata.Labels == nil {
+				return false
+			}
+			labelValue, exists := w.Metadata.Labels[key]
+			if !exists || labelValue != value {
+				return false
+			}
+		}
+	}
+
+	// Filter by using selectors if specified
+	if len(filters.UsingFilters) > 0 {
+		for key, value := range filters.UsingFilters {
+			if w.Spec.Using == nil || len(w.Spec.Using) == 0 {
+				return false
+			}
+			// Check if any using entry contains the key=value pair
+			found := false
+			for _, usingEntry := range w.Spec.Using {
+				if usingValue, exists := usingEntry[key]; exists && usingValue == value {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// FilterWants filters a list of wants based on the provided filters
+func FilterWants(wants []*Want, filters WantFilters) []*Want {
+	filtered := make([]*Want, 0, len(wants))
+	for _, want := range wants {
+		if want.MatchesFilters(filters) {
+			filtered = append(filtered, want)
+		}
+	}
+	return filtered
+}

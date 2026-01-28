@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-// ListWants retrieves all wants from the server, optionally filtered by type and labels
-func (c *Client) ListWants(wantType string, labels []string) (*APIDumpResponse, error) {
+// ListWants retrieves all wants from the server, optionally filtered by type, labels, and using selectors
+func (c *Client) ListWants(wantType string, labels []string, using []string) (*APIDumpResponse, error) {
 	var result APIDumpResponse
 	path := "/api/v1/wants"
 
@@ -17,6 +17,9 @@ func (c *Client) ListWants(wantType string, labels []string) (*APIDumpResponse, 
 	}
 	for _, label := range labels {
 		params = append(params, fmt.Sprintf("label=%s", label))
+	}
+	for _, u := range using {
+		params = append(params, fmt.Sprintf("using=%s", u))
 	}
 
 	if len(params) > 0 {

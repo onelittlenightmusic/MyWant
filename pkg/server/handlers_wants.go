@@ -124,15 +124,26 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
 	}
 
-	// Parse type query parameter for filtering by want type
-	wantTypeFilter := r.URL.Query().Get("type")
+	// Build filters from query parameters
+	filters := mywant.WantFilters{
+		Type:         r.URL.Query().Get("type"),
+		Labels:       make(map[string]string),
+		UsingFilters: make(map[string]string),
+	}
 
-	// Parse label query parameters for filtering by labels (format: key=value)
-	labelFilters := make(map[string]string)
+	// Parse label query parameters (format: key=value)
 	for _, label := range r.URL.Query()["label"] {
 		parts := strings.SplitN(label, "=", 2)
 		if len(parts) == 2 {
-			labelFilters[parts[0]] = parts[1]
+			filters.Labels[parts[0]] = parts[1]
+		}
+	}
+
+	// Parse using query parameters (format: key=value)
+	for _, u := range r.URL.Query()["using"] {
+		parts := strings.SplitN(u, "=", 2)
+		if len(parts) == 2 {
+			filters.UsingFilters[parts[0]] = parts[1]
 		}
 	}
 
@@ -175,27 +186,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		if !includeSystemWants && want.Metadata.IsSystemWant {
 			continue
 		}
-		// Filter by want type if specified
-		if wantTypeFilter != "" && want.Metadata.Type != wantTypeFilter {
+		// Apply filters using common filtering function
+		if !want.MatchesFilters(filters) {
 			continue
-		}
-		// Filter by labels if specified
-		if len(labelFilters) > 0 {
-			matchesAllLabels := true
-			for key, value := range labelFilters {
-				if want.Metadata.Labels == nil {
-					matchesAllLabels = false
-					break
-				}
-				labelValue, exists := want.Metadata.Labels[key]
-				if !exists || labelValue != value {
-					matchesAllLabels = false
-					break
-				}
-			}
-			if !matchesAllLabels {
-				continue
-			}
 		}
 		// Calculate hash for change detection
 		want.Hash = mywant.CalculateWantHash(want)
