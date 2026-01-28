@@ -28,7 +28,7 @@ import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPa
 import { Toast } from '@/components/notifications';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
-import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+
 
 export const Dashboard: React.FC = () => {
   const { 
@@ -730,7 +730,7 @@ export const Dashboard: React.FC = () => {
         )}
       </RightSidebar>
       <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
-      <ConfirmDeleteModal isOpen={showDeleteConfirmation} onClose={() => setShowDeleteConfirmation(false)} onConfirm={handleDeleteWantConfirm} want={deleteWantState} loading={isDeletingWant} title="Delete Want" message={deleteWantState ? `Are you sure you want to delete "${deleteWantState.metadata?.name}"?` : 'Are you sure?'} />
+
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />
     </Layout>
