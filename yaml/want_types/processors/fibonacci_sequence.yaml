@@ -168,5 +168,5 @@ wantType:
     - name: processed_data
       type: state
       description: Processed data output
-      required: true
+      required: false
       multiple: false
