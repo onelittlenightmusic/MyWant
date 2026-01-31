@@ -256,6 +256,9 @@ func NewServer(config ServerConfig) *Server {
 	// Register knowledge management agent
 	types.RegisterKnowledgeAgents(agentRegistry)
 
+	// Register MCP server process management agent
+	types.RegisterMCPServerProcessAgent(agentRegistry)
+
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
 	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))

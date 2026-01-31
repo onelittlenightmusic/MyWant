@@ -27,9 +27,14 @@ func (l *LoggerWant) IsAchieved() bool {
 	return false // Continuous execution
 }
 
+// Initialize resets state before execution begins
+func (l *LoggerWant) Initialize() {
+	// No initialization needed for logger
+}
+
 // NewLoggerWant creates a new logger want instance
 func NewLoggerWant(m mywant.Metadata, s mywant.WantSpec) mywant.Progressable {
-	return &LoggerWant{Want: mywant.Want{Metadata: m, Spec: s}}
+	return &LoggerWant{Want: *mywant.NewWantWithLocals(m, s, nil, "logger")}
 }
 
 func main() {
@@ -38,7 +43,7 @@ func main() {
 	fmt.Println()
 
 	// Create a config with a scheduled logger want
-	config := &mywant.Config{
+	config := mywant.Config{
 		Wants: []*mywant.Want{
 			{
 				Metadata: mywant.Metadata{
@@ -60,7 +65,8 @@ func main() {
 	}
 
 	// Create chain builder
-	builder := mywant.NewChainBuilder(config)
+	builder := mywant.NewChainBuilderWithPaths("", "")
+	builder.SetConfigInternal(config)
 
 	// Register logger want type
 	builder.RegisterWantType("logger", NewLoggerWant)
@@ -74,7 +80,6 @@ func main() {
 	fmt.Println("Scheduler Want will manage the scheduling automatically")
 	fmt.Println()
 
-	ctx := context.Background()
 	builder.ExecuteWithMode(false) // Batch mode
 
 	// Run for 15 seconds to see multiple executions

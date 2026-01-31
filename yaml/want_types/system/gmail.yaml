@@ -32,6 +32,23 @@ wantType:
     validation:
       minLength: 1
 
+  - name: gmail_token_path
+    description: |
+      Path to the Gmail authentication token file (e.g., ~/.config/goose/gmail-token.json).
+      Optional if the token is already available in the MCP server's default location.
+    type: string
+    required: false
+
+  - name: google_client_id
+    description: Google OAuth Client ID. Optional if configured in environment.
+    type: string
+    required: false
+
+  - name: google_client_secret
+    description: Google OAuth Client Secret. Optional if configured in environment.
+    type: string
+    required: false
+
   state:
   - name: gmail_status
     description: Current status of the Gmail operation (initialized, executing, completed, failed)
@@ -186,4 +203,4 @@ wantType:
   - Email MCP tool specifications
 
   require:
-    type: users
+    type: none

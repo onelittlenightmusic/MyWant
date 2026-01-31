@@ -13,8 +13,125 @@ import (
 	"sync"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	mywant "mywant/engine/src"
 )
+
+// ============ NativeMCPManager ============
+
+// NativeMCPManager handles direct MCP tool calls using the official SDK
+// It manages subprocesses for MCP servers and communicates via Stdio
+type NativeMCPManager struct {
+	mu       sync.Mutex
+	sessions map[string]*mcp.ClientSession
+}
+
+var (
+	nativeMCPManager *NativeMCPManager
+	nativeMCPMutex   sync.Mutex
+)
+
+// GetNativeMCPManager returns or creates a NativeMCPManager instance
+func GetNativeMCPManager(ctx context.Context) *NativeMCPManager {
+	nativeMCPMutex.Lock()
+	defer nativeMCPMutex.Unlock()
+
+	if nativeMCPManager == nil {
+		nativeMCPManager = &NativeMCPManager{
+			sessions: make(map[string]*mcp.ClientSession),
+		}
+	}
+	return nativeMCPManager
+}
+
+// ExecuteTool executes a specific tool on an MCP server directly
+func (m *NativeMCPManager) ExecuteTool(ctx context.Context, serverName string, command string, args []string, toolName string, toolArgs map[string]interface{}) (*mcp.CallToolResult, error) {
+	m.mu.Lock()
+	session, exists := m.sessions[serverName]
+	m.mu.Unlock()
+
+	if !exists {
+		log.Printf("[NATIVE-MCP] Searching for existing process for: %s\n", serverName)
+		
+		var reader io.ReadCloser
+		var writer io.WriteCloser
+
+		// Check the process registry first
+		if proc, ok := GetMCPServerRegistry().Get(serverName); ok {
+			log.Printf("[NATIVE-MCP] Using existing process pipes for: %s\n", serverName)
+			reader = proc.Stdout
+			writer = proc.Stdin
+		} else {
+			log.Printf("[NATIVE-MCP] Starting new server process: %s (%s %v)\n", serverName, command, args)
+			// Fallback: Start the server process if not found in registry (legacy behavior)
+			cmd := exec.CommandContext(ctx, command, args...)
+			stdin, err := cmd.StdinPipe()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+			}
+			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+			}
+			cmd.Stderr = os.Stderr
+
+			if err := cmd.Start(); err != nil {
+				return nil, fmt.Errorf("failed to start server process: %w", err)
+			}
+			reader = stdout
+			writer = stdin
+		}
+
+		// Create MCP client
+		client := mcp.NewClient(&mcp.Implementation{
+			Name:    "mywant-native-client",
+			Version: "1.0.0",
+		}, nil)
+
+		// Create transport using pipes
+		transport := &mcp.IOTransport{
+			Reader: reader,
+			Writer: writer,
+		}
+
+		// Connect to server
+		cs, err := client.Connect(ctx, transport, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to MCP server: %w", err)
+		}
+
+		m.mu.Lock()
+		m.sessions[serverName] = cs
+		session = cs
+		m.mu.Unlock()
+
+		log.Printf("[NATIVE-MCP] Connected to server: %s\n", serverName)
+	}
+
+	// Call the tool
+	log.Printf("[NATIVE-MCP] Calling tool: %s on server: %s\n", toolName, serverName)
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      toolName,
+		Arguments: toolArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tool call failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// CloseAllSessions closes all active MCP server sessions
+func (m *NativeMCPManager) CloseAllSessions() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for name, session := range m.sessions {
+		log.Printf("[NATIVE-MCP] Closing session: %s\n", name)
+		session.Close()
+	}
+	m.sessions = make(map[string]*mcp.ClientSession)
+}
 
 // ============ GooseManager ============
 
@@ -716,7 +833,17 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 
 	operationStr := fmt.Sprintf("%v", operation)
 
+	// Check if we should use native MCP client
+	useNative, _ := want.GetStateBool("mcp_native", false)
+
 	want.StoreState("achieving_percentage", 25)
+	
+	if useNative {
+		logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation via Native SDK: %s", operationStr)
+		want.StoreLog(logMsg)
+		return a.executeNativeMCPOperation(ctx, want, operationStr)
+	}
+
 	logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation via Goose: %s", operationStr)
 	want.StoreLog(logMsg)
 
@@ -846,6 +973,106 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	want.StoreLog(fmt.Sprintf("[MCP-AGENT] Operation completed via Goose"))
 
 	return nil
+}
+
+// executeNativeMCPOperation performs direct MCP tool invocation using the Go SDK
+func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.Want, operation string) error {
+	native := GetNativeMCPManager(ctx)
+	var result map[string]interface{}
+
+	switch operation {
+	case "gmail_search":
+		query, _ := want.GetState("mcp_query")
+		maxResults, _ := want.GetState("mcp_max_results")
+		queryStr := fmt.Sprintf("%v", query)
+		
+		maxResultsInt := 10
+		if maxResults != nil {
+			if mr, ok := maxResults.(int); ok {
+				maxResultsInt = mr
+			} else if mr, ok := maxResults.(float64); ok {
+				maxResultsInt = int(mr)
+			}
+		}
+
+		// Direct tool call to Gmail MCP server
+		toolResult, err := native.ExecuteTool(ctx, "gmail", "npx", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"}, "search_emails", map[string]interface{}{
+			"query":      queryStr,
+			"maxResults": maxResultsInt,
+		})
+		if err != nil {
+			return err
+		}
+		
+		result = map[string]interface{}{
+			"operation": "gmail_search",
+			"status":    "completed",
+			"content":   flattenMCPContent(toolResult.Content),
+		}
+
+	case "gmail_read":
+		messageID, _ := want.GetState("mcp_message_id")
+		messageIDStr := fmt.Sprintf("%v", messageID)
+
+		toolResult, err := native.ExecuteTool(ctx, "gmail", "npx", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"}, "get_message", map[string]interface{}{
+			"id": messageIDStr,
+		})
+		if err != nil {
+			return err
+		}
+
+		result = map[string]interface{}{
+			"operation": "gmail_read",
+			"status":    "completed",
+			"content":   flattenMCPContent(toolResult.Content),
+		}
+
+	default:
+		// Attempt to generic tool call if command and args are provided in state
+		command, _ := want.GetStateString("mcp_command", "")
+		argsRaw, _ := want.GetState("mcp_args")
+		toolName, _ := want.GetStateString("mcp_tool", "")
+		toolArgsRaw, _ := want.GetState("mcp_tool_args")
+
+		if command != "" && toolName != "" {
+			var args []string
+			if a, ok := argsRaw.([]string); ok {
+				args = a
+			}
+			
+			var toolArgs map[string]interface{}
+			if ta, ok := toolArgsRaw.(map[string]interface{}); ok {
+				toolArgs = ta
+			}
+
+			toolResult, err := native.ExecuteTool(ctx, command, command, args, toolName, toolArgs)
+			if err != nil {
+				return err
+			}
+			result = map[string]interface{}{
+				"operation": operation,
+				"status":    "completed",
+				"content":   flattenMCPContent(toolResult.Content),
+			}
+		} else {
+			return fmt.Errorf("unknown native MCP operation or missing mcp_command/mcp_tool: %s", operation)
+		}
+	}
+
+	want.StoreState("agent_result", result)
+	want.StoreState("achieving_percentage", 100)
+	return nil
+}
+
+// flattenMCPContent extracts text from MCP content slices into a simple string slice
+func flattenMCPContent(contents []mcp.Content) []string {
+	var results []string
+	for _, c := range contents {
+		if tc, ok := c.(*mcp.TextContent); ok {
+			results = append(results, tc.Text)
+		}
+	}
+	return results
 }
 
 // RegisterMCPAgent registers the MCP agent with the agent registry
