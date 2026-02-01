@@ -1124,20 +1124,12 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
             <h4 className="text-base font-medium text-gray-900 mb-4">Execution Result</h4>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Name:</span>
-                <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Type:</span>
-                <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between items-center">
                 <span className="text-gray-600 text-sm">Status:</span>
                 <span className="font-medium text-sm">{want.status || 'N/A'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">ID:</span>
-                <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
+                <span className="text-gray-600 text-sm">Final Result:</span>
+                <span className="font-medium text-sm">{want.state?.final_result ? JSON.stringify(want.state.final_result) : 'N/A'}</span>
               </div>
             </div>
           </div>

@@ -274,6 +274,10 @@ type Want struct {
 
 	// Metadata protection
 	metadataMutex sync.RWMutex `json:"-" yaml:"-"`
+
+	// Retry mechanism for failed phases
+	PhaseRetryCount    map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
+	LastPhaseError     string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
 }
 
 func (n *Want) SetStatus(status WantStatus) {
@@ -622,6 +626,12 @@ func (n *Want) StartProgressionLoop(
 			// 3.1. Check if want is achieved (before precondition check)
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
+				return
+			}
+
+			// 3.2. Check if want has failed
+			status := n.GetStatus()
+			if status == WantStatusFailed || status == WantStatusTerminated {
 				return
 			}
 			// 3.5. Get current paths (called each iteration to track topology changes)

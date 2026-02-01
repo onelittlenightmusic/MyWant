@@ -160,6 +160,12 @@ func (a *MCPServerProcessAgent) MonitorServer(ctx context.Context, want *mywant.
 }
 
 func RegisterMCPServerProcessAgent(registry *mywant.AgentRegistry) {
+	// Register the capability that this agent provides
+	registry.RegisterCapability(mywant.Capability{
+		Name:  "mcp_server_management",
+		Gives: []string{"mcp_server_management"},
+	})
+
 	agent := NewMCPServerProcessAgent()
 	
 	// DoAgentとして登録

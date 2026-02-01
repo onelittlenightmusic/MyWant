@@ -111,7 +111,9 @@ func (n *Want) executeAgent(agent Agent) error {
 	n.History.AgentHistory = append(n.History.AgentHistory, agentExec)
 
 	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
-	executeFunc := func() {
+	var agentErr error // Capture error from DoAgent execution
+
+	executeFunc := func() error {
 		defer func() {
 			// Update agent execution record
 			for i := range n.History.AgentHistory {
@@ -170,6 +172,7 @@ func (n *Want) executeAgent(agent Agent) error {
 				}
 			}
 			// AgentHistory is now managed separately from state
+			return err // Return error for propagation
 		} else {
 			for i := range n.History.AgentHistory {
 				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
@@ -183,18 +186,19 @@ func (n *Want) executeAgent(agent Agent) error {
 
 		// FRAMEWORK-LEVEL: Commit all agent state changes
 		n.DumpStateForAgent("DoAgent")
+		return nil
 	}
 
 	// Execute synchronously for DO agents, asynchronously for MONITOR agents
 	if agent.GetType() == DoAgentType {
 		// DO agents execute synchronously to return results immediately
-		executeFunc()
+		agentErr = executeFunc()
+		return agentErr // Propagate error from DoAgent
 	} else {
 		// MONITOR agents execute asynchronously to run in background
 		go executeFunc()
+		return nil // MonitorAgents run in background, can't return their errors
 	}
-
-	return nil
 }
 
 // StopAllAgents stops all running agents for this want
@@ -298,10 +302,7 @@ func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
 func (n *Want) CommitStateChanges() {
 	// Step 1: Copy staged changes while holding agentStateMutex
 	n.agentStateMutex.Lock()
-	if len(n.agentStateChanges) == 0 {
-		n.agentStateMutex.Unlock()
-		return
-	}
+	hasStateChanges := len(n.agentStateChanges) > 0
 	changesCopy := make(map[string]any)
 	for k, v := range n.agentStateChanges {
 		changesCopy[k] = v
@@ -313,24 +314,31 @@ func (n *Want) CommitStateChanges() {
 	n.agentStateMutex.Unlock()
 
 	// Step 2: Apply changes to State using encapsulated method
-	n.SetStateAtomic(changesCopy)
+	if hasStateChanges {
+		n.SetStateAtomic(changesCopy)
 
-	// Step 3: Add single history entry with all changes with stateMutex protection
-	historyEntry := StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: changesCopy,
-		Timestamp:  time.Now(),
+		// Step 3: Add single history entry with all changes with stateMutex protection
+		historyEntry := StateHistoryEntry{
+			WantName:   n.Metadata.Name,
+			StateValue: changesCopy,
+			Timestamp:  time.Now(),
+		}
+
+		n.stateMutex.Lock()
+		if n.History.StateHistory == nil {
+			n.History.StateHistory = make([]StateHistoryEntry, 0)
+		}
+		n.History.StateHistory = append(n.History.StateHistory, historyEntry)
+		n.stateMutex.Unlock()
+
+		log.Printf("💾 Committed %d state changes for want %s in single batch\n",
+			changeCount, n.Metadata.Name)
 	}
 
-	n.stateMutex.Lock()
-	if n.History.StateHistory == nil {
-		n.History.StateHistory = make([]StateHistoryEntry, 0)
+	// Step 4: Commit pending logs (same as EndProgressCycle)
+	if len(n.pendingLogs) > 0 {
+		n.addAggregatedLogHistory()
 	}
-	n.History.StateHistory = append(n.History.StateHistory, historyEntry)
-	n.stateMutex.Unlock()
-
-	log.Printf("💾 Committed %d state changes for want %s in single batch\n",
-		changeCount, n.Metadata.Name)
 }
 func (n *Want) GetStagedChanges() map[string]any {
 	n.agentStateMutex.RLock()

@@ -73,12 +73,17 @@ func New(config Config) *Server {
 
 	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
 	mywant.SetGlobalChainBuilder(globalBuilder)
+
+	// Register Gmail dynamic want type factory
+	types.RegisterGmailDynamicWant(globalBuilder)
+
 	tempServer := &Server{}
 
 	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
 	tempServer.registerDynamicAgents(agentRegistry)
 	types.RegisterExecutionAgents(agentRegistry)
 	types.RegisterMCPAgent(agentRegistry)
+	types.RegisterDynamicMCPAgents(agentRegistry) // Register Discovery, Developer, Compiler, Validator agents
 
 	// Create reaction queue manager for reminders (multi-queue system)
 	reactionQueueManager := types.NewReactionQueueManager()
@@ -108,6 +113,9 @@ func New(config Config) *Server {
 
 	// Register MCP server process management agent
 	types.RegisterMCPServerProcessAgent(agentRegistry)
+
+	// Register Dynamic MCP Agents
+	types.RegisterDynamicMCPAgents(agentRegistry)
 
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
@@ -163,6 +171,7 @@ func (s *Server) Start() error {
 	types.RegisterReminderWantType(s.globalBuilder)
 	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
+	types.RegisterGmailDynamicWantType(s.globalBuilder)
 	types.RegisterKnowledgeWantType(s.globalBuilder)
 	types.RegisterFlightMockServerWantType(s.globalBuilder)
 	types.RegisterDraftWantType(s.globalBuilder)

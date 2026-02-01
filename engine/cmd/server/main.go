@@ -259,6 +259,9 @@ func NewServer(config ServerConfig) *Server {
 	// Register MCP server process management agent
 	types.RegisterMCPServerProcessAgent(agentRegistry)
 
+	// Register Dynamic MCP Agents
+	types.RegisterDynamicMCPAgents(agentRegistry)
+
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
 	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))
@@ -2170,6 +2173,7 @@ func (s *Server) Start() error {
 	types.RegisterReminderWantType(s.globalBuilder)
 	types.RegisterSilencerWantType(s.globalBuilder)
 	types.RegisterGmailWantType(s.globalBuilder)
+	types.RegisterGmailDynamicWantType(s.globalBuilder)
 	types.RegisterKnowledgeWantType(s.globalBuilder)
 	types.RegisterFlightMockServerWantType(s.globalBuilder)
 	types.RegisterDraftWantType(s.globalBuilder)

@@ -399,6 +399,62 @@ INSTRUCTIONS:
 6. The output should be the COMPLETE Markdown document.
 7. Return ONLY the Markdown content, nothing else.`, topic, depth, existingContent, newFacts)
 
+	case "mcp_discovery":
+		prompt := params["prompt"].(string)
+		return fmt.Sprintf(`You are a Model Context Protocol (MCP) expert. 
+Your task is to analyze the following user request and find the appropriate Gmail MCP tool.
+
+USER REQUEST: "%s"
+
+INSTRUCTIONS:
+1. Use the Gmail MCP server tools to fulfill the user request.
+2. During the process, capture the EXACT JSON request you send to the MCP server and the EXACT JSON response you receive.
+3. Once you have the data, return ONLY a single JSON object containing both.
+
+REQUIRED OUTPUT FORMAT:
+{
+  "request": { "name": "tool_name", "arguments": { ... } },
+  "response": { "content": [ ... ] }
+}
+
+Do not include any other text, markdown formatting, or explanations.`, prompt)
+
+	case "mcp_developer":
+		prompt := params["prompt"].(string)
+		return fmt.Sprintf(`You are a senior Go developer. Generate a COMPLETE, self-contained Go source file for a WebAssembly (WASM) plugin.
+
+TASK:
+Implement a Go file with two exported functions to adapt an MCP tool to MyWant.
+
+REQUIRED EXPORTS:
+1. //export __mcp_transform
+   func __mcp_transform(ptr, size uint32) uint64 { ... }
+   - Input: JSON bytes (params map[string]any).
+   - Logic: Call "TransformRequest(params)" which you must also implement.
+   - Output: Packed uint64 (ptr << 32 | size) of JSON bytes (tool arguments).
+2. //export __mcp_parse
+   func __mcp_parse(ptr, size uint32) uint64 { ... }
+   - Input: JSON bytes (rawResponse map[string]any).
+   - Logic: Call "ParseResponse(rawResponse)" which you must also implement.
+   - Output: Packed uint64 (ptr << 32 | size) of JSON bytes (structured result).
+3. //export __mcp_malloc
+   func __mcp_malloc(size uint32) uintptr { ... }
+   - Implementation: return uintptr(unsafe.Pointer(&make([]byte, size)[0]))
+
+REQUIRED HELPER FUNCTIONS (You must implement these):
+- func ptrToBytes(ptr, size uint32) []byte
+- func bytesToPacked(b []byte) uint64
+
+CONSTRAINTS:
+- Use ONLY standard library packages ("encoding/json", "unsafe", "strings", "fmt").
+- Ensure the code is valid Go and compiles with TinyGo.
+- Return ONLY the Go source code inside a single code block. No explanations.
+- The entry point must be "package main" with an empty "func main() {}".
+
+CONTEXT:
+%s
+`, prompt)
+
 	case "interact_recommend":
 		message := params["message"].(string)
 		conversationHistory := ""
