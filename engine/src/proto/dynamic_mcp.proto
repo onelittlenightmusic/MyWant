@@ -1,0 +1,27 @@
+syntax = "proto3";
+package proto;
+
+option go_package = "mywant/engine/src/proto";
+
+service MCPLogic {
+  // ユーザー入力(Params)を MCP サーバーへのリクエスト(JSON)に変換
+  rpc TransformRequest(RequestInput) returns (JSONResponse);
+  
+  // MCP サーバーの生レスポンスを MyWant のステート形式にパース
+  rpc ParseResponse(ResponseInput) returns (JSONResponse);
+}
+
+message RequestInput {
+  string operation = 1;
+  string params_json = 2; // MyWant のパラメータを JSON 文字列化したもの
+}
+
+message ResponseInput {
+  string operation = 1;
+  string raw_json = 2;    // MCP サーバーからの生レスポンス
+}
+
+message JSONResponse {
+  string json_data = 1;   // 処理結果の JSON
+  string error = 2;       // エラーがあれば格納
+}

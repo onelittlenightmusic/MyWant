@@ -1,0 +1,37 @@
+wantType:
+  metadata:
+    name: gmail_dynamic
+    title: Gmail Dynamic
+    description: |
+      A self-evolving Gmail want that discovers tools and generates its own
+      parsing logic into a WASM plugin.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: prompt
+    description: Natural language instruction for Gmail operation.
+    type: string
+    required: true
+    example: "Search for unread emails"
+
+  state:
+  - name: phase
+    description: Current evolution phase (discovery, coding, compiling, validation, stable)
+    type: string
+    persistent: true
+    initialValue: "discovery"
+
+  - name: wasm_path
+    description: Path to the generated WASM binary
+    type: string
+    persistent: true
+
+  - name: final_result
+    description: Result of the execution
+    type: any
+    persistent: true
+
+  require:
+    type: none

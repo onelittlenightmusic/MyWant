@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: gmail-search-unread
+      type: gmail_dynamic
+      labels:
+        category: test
+    spec:
+      params:
+        prompt: "Search for unread emails from the last 7 days and show me the subjects"

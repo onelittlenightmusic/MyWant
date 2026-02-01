@@ -1,0 +1,12 @@
+apiVersion: mywant/v1
+kind: Want
+metadata:
+  name: prime sieve pipeline
+  type: prime sieve
+  labels:
+    role: math-target
+spec:
+  params:
+    start_number: 2
+    end_number: 100
+  recipe: yaml/recipes/prime-sieve.yaml
