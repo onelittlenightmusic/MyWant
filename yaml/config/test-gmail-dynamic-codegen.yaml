@@ -1,0 +1,7 @@
+wants:
+  - metadata:
+      name: test_gmail_search_codegen
+      type: gmail_dynamic
+    spec:
+      params:
+        prompt: "Search for emails from my boss about the Q1 project"

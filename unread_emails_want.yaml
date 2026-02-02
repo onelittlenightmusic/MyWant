@@ -1,0 +1,7 @@
+wants:
+  - metadata:
+      name: check-unread-emails
+      type: gmail
+    spec:
+      params:
+        prompt: "Search for unread emails"
