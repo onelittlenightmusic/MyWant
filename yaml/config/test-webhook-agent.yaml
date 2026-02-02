@@ -1,0 +1,30 @@
+# Test configuration for webhook-based external agent execution
+#
+# Before running:
+# 1. Start external agent server: cd examples/external_agent_webhook && WEBHOOK_AUTH_TOKEN=test123 go run main.go
+# 2. Start MyWant server: WEBHOOK_AUTH_TOKEN=test123 ./want-cli start -D --port 8080
+# 3. Deploy this config: ./want-cli wants create -f yaml/config/test-webhook-agent.yaml
+
+wants:
+  - name: webhook-flight-test
+    type: base_travel
+    spec:
+      params:
+        departure: "NRT"
+        arrival: "LAX"
+        date: "2026-03-15"
+      requires:
+        - "flight_api_agency"
+
+agents:
+  - name: agent_webhook_flight
+    type: do
+    capabilities:
+      - flight_api_agency
+    execution:
+      mode: webhook
+      webhook:
+        service_url: "http://localhost:9000/flight"
+        callback_url: "http://localhost:8080/api/v1/agents/webhook/callback"
+        auth_token: "${WEBHOOK_AUTH_TOKEN}"
+        timeout_ms: 30000

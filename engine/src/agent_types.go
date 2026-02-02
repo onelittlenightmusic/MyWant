@@ -33,14 +33,18 @@ type BaseAgent struct {
 	Name         string    `yaml:"name"`
 	Capabilities []string  `yaml:"capabilities"`
 	Type         AgentType `yaml:"type"`
+
+	// Execution configuration (local, webhook, rpc)
+	ExecutionConfig ExecutionConfig `yaml:"execution" json:"execution"`
 }
 
 // NewBaseAgent creates a new BaseAgent with the given parameters. This is the canonical constructor for creating agents.
 func NewBaseAgent(name string, capabilities []string, agentType AgentType) *BaseAgent {
 	return &BaseAgent{
-		Name:         name,
-		Capabilities: capabilities,
-		Type:         agentType,
+		Name:            name,
+		Capabilities:    capabilities,
+		Type:            agentType,
+		ExecutionConfig: DefaultExecutionConfig(), // Default to local execution
 	}
 }
 

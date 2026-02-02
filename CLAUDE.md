@@ -16,6 +16,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 **Official Docs:**
 - [Want System](docs/want-system.md) - Core Want/Recipe concepts
 - [Agent System](docs/agent-system.md) - Agent architecture
+- [Agent Execution Modes](docs/AgentExecutionModes.md) - Local/Webhook/RPC execution
 - [Want Developer Guide](docs/WantDeveloperGuide.md) - Custom Want type development (state management, exec cycle, achieving_percentage)
 - [Agent Catalog](AGENTS.md) - Available agents and capabilities
 - [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete want-cli reference
@@ -45,6 +46,11 @@ MyWant is a **declarative chain programming system** where you express "what you
 **Agent Types:**
 - **DoAgent** - Execute specific tasks once (e.g., book flight)
 - **MonitorAgent** - Continuously poll external state (e.g., flight status monitor)
+
+**Agent Execution Modes:**
+- **Local** - In-process goroutines (default, fastest)
+- **Webhook** - External HTTP services (language-agnostic, scalable)
+- **RPC** - gRPC/JSON-RPC services (high-performance, planned)
 
 ## Essential Commands
 

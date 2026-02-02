@@ -84,8 +84,25 @@ func (n *Want) ExecuteAgents() error {
 	return nil
 }
 
-// executeAgent executes a single agent in a goroutine
+// executeAgent executes a single agent using the appropriate executor
 func (n *Want) executeAgent(agent Agent) error {
+	// Get BaseAgent to access ExecutionConfig
+	var execConfig ExecutionConfig
+	switch a := agent.(type) {
+	case *DoAgent:
+		execConfig = a.BaseAgent.ExecutionConfig
+	case *MonitorAgent:
+		execConfig = a.BaseAgent.ExecutionConfig
+	default:
+		execConfig = DefaultExecutionConfig()
+	}
+
+	// Create executor
+	executor, err := NewExecutor(execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create executor for agent %s: %w", agent.GetName(), err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	n.runningAgents[agent.GetName()] = cancel
 	if n.RunningAgents == nil {
@@ -103,10 +120,11 @@ func (n *Want) executeAgent(agent Agent) error {
 		n.EndProgressCycle()
 	}
 	agentExec := AgentExecution{
-		AgentName: agent.GetName(),
-		AgentType: string(agent.GetType()),
-		StartTime: time.Now(),
-		Status:    "running",
+		AgentName:     agent.GetName(),
+		AgentType:     string(agent.GetType()),
+		StartTime:     time.Now(),
+		Status:        "running",
+		ExecutionMode: string(executor.GetMode()),
 	}
 	n.History.AgentHistory = append(n.History.AgentHistory, agentExec)
 
@@ -160,7 +178,9 @@ func (n *Want) executeAgent(agent Agent) error {
 		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
 		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
 
-		shouldStop, err := agent.Exec(ctx, n)
+		// Execute through executor (supports local, webhook, rpc)
+		err := executor.Execute(ctx, agent, n)
+		shouldStop := false // Executor doesn't return shouldStop currently
 		if err != nil {
 			log.Printf("Agent %s failed: %v\n", agent.GetName(), err)
 			// Update agent execution record with error

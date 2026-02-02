@@ -89,6 +89,9 @@ type AgentExecution struct {
 	Status    string     `json:"status" yaml:"status"` // "running", "achieved", "failed"
 	Error     string     `json:"error,omitempty" yaml:"error,omitempty"`
 	Activity  string     `json:"activity,omitempty" yaml:"activity,omitempty"` // Description of agent action like "flight reservation has been created"
+
+	// Execution mode information
+	ExecutionMode string `json:"execution_mode,omitempty" yaml:"execution_mode,omitempty"` // local, webhook, rpc
 }
 
 // ParameterUpdateListener represents a want that can receive parameter updates

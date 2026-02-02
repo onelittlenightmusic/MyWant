@@ -346,6 +346,9 @@ func (s *Server) setupRoutes() {
 	agents.HandleFunc("/{name}", s.getAgent).Methods("GET")
 	agents.HandleFunc("/{name}", s.deleteAgent).Methods("DELETE")
 
+	// Register agent API routes (for external agent communication)
+	s.registerAgentAPIRoutes()
+
 	// Capabilities CRUD endpoints
 	capabilities := api.PathPrefix("/capabilities").Subrouter()
 	capabilities.HandleFunc("", s.createCapability).Methods("POST")

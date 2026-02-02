@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package mywant.agent;
+
+option go_package = "mywant/engine/src/proto/agentpb";
+
+// AgentService defines RPC methods for external agent execution
+service AgentService {
+  // Execute runs a DoAgent synchronously and returns the result
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+
+  // StartMonitor starts a MonitorAgent asynchronously
+  rpc StartMonitor(MonitorRequest) returns (MonitorResponse);
+
+  // StopMonitor stops a running monitor
+  rpc StopMonitor(StopMonitorRequest) returns (StopMonitorResponse);
+}
+
+// ExecuteRequest contains parameters for agent execution
+message ExecuteRequest {
+  string want_id = 1;
+  string agent_name = 2;
+  string operation = 3;
+  map<string, string> want_state = 4;
+  map<string, string> params = 5;
+  string callback_url = 6;
+}
+
+// ExecuteResponse contains agent execution results
+message ExecuteResponse {
+  string status = 1;  // "completed", "failed"
+  map<string, string> state_updates = 2;
+  string error = 3;
+  int64 execution_time_ms = 4;
+}
+
+// MonitorRequest starts a monitoring agent
+message MonitorRequest {
+  string want_id = 1;
+  string agent_name = 2;
+  string callback_url = 3;
+  map<string, string> want_state = 4;
+}
+
+// MonitorResponse confirms monitor start
+message MonitorResponse {
+  string monitor_id = 1;
+  string status = 2;  // "started", "failed"
+  string error = 3;
+}
+
+// StopMonitorRequest stops a monitor
+message StopMonitorRequest {
+  string monitor_id = 1;
+}
+
+// StopMonitorResponse confirms monitor stop
+message StopMonitorResponse {
+  string status = 1;  // "stopped"
+}
