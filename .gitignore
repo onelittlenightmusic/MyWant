@@ -8,6 +8,11 @@ engine/cmd/server/mywant-server
 engine/mywant-server
 mcp/server/mywant-mcp-server
 
+# External agent binaries
+examples/external_agent_grpc/external-agent-grpc
+examples/external_agent_webhook/external-agent
+engine/cmd/server/server
+
 # Node.js dependencies
 node_modules/
 
