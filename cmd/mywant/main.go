@@ -25,6 +25,8 @@ to solve your wants based on their capabilities.`,
 }
 
 func main() {
+	// Set up persistent pre-run to handle config file
+	rootCmd.PersistentPreRun = preRunConfig
 
 	// Register commands
 
@@ -63,6 +65,13 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&server, "server", "http://localhost:8080", "MyWant server URL")
 
 	viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
+}
+
+// preRunConfig is called before command execution to set custom config path
+func preRunConfig(cmd *cobra.Command, args []string) {
+	if cfgFile != "" {
+		commands.SetConfigPath(cfgFile)
+	}
 }
 
 func initConfig() {

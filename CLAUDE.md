@@ -65,7 +65,11 @@ MyWant is a **declarative chain programming system** where you express "what you
 # Reset to defaults
 ./mywant config reset
 
-# Configuration file location: ~/.mywant/config.yaml
+# Use custom config file
+./mywant --config /path/to/config.yaml config get
+./mywant --config ./dev-config.yaml start -D
+
+# Configuration file location: ~/.mywant/config.yaml (default)
 ```
 
 **CLI Quick Start:**

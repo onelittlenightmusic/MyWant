@@ -34,8 +34,19 @@ func DefaultConfig() *MyWantConfig {
 	}
 }
 
+// configFilePath holds the custom config file path if specified
+var configFilePath string
+
+// SetConfigPath sets a custom config file path
+func SetConfigPath(path string) {
+	configFilePath = path
+}
+
 // getConfigPath returns the path to the config file
 func getConfigPath() string {
+	if configFilePath != "" {
+		return configFilePath
+	}
 	return filepath.Join(getMyWantDir(), "config.yaml")
 }
 

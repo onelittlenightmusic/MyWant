@@ -6,7 +6,13 @@ The `mywant config` command provides an interactive way to configure your MyWant
 
 ## Configuration File
 
-All configuration is stored in: `~/.mywant/config.yaml`
+**Default location:** `~/.mywant/config.yaml`
+
+**Custom location:** Use `--config` flag to specify a different path:
+```bash
+mywant --config /path/to/custom-config.yaml config get
+mywant --config /path/to/custom-config.yaml start -D
+```
 
 ### Configuration Options
 
@@ -215,6 +221,34 @@ Command-line flags override configuration file values:
 
 # Override host and port
 ./mywant start -D --host 0.0.0.0 --port 9090
+```
+
+### Custom Configuration File
+
+Use a different configuration file with the `--config` flag:
+
+```bash
+# Use custom config file
+./mywant --config /path/to/custom-config.yaml config get
+
+# Start with custom config
+./mywant --config /path/to/custom-config.yaml start -D
+
+# All commands support --config flag
+./mywant --config ./dev-config.yaml ps
+./mywant --config ./prod-config.yaml wants list
+```
+
+**Example: Multiple Environments**
+```bash
+# Development
+./mywant --config ~/.mywant/dev-config.yaml start -D
+
+# Staging
+./mywant --config ~/.mywant/staging-config.yaml start -D
+
+# Production
+./mywant --config ~/.mywant/prod-config.yaml start -D
 ```
 
 ### Multiple Environments
