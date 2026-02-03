@@ -4,7 +4,7 @@
 
 **Declarative chain programming with YAML configuration.** Express what you want to achieve, not how to do it.
 
-📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Agent Catalog](AGENTS.md) | [Examples](docs/agent-examples.md) | [CLI Guide](docs/WANT_CLI_USAGE.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
+📚 **Documentation:** [Want System](docs/want-system.md) | [Agent System](docs/agent-system.md) | [Agent Catalog](AGENTS.md) | [Examples](docs/agent-examples.md) | [CLI Guide](docs/MYWANT_CLI_USAGE.md) | [Shortcuts & Testing](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Features
 
@@ -87,10 +87,10 @@ curl http://localhost:8080/api/v1/wants/{id}/status
 ## Go Library Usage
 
 ```go
-import "github.com/onelittlenightmusic/MyWant"
+import "mywant/engine/src"
 
-config, _ := mywant.LoadConfigFromYAML("config.yaml")
-builder := mywant.NewChainBuilder(config)
+config, _ := src.LoadConfigFromYAML("config.yaml")
+builder := src.NewChainBuilder(config)
 builder.RegisterWantType("your-type", yourConstructor)
 builder.Execute()
 ```

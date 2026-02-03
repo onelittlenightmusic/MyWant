@@ -379,6 +379,6 @@ Change ports in configuration:
 
 ## See Also
 
-- [Want CLI Usage Guide](WANT_CLI_USAGE.md)
+- [MyWant CLI Usage Guide](MYWANT_CLI_USAGE.md)
 - [Agent Execution Modes](AgentExecutionModes.md)
 - [Agent Worker Mode](AgentWorkerMode.md)

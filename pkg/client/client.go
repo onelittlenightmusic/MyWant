@@ -91,7 +91,7 @@ func (c *Client) doRequest(method, path string, body any, contentType string) (*
 	}
 
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("User-Agent", "want-cli/1.0.0")
+	req.Header.Set("User-Agent", "mywant/1.0.0")
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {

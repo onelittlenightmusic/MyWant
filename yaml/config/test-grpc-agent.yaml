@@ -2,8 +2,8 @@
 #
 # Before running:
 # 1. Start external gRPC agent server: cd examples/external_agent_grpc && go run main.go
-# 2. Start MyWant server: ./want-cli start -D --port 8080
-# 3. Deploy this config: ./want-cli wants create -f yaml/config/test-grpc-agent.yaml
+# 2. Start MyWant server: ./mywant start -D --port 8080
+# 3. Deploy this config: ./mywant wants create -f yaml/config/test-grpc-agent.yaml
 
 wants:
   - name: grpc-flight-test

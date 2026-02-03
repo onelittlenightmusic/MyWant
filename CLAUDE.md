@@ -19,7 +19,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 - [Agent Execution Modes](docs/AgentExecutionModes.md) - Local/Webhook/RPC execution
 - [Want Developer Guide](docs/WantDeveloperGuide.md) - Custom Want type development (state management, exec cycle, achieving_percentage)
 - [Agent Catalog](AGENTS.md) - Available agents and capabilities
-- [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete mywant reference
+- [CLI Usage Guide](docs/MYWANT_CLI_USAGE.md) - Complete mywant reference
 - [Examples](docs/agent-examples.md) - Agent usage examples
 - [Keyboard Shortcuts & MCP Testing](web/SHORTCUTS_AND_MCP_TESTING.md) - Frontend shortcuts
 
@@ -102,7 +102,7 @@ make release
 ./mywant stop
 ```
 
-**Want-CLI Management:**
+**MyWant CLI Management:**
 ```sh
 # Want lifecycle
 ./mywant wants get <WANT_ID>           # Get detailed status
