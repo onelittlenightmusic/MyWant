@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"mywant/engine/src/pubsub"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -237,6 +239,11 @@ type Want struct {
 
 	// State synchronization
 	stateMutex sync.RWMutex `json:"-" yaml:"-"`
+
+	// Remote execution mode (for external agent execution via webhook/grpc)
+	remoteMode  bool   `json:"-" yaml:"-"` // True when executing in external agent service
+	callbackURL string `json:"-" yaml:"-"` // Callback URL for state updates
+	agentName   string `json:"-" yaml:"-"` // Current executing agent name
 
 	// Stop channel for graceful shutdown of want's goroutines
 	stopChannel chan struct{} `json:"-" yaml:"-"`
@@ -974,6 +981,116 @@ func (n *Want) GetState(key string) (any, bool) {
 
 	value, exists := n.State[key]
 	return value, exists
+}
+
+// GetPendingStateChanges returns a copy of pending state changes (changes not yet committed)
+// This is useful for external agent execution to return only changed fields
+func (n *Want) GetPendingStateChanges() map[string]any {
+	n.stateMutex.RLock()
+	defer n.stateMutex.RUnlock()
+
+	if n.pendingStateChanges == nil {
+		return make(map[string]any)
+	}
+
+	// Return a copy to avoid concurrent access issues
+	changes := make(map[string]any, len(n.pendingStateChanges))
+	for k, v := range n.pendingStateChanges {
+		changes[k] = v
+	}
+	return changes
+}
+
+// SetRemoteCallback configures Want for remote execution mode with callback support
+func (n *Want) SetRemoteCallback(callbackURL, agentName string) {
+	n.callbackURL = callbackURL
+	n.agentName = agentName
+	n.remoteMode = true
+}
+
+// SendCallback sends pending state changes to the callback URL (for remote agent execution)
+func (n *Want) SendCallback() error {
+	if n.callbackURL == "" {
+		return fmt.Errorf("callback URL not set")
+	}
+
+	changes := n.GetPendingStateChanges()
+	if len(changes) == 0 {
+		return nil // No changes to send
+	}
+
+	callback := WebhookCallback{
+		AgentName:    n.agentName,
+		WantID:       n.Metadata.Name,
+		Status:       "state_changed",
+		StateUpdates: changes,
+	}
+
+	// Send callback asynchronously
+	go func() {
+		body, err := json.Marshal(callback)
+		if err != nil {
+			log.Printf("[CALLBACK] Failed to marshal callback: %v", err)
+			return
+		}
+
+		resp, err := http.Post(n.callbackURL, "application/json", bytes.NewReader(body))
+		if err != nil {
+			log.Printf("[CALLBACK] Failed to send callback to %s: %v", n.callbackURL, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+			log.Printf("[CALLBACK] Callback returned status %d", resp.StatusCode)
+		}
+	}()
+
+	return nil
+}
+
+// ============================================================================
+// Agent Lifecycle Management
+// ============================================================================
+
+// RegisterRunningAgent registers a running agent with its cancel function
+func (n *Want) RegisterRunningAgent(agentName string, cancel context.CancelFunc) {
+	n.agentStateMutex.Lock()
+	defer n.agentStateMutex.Unlock()
+
+	if n.runningAgents == nil {
+		n.runningAgents = make(map[string]context.CancelFunc)
+	}
+	n.runningAgents[agentName] = cancel
+
+	log.Printf("[LIFECYCLE] Registered running agent: %s for want %s", agentName, n.Metadata.Name)
+}
+
+// UnregisterRunningAgent removes a running agent from the registry
+func (n *Want) UnregisterRunningAgent(agentName string) {
+	n.agentStateMutex.Lock()
+	defer n.agentStateMutex.Unlock()
+
+	if n.runningAgents != nil {
+		delete(n.runningAgents, agentName)
+		log.Printf("[LIFECYCLE] Unregistered running agent: %s for want %s", agentName, n.Metadata.Name)
+	}
+}
+
+// GetRunningAgents returns the names of all currently running agents
+func (n *Want) GetRunningAgents() []string {
+	n.agentStateMutex.RLock()
+	defer n.agentStateMutex.RUnlock()
+
+	if n.runningAgents == nil {
+		return []string{}
+	}
+
+	agents := make([]string, 0, len(n.runningAgents))
+	for agentName := range n.runningAgents {
+		agents = append(agents, agentName)
+	}
+	return agents
 }
 
 // if ok { // provided is a valid bool }

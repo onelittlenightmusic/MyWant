@@ -7,7 +7,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 **Key Features:**
 - 📝 YAML-driven workflows with recipe-based configuration
 - 🤖 Autonomous agent ecosystem (Do/Monitor agents)
-- 💻 Full-stack CLI (`want-cli`) for complete lifecycle management
+- 💻 Full-stack CLI (`mywant`) for complete lifecycle management
 - 📊 Interactive dashboard with real-time monitoring
 - 💾 Persistent memory with continuous state reconciliation
 
@@ -19,7 +19,7 @@ MyWant is a **declarative chain programming system** where you express "what you
 - [Agent Execution Modes](docs/AgentExecutionModes.md) - Local/Webhook/RPC execution
 - [Want Developer Guide](docs/WantDeveloperGuide.md) - Custom Want type development (state management, exec cycle, achieving_percentage)
 - [Agent Catalog](AGENTS.md) - Available agents and capabilities
-- [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete want-cli reference
+- [CLI Usage Guide](docs/WANT_CLI_USAGE.md) - Complete mywant reference
 - [Examples](docs/agent-examples.md) - Agent usage examples
 - [Keyboard Shortcuts & MCP Testing](web/SHORTCUTS_AND_MCP_TESTING.md) - Frontend shortcuts
 
@@ -54,52 +54,72 @@ MyWant is a **declarative chain programming system** where you express "what you
 
 ## Essential Commands
 
+**Configuration Management:**
+```sh
+# Interactive configuration setup
+./mywant config set
+
+# View current configuration
+./mywant config get
+
+# Reset to defaults
+./mywant config reset
+
+# Configuration file location: ~/.mywant/config.yaml
+```
+
 **CLI Quick Start:**
 ```sh
 # Build CLI with embedded GUI
 make release
 
-# Start backend API and embedded GUI together (single command)
-./want-cli start -D --port 8080
+# Start backend API and embedded GUI (uses config file)
+./mywant start -D
+
+# Start with specific port (overrides config)
+./mywant start -D --port 8080
+
+# Start Agent Service (worker mode)
+./mywant start --worker -D
 
 # Or run in development mode with hot reload
-./want-cli start --dev --port 8080
+./mywant start --dev
 
 # Deploy a want from file
-./want-cli wants create -f yaml/config/config-travel.yaml
+./mywant wants create -f yaml/config/config-travel.yaml
 
 # List all wants
-./want-cli wants list
+./mywant wants list
 
 # Check process status
-./want-cli ps
+./mywant ps
 
 # Stop server
-./want-cli stop --port 8080
+./mywant stop
 ```
 
 **Want-CLI Management:**
 ```sh
 # Want lifecycle
-./want-cli wants get <WANT_ID>           # Get detailed status
-./want-cli wants delete <WANT_ID>        # Delete want
-./want-cli wants suspend/resume <ID>     # Lifecycle control
+./mywant wants get <WANT_ID>           # Get detailed status
+./mywant wants delete <WANT_ID>        # Delete want
+./mywant wants suspend/resume <ID>     # Lifecycle control
 
 # Recipe operations
-./want-cli recipes list                  # List available recipes
-./want-cli recipes create -f recipe.yaml # Create new recipe
-./want-cli recipes from-want <ID> --name "my-recipe"  # Generate from existing want
+./mywant recipes list                  # List available recipes
+./mywant recipes create -f recipe.yaml # Create new recipe
+./mywant recipes from-want <ID> --name "my-recipe"  # Generate from existing want
 
 # System inspection
-./want-cli types list                    # List want types
-./want-cli agents list                   # List registered agents
-./want-cli capabilities list             # List capabilities
-./want-cli logs                          # View operation logs
+./mywant types list                    # List want types
+./mywant agents list                   # List registered agents
+./mywant capabilities list             # List capabilities
+./mywant logs                          # View operation logs
 ```
 
 **Legacy Make Commands:**
 ```sh
-make restart-all             # Start servers: MyWant (8080) + Mock Flight (8081)
+make restart-all             # Start servers: MyWant (8080) + Mock Flight (8090)
 make test-concurrent-deploy  # Test concurrent deployments with race detection
 make run-travel-recipe       # Independent wants (restaurant, hotel, buffet)
 make run-queue-system-recipe # Pipeline (generator→queue→sink)
@@ -196,9 +216,31 @@ description: "Handles luxury hotel bookings with automated upgrades."
 
 **Agent Management:**
 ```sh
-./want-cli agents list           # Show registered agents
-./want-cli capabilities list     # Show available capabilities
-./want-cli wants get <ID> --history  # View agent execution history
+./mywant agents list           # Show registered agents
+./mywant capabilities list     # Show available capabilities
+./mywant wants get <ID> --history  # View agent execution history
+```
+
+## System Directories
+
+**Configuration and Logs:**
+- `~/.mywant/` - All configuration, PID files, logs, and runtime data
+  - `config.yaml` - CLI configuration (agent mode, hosts, ports)
+  - `server.pid` - Backend server process ID
+  - `server.log` - Backend server logs
+  - `agent-service.pid` - Agent service process ID
+  - `agent-service.port` - Agent service port number
+  - `agent-service.log` - Agent service logs
+  - `flight-server.log` - Mock flight server logs
+
+**Configuration Options (`~/.mywant/config.yaml`):**
+```yaml
+agent_mode: local              # local, webhook, or grpc
+server_host: localhost         # Main server host
+server_port: 8080              # Main server port
+agent_service_host: localhost  # Agent service host (webhook/grpc)
+agent_service_port: 8081       # Agent service port (webhook/grpc)
+mock_flight_port: 8090         # Mock flight server port
 ```
 
 ## Pending Improvements
@@ -206,7 +248,6 @@ description: "Handles luxury hotel bookings with automated upgrades."
 - Frontend recipe cards need deploy button for direct recipe launch
 - Replace direct `State` field access with `GetState()` everywhere
 - Consider async rebooking in dynamic travel changes
-- Logs location: `logs/mywant-backend.log`
 
 ## RAG Database (Code Search)
 
@@ -231,7 +272,7 @@ rag.close()
 ### 2026-01-10: Documentation Update
 ✅ **Updated CLAUDE.md with latest system information**
 - Added Agent System documentation (DoAgent/MonitorAgent, Capabilities)
-- Integrated want-cli commands and usage patterns
+- Integrated mywant commands and usage patterns
 - Updated project overview to reflect declarative agent-based architecture
 - Added comprehensive CLI quick start and management commands
 - Documented agent patterns (Monitor & Retrigger, Silencer)

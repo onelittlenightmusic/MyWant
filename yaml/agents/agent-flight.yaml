@@ -9,7 +9,7 @@ agents:
     uses: []
     role: action
     configuration:
-      server_url: http://localhost:8081
+      server_url: http://localhost:8090
       default_from: New York
       default_to: Los Angeles
       default_flight_number: AA123
@@ -116,7 +116,7 @@ agents:
     uses: []
     role: monitor
     configuration:
-      server_url: http://localhost:8081
+      server_url: http://localhost:8090
       default_poll_interval: 10s
       timeout: 30s
     monitoring:

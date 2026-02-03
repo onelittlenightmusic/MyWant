@@ -13,7 +13,7 @@ MyWantには2つの主要なエージェント・タイプが存在します：
 
 ## エージェント・カタログ
 
-現在システムに登録されている主要なエージェントの一覧です。これらは `want-cli agents list` で確認できます。
+現在システムに登録されている主要なエージェントの一覧です。これらは `mywant agents list` で確認できます。
 
 ### ✈️ トラベル・ドメイン (Travel)
 
@@ -79,13 +79,13 @@ CLIを使用して、実行時のエージェントの状態を確認できま�
 
 ```bash
 # 登録されている全エージェントを表示
-./want-cli agents list
+./mywant agents list
 
 # 利用可能な能力の一覧を表示
-./want-cli capabilities list
+./mywant capabilities list
 
 # 特定のWantでどのアージェントが動いたか履歴を確認
-./want-cli wants get <WANT_ID> --history
+./mywant wants get <WANT_ID> --history
 ```
 
 ---

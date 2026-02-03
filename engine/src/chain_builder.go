@@ -335,6 +335,11 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
+
+func (cb *ChainBuilder) GetAgentRegistry() *AgentRegistry {
+	return cb.agentRegistry
+}
+
 func (cb *ChainBuilder) SetCustomTargetRegistry(registry *CustomTargetTypeRegistry) {
 	cb.customRegistry = registry
 }

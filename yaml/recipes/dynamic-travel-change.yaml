@@ -11,7 +11,7 @@ recipe:
   parameters:
     prefix: "travel"
     display_name: "Dynamic Travel Itinerary with Flight Monitoring"
-    server_url: "http://localhost:8081"
+    server_url: "http://localhost:8090"
     flight_number: "AA100"
     flight_type: "business class"
     from: "New York"

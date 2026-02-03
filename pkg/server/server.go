@@ -210,7 +210,7 @@ func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
 				"agent_flight_api",
 				[]string{"flight_api_agency"},
 				[]string{},
-				"http://localhost:8081",
+				"http://localhost:8090",
 			)
 			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
 				_, err := flightAgent.Exec(ctx, want)

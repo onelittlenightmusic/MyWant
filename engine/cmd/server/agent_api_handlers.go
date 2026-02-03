@@ -18,6 +18,14 @@ import (
 
 // validateAgentAuth validates Bearer token authentication for external agents
 func (s *Server) validateAgentAuth(r *http.Request) bool {
+	expectedToken := os.Getenv("WEBHOOK_AUTH_TOKEN")
+
+	// If no token configured, allow all requests (development mode)
+	if expectedToken == "" {
+		log.Printf("[AUTH] Warning: WEBHOOK_AUTH_TOKEN not set, allowing all agent requests")
+		return true
+	}
+
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return false
@@ -30,14 +38,6 @@ func (s *Server) validateAgentAuth(r *http.Request) bool {
 	}
 
 	token := authHeader[len(prefix):]
-	expectedToken := os.Getenv("WEBHOOK_AUTH_TOKEN")
-
-	// If no token configured, allow all requests (development mode)
-	if expectedToken == "" {
-		log.Printf("[AUTH] Warning: WEBHOOK_AUTH_TOKEN not set, allowing all agent requests")
-		return true
-	}
-
 	return token == expectedToken
 }
 
@@ -325,9 +325,16 @@ func (s *Server) registerAgentAPIRoutes() {
 	// Manual agent execution
 	s.router.HandleFunc("/api/v1/wants/{id}/agents/{agentName}/execute", s.handleAgentExecute).Methods("POST")
 
+	// Agent Service (serve registered agents via HTTP)
+	s.router.HandleFunc("/api/v1/agent-service/execute", s.handleAgentServiceExecute).Methods("POST")
+	s.router.HandleFunc("/api/v1/agent-service/monitor/execute", s.handleAgentServiceMonitorExecute).Methods("POST")
+
 	log.Println("[ROUTES] Registered agent API routes:")
 	log.Println("  GET  /api/v1/wants/{id}/state")
 	log.Println("  POST /api/v1/wants/{id}/state")
 	log.Println("  POST /api/v1/agents/webhook/callback")
 	log.Println("  POST /api/v1/wants/{id}/agents/{agentName}/execute")
+	log.Println("[ROUTES] Registered agent service routes:")
+	log.Println("  POST /api/v1/agent-service/execute")
+	log.Println("  POST /api/v1/agent-service/monitor/execute")
 }

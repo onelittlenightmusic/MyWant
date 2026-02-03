@@ -385,10 +385,10 @@ Each agent execution is tracked in `AgentExecution` history:
 
 ```bash
 # Get want with agent history
-./want-cli wants get my-want --history
+./mywant wants get my-want --history
 
 # Check specific agent executions
-./want-cli wants get my-want | jq '.history.agent_history'
+./mywant wants get my-want | jq '.history.agent_history'
 ```
 
 ### Logs
@@ -422,17 +422,17 @@ WEBHOOK_AUTH_TOKEN=test123 go run main.go
 
 2. Start MyWant:
 ```bash
-WEBHOOK_AUTH_TOKEN=test123 ./want-cli start -D --port 8080
+WEBHOOK_AUTH_TOKEN=test123 ./mywant start -D --port 8080
 ```
 
 3. Deploy test want:
 ```bash
-./want-cli wants create -f yaml/config/test-webhook-agent.yaml
+./mywant wants create -f yaml/config/test-webhook-agent.yaml
 ```
 
 4. Verify execution:
 ```bash
-./want-cli wants get webhook-flight-test --history
+./mywant wants get webhook-flight-test --history
 ```
 
 ## Migration Guide

@@ -59,7 +59,7 @@ logs/
 tmp/
 *.log
 *.pid
-/want-cli
+/mywant
 build_error.log
 drag_drop_success.png
 
@@ -68,3 +68,5 @@ debug_repro.txt
 *_results.txt
 *_report.txt
 demo-restart.sh
+*.json
+demo_*.yaml

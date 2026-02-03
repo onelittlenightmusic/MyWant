@@ -78,7 +78,15 @@ func (e *WebhookExecutor) Execute(ctx context.Context, agent Agent, want *Want) 
 	if agent.GetType() == DoAgentType {
 		return e.executeSyncWebhook(ctx, agent, want)
 	}
-	return e.executeAsyncWebhook(ctx, agent, want)
+
+	// MonitorAgent execution
+	if e.config.MonitorMode == "one-shot" {
+		// Execute once and return
+		return e.executeMonitorWithSync(ctx, agent, want)
+	}
+
+	// Periodic execution (default)
+	return e.startMonitorLoop(ctx, agent, want)
 }
 
 // executeSyncWebhook executes DoAgent via webhook and waits for response
@@ -96,7 +104,7 @@ func (e *WebhookExecutor) executeSyncWebhook(ctx context.Context, agent Agent, w
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	url := e.config.ServiceURL + "/execute"
+	url := e.config.ServiceURL + "/api/v1/agent-service/execute"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -188,6 +196,144 @@ func (e *WebhookExecutor) executeAsyncWebhook(ctx context.Context, agent Agent, 
 	} else {
 		log.Printf("[WEBHOOK] MonitorAgent %s started with monitor_id: %s", agent.GetName(), response.MonitorID)
 	}
+
+	return nil
+}
+
+// executeMonitorWithSync executes MonitorAgent via Agent Service (one cycle with state sync)
+func (e *WebhookExecutor) executeMonitorWithSync(ctx context.Context, agent Agent, want *Want) error {
+	// 1. Fetch latest state from server
+	latestState, err := e.fetchLatestWantState(want.Metadata.Name)
+	if err != nil {
+		log.Printf("[WEBHOOK] Failed to fetch latest state: %v, using current state", err)
+		latestState = want.State // Fallback to current state
+	}
+
+	// 2. Create request with latest state
+	request := MonitorRequest{
+		WantID:      want.Metadata.Name,
+		AgentName:   agent.GetName(),
+		WantState:   latestState, // Latest state synced from server
+		CallbackURL: e.config.CallbackURL,
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := e.config.ServiceURL + "/api/v1/agent-service/monitor/execute"
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if e.config.AuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+e.config.AuthToken)
+	}
+
+	log.Printf("[WEBHOOK] Executing MonitorAgent %s at %s (state fields: %d)",
+		agent.GetName(), url, len(latestState))
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("webhook request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("webhook returned status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		log.Printf("[WEBHOOK] Warning: failed to decode response: %v", err)
+		return nil
+	}
+
+	log.Printf("[WEBHOOK] MonitorAgent %s executed (status: %v, changes: %v)",
+		agent.GetName(), response["status"], response["state_updates_count"])
+
+	// Note: State updates are sent via callback for MonitorAgents
+	// They are not applied directly here like DoAgents
+	return nil
+}
+
+// fetchLatestWantState fetches the latest state from the server
+func (e *WebhookExecutor) fetchLatestWantState(wantID string) (map[string]any, error) {
+	// GET /api/v1/wants/{id}/state
+	url := fmt.Sprintf("%s/api/v1/wants/%s/state", e.config.ServiceURL, wantID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if e.config.AuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+e.config.AuthToken)
+	}
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var stateResp WantStateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&stateResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return stateResp.State, nil
+}
+
+// startMonitorLoop starts a periodic execution loop for MonitorAgent
+func (e *WebhookExecutor) startMonitorLoop(ctx context.Context, agent Agent, want *Want) error {
+	interval := time.Duration(e.config.MonitorIntervalMs) * time.Millisecond
+	if interval <= 0 {
+		interval = 30 * time.Second // Default to 30s if not configured
+	}
+	agentName := agent.GetName()
+
+	log.Printf("[WEBHOOK] Starting MonitorAgent %s loop (interval: %v)", agentName, interval)
+
+	// Create cancellable context for this monitor
+	monitorCtx, cancel := context.WithCancel(ctx)
+
+	// Register cancel function with Want for lifecycle management
+	want.RegisterRunningAgent(agentName, cancel)
+
+	// Start monitoring loop in background
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		defer want.UnregisterRunningAgent(agentName)
+
+		// Execute immediately on start
+		if err := e.executeMonitorWithSync(monitorCtx, agent, want); err != nil {
+			log.Printf("[WEBHOOK] MonitorAgent %s initial execution failed: %v", agentName, err)
+		}
+
+		// Periodic execution
+		for {
+			select {
+			case <-ticker.C:
+				if err := e.executeMonitorWithSync(monitorCtx, agent, want); err != nil {
+					log.Printf("[WEBHOOK] MonitorAgent %s cycle failed: %v", agentName, err)
+				}
+			case <-monitorCtx.Done():
+				log.Printf("[WEBHOOK] MonitorAgent %s loop stopped: %v", agentName, monitorCtx.Err())
+				return
+			}
+		}
+	}()
 
 	return nil
 }

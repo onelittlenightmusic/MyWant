@@ -7,7 +7,7 @@ wants:
         priority: high
     spec:
       params:
-        server_url: "http://localhost:8081"
+        server_url: "http://localhost:8090"
         flight_number: "AA123"
         from: "New York"
         to: "Los Angeles"

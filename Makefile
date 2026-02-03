@@ -9,13 +9,13 @@ fmt:
 vet:
 	@echo "🔍 Running go vet..."
 	go vet -C engine ./src/... ./cmd/server/...
-	go vet ./pkg/... ./cmd/want-cli/...
+	go vet ./pkg/... ./cmd/mywant/...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run -C engine ./src/... ./cmd/server/...; \
-		golangci-lint run ./pkg/... ./cmd/want-cli/...; \
+		golangci-lint run ./pkg/... ./cmd/mywant/...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 		echo "📋 Running basic checks instead..."; \
@@ -25,7 +25,7 @@ lint:
 test:
 	@echo "🧪 Running tests..."
 	go test -C engine -v ./src/... || echo "⚠️  Engine tests failed"
-	go test -v ./pkg/... ./cmd/want-cli/... || echo "⚠️  CLI/Package tests failed"
+	go test -v ./pkg/... ./cmd/mywant/... || echo "⚠️  CLI/Package tests failed"
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
@@ -36,11 +36,11 @@ build-gui:
 	cd web && npm install && npm run build
 
 build-cli:
-	@echo "🔨 Building want-cli with embedded GUI..."
-	go build -o want-cli ./cmd/want-cli
+	@echo "🔨 Building mywant with embedded GUI..."
+	go build -o mywant ./cmd/mywant
 
 release: build-gui build-cli
-	@echo "🚀 Release build complete: want-cli"
+	@echo "🚀 Release build complete: mywant"
 
 # Build the mywant library
 build: check
@@ -277,38 +277,38 @@ help:
 
 all: build
 
-# Kill and restart processes using want-cli
+# Kill and restart processes using mywant
 restart-all:
 	@echo "🔄 Restarting MyWant server and mock server..."
 	@echo "🛑 Stopping existing processes..."
-	@./want-cli stop 2>/dev/null || echo "  Server not running"
+	@./mywant stop 2>/dev/null || echo "  Server not running"
 	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
 	@echo "🧹 Cleaning logs..."
-	@rm -f logs/server.log
+	@rm -f ~/.mywant/server.log
 	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
 	@$(MAKE) build-server
 	@$(MAKE) build-gui
 	@$(MAKE) build-cli
-	@mkdir -p logs
+	@mkdir -p ~/.mywant
 	@$(MAKE) build-mock
-	@echo "🚀 Starting MyWant server via want-cli..."
-	@nohup ./want-cli start -D --port 8080 > /dev/null 2>&1 &
+	@echo "🚀 Starting MyWant server via mywant..."
+	@nohup ./mywant start -D --port 8080 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
 	@echo ""
 	@echo "✈️  Starting mock flight server..."
-	@nohup ./bin/flight-server > ./logs/flight-server.log 2>&1 &
+	@nohup ./bin/flight-server > ~/.mywant/flight-server.log 2>&1 &
 	@sleep 1
 	@echo "✅ Mock server started (PID: $$(pgrep -f './bin/flight-server'))"
 	@echo "✅ All processes started!"
 	@echo "🌐 URL: http://localhost:8080"
-	@echo "✈️  Mock Server: http://localhost:8081"
+	@echo "✈️  Mock Server: http://localhost:8090"
 	@echo ""
 	@echo "📋 Server management:"
-	@echo "  Stop: ./want-cli stop"
-	@echo "  View status: ./want-cli ps"
+	@echo "  Stop: ./mywant stop"
+	@echo "  View status: ./mywant ps"
 
 # Gmail MCP troubleshooting targets
 troubleshoot-mcp:

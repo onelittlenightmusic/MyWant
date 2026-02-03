@@ -88,7 +88,7 @@ go build -o flight-server
 ./flight-server
 ```
 
-Server starts on port 8081 by default. Set `PORT` environment variable to use a different port:
+Server starts on port 8090 by default. Set `PORT` environment variable to use a different port:
 ```bash
 PORT=9090 ./flight-server
 ```
@@ -97,7 +97,7 @@ PORT=9090 ./flight-server
 
 ```bash
 # Create a flight
-FLIGHT_ID=$(curl -s -X POST http://localhost:8081/api/flights \
+FLIGHT_ID=$(curl -s -X POST http://localhost:8090/api/flights \
   -H "Content-Type: application/json" \
   -d '{
     "flight_number": "AA123",
@@ -108,18 +108,18 @@ FLIGHT_ID=$(curl -s -X POST http://localhost:8081/api/flights \
   }' | jq -r '.id')
 
 # Check status immediately (confirmed)
-curl -s http://localhost:8081/api/flights/$FLIGHT_ID | jq '.status'
+curl -s http://localhost:8090/api/flights/$FLIGHT_ID | jq '.status'
 
 # Wait 25 seconds and check again (details_changed)
 sleep 25
-curl -s http://localhost:8081/api/flights/$FLIGHT_ID | jq '.status'
+curl -s http://localhost:8090/api/flights/$FLIGHT_ID | jq '.status'
 
 # Wait another 20 seconds (delayed_one_day)
 sleep 20
-curl -s http://localhost:8081/api/flights/$FLIGHT_ID | jq '.status'
+curl -s http://localhost:8090/api/flights/$FLIGHT_ID | jq '.status'
 
 # Cancel the flight
-curl -s -X DELETE http://localhost:8081/api/flights/$FLIGHT_ID
+curl -s -X DELETE http://localhost:8090/api/flights/$FLIGHT_ID
 ```
 
 ## Integration with FlightAgent

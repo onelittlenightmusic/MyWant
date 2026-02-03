@@ -892,7 +892,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 	// Get server URL from params
 	serverURL, ok := spec.Params["server_url"].(string)
 	if !ok || serverURL == "" {
-		serverURL = "http://localhost:8081"
+		serverURL = "http://localhost:8090"
 	}
 
 	// Create monitoring agent during initialization

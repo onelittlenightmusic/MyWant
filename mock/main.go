@@ -30,7 +30,7 @@ func main() {
 	// Setup server
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8081"
+		port = "8090"
 	}
 
 	addr := fmt.Sprintf(":%s", port)

@@ -11,7 +11,7 @@
 - 📝 **YAML-Driven Workflows**: Define complex logic and dependencies through simple declarative YAML.
 - 🤖 **Autonomous Agent Ecosystem**: Specialized agents (Do/Monitor) solve your "Wants" based on their "Capabilities".
 - 📦 **Modular Recipes**: Package reusable logic into Custom Want Types with flexible parameter support.
-- 💻 **Full-Stack CLI (`want-cli`)**: Manage the entire lifecycle—Server, GUI, Wants, and Recipes—from a single tool.
+- 💻 **Full-Stack CLI (`mywant`)**: Manage the entire lifecycle—Server, GUI, Wants, and Recipes—from a single tool.
 - 🚀 **Zero-Install GUI**: Single-binary experience with React frontend assets embedded directly into the Go binary.
 - 📊 **Interactive Dashboard**: Real-time monitoring with intuitive drag-and-drop hierarchy and state visualization.
 - 💾 **Persistent Memory**: Continuous state reconciliation and memory recovery across system restarts.
@@ -29,9 +29,9 @@ make release
 
 ```bash
 # Start backend and GUI together in background
-./want-cli start -D
+./mywant start -D
 # Check status
-./want-cli ps
+./mywant ps
 ```
 
 ### 3. Access the Dashboard
@@ -58,7 +58,7 @@ wants:
 
 **Run:**
 ```bash
-./want-cli wants create -f yaml/config/config-reminder.yaml
+./mywant wants create -f yaml/config/config-reminder.yaml
 ```
 The new want execution will immediately appear on your dashboard.
 
@@ -67,9 +67,9 @@ The new want execution will immediately appear on your dashboard.
 Explore more complex scenarios using pre-defined configurations:
 
 ```bash
-./want-cli wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
-./want-cli wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
-./want-cli wants create -f yaml/config/config-reminder.yaml        # Simple reminder
+./mywant wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
+./mywant wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
+./mywant wants create -f yaml/config/config-reminder.yaml        # Simple reminder
 ```
 
 ## API Usage
@@ -106,7 +106,7 @@ make help
 # Run all quality checks (fmt, vet, test)
 make check
 
-# Build the integrated want-cli (Production release)
+# Build the integrated mywant (Production release)
 make release
 
 # Run the server in development mode (standalone binary)

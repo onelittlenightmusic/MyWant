@@ -28,9 +28,9 @@ wantType:
   - name: log_file
     description: Path to the server log file
     type: string
-    default: logs/flight-server.log
+    default: ~/.mywant/flight-server.log
     required: false
-    example: logs/flight-server.log
+    example: ~/.mywant/flight-server.log
 
   state:
   - name: server_phase
@@ -51,8 +51,8 @@ wantType:
     description: Path to the active log file
     type: string
     persistent: true
-    initialValue: logs/flight-server.log
-    example: logs/flight-server.log
+    initialValue: ~/.mywant/flight-server.log
+    example: ~/.mywant/flight-server.log
 
   - name: server_pid
     description: Process ID of the running server (0 if not running)
@@ -66,7 +66,7 @@ wantType:
     type: string
     persistent: true
     initialValue: ''
-    example: 'Failed to bind to port 8081'
+    example: 'Failed to bind to port 8090'
 
   connectivity:
     inputs: []
@@ -105,7 +105,7 @@ wantType:
         type: flight_mock_server
       spec:
         params:
-          log_file: logs/flight-server-dev.log
+          log_file: ~/.mywant/flight-server-dev.log
 
   relatedTypes:
   - execution_result

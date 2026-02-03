@@ -91,7 +91,7 @@ func main() {
 		"agent_flight_api",
 		[]string{"flight_api_agency"}, // Must match capability name that provides create_flight
 		[]string{},
-		"http://localhost:8081",
+		"http://localhost:8090",
 	)
 	agentRegistry.RegisterAgent(flightAPIAgent)
 	fmt.Printf("✅ Registered agent_flight_api with flight_api_agency capability\n")

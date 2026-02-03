@@ -1,6 +1,6 @@
-# want-cli Usage Guide
+# mywant Usage Guide
 
-`want-cli` is a powerful command-line tool to manage MyWant executions, recipes, agents, and the server itself.
+`mywant` is a powerful command-line tool to manage MyWant executions, recipes, agents, and the server itself.
 
 ## Installation
 
@@ -64,19 +64,19 @@ Start, monitor, and stop the integrated MyWant services (API and GUI).
 
 ```bash
 # Start MyWant server (API and GUI) in background
-./want-cli start --detach
+./mywant start --detach
 # Short version:
-./want-cli s -D
+./mywant s -D
 
 # Check status of all processes
-./want-cli ps
+./mywant ps
 # Short version:
-./want-cli p
+./mywant p
 
 # Stop the server
-./want-cli stop
+./mywant stop
 # Short version:
-./want-cli st
+./mywant st
 ```
 
 ### Want Management
@@ -85,33 +85,33 @@ List, view, and manage lifecycle of wants.
 
 ```bash
 # List all wants
-./want-cli wants list
+./mywant wants list
 # Short version:
-./want-cli w l
+./mywant w l
 
 # Get detailed status of a specific want
-./want-cli wants get <WANT_ID>
+./mywant wants get <WANT_ID>
 # Short version:
-./want-cli w g <WANT_ID>
+./mywant w g <WANT_ID>
 
 # Create/Deploy a new want from YAML file
-./want-cli wants create -f config.yaml
+./mywant wants create -f config.yaml
 # Short version:
-./want-cli w c -f config.yaml
+./mywant w c -f config.yaml
 
 # Delete a want
-./want-cli wants delete <WANT_ID>
+./mywant wants delete <WANT_ID>
 # Short version:
-./want-cli w d <WANT_ID>
+./mywant w d <WANT_ID>
 
 # Batch lifecycle operations
-./want-cli wants suspend <ID1> <ID2>
-./want-cli w sus <ID1> <ID2>
+./mywant wants suspend <ID1> <ID2>
+./mywant w sus <ID1> <ID2>
 
 # Export/Import wants
-./want-cli wants export -o backup.yaml
+./mywant wants export -o backup.yaml
 # Short version:
-./want-cli w e -o backup.yaml
+./mywant w e -o backup.yaml
 ```
 
 ### Recipe Management
@@ -120,19 +120,19 @@ Handle reusable templates.
 
 ```bash
 # List available recipes
-./want-cli recipes list
+./mywant recipes list
 # Short version:
-./want-cli r l
+./mywant r l
 
 # Create a new recipe from a file
-./want-cli recipes create -f recipe.yaml
+./mywant recipes create -f recipe.yaml
 # Short version:
-./want-cli r c -f recipe.yaml
+./mywant r c -f recipe.yaml
 
 # Generate a recipe from an existing deployed want
-./want-cli recipes from-want <WANT_ID> --name "my-new-recipe"
+./mywant recipes from-want <WANT_ID> --name "my-new-recipe"
 # Short version:
-./want-cli r fw <WANT_ID> -n "my-new-recipe"
+./mywant r fw <WANT_ID> -n "my-new-recipe"
 ```
 
 ### System Inspection
@@ -141,36 +141,36 @@ Explore available types and agents.
 
 ```bash
 # List available want types
-./want-cli types list
+./mywant types list
 # Short version:
-./want-cli t l
+./mywant t l
 
 # List registered agents
-./want-cli agents list
+./mywant agents list
 # Short version:
-./want-cli a l
+./mywant a l
 ```
 
 ### Utilities
 
 ```bash
 # View API operation logs
-./want-cli logs
+./mywant logs
 # Short version:
-./want-cli l
+./mywant l
 ```
 
 ## Shell Completion
 
-`want-cli` supports generating shell completion scripts for Bash, Zsh, Fish, and PowerShell.
+`mywant` supports generating shell completion scripts for Bash, Zsh, Fish, and PowerShell.
 
 To enable completion in your current session (Zsh example):
 ```zsh
-source <(./want-cli completion zsh)
+source <(./mywant completion zsh)
 ```
 
 ## Global Flags
 
 - `--server`: Specify MyWant server URL (default: `http://localhost:8080`)
-- `--config`: Specify a custom CLI config file (default: `~/.want-cli.yaml`)
+- `--config`: Specify a custom CLI config file (default: `~/.mywant.yaml`)
 - `-h, --help`: Show help for any command

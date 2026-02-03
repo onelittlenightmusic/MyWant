@@ -24,10 +24,12 @@ type ExecutionConfig struct {
 
 // WebhookConfig contains webhook execution settings
 type WebhookConfig struct {
-	ServiceURL  string `yaml:"service_url" json:"service_url"`     // External agent service endpoint
-	CallbackURL string `yaml:"callback_url" json:"callback_url"`   // MyWant callback endpoint
-	AuthToken   string `yaml:"auth_token" json:"auth_token"`       // Authentication token
-	TimeoutMs   int    `yaml:"timeout_ms" json:"timeout_ms"`       // Request timeout in milliseconds
+	ServiceURL        string `yaml:"service_url" json:"service_url"`               // External agent service endpoint
+	CallbackURL       string `yaml:"callback_url" json:"callback_url"`             // MyWant callback endpoint
+	AuthToken         string `yaml:"auth_token" json:"auth_token"`                 // Authentication token
+	TimeoutMs         int    `yaml:"timeout_ms" json:"timeout_ms"`                 // Request timeout in milliseconds
+	MonitorIntervalMs int    `yaml:"monitor_interval_ms" json:"monitor_interval_ms"` // Monitor polling interval (default: 30000ms)
+	MonitorMode       string `yaml:"monitor_mode" json:"monitor_mode"`             // "one-shot" or "periodic" (default: "periodic")
 }
 
 // RPCConfig contains RPC execution settings
@@ -79,6 +81,15 @@ func (wc *WebhookConfig) Validate() error {
 	}
 	if wc.TimeoutMs <= 0 {
 		wc.TimeoutMs = 30000 // Default 30s timeout
+	}
+	if wc.MonitorIntervalMs <= 0 {
+		wc.MonitorIntervalMs = 30000 // Default 30s monitor interval
+	}
+	if wc.MonitorMode == "" {
+		wc.MonitorMode = "periodic" // Default to periodic monitoring
+	}
+	if wc.MonitorMode != "one-shot" && wc.MonitorMode != "periodic" {
+		return fmt.Errorf("invalid monitor_mode: %s (must be 'one-shot' or 'periodic')", wc.MonitorMode)
 	}
 
 	// Expand environment variables in auth token
