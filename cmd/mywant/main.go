@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"mywant/cmd/mywant/commands"
 
@@ -58,7 +59,7 @@ func main() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mywant.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mywant/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&server, "server", "http://localhost:8080", "MyWant server URL")
 
 	viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
@@ -74,8 +75,11 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".mywant")
+		// Use ~/.mywant/config.yaml
+		mywantDir := filepath.Join(home, ".mywant")
+		viper.AddConfigPath(mywantDir)
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
 	}
 
 	viper.AutomaticEnv()

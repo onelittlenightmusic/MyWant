@@ -172,5 +172,5 @@ source <(./mywant completion zsh)
 ## Global Flags
 
 - `--server`: Specify MyWant server URL (default: `http://localhost:8080`)
-- `--config`: Specify a custom CLI config file (default: `~/.mywant.yaml`)
+- `--config`: Specify a custom CLI config file (default: `~/.mywant/config.yaml`)
 - `-h, --help`: Show help for any command
