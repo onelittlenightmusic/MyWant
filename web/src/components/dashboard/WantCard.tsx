@@ -42,6 +42,9 @@ interface WantCardProps {
   onToggleExpand?: (wantId: string) => void;
   onLabelDropped?: (wantId: string) => void;
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
+  onReorderDragOver?: (index: number, position: 'before' | 'after' | 'inside' | null) => void;
+  onReorderDrop?: (draggedId: string, index: number, position: 'before' | 'after') => void;
+  index: number;
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
   isBeingProcessed?: boolean; // New prop for initializing/deleting states
@@ -65,6 +68,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   onToggleExpand,
   onLabelDropped,
   onWantDropped,
+  onReorderDragOver,
+  onReorderDrop,
+  index,
   isSelectMode = false,
   selectedWantIds,
   isBeingProcessed = false // Default to false
@@ -188,10 +194,34 @@ export const WantCard: React.FC<WantCardProps> = ({
       e.preventDefault();
       e.stopPropagation();
       setIsDragOver(false);
-      if (isTargetWant) {
+
+      // Determine position within the card for reordering vs child-drop
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const edgeThreshold = rect.width * 0.2; // 20% from edges
+      
+      let position: 'before' | 'after' | 'inside' | null = null;
+      
+      if (x < edgeThreshold) {
+        position = 'before';
+      } else if (x > rect.width - edgeThreshold) {
+        position = 'after';
+      } else if (isTargetWant) {
+        position = 'inside';
+      }
+
+      if (onReorderDragOver) {
+        onReorderDragOver(index, position);
+      }
+
+      if (position === 'inside') {
         e.dataTransfer.dropEffect = 'move';
         setIsOverTarget(true);
         if (!isDragOverWant) setIsDragOverWant(true);
+      } else {
+        setIsOverTarget(false);
+        setIsDragOverWant(false);
+        e.dataTransfer.dropEffect = 'move';
       }
     } else if (isLabelDrag) {
       e.preventDefault();
@@ -209,6 +239,9 @@ export const WantCard: React.FC<WantCardProps> = ({
     setIsDragOverWant(false);
     setIsOverTarget(false);
     setDraggedOverChildId(null);
+    if (onReorderDragOver) {
+      onReorderDragOver(index, null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -226,14 +259,36 @@ export const WantCard: React.FC<WantCardProps> = ({
     setIsOverTarget(false);
     setDraggedOverChildId(null);
     setDraggingWant(null);
+    
+    if (onReorderDragOver) {
+      onReorderDragOver(index, null);
+    }
 
     const draggedWantId = e.dataTransfer.getData('application/mywant-id');
     const targetWantId = want.metadata?.id || want.id;
 
-    if (draggedWantId && targetWantId && isTargetWant) {
-      if (draggedWantId === targetWantId) return;
+    if (!draggedWantId || !targetWantId) return;
+    if (draggedWantId === targetWantId) return;
+
+    // Determine position for drop
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const edgeThreshold = rect.width * 0.2;
+
+    if (x < edgeThreshold) {
+      if (onReorderDrop) onReorderDrop(draggedWantId, index, 'before');
+      return;
+    } else if (x > rect.width - edgeThreshold) {
+      if (onReorderDrop) onReorderDrop(draggedWantId, index, 'after');
+      return;
+    } else if (isTargetWant) {
       if (onWantDropped) onWantDropped(draggedWantId, targetWantId);
       return;
+    }
+    
+    // Default to reorder if not a target
+    if (onReorderDrop) {
+      onReorderDrop(draggedWantId, index, x < rect.width / 2 ? 'before' : 'after');
     }
 
     try {

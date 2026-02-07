@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
 import { WantCard } from './WantCard';
@@ -6,6 +7,7 @@ import { DraftWantCard } from './DraftWantCard';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { classNames } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
+import styles from './WantCard.module.css';
 
 interface WantWithChildren extends Want {
   children?: Want[];
@@ -68,6 +70,46 @@ export const WantGrid: React.FC<WantGridProps> = ({
   selectedWantIds = new Set(),
   onSelectWant
 }) => {
+  const { reorderWant } = useWantStore();
+  const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+
+  const handleReorderDragOver = (index: number, position: 'before' | 'after' | 'inside' | null) => {
+    if (position === 'before') {
+      setDragOverGap(index);
+    } else if (position === 'after') {
+      setDragOverGap(index + 1);
+    } else {
+      setDragOverGap(null);
+    }
+  };
+
+  const handleReorderDrop = async (draggedId: string, index: number, position: 'before' | 'after') => {
+    const targetGap = position === 'before' ? index : index + 1;
+    
+    let previousWantId: string | undefined;
+    let nextWantId: string | undefined;
+
+    if (targetGap === 0) {
+      // First position
+      nextWantId = filteredWants[0].metadata?.id || filteredWants[0].id;
+    } else if (targetGap >= filteredWants.length) {
+      // Last position
+      previousWantId = filteredWants[filteredWants.length - 1].metadata?.id || filteredWants[filteredWants.length - 1].id;
+    } else {
+      // Between items
+      const prevWant = filteredWants[targetGap - 1];
+      const nextWant = filteredWants[targetGap];
+      previousWantId = prevWant.metadata?.id || prevWant.id;
+      nextWantId = nextWant.metadata?.id || nextWant.id;
+    }
+
+    try {
+      await reorderWant(draggedId, previousWantId, nextWantId);
+    } catch (error) {
+      console.error('Failed to reorder want:', error);
+    }
+  };
+
   const hierarchicalWants = useMemo(() => {
     const wantsByName = new Map<string, Want>();
     wants.forEach(want => {
@@ -181,16 +223,35 @@ export const WantGrid: React.FC<WantGridProps> = ({
             key={wantId || `want-${index}`}
             data-want-id={wantId}
             data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-            className={classNames('transition-all duration-300 ease-out h-full', isExpanded ? 'col-span-3' : '')}
+            className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'col-span-3' : '')}
           >
+            {/* Drop Indicator Before */}
+            {dragOverGap === index && (
+              <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-left-[14px]")}>
+                <div className={styles.plusIconContainer}>
+                  <Plus size={14} />
+                </div>
+              </div>
+            )}
+
             <WantCard
               want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
               onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
               onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onEdit={onEditWant} onDelete={onDeleteWant}
               onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
               onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
+              onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
               isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
             />
+
+            {/* Drop Indicator After (only for the last item) */}
+            {index === filteredWants.length - 1 && dragOverGap === index + 1 && (
+              <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-right-[14px]")}>
+                <div className={styles.plusIconContainer}>
+                  <Plus size={14} />
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -205,7 +266,26 @@ export const WantGrid: React.FC<WantGridProps> = ({
         </div>
       ))}
 
-      <button onClick={onCreateWant} className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[200px]">
+      <button 
+        onClick={onCreateWant} 
+        onDragOver={(e) => {
+          const { draggingWant } = useWantStore.getState();
+          if (draggingWant || e.dataTransfer.types.includes('application/mywant-id')) {
+            e.preventDefault();
+            setDragOverGap(filteredWants.length);
+          }
+        }}
+        onDragLeave={() => setDragOverGap(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOverGap(null);
+          const draggedId = e.dataTransfer.getData('application/mywant-id');
+          if (draggedId) {
+            handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
+          }
+        }}
+        className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[200px]"
+      >
         <div className="w-16 h-16 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors mb-3">
           <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

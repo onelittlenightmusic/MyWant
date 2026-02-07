@@ -46,6 +46,7 @@ interface WantStore {
   setDraggingTemplate: (template: DraggingTemplate | null) => void;
   setIsOverTarget: (isOver: boolean) => void;
   setHighlightedLabel: (label: { key: string; value: string } | null) => void;
+  reorderWant: (id: string, previousWantId?: string, nextWantId?: string) => Promise<void>;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -77,6 +78,33 @@ export const useWantStore = create<WantStore>()(
       }
     },
 
+    reorderWant: async (id: string, previousWantId?: string, nextWantId?: string) => {
+      set({ loading: true, error: null });
+      try {
+        await apiClient.updateWantOrder(id, { previousWantId, nextWantId });
+        // After reordering, we need to fetch wants again to get the updated order keys
+        const wants = await apiClient.listWants();
+        
+        // Use sorting logic respecting orderKey
+        const sortedWants = [...wants].sort((a, b) => {
+          const keyA = a.metadata?.orderKey || a.metadata?.id || '';
+          const keyB = b.metadata?.orderKey || b.metadata?.id || '';
+          return keyA.localeCompare(keyB);
+        });
+
+        set({ 
+          wants: sortedWants,
+          loading: false 
+        });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : 'Failed to reorder want',
+          loading: false
+        });
+        throw error;
+      }
+    },
+
     fetchWants: async () => {
       const currentState = useWantStore.getState();
 
@@ -87,11 +115,11 @@ export const useWantStore = create<WantStore>()(
 
       try {
         const wants = await apiClient.listWants();
-        // Sort deterministically by ID to ensure consistent ordering across fetches
+        // Sort by orderKey for consistent ordering that respects reordering
         const sortedWants = [...wants].sort((a, b) => {
-          const idA = a.metadata?.id || a.id || '';
-          const idB = b.metadata?.id || b.id || '';
-          return idA.localeCompare(idB);
+          const keyA = a.metadata?.orderKey || a.metadata?.id || '';
+          const keyB = b.metadata?.orderKey || b.metadata?.id || '';
+          return keyA.localeCompare(keyB);
         });
 
         // Compare hashes to detect changes (ID-based comparison)
