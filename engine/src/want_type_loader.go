@@ -20,6 +20,7 @@ type WantTypeDefinition struct {
 	Connect      *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`       // New connectivity requirement field
 	Require      *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`       // Structured connectivity requirement (deprecated)
 	UsageLimit   *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use connect instead
+	Requires     []string         `json:"requires,omitempty" yaml:"requires,omitempty"`     // Agent capability requirements
 	Agents       []AgentDef       `json:"agents" yaml:"agents"`
 	Constraints  []ConstraintDef  `json:"constraints" yaml:"constraints"`
 	Examples     []ExampleDef     `json:"examples" yaml:"examples"`

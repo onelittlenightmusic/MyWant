@@ -68,10 +68,27 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assign IDs
+	// Assign IDs and apply want type defaults
 	for _, want := range config.Wants {
 		if want.Metadata.ID == "" {
 			want.Metadata.ID = generateWantID()
+		}
+
+		// Apply want type definition defaults (including Requires) if not already set
+		typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
+		if typeDef != nil {
+			log.Printf("[API:CREATE] Found want type definition for '%s', Requires: %v\n",
+				want.Metadata.Type, typeDef.Requires)
+			if len(want.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
+				want.Spec.Requires = typeDef.Requires
+				log.Printf("[API:CREATE] Applied requires from want type definition for '%s': %v\n",
+					want.Metadata.Type, typeDef.Requires)
+			} else {
+				log.Printf("[API:CREATE] Skipped requires application for '%s' (spec.requires=%v, typeDef.requires=%v)\n",
+					want.Metadata.Type, want.Spec.Requires, typeDef.Requires)
+			}
+		} else {
+			log.Printf("[API:CREATE] No want type definition found for '%s'\n", want.Metadata.Type)
 		}
 	}
 

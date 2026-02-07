@@ -339,7 +339,7 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 	for _, alias := range aliases {
 		cb.wantTypeDefinitions[alias] = def
 		cb.connectivityRegistry[alias] = metadata
-		
+
 		// Also register factory for alias if it exists
 		if _, ok := typeImplementationRegistry[wantType]; ok {
 			if _, alreadyRegistered := cb.registry[alias]; !alreadyRegistered {
@@ -347,6 +347,14 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 			}
 		}
 	}
+}
+
+// GetWantTypeDefinition retrieves a want type definition by name
+func (cb *ChainBuilder) GetWantTypeDefinition(wantType string) *WantTypeDefinition {
+	if cb.wantTypeDefinitions == nil {
+		return nil
+	}
+	return cb.wantTypeDefinitions[wantType]
 }
 
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
@@ -1727,6 +1735,18 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		InfoLog("[WARN] Rejecting want '%s' (ID: %s): name already exists (existing ID: %s)\n",
 			wantConfig.Metadata.Name, wantConfig.Metadata.ID, existingWant.want.Metadata.ID)
 		return
+	}
+
+	// Apply want type definition defaults (including Requires) if available
+	if cb.wantTypeDefinitions != nil {
+		if typeDef, exists := cb.wantTypeDefinitions[wantConfig.Metadata.Type]; exists {
+			// Apply Requires from want type definition if not already set in wantConfig
+			if len(wantConfig.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
+				wantConfig.Spec.Requires = typeDef.Requires
+				DebugLog("[CHAIN-BUILDER] Applied requires from want type definition for '%s': %v\n",
+					wantConfig.Metadata.Type, typeDef.Requires)
+			}
+		}
 	}
 
 	wantFunction, err := cb.createWantFunction(wantConfig)

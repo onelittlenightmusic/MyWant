@@ -68,8 +68,6 @@ recipe:
         params:
           restaurant_type: restaurant_type
           duration_hours: dinner_duration
-        requires:
-          - restaurant_reservation
 
     # Hotel accommodation booking with agent processing
     - metadata:
@@ -79,8 +77,6 @@ recipe:
       spec:
         params:
           hotel_type: hotel_type
-        requires:
-          - hotel_reservation
 
     # Morning breakfast buffet with agent processing
     - metadata:
@@ -90,8 +86,6 @@ recipe:
       spec:
         params:
           buffet_type: buffet_type
-        requires:
-          - buffet_reservation
 
   # Recipe result definition - specifies how to compute travel planning results
   result:
