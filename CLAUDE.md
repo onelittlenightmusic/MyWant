@@ -65,7 +65,7 @@ make run-queue-system-recipe # Pipeline demo
 make run-qnet-recipe         # Multi-stream demo
 ```
 
-**Note:** Never use `make build-server` directly.
+**Note:** `make restart-all` builds and starts the correct server (`./mywant` via `pkg/server`).
 
 ## Key Patterns
 
@@ -80,12 +80,12 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 
 ## File Organization
 
-`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/src/` (core) • `engine/cmd/types/` (*_types.go) • `engine/cmd/server/` (HTTP API) • `docs/` • `web/` (React frontend)
+`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/src/` (core) • `engine/cmd/types/` (*_types.go) • `pkg/server/` (HTTP API) • `docs/` • `web/` (React frontend)
 
 ## Coding Rules
 
 1. Max 7s sleep in build/test
-2. Never `make build-server` (use `make restart-all`)
+2. **Server modifications**: Edit `pkg/server/handlers_*.go`, NOT `engine/cmd/server/` (deleted)
 3. Always `StoreState(k,v)` / `GetState(k)` for state access
 4. Initialize StateHistory: `if want.History.StateHistory == nil { want.History.StateHistory = make([]StateHistoryEntry, 0) }`
 
@@ -126,6 +126,24 @@ agent_service_host: localhost
 agent_service_port: 8081
 mock_flight_port: 8090
 ```
+
+## Server Implementation
+
+**CRITICAL**: MyWant uses `pkg/server` package for the HTTP server. `engine/cmd/server/` was deleted (legacy).
+
+**Server Flow:**
+```
+./mywant start -D → cmd/mywant/commands/start.go → server.New() → pkg/server/server.go
+```
+
+**When modifying server**:
+- ✅ Edit `pkg/server/handlers_*.go` (want, agent, recipe handlers)
+- ✅ Edit `pkg/server/server.go` (server setup)
+- ❌ NEVER edit `engine/cmd/server/*` (deleted - was legacy standalone server)
+
+**Build & Run:**
+- `make restart-all` - Builds `./mywant` (includes `pkg/server`) and starts it
+- `./mywant start -D` - Starts server using `pkg/server` implementation
 
 ## Pending Improvements
 

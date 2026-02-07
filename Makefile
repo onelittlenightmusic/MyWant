@@ -1,4 +1,4 @@
-.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval build-server run-server test-server-api test-server-simple run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -8,13 +8,13 @@ fmt:
 
 vet:
 	@echo "🔍 Running go vet..."
-	go vet -C engine ./src/... ./cmd/server/...
+	go vet -C engine ./src/...
 	go vet ./pkg/... ./cmd/mywant/...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run -C engine ./src/... ./cmd/server/...; \
+		golangci-lint run -C engine ./src/...; \
 		golangci-lint run ./pkg/... ./cmd/mywant/...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
@@ -113,12 +113,6 @@ test-all: restart-all
 	@echo ""
 	@echo "======================================================="
 
-# Build the mywant server binary
-build-server:
-	@echo "🏗️  Building mywant server..."
-	@mkdir -p bin
-	@go build -C engine -o ../bin/mywant ./cmd/server
-
 # Build the mock flight server
 build-mock:
 	@echo "🏗️  Building mock flight server..."
@@ -128,93 +122,6 @@ build-mock:
 # Run the mock flight server
 run-mock: build-mock
 	@./bin/flight-server
-
-# Run the mywant server
-run-server: build-server
-	@./bin/mywant 8080 localhost
-
-# Test server API endpoints
-test-server-api: build-server
-	@echo "🧪 Testing MyWant Server API..."
-	@echo "📋 Starting server in background..."
-	@./bin/mywant 8080 localhost & \
-	SERVER_PID=$$! && \
-	sleep 3 && \
-	echo "✅ Server started (PID: $$SERVER_PID)" && \
-	echo "" && \
-	echo "🩺 Testing health endpoint..." && \
-	curl -s http://localhost:8080/health | jq '.' && \
-	echo "" && \
-	echo "📝 Creating want with qnet-target config..." && \
-	WANT_ID=$$(curl -s -X POST http://localhost:8080/api/v1/wants \
-		-H "Content-Type: application/json" \
-		-d '{"yaml": "$(shell cat config/config-qnet-target.yaml | sed 's/"/\"/g' | tr -d '\n')"}' \
-		| jq -r '.id') && \
-	echo "✅ Created want: $$WANT_ID" && \
-	echo "" && \
-	echo "📋 Listing all wants..." && \
-	curl -s http://localhost:8080/api/v1/wants | jq '.' && \
-	echo "" && \
-	echo "⏳ Waiting for execution to complete..." && \
-	sleep 5 && \
-	echo "" && \
-	echo "📊 Getting want status..." && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/status | jq '.' && \
-	echo "" && \
-	echo "🎯 Getting want runtime state..." && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID | jq '.' && \
-	echo "" && \
-	echo "📈 Getting want results..." && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/results | jq '.' && \
-	echo "" && \
-	echo "🛑 Stopping server..." && \
-	kill $$SERVER_PID && \
-	echo "✅ Server API tests completed successfully!"
-
-# Simple server API test (no jq required)
-test-server-simple: build-server
-	@echo "🧪 Simple MyWant Server API Test..."
-	@echo "📋 Starting server in background..."
-	@./bin/mywant 8080 localhost & \
-	SERVER_PID=$$! && \
-	sleep 3 && \
-	echo "✅ Server started (PID: $$SERVER_PID)" && \
-	echo "" && \
-	echo "🩺 Testing health endpoint:" && \
-	curl -s http://localhost:8080/health && \
-	echo "" && \
-	echo "" && \
-	echo "📝 Creating want with YAML config:" && \
-	curl -s -X POST http://localhost:8080/api/v1/wants \
-		-H "Content-Type: application/yaml" \
-		--data-binary @yaml/config/config-qnet.yaml && \
-	echo "" && \
-	echo "" && \
-	echo "📋 Listing all wants:" && \
-	WANT_ID=$$(curl -s http://localhost:8080/api/v1/wants | grep -o 'want-[^" ]*' | head -1) && \
-	curl -s http://localhost:8080/api/v1/wants && \
-	echo "" && \
-	echo "" && \
-	echo "⏳ Waiting for execution to complete..." && \
-	sleep 5 && \
-	echo "" && \
-	echo "🎯 Getting want runtime state ($$WANT_ID):" && \
-	mkdir -p test && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID | tee test/want.json && \
-	echo "" && \
-	echo "" && \
-	echo "📊 Getting want status ($$WANT_ID):" && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/status && \
-	echo "" && \
-	echo "" && \
-	echo "📈 Getting want results ($$WANT_ID):" && \
-	curl -s http://localhost:8080/api/v1/wants/$$WANT_ID/results && \
-	echo "" && \
-	echo "" && \
-	echo "🛑 Stopping server..." && \
-	kill $$SERVER_PID && \
-	echo "💾 Want runtime state saved to test/want.json" && \
-	echo "✅ Simple server API test completed!"
 
 clean:
 	@echo "🧹 Cleaning build artifacts..."
@@ -237,7 +144,6 @@ help:
 	@echo "🔨 Build:"
 	@echo "  build        - Build mywant library (with quality checks)"
 	@echo "  test-build   - Quick build test"
-	@echo "  build-server - Build mywant server binary"
 	@echo "  build-mock   - Build mock flight server"
 	@echo ""
 	@echo "🏃 Run Examples:"
@@ -263,7 +169,6 @@ help:
 	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"
-	@echo "  run-server       - Start mywant server"
 	@echo "  run-mock         - Start mock flight server"
 	@echo "  restart-all      - Kill and restart frontend, backend, and mock server"
 	@echo ""
@@ -288,7 +193,6 @@ restart-all:
 	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
-	@$(MAKE) build-server
 	@$(MAKE) build-gui
 	@$(MAKE) build-cli
 	@mkdir -p ~/.mywant
