@@ -66,6 +66,13 @@ type DoAgent struct {
 	Action func(ctx context.Context, want *Want) error
 }
 
+// NewDoAgent creates a new DoAgent with the given parameters. This is the canonical constructor for DoAgent-based agents.
+func NewDoAgent(name string, capabilities []string) DoAgent {
+	return DoAgent{
+		BaseAgent: *NewBaseAgent(name, capabilities, DoAgentType),
+	}
+}
+
 func (a *DoAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	if a.Action != nil {
 		err := a.Action(ctx, want)
@@ -75,6 +82,46 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 		return false, err // DoAgents don't stop monitoring
 	}
 	return false, fmt.Errorf("no action defined for DoAgent %s", a.Name)
+}
+
+// PremiumServiceAgent provides common premium service functionality for reservation agents
+type PremiumServiceAgent struct {
+	DoAgent
+	PremiumLevel string
+	ServiceTier  string
+}
+
+// NewPremiumServiceAgent creates a new premium service agent with the given parameters
+func NewPremiumServiceAgent(name string, capabilities []string, premiumLevel string) PremiumServiceAgent {
+	return PremiumServiceAgent{
+		DoAgent:      NewDoAgent(name, capabilities),
+		PremiumLevel: premiumLevel,
+		ServiceTier:  "premium",
+	}
+}
+
+// ActivityFormatter is a function type that formats activity and log messages from a schedule
+type ActivityFormatter func(schedule interface{}) (activity, logMessage string)
+
+// ExecuteReservation executes common reservation flow for premium service agents
+// This method standardizes the pattern: generate schedule → store state → set activity → log completion
+func (psa *PremiumServiceAgent) ExecuteReservation(
+	ctx context.Context,
+	want *Want,
+	schedule interface{},
+	formatter ActivityFormatter,
+) (bool, error) {
+	// Store schedule result
+	want.StoreStateForAgent("agent_result", schedule)
+
+	// Format and store activity description
+	activity, logMsg := formatter(schedule)
+	want.SetAgentActivity(psa.Name, activity)
+
+	// Store completion log
+	want.StoreLog(logMsg)
+
+	return false, nil
 }
 
 // MonitorAgent implements an agent that monitors want execution and state.

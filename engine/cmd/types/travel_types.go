@@ -1410,45 +1410,12 @@ func generateTravelTimeline(events []TimeSlot) string {
 	return timeline
 }
 
-// TravelCoordinatorWant orchestrates the entire travel itinerary RegisterTravelWantTypes registers all travel-related want types Note: All coordinators now use the unified "coordinator" type Configuration is determined by parameters (is_buffet, required_inputs, etc.)
+// RegisterTravelWantTypes registers all travel-related want types
+// Note: AgentRegistry is automatically set by ChainBuilder.createWantFunction
+// so explicit SetAgentRegistry calls are not needed
 func RegisterTravelWantTypes(builder *ChainBuilder) {
 	builder.RegisterWantType("flight", NewFlightWant)
 	builder.RegisterWantType("restaurant", NewRestaurantWant)
 	builder.RegisterWantType("hotel", NewHotelWant)
 	builder.RegisterWantType("buffet", NewBuffetWant)
-}
-
-// RegisterTravelWantTypesWithAgents registers travel want types with agent system support
-func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *AgentRegistry) {
-	builder.RegisterWantType("flight", func(metadata Metadata, spec WantSpec) Progressable {
-		result := NewFlightWant(metadata, spec)
-		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
-			wantObj.SetAgentRegistry(agentRegistry)
-		}
-		return result
-	})
-
-	builder.RegisterWantType("restaurant", func(metadata Metadata, spec WantSpec) Progressable {
-		result := NewRestaurantWant(metadata, spec)
-		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
-			wantObj.SetAgentRegistry(agentRegistry)
-		}
-		return result
-	})
-
-	builder.RegisterWantType("hotel", func(metadata Metadata, spec WantSpec) Progressable {
-		result := NewHotelWant(metadata, spec)
-		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
-			wantObj.SetAgentRegistry(agentRegistry)
-		}
-		return result
-	})
-
-	builder.RegisterWantType("buffet", func(metadata Metadata, spec WantSpec) Progressable {
-		result := NewBuffetWant(metadata, spec)
-		if wantObj, ok := result.(interface{ SetAgentRegistry(*AgentRegistry) }); ok {
-			wantObj.SetAgentRegistry(agentRegistry)
-		}
-		return result
-	})
 }

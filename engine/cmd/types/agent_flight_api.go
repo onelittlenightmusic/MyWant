@@ -43,13 +43,7 @@ type CreateFlightRequest struct {
 // NewAgentFlightAPI creates a new flight API agent
 func NewAgentFlightAPI(name string, capabilities []string, uses []string, serverURL string) *AgentFlightAPI {
 	return &AgentFlightAPI{
-		DoAgent: DoAgent{
-			BaseAgent: BaseAgent{
-				Name:         name,
-				Capabilities: capabilities,
-				Type:         DoAgentType,
-			},
-		},
+		DoAgent:   NewDoAgent(name, capabilities),
 		ServerURL: serverURL,
 	}
 }
@@ -94,77 +88,51 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	prevFlightID, hasPrevFlight := want.GetState("_previous_flight_id")
 	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
 
-	flightNumber, _ := params["flight_number"].(string)
-	if flightNumber == "" {
-		flightNumber = "AA123"
-	}
+	// Extract parameters using ParamExtractor
+	extractor := NewParamExtractor(params)
+	flightNumber := extractor.String("flight_number", "AA123")
 
 	// For rebooking, generate a different flight number
 	if isRebooking {
 		baseFlight := flightNumber
-		// Generate alternative flight numbers based on base flight e.g., AA100 -> AA101, AA102, etc.
-		flightSuffixes := []string{"A", "B", "C", "D", "E"}
-		flightNumber = baseFlight + flightSuffixes[rand.Intn(len(flightSuffixes))]
+		flightNumber = generateRebookingFlightNumber(baseFlight)
 		want.StoreLog(fmt.Sprintf("Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber))
 	}
 
-	from, _ := params["from"].(string)
-	if from == "" {
-		from = "New York"
-	}
+	from := extractor.String("from", "New York")
+	to := extractor.String("to", "Los Angeles")
+	// Generate flight timing (handles both departure_date and departure_time parameters)
+	departureDate := extractor.String("departure_date", "")
+	departureTimeStr := extractor.String("departure_time", "")
 
-	to, _ := params["to"].(string)
-	if to == "" {
-		to = "Los Angeles"
-	}
-	departureDate, _ := params["departure_date"].(string)
-	var departureTime time.Time
-	var arrivalTime time.Time
+	var departureTime, arrivalTime time.Time
+	var err error
 
-	if departureDate != "" {
-		parsedDate, err := time.Parse("2006-01-02", departureDate)
-		if err == nil {
-			departureTime = parsedDate.Add(8 * time.Hour)
-			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-
-			// For rebooking, schedule next available flight (add 2-4 hours to departure)
-			if isRebooking {
-				delayHours := 2 + time.Duration(rand.Intn(3))
-				departureTime = departureTime.Add(delayHours * time.Hour)
-				arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-				want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
-					departureTime.Format(time.RFC3339)))
-			}
+	// Prefer departure_time (RFC3339) over departure_date
+	if departureTimeStr != "" {
+		departureTime, arrivalTime, err = GenerateFlightTiming(departureTimeStr, isRebooking)
+	} else if departureDate != "" {
+		// Convert departure_date to RFC3339 format (8:00 AM on that date)
+		parsedDate, parseErr := time.Parse("2006-01-02", departureDate)
+		if parseErr == nil {
+			departureTimeStr = parsedDate.Add(8 * time.Hour).Format(time.RFC3339)
+			departureTime, arrivalTime, err = GenerateFlightTiming(departureTimeStr, isRebooking)
 		} else {
-			// Fall back to default if parsing fails
-			departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
-			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
+			// Fallback to default
+			departureTime, arrivalTime, err = GenerateFlightTiming("", isRebooking)
 		}
 	} else {
-		// Try to get departure_time parameter (RFC3339 format)
-		departureTimeStr, _ := params["departure_time"].(string)
-		var err error
-		departureTime, err = time.Parse(time.RFC3339, departureTimeStr)
-		if err != nil {
-			// Default to tomorrow morning
-			departureTime = time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour).Add(8 * time.Hour)
-		}
+		// No date specified, use default
+		departureTime, arrivalTime, err = GenerateFlightTiming("", isRebooking)
+	}
 
-		arrivalTimeStr, _ := params["arrival_time"].(string)
-		arrivalTime, err = time.Parse(time.RFC3339, arrivalTimeStr)
-		if err != nil {
-			// Default to 3.5 hours after departure
-			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-		}
+	if err != nil {
+		return fmt.Errorf("failed to generate flight timing: %w", err)
+	}
 
-		// For rebooking, schedule next available flight (add 2-4 hours to departure)
-		if isRebooking {
-			delayHours := 2 + time.Duration(rand.Intn(3))
-			departureTime = departureTime.Add(delayHours * time.Hour)
-			arrivalTime = departureTime.Add(3*time.Hour + 30*time.Minute)
-			want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
-				departureTime.Format(time.RFC3339)))
-		}
+	if isRebooking {
+		want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
+			departureTime.Format(time.RFC3339)))
 	}
 	request := CreateFlightRequest{
 		FlightNumber:  flightNumber,
@@ -272,4 +240,10 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	want.StoreLog(fmt.Sprintf("Cancelled flight: %s", flightIDStr))
 
 	return nil
+}
+
+// generateRebookingFlightNumber generates an alternative flight number for rebooking
+func generateRebookingFlightNumber(baseFlight string) string {
+	flightSuffixes := []string{"A", "B", "C", "D", "E"}
+	return baseFlight + flightSuffixes[rand.Intn(len(flightSuffixes))]
 }

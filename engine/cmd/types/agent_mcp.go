@@ -919,15 +919,8 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	// Route to appropriate MCP operation via Goose
 	switch operationStr {
 	case "gmail_search":
-		query, _ := want.GetState("mcp_query")
-		maxResults, _ := want.GetState("mcp_max_results")
-		queryStr := fmt.Sprintf("%v", query)
-		maxResultsInt := 10
-		if maxResults != nil {
-			if mr, ok := maxResults.(float64); ok {
-				maxResultsInt = int(mr)
-			}
-		}
+		queryStr, _ := want.GetStateString("mcp_query", "")
+		maxResultsInt, _ := want.GetStateInt("mcp_max_results", 10)
 
 		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail search via Goose for query: %s", queryStr))
 
@@ -965,8 +958,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		}
 
 	case "gmail_read":
-		messageID, _ := want.GetState("mcp_message_id")
-		messageIDStr := fmt.Sprintf("%v", messageID)
+		messageIDStr, _ := want.GetStateString("mcp_message_id", "")
 
 		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail read via Goose for messageID: %s", messageIDStr))
 
@@ -989,12 +981,9 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		}
 
 	case "gmail_send":
-		to, _ := want.GetState("mcp_to")
-		subject, _ := want.GetState("mcp_subject")
-		body, _ := want.GetState("mcp_body")
-		toStr := fmt.Sprintf("%v", to)
-		subjectStr := fmt.Sprintf("%v", subject)
-		bodyStr := fmt.Sprintf("%v", body)
+		toStr, _ := want.GetStateString("mcp_to", "")
+		subjectStr, _ := want.GetStateString("mcp_subject", "")
+		bodyStr, _ := want.GetStateString("mcp_body", "")
 
 		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail send via Goose to: %s", toStr))
 
@@ -1067,8 +1056,7 @@ func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.W
 		}
 
 	case "gmail_read":
-		messageID, _ := want.GetState("mcp_message_id")
-		messageIDStr := fmt.Sprintf("%v", messageID)
+		messageIDStr, _ := want.GetStateString("mcp_message_id", "")
 
 		toolResult, err := native.ExecuteTool(ctx, "gmail", "npx", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"}, "get_message", map[string]interface{}{
 			"id": messageIDStr,

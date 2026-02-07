@@ -3,47 +3,37 @@ package types
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	. "mywant/engine/src"
 	"time"
 )
 
-// AgentPremium extends DoAgent with premium service capabilities
+// AgentPremium extends PremiumServiceAgent with premium hotel service capabilities
 type AgentPremium struct {
-	DoAgent
-	PremiumLevel string
-	ServiceTier  string
+	PremiumServiceAgent
 }
 
 // NewAgentPremium creates a new premium agent
 func NewAgentPremium(name string, capabilities []string, uses []string, premiumLevel string) *AgentPremium {
 	return &AgentPremium{
-		DoAgent: DoAgent{
-			BaseAgent: *NewBaseAgent(name, capabilities, DoAgentType),
-		},
-		PremiumLevel: premiumLevel,
-		ServiceTier:  "premium",
+		PremiumServiceAgent: NewPremiumServiceAgent(name, capabilities, premiumLevel),
 	}
 }
 
 // Exec executes premium agent actions with enhanced capabilities
 func (a *AgentPremium) Exec(ctx context.Context, want *Want) (bool, error) {
-	// Generate premium hotel booking schedule
 	schedule := a.generateHotelSchedule(want)
-	want.StoreStateForAgent("agent_result", schedule)
-
-	// Record activity description for agent history
-	activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",
-		schedule.HotelType,
-		schedule.CheckInTime.Format("15:04 Jan 2"),
-		schedule.CheckOutTime.Format("15:04 Jan 2"),
-		a.PremiumLevel)
-	want.SetAgentActivity(a.Name, activity)
-
-	want.StoreLog(fmt.Sprintf("Premium hotel booking completed: %s from %s to %s",
-		schedule.HotelType, schedule.CheckInTime.Format("15:04 Jan 2"), schedule.CheckOutTime.Format("15:04 Jan 2")))
-
-	return false, nil // Action completed
+	premiumLevel := a.PremiumLevel // Capture for closure
+	return a.ExecuteReservation(ctx, want, schedule, func(s interface{}) (string, string) {
+		sch := s.(HotelSchedule)
+		activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",
+			sch.HotelType,
+			sch.CheckInTime.Format("15:04 Jan 2"),
+			sch.CheckOutTime.Format("15:04 Jan 2"),
+			premiumLevel)
+		logMsg := fmt.Sprintf("Premium hotel booking completed: %s from %s to %s",
+			sch.HotelType, sch.CheckInTime.Format("15:04 Jan 2"), sch.CheckOutTime.Format("15:04 Jan 2"))
+		return activity, logMsg
+	})
 }
 
 // generateHotelSchedule creates a premium hotel schedule
@@ -53,12 +43,10 @@ func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
 	// Generate premium hotel booking with better times and luxury amenities
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow
 	// Premium service: earlier check-in, later check-out
-	checkInTime := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
-		14+rand.Intn(2), rand.Intn(60), 0, 0, time.Local) // 2-4 PM early check-in
+	checkInTime := GenerateRandomTimeInRange(baseDate, CheckInRange)
 
 	nextDay := baseDate.AddDate(0, 0, 1)
-	checkOutTime := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(),
-		11+rand.Intn(2), rand.Intn(60), 0, 0, time.Local) // 11 AM - 1 PM late check-out
+	checkOutTime := GenerateRandomTimeInRange(nextDay, CheckOutRange)
 
 	// Extract hotel type from want parameters
 	hotelType := want.GetStringParam("hotel_type", "luxury")
