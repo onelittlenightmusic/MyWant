@@ -1168,6 +1168,67 @@ func GetStateAs[T any](n *Want, key string) (T, bool) {
 	return typedVal, ok
 }
 
+// GetStateMulti populates the provided Dict with values from the state.
+// For each key in the data map, it retrieves the current state value,
+// converts it to the type of the value currently in the map,
+// and updates either the map entry or the value it points to (if it's a pointer).
+func (n *Want) GetStateMulti(data Dict) {
+	for key, templateValue := range data {
+		val, exists := n.GetState(key)
+		if !exists {
+			continue
+		}
+
+		// Use reflection to handle both pointers and direct values
+		rv := reflect.ValueOf(templateValue)
+		
+		// 1. If it's a pointer, we populate the value it points to
+		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+			elem := rv.Elem()
+			switch elem.Interface().(type) {
+			case string:
+				s, _ := n.GetStateString(key, "")
+				elem.SetString(s)
+			case int:
+				i, _ := n.GetStateInt(key, 0)
+				elem.SetInt(int64(i))
+			case float64:
+				f, _ := n.GetStateFloat64(key, 0)
+				elem.SetFloat(f)
+			case bool:
+				b, _ := n.GetStateBool(key, false)
+				elem.SetBool(b)
+			case time.Time:
+				t, _ := n.GetStateTime(key, time.Time{})
+				elem.Set(reflect.ValueOf(t))
+			default:
+				// Try direct assignment for other types
+				v := reflect.ValueOf(val)
+				if v.Type().AssignableTo(elem.Type()) {
+					elem.Set(v)
+				}
+			}
+			continue
+		}
+
+		// 2. Otherwise, update the map entry with a converted value
+		switch templateValue.(type) {
+		case string:
+			data[key], _ = n.GetStateString(key, "")
+		case int:
+			data[key], _ = n.GetStateInt(key, 0)
+		case float64:
+			data[key], _ = n.GetStateFloat64(key, 0)
+		case bool:
+			data[key], _ = n.GetStateBool(key, false)
+		case time.Time:
+			data[key], _ = n.GetStateTime(key, time.Time{})
+		default:
+			data[key] = val
+		}
+	}
+}
+
 // CalculateAchievingPercentage computes the progress percentage toward completion. This is a virtual method that want type implementations should override to provide type-specific completion percentage calculation. Default implementation returns 0 unless the want has reached completion status,
 // in which case it returns 100. Want types should override this to provide meaningful progress indicators: - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%) - QueueWant: Calculate based on processedCount / total capacity
 // - Numbers generator: Calculate based on currentCount / target count - Coordinator: Calculate based on channels heard / total required channels - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0

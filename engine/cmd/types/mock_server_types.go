@@ -201,10 +201,12 @@ func (m *FlightMockServerWant) getOrInitializeLocals() *MockServerLocals {
 		LogFile:       "logs/flight-server.log",
 	}
 
-	locals.Phase, _ = m.GetStateString("server_phase", MockServerPhaseStarting)
-	locals.ServerBinary, _ = m.GetStateString("server_binary", "./bin/flight-server")
-	locals.LogFile, _ = m.GetStateString("log_file", "logs/flight-server.log")
-	locals.ServerPID, _ = m.GetStateInt("server_pid", 0)
+	m.GetStateMulti(Dict{
+		"server_phase":  &locals.Phase,
+		"server_binary": &locals.ServerBinary,
+		"log_file":      &locals.LogFile,
+		"server_pid":    &locals.ServerPID,
+	})
 
 	return locals
 }

@@ -579,12 +579,14 @@ func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
 		LastCheckTime: time.Now(),
 	}
 
-	locals.Phase, _ = r.GetStateString("reminder_phase", ReminderPhaseWaiting)
-	locals.Message, _ = r.GetStateString("message", "")
-	locals.Ahead, _ = r.GetStateString("ahead", "")
-	locals.RequireReaction, _ = r.GetStateBool("require_reaction", false)
-	locals.ReachingTime, _ = r.GetStateTime("reaching_time", time.Time{})
-	locals.EventTime, _ = r.GetStateTime("event_time", time.Time{})
+	r.GetStateMulti(Dict{
+		"reminder_phase":   &locals.Phase,
+		"message":          &locals.Message,
+		"ahead":            &locals.Ahead,
+		"require_reaction": &locals.RequireReaction,
+		"reaching_time":    &locals.ReachingTime,
+		"event_time":       &locals.EventTime,
+	})
 
 	// Always ensure monitor is initialized
 	if locals.monitor == nil {
