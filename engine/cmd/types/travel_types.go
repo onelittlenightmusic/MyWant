@@ -965,14 +965,7 @@ func (f *FlightWant) Progress() {
 
 	_, connectionAvailable := f.GetFirstOutputChannel()
 
-	phaseVal, _ := f.GetState("_flight_phase")
-	phase := ""
-	if phaseVal != nil {
-		phase, _ = phaseVal.(string)
-	}
-	if phase == "" {
-		phase = PhaseInitial
-	}
+	phase, _ := f.GetStateString("_flight_phase", PhaseInitial)
 
 	// Only log phase transition to avoid spam
 	lastLoggedPhase, _ := f.GetStateString("last_logged_phase", "")
@@ -1056,18 +1049,8 @@ func (f *FlightWant) Progress() {
 
 	// === Phase 4: Canceling ===
 	case PhaseCanceling:
-		flightIDVal, flightIDExists := f.GetState("flight_id")
-		if !flightIDExists || flightIDVal == "" {
-			f.ResetFlightState()
-			f.StoreStateMulti(Dict{
-				"_flight_phase": PhaseBooking,
-				"completed":     false,
-			})
-			return
-		}
-
-		flightID, ok := flightIDVal.(string)
-		if !ok {
+		flightID, ok := f.GetStateString("flight_id", "")
+		if !ok || flightID == "" {
 			f.ResetFlightState()
 			f.StoreStateMulti(Dict{
 				"_flight_phase": PhaseBooking,
@@ -1268,16 +1251,11 @@ func (f *FlightWant) ResetFlightState() {
 
 // shouldCancelAndRebook checks if the current flight should be cancelled due to delay
 func (f *FlightWant) shouldCancelAndRebook() bool {
-	flightIDVal, exists := f.GetState("flight_id")
-	if !exists || flightIDVal == "" {
+	flightID, ok := f.GetStateString("flight_id", "")
+	if !ok || flightID == "" {
 		return false
 	}
-	statusVal, exists := f.GetState("flight_status")
-	if !exists {
-		return false
-	}
-
-	status, ok := statusVal.(string)
+	status, ok := f.GetStateString("flight_status", "")
 	if !ok {
 		return false
 	}

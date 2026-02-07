@@ -76,7 +76,7 @@ func (mw *MonitorWant) IsAchieved() bool {
 
 // Progress implements the Progressable interface
 func (mw *MonitorWant) Progress() {
-	if _, exists := mw.Want.GetState("start_time"); exists {
+	if _, ok := mw.Want.GetStateTime("start_time", time.Time{}); ok {
 		// Already monitoring
 		return
 	}

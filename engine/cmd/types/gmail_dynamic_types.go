@@ -128,8 +128,7 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 	}
 
 	// Check if samples were collected
-	samples, exists := g.GetState("raw_samples")
-	if exists && samples != nil {
+	if _, exists := g.GetState("raw_samples"); exists {
 		g.StoreState("phase", string(PhaseCoding))
 		g.StoreLog("[PHASE:DISCOVERY] Samples collected. Moving to PhaseCoding.")
 	} else {
@@ -150,8 +149,7 @@ func (g *GmailDynamicWant) handleCoding() error {
 		return fmt.Errorf("Developer Agent failed: %w", err)
 	}
 
-	source, exists := g.GetState("source_code")
-	if exists && source != "" {
+	if source, _ := g.GetStateString("source_code", ""); source != "" {
 		g.StoreState("phase", string(PhaseCompiling))
 		g.StoreLog("[PHASE:CODING] Code generated. Moving to PhaseCompiling.")
 	} else {
@@ -222,8 +220,7 @@ func (g *GmailDynamicWant) handleValidation() error {
 		return fmt.Errorf("Validator Agent failed: %w. Feedback: %s", err, feedback)
 	}
 
-	success, _ := g.GetStateBool("validation_success", false)
-	if success {
+	if success, _ := g.GetStateBool("validation_success", false); success {
 		g.StoreState("phase", string(PhaseStable))
 		g.StoreLog("[PHASE:VALIDATION] Success! Moving to PhaseStable.")
 		// Clear error_feedback on success

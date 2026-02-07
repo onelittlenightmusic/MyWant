@@ -109,24 +109,14 @@ func (g *GmailWant) Initialize() {
 
 // IsAchieved returns true when the Gmail operation is complete or failed
 func (g *GmailWant) IsAchieved() bool {
-	status, exists := g.GetState("gmail_status")
-	if !exists {
-		return false
-	}
-
-	statusStr := fmt.Sprintf("%v", status)
-	return statusStr == "completed" || statusStr == "failed"
+	status, _ := g.GetStateString("gmail_status", "pending")
+	return status == "completed" || status == "failed"
 }
 
 // CalculateAchievingPercentage returns the progress percentage
 func (g *GmailWant) CalculateAchievingPercentage() float64 {
-	status, exists := g.GetState("gmail_status")
-	if !exists {
-		return 0
-	}
-
-	statusStr := fmt.Sprintf("%v", status)
-	switch statusStr {
+	status, _ := g.GetStateString("gmail_status", "pending")
+	switch status {
 	case "pending", "initialized":
 		return 10
 	case "executing":

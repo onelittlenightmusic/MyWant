@@ -46,7 +46,7 @@ func (s *SilencerWant) Initialize() {
 // IsAchieved - Silencers are processors, they stay active to process stream
 // until they receive a completion signal
 func (s *SilencerWant) IsAchieved() bool {
-	phase, _ := s.GetState("silencer_phase")
+	phase, _ := s.GetStateString("silencer_phase", "active")
 	return phase == "completed"
 }
 

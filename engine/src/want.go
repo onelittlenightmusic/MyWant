@@ -1120,6 +1120,19 @@ func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 	return defaultValue, false
 }
 
+func (n *Want) GetStateFloat64(key string, defaultValue float64) (float64, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		return defaultValue, false
+	}
+	if floatVal, ok := value.(float64); ok {
+		return floatVal, true
+	} else if intVal, ok := value.(int); ok {
+		return float64(intVal), true
+	}
+	return defaultValue, false
+}
+
 // if ok { // name is a valid string }
 func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	value, exists := n.GetState(key)
@@ -1128,6 +1141,19 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 	}
 	if strVal, ok := value.(string); ok {
 		return strVal, true
+	}
+	return defaultValue, false
+}
+
+func (n *Want) GetStateTime(key string, defaultValue time.Time) (time.Time, bool) {
+	value, exists := n.GetState(key)
+	if !exists {
+		return defaultValue, false
+	}
+	if strVal, ok := value.(string); ok {
+		if t, err := time.Parse(time.RFC3339, strVal); err == nil {
+			return t, true
+		}
 	}
 	return defaultValue, false
 }

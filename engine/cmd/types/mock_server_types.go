@@ -81,7 +81,7 @@ func (m *FlightMockServerWant) Initialize() {
 
 // IsAchieved checks if the mock server is running
 func (m *FlightMockServerWant) IsAchieved() bool {
-	phase, _ := m.GetState("server_phase")
+	phase, _ := m.GetStateString("server_phase", "")
 	return phase == MockServerPhaseRunning
 }
 
@@ -90,7 +90,7 @@ func (m *FlightMockServerWant) CalculateAchievingPercentage() int {
 	if m.IsAchieved() || m.Status == WantStatusAchieved {
 		return 100
 	}
-	phase, _ := m.GetState("server_phase")
+	phase, _ := m.GetStateString("server_phase", "")
 	switch phase {
 	case MockServerPhaseStarting:
 		return 50
@@ -130,23 +130,13 @@ func (m *FlightMockServerWant) Progress() {
 		// Check if we have a PID now (server started)
 		// Server should transition to running after DoAgent execution
 		// Check if we have a PID
-		if pidValue, exists := m.GetState("server_pid"); exists && pidValue != nil {
-			var pid int
-			switch v := pidValue.(type) {
-			case int:
-				pid = v
-			case float64:
-				pid = int(v)
-			}
-
-			if pid > 0 {
-				m.StoreLog("[MOCK_SERVER] Server is running with PID %d", pid)
-				m.StoreState("server_phase", MockServerPhaseRunning)
-				locals.Phase = MockServerPhaseRunning
-				locals.ServerPID = pid
-				m.updateLocals(locals)
-				m.ProvideDone()
-			}
+		if pid, ok := m.GetStateInt("server_pid", 0); ok && pid > 0 {
+			m.StoreLog("[MOCK_SERVER] Server is running with PID %d", pid)
+			m.StoreState("server_phase", MockServerPhaseRunning)
+			locals.Phase = MockServerPhaseRunning
+			locals.ServerPID = pid
+			m.updateLocals(locals)
+			m.ProvideDone()
 		}
 
 	case MockServerPhaseRunning:
@@ -156,7 +146,7 @@ func (m *FlightMockServerWant) Progress() {
 
 	case MockServerPhaseStopping:
 		// Server is stopping, check if PID is cleared
-		if pidValue, exists := m.GetState("server_pid"); !exists || pidValue == nil || pidValue == 0 {
+		if pid, _ := m.GetStateInt("server_pid", 0); pid == 0 {
 			m.StoreLog("[MOCK_SERVER] Server stopped successfully")
 			m.StoreState("server_phase", MockServerPhaseStopped)
 			locals.Phase = MockServerPhaseStopped
@@ -211,28 +201,10 @@ func (m *FlightMockServerWant) getOrInitializeLocals() *MockServerLocals {
 		LogFile:       "logs/flight-server.log",
 	}
 
-	if phase, exists := m.GetState("server_phase"); exists {
-		if phaseStr, ok := phase.(string); ok {
-			locals.Phase = phaseStr
-		}
-	}
-
-	if binPath, exists := m.GetState("server_binary"); exists {
-		locals.ServerBinary = fmt.Sprintf("%v", binPath)
-	}
-
-	if logPath, exists := m.GetState("log_file"); exists {
-		locals.LogFile = fmt.Sprintf("%v", logPath)
-	}
-
-	if pidValue, exists := m.GetState("server_pid"); exists && pidValue != nil {
-		switch v := pidValue.(type) {
-		case int:
-			locals.ServerPID = v
-		case float64:
-			locals.ServerPID = int(v)
-		}
-	}
+	locals.Phase, _ = m.GetStateString("server_phase", MockServerPhaseStarting)
+	locals.ServerBinary, _ = m.GetStateString("server_binary", "./bin/flight-server")
+	locals.LogFile, _ = m.GetStateString("log_file", "logs/flight-server.log")
+	locals.ServerPID, _ = m.GetStateInt("server_pid", 0)
 
 	return locals
 }

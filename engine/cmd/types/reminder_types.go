@@ -582,37 +582,12 @@ func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
 		LastCheckTime: time.Now(),
 	}
 
-	if phase, exists := r.GetState("reminder_phase"); exists {
-		if phaseStr, ok := phase.(string); ok {
-			locals.Phase = phaseStr
-		}
-	}
-
-	if message, exists := r.GetState("message"); exists {
-		locals.Message = fmt.Sprintf("%v", message)
-	}
-
-	if ahead, exists := r.GetState("ahead"); exists {
-		locals.Ahead = fmt.Sprintf("%v", ahead)
-	}
-
-	if reqReact, exists := r.GetState("require_reaction"); exists {
-		if boolVal, ok := reqReact.(bool); ok {
-			locals.RequireReaction = boolVal
-		}
-	}
-
-	if rtStr, exists := r.GetState("reaching_time"); exists {
-		if rtTime, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", rtStr)); err == nil {
-			locals.ReachingTime = rtTime
-		}
-	}
-
-	if etStr, exists := r.GetState("event_time"); exists {
-		if etTime, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", etStr)); err == nil {
-			locals.EventTime = etTime
-		}
-	}
+	locals.Phase, _ = r.GetStateString("reminder_phase", ReminderPhaseWaiting)
+	locals.Message, _ = r.GetStateString("message", "")
+	locals.Ahead, _ = r.GetStateString("ahead", "")
+	locals.RequireReaction, _ = r.GetStateBool("require_reaction", false)
+	locals.ReachingTime, _ = r.GetStateTime("reaching_time", time.Time{})
+	locals.EventTime, _ = r.GetStateTime("event_time", time.Time{})
 
 	// Always ensure monitor is initialized
 	if locals.monitor == nil {

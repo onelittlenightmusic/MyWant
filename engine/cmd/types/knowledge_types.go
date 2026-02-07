@@ -82,13 +82,8 @@ func (k *KnowledgeWant) fail(msg string) {
 
 // CalculateAchievingPercentage returns the progress percentage
 func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
-	status, exists := k.GetState("knowledge_status")
-	if !exists {
-		return 0
-	}
-
-	statusStr := fmt.Sprintf("%v", status)
-	switch statusStr {
+	status, _ := k.GetStateString("knowledge_status", "")
+	switch status {
 	case "stale":
 		return 10
 	case "updating":
@@ -104,10 +99,7 @@ func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
 
 // IsAchieved returns true when the knowledge is fresh and the file is up to date
 func (k *KnowledgeWant) IsAchieved() bool {
-	status, exists := k.GetState("knowledge_status")
-	if !exists {
-		return false
-	}
+	status, _ := k.GetStateString("knowledge_status", "")
 	return status == "fresh"
 }
 
@@ -123,7 +115,7 @@ func (k *KnowledgeWant) Progress() {
 		}
 	}
 
-	status, _ := k.GetState("knowledge_status")
+	status, _ := k.GetStateString("knowledge_status", "")
 
 	if status == "stale" {
 		k.runMonitor()
@@ -133,13 +125,8 @@ func (k *KnowledgeWant) Progress() {
 }
 
 func (k *KnowledgeWant) shouldRefresh() bool {
-	lastSync, exists := k.GetState("last_sync_time")
-	if !exists || lastSync == "" {
-		return true
-	}
-
-	lastTime, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", lastSync))
-	if err != nil {
+	lastTime, ok := k.GetStateTime("last_sync_time", time.Time{})
+	if !ok {
 		return true
 	}
 
