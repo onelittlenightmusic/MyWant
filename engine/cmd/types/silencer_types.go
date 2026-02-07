@@ -41,9 +41,6 @@ func (s *SilencerWant) Initialize() {
 		"last_processed_id": "",
 		"silencer_phase":    "active",
 	})
-
-	// Register required capability for processing reactions
-	s.Spec.Requires = []string{"reaction_auto_approval"}
 }
 
 // IsAchieved - Silencers are processors, they stay active to process stream
@@ -69,13 +66,13 @@ func (s *SilencerWant) Progress() {
 	// Try to get a packet from input channels
 	// Use blocking wait (infinite) for stream processing
 	// Processor wants should continuously wait for packets from stream
-	index, data, done, ok := s.UseForever()
+	_, data, done, ok := s.UseForever()
 	if !ok {
 		return
 	}
 
 	if done {
-		s.StoreLog("[SILENCER] Received DONE signal. Finalizing...")
+		s.StoreLog("📦 Silencer received DONE signal")
 		s.StoreStateMulti(map[string]any{
 			"silencer_phase":       "completed",
 			"achieving_percentage": 100,
@@ -83,20 +80,16 @@ func (s *SilencerWant) Progress() {
 		return
 	}
 
-	s.StoreLog("[SILENCER] Received packet from channel %d: %v", index, data)
-
 	// Process the received packet
 	s.processPacket(data)
 }
 
 // processPacket handles the reaction request data
 func (s *SilencerWant) processPacket(data any) {
-	s.StoreLog("[SILENCER] Received packet data type: %T", data)
 	packet, ok := data.(map[string]any)
 	if !ok {
 		// Try to decode if it's a JSON string
 		if str, ok := data.(string); ok {
-			s.StoreLog("[SILENCER] Decoding JSON string packet")
 			if err := json.Unmarshal([]byte(str), &packet); err != nil {
 				s.StoreLog("[SILENCER] ERROR: Failed to parse packet string: %v", err)
 				return
@@ -118,8 +111,6 @@ func (s *SilencerWant) processPacket(data any) {
 		return
 	}
 
-	s.StoreLog("[SILENCER] Processing reaction %s (type: %s)", reactionID, reactionType)
-
 	locals := s.GetLocals()
 	if reactionType == "internal" {
 		// Store target reaction ID for agents - use SetStateAtomic for immediate visibility
@@ -127,7 +118,6 @@ func (s *SilencerWant) processPacket(data any) {
 
 		// If policy is all_true, trigger DoAgent for auto-approval
 		if locals.Policy == "all_true" {
-			s.Spec.Requires = []string{"reaction_auto_approval"}
 			if err := s.ExecuteAgents(); err != nil {
 				s.StoreLog("[SILENCER] ERROR: Failed to execute auto-approval agent: %v", err)
 			} else {
@@ -137,6 +127,7 @@ func (s *SilencerWant) processPacket(data any) {
 					"processed_count":   count + 1,
 					"last_processed_id": reactionID,
 				})
+				s.StoreLog("📦 Silencer auto-approved reaction: %s", reactionID)
 			}
 		} else {
 			// Otherwise maybe use monitor?

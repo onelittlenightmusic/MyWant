@@ -35,3 +35,9 @@ wantType:
 
   require:
     type: none
+
+  requires:
+    - mcp_dynamic_discovery
+    - mcp_dynamic_developer
+    - mcp_dynamic_compiler
+    - mcp_dynamic_validator

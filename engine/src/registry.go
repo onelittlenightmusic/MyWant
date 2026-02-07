@@ -76,8 +76,8 @@ func initializeInstance(instance any, baseWant *Want) {
 	if fieldType.Kind() == reflect.Ptr && fieldType.Elem().Name() == "Want" {
 		field.Set(reflect.ValueOf(baseWant))
 	} else if fieldType.Kind() == reflect.Struct && fieldType.Name() == "Want" {
-		// Case 2: Struct embedding (Want)
-		field.Set(reflect.ValueOf(*baseWant))
+		// Case 2: Struct embedding (Want) - use Elem() to avoid copying the mutex
+		field.Set(reflect.ValueOf(baseWant).Elem())
 	}
 }
 

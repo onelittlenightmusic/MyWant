@@ -37,8 +37,6 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types
-	
-	mywant.
 
 	fmt.Println("📋 Test Scenario:")
 	fmt.Println("1. Start target want (creates children from recipe)")

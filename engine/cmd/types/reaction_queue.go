@@ -26,7 +26,7 @@ type QueueMetadata struct {
 // ReactionQueue represents a single reaction queue that can hold multiple reactions
 type ReactionQueue struct {
 	ID        string         `json:"id"`
-	reactions []ReactionData `json:"reactions"`
+	reactions []ReactionData `json:"-"`
 	mutex     sync.RWMutex   `json:"-"`
 	CreatedAt time.Time      `json:"created_at"`
 }

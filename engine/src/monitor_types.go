@@ -76,36 +76,39 @@ func (mw *MonitorWant) IsAchieved() bool {
 
 // Progress implements the Progressable interface
 func (mw *MonitorWant) Progress() {
-	log.Printf("🔍 Monitor %s starting continuous monitoring\n", mw.Want.Metadata.Name)
-	mw.Want.SetStatus(WantStatusReaching)
-	if _, exists := mw.Want.GetState("start_time"); !exists {
-		mw.Want.StoreState("start_time", time.Now())
-		mw.Want.StoreState("status", "monitoring")
-		mw.Want.StoreState("alerts_triggered", 0)
+	if _, exists := mw.Want.GetState("start_time"); exists {
+		// Already monitoring
+		return
 	}
+
+	mw.Want.StoreState("start_time", time.Now())
+	mw.Want.StoreState("status", "monitoring")
+	mw.Want.StoreState("alerts_triggered", 0)
+	mw.Want.SetStatus(WantStatusReaching)
+
 	var monitorAgent *MonitorAgent
 	if agentRegistry := mw.Want.GetAgentRegistry(); agentRegistry != nil {
 		if agent, exists := agentRegistry.GetAgent(mw.Want.Metadata.Name); exists {
 			if ma, ok := agent.(*MonitorAgent); ok {
 				monitorAgent = ma
 			} else {
-				log.Printf("⚠️ Monitor %s agent is not a MonitorAgent type\n", mw.Want.Metadata.Name)
+				log.Printf("⚠️ Monitor %s agent is not a MonitorAgent type", mw.Want.Metadata.Name)
 				mw.Want.SetStatus(WantStatusFailed)
 				return
 			}
 		} else {
-			log.Printf("⚠️ Monitor %s agent not found in registry\n", mw.Want.Metadata.Name)
+			log.Printf("⚠️ Monitor %s agent not found in registry", mw.Want.Metadata.Name)
 			mw.Want.SetStatus(WantStatusFailed)
 			return
 		}
 	} else {
-		log.Printf("⚠️ Monitor %s has no AgentRegistry set\n", mw.Want.Metadata.Name)
+		log.Printf("⚠️ Monitor %s has no AgentRegistry set", mw.Want.Metadata.Name)
 		mw.Want.SetStatus(WantStatusFailed)
 		return
 	}
 
 	if monitorAgent.Monitor == nil {
-		log.Printf("⚠️ Monitor %s agent has no Monitor function set\n", mw.Want.Metadata.Name)
+		log.Printf("⚠️ Monitor %s agent has no Monitor function set", mw.Want.Metadata.Name)
 		mw.Want.SetStatus(WantStatusFailed)
 		return
 	}
@@ -118,20 +121,20 @@ func (mw *MonitorWant) Progress() {
 		for {
 			select {
 			case <-mw.Want.GetStopChannel(): // Stop monitoring if want is stopped
-				log.Printf("🛑 Monitor %s stopping continuous monitoring\n", mw.Want.Metadata.Name)
+				log.Printf("🛑 Monitor %s stopping continuous monitoring", mw.Want.Metadata.Name)
 				mw.Want.SetStatus(WantStatusAchieved) // Mark as completed when stopped
 				return
 			case <-ticker.C:
 				err := monitorAgent.Monitor(context.Background(), mw.Want)
 				if err != nil {
-					log.Printf("❌ Monitor %s agent execution failed: %v\n", mw.Want.Metadata.Name, err)
+					log.Printf("❌ Monitor %s agent execution failed: %v", mw.Want.Metadata.Name, err)
 					// Optionally set want status to failed, but continue monitoring mw.Want.SetStatus(WantStatusFailed)
 				}
 			}
 		}
 	}()
 
-	log.Printf("🔍 Monitor %s continuous monitoring started\n", mw.Want.Metadata.Name)
+	log.Printf("🔍 Monitor %s continuous monitoring started", mw.Want.Metadata.Name)
 }
 func (mw *MonitorWant) GetAlerts() []AlertRecord {
 	return mw.Alerts

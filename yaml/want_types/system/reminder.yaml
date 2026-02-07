@@ -461,3 +461,7 @@ wantType:
       type: want
       description: Stream of reaction requests {reaction_id, reaction_type}
 
+  requires:
+    - reminder_monitoring
+    - reminder_queue_management
+

@@ -32,24 +32,22 @@ type EvidenceWant struct {
 	Want
 }
 
+func (e *EvidenceWant) GetLocals() *EvidenceWantLocals {
+	return GetLocals[EvidenceWantLocals](&e.Want)
+}
+
 // Initialize resets state before execution begins
 func (e *EvidenceWant) Initialize() {
 	// Get or initialize locals
-	locals, ok := e.Locals.(*EvidenceWantLocals)
-	if !ok {
+	locals := e.GetLocals()
+	if locals == nil {
 		locals = &EvidenceWantLocals{}
 		e.Locals = locals
 	}
 
 	// Populate locals from parameters
-	if e.Spec.Params != nil {
-		if v, ok := e.Spec.Params["evidence_type"].(string); ok {
-			locals.EvidenceType = v
-		}
-		if v, ok := e.Spec.Params["approval_id"].(string); ok {
-			locals.ApprovalID = v
-		}
-	}
+	locals.EvidenceType = e.GetStringParam("evidence_type", "")
+	locals.ApprovalID = e.GetStringParam("approval_id", "")
 }
 
 // IsAchieved checks if evidence has been provided
@@ -59,32 +57,20 @@ func (e *EvidenceWant) IsAchieved() bool {
 }
 
 func (e *EvidenceWant) Progress() {
-	outCount := e.GetOutCount()
-	paths := e.GetPaths()
-	pathsOutLen := 0
-	if paths != nil {
-		pathsOutLen = len(paths.Out)
-	}
-	e.StoreLog("[EVIDENCE] Progress() called, OutCount=%d, paths.Out len=%d, Status=%s", outCount, pathsOutLen, e.Status)
-
-	locals, ok := e.Locals.(*EvidenceWantLocals)
-	if !ok {
+	locals := e.GetLocals()
+	if locals == nil {
 		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
 		return
 	}
 
 	provided, _ := e.GetStateBool("evidence_provided", false)
-	e.StoreLog("[EVIDENCE] evidence_provided=%v", provided)
-
 	if provided {
-		e.StoreLog("[EVIDENCE] Already provided, returning")
 		return
 	}
 
 	// NOTE: Framework ensures output connections exist before Progress() is called
 	// due to require: "users" in type-evidence.yaml
 
-	e.StoreLog("[EVIDENCE] Setting evidence_provided=true and sending data")
 	e.StoreState("evidence_provided", true)
 
 	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
@@ -104,7 +90,7 @@ func (e *EvidenceWant) Progress() {
 		"final_result":         evidence,
 	})
 
-	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount)
+	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount())
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
@@ -134,24 +120,22 @@ type DescriptionWant struct {
 	Want
 }
 
+func (d *DescriptionWant) GetLocals() *DescriptionWantLocals {
+	return GetLocals[DescriptionWantLocals](&d.Want)
+}
+
 // Initialize resets state before execution begins
 func (d *DescriptionWant) Initialize() {
 	// Get or initialize locals
-	locals, ok := d.Locals.(*DescriptionWantLocals)
-	if !ok {
+	locals := d.GetLocals()
+	if locals == nil {
 		locals = &DescriptionWantLocals{}
 		d.Locals = locals
 	}
 
 	// Populate locals from parameters
-	if d.Spec.Params != nil {
-		if v, ok := d.Spec.Params["description_format"].(string); ok {
-			locals.DescriptionFormat = v
-		}
-		if v, ok := d.Spec.Params["approval_id"].(string); ok {
-			locals.ApprovalID = v
-		}
-	}
+	locals.DescriptionFormat = d.GetStringParam("description_format", "")
+	locals.ApprovalID = d.GetStringParam("approval_id", "")
 }
 
 // IsAchieved checks if description has been provided
@@ -161,32 +145,20 @@ func (d *DescriptionWant) IsAchieved() bool {
 }
 
 func (d *DescriptionWant) Progress() {
-	outCount := d.GetOutCount()
-	paths := d.GetPaths()
-	pathsOutLen := 0
-	if paths != nil {
-		pathsOutLen = len(paths.Out)
-	}
-	d.StoreLog("[DESCRIPTION] Progress() called, OutCount=%d, paths.Out len=%d, Status=%s", outCount, pathsOutLen, d.Status)
-
-	locals, ok := d.Locals.(*DescriptionWantLocals)
-	if !ok {
+	locals := d.GetLocals()
+	if locals == nil {
 		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")
 		return
 	}
 
 	provided, _ := d.GetStateBool("description_provided", false)
-	d.StoreLog("[DESCRIPTION] description_provided=%v", provided)
-
 	if provided {
-		d.StoreLog("[DESCRIPTION] Already provided, returning")
 		return
 	}
 
 	// NOTE: Framework ensures output connections exist before Progress() is called
 	// due to require: "users" in type-description.yaml
 
-	d.StoreLog("[DESCRIPTION] Setting description_provided=true and sending data")
 	d.StoreState("description_provided", true)
 
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
@@ -207,7 +179,7 @@ func (d *DescriptionWant) Progress() {
 		"final_result":            description,
 	})
 
-	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, outCount)
+	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, d.GetOutCount())
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)

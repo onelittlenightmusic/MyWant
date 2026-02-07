@@ -212,3 +212,6 @@ wantType:
   - Agent system documentation for hotel booking
   connect:
     type: none
+
+  requires:
+    - hotel_agency

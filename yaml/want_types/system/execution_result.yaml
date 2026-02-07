@@ -247,3 +247,6 @@ wantType:
 
   require:
     type: none
+
+  requires:
+    - command_execution

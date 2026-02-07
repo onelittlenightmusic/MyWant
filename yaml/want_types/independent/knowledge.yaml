@@ -72,3 +72,7 @@ wantType:
           topic: "Vite and React performance optimization"
           output_path: "notes/web_dev.md"
           refresh_interval: "12h"
+
+  requires:
+    - knowledge_monitoring
+    - knowledge_updating

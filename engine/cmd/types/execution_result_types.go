@@ -55,7 +55,6 @@ func init() {
 
 // Initialize resets execution state before starting
 func (e *ExecutionResultWant) Initialize() {
-	e.StoreLog("[INITIALIZE] %s - Resetting state for fresh execution\n", e.Metadata.Name)
 	// Reset completion state for fresh execution using batch update
 	e.StoreStateMulti(map[string]any{
 		"completed":            false,
@@ -102,10 +101,10 @@ func (e *ExecutionResultWant) Progress() {
 		e.handlePhaseExecuting(locals)
 
 	case ExecutionPhaseCompleted:
-		e.handlePhaseCompleted(locals)
+		// Already completed, nothing more to do
 
 	case ExecutionPhaseFailed:
-		e.handlePhaseFailed(locals)
+		// Already failed, nothing more to do
 
 	default:
 		e.StoreLog("ERROR: Unknown phase: %s", locals.Phase)
@@ -129,10 +128,6 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	}
 
 	locals.Command = fmt.Sprintf("%v", command)
-
-	// Set agent requirement for command execution
-	// This tells ExecuteAgents() to find agents that provide "command_execution" capability
-	e.Spec.Requires = []string{"command_execution"}
 
 	// Get optional parameters
 	if timeout, ok := e.Spec.Params["timeout"]; ok {
@@ -162,8 +157,6 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 		"completed":            false,
 		"achieving_percentage": 0,
 	})
-
-	e.StoreLog("Initializing execution of command: %s", locals.Command)
 
 	// Transition to executing phase
 	locals.Phase = ExecutionPhaseExecuting
@@ -276,18 +269,6 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	e.StoreStateMulti(stateUpdates)
 	e.updateLocals(locals)
 	e.ProvideDone()
-}
-
-// handlePhaseCompleted handles the completed phase
-func (e *ExecutionResultWant) handlePhaseCompleted(locals *ExecutionResultWantLocals) {
-	// Already completed, nothing more to do
-	e.StoreLog("Execution completed")
-}
-
-// handlePhaseFailed handles the failed phase
-func (e *ExecutionResultWant) handlePhaseFailed(locals *ExecutionResultWantLocals) {
-	// Already failed, nothing more to do
-	e.StoreLog("Execution failed")
 }
 
 // buildFinalResult combines stdout and stderr into final result

@@ -30,8 +30,6 @@ func init() {
 
 // Initialize prepares the Knowledge want for execution
 func (k *KnowledgeWant) Initialize() {
-	k.StoreLog("[KNOWLEDGE] Initializing Knowledge want: %s\n", k.Metadata.Name)
-
 	// Get or initialize locals
 	locals := k.GetLocals()
 	if locals == nil {
@@ -40,34 +38,25 @@ func (k *KnowledgeWant) Initialize() {
 	}
 
 	// Parse topic
-	topic, ok := k.Spec.Params["topic"]
-	if !ok || topic == "" {
+	locals.Topic = k.GetStringParam("topic", "")
+	if locals.Topic == "" {
 		k.fail("Missing required parameter 'topic'")
 		return
 	}
-	locals.Topic = fmt.Sprintf("%v", topic)
 
 	// Parse output_path
-	path, ok := k.Spec.Params["output_path"]
-	if !ok || path == "" {
+	locals.OutputPath = k.GetStringParam("output_path", "")
+	if locals.OutputPath == "" {
 		k.fail("Missing required parameter 'output_path'")
 		return
 	}
-	locals.OutputPath = fmt.Sprintf("%v", path)
 
 	// Parse depth
-	depth, ok := k.Spec.Params["depth"]
-	if !ok {
-		depth = "comprehensive"
-	}
-	locals.Depth = fmt.Sprintf("%v", depth)
+	locals.Depth = k.GetStringParam("depth", "comprehensive")
 
 	// Parse refresh_interval
-	intervalStr, ok := k.Spec.Params["refresh_interval"]
-	if !ok {
-		intervalStr = "24h"
-	}
-	interval, err := time.ParseDuration(fmt.Sprintf("%v", intervalStr))
+	intervalStr := k.GetStringParam("refresh_interval", "24h")
+	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {
 		k.StoreLog("Warning: Invalid refresh_interval format, defaulting to 24h: %v", err)
 		interval = 24 * time.Hour
@@ -81,7 +70,7 @@ func (k *KnowledgeWant) Initialize() {
 		k.StoreState("knowledge_status", "stale")
 	}
 
-	k.StoreLog("[KNOWLEDGE] Knowledge want initialized for topic: %s\n", locals.Topic)
+	k.StoreLog("[KNOWLEDGE] Knowledge want initialized for topic: %s", locals.Topic)
 }
 
 func (k *KnowledgeWant) fail(msg string) {
@@ -163,9 +152,6 @@ func (k *KnowledgeWant) shouldRefresh() bool {
 }
 
 func (k *KnowledgeWant) runMonitor() {
-	k.StoreLog("[KNOWLEDGE] Running KnowledgeMonitor to search for updates...")
-	k.Spec.Requires = []string{"knowledge_monitoring"}
-
 	if err := k.ExecuteAgents(); err != nil {
 		k.StoreLog("ERROR: KnowledgeMonitor failed: %v", err)
 		return
@@ -176,9 +162,6 @@ func (k *KnowledgeWant) runMonitor() {
 }
 
 func (k *KnowledgeWant) runUpdater() {
-	k.StoreLog("[KNOWLEDGE] Running KnowledgeUpdater to synthesize and save results...")
-	k.Spec.Requires = []string{"knowledge_updating"}
-
 	if err := k.ExecuteAgents(); err != nil {
 		k.StoreLog("ERROR: KnowledgeUpdater failed: %v", err)
 		return

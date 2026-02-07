@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	. "mywant/engine/src"
@@ -41,7 +40,6 @@ func init() {
 
 // Initialize prepares the mock server want for execution
 func (m *FlightMockServerWant) Initialize() {
-	log.Printf("[MOCK_SERVER] Initialize() called for %s\n", m.Metadata.Name)
 	m.StoreLog("[MOCK_SERVER] Initializing flight mock server: %s", m.Metadata.Name)
 
 	// Get or initialize locals
@@ -76,14 +74,6 @@ func (m *FlightMockServerWant) Initialize() {
 
 	m.StoreStateMulti(stateMap)
 	m.Locals = locals
-
-	// Set up agent requirements for mock server management
-	m.Spec.Requires = []string{
-		"mock_server_management", // DoAgent manages server lifecycle
-	}
-
-	m.StoreLog("[MOCK_SERVER] Initialized mock server '%s' with binary=%s, log=%s",
-		m.Metadata.Name, locals.ServerBinary, locals.LogFile)
 
 	// Note: Don't execute agents here - agentRegistry may not be set yet
 	// Agent execution will happen in first Progress() call
@@ -126,7 +116,6 @@ func (m *FlightMockServerWant) Progress() {
 	case MockServerPhaseStarting:
 		// First time in starting phase - execute agents to start server
 		if m.GetAgentRegistry() != nil {
-			m.StoreLog("[MOCK_SERVER] Executing agents to start server")
 			if err := m.ExecuteAgents(); err != nil {
 				m.StoreLog("[ERROR] Failed to execute agents: %v", err)
 				m.StoreState("server_phase", MockServerPhaseFailed)

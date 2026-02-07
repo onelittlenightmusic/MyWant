@@ -34,7 +34,7 @@ func init() {
 
 // Initialize prepares the Gmail want for execution
 func (g *GmailWant) Initialize() {
-	g.StoreLog("[GMAIL] Initializing Gmail want: %s\n", g.Metadata.Name)
+	g.StoreLog("[GMAIL] Initializing Gmail want: %s", g.Metadata.Name)
 
 	// Get or initialize locals
 	locals := g.GetLocals()
@@ -72,7 +72,6 @@ func (g *GmailWant) Initialize() {
 			defaultTokenPath := filepath.Join(mcpDir, "credentials.json")
 			if _, err := os.Stat(defaultTokenPath); err == nil {
 				locals.GmailTokenPath = defaultTokenPath
-				g.StoreLog("[GMAIL] Auto-discovered token path: %s", defaultTokenPath)
 			}
 		}
 
@@ -93,7 +92,6 @@ func (g *GmailWant) Initialize() {
 					if locals.GoogleClientSecret == "" {
 						locals.GoogleClientSecret = config.Web.ClientSecret
 					}
-					g.StoreLog("[GMAIL] Auto-discovered Client ID/Secret from: %s", keysPath)
 				}
 			}
 		}
@@ -107,7 +105,6 @@ func (g *GmailWant) Initialize() {
 
 	g.Locals = locals
 	g.StoreState("gmail_status", "initialized")
-	g.StoreLog("[GMAIL] Gmail want initialized with prompt: %s\n", locals.Prompt)
 }
 
 // IsAchieved returns true when the Gmail operation is complete or failed
@@ -166,7 +163,6 @@ func (g *GmailWant) Progress() {
 
 	// State: pending or initialized -> Start execution
 	if status == "pending" || status == "initialized" {
-		g.StoreLog("[GMAIL] Starting execution phase")
 		g.StoreState("gmail_status", "executing")
 
 		// Set up environment variables from parameters
@@ -187,21 +183,15 @@ func (g *GmailWant) Progress() {
 		g.StoreState("mcp_native", true)
 
 		// Store the prompt as an MCP operation for the agent
-		g.StoreLog("Searching emails with query: %s", locals.Prompt)
 		g.StoreState("mcp_operation", "gmail_search")
 		g.StoreState("mcp_query", locals.Prompt)
 		g.StoreState("mcp_max_results", 10)
 
-		// Set agent requirements
-		g.Spec.Requires = []string{"mcp_server_management", "mcp_gmail"}
 		return // Yield and let agents run in their own turn
 	}
 
 	// State: executing -> Check if agents have finished
 	if status == "executing" {
-		// Set requirements again to ensure agents are active
-		g.Spec.Requires = []string{"mcp_server_management", "mcp_gmail"}
-
 		// Execute Agents via agent framework (this triggers them if they haven't run)
 		if err := g.ExecuteAgents(); err != nil {
 			g.StoreLog("ERROR: Failed to execute MCP agent: %v", err)
@@ -246,13 +236,11 @@ func (g *GmailWant) Progress() {
 		// Store final result as a clean array of email objects
 		g.StoreState("final_result", emails)
 		g.StoreState("gmail_status", "completed")
-		g.StoreLog("Gmail search completed: found %d emails", len(emails))
+		g.StoreLog("📦 Gmail search completed for '%s': found %d emails", locals.Prompt, len(emails))
 
 		// Provide result to output channels
 		g.Provide(emails)
 		g.ProvideDone()
-
-		g.StoreLog("[GMAIL] Gmail search completed for want: %s\n", g.Metadata.Name)
 	}
 }
 

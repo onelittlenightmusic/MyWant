@@ -204,3 +204,7 @@ wantType:
 
   require:
     type: none
+
+  requires:
+    - mcp_server_management
+    - mcp_gmail

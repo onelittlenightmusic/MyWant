@@ -281,3 +281,6 @@ wantType:
   - MonitorRestaurant implementation
   connect:
     type: none
+
+  requires:
+    - restaurant_agency

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"mywant/engine/src/chain"
 	"path/filepath"
 	"reflect"
@@ -107,7 +106,6 @@ func (tcs *TargetCompletionSubscription) GetSubscriberName() string {
 
 // OnEvent handles the OwnerCompletionEvent
 func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event WantEvent) EventResponse {
-	log.Printf("[DEBUG OnEvent] Handler called for target %s\n", tcs.target.Metadata.Name)
 	completionEvent, ok := event.(*OwnerCompletionEvent)
 	if !ok {
 		return EventResponse{
@@ -123,8 +121,6 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
-		tcs.target.StoreLog("[TARGET] ⏭️  Ignoring completion event for different target: TargetName=%s (expected %s, child=%s)\n",
-			completionEvent.TargetName, tcs.target.Metadata.Name, completionEvent.ChildName)
 		return EventResponse{Handled: false}
 	}
 
@@ -132,15 +128,6 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	tcs.target.childCompletionMutex.Lock()
 	tcs.target.completedChildren[completionEvent.ChildName] = true
 	tcs.target.childCompletionMutex.Unlock()
-
-	// DEBUG: Log child completion tracking
-	tcs.target.StoreLog("[TARGET] 📍 Child completion event received: %s\n", completionEvent.ChildName)
-	tcs.target.StoreLog("[TARGET] 📍 Tracked completed children: %v\n", tcs.target.completedChildren)
-	tcs.target.StoreLog("[TARGET] 📍 Expected child wants (%d): ", len(tcs.target.childWants))
-	for i, child := range tcs.target.childWants {
-		tcs.target.StoreLog("%d=%s ", i, child.Metadata.Name)
-	}
-	tcs.target.StoreLog("\n")
 
 	allComplete := tcs.target.checkAllChildrenComplete()
 
@@ -238,10 +225,9 @@ func (t *Target) resolveRecipeParameters() {
 	t.RecipeParams = resolvedParams
 }
 func (t *Target) CreateChildWants() []*Want {
-	t.StoreLog("[TARGET] 🛠️  CreateChildWants() called for %s (RecipePath: %s)\n", t.Metadata.Name, t.RecipePath)
 	// Recipe loader is required for target wants
 	if t.recipeLoader == nil {
-		t.StoreLog("[TARGET] ❌ ERROR: Recipe loader is nil for target %s\n", t.Metadata.Name)
+		t.StoreLog("[TARGET] ❌ ERROR: Recipe loader is nil for target %s", t.Metadata.Name)
 		return []*Want{}
 	}
 
@@ -253,24 +239,20 @@ func (t *Target) CreateChildWants() []*Want {
 	// Use target name as prefix to ensure child wants are properly namespaced
 	// This ensures that each target instance's children have unique namespace prefixes
 	paramsWithPrefix["prefix"] = t.Metadata.Name
-	t.StoreLog("[TARGET] Parameters with prefix for %s: %+v\n", t.Metadata.Name, paramsWithPrefix)
 
 	// Load child wants from recipe
 	config, err := t.recipeLoader.LoadConfigFromRecipe(t.RecipePath, paramsWithPrefix)
 	if err != nil {
-		t.StoreLog("[TARGET] ❌ ERROR: Failed to load config from recipe %s: %v\n", t.RecipePath, err)
+		t.StoreLog("[TARGET] ❌ ERROR: Failed to load config from recipe %s: %v", t.RecipePath, err)
 		return []*Want{}
 	}
-	t.StoreLog("[TARGET] Successfully loaded %d wants from recipe %s\n", len(config.Wants), t.RecipePath)
 
 	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
 	for _, childWant := range config.Wants {
 		if childWant.Metadata.Type == parentType {
-			t.StoreLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s\n",
+			t.StoreLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s",
 				t.Metadata.Name, parentType, t.RecipePath)
-			t.StoreLog("[TARGET] 💡 HINT: Child want type '%s' must be different from parent type '%s' to prevent recursive instantiation\n",
-				childWant.Metadata.Type, parentType)
 			return []*Want{}
 		}
 	}
@@ -278,7 +260,6 @@ func (t *Target) CreateChildWants() []*Want {
 		// Ensure ID is generated if not present
 		if config.Wants[i].Metadata.ID == "" {
 			config.Wants[i].Metadata.ID = generateUUID()
-			t.StoreLog("[TARGET] Generated ID %s for child want %s\n", config.Wants[i].Metadata.ID, config.Wants[i].Metadata.Name)
 		}
 
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
@@ -313,11 +294,10 @@ func (t *Target) CreateChildWants() []*Want {
 			}
 			config.Wants[i].Spec.Using[j]["owner-name"] = instanceID
 		}
-		t.StoreLog("[TARGET] Configured owner references and labels for child want %s (ID: %s)\n", config.Wants[i].Metadata.Name, config.Wants[i].Metadata.ID)
 	}
 
 	t.childWants = config.Wants
-	t.StoreLog("[TARGET] Returning %d child wants for %s\n", len(t.childWants), t.Metadata.Name)
+	t.StoreLog("📦 Target %s initialized: %d child wants created from recipe", t.Metadata.Name, len(t.childWants))
 	return t.childWants
 }
 
@@ -334,7 +314,6 @@ func (t *Target) IsAchieved() bool {
 		// CRITICAL: If achieved, achieving_percentage MUST be 100%
 		// Always enforce this consistency to ensure proper reporting
 		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
-		t.StoreLog("[TARGET] 💯 IsAchieved() enforcing achieving_percentage = 100\n")
 		t.StoreState("achieving_percentage", 100.0)
 		return true
 	}
@@ -421,17 +400,15 @@ func (t *Target) Progress() {
 	if t.Status == WantStatusAchieved {
 		// Consistency check: If achieved, achieving_percentage must be 100%
 		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
-		t.StoreLog("[TARGET] 💯 Progress() guard: Status=ACHIEVED, forcing achieving_percentage = 100\n")
 		t.StoreState("achieving_percentage", 100.0)
 		return
 	}
 
 	// Phase 1: Create child wants (only once)
-	// t.StoreLog("[TARGET] 🔍 Progress Phase 1 check: childrenCreated=%v, builder!=nil=%v, recipeLoader!=nil=%v\n", t.childrenCreated, t.builder != nil, t.recipeLoader != nil)
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
-			t.StoreLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v\n", err)
+			t.StoreLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v", err)
 			return
 		}
 
@@ -455,7 +432,6 @@ func (t *Target) Progress() {
 		// Calculate achieving_percentage based on achieved children count (outside of lock)
 		if len(t.childWants) > 0 {
 			achievedCount := 0
-			// t.StoreLog("[TARGET] 🔍 Progress check - Child completion status:\n")
 			for _, child := range t.childWants {
 				// Check both snapshot AND actual child Status
 				// This handles cases where events might have been missed
@@ -469,20 +445,16 @@ func (t *Target) Progress() {
 						t.childCompletionMutex.Unlock()
 					}
 				}
-				// t.StoreLog("[TARGET] 🔍   - %s: %v (Status=%s)\n", child.Metadata.Name, completed, child.Status)
 			}
 			achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
-			// t.StoreLog("[TARGET] 🔍 Achievement: %d/%d = %.2f%%\n", achievedCount, len(t.childWants), achievingPercentage)
 			t.StoreState("achieving_percentage", achievingPercentage)
 		} else {
 			// No children - target is immediately complete at 100%
-			t.StoreLog("[TARGET] 🔍 No children - setting achieving_percentage = 100\n")
 			t.StoreState("achieving_percentage", 100.0)
 		}
 
 		if allComplete {
 			// All children complete: SetStatus() will automatically set achieving_percentage = 100
-			t.StoreLog("[TARGET] ✅ All children complete! Setting Status = ACHIEVED\n")
 			t.SetStatus(WantStatusAchieved)
 
 			// Send completion packet to parent/upstream wants (only once)
@@ -530,7 +502,7 @@ func (t *Target) Progress() {
 				time.Sleep(10 * time.Millisecond)            // Add short sleep after providing
 				t.StoreState("completion_packet_sent", true) // Mark that we've sent the completion packet
 
-				t.StoreLog("[TARGET] ✅ Target %s sent completion packet to parent coordinator\n", t.Metadata.Name)
+				t.StoreLog("✅ Target %s completed and sent results to parent", t.Metadata.Name)
 			}
 
 			// Compute and store recipe result (this part remains)
@@ -602,12 +574,6 @@ func (t *Target) isChildWant(want *Want) bool {
 	for _, ownerRef := range want.Metadata.OwnerReferences {
 		match := ownerRef.Controller && ownerRef.Kind == "Want" && ownerRef.Name == t.Metadata.Name
 
-		// Detailed debug log only for potential children
-		if ownerRef.Name == t.Metadata.Name {
-			log.Printf(">>> [CHECK] Comparing want %s ownerRef: Name=%s, Controller=%v, Kind=%v vs Target %s\n",
-				want.Metadata.Name, ownerRef.Name, ownerRef.Controller, ownerRef.Kind, t.Metadata.Name)
-		}
-
 		if match {
 			return true
 		}
@@ -654,26 +620,22 @@ func (t *Target) computeTemplateResult() {
 	defer t.stateMutex.Unlock()
 
 	if t.recipeLoader == nil {
-		t.StoreLog("[TARGET] ⚠️  Target %s: No recipe loader available for result computation\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		t.StoreLog("[TARGET] ⚠️  Target %s: Failed to load recipe result definition: %v\n", t.Metadata.Name, err)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	if recipeResult == nil {
-		t.StoreLog("[TARGET] ⚠️  Target %s: No result definition in recipe, using fallback\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
 
 	// Check if builder is available (may be nil in test environments)
 	if t.builder == nil {
-		t.StoreLog("[TARGET] ⚠️  Target %s: No builder available for result computation, using fallback\n", t.Metadata.Name)
 		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
 		return
 	}
@@ -701,13 +663,6 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 
-	// Log child want names for debugging result extraction
-	childNames := make([]string, 0, len(childWantsByName))
-	for name := range childWantsByName {
-		childNames = append(childNames, name)
-	}
-	t.StoreLog("🧮 Target %s: Found %d child wants for recipe-defined result computation: %v\n", t.Metadata.Name, len(childWantsByName), childNames)
-
 	// Stats are now stored in State - no separate initialization needed
 	var primaryResult any
 	metrics := make(map[string]any)
@@ -724,9 +679,6 @@ func (t *Target) computeTemplateResult() {
 		// Use first result as primary result for backward compatibility
 		if i == 0 {
 			primaryResult = resultValue
-			t.StoreLog("[TARGET] ✅ Target %s: Primary result (%s from %s): %v\n", t.Metadata.Name, resultSpec.StatName, resultSpec.WantName, primaryResult)
-		} else {
-			t.StoreLog("📊 Target %s: Metric %s (%s from %s): %v\n", t.Metadata.Name, resultSpec.Description, resultSpec.StatName, resultSpec.WantName, resultValue)
 		}
 	}
 	for i, resultSpec := range *recipeResult {
@@ -746,7 +698,7 @@ func (t *Target) computeTemplateResult() {
 	}
 	t.childCount = len(childWantsByName)
 
-	t.StoreLog("[TARGET] ✅ Target %s: Recipe-defined result computation completed\n", t.Metadata.Name)
+	t.StoreLog("📊 Target %s: Results computed from %d child wants", t.Metadata.Name, t.childCount)
 }
 
 // ApprovalData represents shared evidence and description data

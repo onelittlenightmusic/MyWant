@@ -2,7 +2,6 @@ package types
 
 import (
 	"fmt"
-	"log"
 
 	. "mywant/engine/src"
 )
@@ -137,7 +136,6 @@ func (f *FibonacciFilter) Progress() {
 
 	// Check for end signal
 	if done {
-		log.Printf("[FIBONACCI-FILTER:%s] Received DONE signal. Finalizing...", f.Metadata.Name)
 		// End signal received - finalize and complete
 		f.StoreStateMulti(Dict{
 			"filtered":             locals.filtered,

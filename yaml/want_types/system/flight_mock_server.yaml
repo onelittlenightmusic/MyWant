@@ -75,6 +75,9 @@ wantType:
   require:
     connectivity: none
 
+  requires:
+    - mock_server_management
+
   agents:
   - name: mock_server_management
     role: action

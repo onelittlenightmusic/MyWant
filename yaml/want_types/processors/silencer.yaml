@@ -40,5 +40,9 @@ wantType:
     - name: reaction_requests
       type: want
       description: Stream of reaction requests {reaction_id, reaction_type}
-      required: true
-      multiple: true
+            required: true
+            multiple: true
+      
+        requires:
+          - reaction_auto_approval
+      

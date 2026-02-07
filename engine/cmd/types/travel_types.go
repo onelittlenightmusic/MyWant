@@ -118,8 +118,6 @@ func (b *BaseTravelWant) Progress() {
 		b.ProvideDone()
 	} else if schedule == nil {
 		b.StoreLog("ERROR: Failed to generate schedule")
-	} else if !connectionAvailable {
-		b.StoreLog("WARNING: Output channel not available, schedule not sent")
 	}
 }
 
@@ -149,8 +147,6 @@ func (r *RestaurantWant) Initialize() {
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
 func (r *RestaurantWant) tryAgentExecution() any {
 	if len(r.Spec.Requires) > 0 {
-		r.StoreState("agent_requirements", r.Spec.Requires)
-
 		// Step 1: Execute MonitorRestaurant first to check for existing state
 		monitorAgent := NewMonitorRestaurant(
 			"restaurant_monitor",
@@ -230,6 +226,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		"achieving_percentage":       100,
 		"final_result":               newEvent.Name,
 	})
+	r.StoreLog("📦 Restaurant reservation created: %s", newEvent.Name)
 	return newSchedule
 }
 
@@ -394,8 +391,6 @@ func (h *HotelWant) Initialize() {
 // tryAgentExecution implements TravelWantInterface for HotelWant
 func (h *HotelWant) tryAgentExecution() any {
 	if len(h.Spec.Requires) > 0 {
-		h.StoreState("agent_requirements", h.Spec.Requires)
-
 		// Use dynamic agent execution based on requirements
 		if err := h.ExecuteAgents(); err != nil {
 			h.StoreState("agent_execution_status", "failed")
@@ -456,6 +451,7 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		"final_result":         newEvent.Name,
 		"achieving_percentage": 100,
 	})
+	h.StoreLog("📦 Hotel reservation created: %s", newEvent.Name)
 	return newSchedule
 }
 
@@ -476,8 +472,6 @@ func (b *BuffetWant) Initialize() {
 // tryAgentExecution implements TravelWantInterface for BuffetWant
 func (b *BuffetWant) tryAgentExecution() any {
 	if len(b.Spec.Requires) > 0 {
-		b.StoreState("agent_requirements", b.Spec.Requires)
-
 		// Use dynamic agent execution based on requirements
 		if err := b.ExecuteAgents(); err != nil {
 			b.StoreState("agent_execution_status", "failed")
@@ -535,6 +529,7 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		"final_result":          newEvent.Name,
 		"achieving_percentage":  100,
 	})
+	b.StoreLog("📦 Buffet reservation created: %s", newEvent.Name)
 	return newSchedule
 }
 
@@ -968,10 +963,7 @@ func (f *FlightWant) Progress() {
 		return
 	}
 
-	out, connectionAvailable := f.GetFirstOutputChannel()
-	if !connectionAvailable {
-		// No output channel is acceptable for standalone or sink wants
-	}
+	_, connectionAvailable := f.GetFirstOutputChannel()
 
 	phaseVal, _ := f.GetState("_flight_phase")
 	phase := ""
@@ -982,12 +974,18 @@ func (f *FlightWant) Progress() {
 		phase = PhaseInitial
 	}
 
+	// Only log phase transition to avoid spam
+	lastLoggedPhase, _ := f.GetStateString("last_logged_phase", "")
+	if lastLoggedPhase != phase {
+		f.StoreLog("[FLIGHT] Transitioned to phase: %s", phase)
+		f.StoreState("last_logged_phase", phase)
+	}
+
 	// State machine: handle each phase
 	switch phase {
 
 	// === Phase 1: Initial Setup ===
 	case PhaseInitial:
-		f.StoreLog("Phase: Initial booking")
 		f.StoreState("_flight_phase", PhaseBooking)
 		return
 
@@ -997,37 +995,29 @@ func (f *FlightWant) Progress() {
 		if locals.monitoringDuration == 0 {
 			completionTimeoutSeconds := f.GetIntParam("completion_timeout", 60)
 			locals.monitoringDuration = time.Duration(completionTimeoutSeconds) * time.Second
-			f.StoreLog("Monitoring duration initialized: %v seconds", completionTimeoutSeconds)
 		}
 
-		f.StoreLog("Executing initial booking")
 		f.StoreState("completed", true)
 		f.tryAgentExecution()
 
 		agentResult, hasResult := f.GetState("agent_result")
 		if hasResult && agentResult != nil {
-			f.StoreLog("Initial booking succeeded, sending packet")
 			agentSchedule := f.extractFlightSchedule(agentResult)
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
 				if connectionAvailable {
+					out, _ := f.GetFirstOutputChannel()
 					f.sendFlightPacket(out, agentSchedule, "Initial")
-					f.StoreLog("Initial flight packet sent to coordinator")
-				} else {
-					f.StoreLog("No output channel available, skipping packet send")
 				}
 
 				// Transition to monitoring phase
 				locals.monitoringStartTime = time.Now()
 				f.StoreState("_flight_phase", PhaseMonitoring)
-				f.StoreLog("Transitioning to monitoring phase")
-
 				return
 			}
 		}
 
 		// Booking failed - don't complete, let it retry or stay in booking phase
-		f.StoreLog("Initial booking failed - will retry")
 		return
 
 	// === Phase 3: Monitoring ===
@@ -1035,7 +1025,7 @@ func (f *FlightWant) Progress() {
 		if time.Since(locals.monitoringStartTime) < locals.monitoringDuration {
 			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
-				f.StoreLog("Delay detected at %v, initiating cancellation", elapsed)
+				f.StoreLog("📦 Delay detected at %v, initiating cancellation", elapsed)
 				f.StoreStateMulti(Dict{
 					"flight_action": "cancel_flight",
 					"completed":     false,
@@ -1055,7 +1045,7 @@ func (f *FlightWant) Progress() {
 
 		} else {
 			// Monitoring period expired - flight stable, complete
-			f.StoreLog("Monitoring completed successfully")
+			f.StoreLog("📦 Flight monitoring completed successfully")
 			f.StoreStateMulti(Dict{
 				"_flight_phase":        PhaseCompleted,
 				"achieving_percentage": 100,
@@ -1068,7 +1058,6 @@ func (f *FlightWant) Progress() {
 	case PhaseCanceling:
 		flightIDVal, flightIDExists := f.GetState("flight_id")
 		if !flightIDExists || flightIDVal == "" {
-			f.StoreLog("No flight_id to cancel, resetting to booking phase")
 			f.ResetFlightState()
 			f.StoreStateMulti(Dict{
 				"_flight_phase": PhaseBooking,
@@ -1079,7 +1068,6 @@ func (f *FlightWant) Progress() {
 
 		flightID, ok := flightIDVal.(string)
 		if !ok {
-			f.StoreLog("Invalid flight_id type, resetting to booking phase")
 			f.ResetFlightState()
 			f.StoreStateMulti(Dict{
 				"_flight_phase": PhaseBooking,
@@ -1089,13 +1077,11 @@ func (f *FlightWant) Progress() {
 		}
 
 		// Execute cancel flight action
-		f.StoreLog("Executing cancel_flight action for flight %s", flightID)
 		f.tryAgentExecution()
 
-		f.StoreLog("Cancelled flight: %s", flightID)
+		f.StoreLog("📦 Cancelled flight: %s", flightID)
 
 		// Reset flight state and transition back to booking phase for rebooking
-		f.StoreLog("Cancellation completed, resetting state and returning to booking phase")
 		f.ResetFlightState()
 		f.StoreStateMulti(Dict{
 			"_flight_phase": PhaseBooking,
@@ -1110,7 +1096,7 @@ func (f *FlightWant) Progress() {
 		return
 
 	default:
-		f.StoreLog("Unknown phase: %s", phase)
+		f.StoreLog("ERROR: Unknown phase: %s", phase)
 		f.StoreState("_flight_phase", PhaseCompleted)
 		return
 	}
@@ -1144,8 +1130,6 @@ func (f *FlightWant) sendFlightPacket(out any, schedule *FlightSchedule, label s
 // Attempts to execute flight booking using the agent system
 func (f *FlightWant) tryAgentExecution() any {
 	if len(f.Spec.Requires) > 0 {
-		f.StoreState("agent_requirements", f.Spec.Requires)
-
 		// Execute agents via ExecuteAgents() which properly tracks agent history
 		if err := f.ExecuteAgents(); err != nil {
 			f.StoreStateMulti(Dict{

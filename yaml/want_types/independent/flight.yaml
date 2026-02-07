@@ -181,3 +181,6 @@ wantType:
     - Travel coordinator flight integration
     connect:
       type: none
+
+  requires:
+    - flight_api_agency

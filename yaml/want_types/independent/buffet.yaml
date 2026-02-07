@@ -215,3 +215,6 @@ wantType:
   - Travel coordinator for schedule integration
   connect:
     type: none
+
+  requires:
+    - buffet_agency
