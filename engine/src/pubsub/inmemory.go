@@ -19,14 +19,14 @@ type WatermillPubSub struct {
 	logger     watermill.LoggerAdapter
 	ctx        context.Context
 	cancel     context.CancelFunc
-	
+
 	// pointerMap stores the original Message objects indexed by Watermill UUID
 	// to preserve type information across the bridge.
 	pointerMap map[string]*Message
 	// topicCache stores sequence of IDs per topic for replay support
-	topicCache map[string][]string 
-	cacheMu    sync.RWMutex
-	maxCache   int
+	topicCache  map[string][]string
+	cacheMu     sync.RWMutex
+	maxCache    int
 	consumerBuf int
 
 	// Track active subscriptions
@@ -44,7 +44,7 @@ type TopicStats struct {
 // NewInMemoryPubSub creates a new Watermill-backed PubSub with pointer preservation.
 func NewInMemoryPubSub() *WatermillPubSub {
 	logger := watermill.NewStdLogger(false, false)
-	
+
 	pubSub := gochannel.NewGoChannel(
 		gochannel.Config{
 			BlockPublishUntilSubscriberAck: false,
@@ -110,13 +110,13 @@ func (ps *WatermillPubSub) GetStats(topic string) (TopicStats, error) {
 // Publish publishes a message.
 func (ps *WatermillPubSub) Publish(topic string, msg *Message) error {
 	msgID := watermill.NewUUID()
-	
+
 	ps.cacheMu.Lock()
 	// Add to correlation map
 	ps.pointerMap[msgID] = msg
 	// Add to topic replay cache
 	ps.topicCache[topic] = append(ps.topicCache[topic], msgID)
-	
+
 	// Cleanup old entries
 	if len(ps.topicCache[topic]) > ps.maxCache {
 		oldID := ps.topicCache[topic][0]
@@ -145,7 +145,7 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 	ps.subMu.Unlock()
 
 	subCtx, subCancel := context.WithCancel(ps.ctx)
-	
+
 	ps.subMu.Lock()
 	ps.subscriptions[key] = subCancel
 	ps.subMu.Unlock()
@@ -197,7 +197,7 @@ func (ps *WatermillPubSub) Subscribe(topic string, consumerID string) (Subscript
 				if !ok {
 					return
 				}
-				
+
 				ps.cacheMu.RLock()
 				foundMsg, exists := ps.pointerMap[wMsg.UUID]
 				ps.cacheMu.RUnlock()
@@ -242,14 +242,14 @@ func (ps *WatermillPubSub) IsSubscribed(topic string, consumerID string) bool {
 func (ps *WatermillPubSub) Unsubscribe(topic string, consumerID string) error {
 	ps.subMu.Lock()
 	defer ps.subMu.Unlock()
-	
+
 	key := consumerID + ":" + topic
 	if cancel, exists := ps.subscriptions[key]; exists {
 		cancel()
 		delete(ps.subscriptions, key)
 		delete(ps.chanMap, key)
 	}
-	
+
 	return nil
 }
 

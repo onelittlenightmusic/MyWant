@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"time"
 
-	pb "mywant/engine/src/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	pb "mywant/engine/src/proto"
 )
 
 // AgentExecutor defines the interface for executing agents

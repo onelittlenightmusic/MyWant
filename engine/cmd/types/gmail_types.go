@@ -237,7 +237,7 @@ func (g *GmailWant) Progress() {
 // parseEmails parses the human-readable text from Gmail MCP into a slice of structured email maps
 func parseEmails(text string) []map[string]string {
 	var emails []map[string]string
-	
+
 	// Normalize line endings and split by "ID: " which marks the start of each email
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	parts := strings.Split(text, "ID: ")
@@ -258,7 +258,7 @@ func parseEmails(text string) []map[string]string {
 			if line == "" {
 				continue
 			}
-			
+
 			kv := strings.SplitN(line, ": ", 2)
 			if len(kv) == 2 {
 				key := strings.ToLower(strings.TrimSpace(kv[0]))
@@ -266,7 +266,7 @@ func parseEmails(text string) []map[string]string {
 				email[key] = value
 			}
 		}
-		
+
 		if len(email) > 1 { // Should have more than just ID
 			emails = append(emails, email)
 		}

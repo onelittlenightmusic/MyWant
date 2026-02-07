@@ -139,12 +139,12 @@ REQUIREMENTS:
 3. Return ONLY the Go source code.
 
 OUTPUT FORMAT:
-` + "```go" + `
+`+"```go"+`
 package main
 import (...)
 func TransformRequest(...) ...
 func ParseResponse(...) ...
-` + "```", "Implement Go functions to transform parameters and parse responses for a WASM plugin.", samples, feedback)
+`+"```", "Implement Go functions to transform parameters and parse responses for a WASM plugin.", samples, feedback)
 
 	result, err := goose.ExecuteViaGoose(ctx, "mcp_developer", map[string]interface{}{
 		"provider": "gemini-cli",
@@ -213,10 +213,10 @@ func executeCompilerAction(ctx context.Context, want *mywant.Want) error {
 		errorFeedback := fmt.Sprintf("Compilation error: %s", errMsg)
 		want.StoreState("error_feedback", errorFeedback)
 		want.StoreLog("[COMPILER][ERROR] %s", errorFeedback)
-		
+
 		// PRINT TO STDOUT FOR IMMEDIATE VISIBILITY
 		fmt.Printf("[WASM-COMPILER-FAILURE] Want %s failed to compile Go to WASM.\nOutput: %s\n", want.Metadata.ID, errMsg)
-		
+
 		return fmt.Errorf("compilation failed: %w", err)
 	}
 

@@ -98,16 +98,16 @@ func (g *GmailDynamicWant) Progress() {
 		// Increment retry count
 		g.PhaseRetryCount[string(phase)] = currentRetries + 1
 		g.LastPhaseError = err.Error()
-		
+
 		feedback, _ := g.GetStateString("error_feedback", "")
 		errorMsg := fmt.Sprintf("Agent failed: %v", err)
 		if feedback != "" {
 			errorMsg = fmt.Sprintf("%s | Compiler Output: %s", errorMsg, feedback)
 		}
 
-		g.StoreLog("[GMAIL-DYNAMIC][RETRY %d/%d] Phase %s: %s", 
+		g.StoreLog("[GMAIL-DYNAMIC][RETRY %d/%d] Phase %s: %s",
 			g.PhaseRetryCount[string(phase)], MaxRetriesPerPhase, phase, errorMsg)
-		
+
 		g.SetStatus(mywant.WantStatusReaching)
 		return
 	}
@@ -122,7 +122,7 @@ func (g *GmailDynamicWant) Progress() {
 
 func (g *GmailDynamicWant) handleDiscovery() error {
 	g.StoreLog("[PHASE:DISCOVERY] Requesting tool discovery via Goose/Gemini")
-	
+
 	if err := g.ExecuteAgents(); err != nil {
 		return fmt.Errorf("Discovery Agent failed: %w", err)
 	}
@@ -234,6 +234,6 @@ func (g *GmailDynamicWant) handleValidation() error {
 func (g *GmailDynamicWant) handleStable() {
 	// Re-use the existing WASM for any incoming prompts
 	g.StoreLog("[PHASE:STABLE] Using optimized WASM logic for execution")
-	
+
 	// Final result handling...
 }

@@ -68,7 +68,7 @@ func (a *MCPServerProcessAgent) StartServer(ctx context.Context, want *mywant.Wa
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	command := want.GetStringParam("mcp_command", "npx")
 	argsRaw, _ := want.GetState("mcp_args")
-	
+
 	// レジストリを確認
 	registry := GetMCPServerRegistry()
 	if proc, ok := registry.Get(serverName); ok {
@@ -88,7 +88,7 @@ func (a *MCPServerProcessAgent) StartServer(ctx context.Context, want *mywant.Wa
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
-	
+
 	// 環境変数の設定 (GMAIL_TOKEN_PATH, GOOGLE_CLIENT_ID など)
 	envMap, _ := want.GetState("mcp_env")
 	cmd.Env = os.Environ()
@@ -135,7 +135,7 @@ func (a *MCPServerProcessAgent) StartServer(ctx context.Context, want *mywant.Wa
 func (a *MCPServerProcessAgent) MonitorServer(ctx context.Context, want *mywant.Want) error {
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	registry := GetMCPServerRegistry()
-	
+
 	proc, ok := registry.Get(serverName)
 	if !ok {
 		want.StoreState("mcp_server_status", "stopped")
@@ -167,7 +167,7 @@ func RegisterMCPServerProcessAgent(registry *mywant.AgentRegistry) {
 	})
 
 	agent := NewMCPServerProcessAgent()
-	
+
 	// DoAgentとして登録
 	doAgent := &mywant.DoAgent{
 		BaseAgent: *agent.BaseAgent,

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	pb "mywant/engine/src/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
+	pb "mywant/engine/src/proto"
 )
 
 // Mock gRPC server for testing

@@ -254,10 +254,10 @@ func (w *Worker) handleAgentServiceMonitorExecute(rw http.ResponseWriter, r *htt
 // handleHealth returns health status
 func (w *Worker) handleHealth(rw http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
-		"status":         "healthy",
-		"mode":           "worker",
-		"agents_count":   len(w.agentRegistry.GetAllAgents()),
-		"capabilities":   len(w.agentRegistry.GetAllCapabilities()),
+		"status":       "healthy",
+		"mode":         "worker",
+		"agents_count": len(w.agentRegistry.GetAllAgents()),
+		"capabilities": len(w.agentRegistry.GetAllCapabilities()),
 	}
 
 	rw.Header().Set("Content-Type", "application/json")

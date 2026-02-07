@@ -284,8 +284,8 @@ type Want struct {
 	metadataMutex sync.RWMutex `json:"-" yaml:"-"`
 
 	// Retry mechanism for failed phases
-	PhaseRetryCount    map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
-	LastPhaseError     string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
+	PhaseRetryCount map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
+	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
 }
 
 func (n *Want) SetStatus(status WantStatus) {
@@ -1181,7 +1181,7 @@ func (n *Want) GetStateMulti(data Dict) {
 
 		// Use reflection to handle both pointers and direct values
 		rv := reflect.ValueOf(templateValue)
-		
+
 		// 1. If it's a pointer, we populate the value it points to
 		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
 			elem := rv.Elem()

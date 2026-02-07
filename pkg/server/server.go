@@ -164,7 +164,7 @@ func (s *Server) Start() error {
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
 
 	// Note: Domain-specific want types (Travel, QNet, etc.) are now automatically
-	// registered via init() functions in the 'types' package when their YAML 
+	// registered via init() functions in the 'types' package when their YAML
 	// definitions are stored in the global builder below.
 
 	// Transfer loaded want type definitions to global builder for state initialization

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"time"
 	mywant "mywant/engine/src"
+	"time"
 )
 
 func init() {
@@ -251,7 +251,7 @@ func (q *Queue) Progress() {
 		q.StoreLog("[QUEUE-EXEC] Received DONE signal")
 	} else if i != nil {
 		packet := i.(QueuePacket)
-		if packet.Num % locals.batchUpdateInterval == 0 || packet.Num <= 5 {
+		if packet.Num%locals.batchUpdateInterval == 0 || packet.Num <= 5 {
 			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", packet.Num, packet.Time)
 		}
 	}

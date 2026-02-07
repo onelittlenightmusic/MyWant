@@ -52,7 +52,7 @@ func (m *NativeMCPManager) ExecuteTool(ctx context.Context, serverName string, c
 
 	if !exists {
 		log.Printf("[NATIVE-MCP] Searching for existing process for: %s\n", serverName)
-		
+
 		var reader io.ReadCloser
 		var writer io.WriteCloser
 
@@ -883,7 +883,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	// Read operation type and parameters from want state
 	var operationStr string
 	var useNative bool
-	
+
 	want.GetStateMulti(mywant.Dict{
 		"mcp_operation": &operationStr,
 		"mcp_native":    &useNative,
@@ -895,7 +895,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	}
 
 	want.StoreState("achieving_percentage", 25)
-	
+
 	if useNative {
 		want.StoreLog("[MCP-AGENT] Executing MCP operation via Native SDK: %s", operationStr)
 		return a.executeNativeMCPOperation(ctx, want, operationStr)
@@ -1034,7 +1034,7 @@ func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.W
 		if err != nil {
 			return err
 		}
-		
+
 		result = map[string]interface{}{
 			"operation": "gmail_search",
 			"status":    "completed",
@@ -1074,7 +1074,7 @@ func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.W
 			if a, ok := argsRaw.([]string); ok {
 				args = a
 			}
-			
+
 			var toolArgs map[string]interface{}
 			if ta, ok := toolArgsRaw.(map[string]interface{}); ok {
 				toolArgs = ta

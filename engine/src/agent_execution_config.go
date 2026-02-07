@@ -17,26 +17,26 @@ const (
 
 // ExecutionConfig defines how an agent should be executed
 type ExecutionConfig struct {
-	Mode          ExecutionMode      `yaml:"mode" json:"mode"`
-	WebhookConfig *WebhookConfig     `yaml:"webhook,omitempty" json:"webhook,omitempty"`
-	RPCConfig     *RPCConfig         `yaml:"rpc,omitempty" json:"rpc,omitempty"`
+	Mode          ExecutionMode  `yaml:"mode" json:"mode"`
+	WebhookConfig *WebhookConfig `yaml:"webhook,omitempty" json:"webhook,omitempty"`
+	RPCConfig     *RPCConfig     `yaml:"rpc,omitempty" json:"rpc,omitempty"`
 }
 
 // WebhookConfig contains webhook execution settings
 type WebhookConfig struct {
-	ServiceURL        string `yaml:"service_url" json:"service_url"`               // External agent service endpoint
-	CallbackURL       string `yaml:"callback_url" json:"callback_url"`             // MyWant callback endpoint
-	AuthToken         string `yaml:"auth_token" json:"auth_token"`                 // Authentication token
-	TimeoutMs         int    `yaml:"timeout_ms" json:"timeout_ms"`                 // Request timeout in milliseconds
+	ServiceURL        string `yaml:"service_url" json:"service_url"`                 // External agent service endpoint
+	CallbackURL       string `yaml:"callback_url" json:"callback_url"`               // MyWant callback endpoint
+	AuthToken         string `yaml:"auth_token" json:"auth_token"`                   // Authentication token
+	TimeoutMs         int    `yaml:"timeout_ms" json:"timeout_ms"`                   // Request timeout in milliseconds
 	MonitorIntervalMs int    `yaml:"monitor_interval_ms" json:"monitor_interval_ms"` // Monitor polling interval (default: 30000ms)
-	MonitorMode       string `yaml:"monitor_mode" json:"monitor_mode"`             // "one-shot" or "periodic" (default: "periodic")
+	MonitorMode       string `yaml:"monitor_mode" json:"monitor_mode"`               // "one-shot" or "periodic" (default: "periodic")
 }
 
 // RPCConfig contains RPC execution settings
 type RPCConfig struct {
-	Endpoint string `yaml:"endpoint" json:"endpoint"`   // host:port
-	Protocol string `yaml:"protocol" json:"protocol"`   // grpc or jsonrpc
-	UseTLS   bool   `yaml:"use_tls" json:"use_tls"`     // Enable TLS
+	Endpoint string `yaml:"endpoint" json:"endpoint"` // host:port
+	Protocol string `yaml:"protocol" json:"protocol"` // grpc or jsonrpc
+	UseTLS   bool   `yaml:"use_tls" json:"use_tls"`   // Enable TLS
 }
 
 // DefaultExecutionConfig returns a default local execution config
