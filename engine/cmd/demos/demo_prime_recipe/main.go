@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -34,7 +34,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register prime want types
-	types.RegisterPrimeWantTypes(builder)
+	
 
 	fmt.Println("🏁 Executing recipe-based prime sieve...")
 	builder.Execute()

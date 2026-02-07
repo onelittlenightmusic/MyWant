@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -38,7 +38,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types first
-	types.RegisterTravelWantTypes(builder)
+	
 
 	fmt.Println("\n🚀 Executing travel target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 
 	"github.com/stretchr/testify/assert"
@@ -26,9 +26,6 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 
 	server := New(config)
 	server.setupRoutes()
-
-	// Register prime types
-	types.RegisterPrimeWantTypes(server.globalBuilder)
 
 	// Start the reconcile loop (critical for processing wants)
 	go server.globalBuilder.ExecuteWithMode(true)

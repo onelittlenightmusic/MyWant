@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -41,7 +41,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, combiner, sink)
-	types.RegisterQNetWantTypes(builder)
+	
 
 	fmt.Println("🏁 Executing recipe-based qnet with parameterized using fields...")
 	builder.Execute()

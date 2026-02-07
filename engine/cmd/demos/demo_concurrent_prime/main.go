@@ -7,7 +7,7 @@ import (
 	"time"
 
 	. "mywant/engine/src"
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 	})
 
 	// Register prime types
-	types.RegisterPrimeWantTypes(cb)
+	
 
 	// Start reconcile loop
 	go cb.reconcileLoop()

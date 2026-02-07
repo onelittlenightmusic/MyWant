@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -61,7 +61,7 @@ func main() {
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register travel want types
-	types.RegisterTravelWantTypes(builder)
+	
 
 	fmt.Println("🚀 Executing agent-enabled travel planning...")
 	builder.Execute()

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"os"
 )
@@ -28,7 +28,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types
-	types.RegisterQNetWantTypes(builder)
+	
 
 	// Execute
 	fmt.Println("\n🚀 Executing simple 3-want pipeline (gen → queue → sink)")

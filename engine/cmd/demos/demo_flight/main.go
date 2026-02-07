@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 )
 
@@ -32,7 +32,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel-related want types (includes flight)
-	types.RegisterTravelWantTypes(builder)
+	
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 

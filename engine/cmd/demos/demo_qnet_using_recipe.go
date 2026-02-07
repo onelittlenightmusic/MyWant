@@ -2,7 +2,7 @@ package demos_moved
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -42,7 +42,7 @@ func RunDemoQnetUsingRecipe() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types
-	types.RegisterQNetWantTypes(builder)
+	
 
 	fmt.Println("🚀 Executing qnet with using fields from YAML...")
 	builder.Execute()

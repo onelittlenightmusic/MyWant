@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"time"
 )
@@ -37,8 +37,8 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types
-	types.RegisterQNetWantTypes(builder)
-	mywant.RegisterOwnerWantTypes(builder)
+	
+	mywant.
 
 	fmt.Println("📋 Test Scenario:")
 	fmt.Println("1. Start target want (creates children from recipe)")

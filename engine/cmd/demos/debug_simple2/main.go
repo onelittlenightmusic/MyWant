@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"time"
 )
@@ -27,7 +27,7 @@ func main() {
 
 	config := &mywant.Config{Wants: wants}
 	builder := mywant.NewChainBuilder(*config)
-	types.RegisterQNetWantTypes(builder)
+	
 
 	// Execute in background goroutine
 	go builder.Execute()

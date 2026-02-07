@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 	"strconv"
@@ -104,7 +104,7 @@ func main() {
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register domain-specific want types
-	types.RegisterTravelWantTypes(builder)
+	
 
 	fmt.Println("🏁 Executing recipe-based travel planning with extended monitoring...")
 	fmt.Println()

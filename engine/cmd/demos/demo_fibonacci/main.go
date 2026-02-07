@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -58,9 +58,6 @@ func main() {
 
 	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
 	builder := NewChainBuilder(config)
-
-	// Register fibonacci want types
-	types.RegisterFibonacciWantTypes(builder)
 
 	fmt.Println("\nExecuting fibonacci sequence with reconcile loop...")
 	builder.Execute()

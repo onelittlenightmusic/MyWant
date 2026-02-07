@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -27,7 +27,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register prime node types
-	types.RegisterPrimeWantTypes(builder)
+	
 
 	fmt.Println("\nExecuting prime sieve with reconcile loop...")
 	builder.Execute()

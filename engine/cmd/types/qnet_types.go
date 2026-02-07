@@ -10,8 +10,11 @@ import (
 
 func init() {
 	mywant.RegisterWantImplementation[Numbers, NumbersLocals]("numbers")
+	mywant.RegisterWantImplementation[Numbers, NumbersLocals]("qnet numbers")
 	mywant.RegisterWantImplementation[Queue, QueueLocals]("queue")
+	mywant.RegisterWantImplementation[Queue, QueueLocals]("qnet queue")
 	mywant.RegisterWantImplementation[Combiner, CombinerLocals]("combiner")
+	mywant.RegisterWantImplementation[Combiner, CombinerLocals]("qnet combiner")
 }
 
 // NumbersLocals holds type-specific local state for Numbers want

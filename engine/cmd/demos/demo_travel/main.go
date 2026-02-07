@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
 	"os"
 )
@@ -32,7 +32,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types
-	types.RegisterTravelWantTypes(builder)
+	
 
 	fmt.Println("\n🏁 Executing travel planning workflow...")
 	builder.Execute()

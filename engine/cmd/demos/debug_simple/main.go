@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 )
 
@@ -29,7 +29,7 @@ func main() {
 
 	fmt.Println("Creating ChainBuilder...")
 	builder := mywant.NewChainBuilder(*config)
-	types.RegisterQNetWantTypes(builder)
+	
 
 	fmt.Println("\n=== Before Execute ===")
 	states := builder.GetAllWantStates()

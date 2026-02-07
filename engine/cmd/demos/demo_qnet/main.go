@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"os"
 )
@@ -27,7 +27,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register qnet node types
-	types.RegisterQNetWantTypes(builder)
+	
 
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()

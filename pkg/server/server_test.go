@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,9 +22,6 @@ func setupTestServer() *Server {
 
 	server := New(config)
 	server.setupRoutes()
-
-	// Register built-in types for testing (normally done in Start)
-	types.RegisterQNetWantTypes(server.globalBuilder)
 
 	return server
 }

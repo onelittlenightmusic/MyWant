@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"os"
 	"path/filepath"
@@ -40,7 +40,7 @@ func main() {
 
 	// Register want types
 	fmt.Println("\nRegistering want types...")
-	types.RegisterQNetWantTypes(builder)
+	
 
 	// Show initial state
 	fmt.Println("\n📊 Initial notification system state:")

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 	"os"
 	"path/filepath"
@@ -60,7 +60,7 @@ func main() {
 	}
 
 	// Register approval want types
-	types.RegisterApprovalWantTypes(builder)
+	
 
 	fmt.Printf("📋 Configuration loaded with %d wants\n", len(config.Wants))
 

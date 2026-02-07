@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types"
 	mywant "mywant/engine/src"
 )
 
@@ -37,7 +37,7 @@ func main() {
 		},
 	}
 	builder := mywant.NewChainBuilder(config)
-	types.RegisterQNetWantTypes(builder)
+	
 
 	fmt.Println("🔧 Creating test want...")
 	testWant := config.Wants[0]
