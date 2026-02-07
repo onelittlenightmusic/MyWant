@@ -69,19 +69,21 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	phase, ok := want.GetStateString("reminder_phase", "")
-	if !ok || (phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching) {
+	var phase string
+	var requireReaction bool
+	var queueID string
+
+	want.GetStateMulti(Dict{
+		"reminder_phase":    &phase,
+		"require_reaction":  &requireReaction,
+		"reaction_queue_id": &queueID,
+	})
+
+	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
 		return nil
 	}
 
 	want.StoreLog("[MONITOR] Monitoring reminder want %s in phase %s", want.Metadata.Name, phase)
-
-	// Check if reaction is required
-	requireReaction, ok := want.GetStateBool("require_reaction", false)
-	if !ok {
-		want.StoreLog("[MONITOR] No require_reaction state found for %s", want.Metadata.Name)
-		return nil
-	}
 
 	// If reaction not required, nothing to monitor
 	if !requireReaction {
@@ -90,8 +92,7 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 	}
 
 	// Get the reaction queue ID (set by DoAgent when queue was created)
-	queueID, ok := want.GetStateString("reaction_queue_id", "")
-	if !ok || queueID == "" {
+	if queueID == "" {
 		want.StoreLog("[MONITOR] No reaction_queue_id found for %s", want.Metadata.Name)
 		// Queue not created yet, nothing to monitor
 		return nil

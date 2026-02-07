@@ -28,9 +28,16 @@ func NewReminderQueueAgent() *mywant.DoAgent {
 
 // manageReactionQueue handles queue creation and deletion based on reminder phase
 func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
-	// Get current reminder phase
-	phase, ok := want.GetStateString("reminder_phase", "")
-	if !ok || phase == "" {
+	var phase string
+	var existingQueueID string
+
+	// Get current reminder phase and queue ID
+	want.GetStateMulti(mywant.Dict{
+		"reminder_phase":    &phase,
+		"reaction_queue_id": &existingQueueID,
+	})
+
+	if phase == "" {
 		// No phase set yet, nothing to do
 		return nil
 	}
@@ -41,8 +48,7 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 		return fmt.Errorf("HTTP client not available - cannot manage reaction queue")
 	}
 
-	// Check if we already have a queue ID
-	existingQueueID, _ := want.GetStateString("reaction_queue_id", "")
+	// Handle phase transitions
 
 	// Handle phase transitions
 	switch phase {
