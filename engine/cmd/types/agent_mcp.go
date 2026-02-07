@@ -1059,10 +1059,15 @@ func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.W
 
 	default:
 		// Attempt to generic tool call if command and args are provided in state
-		command, _ := want.GetStateString("mcp_command", "")
-		argsRaw, _ := want.GetState("mcp_args")
-		toolName, _ := want.GetStateString("mcp_tool", "")
-		toolArgsRaw, _ := want.GetState("mcp_tool_args")
+		var command, toolName string
+		var argsRaw, toolArgsRaw interface{}
+
+		want.GetStateMulti(mywant.Dict{
+			"mcp_command":   &command,
+			"mcp_args":      &argsRaw,
+			"mcp_tool":      &toolName,
+			"mcp_tool_args": &toolArgsRaw,
+		})
 
 		if command != "" && toolName != "" {
 			var args []string
