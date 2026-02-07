@@ -128,7 +128,7 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 	}
 
 	// Check if samples were collected
-	if _, exists := g.GetState("raw_samples"); exists {
+	if _, ok := g.GetState("raw_samples"); ok {
 		g.StoreState("phase", string(PhaseCoding))
 		g.StoreLog("[PHASE:DISCOVERY] Samples collected. Moving to PhaseCoding.")
 	} else {

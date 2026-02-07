@@ -129,13 +129,7 @@ func (f *PrimeSequence) Progress() {
 		return
 	}
 
-	totalProcessedVal, _ := f.GetState("total_processed")
-	totalProcessed := 0
-	if totalProcessedVal != nil {
-		if tp, ok := totalProcessedVal.(int); ok {
-			totalProcessed = tp
-		}
-	}
+	totalProcessed, _ := f.GetStateInt("total_processed", 0)
 
 	// Restore foundPrimes from persistent state if it exists
 	foundPrimesVal, _ := f.GetState("foundPrimes")

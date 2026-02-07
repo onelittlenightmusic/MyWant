@@ -619,18 +619,13 @@ type MonitorFlightAPI struct {
 
 // Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Progress method (FlightWant) Individual agents should NOT implement their own polling loops
 func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
-	flightID, exists := want.GetState("flight_id")
-	if !exists {
+	flightID, ok := want.GetStateString("flight_id", "")
+	if !ok || flightID == "" {
 		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
 	}
 
-	flightIDStr, ok := flightID.(string)
-	if !ok {
-		return false, fmt.Errorf("flight_id is not a string")
-	}
-
 	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
-	if flightIDStr == "" {
+	if flightID == "" {
 		want.StoreLog("Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
 		return false, nil
 	}
@@ -644,13 +639,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 	m.LastPollTime = now
 
 	// Restore last known status from want state for persistence across execution cycles
-	if lastStatus, exists := want.GetState("flight_status"); exists {
-		if lastStatusStr, ok := lastStatus.(string); ok {
-			m.LastKnownStatus = lastStatusStr
-		}
-	} else {
-		m.LastKnownStatus = "unknown" // Default if not found in state
-	}
+	m.LastKnownStatus, _ = want.GetStateString("flight_status", "unknown")
 
 	// Restore status history from want state for persistence Do NOT clear history - it accumulates across multiple monitoring executions
 	if historyI, exists := want.GetState("status_history"); exists {
@@ -690,7 +679,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 			}
 		}
 	}
-	url := fmt.Sprintf("%s/api/flights/%s", m.ServerURL, flightIDStr)
+	url := fmt.Sprintf("%s/api/flights/%s", m.ServerURL, flightID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return false, fmt.Errorf("failed to get flight status: %v", err)
@@ -899,8 +888,7 @@ func (f *FlightWant) Initialize() {
 
 // IsAchieved checks if flight booking is complete (all phases finished)
 func (f *FlightWant) IsAchieved() bool {
-	phaseVal, _ := f.GetState("_flight_phase")
-	phase, _ := phaseVal.(string)
+	phase, _ := f.GetStateString("_flight_phase", "")
 	return phase == PhaseCompleted
 }
 
@@ -1127,8 +1115,7 @@ func (f *FlightWant) tryAgentExecution() any {
 			f.StoreState("execution_source", "agent")
 
 			// Start background monitoring for this flight using pre-initialized monitor
-			flightIDVal, _ := f.GetState("flight_id")
-			flightID, _ := flightIDVal.(string)
+			flightID, _ := f.GetStateString("flight_id", "")
 
 			// Get monitor from locals (created during initialization)
 			locals := f.GetLocals()

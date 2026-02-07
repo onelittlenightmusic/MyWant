@@ -73,15 +73,8 @@ func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification
 
 	// Keep count of notifications received
 	countKey := "notification_count"
-	if count, exists := bnw.Want.GetState(countKey); exists {
-		if c, ok := count.(int); ok {
-			bnw.Want.StoreState(countKey, c+1)
-		} else {
-			bnw.Want.StoreState(countKey, 1)
-		}
-	} else {
-		bnw.Want.StoreState(countKey, 1)
-	}
+	count, _ := bnw.Want.GetStateInt(countKey, 0)
+	bnw.Want.StoreState(countKey, count+1)
 }
 func (bnw *BaseNotifiableWant) GetNotificationBufferSize() int {
 	return len(bnw.NotificationBuffer)

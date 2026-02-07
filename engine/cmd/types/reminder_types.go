@@ -222,8 +222,7 @@ func (r *ReminderWant) startMonitoringIfNeeded(locals *ReminderLocals) {
 		return
 	}
 
-	queueIDValue, exists := r.GetState("reaction_queue_id")
-	if exists && queueIDValue != nil && queueIDValue != "" {
+	if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
 		agentName := "reaction-monitor-" + r.Metadata.ID
 		if _, exists := r.GetBackgroundAgent(agentName); !exists {
 			// Use pre-initialized monitor from locals
@@ -242,7 +241,7 @@ func (r *ReminderWant) hasWhenSpec() bool {
 
 // IsAchieved checks if the reminder has been completed
 func (r *ReminderWant) IsAchieved() bool {
-	phase, _ := r.GetState("reminder_phase")
+	phase, _ := r.GetStateString("reminder_phase", "")
 	return phase == ReminderPhaseCompleted
 }
 
@@ -410,11 +409,10 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 		return
 	}
 
-	queueIDValue, exists := r.GetState("reaction_queue_id")
-	if exists && queueIDValue != nil && queueIDValue != "" {
+	if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
 		// Emit reaction request packet to connected users (silencers)
 		packet := map[string]any{
-			"reaction_id":   queueIDValue,
+			"reaction_id":   queueID,
 			"reaction_type": locals.ReactionType,
 			"source_want":   r.Metadata.Name,
 		}
@@ -453,8 +451,7 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// Start background monitoring agent if not already running
 		// (This covers the case where we restarted while in reaching phase)
 		if locals.RequireReaction {
-			queueIDValue, exists := r.GetState("reaction_queue_id")
-			if exists && queueIDValue != nil && queueIDValue != "" {
+			if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
 				agentName := "reaction-monitor-" + r.Metadata.ID
 				if _, exists := r.GetBackgroundAgent(agentName); !exists {
 					// Use pre-initialized monitor from locals
