@@ -20,21 +20,20 @@ type KnowledgeWant struct {
 	Want
 }
 
-// NewKnowledgeWant creates a new KnowledgeWant
-func NewKnowledgeWant(metadata Metadata, spec WantSpec) Progressable {
-	return &KnowledgeWant{Want: *NewWantWithLocals(
-		metadata,
-		spec,
-		&KnowledgeLocals{},
-		"fresh knowledge",
-	)}
+func init() {
+	RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("fresh knowledge")
 }
 
 // Initialize prepares the Knowledge want for execution
 func (k *KnowledgeWant) Initialize() {
 	k.StoreLog("[KNOWLEDGE] Initializing Knowledge want: %s\n", k.Metadata.Name)
 
-	locals := &KnowledgeLocals{}
+	// Get or initialize locals
+	locals, ok := k.Locals.(*KnowledgeLocals)
+	if !ok {
+		locals = &KnowledgeLocals{}
+		k.Locals = locals
+	}
 
 	// Parse topic
 	topic, ok := k.Spec.Params["topic"]
@@ -193,9 +192,4 @@ func (k *KnowledgeWant) getLocals() *KnowledgeLocals {
 		return nil
 	}
 	return locals
-}
-
-// RegisterKnowledgeWantType registers the knowledge want type with the builder
-func RegisterKnowledgeWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("fresh knowledge", NewKnowledgeWant)
 }

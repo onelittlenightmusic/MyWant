@@ -8,6 +8,12 @@ import (
 	mywant "mywant/engine/src"
 )
 
+func init() {
+	mywant.RegisterWantImplementation[Numbers, NumbersLocals]("numbers")
+	mywant.RegisterWantImplementation[Queue, QueueLocals]("queue")
+	mywant.RegisterWantImplementation[Combiner, CombinerLocals]("combiner")
+}
+
 // NumbersLocals holds type-specific local state for Numbers want
 type NumbersLocals struct {
 	Rate                float64
@@ -69,16 +75,6 @@ func ExpRand64() float64 {
 // Numbers creates packets and sends them downstream
 type Numbers struct {
 	mywant.Want
-}
-
-// PacketNumbers creates a new numbers want
-func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	return &Numbers{*mywant.NewWantWithLocals(
-		metadata,
-		spec,
-		&NumbersLocals{},
-		"sequence",
-	)}
 }
 
 // Initialize resets state before execution begins
@@ -203,15 +199,6 @@ type Queue struct {
 }
 
 // NewQueue creates a new queue want
-func NewQueue(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	return &Queue{*mywant.NewWantWithLocals(
-		metadata,
-		spec,
-		&QueueLocals{},
-		"queue",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (q *Queue) Initialize() {
 	// No state reset needed for queue wants
@@ -391,15 +378,6 @@ type Combiner struct {
 	mywant.Want
 }
 
-func NewCombiner(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	return &Combiner{*mywant.NewWantWithLocals(
-		metadata,
-		spec,
-		&CombinerLocals{},
-		"combiner",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (c *Combiner) Initialize() {
 	// No state reset needed for queue wants
@@ -463,11 +441,4 @@ func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	})
 
 	return nil
-}
-
-// RegisterQNetWantTypes registers the qnet-specific want types with a mywant.ChainBuilder
-func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
-	builder.RegisterWantType("qnet numbers", PacketNumbers)
-	builder.RegisterWantType("qnet queue", NewQueue)
-	builder.RegisterWantType("qnet combiner", NewCombiner)
 }

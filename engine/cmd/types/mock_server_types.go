@@ -6,7 +6,6 @@ import (
 	"time"
 
 	. "mywant/engine/src"
-	mywant "mywant/engine/src"
 )
 
 // MockServerPhase constants
@@ -32,17 +31,8 @@ type FlightMockServerWant struct {
 	Want
 }
 
-// NewFlightMockServerWant creates a new FlightMockServerWant
-func NewFlightMockServerWant(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	want := NewWantWithLocals(
-		metadata,
-		spec,
-		&MockServerLocals{},
-		"flight_mock_server",
-	)
-	m := &FlightMockServerWant{Want: *want}
-	m.Initialize()
-	return m
+func init() {
+	RegisterWantImplementation[FlightMockServerWant, MockServerLocals]("flight_mock_server")
 }
 
 // Initialize prepares the mock server want for execution
@@ -50,13 +40,17 @@ func (m *FlightMockServerWant) Initialize() {
 	log.Printf("[MOCK_SERVER] Initialize() called for %s\n", m.Metadata.Name)
 	m.StoreLog("[MOCK_SERVER] Initializing flight mock server: %s", m.Metadata.Name)
 
-	// Initialize locals
-	locals := &MockServerLocals{
-		Phase:         MockServerPhaseStarting,
-		LastCheckTime: time.Now(),
-		ServerBinary:  "./bin/flight-server",
-		LogFile:       "logs/flight-server.log",
+	// Get or initialize locals
+	locals, ok := m.Locals.(*MockServerLocals)
+	if !ok {
+		locals = &MockServerLocals{}
+		m.Locals = locals
 	}
+	locals.Phase = MockServerPhaseStarting
+	locals.LastCheckTime = time.Now()
+	locals.ServerBinary = "./bin/flight-server"
+	locals.LogFile = "logs/flight-server.log"
+	locals.ServerPID = 0
 
 	// Parse server_binary parameter (optional, default: ./bin/flight-server)
 	if binPath, ok := m.Spec.Params["server_binary"]; ok {
@@ -255,11 +249,4 @@ func (m *FlightMockServerWant) getOrInitializeLocals() *MockServerLocals {
 // updateLocals updates the in-memory locals
 func (m *FlightMockServerWant) updateLocals(locals *MockServerLocals) {
 	m.Locals = locals
-}
-
-// RegisterFlightMockServerWantType registers the flight mock server want type
-func RegisterFlightMockServerWantType(builder *mywant.ChainBuilder) {
-	log.Println("[INFO] Registering flight_mock_server want type")
-	builder.RegisterWantType("flight_mock_server", NewFlightMockServerWant)
-	log.Println("[INFO] Successfully registered flight_mock_server want type")
 }

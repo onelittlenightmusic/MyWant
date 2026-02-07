@@ -7,19 +7,17 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[FibonacciNumbers, FibonacciNumbersLocals]("fibonacci numbers")
+	RegisterWantImplementation[FibonacciFilter, FibonacciFilterLocals]("fibonacci filter")
+}
+
+// FibonacciNumbersLocals holds type-specific local state for FibonacciNumbers
+type FibonacciNumbersLocals struct{}
+
 // FibonacciNumbers generates fibonacci sequence numbers
 type FibonacciNumbers struct {
 	Want
-}
-
-// NewFibonacciNumbers creates a new fibonacci numbers want
-func NewFibonacciNumbers(metadata Metadata, spec WantSpec) Progressable {
-	return &FibonacciNumbers{*NewWantWithLocals(
-		metadata,
-		spec,
-		nil,
-		"fibonacci numbers",
-	)}
 }
 
 // Initialize resets state before execution begins
@@ -77,21 +75,17 @@ type FibonacciFilter struct {
 	Want
 }
 
-// NewFibonacciFilter creates a new fibonacci filter want
-func NewFibonacciFilter(metadata Metadata, spec WantSpec) Progressable {
-	return &FibonacciFilter{*NewWantWithLocals(
-		metadata,
-		spec,
-		&FibonacciFilterLocals{
-			filtered: make([]int, 0),
-		},
-		"fibonacci filter",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (f *FibonacciFilter) Initialize() {
-	// No state reset needed for fibonacci wants
+	// Get or initialize locals
+	locals, ok := f.Locals.(*FibonacciFilterLocals)
+	if !ok {
+		locals = &FibonacciFilterLocals{}
+		f.Locals = locals
+	}
+	if locals.filtered == nil {
+		locals.filtered = make([]int, 0)
+	}
 }
 
 // IsAchieved checks if fibonacci filtering is complete
@@ -175,10 +169,4 @@ func (f *FibonacciFilter) Progress() {
 	}
 
 	// Yield control - will be called again for next packet
-}
-
-// RegisterFibonacciWantTypes registers the fibonacci-specific want types with a ChainBuilder
-func RegisterFibonacciWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("fibonacci numbers", NewFibonacciNumbers)
-	builder.RegisterWantType("fibonacci filter", NewFibonacciFilter)
 }

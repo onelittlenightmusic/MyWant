@@ -74,9 +74,6 @@ func New(config Config) *Server {
 	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
 	mywant.SetGlobalChainBuilder(globalBuilder)
 
-	// Register Gmail dynamic want type factory
-	types.RegisterGmailDynamicWant(globalBuilder)
-
 	tempServer := &Server{}
 
 	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
@@ -161,25 +158,17 @@ func (s *Server) Start() error {
 		}()
 	}
 
-	// Register all want types on global builder before starting reconcile loop
-	types.RegisterQNetWantTypes(s.globalBuilder)
-	types.RegisterFibonacciWantTypes(s.globalBuilder)
-	types.RegisterPrimeWantTypes(s.globalBuilder)
-	types.RegisterTravelWantTypes(s.globalBuilder)
-	types.RegisterApprovalWantTypes(s.globalBuilder)
-	types.RegisterExecutionResultWantType(s.globalBuilder)
-	types.RegisterReminderWantType(s.globalBuilder)
-	types.RegisterSilencerWantType(s.globalBuilder)
-	types.RegisterGmailWantType(s.globalBuilder)
-	types.RegisterGmailDynamicWantType(s.globalBuilder)
-	types.RegisterKnowledgeWantType(s.globalBuilder)
-	types.RegisterFlightMockServerWantType(s.globalBuilder)
-	types.RegisterDraftWantType(s.globalBuilder)
+	// Register core system want types
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
 
+	// Note: Domain-specific want types (Travel, QNet, etc.) are now automatically
+	// registered via init() functions in the 'types' package when their YAML 
+	// definitions are stored in the global builder below.
+
 	// Transfer loaded want type definitions to global builder for state initialization
+	// This will trigger automatic registration of Go implementations via StoreWantTypeDefinition
 	if s.wantTypeLoader != nil {
 		allDefs := s.wantTypeLoader.GetAll()
 		for _, def := range allDefs {

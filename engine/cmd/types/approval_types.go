@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterWantImplementation[EvidenceWant, EvidenceWantLocals]("evidence")
+	RegisterWantImplementation[DescriptionWant, DescriptionWantLocals]("description")
+}
+
 // ApprovalResult represents the outcome of an approval process
 type ApprovalResult struct {
 	ApprovalID   string
@@ -27,34 +32,24 @@ type EvidenceWant struct {
 	Want
 }
 
-func NewEvidenceWant(metadata Metadata, spec WantSpec) Progressable {
-	// Populate locals from parameters
-	var evidenceType, approvalID string
-	if spec.Params != nil {
-		if v, ok := spec.Params["evidence_type"].(string); ok {
-			evidenceType = v
-		}
-		if v, ok := spec.Params["approval_id"].(string); ok {
-			approvalID = v
-		}
-	}
-
-	locals := &EvidenceWantLocals{
-		EvidenceType: evidenceType,
-		ApprovalID:   approvalID,
-	}
-
-	return &EvidenceWant{*NewWantWithLocals(
-		metadata,
-		spec,
-		locals,
-		"evidence",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (e *EvidenceWant) Initialize() {
-	// No state reset needed for approval wants
+	// Get or initialize locals
+	locals, ok := e.Locals.(*EvidenceWantLocals)
+	if !ok {
+		locals = &EvidenceWantLocals{}
+		e.Locals = locals
+	}
+
+	// Populate locals from parameters
+	if e.Spec.Params != nil {
+		if v, ok := e.Spec.Params["evidence_type"].(string); ok {
+			locals.EvidenceType = v
+		}
+		if v, ok := e.Spec.Params["approval_id"].(string); ok {
+			locals.ApprovalID = v
+		}
+	}
 }
 
 // IsAchieved checks if evidence has been provided
@@ -139,34 +134,24 @@ type DescriptionWant struct {
 	Want
 }
 
-func NewDescriptionWant(metadata Metadata, spec WantSpec) Progressable {
-	// Populate locals from parameters
-	var descriptionFormat, approvalID string
-	if spec.Params != nil {
-		if v, ok := spec.Params["description_format"].(string); ok {
-			descriptionFormat = v
-		}
-		if v, ok := spec.Params["approval_id"].(string); ok {
-			approvalID = v
-		}
-	}
-
-	locals := &DescriptionWantLocals{
-		DescriptionFormat: descriptionFormat,
-		ApprovalID:        approvalID,
-	}
-
-	return &DescriptionWant{*NewWantWithLocals(
-		metadata,
-		spec,
-		locals,
-		"description",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (d *DescriptionWant) Initialize() {
-	// No state reset needed for approval wants
+	// Get or initialize locals
+	locals, ok := d.Locals.(*DescriptionWantLocals)
+	if !ok {
+		locals = &DescriptionWantLocals{}
+		d.Locals = locals
+	}
+
+	// Populate locals from parameters
+	if d.Spec.Params != nil {
+		if v, ok := d.Spec.Params["description_format"].(string); ok {
+			locals.DescriptionFormat = v
+		}
+		if v, ok := d.Spec.Params["approval_id"].(string); ok {
+			locals.ApprovalID = v
+		}
+	}
 }
 
 // IsAchieved checks if description has been provided
@@ -239,22 +224,4 @@ func (d *DescriptionWant) CalculateAchievingPercentage() int {
 		return 100
 	}
 	return 0
-}
-
-// RegisterApprovalWantTypes registers all approval-related want types
-func RegisterApprovalWantTypes(builder *ChainBuilder) {
-	// Register evidence type with YAML definition that includes require: "users"
-	// This ensures evidence wants wait for output connections before providing data
-	if err := builder.RegisterWantTypeFromYAML("evidence", NewEvidenceWant, "yaml/agents/type-evidence.yaml"); err != nil {
-		// Fallback to basic registration if YAML fails
-		builder.RegisterWantType("evidence", NewEvidenceWant)
-	}
-
-	// Register description type with YAML definition that includes require: "users"
-	// This ensures description wants wait for output connections before providing data
-	if err := builder.RegisterWantTypeFromYAML("description", NewDescriptionWant, "yaml/agents/type-description.yaml"); err != nil {
-		// Fallback to basic registration if YAML fails
-		builder.RegisterWantType("description", NewDescriptionWant)
-	}
-
 }

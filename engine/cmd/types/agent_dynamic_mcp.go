@@ -284,8 +284,3 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	want.StoreState("error_feedback", "") // Clear any previous error feedback
 	return nil
 }
-
-// RegisterGmailDynamicWant registers the Gmail dynamic want type factory
-func RegisterGmailDynamicWant(builder *mywant.ChainBuilder) {
-	builder.RegisterWantType("gmail_dynamic", NewGmailDynamicWant)
-}

@@ -10,30 +10,26 @@ type SilencerWant struct {
 	Want
 }
 
+func init() {
+	RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
+}
+
 // SilencerLocals holds type-specific local state for SilencerWant
 type SilencerLocals struct {
 	Policy string
-}
-
-// NewSilencerWant creates a new SilencerWant
-func NewSilencerWant(metadata Metadata, spec WantSpec) Progressable {
-	return &SilencerWant{Want: *NewWantWithLocals(
-		metadata,
-		spec,
-		&SilencerLocals{},
-		"silencer",
-	)}
 }
 
 // Initialize prepares the silencer want for execution
 func (s *SilencerWant) Initialize() {
 	s.StoreLog("[SILENCER] Initializing silencer: %s\n", s.Metadata.Name)
 
-	// Initialize locals
-	locals := &SilencerLocals{
-		Policy: s.GetStringParam("policy", "all_true"),
+	// Get or initialize locals
+	locals, ok := s.Locals.(*SilencerLocals)
+	if !ok {
+		locals = &SilencerLocals{}
+		s.Locals = locals
 	}
-	s.Locals = locals
+	locals.Policy = s.GetStringParam("policy", "all_true")
 
 	// Initialize state
 	s.StoreStateMulti(map[string]any{
@@ -146,9 +142,4 @@ func (s *SilencerWant) processPacket(data any) {
 	} else {
 		s.StoreLog("[SILENCER] Reaction type '%s' not supported", reactionType)
 	}
-}
-
-// RegisterSilencerWantType registers the SilencerWant type with the ChainBuilder
-func RegisterSilencerWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("silencer", NewSilencerWant)
 }

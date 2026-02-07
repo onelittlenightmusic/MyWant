@@ -289,6 +289,13 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 	wantType := def.Metadata.Name
 	cb.wantTypeDefinitions[wantType] = def
 
+	// Automatically register factory if a Go implementation exists in the registry
+	if _, ok := typeImplementationRegistry[wantType]; ok {
+		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
+			cb.RegisterWantType(wantType, createGenericFactory(wantType))
+		}
+	}
+
 	// Store connectivity metadata for later use during want creation
 	if cb.connectivityRegistry == nil {
 		cb.connectivityRegistry = make(map[string]ConnectivityMetadata)
@@ -329,6 +336,13 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 	for _, alias := range aliases {
 		cb.wantTypeDefinitions[alias] = def
 		cb.connectivityRegistry[alias] = metadata
+		
+		// Also register factory for alias if it exists
+		if _, ok := typeImplementationRegistry[wantType]; ok {
+			if _, alreadyRegistered := cb.registry[alias]; !alreadyRegistered {
+				cb.RegisterWantType(alias, createGenericFactory(wantType))
+			}
+		}
 	}
 }
 

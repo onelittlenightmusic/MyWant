@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
+	RegisterWantImplementation[HotelWant, HotelWantLocals]("hotel")
+	RegisterWantImplementation[BuffetWant, BuffetWantLocals]("buffet")
+	RegisterWantImplementation[FlightWant, FlightWantLocals]("flight")
+}
+
 // RestaurantWantLocals holds type-specific local state for RestaurantWant
 type RestaurantWantLocals struct {
 	RestaurantType string
@@ -130,21 +137,9 @@ type RestaurantWant struct {
 	BaseTravelWant
 }
 
-// NewRestaurantWant creates a new restaurant reservation want
-func NewRestaurantWant(metadata Metadata, spec WantSpec) Progressable {
-	locals := &RestaurantWantLocals{}
-	want := NewWantWithLocals(
-		metadata,
-		spec,
-		locals,
-		"restaurant",
-	)
-	restaurantWant := &RestaurantWant{
-		BaseTravelWant: BaseTravelWant{Want: *want},
-	}
-	// Set executor to self for interface method dispatch
-	restaurantWant.BaseTravelWant.executor = restaurantWant
-	return restaurantWant
+// Initialize prepares the restaurant want for execution
+func (r *RestaurantWant) Initialize() {
+	r.BaseTravelWant.executor = r
 }
 
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
@@ -383,20 +378,9 @@ type HotelWant struct {
 }
 
 // NewHotelWant creates a new hotel reservation want
-func NewHotelWant(metadata Metadata, spec WantSpec) Progressable {
-	locals := &HotelWantLocals{}
-	want := NewWantWithLocals(
-		metadata,
-		spec,
-		locals,
-		"hotel",
-	)
-	hotelWant := &HotelWant{
-		BaseTravelWant: BaseTravelWant{Want: *want},
-	}
-	// Set executor to self for interface method dispatch
-	hotelWant.BaseTravelWant.executor = hotelWant
-	return hotelWant
+// Initialize prepares the hotel want for execution
+func (h *HotelWant) Initialize() {
+	h.BaseTravelWant.executor = h
 }
 
 // tryAgentExecution implements TravelWantInterface for HotelWant
@@ -472,20 +456,9 @@ type BuffetWant struct {
 	BaseTravelWant
 }
 
-func NewBuffetWant(metadata Metadata, spec WantSpec) Progressable {
-	locals := &BuffetWantLocals{}
-	want := NewWantWithLocals(
-		metadata,
-		spec,
-		locals,
-		"buffet",
-	)
-	buffetWant := &BuffetWant{
-		BaseTravelWant: BaseTravelWant{Want: *want},
-	}
-	// Set executor to self for interface method dispatch
-	buffetWant.BaseTravelWant.executor = buffetWant
-	return buffetWant
+// Initialize prepares the buffet want for execution
+func (b *BuffetWant) Initialize() {
+	b.BaseTravelWant.executor = b
 }
 
 // tryAgentExecution implements TravelWantInterface for BuffetWant
@@ -887,19 +860,25 @@ type FlightWant struct {
 	BaseTravelWant
 }
 
-// NewFlightWant creates a new flight booking want
-func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
+// Initialize prepares the flight want for execution
+func (f *FlightWant) Initialize() {
+	f.BaseTravelWant.executor = f
+
 	// Get server URL from params
-	serverURL, ok := spec.Params["server_url"].(string)
-	if !ok || serverURL == "" {
-		serverURL = "http://localhost:8090"
+	serverURL := f.GetStringParam("server_url", "http://localhost:8090")
+
+	// Get or initialize locals
+	locals, ok := f.Locals.(*FlightWantLocals)
+	if !ok {
+		locals = &FlightWantLocals{}
+		f.Locals = locals
 	}
 
 	// Create monitoring agent during initialization
-	monitor := &MonitorFlightAPI{
+	locals.monitor = &MonitorFlightAPI{
 		MonitorAgent: MonitorAgent{
 			BaseAgent: BaseAgent{
-				Name:         "flight-monitor-" + metadata.ID,
+				Name:         "flight-monitor-" + f.Metadata.ID,
 				Capabilities: []string{},
 				Type:         MonitorAgentType,
 			},
@@ -908,17 +887,7 @@ func NewFlightWant(metadata Metadata, spec WantSpec) Progressable {
 		PollInterval:        10 * time.Second,
 		StatusChangeHistory: make([]StatusChange, 0),
 	}
-
-	locals := &FlightWantLocals{
-		monitoringDone: make(chan struct{}),
-		monitor:        monitor,
-	}
-	want := NewWantWithLocals(metadata, spec, locals, "flight")
-	flightWant := &FlightWant{
-		BaseTravelWant: BaseTravelWant{Want: *want},
-	}
-	flightWant.BaseTravelWant.executor = flightWant
-	return flightWant
+	locals.monitoringDone = make(chan struct{})
 }
 
 // IsAchieved checks if flight booking is complete (all phases finished)
@@ -1408,14 +1377,4 @@ func generateTravelTimeline(events []TimeSlot) string {
 	}
 
 	return timeline
-}
-
-// RegisterTravelWantTypes registers all travel-related want types
-// Note: AgentRegistry is automatically set by ChainBuilder.createWantFunction
-// so explicit SetAgentRegistry calls are not needed
-func RegisterTravelWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("flight", NewFlightWant)
-	builder.RegisterWantType("restaurant", NewRestaurantWant)
-	builder.RegisterWantType("hotel", NewHotelWant)
-	builder.RegisterWantType("buffet", NewBuffetWant)
 }

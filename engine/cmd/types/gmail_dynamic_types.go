@@ -18,28 +18,26 @@ const (
 	MaxRetriesPerPhase = 3 // Maximum retries for an agent in a given phase
 )
 
+// GmailDynamicLocals holds type-specific local state for GmailDynamicWant
+type GmailDynamicLocals struct{}
+
 // GmailDynamicWant represents a self-evolving Gmail want
 type GmailDynamicWant struct {
 	mywant.Want
 }
 
-// NewGmailDynamicWant creates a new instance
-func NewGmailDynamicWant(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-	want := &mywant.Want{
-		Metadata: metadata,
-		Spec:     spec,
-	}
-	want.Init()
-
-	// Initialize PhaseRetryCount map
-	want.PhaseRetryCount = make(map[string]int)
-
-	return &GmailDynamicWant{Want: *want}
+func init() {
+	mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("gmail_dynamic")
 }
 
 func (g *GmailDynamicWant) Initialize() {
 	fmt.Printf("[GMAIL-DYNAMIC] Initialize() called for: %s\n", g.Metadata.Name)
 	g.StoreLog("[GMAIL-DYNAMIC] Initializing dynamic want: %s", g.Metadata.Name)
+
+	// Initialize PhaseRetryCount map
+	if g.PhaseRetryCount == nil {
+		g.PhaseRetryCount = make(map[string]int)
+	}
 
 	phase, _ := g.GetStateString("phase", "")
 	if phase == "" {
@@ -265,10 +263,4 @@ func (g *GmailDynamicWant) handleStable() {
 	g.StoreLog("[PHASE:STABLE] Using optimized WASM logic for execution")
 	
 	// Final result handling...
-}
-
-func RegisterGmailDynamicWantType(builder *mywant.ChainBuilder) {
-	fmt.Println("[INFO] Registering gmail_dynamic want type")
-	builder.RegisterWantType("gmail_dynamic", NewGmailDynamicWant)
-	fmt.Println("[INFO] Successfully registered gmail_dynamic want type")
 }

@@ -24,22 +24,20 @@ type GmailWant struct {
 	Want
 }
 
-// NewGmailWant creates a new GmailWant
-func NewGmailWant(metadata Metadata, spec WantSpec) Progressable {
-	return &GmailWant{Want: *NewWantWithLocals(
-		metadata,
-		spec,
-		&GmailLocals{},
-		"gmail",
-	)}
+func init() {
+	RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
 }
 
 // Initialize prepares the Gmail want for execution
 func (g *GmailWant) Initialize() {
 	g.StoreLog("[GMAIL] Initializing Gmail want: %s\n", g.Metadata.Name)
 
-	// Initialize locals
-	locals := &GmailLocals{}
+	// Get or initialize locals
+	locals, ok := g.Locals.(*GmailLocals)
+	if !ok {
+		locals = &GmailLocals{}
+		g.Locals = locals
+	}
 
 	// Parse and validate parameters
 	// prompt (required)
@@ -301,9 +299,4 @@ func (g *GmailWant) getLocals() *GmailLocals {
 	}
 
 	return locals
-}
-
-// RegisterGmailWantType registers the Gmail want type with the builder
-func RegisterGmailWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("gmail", NewGmailWant)
 }

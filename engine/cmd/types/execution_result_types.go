@@ -45,14 +45,8 @@ type ExecutionResultWant struct {
 	Want
 }
 
-// NewExecutionResultWant creates a new ExecutionResultWant
-func NewExecutionResultWant(metadata Metadata, spec WantSpec) Progressable {
-	return &ExecutionResultWant{Want: *NewWantWithLocals(
-		metadata,
-		spec,
-		&ExecutionResultWantLocals{},
-		"execution_result",
-	)}
+func init() {
+	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
 }
 
 // Initialize resets execution state before starting
@@ -74,12 +68,15 @@ func (e *ExecutionResultWant) Initialize() {
 		"_phase":               string(ExecutionPhaseInitial),
 	})
 
-	// Also reset the in-memory Locals struct to ensure Progress() loop starts fresh
-	e.Locals = &ExecutionResultWantLocals{
-		Phase:   ExecutionPhaseInitial,
-		Timeout: 30,
-		Shell:   "/bin/bash",
+	// Get or initialize locals
+	locals, ok := e.Locals.(*ExecutionResultWantLocals)
+	if !ok {
+		locals = &ExecutionResultWantLocals{}
+		e.Locals = locals
 	}
+	locals.Phase = ExecutionPhaseInitial
+	locals.Timeout = 30
+	locals.Shell = "/bin/bash"
 }
 
 // IsAchieved checks if execution is completed
@@ -333,11 +330,6 @@ func (e *ExecutionResultWant) getOrInitializeLocals() *ExecutionResultWantLocals
 // updateLocals updates the locals
 func (e *ExecutionResultWant) updateLocals(locals *ExecutionResultWantLocals) {
 	e.Locals = locals
-}
-
-// RegisterExecutionResultWantType registers the execution_result want type with the chain builder
-func RegisterExecutionResultWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("execution_result", NewExecutionResultWant)
 }
 
 // RegisterExecutionAgents registers the ExecutionAgent with the agent registry

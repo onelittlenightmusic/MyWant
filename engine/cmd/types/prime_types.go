@@ -6,6 +6,11 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[PrimeNumbers, PrimeNumbersLocals]("prime numbers")
+	RegisterWantImplementation[PrimeSequence, PrimeSequenceLocals]("prime sequence")
+}
+
 // PrimeNumbersLocals holds type-specific local state for PrimeNumbers want
 type PrimeNumbersLocals struct {
 	Start int
@@ -15,16 +20,6 @@ type PrimeNumbersLocals struct {
 // PrimeNumbers creates numbers and sends them downstream
 type PrimeNumbers struct {
 	Want
-}
-
-// NewPrimeNumbers creates a new prime numbers want
-func NewPrimeNumbers(metadata Metadata, spec WantSpec) Progressable {
-	return &PrimeNumbers{*NewWantWithLocals(
-		metadata,
-		spec,
-		&PrimeNumbersLocals{},
-		"prime numbers",
-	)}
 }
 
 // Initialize resets state before execution begins
@@ -92,21 +87,17 @@ type PrimeSequence struct {
 	Want
 }
 
-// NewPrimeSequence creates a new prime sequence want
-func NewPrimeSequence(metadata Metadata, spec WantSpec) Progressable {
-	return &PrimeSequence{*NewWantWithLocals(
-		metadata,
-		spec,
-		&PrimeSequenceLocals{
-			foundPrimes: make([]int, 0),
-		},
-		"prime sequence",
-	)}
-}
-
 // Initialize resets state before execution begins
 func (f *PrimeSequence) Initialize() {
-	// No state reset needed for prime wants
+	// Get or initialize locals
+	locals, ok := f.Locals.(*PrimeSequenceLocals)
+	if !ok {
+		locals = &PrimeSequenceLocals{}
+		f.Locals = locals
+	}
+	if locals.foundPrimes == nil {
+		locals.foundPrimes = make([]int, 0)
+	}
 }
 
 // IsAchieved checks if prime sequence filtering is complete
@@ -224,10 +215,4 @@ func (f *PrimeSequence) Progress() {
 	}
 
 	// Yield control - will be called again for next packet
-}
-
-// RegisterPrimeWantTypes registers the prime-specific want types with a ChainBuilder
-func RegisterPrimeWantTypes(builder *ChainBuilder) {
-	builder.RegisterWantType("prime numbers", NewPrimeNumbers)
-	builder.RegisterWantType("prime sequence", NewPrimeSequence)
 }

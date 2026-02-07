@@ -35,14 +35,8 @@ type ReminderWant struct {
 	Want
 }
 
-// NewReminderWant creates a new ReminderWant
-func NewReminderWant(metadata Metadata, spec WantSpec) Progressable {
-	return &ReminderWant{Want: *NewWantWithLocals(
-		metadata,
-		spec,
-		&ReminderLocals{},
-		"reminder",
-	)}
+func init() {
+	RegisterWantImplementation[ReminderWant, ReminderLocals]("reminder")
 }
 
 // Initialize prepares the reminder want for execution
@@ -55,12 +49,15 @@ func (r *ReminderWant) Initialize() {
 		r.StoreLog("ERROR: Failed to stop existing background agents: %v", err)
 	}
 
-	// Initialize locals
-	locals := &ReminderLocals{
-		Phase:          ReminderPhaseWaiting,
-		LastCheckTime:  time.Now(),
-		TimeoutSeconds: 300, // 5 minutes default timeout
+	// Get or initialize locals
+	locals, ok := r.Locals.(*ReminderLocals)
+	if !ok {
+		locals = &ReminderLocals{}
+		r.Locals = locals
 	}
+	locals.Phase = ReminderPhaseWaiting
+	locals.LastCheckTime = time.Now()
+	locals.TimeoutSeconds = 300 // 5 minutes default timeout
 
 	// Parse and validate parameters
 	// Message (required)
@@ -717,9 +714,4 @@ func parseDurationString(s string) (time.Duration, error) {
 	}
 
 	return time.Duration(num) * unit, nil
-}
-
-// RegisterReminderWantType registers the ReminderWant type with the ChainBuilder
-func RegisterReminderWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("reminder", NewReminderWant)
 }
