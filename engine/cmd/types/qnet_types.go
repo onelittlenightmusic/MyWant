@@ -120,9 +120,6 @@ func (g *Numbers) Progress() {
 	}
 
 	paramRate := g.GetFloatParam("rate", locals.Rate)
-	if g.State == nil {
-		g.State = make(map[string]any)
-	}
 
 	// Check if we're already done before generating more packets
 	if locals.currentCount >= paramCount {
@@ -242,10 +239,6 @@ func (q *Queue) Progress() {
 	}
 	if locals.ServiceTime == 0 {
 		locals.ServiceTime = q.GetFloatParam("service_time", 1.0)
-	}
-
-	if q.State == nil {
-		q.State = make(map[string]any)
 	}
 
 	_, i, done, ok := q.Use(100) // Use 100ms timeout instead of forever
@@ -420,9 +413,6 @@ func (c *Combiner) Progress() {
 		return
 	}
 
-	if c.State == nil {
-		c.State = make(map[string]any)
-	}
 	processed, _ := c.GetStateInt("processed", 0)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
 		return
