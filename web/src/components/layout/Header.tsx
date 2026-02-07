@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, BarChart3, ListChecks } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, BarChart3, ListChecks, Map } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 
@@ -19,6 +19,8 @@ interface HeaderProps {
   isInteractThinking?: boolean;
   gooseProvider?: string;
   onProviderChange?: (provider: string) => void;
+  showMinimap?: boolean;
+  onMinimapToggle?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,8 +38,30 @@ export const Header: React.FC<HeaderProps> = ({
   onInteractSubmit,
   isInteractThinking = false,
   gooseProvider = 'claude-code',
-  onProviderChange
+  onProviderChange,
+  showMinimap = false,
+  onMinimapToggle
 }) => {
+  const [showProviderSelect, setShowProviderSelect] = useState(false);
+  const selectRef = useRef<HTMLDivElement>(null);
+
+  // Hide provider select when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
+        setShowProviderSelect(false);
+      }
+    };
+
+    if (showProviderSelect) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showProviderSelect]);
+
+  const handleRobotClick = () => {
+    setShowProviderSelect(prev => !prev);
+  };
   return (
     <header className={classNames(
       "bg-white border-b border-gray-200 px-6 py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out left-0",
@@ -55,23 +79,43 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* InteractBubble - shown on desktop */}
         {onInteractSubmit && (
-          <div className="hidden lg:flex items-center flex-1 justify-center max-w-xl gap-2">
-            <select
-              value={gooseProvider}
-              onChange={(e) => onProviderChange?.(e.target.value)}
-              className="text-xs border border-gray-300 rounded-md py-1.5 pl-2 pr-8 focus:ring-primary-500 focus:border-primary-500 bg-white"
-            >
-              <option value="claude-code">Claude</option>
-              <option value="gemini-cli">Gemini</option>
-            </select>
+          <div className="hidden lg:flex items-center flex-1 justify-center max-w-xl gap-2" ref={selectRef}>
+            <div className={classNames(
+              "transition-all duration-300 ease-in-out overflow-hidden",
+              showProviderSelect ? "opacity-100 max-w-xs" : "opacity-0 max-w-0"
+            )}>
+              <select
+                value={gooseProvider}
+                onChange={(e) => onProviderChange?.(e.target.value)}
+                className="text-xs border border-gray-300 rounded-md py-1.5 pl-2 pr-8 focus:ring-primary-500 focus:border-primary-500 bg-white whitespace-nowrap"
+              >
+                <option value="claude-code">Claude</option>
+                <option value="gemini-cli">Gemini</option>
+              </select>
+            </div>
             <InteractBubble
               onSubmit={onInteractSubmit}
               isThinking={isInteractThinking}
+              onRobotClick={handleRobotClick}
             />
           </div>
         )}
 
         <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* Minimap toggle button - only shown on mobile (lg:hidden) */}
+          {onMinimapToggle && (
+            <button
+              onClick={onMinimapToggle}
+              className={classNames(
+                "lg:hidden p-2 rounded-md transition-colors",
+                showMinimap ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-100"
+              )}
+              title={showMinimap ? "Hide minimap" : "Show minimap"}
+            >
+              <Map className="h-5 w-5" />
+            </button>
+          )}
+
           {onToggleSelectMode && (
             <button
               onClick={onToggleSelectMode}

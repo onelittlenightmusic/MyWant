@@ -6,12 +6,14 @@ interface InteractBubbleProps {
   onSubmit: (message: string) => void;
   isThinking: boolean;
   disabled?: boolean;
+  onRobotClick?: () => void;
 }
 
 export const InteractBubble: React.FC<InteractBubbleProps> = ({
   onSubmit,
   isThinking,
-  disabled = false
+  disabled = false,
+  onRobotClick
 }) => {
   const [message, setMessage] = useState('');
   const [isComposing, setIsComposing] = useState(false);
@@ -69,7 +71,10 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   return (
     <div className="inline-flex items-center gap-2">
       {/* Robot Icon */}
-      <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg flex-shrink-0">
+      <div
+        className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg flex-shrink-0 cursor-pointer hover:bg-blue-700 transition-colors"
+        onClick={onRobotClick}
+      >
         <Bot className="h-6 w-6 text-white" />
       </div>
 

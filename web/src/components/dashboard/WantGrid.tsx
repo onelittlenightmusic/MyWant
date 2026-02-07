@@ -172,7 +172,12 @@ export const WantGrid: React.FC<WantGridProps> = ({
         const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
 
         return (
-          <div key={wantId || `want-${index}`} data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id} className={classNames('transition-all duration-300 ease-out h-full', isExpanded ? 'col-span-3' : '')}>
+          <div
+            key={wantId || `want-${index}`}
+            data-want-id={wantId}
+            data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
+            className={classNames('transition-all duration-300 ease-out h-full', isExpanded ? 'col-span-3' : '')}
+          >
             <WantCard
               want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
               onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
@@ -186,7 +191,11 @@ export const WantGrid: React.FC<WantGridProps> = ({
       })}
 
       {drafts.map((draft) => (
-        <div key={draft.id} className="h-full">
+        <div
+          key={draft.id}
+          data-draft-id={draft.id}
+          className="h-full"
+        >
           <DraftWantCard draft={draft} selected={activeDraftId === draft.id} onClick={() => onDraftClick?.(draft)} onDelete={() => onDraftDelete?.(draft)} />
         </div>
       ))}

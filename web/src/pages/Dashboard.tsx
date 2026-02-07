@@ -21,6 +21,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { WantGrid } from '@/components/dashboard/WantGrid';
+import { WantMinimap } from '@/components/dashboard/WantMinimap';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { SummarySidebarContent } from '@/components/sidebar/SummarySidebarContent';
@@ -67,10 +68,13 @@ export const Dashboard: React.FC = () => {
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [deleteDraftState, setDeleteDraftState] = useState<DraftWant | null>(null);
   const [showDeleteDraftConfirmation, setShowDeleteDraftConfirmation] = useState(false);
-  
+
   // Global Drag and Drop state
   const [isGlobalDragOver, setIsGlobalDragOver] = useState(false);
   const [dragCounter, setDragCounter] = useState(0);
+
+  // Minimap state
+  const [minimapOpen, setMinimapOpen] = useState(true); // Desktop default: true
 
   const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
   const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
@@ -210,6 +214,21 @@ export const Dashboard: React.FC = () => {
       setEditingWant(null);
       sidebar.openForm();
     }
+  };
+
+  const handleMinimapClick = (wantId: string) => {
+    const element = document.querySelector(`[data-want-id="${wantId}"]`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const handleMinimapDraftClick = (draftId: string) => {
+    const element = document.querySelector(`[data-draft-id="${draftId}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Also activate the draft (same behavior as clicking the draft card)
+    const draft = drafts.find(d => d.id === draftId);
+    if (draft) handleDraftClick(draft);
   };
 
   const handleDraftDelete = (draft: DraftWant) => { setDeleteDraftState(draft); setShowDeleteDraftConfirmation(true); };
@@ -609,7 +628,20 @@ export const Dashboard: React.FC = () => {
 
   return (
     <Layout sidebarMinimized={sidebarMinimized} onSidebarMinimizedChange={setSidebarMinimized}>
-      <Header onCreateWant={handleCreateWant} showSummary={sidebar.showSummary} onSummaryToggle={sidebar.toggleSummary} sidebarMinimized={sidebarMinimized} showSelectMode={isSelectMode} onToggleSelectMode={handleToggleSelectMode} onInteractSubmit={handleInteractSubmit} isInteractThinking={hasThinkingDraft} gooseProvider={gooseProvider} onProviderChange={setGooseProvider} />
+      <Header
+        onCreateWant={handleCreateWant}
+        showSummary={sidebar.showSummary}
+        onSummaryToggle={sidebar.toggleSummary}
+        sidebarMinimized={sidebarMinimized}
+        showSelectMode={isSelectMode}
+        onToggleSelectMode={handleToggleSelectMode}
+        onInteractSubmit={handleInteractSubmit}
+        isInteractThinking={hasThinkingDraft}
+        gooseProvider={gooseProvider}
+        onProviderChange={setGooseProvider}
+        showMinimap={minimapOpen}
+        onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
+      />
       <main
         className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative"
         onDragEnter={handleGlobalDragEnter}
@@ -729,6 +761,15 @@ export const Dashboard: React.FC = () => {
           />
         )}
       </RightSidebar>
+      <WantMinimap
+        wants={filteredWants}
+        drafts={drafts}
+        selectedWantId={selectedWant?.metadata?.id || selectedWant?.id}
+        activeDraftId={activeDraftId}
+        onWantClick={handleMinimapClick}
+        onDraftClick={handleMinimapDraftClick}
+        isOpen={minimapOpen}
+      />
       <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
