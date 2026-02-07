@@ -114,7 +114,7 @@ wantType:
         params:
           count: 1
   relatedTypes:
-  - fibonacci sequence
+  - fibonacci filter
   - prime numbers
   - numbers
   - queue

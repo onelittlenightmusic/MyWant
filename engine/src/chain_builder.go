@@ -216,6 +216,9 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		labelRegistry:          make(map[string]map[string]bool),
 	}
 
+	// Register all types that have Go implementations
+	builder.RegisterAllKnownImplementations()
+
 	// Note: Recipe scanning is done at server startup (main.go) via ScanAndRegisterCustomTypes() This avoids duplicate scanning logs when multiple ChainBuilder instances are created Recipe registry is passed via the environment during server initialization
 
 	// Initialize PubSub system for label-based packet delivery

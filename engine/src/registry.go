@@ -80,3 +80,14 @@ func initializeInstance(instance any, baseWant *Want) {
 		field.Set(reflect.ValueOf(*baseWant))
 	}
 }
+
+// RegisterAllKnownImplementations registers all Go implementations in the registry with the provided ChainBuilder.
+// This is useful for demos or tests where YAML-based automatic registration via StoreWantTypeDefinition might not occur.
+func (cb *ChainBuilder) RegisterAllKnownImplementations() {
+	for typeName := range typeImplementationRegistry {
+		// Only register if not already registered manually
+		if _, exists := cb.registry[typeName]; !exists {
+			cb.RegisterWantType(typeName, createGenericFactory(typeName))
+		}
+	}
+}

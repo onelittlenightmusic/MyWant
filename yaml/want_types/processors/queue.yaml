@@ -146,7 +146,7 @@ wantType:
   - numbers
   - combiner
   - sink
-  - fibonacci sequence
+  - fibonacci filter
   - prime sequence
   seeAlso:
   - queue-system recipe

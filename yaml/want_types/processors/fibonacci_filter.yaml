@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: fibonacci sequence
-    title: fibonacci sequence
+    name: fibonacci filter
+    title: fibonacci filter
     description: 'Processor that filters Fibonacci numbers based on value range constraints.
 
       Accepts a stream of Fibonacci numbers and outputs only those that fall
@@ -97,7 +97,7 @@ wantType:
     want:
       metadata:
         name: small-fibonacci-filter
-        type: fibonacci sequence
+        type: fibonacci filter
         labels: {}
       spec:
         params:
@@ -119,7 +119,7 @@ wantType:
     want:
       metadata:
         name: large-fibonacci-range
-        type: fibonacci sequence
+        type: fibonacci filter
         labels: {}
       spec:
         params:
@@ -141,7 +141,7 @@ wantType:
     want:
       metadata:
         name: exact-value-match
-        type: fibonacci sequence
+        type: fibonacci filter
         labels: {}
       spec:
         params:
