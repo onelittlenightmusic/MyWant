@@ -81,6 +81,7 @@ type Metadata struct {
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	UpdatedAt       int64             `json:"updatedAt" yaml:"-"`                                   // Server-managed timestamp, ignored on load
 	IsSystemWant    bool              `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
+	OrderKey        string            `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
 }
 
 // WantSpec contains the desired state configuration for a want

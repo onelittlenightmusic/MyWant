@@ -43,6 +43,7 @@ export interface WantMetadata {
   ownerReferences?: OwnerReference[];
   updatedAt?: number; // Server-managed timestamp for detecting metadata changes
   isSystemWant?: boolean; // true for system-managed wants (e.g., system-scheduler)
+  orderKey?: string; // Fractional index for custom ordering (supports drag-and-drop reordering)
 }
 
 export interface WhenSpec {

@@ -152,6 +152,14 @@ class MyWantApiClient {
     return response.data;
   }
 
+  async updateWantOrder(
+    id: string,
+    request: { previousWantId?: string; nextWantId?: string }
+  ): Promise<{ success: boolean; orderKey: string; wantId: string }> {
+    const response = await this.client.put(`/api/v1/wants/${id}/order`, request);
+    return response.data;
+  }
+
   async deleteWant(id: string): Promise<void> {
     await this.client.delete(`/api/v1/wants/${id}`);
   }

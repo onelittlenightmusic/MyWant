@@ -114,7 +114,12 @@ export const WantGrid: React.FC<WantGridProps> = ({
         return true;
       };
       return checkWantMatches(want) || want.children?.some(child => checkWantMatches(child)) || false;
-    }).sort((a, b) => (a.metadata?.id || '').localeCompare(b.metadata?.id || ''));
+    }).sort((a, b) => {
+      // Sort by orderKey if available, otherwise fall back to ID
+      const keyA = a.metadata?.orderKey || a.metadata?.id || '';
+      const keyB = b.metadata?.orderKey || b.metadata?.id || '';
+      return keyA.localeCompare(keyB);
+    });
   }, [hierarchicalWants, searchQuery, statusFilters]);
 
   React.useEffect(() => {
