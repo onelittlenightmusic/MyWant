@@ -21,8 +21,13 @@ type KnowledgeWant struct {
 }
 
 // NewKnowledgeWant creates a new KnowledgeWant
-func NewKnowledgeWant(want *Want) *KnowledgeWant {
-	return &KnowledgeWant{Want: *want}
+func NewKnowledgeWant(metadata Metadata, spec WantSpec) Progressable {
+	return &KnowledgeWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		&KnowledgeLocals{},
+		"fresh knowledge",
+	)}
 }
 
 // Initialize prepares the Knowledge want for execution
@@ -77,7 +82,7 @@ func (k *KnowledgeWant) Initialize() {
 }
 
 func (k *KnowledgeWant) fail(msg string) {
-	k.StoreLog(fmt.Sprintf("ERROR: %s", msg))
+	k.StoreLog("ERROR: %s", msg)
 	k.StoreState("knowledge_status", "failed")
 	k.StoreState("error", msg)
 	k.Status = "failed"
@@ -192,12 +197,5 @@ func (k *KnowledgeWant) getLocals() *KnowledgeLocals {
 
 // RegisterKnowledgeWantType registers the knowledge want type with the builder
 func RegisterKnowledgeWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("fresh knowledge", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init()
-		return NewKnowledgeWant(want)
-	})
+	builder.RegisterWantType("fresh knowledge", NewKnowledgeWant)
 }

@@ -25,8 +25,13 @@ type GmailWant struct {
 }
 
 // NewGmailWant creates a new GmailWant
-func NewGmailWant(want *Want) *GmailWant {
-	return &GmailWant{Want: *want}
+func NewGmailWant(metadata Metadata, spec WantSpec) Progressable {
+	return &GmailWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		&GmailLocals{},
+		"gmail",
+	)}
 }
 
 // Initialize prepares the Gmail want for execution
@@ -41,7 +46,7 @@ func (g *GmailWant) Initialize() {
 	promptParam := g.GetStringParam("prompt", "")
 	if promptParam == "" {
 		errorMsg := "Missing required parameter 'prompt'"
-		g.StoreLog(fmt.Sprintf("ERROR: %s", errorMsg))
+		g.StoreLog("ERROR: %s", errorMsg)
 		g.StoreState("gmail_status", "failed")
 		g.StoreState("error", errorMsg)
 		g.Status = "failed"
@@ -175,7 +180,7 @@ func (g *GmailWant) Progress() {
 		g.StoreState("mcp_native", true)
 
 		// Store the prompt as an MCP operation for the agent
-		g.StoreLog(fmt.Sprintf("Searching emails with query: %s", locals.Prompt))
+		g.StoreLog("Searching emails with query: %s", locals.Prompt)
 		g.StoreState("mcp_operation", "gmail_search")
 		g.StoreState("mcp_query", locals.Prompt)
 		g.StoreState("mcp_max_results", 10)
@@ -192,7 +197,7 @@ func (g *GmailWant) Progress() {
 
 		// Execute Agents via agent framework (this triggers them if they haven't run)
 		if err := g.ExecuteAgents(); err != nil {
-			g.StoreLog(fmt.Sprintf("ERROR: Failed to execute MCP agent: %v", err))
+			g.StoreLog("ERROR: Failed to execute MCP agent: %v", err)
 			g.StoreState("gmail_status", "failed")
 			g.StoreState("error", fmt.Sprintf("MCP agent failed: %v", err))
 			return
@@ -208,7 +213,7 @@ func (g *GmailWant) Progress() {
 		// Convert agent result to map
 		resultMap, ok := agentResult.(map[string]interface{})
 		if !ok {
-			g.StoreLog(fmt.Sprintf("ERROR: Agent result is not a map: %T", agentResult))
+			g.StoreLog("ERROR: Agent result is not a map: %T", agentResult)
 			g.StoreState("gmail_status", "failed")
 			g.StoreState("error", "Invalid agent result format")
 			return
@@ -234,7 +239,7 @@ func (g *GmailWant) Progress() {
 		// Store final result as a clean array of email objects
 		g.StoreState("final_result", emails)
 		g.StoreState("gmail_status", "completed")
-		g.StoreLog(fmt.Sprintf("Gmail search completed: found %d emails", len(emails)))
+		g.StoreLog("Gmail search completed: found %d emails", len(emails))
 
 		// Provide result to output channels
 		g.Provide(emails)
@@ -300,12 +305,5 @@ func (g *GmailWant) getLocals() *GmailLocals {
 
 // RegisterGmailWantType registers the Gmail want type with the builder
 func RegisterGmailWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("gmail", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init() // Critical: Register for events
-		return NewGmailWant(want)
-	})
+	builder.RegisterWantType("gmail", NewGmailWant)
 }

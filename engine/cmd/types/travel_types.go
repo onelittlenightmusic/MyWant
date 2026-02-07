@@ -746,7 +746,7 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 		}
 
 		if hasStateChange {
-			want.StoreLog(fmt.Sprintf("Status changed: %s -> %s", oldStatus, newStatus))
+			want.StoreLog("Status changed: %s -> %s", oldStatus, newStatus)
 
 			// Record status change
 			statusChange := StatusChange{
@@ -773,8 +773,8 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 			}
 			updates["agent_result"] = schedule
-			want.StoreLog(fmt.Sprintf("[PACKET-SEND] Flight schedule packet: FlightNumber=%s, From=%s, To=%s, Status=%s",
-				schedule.FlightNumber, reservation.From, reservation.To, newStatus))
+			want.StoreLog("[PACKET-SEND] Flight schedule packet: FlightNumber=%s, From=%s, To=%s, Status=%s",
+				schedule.FlightNumber, reservation.From, reservation.To, newStatus)
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range m.StatusChangeHistory {
 				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
@@ -789,12 +789,12 @@ func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 			m.LastKnownStatus = newStatus
 
 			// Print status progression
-			want.StoreLog(fmt.Sprintf("FLIGHT %s STATUS PROGRESSION: %s (at %s)",
-				reservation.ID, newStatus, time.Now().Format("15:04:05")))
+			want.StoreLog("FLIGHT %s STATUS PROGRESSION: %s (at %s)",
+				reservation.ID, newStatus, time.Now().Format("15:04:05"))
 
 			// Update hash after successful commit
 			m.LastRecordedStateHash = currentStateHash
-			want.StoreLog(fmt.Sprintf("State recorded (hash: %s)", currentStateHash[:8]))
+			want.StoreLog("State recorded (hash: %s)", currentStateHash[:8])
 		} else {
 			// No status change - don't create history entry, but still update other flight details Removed verbose log: "Flight details changed but status is still: ..."
 			m.LastRecordedStateHash = currentStateHash
@@ -968,7 +968,7 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 		}
 		return &schedule
 	default:
-		f.StoreLog(fmt.Sprintf("agent_result is unexpected type: %T", result))
+		f.StoreLog("agent_result is unexpected type: %T", result)
 		return nil
 	}
 }
@@ -1016,7 +1016,7 @@ func (f *FlightWant) Progress() {
 		if locals.monitoringDuration == 0 {
 			completionTimeoutSeconds := f.GetIntParam("completion_timeout", 60)
 			locals.monitoringDuration = time.Duration(completionTimeoutSeconds) * time.Second
-			f.StoreLog(fmt.Sprintf("Monitoring duration initialized: %v seconds", completionTimeoutSeconds))
+			f.StoreLog("Monitoring duration initialized: %v seconds", completionTimeoutSeconds)
 		}
 
 		f.StoreLog("Executing initial booking")
@@ -1054,7 +1054,7 @@ func (f *FlightWant) Progress() {
 		if time.Since(locals.monitoringStartTime) < locals.monitoringDuration {
 			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
-				f.StoreLog(fmt.Sprintf("Delay detected at %v, initiating cancellation", elapsed))
+				f.StoreLog("Delay detected at %v, initiating cancellation", elapsed)
 				f.StoreStateMulti(Dict{
 					"flight_action": "cancel_flight",
 					"completed":     false,
@@ -1066,7 +1066,7 @@ func (f *FlightWant) Progress() {
 			// Log monitoring progress every 30 seconds
 			now := time.Now()
 			if locals.lastLogTime.IsZero() || now.Sub(locals.lastLogTime) >= 30*time.Second {
-				f.StoreLog(fmt.Sprintf("Monitoring... (elapsed: %v/%v)", elapsed, locals.monitoringDuration))
+				f.StoreLog("Monitoring... (elapsed: %v/%v)", elapsed, locals.monitoringDuration)
 				locals.lastLogTime = now
 			}
 
@@ -1108,10 +1108,10 @@ func (f *FlightWant) Progress() {
 		}
 
 		// Execute cancel flight action
-		f.StoreLog(fmt.Sprintf("Executing cancel_flight action for flight %s", flightID))
+		f.StoreLog("Executing cancel_flight action for flight %s", flightID)
 		f.tryAgentExecution()
 
-		f.StoreLog("Cancelled flight: " + flightID)
+		f.StoreLog("Cancelled flight: %s", flightID)
 
 		// Reset flight state and transition back to booking phase for rebooking
 		f.StoreLog("Cancellation completed, resetting state and returning to booking phase")
@@ -1129,7 +1129,7 @@ func (f *FlightWant) Progress() {
 		return
 
 	default:
-		f.StoreLog("Unknown phase: " + phase)
+		f.StoreLog("Unknown phase: %s", phase)
 		f.StoreState("_flight_phase", PhaseCompleted)
 		return
 	}
@@ -1150,13 +1150,13 @@ func (f *FlightWant) sendFlightPacket(out any, schedule *FlightSchedule, label s
 	}
 	f.Provide(travelSchedule)
 
-	f.StoreLog(fmt.Sprintf("[PACKET-SEND] %s flight: %s (%s to %s) | TravelSchedule: Date=%s, Events=%d",
+	f.StoreLog("[PACKET-SEND] %s flight: %s (%s to %s) | TravelSchedule: Date=%s, Events=%d",
 		label,
 		schedule.ReservationName,
 		schedule.DepartureTime.Format("15:04 Jan 2"),
 		schedule.ArrivalTime.Format("15:04 Jan 2"),
 		travelSchedule.Date.Format("2006-01-02"),
-		len(travelSchedule.Events)))
+		len(travelSchedule.Events))
 }
 
 // tryAgentExecution implements TravelWantInterface for FlightWant
@@ -1191,7 +1191,7 @@ func (f *FlightWant) tryAgentExecution() any {
 			monitor.Name = agentName
 
 			if err := f.AddMonitoringAgent(agentName, 10*time.Second, monitor.Exec); err != nil {
-				f.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
+				f.StoreLog("ERROR: Failed to start background monitoring: %v", err)
 			}
 
 			// Extract and return FlightSchedule

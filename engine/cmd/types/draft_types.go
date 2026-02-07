@@ -12,8 +12,15 @@ type DraftWant struct {
 }
 
 // NewDraftWant creates a new DraftWant
-func NewDraftWant(want *Want) *DraftWant {
-	return &DraftWant{Want: *want}
+func NewDraftWant(metadata Metadata, spec WantSpec) Progressable {
+	// DraftWant doesn't seem to have a specific Locals struct defined in the file,
+	// passing nil for locals as per original implementation which didn't set it.
+	return &DraftWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		nil,
+		"draft",
+	)}
 }
 
 // Initialize prepares the draft want
@@ -41,15 +48,7 @@ func (d *DraftWant) CalculateAchievingPercentage() int {
 func RegisterDraftWantType(builder *ChainBuilder) {
 	InfoLog("[INFO] Registering draft want type")
 	// Register the factory for the "draft" type
-	err := builder.RegisterWantTypeFromYAML("draft", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		// Register for event system support if needed in the future
-		want.Init()
-		return NewDraftWant(want)
-	}, filepath.Join(WantTypesDir, "system/draft.yaml"))
+	err := builder.RegisterWantTypeFromYAML("draft", NewDraftWant, filepath.Join(WantTypesDir, "system/draft.yaml"))
 	if err != nil {
 		ErrorLog("[ERROR] Failed to register draft want type: %v", err)
 	} else {

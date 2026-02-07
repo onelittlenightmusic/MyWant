@@ -34,7 +34,7 @@ func (a *AgentBuffet) Exec(ctx context.Context, want *Want) (bool, error) {
 
 // generateBuffetSchedule creates a buffet reservation schedule
 func (a *AgentBuffet) generateBuffetSchedule(want *Want) BuffetSchedule {
-	want.StoreLog(fmt.Sprintf("Processing buffet reservation for %s with premium service", want.Metadata.Name))
+	want.StoreLog("Processing buffet reservation for %s with premium service", want.Metadata.Name)
 
 	// Generate buffet reservation with appropriate timing (lunch or dinner)
 	baseDate := time.Now()

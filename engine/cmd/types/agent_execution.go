@@ -91,7 +91,7 @@ func (a *ExecutionAgent) executeCommand(ctx context.Context, want *mywant.Want) 
 		} else {
 			exitCode = -1
 			stderr.WriteString(fmt.Sprintf("\nCommand execution error: %v", err))
-			want.StoreLog(fmt.Sprintf("ERROR executing command: %v", err))
+			want.StoreLog("ERROR executing command: %v", err)
 		}
 	}
 
@@ -110,9 +110,9 @@ func (a *ExecutionAgent) executeCommand(ctx context.Context, want *mywant.Want) 
 	want.StoreState("agent_result", result)
 
 	if exitCode == 0 {
-		want.StoreLog(fmt.Sprintf("Command executed successfully in %dms", executionTimeMs))
+		want.StoreLog("Command executed successfully in %dms", executionTimeMs)
 	} else {
-		want.StoreLog(fmt.Sprintf("Command failed with exit code %d", exitCode))
+		want.StoreLog("Command failed with exit code %d", exitCode)
 	}
 
 	return nil // Return nil even on command failure (agent executed successfully)

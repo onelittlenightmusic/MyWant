@@ -109,7 +109,7 @@ func (e *EvidenceWant) Progress() {
 		"final_result":         evidence,
 	})
 
-	e.StoreLog(fmt.Sprintf("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount))
+	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, outCount)
 
 	// Broadcast evidence to all output channels using Provide
 	e.Provide(evidenceData)
@@ -222,7 +222,7 @@ func (d *DescriptionWant) Progress() {
 		"final_result":            description,
 	})
 
-	d.StoreLog(fmt.Sprintf("📦 Description provided: %s to %d coordinator(s)", description, outCount))
+	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, outCount)
 
 	// Broadcast description to all output channels using Provide
 	d.Provide(descriptionData)

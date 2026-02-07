@@ -38,7 +38,7 @@ func (a *AgentPremium) Exec(ctx context.Context, want *Want) (bool, error) {
 
 // generateHotelSchedule creates a premium hotel schedule
 func (a *AgentPremium) generateHotelSchedule(want *Want) HotelSchedule {
-	want.StoreLog(fmt.Sprintf("Processing hotel reservation for %s with premium service", want.Metadata.Name))
+	want.StoreLog("Processing hotel reservation for %s with premium service", want.Metadata.Name)
 
 	// Generate premium hotel booking with better times and luxury amenities
 	baseDate := time.Now().AddDate(0, 0, 1) // Tomorrow

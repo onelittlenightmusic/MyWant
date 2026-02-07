@@ -33,7 +33,13 @@ type FlightMockServerWant struct {
 }
 
 // NewFlightMockServerWant creates a new FlightMockServerWant
-func NewFlightMockServerWant(want *Want) *FlightMockServerWant {
+func NewFlightMockServerWant(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
+	want := NewWantWithLocals(
+		metadata,
+		spec,
+		&MockServerLocals{},
+		"flight_mock_server",
+	)
 	m := &FlightMockServerWant{Want: *want}
 	m.Initialize()
 	return m
@@ -254,13 +260,6 @@ func (m *FlightMockServerWant) updateLocals(locals *MockServerLocals) {
 // RegisterFlightMockServerWantType registers the flight mock server want type
 func RegisterFlightMockServerWantType(builder *mywant.ChainBuilder) {
 	log.Println("[INFO] Registering flight_mock_server want type")
-	builder.RegisterWantType("flight_mock_server", func(metadata mywant.Metadata, spec mywant.WantSpec) mywant.Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init() // Critical: Register for events
-		return NewFlightMockServerWant(want)
-	})
+	builder.RegisterWantType("flight_mock_server", NewFlightMockServerWant)
 	log.Println("[INFO] Successfully registered flight_mock_server want type")
 }

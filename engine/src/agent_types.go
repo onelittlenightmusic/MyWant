@@ -119,7 +119,7 @@ func (psa *PremiumServiceAgent) ExecuteReservation(
 	want.SetAgentActivity(psa.Name, activity)
 
 	// Store completion log
-	want.StoreLog(logMsg)
+	want.StoreLog("%s", logMsg)
 
 	return false, nil
 }

@@ -169,9 +169,9 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 
 	// Log the reaction
 	if reaction.Approved {
-		want.StoreLog(fmt.Sprintf("User approved reminder reaction (comment: %s)", reaction.Comment))
+		want.StoreLog("User approved reminder reaction (comment: %s)", reaction.Comment)
 	} else {
-		want.StoreLog(fmt.Sprintf("User rejected reminder reaction (comment: %s)", reaction.Comment))
+		want.StoreLog("User rejected reminder reaction (comment: %s)", reaction.Comment)
 	}
 
 	want.StoreLog("[INFO] MonitorAgent processed reaction %s from queue %s for want %s",

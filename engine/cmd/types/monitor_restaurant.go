@@ -46,33 +46,33 @@ func NewMonitorRestaurant(name string, capabilities []string, uses []string) *Mo
 
 // Exec executes restaurant monitoring by reading state from YAML files
 func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) (bool, error) {
-	want.StoreLog(fmt.Sprintf("Starting monitoring for %s (execution #%d)", want.Metadata.Name, m.ExecutionCount))
+	want.StoreLog("Starting monitoring for %s (execution #%d)", want.Metadata.Name, m.ExecutionCount)
 
 	// Determine which YAML file to read based on execution count
 	filename := fmt.Sprintf("restaurant%d.yaml", m.ExecutionCount)
 	filepath := filepath.Join(m.TestDataPath, filename)
 
-	want.StoreLog(fmt.Sprintf("Reading state from %s", filepath))
+	want.StoreLog("Reading state from %s", filepath)
 
 	// Read the YAML file
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			want.StoreLog(fmt.Sprintf("No initial state file found at %s, proceeding without existing schedule", filepath))
+			want.StoreLog("No initial state file found at %s, proceeding without existing schedule", filepath)
 		} else {
-			want.StoreLog(fmt.Sprintf("Error reading %s: %v", filepath, err))
+			want.StoreLog("Error reading %s: %v", filepath, err)
 			return false, err
 		}
 	}
 	var restaurantState RestaurantState
 	if err := yaml.Unmarshal(data, &restaurantState); err != nil {
-		want.StoreLog(fmt.Sprintf("Error parsing YAML: %v", err))
+		want.StoreLog("Error parsing YAML: %v", err)
 		return false, err
 	}
 
 	// Debug: Print parsed state
-	want.StoreLog(fmt.Sprintf("DEBUG: Parsed state: %+v", restaurantState))
-	want.StoreLog(fmt.Sprintf("DEBUG: Start time: %v, IsZero: %v", restaurantState.State.Start, restaurantState.State.Start.IsZero()))
+	want.StoreLog("DEBUG: Parsed state: %+v", restaurantState)
+	want.StoreLog("DEBUG: Start time: %v, IsZero: %v", restaurantState.State.Start, restaurantState.State.Start.IsZero())
 	if !restaurantState.State.Start.IsZero() {
 		duration := restaurantState.State.End.Sub(restaurantState.State.Start)
 
@@ -86,7 +86,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) (bool, error) 
 			PremiumAmenities: []string{"monitoring_data"},
 		}
 
-		want.StoreLog(fmt.Sprintf("DEBUG: About to store agent_result: %+v", schedule))
+		want.StoreLog("DEBUG: About to store agent_result: %+v", schedule)
 		want.StoreStateMulti(map[string]any{
 			"agent_result":            schedule,
 			"monitor_execution_count": m.ExecutionCount,
@@ -94,10 +94,10 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) (bool, error) 
 		})
 		want.StoreLog("DEBUG: Stored agent_result successfully")
 
-		want.StoreLog(fmt.Sprintf("Loaded existing schedule: %s from %s to %s",
+		want.StoreLog("Loaded existing schedule: %s from %s to %s",
 			restaurantState.State.Name,
 			restaurantState.State.Start.Format("15:04 Jan 2"),
-			restaurantState.State.End.Format("15:04 Jan 2")))
+			restaurantState.State.End.Format("15:04 Jan 2"))
 	} else {
 		// No existing schedule found - store explicit first record
 		want.StoreStateMulti(map[string]any{
@@ -105,7 +105,7 @@ func (m *MonitorRestaurant) Exec(ctx context.Context, want *Want) (bool, error) 
 			"monitor_execution_count": m.ExecutionCount,
 			"monitor_source_file":     filename,
 		})
-		want.StoreLog(fmt.Sprintf("No existing schedule found in %s - stored first record", filename))
+		want.StoreLog("No existing schedule found in %s - stored first record", filename)
 	}
 	m.ExecutionCount++
 

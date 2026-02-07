@@ -36,8 +36,13 @@ type ReminderWant struct {
 }
 
 // NewReminderWant creates a new ReminderWant
-func NewReminderWant(want *Want) *ReminderWant {
-	return &ReminderWant{Want: *want}
+func NewReminderWant(metadata Metadata, spec WantSpec) Progressable {
+	return &ReminderWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		&ReminderLocals{},
+		"reminder",
+	)}
 }
 
 // Initialize prepares the reminder want for execution
@@ -80,7 +85,7 @@ func (r *ReminderWant) Initialize() {
 	// Parse ahead duration
 	aheadDuration, err := parseDurationString(ahead)
 	if err != nil {
-		r.StoreLog(fmt.Sprintf("ERROR: Invalid ahead parameter '%s': %v", ahead, err))
+		r.StoreLog("ERROR: Invalid ahead parameter '%s': %v", ahead, err)
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		r.StoreState("error_message", fmt.Sprintf("Invalid ahead parameter: %s", ahead))
 		r.Status = "failed"
@@ -111,7 +116,7 @@ func (r *ReminderWant) Initialize() {
 		var parseErr error
 		eventTime, parseErr = time.Parse(time.RFC3339, fmt.Sprintf("%v", eventTimeStr))
 		if parseErr != nil {
-			r.StoreLog(fmt.Sprintf("ERROR: Invalid event_time format: %v", parseErr))
+			r.StoreLog("ERROR: Invalid event_time format: %v", parseErr)
 			r.StoreState("reminder_phase", ReminderPhaseFailed)
 			r.StoreState("error_message", "Invalid event_time format (use RFC3339)")
 			r.Status = "failed"
@@ -123,7 +128,7 @@ func (r *ReminderWant) Initialize() {
 		durationStr := fmt.Sprintf("%v", durationFromNowStr)
 		duration, parseErr := parseDurationString(durationStr)
 		if parseErr != nil {
-			r.StoreLog(fmt.Sprintf("ERROR: Invalid duration_from_now format: %v", parseErr))
+			r.StoreLog("ERROR: Invalid duration_from_now format: %v", parseErr)
 			r.StoreState("reminder_phase", ReminderPhaseFailed)
 			r.StoreState("error_message", fmt.Sprintf("Invalid duration_from_now format: %s", durationStr))
 			r.Status = "failed"
@@ -320,7 +325,7 @@ func (r *ReminderWant) Progress() {
 		break
 
 	default:
-		r.StoreLog(fmt.Sprintf("ERROR: Unknown phase: %s", locals.Phase))
+		r.StoreLog("ERROR: Unknown phase: %s", locals.Phase)
 		r.StoreState("reminder_phase", ReminderPhaseFailed)
 		locals.Phase = ReminderPhaseFailed
 		r.Status = "failed"
@@ -410,7 +415,7 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 	// Check if reaching time has arrived
 	now := time.Now()
 	if now.After(locals.ReachingTime) {
-		r.StoreLog(fmt.Sprintf("Reaching time arrived: %s", locals.ReachingTime.Format(time.RFC3339)))
+		r.StoreLog("Reaching time arrived: %s", locals.ReachingTime.Format(time.RFC3339))
 
 		// Clear existing queue ID to force creation of a new one for this new cycle
 		r.StoreStateMulti(map[string]any{
@@ -492,7 +497,7 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 					// Use pre-initialized monitor from locals
 					monitor := locals.monitor
 					if err := r.AddMonitoringAgent(agentName, 2*time.Second, monitor.Exec); err != nil {
-						r.StoreLog(fmt.Sprintf("ERROR: Failed to start background monitoring: %v", err))
+						r.StoreLog("ERROR: Failed to start background monitoring: %v", err)
 					} else {
 						r.StoreLog("[REMINDER] Started background monitoring for %s", r.Metadata.Name)
 					}
@@ -503,14 +508,14 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// Check for timeout
 		now := time.Now()
 		if now.Unix()-locals.LastCheckTime.Unix() > int64(locals.TimeoutSeconds) {
-			r.StoreLog(fmt.Sprintf("Reminder reaction timeout after %d seconds", locals.TimeoutSeconds))
+			r.StoreLog("Reminder reaction timeout after %d seconds", locals.TimeoutSeconds)
 			r.handleTimeout(locals)
 			return
 		}
 	} else {
 		// No reaction required, check if event time has passed
 		if !locals.EventTime.IsZero() && time.Now().After(locals.EventTime) {
-			r.StoreLog(fmt.Sprintf("Event time passed, completing reminder"))
+			r.StoreLog("Event time passed, completing reminder")
 			r.StoreStateMulti(map[string]any{
 				"reminder_phase":           ReminderPhaseCompleted,
 				"auto_completed":           true,
@@ -716,12 +721,5 @@ func parseDurationString(s string) (time.Duration, error) {
 
 // RegisterReminderWantType registers the ReminderWant type with the ChainBuilder
 func RegisterReminderWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("reminder", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init() // Critical: Register for events
-		return NewReminderWant(want)
-	})
+	builder.RegisterWantType("reminder", NewReminderWant)
 }

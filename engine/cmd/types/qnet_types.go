@@ -95,7 +95,7 @@ func (g *Numbers) IsAchieved() bool {
 	paramCount := g.GetIntParam("count", locals.Count)
 	isAchieved := locals.currentCount >= paramCount
 	if isAchieved {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-ISACHIEVED] Complete: currentCount=%d, paramCount=%d", locals.currentCount, paramCount))
+		g.StoreLog("[NUMBERS-ISACHIEVED] Complete: currentCount=%d, paramCount=%d", locals.currentCount, paramCount)
 	}
 	return isAchieved
 }
@@ -123,7 +123,7 @@ func (g *Numbers) Progress() {
 
 	// Check if we're already done before generating more packets
 	if locals.currentCount >= paramCount {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending DONE signal", locals.currentCount, paramCount))
+		g.StoreLog("[NUMBERS-EXEC] Already complete: currentCount=%d >= paramCount=%d, sending DONE signal", locals.currentCount, paramCount)
 		g.ProvideDone()
 		return
 	}
@@ -154,7 +154,7 @@ func (g *Numbers) Progress() {
 				achievingPercentage = 100
 			}
 		}
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount)))
+		g.StoreLog("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount))
 		g.StoreStateMulti(mywant.Dict{
 			"total_processed":      locals.currentCount,
 			"average_wait_time":    0.0, // Generators don't have wait time
@@ -169,7 +169,7 @@ func (g *Numbers) Progress() {
 
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
-		g.StoreLog(fmt.Sprintf("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount))
+		g.StoreLog("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount)
 		g.StoreStateMulti(mywant.Dict{
 			"achieving_percentage": 100,
 			"final_result":         fmt.Sprintf("Generated %d packets", paramCount),
@@ -257,7 +257,7 @@ func (q *Queue) Progress() {
 	} else if i != nil {
 		packet := i.(QueuePacket)
 		if packet.Num % locals.batchUpdateInterval == 0 || packet.Num <= 5 {
-			q.StoreLog(fmt.Sprintf("[QUEUE-EXEC] Received packet #%d, time=%.2f", packet.Num, packet.Time))
+			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", packet.Num, packet.Time)
 		}
 	}
 
@@ -268,7 +268,7 @@ func (q *Queue) Progress() {
 
 		// Trigger OnEnded callback
 		if err := q.OnEnded(nil, locals); err != nil {
-			q.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
+			q.StoreLog("OnEnded callback error: %v", err)
 		}
 		// Forward end signal to next want
 		q.ProvideDone()
@@ -436,7 +436,7 @@ func (c *Combiner) Progress() {
 	if done {
 		// Trigger OnEnded callback
 		if err := c.OnEnded(nil, locals); err != nil {
-			c.StoreLog(fmt.Sprintf("OnEnded callback error: %v", err))
+			c.StoreLog("OnEnded callback error: %v", err)
 		}
 		// Forward end signal to next want
 		c.ProvideDone()

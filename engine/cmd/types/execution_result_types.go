@@ -46,8 +46,13 @@ type ExecutionResultWant struct {
 }
 
 // NewExecutionResultWant creates a new ExecutionResultWant
-func NewExecutionResultWant(want *Want) *ExecutionResultWant {
-	return &ExecutionResultWant{Want: *want}
+func NewExecutionResultWant(metadata Metadata, spec WantSpec) Progressable {
+	return &ExecutionResultWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		&ExecutionResultWantLocals{},
+		"execution_result",
+	)}
 }
 
 // Initialize resets execution state before starting
@@ -332,14 +337,7 @@ func (e *ExecutionResultWant) updateLocals(locals *ExecutionResultWantLocals) {
 
 // RegisterExecutionResultWantType registers the execution_result want type with the chain builder
 func RegisterExecutionResultWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("execution_result", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init() // Critical: Register for events
-		return NewExecutionResultWant(want)
-	})
+	builder.RegisterWantType("execution_result", NewExecutionResultWant)
 }
 
 // RegisterExecutionAgents registers the ExecutionAgent with the agent registry

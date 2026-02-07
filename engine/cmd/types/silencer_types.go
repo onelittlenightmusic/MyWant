@@ -16,8 +16,13 @@ type SilencerLocals struct {
 }
 
 // NewSilencerWant creates a new SilencerWant
-func NewSilencerWant(want *Want) *SilencerWant {
-	return &SilencerWant{Want: *want}
+func NewSilencerWant(metadata Metadata, spec WantSpec) Progressable {
+	return &SilencerWant{Want: *NewWantWithLocals(
+		metadata,
+		spec,
+		&SilencerLocals{},
+		"silencer",
+	)}
 }
 
 // Initialize prepares the silencer want for execution
@@ -145,12 +150,5 @@ func (s *SilencerWant) processPacket(data any) {
 
 // RegisterSilencerWantType registers the SilencerWant type with the ChainBuilder
 func RegisterSilencerWantType(builder *ChainBuilder) {
-	builder.RegisterWantType("silencer", func(metadata Metadata, spec WantSpec) Progressable {
-		want := &Want{
-			Metadata: metadata,
-			Spec:     spec,
-		}
-		want.Init() // Critical: Register for events
-		return NewSilencerWant(want)
-	})
+	builder.RegisterWantType("silencer", NewSilencerWant)
 }

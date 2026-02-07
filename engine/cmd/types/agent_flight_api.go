@@ -96,7 +96,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	if isRebooking {
 		baseFlight := flightNumber
 		flightNumber = generateRebookingFlightNumber(baseFlight)
-		want.StoreLog(fmt.Sprintf("Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber))
+		want.StoreLog("Rebooking: Original flight %s -> New flight %s", baseFlight, flightNumber)
 	}
 
 	from := extractor.String("from", "New York")
@@ -131,8 +131,8 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	}
 
 	if isRebooking {
-		want.StoreLog(fmt.Sprintf("Rebooking: Adjusted departure time to %s (next available flight)",
-			departureTime.Format(time.RFC3339)))
+		want.StoreLog("Rebooking: Adjusted departure time to %s (next available flight)",
+			departureTime.Format(time.RFC3339))
 	}
 	request := CreateFlightRequest{
 		FlightNumber:  flightNumber,
@@ -188,8 +188,8 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 		reservation.FlightNumber, reservation.FlightNumber, reservation.From, reservation.To)
 	want.SetAgentActivity(a.Name, activity)
 
-	want.StoreLog(fmt.Sprintf("Created flight reservation: %s (ID: %s, Status: %s)",
-		reservation.FlightNumber, reservation.ID, reservation.Status))
+	want.StoreLog("Created flight reservation: %s (ID: %s, Status: %s)",
+		reservation.FlightNumber, reservation.ID, reservation.Status)
 
 	return nil
 }
@@ -237,7 +237,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)
 	want.SetAgentActivity(a.Name, activity)
 
-	want.StoreLog(fmt.Sprintf("Cancelled flight: %s", flightIDStr))
+	want.StoreLog("Cancelled flight: %s", flightIDStr)
 
 	return nil
 }

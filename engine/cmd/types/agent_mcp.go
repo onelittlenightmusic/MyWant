@@ -895,19 +895,16 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	want.StoreState("achieving_percentage", 25)
 	
 	if useNative {
-		logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation via Native SDK: %s", operationStr)
-		want.StoreLog(logMsg)
+		want.StoreLog("[MCP-AGENT] Executing MCP operation via Native SDK: %s", operationStr)
 		return a.executeNativeMCPOperation(ctx, want, operationStr)
 	}
 
-	logMsg := fmt.Sprintf("[MCP-AGENT] Executing MCP operation via Goose: %s", operationStr)
-	want.StoreLog(logMsg)
+	want.StoreLog("[MCP-AGENT] Executing MCP operation via Goose: %s", operationStr)
 
 	// Get the Goose session server (singleton, persistent)
 	goose, err := GetGooseManager(ctx)
 	if err != nil {
-		errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Goose initialization failed: %v", err)
-		want.StoreLog(errMsg)
+		want.StoreLog("[MCP-AGENT] ERROR: Goose initialization failed: %v", err)
 		return fmt.Errorf("Goose initialization failed: %w", err)
 	}
 
@@ -922,7 +919,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		queryStr, _ := want.GetStateString("mcp_query", "")
 		maxResultsInt, _ := want.GetStateInt("mcp_max_results", 10)
 
-		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail search via Goose for query: %s", queryStr))
+		want.StoreLog("[MCP-AGENT] Executing Gmail search via Goose for query: %s", queryStr)
 
 		// Execute Gmail search via Goose
 		searchResult, err := goose.ExecuteViaGoose(ctx, "gmail_search", map[string]interface{}{
@@ -930,8 +927,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 			"maxResults": maxResultsInt,
 		})
 		if err != nil {
-			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail search via Goose failed: %v", err)
-			want.StoreLog(errMsg)
+			want.StoreLog("[MCP-AGENT] ERROR: Gmail search via Goose failed: %v", err)
 			return fmt.Errorf("Gmail Goose search failed: %w", err)
 		}
 
@@ -960,15 +956,14 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	case "gmail_read":
 		messageIDStr, _ := want.GetStateString("mcp_message_id", "")
 
-		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail read via Goose for messageID: %s", messageIDStr))
+		want.StoreLog("[MCP-AGENT] Executing Gmail read via Goose for messageID: %s", messageIDStr)
 
 		// Execute via Goose
 		readResult, err := goose.ExecuteViaGoose(ctx, "gmail_read", map[string]interface{}{
 			"messageID": messageIDStr,
 		})
 		if err != nil {
-			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail read via Goose failed: %v", err)
-			want.StoreLog(errMsg)
+			want.StoreLog("[MCP-AGENT] ERROR: Gmail read via Goose failed: %v", err)
 			return fmt.Errorf("Gmail Goose read failed: %w", err)
 		}
 
@@ -985,7 +980,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 		subjectStr, _ := want.GetStateString("mcp_subject", "")
 		bodyStr, _ := want.GetStateString("mcp_body", "")
 
-		want.StoreLog(fmt.Sprintf("[MCP-AGENT] Executing Gmail send via Goose to: %s", toStr))
+		want.StoreLog("[MCP-AGENT] Executing Gmail send via Goose to: %s", toStr)
 
 		// Execute via Goose
 		sendResult, err := goose.ExecuteViaGoose(ctx, "gmail_send", map[string]interface{}{
@@ -994,8 +989,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 			"body":    bodyStr,
 		})
 		if err != nil {
-			errMsg := fmt.Sprintf("[MCP-AGENT] ERROR: Gmail send via Goose failed: %v", err)
-			want.StoreLog(errMsg)
+			want.StoreLog("[MCP-AGENT] ERROR: Gmail send via Goose failed: %v", err)
 			return fmt.Errorf("Gmail Goose send failed: %w", err)
 		}
 
@@ -1015,7 +1009,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 	// Store result in state for want to retrieve
 	want.StoreState("agent_result", result)
 	want.StoreState("achieving_percentage", 100)
-	want.StoreLog(fmt.Sprintf("[MCP-AGENT] Operation completed via Goose"))
+	want.StoreLog("[MCP-AGENT] Operation completed via Goose")
 
 	return nil
 }
