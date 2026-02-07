@@ -13,6 +13,10 @@ type DraftWant struct {
 	Want
 }
 
+func (d *DraftWant) GetLocals() *DraftLocals {
+	return GetLocals[DraftLocals](&d.Want)
+}
+
 func init() {
 	RegisterWantImplementation[DraftWant, DraftLocals]("draft")
 }

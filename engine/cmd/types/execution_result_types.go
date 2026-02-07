@@ -45,6 +45,10 @@ type ExecutionResultWant struct {
 	Want
 }
 
+func (e *ExecutionResultWant) GetLocals() *ExecutionResultWantLocals {
+	return GetLocals[ExecutionResultWantLocals](&e.Want)
+}
+
 func init() {
 	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
 }
@@ -69,8 +73,8 @@ func (e *ExecutionResultWant) Initialize() {
 	})
 
 	// Get or initialize locals
-	locals, ok := e.Locals.(*ExecutionResultWantLocals)
-	if !ok {
+	locals := e.GetLocals()
+	if locals == nil {
 		locals = &ExecutionResultWantLocals{}
 		e.Locals = locals
 	}
@@ -168,11 +172,12 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 
 // tryAgentExecution delegates command execution to ExecutionAgent
 func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
+	locals := e.GetLocals()
 	// Store command parameters in state for agent to read
 	e.StoreStateMulti(map[string]any{
-		"shell":             e.Locals.(*ExecutionResultWantLocals).Shell,
-		"timeout":           e.Locals.(*ExecutionResultWantLocals).Timeout,
-		"working_directory": e.Locals.(*ExecutionResultWantLocals).WorkingDirectory,
+		"shell":             locals.Shell,
+		"timeout":           locals.Timeout,
+		"working_directory": locals.WorkingDirectory,
 	})
 
 	// Execute agents via framework
@@ -305,26 +310,16 @@ func (e *ExecutionResultWant) buildFinalResult(locals *ExecutionResultWantLocals
 
 // getOrInitializeLocals gets or initializes locals for this want
 func (e *ExecutionResultWant) getOrInitializeLocals() *ExecutionResultWantLocals {
-	if e.Locals == nil {
-		e.Locals = &ExecutionResultWantLocals{
-			Phase:   ExecutionPhaseInitial,
-			Timeout: 30,
-			Shell:   "/bin/bash",
-		}
-		return e.Locals.(*ExecutionResultWantLocals)
+	if locals := e.GetLocals(); locals != nil {
+		return locals
 	}
 
-	locals, ok := e.Locals.(*ExecutionResultWantLocals)
-	if !ok {
-		e.StoreLog("ERROR: Locals is not ExecutionResultWantLocals")
-		return &ExecutionResultWantLocals{
-			Phase:   ExecutionPhaseInitial,
-			Timeout: 30,
-			Shell:   "/bin/bash",
-		}
+	e.Locals = &ExecutionResultWantLocals{
+		Phase:   ExecutionPhaseInitial,
+		Timeout: 30,
+		Shell:   "/bin/bash",
 	}
-
-	return locals
+	return e.GetLocals()
 }
 
 // updateLocals updates the locals

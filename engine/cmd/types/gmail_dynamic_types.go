@@ -26,6 +26,10 @@ type GmailDynamicWant struct {
 	mywant.Want
 }
 
+func (g *GmailDynamicWant) GetLocals() *GmailDynamicLocals {
+	return mywant.GetLocals[GmailDynamicLocals](&g.Want)
+}
+
 func init() {
 	mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("gmail_dynamic")
 }

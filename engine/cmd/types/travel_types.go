@@ -137,6 +137,10 @@ type RestaurantWant struct {
 	BaseTravelWant
 }
 
+func (r *RestaurantWant) GetLocals() *RestaurantWantLocals {
+	return GetLocals[RestaurantWantLocals](&r.Want)
+}
+
 // Initialize prepares the restaurant want for execution
 func (r *RestaurantWant) Initialize() {
 	r.BaseTravelWant.executor = r
@@ -377,6 +381,10 @@ type HotelWant struct {
 	BaseTravelWant
 }
 
+func (h *HotelWant) GetLocals() *HotelWantLocals {
+	return GetLocals[HotelWantLocals](&h.Want)
+}
+
 // NewHotelWant creates a new hotel reservation want
 // Initialize prepares the hotel want for execution
 func (h *HotelWant) Initialize() {
@@ -454,6 +462,10 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 // BuffetWant creates breakfast buffet reservations
 type BuffetWant struct {
 	BaseTravelWant
+}
+
+func (b *BuffetWant) GetLocals() *BuffetWantLocals {
+	return GetLocals[BuffetWantLocals](&b.Want)
 }
 
 // Initialize prepares the buffet want for execution
@@ -899,7 +911,7 @@ func (f *FlightWant) IsAchieved() bool {
 
 // GetLocals returns the FlightWantLocals from this want
 func (f *FlightWant) GetLocals() *FlightWantLocals {
-	return f.BaseTravelWant.Want.GetLocals().(*FlightWantLocals)
+	return GetLocals[FlightWantLocals](&f.Want)
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule

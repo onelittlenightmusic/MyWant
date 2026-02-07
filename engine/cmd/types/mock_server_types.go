@@ -31,6 +31,10 @@ type FlightMockServerWant struct {
 	Want
 }
 
+func (m *FlightMockServerWant) GetLocals() *MockServerLocals {
+	return GetLocals[MockServerLocals](&m.Want)
+}
+
 func init() {
 	RegisterWantImplementation[FlightMockServerWant, MockServerLocals]("flight_mock_server")
 }
@@ -41,8 +45,8 @@ func (m *FlightMockServerWant) Initialize() {
 	m.StoreLog("[MOCK_SERVER] Initializing flight mock server: %s", m.Metadata.Name)
 
 	// Get or initialize locals
-	locals, ok := m.Locals.(*MockServerLocals)
-	if !ok {
+	locals := m.GetLocals()
+	if locals == nil {
 		locals = &MockServerLocals{}
 		m.Locals = locals
 	}
@@ -206,10 +210,8 @@ func (m *FlightMockServerWant) OnDelete() {
 
 // getOrInitializeLocals retrieves or initializes the locals
 func (m *FlightMockServerWant) getOrInitializeLocals() *MockServerLocals {
-	if m.Locals != nil {
-		if locals, ok := m.Locals.(*MockServerLocals); ok {
-			return locals
-		}
+	if locals := m.GetLocals(); locals != nil {
+		return locals
 	}
 
 	// Initialize from state

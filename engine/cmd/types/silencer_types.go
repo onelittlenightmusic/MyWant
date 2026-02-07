@@ -10,6 +10,10 @@ type SilencerWant struct {
 	Want
 }
 
+func (s *SilencerWant) GetLocals() *SilencerLocals {
+	return GetLocals[SilencerLocals](&s.Want)
+}
+
 func init() {
 	RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
 }
@@ -24,8 +28,8 @@ func (s *SilencerWant) Initialize() {
 	s.StoreLog("[SILENCER] Initializing silencer: %s\n", s.Metadata.Name)
 
 	// Get or initialize locals
-	locals, ok := s.Locals.(*SilencerLocals)
-	if !ok {
+	locals := s.GetLocals()
+	if locals == nil {
 		locals = &SilencerLocals{}
 		s.Locals = locals
 	}
@@ -116,7 +120,7 @@ func (s *SilencerWant) processPacket(data any) {
 
 	s.StoreLog("[SILENCER] Processing reaction %s (type: %s)", reactionID, reactionType)
 
-	locals := s.Locals.(*SilencerLocals)
+	locals := s.GetLocals()
 	if reactionType == "internal" {
 		// Store target reaction ID for agents - use SetStateAtomic for immediate visibility
 		s.SetStateAtomic(map[string]any{"_target_reaction_id": reactionID})

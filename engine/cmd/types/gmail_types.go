@@ -24,6 +24,10 @@ type GmailWant struct {
 	Want
 }
 
+func (g *GmailWant) GetLocals() *GmailLocals {
+	return GetLocals[GmailLocals](&g.Want)
+}
+
 func init() {
 	RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
 }
@@ -33,8 +37,8 @@ func (g *GmailWant) Initialize() {
 	g.StoreLog("[GMAIL] Initializing Gmail want: %s\n", g.Metadata.Name)
 
 	// Get or initialize locals
-	locals, ok := g.Locals.(*GmailLocals)
-	if !ok {
+	locals := g.GetLocals()
+	if locals == nil {
 		locals = &GmailLocals{}
 		g.Locals = locals
 	}
@@ -141,13 +145,18 @@ func (g *GmailWant) CalculateAchievingPercentage() float64 {
 
 // Progress executes the Gmail operation via MCP Agent
 func (g *GmailWant) Progress() {
+	locals := g.GetLocals()
+	if locals == nil {
+		g.StoreLog("ERROR: Failed to access GmailLocals")
+		return
+	}
+
 	// Check if already achieved
 	if g.IsAchieved() {
 		return
 	}
 
-	locals := g.getLocals()
-	if locals == nil || locals.Prompt == "" {
+	if locals.Prompt == "" {
 		g.StoreState("gmail_status", "failed")
 		g.StoreState("error", "No prompt available")
 		return

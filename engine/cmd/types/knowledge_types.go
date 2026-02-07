@@ -20,6 +20,10 @@ type KnowledgeWant struct {
 	Want
 }
 
+func (k *KnowledgeWant) GetLocals() *KnowledgeLocals {
+	return GetLocals[KnowledgeLocals](&k.Want)
+}
+
 func init() {
 	RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("fresh knowledge")
 }
@@ -29,8 +33,8 @@ func (k *KnowledgeWant) Initialize() {
 	k.StoreLog("[KNOWLEDGE] Initializing Knowledge want: %s\n", k.Metadata.Name)
 
 	// Get or initialize locals
-	locals, ok := k.Locals.(*KnowledgeLocals)
-	if !ok {
+	locals := k.GetLocals()
+	if locals == nil {
 		locals = &KnowledgeLocals{}
 		k.Locals = locals
 	}
@@ -150,7 +154,7 @@ func (k *KnowledgeWant) shouldRefresh() bool {
 		return true
 	}
 
-	locals := k.getLocals()
+	locals := k.GetLocals()
 	if locals == nil {
 		return true
 	}
@@ -181,15 +185,4 @@ func (k *KnowledgeWant) runUpdater() {
 	}
 
 	// The agent should set knowledge_status to 'fresh' and update last_sync_time
-}
-
-func (k *KnowledgeWant) getLocals() *KnowledgeLocals {
-	if k.Locals == nil {
-		return nil
-	}
-	locals, ok := k.Locals.(*KnowledgeLocals)
-	if !ok {
-		return nil
-	}
-	return locals
 }

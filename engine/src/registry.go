@@ -81,6 +81,18 @@ func initializeInstance(instance any, baseWant *Want) {
 	}
 }
 
+// GetLocals provides a type-safe way to access the Locals field of a Want.
+// L should be the specific locals struct type (e.g., ReminderLocals).
+func GetLocals[L any](w *Want) *L {
+	if w.Locals == nil {
+		return nil
+	}
+	if locals, ok := w.Locals.(*L); ok {
+		return locals
+	}
+	return nil
+}
+
 // RegisterAllKnownImplementations registers all Go implementations in the registry with the provided ChainBuilder.
 // This is useful for demos or tests where YAML-based automatic registration via StoreWantTypeDefinition might not occur.
 func (cb *ChainBuilder) RegisterAllKnownImplementations() {

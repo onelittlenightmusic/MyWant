@@ -80,6 +80,10 @@ type Numbers struct {
 	mywant.Want
 }
 
+func (g *Numbers) GetLocals() *NumbersLocals {
+	return mywant.GetLocals[NumbersLocals](&g.Want)
+}
+
 // Initialize resets state before execution begins
 func (g *Numbers) Initialize() {
 	// No state reset needed for queue wants
@@ -87,8 +91,8 @@ func (g *Numbers) Initialize() {
 
 // IsAchieved checks if numbers generator is complete (all packets sent)
 func (g *Numbers) IsAchieved() bool {
-	locals, ok := g.Locals.(*NumbersLocals)
-	if !ok {
+	locals := g.GetLocals()
+	if locals == nil {
 		return false
 	}
 	paramCount := g.GetIntParam("count", locals.Count)
@@ -201,6 +205,10 @@ type Queue struct {
 	mywant.Want
 }
 
+func (q *Queue) GetLocals() *QueueLocals {
+	return mywant.GetLocals[QueueLocals](&q.Want)
+}
+
 // NewQueue creates a new queue want
 // Initialize resets state before execution begins
 func (q *Queue) Initialize() {
@@ -209,6 +217,10 @@ func (q *Queue) Initialize() {
 
 // IsAchieved checks if queue is complete (end signal received)
 func (q *Queue) IsAchieved() bool {
+	locals := q.GetLocals()
+	if locals == nil {
+		return false
+	}
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
 		q.StoreLog("[QUEUE-ISACHIEVED] Completed! Shifting to achieved")
@@ -218,8 +230,8 @@ func (q *Queue) IsAchieved() bool {
 
 // Progress executes the queue processing directly with batch mechanism
 func (q *Queue) Progress() {
-	locals, ok := q.Locals.(*QueueLocals)
-	if !ok {
+	locals := q.GetLocals()
+	if locals == nil {
 		q.StoreLog("ERROR: Failed to access QueueLocals from Want.Locals")
 		return
 	}
@@ -346,8 +358,8 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 // Uses processedCount / totalCount * 100 if count parameter is provided
 // Otherwise, returns 100 when complete, 50 during processing, 0 when idle
 func (q *Queue) CalculateAchievingPercentage() int {
-	locals, ok := q.Locals.(*QueueLocals)
-	if !ok {
+	locals := q.GetLocals()
+	if locals == nil {
 		return 0
 	}
 
@@ -381,6 +393,10 @@ type Combiner struct {
 	mywant.Want
 }
 
+func (c *Combiner) GetLocals() *CombinerLocals {
+	return mywant.GetLocals[CombinerLocals](&c.Want)
+}
+
 // Initialize resets state before execution begins
 func (c *Combiner) Initialize() {
 	// No state reset needed for queue wants
@@ -388,14 +404,18 @@ func (c *Combiner) Initialize() {
 
 // IsAchieved checks if combiner is complete (end signal received)
 func (c *Combiner) IsAchieved() bool {
+	locals := c.GetLocals()
+	if locals == nil {
+		return false
+	}
 	completed, _ := c.GetStateBool("completed", false)
 	return completed
 }
 
 // Progress executes the combiner directly
 func (c *Combiner) Progress() {
-	locals, ok := c.Locals.(*CombinerLocals)
-	if !ok {
+	locals := c.GetLocals()
+	if locals == nil {
 		c.StoreLog("ERROR: Failed to access CombinerLocals from Want.Locals")
 		return
 	}

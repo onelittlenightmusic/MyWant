@@ -35,6 +35,10 @@ type ReminderWant struct {
 	Want
 }
 
+func (r *ReminderWant) GetLocals() *ReminderLocals {
+	return GetLocals[ReminderLocals](&r.Want)
+}
+
 func init() {
 	RegisterWantImplementation[ReminderWant, ReminderLocals]("reminder")
 }
@@ -50,8 +54,8 @@ func (r *ReminderWant) Initialize() {
 	}
 
 	// Get or initialize locals
-	locals, ok := r.Locals.(*ReminderLocals)
-	if !ok {
+	locals := r.GetLocals()
+	if locals == nil {
 		locals = &ReminderLocals{}
 		r.Locals = locals
 	}
@@ -609,10 +613,8 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 
 // getOrInitializeLocals retrieves or initializes the locals
 func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
-	if r.Locals != nil {
-		if locals, ok := r.Locals.(*ReminderLocals); ok {
-			return locals
-		}
+	if locals := r.GetLocals(); locals != nil {
+		return locals
 	}
 
 	// Initialize from state

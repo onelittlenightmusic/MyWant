@@ -20,6 +20,10 @@ type FibonacciNumbers struct {
 	Want
 }
 
+func (g *FibonacciNumbers) GetLocals() *FibonacciNumbersLocals {
+	return GetLocals[FibonacciNumbersLocals](&g.Want)
+}
+
 // Initialize resets state before execution begins
 func (g *FibonacciNumbers) Initialize() {
 	// No state reset needed for fibonacci wants
@@ -75,11 +79,15 @@ type FibonacciFilter struct {
 	Want
 }
 
+func (f *FibonacciFilter) GetLocals() *FibonacciFilterLocals {
+	return GetLocals[FibonacciFilterLocals](&f.Want)
+}
+
 // Initialize resets state before execution begins
 func (f *FibonacciFilter) Initialize() {
 	// Get or initialize locals
-	locals, ok := f.Locals.(*FibonacciFilterLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		locals = &FibonacciFilterLocals{}
 		f.Locals = locals
 	}
@@ -98,8 +106,8 @@ func (f *FibonacciFilter) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *FibonacciFilter) Progress() {
-	locals, ok := f.Locals.(*FibonacciFilterLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")
 		return
 	}

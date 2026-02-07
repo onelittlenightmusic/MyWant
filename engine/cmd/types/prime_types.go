@@ -22,6 +22,10 @@ type PrimeNumbers struct {
 	Want
 }
 
+func (g *PrimeNumbers) GetLocals() *PrimeNumbersLocals {
+	return GetLocals[PrimeNumbersLocals](&g.Want)
+}
+
 // Initialize resets state before execution begins
 func (g *PrimeNumbers) Initialize() {
 	// No state reset needed for prime wants
@@ -87,11 +91,15 @@ type PrimeSequence struct {
 	Want
 }
 
+func (f *PrimeSequence) GetLocals() *PrimeSequenceLocals {
+	return GetLocals[PrimeSequenceLocals](&f.Want)
+}
+
 // Initialize resets state before execution begins
 func (f *PrimeSequence) Initialize() {
 	// Get or initialize locals
-	locals, ok := f.Locals.(*PrimeSequenceLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		locals = &PrimeSequenceLocals{}
 		f.Locals = locals
 	}
@@ -110,8 +118,8 @@ func (f *PrimeSequence) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *PrimeSequence) Progress() {
-	locals, ok := f.Locals.(*PrimeSequenceLocals)
-	if !ok {
+	locals := f.GetLocals()
+	if locals == nil {
 		f.StoreLog("ERROR: Failed to access PrimeSequenceLocals from Want.Locals")
 		return
 	}
