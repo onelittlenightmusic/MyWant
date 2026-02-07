@@ -32,7 +32,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types
-	
 
 	fmt.Println("\n🏁 Executing travel planning workflow...")
 	builder.Execute()

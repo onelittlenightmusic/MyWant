@@ -38,7 +38,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel want types first
-	
 
 	fmt.Println("\n🚀 Executing travel target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")

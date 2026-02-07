@@ -40,7 +40,6 @@ func main() {
 
 	// Register want types
 	fmt.Println("\nRegistering want types...")
-	
 
 	// Show initial state
 	fmt.Println("\n📊 Initial notification system state:")

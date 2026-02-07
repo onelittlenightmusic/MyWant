@@ -29,7 +29,6 @@ func main() {
 
 	fmt.Println("Creating ChainBuilder...")
 	builder := mywant.NewChainBuilder(*config)
-	
 
 	fmt.Println("\n=== Before Execute ===")
 	states := builder.GetAllWantStates()

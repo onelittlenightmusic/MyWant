@@ -32,7 +32,7 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register travel-related want types (includes flight)
-	
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 

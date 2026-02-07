@@ -104,7 +104,6 @@ func main() {
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register domain-specific want types
-	
 
 	fmt.Println("🏁 Executing recipe-based travel planning with extended monitoring...")
 	fmt.Println()

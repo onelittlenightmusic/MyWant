@@ -38,7 +38,6 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register domain-specific want types
-	
 
 	fmt.Println("\n🚀 Executing target-based chain with dynamic recipe loading...")
 	fmt.Println("The target want will:")

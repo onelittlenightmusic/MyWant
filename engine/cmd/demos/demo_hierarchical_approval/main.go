@@ -60,7 +60,6 @@ func main() {
 	}
 
 	// Register approval want types
-	
 
 	fmt.Printf("📋 Configuration loaded with %d wants\n", len(config.Wants))
 

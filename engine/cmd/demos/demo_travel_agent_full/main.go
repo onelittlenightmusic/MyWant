@@ -96,7 +96,6 @@ func main() {
 	builder.SetAgentRegistry(agentRegistry)
 
 	// Register travel want types
-	
 
 	fmt.Println("🚀 Executing complete agent-enabled travel planning...")
 	builder.Execute()

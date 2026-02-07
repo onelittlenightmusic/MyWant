@@ -42,7 +42,6 @@ func RunDemoQnetUsingRecipe() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types
-	
 
 	fmt.Println("🚀 Executing qnet with using fields from YAML...")
 	builder.Execute()

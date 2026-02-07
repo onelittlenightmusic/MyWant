@@ -28,7 +28,6 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register want types
-	
 
 	// Execute
 	fmt.Println("\n🚀 Executing simple 3-want pipeline (gen → queue → sink)")

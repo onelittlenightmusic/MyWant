@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	. "mywant/engine/src"
 	_ "mywant/engine/cmd/types"
+	. "mywant/engine/src"
 )
 
 func main() {
@@ -26,7 +26,6 @@ func main() {
 	})
 
 	// Register prime types
-	
 
 	// Start reconcile loop
 	go cb.reconcileLoop()

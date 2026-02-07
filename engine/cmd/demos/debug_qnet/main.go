@@ -39,7 +39,6 @@ func main() {
 
 	fmt.Println("Creating ChainBuilder...")
 	builder := mywant.NewChainBuilder(config)
-	
 
 	fmt.Println("\nBefore reconciliation:")
 	states := builder.GetAllWantStates()

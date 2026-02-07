@@ -34,7 +34,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register prime want types
-	
 
 	fmt.Println("🏁 Executing recipe-based prime sieve...")
 	builder.Execute()

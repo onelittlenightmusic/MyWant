@@ -27,7 +27,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register prime node types
-	
 
 	fmt.Println("\nExecuting prime sieve with reconcile loop...")
 	builder.Execute()

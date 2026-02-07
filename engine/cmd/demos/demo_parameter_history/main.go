@@ -37,7 +37,6 @@ func main() {
 		},
 	}
 	builder := mywant.NewChainBuilder(config)
-	
 
 	fmt.Println("🔧 Creating test want...")
 	testWant := config.Wants[0]

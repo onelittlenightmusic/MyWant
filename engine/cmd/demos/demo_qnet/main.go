@@ -27,7 +27,6 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	// Register qnet node types
-	
 
 	fmt.Println("\nExecuting qnet simulation with reconcile loop...")
 	builder.Execute()

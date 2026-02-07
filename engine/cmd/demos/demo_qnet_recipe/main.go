@@ -41,7 +41,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, combiner, sink)
-	
 
 	fmt.Println("🏁 Executing recipe-based qnet with parameterized using fields...")
 	builder.Execute()

@@ -35,7 +35,6 @@ func main() {
 	builder := NewChainBuilder(config)
 
 	// Register qnet want types (includes sequence, queue, sink)
-	
 
 	fmt.Println("🏁 Executing generic recipe-based queue system...")
 	builder.Execute()
