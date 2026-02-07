@@ -423,7 +423,7 @@ func (c *Combiner) Progress() {
 	if c.State == nil {
 		c.State = make(map[string]any)
 	}
-	processed, _ := c.State["processed"].(int)
+	processed, _ := c.GetStateInt("processed", 0)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
 		return
 	}
@@ -455,7 +455,7 @@ func (c *Combiner) Progress() {
 // OnEnded implements PacketHandler interface for Combiner termination callbacks
 func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
-	processed, _ := c.State["processed"].(int)
+	processed, _ := c.GetStateInt("processed", 0)
 	c.StoreStateMulti(mywant.Dict{
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time

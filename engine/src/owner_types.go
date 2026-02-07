@@ -906,10 +906,10 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		}
 		// Try common variations
 		if spec.StatName == "TotalProcessed" {
-			if value, ok := want.State["total_processed"]; ok {
+			if value, ok := want.GetStateInt("total_processed", 0); ok {
 				return value
 			}
-			if value, ok := want.State["totalprocessed"]; ok {
+			if value, ok := want.GetStateInt("totalprocessed", 0); ok {
 				return value
 			}
 		}
@@ -1017,14 +1017,10 @@ func (t *Target) computeFallbackResultUnsafe() {
 	totalProcessed := 0
 	for _, child := range childWants {
 		if child.State != nil {
-			if processed, ok := child.State["total_processed"]; ok {
-				if processedInt, ok := processed.(int); ok {
-					totalProcessed += processedInt
-				}
-			} else if processed, ok := child.State["TotalProcessed"]; ok {
-				if processedInt, ok := processed.(int); ok {
-					totalProcessed += processedInt
-				}
+			if processed, ok := child.GetStateInt("total_processed", 0); ok {
+				totalProcessed += processed
+			} else if processed, ok := child.GetStateInt("TotalProcessed", 0); ok {
+				totalProcessed += processed
 			}
 		}
 	}
