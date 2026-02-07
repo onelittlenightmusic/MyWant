@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )
 
@@ -214,6 +216,11 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
 
+	// Validate against OpenAPI spec
+	if err := w.validateWithSpec(filePath, data); err != nil {
+		return nil, fmt.Errorf("OpenAPI validation failed: %v", err)
+	}
+
 	var wrapper WantTypeWrapper
 	err = yaml.Unmarshal(data, &wrapper)
 	if err != nil {
@@ -222,11 +229,6 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 
 	def := &wrapper.WantType
 
-	// Validate YAML structure before definition validation
-	if err := w.validateYAMLStructure(filePath, data); err != nil {
-		log.Printf("[WANT-TYPE-LOADER] ⚠️  YAML structure warning in %s: %v\n", filePath, err)
-	}
-
 	err = w.validateDefinition(def)
 	if err != nil {
 		return nil, fmt.Errorf("validation failed: %v", err)
@@ -234,51 +236,58 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 
 	return def, nil
 }
-// validateYAMLStructure checks for common YAML structure issues
-func (w *WantTypeLoader) validateYAMLStructure(filePath string, data []byte) error {
-	// Parse as generic map to check structure
-	var rawData map[string]any
-	if err := yaml.Unmarshal(data, &rawData); err != nil {
-		return fmt.Errorf("YAML parse error: %v", err)
+// validateWithSpec validates want type YAML against OpenAPI spec
+func (w *WantTypeLoader) validateWithSpec(filePath string, yamlData []byte) error {
+	// Load the OpenAPI spec for want types
+	specPaths := []string{
+		filepath.Join(SpecDir, "want-type-spec.yaml"),
+		filepath.Join("..", SpecDir, "want-type-spec.yaml"),
+		filepath.Join("../..", SpecDir, "want-type-spec.yaml"),
+		"yaml/spec/want-type-spec.yaml",
+		"../yaml/spec/want-type-spec.yaml",
 	}
 
-	wantTypeData, ok := rawData["wantType"]
+	var specPath string
+	for _, path := range specPaths {
+		if _, err := os.Stat(path); err == nil {
+			specPath = path
+			break
+		}
+	}
+
+	if specPath == "" {
+		// Fallback to default
+		specPath = filepath.Join(SpecDir, "want-type-spec.yaml")
+	}
+
+	loader := openapi3.NewLoader()
+	spec, err := loader.LoadFromFile(specPath)
+	if err != nil {
+		return fmt.Errorf("failed to load want type OpenAPI spec: %w", err)
+	}
+
+	ctx := context.Background()
+	err = spec.Validate(ctx)
+	if err != nil {
+		return fmt.Errorf("want type OpenAPI spec is invalid: %w", err)
+	}
+
+	// Parse YAML
+	var yamlObj map[string]any
+	err = yaml.Unmarshal(yamlData, &yamlObj)
+	if err != nil {
+		return fmt.Errorf("failed to parse YAML: %w", err)
+	}
+
+	// Check for wantType root key
+	wantTypeData, ok := yamlObj["wantType"]
 	if !ok {
 		return fmt.Errorf("missing 'wantType' root element")
 	}
 
-	wantTypeMap, ok := wantTypeData.(map[string]any)
+	_, ok = wantTypeData.(map[string]any)
 	if !ok {
 		return fmt.Errorf("'wantType' must be an object")
-	}
-
-	// Check if 'requires' is at the correct level (under wantType, not under other fields)
-	if requires, ok := wantTypeMap["requires"]; ok {
-		// Validate requires is an array
-		if _, isArray := requires.([]any); !isArray {
-			return fmt.Errorf("'requires' must be an array of strings")
-		}
-	}
-
-	// Check for misplaced 'requires' fields (common mistake: inside 'require' or 'providers')
-	if require, ok := wantTypeMap["require"]; ok {
-		requireMap, ok := require.(map[string]any)
-		if ok {
-			if _, hasRequires := requireMap["requires"]; hasRequires {
-				return fmt.Errorf("'requires' is misplaced inside 'require' block - should be at wantType level")
-			}
-			if providers, ok := requireMap["providers"]; ok {
-				if providersList, ok := providers.([]any); ok {
-					for i, provider := range providersList {
-						if providerMap, ok := provider.(map[string]any); ok {
-							if _, hasRequires := providerMap["requires"]; hasRequires {
-								return fmt.Errorf("'requires' is misplaced inside 'require.providers[%d]' - should be at wantType level", i)
-							}
-						}
-					}
-				}
-			}
-		}
 	}
 
 	return nil

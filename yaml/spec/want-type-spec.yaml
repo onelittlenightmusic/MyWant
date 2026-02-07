@@ -1,0 +1,400 @@
+openapi: 3.0.3
+info:
+  title: MyWant Want Type Definition Schema
+  description: OpenAPI specification for MyWant want type YAML definition files
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+paths: {}
+
+components:
+  schemas:
+    # Root want type wrapper
+    WantTypeWrapper:
+      type: object
+      description: Root wrapper for want type definition
+      required:
+        - wantType
+      properties:
+        wantType:
+          $ref: '#/components/schemas/WantTypeDefinition'
+      additionalProperties: false
+
+    # Complete want type definition
+    WantTypeDefinition:
+      type: object
+      description: Complete want type definition
+      required:
+        - metadata
+      properties:
+        metadata:
+          $ref: '#/components/schemas/WantTypeMetadata'
+        parameters:
+          type: array
+          description: Parameter definitions for want configuration
+          items:
+            $ref: '#/components/schemas/ParameterDef'
+          default: []
+        state:
+          type: array
+          description: State field definitions
+          items:
+            $ref: '#/components/schemas/StateDef'
+          default: []
+        connectivity:
+          $ref: '#/components/schemas/ConnectivityDef'
+        connect:
+          $ref: '#/components/schemas/RequireSpec'
+          description: New connectivity requirement field
+        require:
+          $ref: '#/components/schemas/RequireSpec'
+          description: Structured connectivity requirement (deprecated, use connect)
+        usageLimit:
+          $ref: '#/components/schemas/UsageLimitSpec'
+          description: Deprecated, use connect instead
+        requires:
+          type: array
+          description: Agent capability requirements (must be at wantType level)
+          items:
+            type: string
+          default: []
+        agents:
+          type: array
+          description: Agent definitions
+          items:
+            $ref: '#/components/schemas/AgentDef'
+          default: []
+        constraints:
+          type: array
+          description: Business logic constraints
+          items:
+            $ref: '#/components/schemas/ConstraintDef'
+          default: []
+        examples:
+          type: array
+          description: Usage examples
+          items:
+            $ref: '#/components/schemas/ExampleDef'
+          default: []
+        relatedTypes:
+          type: array
+          description: Related want type names
+          items:
+            type: string
+          default: []
+        seeAlso:
+          type: array
+          description: Documentation references
+          items:
+            type: string
+          default: []
+      additionalProperties: false
+
+    # Want type metadata
+    WantTypeMetadata:
+      type: object
+      description: Want type identity and classification
+      required:
+        - name
+        - title
+        - description
+        - version
+        - category
+        - pattern
+      properties:
+        name:
+          type: string
+          description: Unique want type name
+          pattern: '^[a-z][a-z0-9_]*$'
+        title:
+          type: string
+          description: Human-readable title
+        description:
+          type: string
+          description: Detailed description
+        version:
+          type: string
+          description: Version string
+          pattern: '^\d+\.\d+(\.\d+)?$'
+        category:
+          type: string
+          description: Want type category
+        pattern:
+          type: string
+          description: Want type pattern
+          enum:
+            - generator
+            - processor
+            - sink
+            - independent
+        system_type:
+          type: boolean
+          description: If true, hide from user-facing want type selector
+          default: false
+      additionalProperties: false
+
+    # Parameter definition
+    ParameterDef:
+      type: object
+      description: Parameter definition for want configuration
+      required:
+        - name
+        - description
+        - type
+        - required
+      properties:
+        name:
+          type: string
+          description: Parameter name
+          pattern: '^[a-z][a-z0-9_]*$'
+        description:
+          type: string
+          description: Parameter description
+        type:
+          type: string
+          description: Go type (int, float64, string, bool, []string, map[string]any)
+        default:
+          description: Default value
+        required:
+          type: boolean
+          description: Whether parameter is required
+        validation:
+          $ref: '#/components/schemas/ValidationRules'
+        example:
+          description: Example value
+      additionalProperties: false
+
+    # Validation rules
+    ValidationRules:
+      type: object
+      description: Validation constraints for parameters
+      properties:
+        min:
+          type: number
+          description: Minimum value
+        max:
+          type: number
+          description: Maximum value
+        pattern:
+          type: string
+          description: Regex pattern
+        enum:
+          type: array
+          description: Allowed values
+          items: {}
+      additionalProperties: false
+
+    # State definition
+    StateDef:
+      type: object
+      description: State field definition
+      required:
+        - name
+        - description
+        - type
+        - persistent
+      properties:
+        name:
+          type: string
+          description: State field name
+          pattern: '^[a-z][a-z0-9_]*$'
+        description:
+          type: string
+          description: State field description
+        type:
+          type: string
+          description: State field type
+        persistent:
+          type: boolean
+          description: Whether state persists across restarts
+        initialValue:
+          description: Initial value
+        example:
+          description: Example value
+      additionalProperties: false
+
+    # Connectivity definition
+    ConnectivityDef:
+      type: object
+      description: Input/output patterns
+      properties:
+        inputs:
+          type: array
+          description: Input channel definitions
+          items:
+            $ref: '#/components/schemas/ChannelDef'
+          default: []
+        outputs:
+          type: array
+          description: Output channel definitions
+          items:
+            $ref: '#/components/schemas/ChannelDef'
+          default: []
+      additionalProperties: false
+
+    # Channel definition
+    ChannelDef:
+      type: object
+      description: Input or output channel definition
+      required:
+        - name
+        - type
+        - description
+      properties:
+        name:
+          type: string
+          description: Channel name
+        type:
+          type: string
+          description: Channel type
+          enum:
+            - want
+            - agent
+            - state
+            - event
+        description:
+          type: string
+          description: Channel description
+        required:
+          type: boolean
+          description: Whether channel is required
+          default: false
+        multiple:
+          type: boolean
+          description: Whether multiple connections allowed
+          default: false
+      additionalProperties: false
+
+    # Require spec
+    RequireSpec:
+      type: object
+      description: Structured connectivity requirements
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          description: Connectivity policy
+          enum:
+            - none
+            - users
+            - providers
+            - providers_and_users
+        providers:
+          type: array
+          description: Input connection specifications
+          items:
+            $ref: '#/components/schemas/ConnectionSpec'
+          default: []
+        users:
+          type: array
+          description: Output connection specifications
+          items:
+            $ref: '#/components/schemas/ConnectionSpec'
+          default: []
+      additionalProperties: false
+
+    # Connection spec
+    ConnectionSpec:
+      type: object
+      description: Single connection definition
+      required:
+        - name
+        - type
+        - description
+        - required
+        - multiple
+      properties:
+        name:
+          type: string
+          description: Connection name
+        type:
+          type: string
+          description: Connection type
+        description:
+          type: string
+          description: Connection description
+        required:
+          type: boolean
+          description: Whether connection is required
+        multiple:
+          type: boolean
+          description: Whether multiple connections allowed
+      additionalProperties: false
+
+    # Usage limit spec (deprecated)
+    UsageLimitSpec:
+      type: object
+      description: Deprecated usage limit specification (use connect instead)
+      additionalProperties: true
+
+    # Agent definition
+    AgentDef:
+      type: object
+      description: Agent integration definition
+      required:
+        - name
+        - role
+        - description
+      properties:
+        name:
+          type: string
+          description: Agent name
+        role:
+          type: string
+          description: Agent role
+          enum:
+            - monitor
+            - action
+            - validator
+            - transformer
+        description:
+          type: string
+          description: Agent description
+        example:
+          type: string
+          description: Usage example
+      additionalProperties: false
+
+    # Constraint definition
+    ConstraintDef:
+      type: object
+      description: Business logic constraint
+      required:
+        - description
+        - validation
+      properties:
+        description:
+          type: string
+          description: Constraint description
+        validation:
+          type: string
+          description: Validation rule
+      additionalProperties: false
+
+    # Example definition
+    ExampleDef:
+      type: object
+      description: Usage example
+      required:
+        - name
+        - description
+        - want
+        - expectedBehavior
+      properties:
+        name:
+          type: string
+          description: Example name
+        description:
+          type: string
+          description: Example description
+        want:
+          type: object
+          description: Full want configuration
+          additionalProperties: true
+        expectedBehavior:
+          type: string
+          description: Expected behavior description
+      additionalProperties: false
