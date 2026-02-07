@@ -70,3 +70,7 @@ debug_repro.txt
 demo-restart.sh
 *.json
 demo_*.yaml
+
+# Demo binaries
+engine/cmd/demos/*/demo_*
+mywant-server

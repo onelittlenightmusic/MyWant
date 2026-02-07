@@ -45,6 +45,7 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/labels", s.addLabelToWant).Methods("POST")
 	wants.HandleFunc("/{id}/labels/{key}", s.removeLabelFromWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/labels", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/order", s.updateWantOrder).Methods("PUT", "OPTIONS")
 	wants.HandleFunc("/{id}/using", s.addUsingDependency).Methods("POST")
 	wants.HandleFunc("/{id}/using/{key}", s.removeUsingDependency).Methods("DELETE")
 	wants.HandleFunc("/{id}/using", s.handleOptions).Methods("OPTIONS")

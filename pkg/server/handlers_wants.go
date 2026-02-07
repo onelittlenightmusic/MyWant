@@ -75,6 +75,26 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Assign OrderKeys to wants that don't have them (for display ordering)
+	// Find the last used order key from existing wants
+	allWantStates := s.globalBuilder.GetAllWantStates()
+	var lastOrderKey string
+	for _, existingWant := range allWantStates {
+		if existingWant.Metadata.OrderKey != "" && existingWant.Metadata.OrderKey > lastOrderKey {
+			lastOrderKey = existingWant.Metadata.OrderKey
+		}
+	}
+	log.Printf("[ORDERKEY] Found %d existing wants, last order key: '%s'\n", len(allWantStates), lastOrderKey)
+
+	// Assign sequential order keys to new wants
+	for _, want := range config.Wants {
+		if want.Metadata.OrderKey == "" {
+			lastOrderKey = mywant.GenerateOrderKeyAfter(lastOrderKey)
+			want.Metadata.OrderKey = lastOrderKey
+			log.Printf("[ORDERKEY] Assigned order key '%s' to want '%s'\n", lastOrderKey, want.Metadata.Name)
+		}
+	}
+
 	executionID := generateWantID()
 	execution := &WantExecution{
 		ID:      executionID,
@@ -659,4 +679,68 @@ func buildWantResponse(want *mywant.Want, groupBy string) any {
 	}
 
 	return response
+}
+
+// updateWantOrder handles PUT /api/v1/wants/{id}/order - updates the order key of a want for drag-and-drop reordering
+func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Parse request body
+	var req struct {
+		PreviousWantID string `json:"previousWantId"` // ID of want before target position (empty = first)
+		NextWantID     string `json:"nextWantId"`     // ID of want after target position (empty = last)
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorMsg := fmt.Sprintf("Invalid request body: %v", err)
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "error", http.StatusBadRequest, errorMsg, "invalid_request")
+		http.Error(w, errorMsg, http.StatusBadRequest)
+		return
+	}
+
+	// Find the want to be reordered
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found {
+		errorMsg := "Want not found"
+		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
+		http.Error(w, errorMsg, http.StatusNotFound)
+		return
+	}
+
+	// Get order keys of surrounding wants
+	var prevKey, nextKey string
+
+	if req.PreviousWantID != "" {
+		prevWant, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID)
+		if found && prevWant != nil {
+			prevKey = prevWant.Metadata.OrderKey
+		}
+	}
+
+	if req.NextWantID != "" {
+		nextWant, _, found := s.globalBuilder.FindWantByID(req.NextWantID)
+		if found && nextWant != nil {
+			nextKey = nextWant.Metadata.OrderKey
+		}
+	}
+
+	// Generate new order key between the two
+	newOrderKey := mywant.GenerateOrderKeyBetween(prevKey, nextKey)
+	want.Metadata.OrderKey = newOrderKey
+
+	// Update the want (this will trigger persistence)
+	s.globalBuilder.UpdateWant(want)
+
+	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated order key for want: %s", want.Metadata.Name))
+
+	// Return success response
+	response := map[string]interface{}{
+		"success":  true,
+		"orderKey": newOrderKey,
+		"wantId":   wantID,
+	}
+	json.NewEncoder(w).Encode(response)
 }
