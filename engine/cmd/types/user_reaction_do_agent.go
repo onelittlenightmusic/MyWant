@@ -29,13 +29,12 @@ func NewUserReactionDoAgent() *UserReactionDoAgent {
 func performAutoApproval(ctx context.Context, want *Want) error {
 	want.StoreLog("[SILENCER:DO] Starting auto-approval check")
 	// Get target reaction ID from state (set by SilencerWant)
-	reactionIDVal, exists := want.GetState("_target_reaction_id")
-	if !exists || reactionIDVal == nil || reactionIDVal == "" {
+	reactionID, ok := want.GetStateString("_target_reaction_id", "")
+	if !ok || reactionID == "" {
 		want.StoreLog("[SILENCER:DO] No target reaction ID found in state")
 		return nil
 	}
 
-	reactionID := fmt.Sprintf("%v", reactionIDVal)
 	want.StoreLog("[SILENCER:DO] Target reaction ID: %s", reactionID)
 
 	httpClient := want.GetHTTPClient()

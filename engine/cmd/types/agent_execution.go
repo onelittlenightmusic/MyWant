@@ -41,17 +41,10 @@ func NewExecutionAgent() *ExecutionAgent {
 // executeCommand performs the actual command execution
 func (a *ExecutionAgent) executeCommand(ctx context.Context, want *mywant.Want) error {
 	// Read parameters from want state
-	command, _ := want.GetState("command")
-	shell, _ := want.GetState("shell")
-	workingDir, _ := want.GetState("working_directory")
-	timeout, _ := want.GetState("timeout")
-
-	commandStr := command.(string)
-	shellStr := shell.(string)
-	workingDirStr, _ := workingDir.(string)
-
-	// Handle timeout as either int or float64 (from JSON/params)
-	timeoutSec := mywant.ToInt(timeout, 30)
+	commandStr, _ := want.GetStateString("command", "")
+	shellStr, _ := want.GetStateString("shell", "/bin/bash")
+	workingDirStr, _ := want.GetStateString("working_directory", "")
+	timeoutSec, _ := want.GetStateInt("timeout", 30)
 
 	want.StoreState("achieving_percentage", 50)
 	want.StoreLog("Starting command execution...")

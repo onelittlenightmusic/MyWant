@@ -881,13 +881,11 @@ func NewMCPAgent() *MCPAgent {
 // executeMCPOperation performs the actual MCP tool invocation via Goose
 func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 	// Read operation type and parameters from want state
-	operation, hasOp := want.GetState("mcp_operation")
-	if !hasOp || operation == "" {
+	operationStr, ok := want.GetStateString("mcp_operation", "")
+	if !ok || operationStr == "" {
 		want.StoreLog("ERROR: mcp_operation not specified in state")
 		return fmt.Errorf("mcp_operation not specified in state")
 	}
-
-	operationStr := fmt.Sprintf("%v", operation)
 
 	// Check if we should use native MCP client
 	useNative, _ := want.GetStateBool("mcp_native", false)
@@ -1021,18 +1019,8 @@ func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.W
 
 	switch operation {
 	case "gmail_search":
-		query, _ := want.GetState("mcp_query")
-		maxResults, _ := want.GetState("mcp_max_results")
-		queryStr := fmt.Sprintf("%v", query)
-		
-		maxResultsInt := 10
-		if maxResults != nil {
-			if mr, ok := maxResults.(int); ok {
-				maxResultsInt = mr
-			} else if mr, ok := maxResults.(float64); ok {
-				maxResultsInt = int(mr)
-			}
-		}
+		queryStr, _ := want.GetStateString("mcp_query", "")
+		maxResultsInt, _ := want.GetStateInt("mcp_max_results", 10)
 
 		// Direct tool call to Gmail MCP server
 		toolResult, err := native.ExecuteTool(ctx, "gmail", "npx", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"}, "search_emails", map[string]interface{}{

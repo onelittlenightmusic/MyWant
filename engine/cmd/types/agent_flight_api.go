@@ -50,29 +50,24 @@ func NewAgentFlightAPI(name string, capabilities []string, uses []string, server
 
 // Exec implements the Agent interface and handles both create_flight and cancel_flight actions Reads the "flight_action" state to determine which action to perform This satisfies the agent framework's requirement for Exec() method
 func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
-	actionVal, exists := want.GetState("flight_action")
-	if exists && actionVal != nil {
-		action, ok := actionVal.(string)
-		if ok {
-			switch action {
-			case "cancel_flight":
-				want.StoreLog("Executing cancel_flight action")
-				if err := a.CancelFlight(ctx, want); err != nil {
-					return false, err
-				}
-				// Clear the action after completion
-				want.StoreStateForAgent("flight_action", "")
-				return false, nil
-			case "create_flight":
-				want.StoreLog("Executing create_flight action")
-				if err := a.CreateFlight(ctx, want); err != nil {
-					return false, err
-				}
-				// Clear the action after completion
-				want.StoreStateForAgent("flight_action", "")
-				return false, nil
-			}
+	action, _ := want.GetStateString("flight_action", "")
+	switch action {
+	case "cancel_flight":
+		want.StoreLog("Executing cancel_flight action")
+		if err := a.CancelFlight(ctx, want); err != nil {
+			return false, err
 		}
+		// Clear the action after completion
+		want.StoreStateForAgent("flight_action", "")
+		return false, nil
+	case "create_flight":
+		want.StoreLog("Executing create_flight action")
+		if err := a.CreateFlight(ctx, want); err != nil {
+			return false, err
+		}
+		// Clear the action after completion
+		want.StoreStateForAgent("flight_action", "")
+		return false, nil
 	}
 
 	// Default to create_flight if no action specified
@@ -85,8 +80,8 @@ func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
 func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	params := want.Spec.Params
 	want.StoreStateForAgent("flight_status", "in process")
-	prevFlightID, hasPrevFlight := want.GetState("_previous_flight_id")
-	isRebooking := hasPrevFlight && prevFlightID != nil && prevFlightID != ""
+	prevFlightID, _ := want.GetStateString("_previous_flight_id", "")
+	isRebooking := prevFlightID != ""
 
 	// Extract parameters using ParamExtractor
 	extractor := NewParamExtractor(params)
@@ -196,16 +191,12 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 
 // CancelFlight implements the cancel_flight capability Cancels a flight reservation via DELETE /api/flights/{id} to the mock server
 func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
-	flightID, exists := want.GetState("flight_id")
-	if !exists {
+	flightID, ok := want.GetStateString("flight_id", "")
+	if !ok || flightID == "" {
 		return fmt.Errorf("no flight_id found in state")
 	}
 
-	flightIDStr, ok := flightID.(string)
-	if !ok {
-		return fmt.Errorf("flight_id is not a string")
-	}
-	url := fmt.Sprintf("%s/api/flights/%s", a.ServerURL, flightIDStr)
+	url := fmt.Sprintf("%s/api/flights/%s", a.ServerURL, flightID)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
@@ -226,7 +217,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 		"flight_status":           "canceled",
 		"status_message":          "Flight canceled by agent",
 		"canceled_at":             time.Now().Format(time.RFC3339),
-		"_previous_flight_id":     flightIDStr,
+		"_previous_flight_id":     flightID,
 		"_previous_flight_status": "canceled",
 		"flight_id":               "",
 		"attempted":               false,
@@ -234,10 +225,10 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 	})
 
 	// Record activity description for agent history
-	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightIDStr)
+	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightID)
 	want.SetAgentActivity(a.Name, activity)
 
-	want.StoreLog("Cancelled flight: %s", flightIDStr)
+	want.StoreLog("Cancelled flight: %s", flightID)
 
 	return nil
 }

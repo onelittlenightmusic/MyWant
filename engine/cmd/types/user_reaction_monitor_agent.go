@@ -30,8 +30,8 @@ func NewUserReactionMonitorAgent() *UserReactionMonitorAgent {
 // Exec implements Agent interface with stop logic for user reaction monitoring
 func (a *UserReactionMonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	// Check if want is still active (waiting or reaching)
-	phase, exists := want.GetState("reminder_phase")
-	if !exists || (phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching) {
+	phase, _ := want.GetStateString("reminder_phase", "")
+	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
 		return true, nil // Stop monitoring - want completed, failed or doesn't have phase
 	}
 
@@ -69,45 +69,34 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	phase, exists := want.GetState("reminder_phase")
-	if !exists {
+	phase, ok := want.GetStateString("reminder_phase", "")
+	if !ok || (phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching) {
 		return nil
 	}
 
-	phaseStr := fmt.Sprintf("%v", phase)
-	if phaseStr != ReminderPhaseWaiting && phaseStr != ReminderPhaseReaching {
-		return nil
-	}
-
-	want.StoreLog("[MONITOR] Monitoring reminder want %s in phase %s", want.Metadata.Name, phaseStr)
+	want.StoreLog("[MONITOR] Monitoring reminder want %s in phase %s", want.Metadata.Name, phase)
 
 	// Check if reaction is required
-	requireReaction, exists := want.GetState("require_reaction")
-	if !exists {
+	requireReaction, ok := want.GetStateBool("require_reaction", false)
+	if !ok {
 		want.StoreLog("[MONITOR] No require_reaction state found for %s", want.Metadata.Name)
 		return nil
 	}
 
-	requireReactionBool := false
-	if boolVal, ok := requireReaction.(bool); ok {
-		requireReactionBool = boolVal
-	}
-
 	// If reaction not required, nothing to monitor
-	if !requireReactionBool {
+	if !requireReaction {
 		want.StoreLog("[MONITOR] Reaction not required for %s, skipping", want.Metadata.Name)
 		return nil
 	}
 
 	// Get the reaction queue ID (set by DoAgent when queue was created)
-	queueIDValue, exists := want.GetState("reaction_queue_id")
-	if !exists || queueIDValue == nil || queueIDValue == "" {
+	queueID, ok := want.GetStateString("reaction_queue_id", "")
+	if !ok || queueID == "" {
 		want.StoreLog("[MONITOR] No reaction_queue_id found for %s", want.Metadata.Name)
 		// Queue not created yet, nothing to monitor
 		return nil
 	}
 
-	queueID := fmt.Sprintf("%v", queueIDValue)
 	want.StoreLog("[MONITOR] Checking queue %s for reactions...", queueID)
 
 	// Get HTTP client for API calls

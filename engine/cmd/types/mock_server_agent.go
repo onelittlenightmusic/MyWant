@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"syscall"
 
 	mywant "mywant/engine/src"
@@ -34,35 +33,15 @@ func manageMockServer(ctx context.Context, want *mywant.Want) error {
 	want.StoreLog("[AGENT] manageMockServer called for want %s", want.Metadata.Name)
 
 	// Get current phase
-	phaseValue, exists := want.GetState("server_phase")
-	want.StoreLog("[AGENT] server_phase exists=%v, value=%v", exists, phaseValue)
-
-	if !exists || phaseValue == nil {
+	phase, ok := want.GetStateString("server_phase", "")
+	if !ok || phase == "" {
 		// No phase set yet, nothing to do
 		want.StoreLog("[AGENT] No server_phase set, returning")
 		return nil
 	}
 
-	phase, ok := phaseValue.(string)
-	if !ok {
-		return fmt.Errorf("server_phase is not a string: %T", phaseValue)
-	}
-
 	// Check if we already have a server PID
-	pidValue, exists := want.GetState("server_pid")
-	existingPID := 0
-	if exists && pidValue != nil {
-		switch v := pidValue.(type) {
-		case int:
-			existingPID = v
-		case float64:
-			existingPID = int(v)
-		case string:
-			if parsed, err := strconv.Atoi(v); err == nil {
-				existingPID = parsed
-			}
-		}
-	}
+	existingPID, _ := want.GetStateInt("server_pid", 0)
 
 	// Get server binary path from params (default: ./bin/flight-server)
 	serverBinary := "./bin/flight-server"
