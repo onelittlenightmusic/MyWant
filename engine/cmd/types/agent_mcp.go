@@ -881,14 +881,18 @@ func NewMCPAgent() *MCPAgent {
 // executeMCPOperation performs the actual MCP tool invocation via Goose
 func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 	// Read operation type and parameters from want state
-	operationStr, ok := want.GetStateString("mcp_operation", "")
-	if !ok || operationStr == "" {
+	var operationStr string
+	var useNative bool
+	
+	want.GetStateMulti(mywant.Dict{
+		"mcp_operation": &operationStr,
+		"mcp_native":    &useNative,
+	})
+
+	if operationStr == "" {
 		want.StoreLog("ERROR: mcp_operation not specified in state")
 		return fmt.Errorf("mcp_operation not specified in state")
 	}
-
-	// Check if we should use native MCP client
-	useNative, _ := want.GetStateBool("mcp_native", false)
 
 	want.StoreState("achieving_percentage", 25)
 	

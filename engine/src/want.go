@@ -1170,7 +1170,7 @@ func GetStateAs[T any](n *Want, key string) (T, bool) {
 
 // GetStateMulti populates the provided Dict with values from the state.
 // For each key in the data map, it retrieves the current state value,
-// converts it to the type of the value currently in the map,
+// converts it to the type of the value currently in the map (acting as a default),
 // and updates either the map entry or the value it points to (if it's a pointer).
 func (n *Want) GetStateMulti(data Dict) {
 	for key, templateValue := range data {
@@ -1187,19 +1187,20 @@ func (n *Want) GetStateMulti(data Dict) {
 			elem := rv.Elem()
 			switch elem.Interface().(type) {
 			case string:
-				s, _ := n.GetStateString(key, "")
+				s, _ := n.GetStateString(key, elem.String())
 				elem.SetString(s)
 			case int:
-				i, _ := n.GetStateInt(key, 0)
+				i, _ := n.GetStateInt(key, int(elem.Int()))
 				elem.SetInt(int64(i))
 			case float64:
-				f, _ := n.GetStateFloat64(key, 0)
+				f, _ := n.GetStateFloat64(key, elem.Float())
 				elem.SetFloat(f)
 			case bool:
-				b, _ := n.GetStateBool(key, false)
+				b, _ := n.GetStateBool(key, elem.Bool())
 				elem.SetBool(b)
 			case time.Time:
-				t, _ := n.GetStateTime(key, time.Time{})
+				current := elem.Interface().(time.Time)
+				t, _ := n.GetStateTime(key, current)
 				elem.Set(reflect.ValueOf(t))
 			default:
 				// Try direct assignment for other types
@@ -1212,17 +1213,17 @@ func (n *Want) GetStateMulti(data Dict) {
 		}
 
 		// 2. Otherwise, update the map entry with a converted value
-		switch templateValue.(type) {
+		switch v := templateValue.(type) {
 		case string:
-			data[key], _ = n.GetStateString(key, "")
+			data[key], _ = n.GetStateString(key, v)
 		case int:
-			data[key], _ = n.GetStateInt(key, 0)
+			data[key], _ = n.GetStateInt(key, v)
 		case float64:
-			data[key], _ = n.GetStateFloat64(key, 0)
+			data[key], _ = n.GetStateFloat64(key, v)
 		case bool:
-			data[key], _ = n.GetStateBool(key, false)
+			data[key], _ = n.GetStateBool(key, v)
 		case time.Time:
-			data[key], _ = n.GetStateTime(key, time.Time{})
+			data[key], _ = n.GetStateTime(key, v)
 		default:
 			data[key] = val
 		}
