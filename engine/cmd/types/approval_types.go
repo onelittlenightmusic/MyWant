@@ -57,11 +57,7 @@ func (e *EvidenceWant) IsAchieved() bool {
 }
 
 func (e *EvidenceWant) Progress() {
-	locals := e.GetLocals()
-	if locals == nil {
-		e.StoreLog("ERROR: Failed to access EvidenceWantLocals from Want.Locals")
-		return
-	}
+	locals := CheckLocalsInitialized[EvidenceWantLocals](&e.Want)
 
 	provided, _ := e.GetStateBool("evidence_provided", false)
 	if provided {
@@ -145,11 +141,7 @@ func (d *DescriptionWant) IsAchieved() bool {
 }
 
 func (d *DescriptionWant) Progress() {
-	locals := d.GetLocals()
-	if locals == nil {
-		d.StoreLog("ERROR: Failed to access DescriptionWantLocals from Want.Locals")
-		return
-	}
+	locals := CheckLocalsInitialized[DescriptionWantLocals](&d.Want)
 
 	provided, _ := d.GetStateBool("description_provided", false)
 	if provided {

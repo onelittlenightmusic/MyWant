@@ -95,7 +95,7 @@ func (b *BaseTravelWant) Progress() {
 	b.StoreState("completed", true)
 
 	if b.executor == nil {
-		b.StoreLog("ERROR: executor not initialized")
+		b.SetModuleError("executor", "Executor not initialized - Initialize() may not have been called")
 		return
 	}
 
@@ -108,8 +108,7 @@ func (b *BaseTravelWant) Progress() {
 	// Generate and provide schedule
 	locals, ok := b.Locals.(TravelWantLocalsInterface)
 	if !ok {
-		b.StoreLog("ERROR: Failed to access TravelWantLocalsInterface from Want.Locals")
-		return
+		b.SetModuleErrorAndExit("Locals", "Failed to cast Locals to TravelWantLocalsInterface")
 	}
 	_, connectionAvailable := b.GetFirstOutputChannel()
 	schedule := b.executor.generateSchedule(locals)
@@ -945,11 +944,7 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 // 4. Canceling: Cancel the flight, reset state, return to Booking for rebooking
 // 5. Completed: Final state after successful completion
 func (f *FlightWant) Progress() {
-	locals := f.GetLocals()
-	if locals == nil {
-		f.StoreLog("ERROR: Failed to access FlightWantLocals from Want.Locals")
-		return
-	}
+	locals := CheckLocalsInitialized[FlightWantLocals](&f.Want)
 
 	_, connectionAvailable := f.GetFirstOutputChannel()
 
@@ -1067,8 +1062,7 @@ func (f *FlightWant) Progress() {
 		return
 
 	default:
-		f.StoreLog("ERROR: Unknown phase: %s", phase)
-		f.StoreState("_flight_phase", PhaseCompleted)
+		f.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", phase))
 		return
 	}
 }

@@ -36,17 +36,17 @@ func (k *KnowledgeWant) Initialize() {
 		k.Locals = locals
 	}
 
-	// Parse topic
+	// Parse and validate required parameters using ConfigError pattern
 	locals.Topic = k.GetStringParam("topic", "")
 	if locals.Topic == "" {
-		k.fail("Missing required parameter 'topic'")
+		k.SetConfigError("topic", "Missing required parameter 'topic'")
 		return
 	}
 
 	// Parse output_path
 	locals.OutputPath = k.GetStringParam("output_path", "")
 	if locals.OutputPath == "" {
-		k.fail("Missing required parameter 'output_path'")
+		k.SetConfigError("output_path", "Missing required parameter 'output_path'")
 		return
 	}
 

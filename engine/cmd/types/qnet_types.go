@@ -105,11 +105,7 @@ func (g *Numbers) IsAchieved() bool {
 
 // Progress executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Progress() {
-	locals, ok := g.Locals.(*NumbersLocals)
-	if !ok {
-		g.StoreLog("ERROR: Failed to access NumbersLocals from Want.Locals")
-		return
-	}
+	locals := mywant.CheckLocalsInitialized[NumbersLocals](&g.Want)
 
 	useDeterministic := g.GetBoolParam("deterministic", false)
 	paramCount := g.GetIntParam("count", locals.Count)
@@ -227,11 +223,7 @@ func (q *Queue) IsAchieved() bool {
 
 // Progress executes the queue processing directly with batch mechanism
 func (q *Queue) Progress() {
-	locals := q.GetLocals()
-	if locals == nil {
-		q.StoreLog("ERROR: Failed to access QueueLocals from Want.Locals")
-		return
-	}
+	locals := mywant.CheckLocalsInitialized[QueueLocals](&q.Want)
 
 	// Initialize missing fields if needed
 	if locals.batchUpdateInterval == 0 {
@@ -407,11 +399,7 @@ func (c *Combiner) IsAchieved() bool {
 
 // Progress executes the combiner directly
 func (c *Combiner) Progress() {
-	locals := c.GetLocals()
-	if locals == nil {
-		c.StoreLog("ERROR: Failed to access CombinerLocals from Want.Locals")
-		return
-	}
+	locals := mywant.CheckLocalsInitialized[CombinerLocals](&c.Want)
 
 	processed, _ := c.GetStateInt("processed", 0)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {

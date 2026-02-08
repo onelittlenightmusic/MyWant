@@ -1617,8 +1617,13 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					// Notify parents of changes (adoption or disowning)
 					cb.notifyParentOfChanges(updatedConfigWant, oldOwnerRefs, newOwnerRefs)
 
-					// Reset status to Idle so want can be re-executed
-					runtimeWant.want.RestartWant()
+					// Clear config error state if present (allows recovery via config update)
+					if runtimeWant.want.Status == WantStatusConfigError {
+						runtimeWant.want.ClearConfigError()
+					} else {
+						// Reset status to Idle so want can be re-executed
+						runtimeWant.want.RestartWant()
+					}
 				}
 			}
 			hasWantChanges = true

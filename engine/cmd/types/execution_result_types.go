@@ -107,21 +107,17 @@ func (e *ExecutionResultWant) Progress() {
 		// Already failed, nothing more to do
 
 	default:
-		e.StoreLog("ERROR: Unknown phase: %s", locals.Phase)
-		locals.Phase = ExecutionPhaseFailed
+		e.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
 		e.updateLocals(locals)
 	}
 }
 
 // handlePhaseInitial handles the initial phase
 func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLocals) {
-	// Validate command parameter
+	// Validate command parameter using ConfigError pattern
 	command, ok := e.Spec.Params["command"]
 	if !ok || command == "" {
-		e.StoreLog("ERROR: Missing required parameter 'command'")
-		e.StoreState("status", "failed")
-		e.StoreState("error_message", "Missing required parameter 'command'")
-		e.StoreState("completed", true)
+		e.SetConfigError("command", "Missing required parameter 'command'")
 		locals.Phase = ExecutionPhaseFailed
 		e.updateLocals(locals)
 		return

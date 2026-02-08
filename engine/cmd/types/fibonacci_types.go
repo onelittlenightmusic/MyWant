@@ -105,11 +105,7 @@ func (f *FibonacciFilter) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *FibonacciFilter) Progress() {
-	locals := f.GetLocals()
-	if locals == nil {
-		f.StoreLog("ERROR: Failed to access FibonacciFilterLocals from Want.Locals")
-		return
-	}
+	locals := CheckLocalsInitialized[FibonacciFilterLocals](&f.Want)
 
 	totalProcessed, _ := f.GetStateInt("total_processed", 0)
 

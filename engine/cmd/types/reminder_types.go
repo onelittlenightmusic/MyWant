@@ -63,14 +63,11 @@ func (r *ReminderWant) Initialize() {
 	locals.LastCheckTime = time.Now()
 	locals.TimeoutSeconds = 300 // 5 minutes default timeout
 
-	// Parse and validate parameters
+	// Parse and validate parameters using ConfigError pattern
 	// Message (required)
 	locals.Message = r.GetStringParam("message", "")
 	if locals.Message == "" {
-		r.StoreLog("ERROR: Missing required parameter 'message'")
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("error_message", "Missing required parameter 'message'")
-		r.Status = "failed"
+		r.SetConfigError("message", "Missing required parameter 'message'")
 		r.Locals = locals
 		return
 	}
@@ -81,10 +78,7 @@ func (r *ReminderWant) Initialize() {
 	// Parse ahead duration
 	aheadDuration, err := parseDurationString(locals.Ahead)
 	if err != nil {
-		r.StoreLog("ERROR: Invalid ahead parameter '%s': %v", locals.Ahead, err)
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("error_message", fmt.Sprintf("Invalid ahead parameter: %s", locals.Ahead))
-		r.Status = "failed"
+		r.SetConfigError("ahead", fmt.Sprintf("Invalid ahead parameter '%s': %v", locals.Ahead, err))
 		r.Locals = locals
 		return
 	}
@@ -97,10 +91,7 @@ func (r *ReminderWant) Initialize() {
 
 	// Check for mutually exclusive parameters
 	if eventTimeStr != "" && durationFromNowStr != "" {
-		r.StoreLog("ERROR: Cannot provide both 'event_time' and 'duration_from_now'")
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("error_message", "Cannot provide both 'event_time' and 'duration_from_now'")
-		r.Status = "failed"
+		r.SetConfigError("event_time/duration_from_now", "Cannot provide both 'event_time' and 'duration_from_now'")
 		r.Locals = locals
 		return
 	}
@@ -112,10 +103,7 @@ func (r *ReminderWant) Initialize() {
 		var parseErr error
 		eventTime, parseErr = time.Parse(time.RFC3339, eventTimeStr)
 		if parseErr != nil {
-			r.StoreLog("ERROR: Invalid event_time format: %v", parseErr)
-			r.StoreState("reminder_phase", ReminderPhaseFailed)
-			r.StoreState("error_message", "Invalid event_time format (use RFC3339)")
-			r.Status = "failed"
+			r.SetConfigError("event_time", fmt.Sprintf("Invalid event_time format (use RFC3339): %v", parseErr))
 			r.Locals = locals
 			return
 		}
@@ -123,20 +111,14 @@ func (r *ReminderWant) Initialize() {
 		// Calculate event_time from duration_from_now
 		duration, parseErr := parseDurationString(durationFromNowStr)
 		if parseErr != nil {
-			r.StoreLog("ERROR: Invalid duration_from_now format: %v", parseErr)
-			r.StoreState("reminder_phase", ReminderPhaseFailed)
-			r.StoreState("error_message", fmt.Sprintf("Invalid duration_from_now format: %s", durationFromNowStr))
-			r.Status = "failed"
+			r.SetConfigError("duration_from_now", fmt.Sprintf("Invalid duration_from_now format: %v", parseErr))
 			r.Locals = locals
 			return
 		}
 		eventTime = time.Now().Add(duration)
 		locals.DurationFromNow = durationFromNowStr
 	} else if !r.hasWhenSpec() {
-		r.StoreLog("ERROR: Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		r.StoreState("error_message", "Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
-		r.Status = "failed"
+		r.SetConfigError("timing", "Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
 		r.Locals = locals
 		return
 	}
@@ -290,10 +272,7 @@ func (r *ReminderWant) Progress() {
 		break
 
 	default:
-		r.StoreLog("ERROR: Unknown phase: %s", locals.Phase)
-		r.StoreState("reminder_phase", ReminderPhaseFailed)
-		locals.Phase = ReminderPhaseFailed
-		r.Status = "failed"
+		r.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
 		r.updateLocals(locals)
 	}
 }

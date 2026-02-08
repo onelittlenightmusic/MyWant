@@ -158,10 +158,7 @@ func (m *FlightMockServerWant) Progress() {
 		break
 
 	default:
-		m.StoreLog("[ERROR] Unknown phase: %s", locals.Phase)
-		m.StoreState("server_phase", MockServerPhaseFailed)
-		locals.Phase = MockServerPhaseFailed
-		m.Status = "failed"
+		m.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
 		m.updateLocals(locals)
 	}
 }

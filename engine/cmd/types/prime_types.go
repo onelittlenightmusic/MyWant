@@ -118,11 +118,7 @@ func (f *PrimeSequence) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *PrimeSequence) Progress() {
-	locals := f.GetLocals()
-	if locals == nil {
-		f.StoreLog("ERROR: Failed to access PrimeSequenceLocals from Want.Locals")
-		return
-	}
+	locals := CheckLocalsInitialized[PrimeSequenceLocals](&f.Want)
 
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {

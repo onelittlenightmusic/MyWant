@@ -18,9 +18,13 @@ const getStatusColor = (status: WantExecutionStatus): string => {
     case 'terminated':
       return '#9333ea'; // Purple
     case 'failed':
+    case 'module_error':
       return '#ef4444'; // Red
+    case 'config_error':
+    case 'stopped':
+      return '#f59e0b'; // Amber/Yellow
     default:
-      return '#d1d5db'; // Gray for created, suspended, stopped
+      return '#d1d5db'; // Gray for created, initializing, suspended
   }
 };
 

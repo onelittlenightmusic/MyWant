@@ -15,6 +15,8 @@ const STATUS_OPTIONS: WantExecutionStatus[] = [
   'reaching',
   'achieved',
   'failed',
+  'module_error',
+  'config_error',
   'stopped'
 ];
 

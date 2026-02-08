@@ -43,15 +43,10 @@ func (g *GmailWant) Initialize() {
 		g.Locals = locals
 	}
 
-	// Parse and validate parameters
-	// prompt (required)
+	// Parse and validate required parameters using ConfigError pattern
 	promptParam := g.GetStringParam("prompt", "")
 	if promptParam == "" {
-		errorMsg := "Missing required parameter 'prompt'"
-		g.StoreLog("ERROR: %s", errorMsg)
-		g.StoreState("gmail_status", "failed")
-		g.StoreState("error", errorMsg)
-		g.Status = "failed"
+		g.SetConfigError("prompt", "Missing required parameter 'prompt'")
 		g.Locals = locals
 		return
 	}
@@ -132,11 +127,7 @@ func (g *GmailWant) CalculateAchievingPercentage() float64 {
 
 // Progress executes the Gmail operation via MCP Agent
 func (g *GmailWant) Progress() {
-	locals := g.GetLocals()
-	if locals == nil {
-		g.StoreLog("ERROR: Failed to access GmailLocals")
-		return
-	}
+	locals := CheckLocalsInitialized[GmailLocals](&g.Want)
 
 	// Check if already achieved
 	if g.IsAchieved() {
@@ -274,16 +265,3 @@ func parseEmails(text string) []map[string]string {
 	return emails
 }
 
-// getLocals safely retrieves the locals struct
-func (g *GmailWant) getLocals() *GmailLocals {
-	if g.Locals == nil {
-		return nil
-	}
-
-	locals, ok := g.Locals.(*GmailLocals)
-	if !ok {
-		return nil
-	}
-
-	return locals
-}
