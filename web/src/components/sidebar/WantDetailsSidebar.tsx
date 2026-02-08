@@ -67,7 +67,7 @@ interface WantDetailsSidebarProps {
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
 
 // Unified section container styling for all metadata/state sections
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50 overflow-hidden';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50 overflow-hidden p-4';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
@@ -387,7 +387,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   if (!want) {
     if (summaryProps) {
       return (
-        <div className="p-8">
+        <div className="px-4 py-8">
           <SummarySidebarContent {...summaryProps} />
         </div>
       );
@@ -770,7 +770,7 @@ const SettingsTab: React.FC<{
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-8 focusable-container">
+      <div className="flex-1 overflow-y-auto px-4 py-8 focusable-container">
         {configMode === 'form' ? (
           <div className="space-y-2">
             {/* Metadata Section */}
@@ -1096,11 +1096,11 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
       const dots = '.'.repeat(Math.max(minDots, Math.min(dotsNeeded, 30)));
 
       items.push(
-        <div key={key} className="flex justify-between items-center text-sm gap-2">
-          <span className="text-gray-600 font-normal text-xs whitespace-nowrap">{key}</span>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-gray-400 text-xs">{dots}</span>
-            <span className="text-gray-800 font-semibold text-base whitespace-nowrap">{valueStr}</span>
+        <div key={key} className="flex justify-between items-center text-sm gap-2 group/kv">
+          <span className="text-gray-600 font-normal text-xs whitespace-nowrap flex-shrink-0">{key}</span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="text-gray-400 text-xs flex-shrink-0">{dots}</span>
+            <span className="text-gray-800 font-semibold text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
           </div>
         </div>
       );
@@ -1116,7 +1116,7 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
 
   return (
-    <div className="p-8 h-full overflow-y-auto">
+    <div className="px-4 py-8 h-full overflow-y-auto">
       {hasState || hasHiddenState ? (
         <div className="space-y-2">
           {/* Execution Result Metadata */}
@@ -1233,7 +1233,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
   };
 
   return (
-    <div className="p-8 space-y-2">
+    <div className="px-4 py-8 space-y-2">
       {/* Current Agent */}
       {want.current_agent && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1580,7 +1580,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasLogs = results?.logs && results.logs.length > 0;
 
   return (
-    <div className="p-8 space-y-2">
+    <div className="px-4 py-8 space-y-2">
       {/* Parameter History Section */}
       {hasParameterHistory && (
         <div className={SECTION_CONTAINER_CLASS}>
