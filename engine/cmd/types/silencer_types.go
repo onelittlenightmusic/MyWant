@@ -5,6 +5,10 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
+}
+
 // SilencerWant represents a want that automatically processes reaction requests
 type SilencerWant struct {
 	Want
@@ -12,10 +16,6 @@ type SilencerWant struct {
 
 func (s *SilencerWant) GetLocals() *SilencerLocals {
 	return GetLocals[SilencerLocals](&s.Want)
-}
-
-func init() {
-	RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
 }
 
 // SilencerLocals holds type-specific local state for SilencerWant

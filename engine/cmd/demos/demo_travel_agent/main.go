@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
@@ -43,24 +42,10 @@ func main() {
 		fmt.Printf("Warning: Failed to load agents: %v\n", err)
 	}
 
-	// Dynamically register AgentPremium
-	agentPremium := types.NewAgentPremium(
-		"agent_premium",
-		[]string{"hotel_reservation"}, // Match the required capability in recipe
-		[]string{"xxx"},
-		"platinum",
-	)
-	agentPremium.Action = func(ctx context.Context, want *Want) error {
-		fmt.Printf("[AGENT_PREMIUM_ACTION] Simple action called, delegating to AgentPremium.Exec()\n")
-		_, err := agentPremium.Exec(ctx, want)
-		return err
-	}
+	// Activate all auto-registered agent implementations (including agent_premium)
+	RegisterAllKnownAgentImplementations(agentRegistry)
 
-	agentRegistry.RegisterAgent(agentPremium)
-	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
 	builder.SetAgentRegistry(agentRegistry)
-
-	// Register travel want types
 
 	fmt.Println("🚀 Executing agent-enabled travel planning...")
 	builder.Execute()

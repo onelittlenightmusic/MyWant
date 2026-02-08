@@ -5,6 +5,10 @@ import (
 	mywant "mywant/engine/src"
 )
 
+func init() {
+	mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("gmail_dynamic")
+}
+
 // GmailDynamicPhase represents the current phase of the dynamic want lifecycle
 type GmailDynamicPhase string
 
@@ -28,10 +32,6 @@ type GmailDynamicWant struct {
 
 func (g *GmailDynamicWant) GetLocals() *GmailDynamicLocals {
 	return mywant.GetLocals[GmailDynamicLocals](&g.Want)
-}
-
-func init() {
-	mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("gmail_dynamic")
 }
 
 func (g *GmailDynamicWant) Initialize() {

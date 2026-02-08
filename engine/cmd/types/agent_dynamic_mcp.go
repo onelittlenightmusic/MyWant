@@ -12,49 +12,22 @@ import (
 	mywant "mywant/engine/src"
 )
 
-// ============ Dynamic MCP Agents ============
+func init() {
+	mywant.RegisterDoAgentType("discovery_agent",
+		[]mywant.Capability{mywant.Cap("mcp_dynamic_discovery")},
+		executeDiscoveryAction)
 
-// RegisterDynamicMCPAgents registers all specialized agents for dynamic wants
-func RegisterDynamicMCPAgents(registry *mywant.AgentRegistry) {
-	// 1. Discovery Agent
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_dynamic_discovery",
-		Gives: []string{"mcp_dynamic_discovery"},
-	})
-	registry.RegisterAgent(&mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent("discovery_agent", []string{"mcp_dynamic_discovery"}, mywant.DoAgentType),
-		Action:    executeDiscoveryAction,
-	})
+	mywant.RegisterDoAgentType("developer_agent",
+		[]mywant.Capability{mywant.Cap("mcp_dynamic_developer")},
+		executeDeveloperAction)
 
-	// 2. Developer Agent
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_dynamic_developer",
-		Gives: []string{"mcp_dynamic_developer"},
-	})
-	registry.RegisterAgent(&mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent("developer_agent", []string{"mcp_dynamic_developer"}, mywant.DoAgentType),
-		Action:    executeDeveloperAction,
-	})
+	mywant.RegisterDoAgentType("compiler_agent",
+		[]mywant.Capability{mywant.Cap("mcp_dynamic_compiler")},
+		executeCompilerAction)
 
-	// 3. Compiler Agent
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_dynamic_compiler",
-		Gives: []string{"mcp_dynamic_compiler"},
-	})
-	registry.RegisterAgent(&mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent("compiler_agent", []string{"mcp_dynamic_compiler"}, mywant.DoAgentType),
-		Action:    executeCompilerAction,
-	})
-
-	// 4. Validator Agent
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_dynamic_validator",
-		Gives: []string{"mcp_dynamic_validator"},
-	})
-	registry.RegisterAgent(&mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent("validator_agent", []string{"mcp_dynamic_validator"}, mywant.DoAgentType),
-		Action:    executeValidatorAction,
-	})
+	mywant.RegisterDoAgentType("validator_agent",
+		[]mywant.Capability{mywant.Cap("mcp_dynamic_validator")},
+		executeValidatorAction)
 }
 
 // --- Discovery Action ---

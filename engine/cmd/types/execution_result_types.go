@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+func init() {
+	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
+	RegisterDoAgentType("execution_command",
+		[]Capability{{Name: "command_execution", Gives: []string{"execute_shell_command"}}},
+		executeCommand)
+}
+
 // ExecutionResultWantLocals holds type-specific local state for ExecutionResultWant
 type ExecutionResultWantLocals struct {
 	Command          string
@@ -47,10 +54,6 @@ type ExecutionResultWant struct {
 
 func (e *ExecutionResultWant) GetLocals() *ExecutionResultWantLocals {
 	return GetLocals[ExecutionResultWantLocals](&e.Want)
-}
-
-func init() {
-	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
 }
 
 // Initialize resets execution state before starting
@@ -304,22 +307,3 @@ func (e *ExecutionResultWant) updateLocals(locals *ExecutionResultWantLocals) {
 	e.Locals = locals
 }
 
-// RegisterExecutionAgents registers the ExecutionAgent with the agent registry
-func RegisterExecutionAgents(registry *AgentRegistry) {
-	if registry == nil {
-		InfoLog("Warning: No agent registry found, skipping ExecutionAgent registration")
-		return
-	}
-
-	// Register capability
-	registry.RegisterCapability(Capability{
-		Name:  "command_execution",
-		Gives: []string{"execute_shell_command"},
-	})
-
-	// Register agent
-	agent := NewExecutionAgent()
-	registry.RegisterAgent(agent)
-
-	InfoLog("[AGENT] Registered ExecutionAgent with capability: command_execution")
-}

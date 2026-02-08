@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	_ "mywant/engine/cmd/types"
 	. "mywant/engine/src"
@@ -43,59 +42,10 @@ func main() {
 		fmt.Printf("Warning: Failed to load agents: %v\n", err)
 	}
 
-	// Dynamically register AgentPremium for hotel
-	agentPremium := types.NewAgentPremium(
-		"agent_premium",
-		[]string{"hotel_reservation"},
-		[]string{"xxx"},
-		"platinum",
-	)
+	// Activate all auto-registered agent implementations (including premium agents)
+	RegisterAllKnownAgentImplementations(agentRegistry)
 
-	agentPremium.Action = func(ctx context.Context, want *Want) error {
-		fmt.Printf("[AGENT_PREMIUM_ACTION] Hotel agent called, delegating to AgentPremium.Exec()\n")
-		_, err := agentPremium.Exec(ctx, want)
-		return err
-	}
-
-	agentRegistry.RegisterAgent(agentPremium)
-	fmt.Printf("🔧 Dynamically registered AgentPremium: %s\n", agentPremium.GetName())
-
-	// Dynamically register Restaurant Agent
-	agentRestaurant := types.NewAgentRestaurant(
-		"agent_restaurant_premium",
-		[]string{"restaurant_reservation"},
-		[]string{"xxx"},
-		"premium",
-	)
-
-	agentRestaurant.Action = func(ctx context.Context, want *Want) error {
-		fmt.Printf("[AGENT_RESTAURANT_ACTION] Restaurant agent called, processing reservation\n")
-		_, err := agentRestaurant.Exec(ctx, want)
-		return err
-	}
-
-	agentRegistry.RegisterAgent(agentRestaurant)
-	fmt.Printf("🔧 Dynamically registered Restaurant Agent: %s\n", agentRestaurant.GetName())
-
-	// Dynamically register Buffet Agent
-	agentBuffet := types.NewAgentBuffet(
-		"agent_buffet_premium",
-		[]string{"buffet_reservation"},
-		[]string{"xxx"},
-		"premium",
-	)
-
-	agentBuffet.Action = func(ctx context.Context, want *Want) error {
-		fmt.Printf("[AGENT_BUFFET_ACTION] Buffet agent called, processing reservation\n")
-		_, err := agentBuffet.Exec(ctx, want)
-		return err
-	}
-
-	agentRegistry.RegisterAgent(agentBuffet)
-	fmt.Printf("🔧 Dynamically registered Buffet Agent: %s\n", agentBuffet.GetName())
 	builder.SetAgentRegistry(agentRegistry)
-
-	// Register travel want types
 
 	fmt.Println("🚀 Executing complete agent-enabled travel planning...")
 	builder.Execute()

@@ -17,6 +17,15 @@ import (
 	mywant "mywant/engine/src"
 )
 
+func init() {
+	mywant.RegisterDoAgentType("mcp_tools",
+		[]mywant.Capability{{
+			Name:  "mcp_gmail",
+			Gives: []string{"mcp_gmail_search", "mcp_gmail_read", "mcp_gmail_send"},
+		}},
+		executeMCPOperation)
+}
+
 // ============ NativeMCPManager ============
 
 // NativeMCPManager handles direct MCP tool calls using the official SDK
@@ -848,38 +857,8 @@ func GetGooseManager(ctx context.Context) (*GooseManager, error) {
 	return manager, nil
 }
 
-// ============ MCPAgent ============
-
-// MCPAgent handles MCP tool invocations for Gmail and other MCP services
-type MCPAgent struct {
-	*mywant.DoAgent
-}
-
-// NewMCPAgent creates an agent for MCP tool invocations
-func NewMCPAgent() *MCPAgent {
-	baseAgent := mywant.NewBaseAgent(
-		"mcp_tools",           // Agent name
-		[]string{"mcp_gmail"}, // Capabilities
-		mywant.DoAgentType,    // Execute synchronously
-	)
-
-	agent := &MCPAgent{
-		DoAgent: &mywant.DoAgent{
-			BaseAgent: *baseAgent,
-			Action:    nil, // Set below
-		},
-	}
-
-	// Define MCP execution logic
-	agent.DoAgent.Action = func(ctx context.Context, want *mywant.Want) error {
-		return agent.executeMCPOperation(ctx, want)
-	}
-
-	return agent
-}
-
-// executeMCPOperation performs the actual MCP tool invocation via Goose
-func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) error {
+// executeMCPOperation performs the actual MCP tool invocation via Goose or Native SDK
+func executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 	// Read operation type and parameters from want state
 	var operationStr string
 	var useNative bool
@@ -898,7 +877,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 
 	if useNative {
 		want.StoreLog("[MCP-AGENT] Executing MCP operation via Native SDK: %s", operationStr)
-		return a.executeNativeMCPOperation(ctx, want, operationStr)
+		return executeNativeMCPOperation(ctx, want, operationStr)
 	}
 
 	want.StoreLog("[MCP-AGENT] Executing MCP operation via Goose: %s", operationStr)
@@ -1017,7 +996,7 @@ func (a *MCPAgent) executeMCPOperation(ctx context.Context, want *mywant.Want) e
 }
 
 // executeNativeMCPOperation performs direct MCP tool invocation using the Go SDK
-func (a *MCPAgent) executeNativeMCPOperation(ctx context.Context, want *mywant.Want, operation string) error {
+func executeNativeMCPOperation(ctx context.Context, want *mywant.Want, operation string) error {
 	native := GetNativeMCPManager(ctx)
 	var result map[string]interface{}
 
@@ -1110,23 +1089,3 @@ func flattenMCPContent(contents []mcp.Content) []string {
 	return results
 }
 
-// RegisterMCPAgent registers the MCP agent with the agent registry
-func RegisterMCPAgent(registry *mywant.AgentRegistry) {
-	if registry == nil {
-		log.Println("Warning: No agent registry found, skipping MCPAgent registration")
-		return
-	}
-
-	// CRITICAL: Register capability BEFORE registering agent
-	// This is required for ExecuteAgents() to find the agent later
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_gmail",
-		Gives: []string{"mcp_gmail_search", "mcp_gmail_read", "mcp_gmail_send"},
-	})
-
-	// Now register the agent that provides these capabilities
-	agent := NewMCPAgent()
-	registry.RegisterAgent(agent)
-
-	log.Printf("[AGENT] MCPAgent registered with capabilities: mcp_gmail\n")
-}

@@ -1,14 +1,9 @@
 package types
 
 import (
-	"context"
-	"crypto/md5"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/rand"
 	. "mywant/engine/src"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -146,27 +141,6 @@ func (r *RestaurantWant) Initialize() {
 // tryAgentExecution implements TravelWantInterface for RestaurantWant
 func (r *RestaurantWant) tryAgentExecution() any {
 	if len(r.Spec.Requires) > 0 {
-		// Step 1: Execute MonitorRestaurant first to check for existing state
-		monitorAgent := NewMonitorRestaurant(
-			"restaurant_monitor",
-			[]string{"restaurant_agency"},
-			[]string{"xxx"},
-		)
-
-		ctx := context.Background()
-		if _, err := monitorAgent.Exec(ctx, &r.Want); err != nil {
-		}
-
-		r.AggregateChanges()
-		if schedule, ok := GetStateAs[RestaurantSchedule](&r.Want, "agent_result"); ok {
-			r.StoreState("execution_source", "monitor")
-
-			// Immediately set the schedule and complete the cycle
-			r.SetSchedule(schedule)
-			return &schedule
-		}
-
-		// Step 2: No existing schedule found, execute AgentRestaurant
 		if err := r.ExecuteAgents(); err != nil {
 			r.StoreState("agent_execution_status", "failed")
 			r.StoreState("agent_execution_error", err.Error())
@@ -176,7 +150,6 @@ func (r *RestaurantWant) tryAgentExecution() any {
 		r.StoreState("agent_execution_status", "completed")
 		r.StoreState("execution_source", "agent")
 
-		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if schedule, ok := GetStateAs[RestaurantSchedule](&r.Want, "agent_result"); ok {
 			return &schedule
 		}
@@ -591,10 +564,9 @@ type FlightWantLocals struct {
 	Duration            time.Duration
 	DepartureDate       string // Departure date in YYYY-MM-DD format
 	monitoringStartTime time.Time
-	monitoringDuration  time.Duration     // How long to monitor for status changes
-	lastLogTime         time.Time         // Track last monitoring log time to reduce spam
-	monitoringDone      chan struct{}     // Signal to stop monitoring goroutine
-	monitor             *MonitorFlightAPI // Monitoring agent instance
+	monitoringDuration  time.Duration // How long to monitor for status changes
+	lastLogTime         time.Time     // Track last monitoring log time to reduce spam
+	monitoringDone      chan struct{} // Signal to stop monitoring goroutine
 }
 
 // StatusChange represents a status change event
@@ -603,242 +575,6 @@ type StatusChange struct {
 	OldStatus string
 	NewStatus string
 	Details   string
-}
-
-// MonitorFlightAPI extends MonitorAgent to poll flight status from mock server
-type MonitorFlightAPI struct {
-	MonitorAgent
-	ServerURL             string
-	PollInterval          time.Duration
-	LastPollTime          time.Time
-	LastKnownStatus       string
-	StatusChangeHistory   []StatusChange
-	LastRecordedStateHash string // Track last recorded state to avoid duplicate history entries
-}
-
-// Exec polls the mock server for flight status updates NOTE: This agent runs ONE TIME per ExecuteAgents() call The continuous polling loop is handled by the Want's Progress method (FlightWant) Individual agents should NOT implement their own polling loops
-func (m *MonitorFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
-	flightID, ok := want.GetStateString("flight_id", "")
-	if !ok || flightID == "" {
-		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
-	}
-
-	// Skip monitoring if flight_id is empty (flight cancellation/rebooking in progress)
-	if flightID == "" {
-		want.StoreLog("Skipping monitoring: flight_id is empty (cancellation/rebooking in progress)")
-		return false, nil
-	}
-	now := time.Now()
-	if !m.LastPollTime.IsZero() && now.Sub(m.LastPollTime) < m.PollInterval {
-		// Skip this polling cycle - wait for PollInterval to elapse
-		return false, nil
-	}
-
-	// Record this poll time for next interval check
-	m.LastPollTime = now
-
-	// Restore last known status from want state for persistence across execution cycles
-	m.LastKnownStatus, _ = want.GetStateString("flight_status", "unknown")
-
-	// Restore status history from want state for persistence Do NOT clear history - it accumulates across multiple monitoring executions
-	if historyI, exists := want.GetState("status_history"); exists {
-		if historyStrs, ok := historyI.([]any); ok {
-			for _, entryI := range historyStrs {
-				if entry, ok := entryI.(string); ok {
-					if parsed, ok := parseStatusHistoryEntry(entry); ok {
-						// Only add if not already in history
-						found := false
-						for _, existing := range m.StatusChangeHistory {
-							if existing.OldStatus == parsed.OldStatus && existing.NewStatus == parsed.NewStatus && existing.Details == parsed.Details {
-								found = true
-								break
-							}
-						}
-						if !found {
-							m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
-						}
-					}
-				}
-			}
-		} else if historyStrs, ok := historyI.([]string); ok {
-			for _, entry := range historyStrs {
-				if parsed, ok := parseStatusHistoryEntry(entry); ok {
-					// Only add if not already in history
-					found := false
-					for _, existing := range m.StatusChangeHistory {
-						if existing.OldStatus == parsed.OldStatus && existing.NewStatus == parsed.NewStatus && existing.Details == parsed.Details {
-							found = true
-							break
-						}
-					}
-					if !found {
-						m.StatusChangeHistory = append(m.StatusChangeHistory, parsed)
-					}
-				}
-			}
-		}
-	}
-	url := fmt.Sprintf("%s/api/flights/%s", m.ServerURL, flightID)
-	resp, err := http.Get(url)
-	if err != nil {
-		return false, fmt.Errorf("failed to get flight status: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
-	}
-	var reservation FlightReservation
-	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
-		return false, fmt.Errorf("failed to decode response: %v", err)
-	}
-	newStatus := reservation.Status
-	oldStatus := m.LastKnownStatus
-	hasStateChange := newStatus != oldStatus
-
-	// Calculate hash of current reservation data for differential history
-	currentStateJSON, _ := json.Marshal(reservation)
-	currentStateHash := fmt.Sprintf("%x", md5.Sum(currentStateJSON))
-
-	// Only update state if state has actually changed (differential history) NOTE: Exec cycle wrapping is handled by the agent execution framework in want_agent.go Individual agents should NOT call BeginExecCycle/EndExecCycle
-	if hasStateChange || currentStateHash != m.LastRecordedStateHash {
-		updates := Dict{
-			"flight_id":      reservation.ID,
-			"flight_number":  reservation.FlightNumber,
-			"from":           reservation.From,
-			"to":             reservation.To,
-			"departure_time": reservation.DepartureTime.Format(time.RFC3339),
-			"arrival_time":   reservation.ArrivalTime.Format(time.RFC3339),
-			"status_message": reservation.StatusMessage,
-			"updated_at":     reservation.UpdatedAt.Format(time.RFC3339),
-		}
-
-		if hasStateChange {
-			want.StoreLog("Status changed: %s -> %s", oldStatus, newStatus)
-
-			// Record status change
-			statusChange := StatusChange{
-				Timestamp: time.Now(),
-				OldStatus: oldStatus,
-				NewStatus: newStatus,
-				Details:   reservation.StatusMessage,
-			}
-			m.StatusChangeHistory = append(m.StatusChangeHistory, statusChange)
-
-			updates["flight_status"] = newStatus
-			updates["status_changed"] = true
-			updates["status_changed_at"] = time.Now().Format(time.RFC3339)
-			updates["status_change_history_count"] = len(m.StatusChangeHistory)
-
-			// Record activity description for agent history
-			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
-				oldStatus, newStatus, reservation.FlightNumber, reservation.StatusMessage)
-			want.SetAgentActivity(m.Name, activity)
-			schedule := FlightSchedule{
-				DepartureTime:   reservation.DepartureTime,
-				ArrivalTime:     reservation.ArrivalTime,
-				FlightNumber:    reservation.FlightNumber,
-				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
-			}
-			updates["agent_result"] = schedule
-			want.StoreLog("[PACKET-SEND] Flight schedule packet: FlightNumber=%s, From=%s, To=%s, Status=%s",
-				schedule.FlightNumber, reservation.From, reservation.To, newStatus)
-			statusHistoryStrs := make([]string, 0)
-			for _, change := range m.StatusChangeHistory {
-				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
-					change.Timestamp.Format("15:04:05"),
-					change.OldStatus,
-					change.NewStatus,
-					change.Details)
-				statusHistoryStrs = append(statusHistoryStrs, historyEntry)
-			}
-			updates["status_history"] = statusHistoryStrs
-
-			m.LastKnownStatus = newStatus
-
-			// Print status progression
-			want.StoreLog("FLIGHT %s STATUS PROGRESSION: %s (at %s)",
-				reservation.ID, newStatus, time.Now().Format("15:04:05"))
-
-			// Update hash after successful commit
-			m.LastRecordedStateHash = currentStateHash
-			want.StoreLog("State recorded (hash: %s)", currentStateHash[:8])
-		} else {
-			// No status change - don't create history entry, but still update other flight details Removed verbose log: "Flight details changed but status is still: ..."
-			m.LastRecordedStateHash = currentStateHash
-		}
-		// Use StoreStateMultiForAgent for background agent updates (separate from Want progress cycle)
-		// Mark this as MonitorAgent for history tracking
-		updates["action_by_agent"] = "MonitorAgent"
-		want.StoreStateMultiForAgent(updates)
-	}
-
-	return false, nil // Continue monitoring
-}
-
-// GetStatusChangeHistory returns the status change history
-func (m *MonitorFlightAPI) GetStatusChangeHistory() []StatusChange {
-	return m.StatusChangeHistory
-}
-
-// WasStatusChanged checks if status has changed since last check
-func (m *MonitorFlightAPI) WasStatusChanged() bool {
-	return len(m.StatusChangeHistory) > 0
-}
-
-// parseStatusHistoryEntry parses a status history entry string
-func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
-	colonIdx := findFirstColon(entry)
-	if colonIdx < 0 || colonIdx+2 >= len(entry) {
-		return StatusChange{}, false
-	}
-
-	// Extract timestamp part (before first colon)
-	timestampStr := entry[:colonIdx]
-	rest := strings.TrimSpace(entry[colonIdx+1:])
-	arrowIdx := strings.Index(rest, " -> ")
-	if arrowIdx < 0 {
-		return StatusChange{}, false
-	}
-
-	// Extract old status (after colon, before arrow)
-	oldStatus := strings.TrimSpace(rest[:arrowIdx])
-	afterArrow := strings.TrimSpace(rest[arrowIdx+4:])
-	parenIdx := strings.Index(afterArrow, "(")
-	if parenIdx < 0 {
-		return StatusChange{}, false
-	}
-
-	// Extract new status (after arrow, before parenthesis)
-	newStatus := strings.TrimSpace(afterArrow[:parenIdx])
-
-	// Extract details (inside parentheses)
-	detailsPart := strings.TrimSpace(afterArrow[parenIdx:])
-	if len(detailsPart) < 2 || !strings.HasPrefix(detailsPart, "(") || !strings.HasSuffix(detailsPart, ")") {
-		return StatusChange{}, false
-	}
-	details := strings.TrimSpace(detailsPart[1 : len(detailsPart)-1])
-	parsedTime, err := time.Parse("15:04:05", timestampStr)
-	if err != nil {
-		parsedTime = time.Now() // Fallback
-	}
-
-	return StatusChange{
-		Timestamp: parsedTime,
-		OldStatus: oldStatus,
-		NewStatus: newStatus,
-		Details:   details,
-	}, true
-}
-
-// findFirstColon finds the first colon in a string
-func findFirstColon(s string) int {
-	for i, ch := range s {
-		if ch == ':' {
-			return i
-		}
-	}
-	return -1
 }
 
 // Flight execution phases (state machine)
@@ -859,9 +595,6 @@ type FlightWant struct {
 func (f *FlightWant) Initialize() {
 	f.BaseTravelWant.executor = f
 
-	// Get server URL from params
-	serverURL := f.GetStringParam("server_url", "http://localhost:8090")
-
 	// Get or initialize locals
 	locals, ok := f.Locals.(*FlightWantLocals)
 	if !ok {
@@ -869,19 +602,6 @@ func (f *FlightWant) Initialize() {
 		f.Locals = locals
 	}
 
-	// Create monitoring agent during initialization
-	locals.monitor = &MonitorFlightAPI{
-		MonitorAgent: MonitorAgent{
-			BaseAgent: BaseAgent{
-				Name:         "flight-monitor-" + f.Metadata.ID,
-				Capabilities: []string{},
-				Type:         MonitorAgentType,
-			},
-		},
-		ServerURL:           serverURL,
-		PollInterval:        10 * time.Second,
-		StatusChangeHistory: make([]StatusChange, 0),
-	}
 	locals.monitoringDone = make(chan struct{})
 }
 
@@ -1108,19 +828,16 @@ func (f *FlightWant) tryAgentExecution() any {
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			f.StoreState("execution_source", "agent")
 
-			// Start background monitoring for this flight using pre-initialized monitor
+			// Start background monitoring for this flight using registered MonitorAgent
 			flightID, _ := f.GetStateString("flight_id", "")
-
-			// Get monitor from locals (created during initialization)
-			locals := f.GetLocals()
-			monitor := locals.monitor
-
-			// Update monitor name with actual flight ID
 			agentName := "flight-monitor-" + flightID
-			monitor.Name = agentName
 
-			if err := f.AddMonitoringAgent(agentName, 10*time.Second, monitor.Exec); err != nil {
-				f.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+			if agent, ok := f.GetAgentRegistry().GetAgent(flightMonitorAgentName); ok {
+				if err := f.AddMonitoringAgent(agentName, 10*time.Second, agent.Exec); err != nil {
+					f.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+				}
+			} else {
+				f.StoreLog("ERROR: Monitor agent %s not found in registry", flightMonitorAgentName)
 			}
 
 			// Extract and return FlightSchedule
@@ -1220,6 +937,7 @@ func (f *FlightWant) ResetFlightState() {
 		"schedule_date",
 		"canceled_at",
 		"_previous_flight_status",
+		"_monitor_state_hash",
 		// NOTE: _previous_flight_id is NOT reset - it's used to detect rebooking state
 	}
 

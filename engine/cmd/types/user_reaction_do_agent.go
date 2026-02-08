@@ -6,23 +6,10 @@ import (
 	. "mywant/engine/src"
 )
 
-// UserReactionDoAgent handles performing reaction actions
-type UserReactionDoAgent struct {
-	DoAgent
-}
-
-// NewUserReactionDoAgent creates a DoAgent that performs reaction actions
-func NewUserReactionDoAgent() *UserReactionDoAgent {
-	agent := &UserReactionDoAgent{}
-	agent.BaseAgent = *NewBaseAgent(
-		"user_reaction_do",
-		[]string{"reaction_auto_approval"},
-		DoAgentType,
-	)
-	agent.Action = func(ctx context.Context, want *Want) error {
-		return performAutoApproval(ctx, want)
-	}
-	return agent
+func init() {
+	RegisterDoAgentType("user_reaction_do",
+		[]Capability{Cap("reaction_auto_approval")},
+		performAutoApproval)
 }
 
 // performAutoApproval performs automatic approval if configured
@@ -72,9 +59,3 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// RegisterUserReactionDoAgent registers the user reaction do agent with the registry
-func RegisterUserReactionDoAgent(registry *AgentRegistry) error {
-	agent := NewUserReactionDoAgent()
-	registry.RegisterAgent(agent)
-	return nil
-}

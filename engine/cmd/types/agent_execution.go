@@ -10,36 +10,8 @@ import (
 	mywant "mywant/engine/src"
 )
 
-// ExecutionAgent handles command execution for ExecutionResultWant
-type ExecutionAgent struct {
-	*mywant.DoAgent
-}
-
-// NewExecutionAgent creates an agent for command execution
-func NewExecutionAgent() *ExecutionAgent {
-	baseAgent := mywant.NewBaseAgent(
-		"execution_command",           // Agent name
-		[]string{"command_execution"}, // Capabilities
-		mywant.DoAgentType,            // Execute synchronously
-	)
-
-	agent := &ExecutionAgent{
-		DoAgent: &mywant.DoAgent{
-			BaseAgent: *baseAgent,
-			Action:    nil, // Set below
-		},
-	}
-
-	// Define execution logic
-	agent.DoAgent.Action = func(ctx context.Context, want *mywant.Want) error {
-		return agent.executeCommand(ctx, want)
-	}
-
-	return agent
-}
-
 // executeCommand performs the actual command execution
-func (a *ExecutionAgent) executeCommand(ctx context.Context, want *mywant.Want) error {
+func executeCommand(ctx context.Context, want *mywant.Want) error {
 	var commandStr, shellStr, workingDirStr string
 	var timeoutSec int
 

@@ -11,6 +11,15 @@ import (
 	mywant "mywant/engine/src"
 )
 
+func init() {
+	mywant.RegisterDoAgentType("mcp_server_do",
+		[]mywant.Capability{mywant.Cap("mcp_server_management")},
+		startMCPServer)
+	mywant.RegisterMonitorAgentType("mcp_server_monitor",
+		[]mywant.Capability{mywant.Cap("mcp_server_monitoring")},
+		monitorMCPServer)
+}
+
 // MCPServerProcess 実行中のMCPサーバプロセスを管理する構造体
 type MCPServerProcess struct {
 	Cmd    *exec.Cmd
@@ -48,23 +57,8 @@ func (r *MCPServerRegistry) Get(name string) (*MCPServerProcess, bool) {
 	return p, ok
 }
 
-// MCPServerProcessAgent MCPサーバプロセスの起動と監視を担当するエージェント
-type MCPServerProcessAgent struct {
-	*mywant.BaseAgent
-}
-
-func NewMCPServerProcessAgent() *MCPServerProcessAgent {
-	return &MCPServerProcessAgent{
-		BaseAgent: mywant.NewBaseAgent(
-			"mcp_server_process_manager",
-			[]string{"mcp_server_management"},
-			mywant.DoAgentType, // Monitorとしても機能させるため、登録時に両方指定する
-		),
-	}
-}
-
-// StartServer (DoAgent Action) サーバを起動する
-func (a *MCPServerProcessAgent) StartServer(ctx context.Context, want *mywant.Want) error {
+// startMCPServer (DoAgent Action) サーバを起動する
+func startMCPServer(ctx context.Context, want *mywant.Want) error {
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	command := want.GetStringParam("mcp_command", "npx")
 	argsRaw, _ := want.GetState("mcp_args")
@@ -131,8 +125,8 @@ func (a *MCPServerProcessAgent) StartServer(ctx context.Context, want *mywant.Wa
 	return nil
 }
 
-// MonitorServer (MonitorAgent Poll) プロセスの生存確認を行う
-func (a *MCPServerProcessAgent) MonitorServer(ctx context.Context, want *mywant.Want) error {
+// monitorMCPServer (MonitorAgent Poll) プロセスの生存確認を行う
+func monitorMCPServer(ctx context.Context, want *mywant.Want) error {
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	registry := GetMCPServerRegistry()
 
@@ -157,28 +151,4 @@ func (a *MCPServerProcessAgent) MonitorServer(ctx context.Context, want *mywant.
 	}
 
 	return nil
-}
-
-func RegisterMCPServerProcessAgent(registry *mywant.AgentRegistry) {
-	// Register the capability that this agent provides
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "mcp_server_management",
-		Gives: []string{"mcp_server_management"},
-	})
-
-	agent := NewMCPServerProcessAgent()
-
-	// DoAgentとして登録
-	doAgent := &mywant.DoAgent{
-		BaseAgent: *agent.BaseAgent,
-		Action:    agent.StartServer,
-	}
-	registry.RegisterAgent(doAgent)
-
-	// MonitorAgentとして登録
-	monitorAgent := &mywant.MonitorAgent{
-		BaseAgent: *agent.BaseAgent,
-		Monitor:   agent.MonitorServer,
-	}
-	registry.RegisterAgent(monitorAgent)
 }

@@ -6,6 +6,10 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("fresh knowledge")
+}
+
 // KnowledgeLocals holds type-specific local state for KnowledgeWant
 type KnowledgeLocals struct {
 	Topic           string
@@ -21,10 +25,6 @@ type KnowledgeWant struct {
 
 func (k *KnowledgeWant) GetLocals() *KnowledgeLocals {
 	return GetLocals[KnowledgeLocals](&k.Want)
-}
-
-func init() {
-	RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("fresh knowledge")
 }
 
 // Initialize prepares the Knowledge want for execution

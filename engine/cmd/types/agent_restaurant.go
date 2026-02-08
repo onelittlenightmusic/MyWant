@@ -8,22 +8,18 @@ import (
 	"time"
 )
 
-// AgentRestaurant extends PremiumServiceAgent with restaurant reservation capabilities
-type AgentRestaurant struct {
-	PremiumServiceAgent
+const agentRestaurantName = "agent_restaurant_premium"
+
+func init() {
+	RegisterDoAgentType(agentRestaurantName,
+		[]Capability{Cap("restaurant_reservation")},
+		executeRestaurantReservation)
 }
 
-// NewAgentRestaurant creates a new restaurant agent
-func NewAgentRestaurant(name string, capabilities []string, uses []string, premiumLevel string) *AgentRestaurant {
-	return &AgentRestaurant{
-		PremiumServiceAgent: NewPremiumServiceAgent(name, capabilities, premiumLevel),
-	}
-}
-
-// Exec executes restaurant agent actions and returns RestaurantSchedule
-func (a *AgentRestaurant) Exec(ctx context.Context, want *Want) (bool, error) {
-	schedule := a.generateRestaurantSchedule(want)
-	return a.ExecuteReservation(ctx, want, schedule, func(s interface{}) (string, string) {
+// executeRestaurantReservation performs a premium restaurant reservation
+func executeRestaurantReservation(ctx context.Context, want *Want) error {
+	schedule := generateRestaurantSchedule(want)
+	return executeReservation(want, agentRestaurantName, schedule, func(s interface{}) (string, string) {
 		sch := s.(RestaurantSchedule)
 		activity := fmt.Sprintf("Restaurant reservation has been booked at %s %s for %.1f hours",
 			sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
@@ -34,48 +30,42 @@ func (a *AgentRestaurant) Exec(ctx context.Context, want *Want) (bool, error) {
 }
 
 // generateRestaurantSchedule creates a restaurant reservation schedule
-func (a *AgentRestaurant) generateRestaurantSchedule(want *Want) RestaurantSchedule {
+func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 	want.StoreLog("Processing restaurant reservation for %s with premium service", want.Metadata.Name)
 
-	// Generate restaurant reservation with appropriate timing (dinner)
 	baseDate := time.Now()
 	reservationTime := GenerateRandomTimeInRange(baseDate, DinnerTimeRange)
-
-	// Restaurant meals typically 1.5-3 hours
 	durationHours := GenerateRandomDuration(1.5, 3.0)
 
-	// Extract restaurant type from want parameters
 	restaurantType := want.GetStringParam("restaurant_type", "fine dining")
+	premiumLevel := want.GetStringParam("premium_level", "premium")
+	serviceTier := want.GetStringParam("service_tier", "premium")
 
-	// Generate realistic restaurant names
-	restaurantName := a.generateRealisticRestaurantName(restaurantType)
-
-	// Generate realistic reservation name with party size reference
+	restaurantName := generateRealisticRestaurantName(restaurantType)
 	partySize := want.GetIntParam("party_size", 2)
-	reservationReference := a.generateReservationReference()
+	reservationReference := generateReservationReference()
 	formattedReservationName := fmt.Sprintf("%s - Party of %d (%s)", restaurantName, partySize, reservationReference)
+
 	return RestaurantSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,
 		RestaurantType:   restaurantType,
 		ReservationName:  formattedReservationName,
-		PremiumLevel:     a.PremiumLevel,
-		ServiceTier:      a.ServiceTier,
+		PremiumLevel:     premiumLevel,
+		ServiceTier:      serviceTier,
 		PremiumAmenities: []string{"wine_pairing", "chef_special", "priority_seating"},
 	}
 }
 
 // generateReservationReference generates a realistic reservation reference code
-func (a *AgentRestaurant) generateReservationReference() string {
-	// Generate reference codes like "RES-12345", "RES-67890"
+func generateReservationReference() string {
 	referenceNumber := 10000 + rand.Intn(90000)
 	return fmt.Sprintf("RES-%d", referenceNumber)
 }
 
 // generateRealisticRestaurantName generates realistic restaurant names based on cuisine type
-func (a *AgentRestaurant) generateRealisticRestaurantName(cuisineType string) string {
-	// Realistic restaurant name patterns by cuisine type
-	var names map[string][]string = map[string][]string{
+func generateRealisticRestaurantName(cuisineType string) string {
+	var names = map[string][]string{
 		"fine dining": {
 			"L'Élégance", "The Michelin House", "Le Bernardin", "Per Se", "The French Laundry",
 			"Alinea", "The Ledbury", "Noma", "Chef's Table", "Sous Vide",
@@ -144,12 +134,9 @@ func (a *AgentRestaurant) generateRealisticRestaurantName(cuisineType string) st
 		},
 	}
 
-	// Select appropriate category or default to fine dining
-	category := cuisineType
-	if list, exists := names[category]; exists {
+	if list, exists := names[cuisineType]; exists {
 		return list[rand.Intn(len(list))]
 	}
 
-	// Fallback for unknown cuisine types
 	return names["fine dining"][rand.Intn(len(names["fine dining"]))]
 }

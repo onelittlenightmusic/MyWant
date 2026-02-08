@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"context"
 	"reflect"
 )
 
@@ -9,6 +10,86 @@ var (
 	typeImplementationRegistry   = make(map[string]reflect.Type)
 	localsImplementationRegistry = make(map[string]reflect.Type)
 )
+
+// Global registry for agent implementation factories
+var agentFactoryRegistry = make(map[string]func(registry *AgentRegistry))
+
+// RegisterAgentImplementation registers an agent factory function that will be called
+// when RegisterAllKnownAgentImplementations is invoked. Used in init() functions of
+// agent implementation files, mirroring the pattern used by RegisterWantImplementation.
+func RegisterAgentImplementation(name string, factory func(registry *AgentRegistry)) {
+	agentFactoryRegistry[name] = factory
+}
+
+// Cap creates a Capability where Name == Gives[0] (most common pattern).
+func Cap(name string) Capability {
+	return Capability{Name: name, Gives: []string{name}}
+}
+
+// RegisterDoAgentType is a declarative API that registers a DoAgent in one call.
+// It registers capabilities, creates the DoAgent, and wires it into the agent factory registry.
+func RegisterDoAgentType(name string, capabilities []Capability, action func(context.Context, *Want) error) {
+	capNames := make([]string, len(capabilities))
+	for i, c := range capabilities {
+		capNames[i] = c.Name
+	}
+	RegisterAgentImplementation(name, func(registry *AgentRegistry) {
+		for _, c := range capabilities {
+			registry.RegisterCapability(c)
+		}
+		agent := &DoAgent{
+			BaseAgent: *NewBaseAgent(name, capNames, DoAgentType),
+			Action:    action,
+		}
+		registry.RegisterAgent(agent)
+	})
+}
+
+// RegisterMonitorAgentType is a declarative API that registers a MonitorAgent in one call.
+// It registers capabilities, creates the MonitorAgent, and wires it into the agent factory registry.
+func RegisterMonitorAgentType(name string, capabilities []Capability, monitor func(context.Context, *Want) error) {
+	capNames := make([]string, len(capabilities))
+	for i, c := range capabilities {
+		capNames[i] = c.Name
+	}
+	RegisterAgentImplementation(name, func(registry *AgentRegistry) {
+		for _, c := range capabilities {
+			registry.RegisterCapability(c)
+		}
+		agent := &MonitorAgent{
+			BaseAgent: *NewBaseAgent(name, capNames, MonitorAgentType),
+			Monitor:   monitor,
+		}
+		registry.RegisterAgent(agent)
+	})
+}
+
+// RegisterPollAgentType is a declarative API that registers a poll-based MonitorAgent in one call.
+// Unlike RegisterMonitorAgentType, the poll function can signal stop via shouldStop=true.
+func RegisterPollAgentType(name string, capabilities []Capability, poll PollFunc) {
+	capNames := make([]string, len(capabilities))
+	for i, c := range capabilities {
+		capNames[i] = c.Name
+	}
+	RegisterAgentImplementation(name, func(registry *AgentRegistry) {
+		for _, c := range capabilities {
+			registry.RegisterCapability(c)
+		}
+		agent := &PollAgent{
+			BaseAgent: *NewBaseAgent(name, capNames, MonitorAgentType),
+			Poll:      poll,
+		}
+		registry.RegisterAgent(agent)
+	})
+}
+
+// RegisterAllKnownAgentImplementations calls all registered agent factory functions
+// to register their agents with the provided AgentRegistry.
+func RegisterAllKnownAgentImplementations(registry *AgentRegistry) {
+	for _, factory := range agentFactoryRegistry {
+		factory(registry)
+	}
+}
 
 // RegisterWantImplementation registers a Go implementation (struct and locals) for a specific Want type name.
 // Used in init() functions of specific Want type implementation files.

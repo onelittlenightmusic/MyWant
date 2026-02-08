@@ -4,6 +4,10 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[DraftWant, DraftLocals]("draft")
+}
+
 // DraftLocals holds type-specific local state for DraftWant
 type DraftLocals struct{}
 
@@ -15,10 +19,6 @@ type DraftWant struct {
 
 func (d *DraftWant) GetLocals() *DraftLocals {
 	return GetLocals[DraftLocals](&d.Want)
-}
-
-func init() {
-	RegisterWantImplementation[DraftWant, DraftLocals]("draft")
 }
 
 // Initialize prepares the draft want

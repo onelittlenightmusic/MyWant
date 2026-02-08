@@ -11,6 +11,10 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
+}
+
 // GmailLocals holds type-specific local state for GmailWant
 type GmailLocals struct {
 	Prompt             string // User's natural language prompt
@@ -26,10 +30,6 @@ type GmailWant struct {
 
 func (g *GmailWant) GetLocals() *GmailLocals {
 	return GetLocals[GmailLocals](&g.Want)
-}
-
-func init() {
-	RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
 }
 
 // Initialize prepares the Gmail want for execution

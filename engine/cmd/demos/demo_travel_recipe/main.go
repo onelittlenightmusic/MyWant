@@ -86,15 +86,9 @@ func main() {
 	}
 	fmt.Printf("\n")
 
-	// Manually register the AgentFlightAPI agent with the loaded capability This ensures we have the flight API agent available with proper implementation
-	flightAPIAgent := types.NewAgentFlightAPI(
-		"agent_flight_api",
-		[]string{"flight_api_agency"}, // Must match capability name that provides create_flight
-		[]string{},
-		"http://localhost:8090",
-	)
-	agentRegistry.RegisterAgent(flightAPIAgent)
-	fmt.Printf("✅ Registered agent_flight_api with flight_api_agency capability\n")
+	// Register all agent implementations (auto-registered via init() functions)
+	RegisterAllKnownAgentImplementations(agentRegistry)
+	fmt.Printf("✅ Registered all known agent implementations\n")
 
 	// Debug: show what agents can provide "create_flight"
 	createFlightAgents := agentRegistry.FindAgentsByGives("create_flight")

@@ -84,46 +84,6 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	return false, fmt.Errorf("no action defined for DoAgent %s", a.Name)
 }
 
-// PremiumServiceAgent provides common premium service functionality for reservation agents
-type PremiumServiceAgent struct {
-	DoAgent
-	PremiumLevel string
-	ServiceTier  string
-}
-
-// NewPremiumServiceAgent creates a new premium service agent with the given parameters
-func NewPremiumServiceAgent(name string, capabilities []string, premiumLevel string) PremiumServiceAgent {
-	return PremiumServiceAgent{
-		DoAgent:      NewDoAgent(name, capabilities),
-		PremiumLevel: premiumLevel,
-		ServiceTier:  "premium",
-	}
-}
-
-// ActivityFormatter is a function type that formats activity and log messages from a schedule
-type ActivityFormatter func(schedule interface{}) (activity, logMessage string)
-
-// ExecuteReservation executes common reservation flow for premium service agents
-// This method standardizes the pattern: generate schedule → store state → set activity → log completion
-func (psa *PremiumServiceAgent) ExecuteReservation(
-	ctx context.Context,
-	want *Want,
-	schedule interface{},
-	formatter ActivityFormatter,
-) (bool, error) {
-	// Store schedule result
-	want.StoreStateForAgent("agent_result", schedule)
-
-	// Format and store activity description
-	activity, logMsg := formatter(schedule)
-	want.SetAgentActivity(psa.Name, activity)
-
-	// Store completion log
-	want.StoreLog("%s", logMsg)
-
-	return false, nil
-}
-
 // MonitorAgent implements an agent that monitors want execution and state.
 type MonitorAgent struct {
 	BaseAgent
@@ -139,6 +99,22 @@ func (a *MonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 		return false, err // Default: continue monitoring
 	}
 	return false, fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
+}
+
+// PollAgent implements an agent that polls with stop-signal support.
+// Unlike MonitorAgent (always continues), PollAgent can signal termination via shouldStop.
+type PollAgent struct {
+	BaseAgent
+	Poll PollFunc
+}
+
+func (a *PollAgent) Exec(ctx context.Context, want *Want) (bool, error) {
+	if a.Poll != nil {
+		shouldStop, err := a.Poll(ctx, want)
+		want.CommitStateChanges()
+		return shouldStop, err
+	}
+	return false, fmt.Errorf("no poll function defined for PollAgent %s", a.Name)
 }
 
 // AgentSpec holds specification for state field validation

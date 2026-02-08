@@ -10,22 +10,10 @@ import (
 	mywant "mywant/engine/src"
 )
 
-// NewMockServerAgent creates a DoAgent that manages mock server lifecycle
-// This agent starts the flight mock server when needed and stops it when the want is deleted
-func NewMockServerAgent() *mywant.DoAgent {
-	agent := &mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent(
-			"mock_server_manager",
-			[]string{"mock_server_management"},
-			mywant.DoAgentType,
-		),
-	}
-
-	agent.Action = func(ctx context.Context, want *mywant.Want) error {
-		return manageMockServer(ctx, want)
-	}
-
-	return agent
+func init() {
+	mywant.RegisterDoAgentType("mock_server_manager",
+		[]mywant.Capability{mywant.Cap("mock_server_management")},
+		manageMockServer)
 }
 
 // manageMockServer handles mock server start and stop based on want phase
@@ -156,9 +144,3 @@ func stopMockServer(pid int, want *mywant.Want) error {
 	return nil
 }
 
-// RegisterMockServerAgent registers the mock server management agent
-func RegisterMockServerAgent(registry *mywant.AgentRegistry) error {
-	agent := NewMockServerAgent()
-	registry.RegisterAgent(agent)
-	return nil
-}

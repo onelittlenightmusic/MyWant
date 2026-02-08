@@ -7,43 +7,27 @@ import (
 	. "mywant/engine/src"
 )
 
-// UserReactionMonitorAgent extends MonitorAgent with stop logic
-type UserReactionMonitorAgent struct {
-	MonitorAgent
-}
+const userReactionMonitorAgentName = "user_reaction_monitor"
 
-// NewUserReactionMonitorAgent creates a MonitorAgent that monitors user reactions via HTTP API
-// This is used for registration in the agent registry
-// The actual continuous monitoring is handled by AddMonitoringAgent in ReminderWant
-func NewUserReactionMonitorAgent() *UserReactionMonitorAgent {
-	return &UserReactionMonitorAgent{
-		MonitorAgent: MonitorAgent{
-			BaseAgent: *NewBaseAgent(
-				"user_reaction_monitor",
-				[]string{"reminder_monitoring", "reaction_auto_approval"},
-				MonitorAgentType,
-			),
+func init() {
+	RegisterPollAgentType(userReactionMonitorAgentName,
+		[]Capability{
+			Cap("reminder_monitoring"),
+			Cap("reaction_auto_approval"),
 		},
-	}
+		pollUserReactions)
 }
 
-// Exec implements Agent interface with stop logic for user reaction monitoring
-func (a *UserReactionMonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
+// pollUserReactions is a PollFunc — includes stop logic
+func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 	// Check if want is still active (waiting or reaching)
 	phase, _ := want.GetStateString("reminder_phase", "")
 	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
 		return true, nil // Stop monitoring - want completed, failed or doesn't have phase
 	}
 
-	// Begin batching cycle for state changes
-	want.BeginProgressCycle()
-
 	// Monitor reaction status
 	err := monitorUserReactions(ctx, want)
-
-	// Commit state changes
-	want.CommitStateChanges()
-
 	if err != nil {
 		return false, err
 	}
@@ -167,12 +151,5 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 	want.StoreLog("[INFO] MonitorAgent processed reaction %s from queue %s for want %s",
 		reaction.ReactionID, queueID, want.Metadata.ID)
 
-	return nil
-}
-
-// RegisterUserReactionMonitorAgent registers the user reaction monitor agent with the registry
-func RegisterUserReactionMonitorAgent(registry *AgentRegistry) error {
-	agent := NewUserReactionMonitorAgent()
-	registry.RegisterAgent(agent)
 	return nil
 }

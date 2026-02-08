@@ -13,10 +13,12 @@ import (
 	. "mywant/engine/src"
 )
 
-// AgentFlightAPI creates and manages flight reservations via REST API Provides two capabilities from flight_api_agency: - create_flight: Exec() method creates new flight reservations via POST /api/flights - cancel_flight: CancelFlight() method cancels existing flights via DELETE /api/flights/{id}
-type AgentFlightAPI struct {
-	DoAgent
-	ServerURL string
+const flightDoAgentName = "agent_flight_api"
+
+func init() {
+	RegisterDoAgentType(flightDoAgentName,
+		[]Capability{Cap("flight_api_agency")},
+		executeFlightAction)
 }
 
 // FlightReservation represents a flight booking from the mock server
@@ -40,44 +42,32 @@ type CreateFlightRequest struct {
 	ArrivalTime   time.Time `json:"arrival_time"`
 }
 
-// NewAgentFlightAPI creates a new flight API agent
-func NewAgentFlightAPI(name string, capabilities []string, uses []string, serverURL string) *AgentFlightAPI {
-	return &AgentFlightAPI{
-		DoAgent:   NewDoAgent(name, capabilities),
-		ServerURL: serverURL,
-	}
-}
-
-// Exec implements the Agent interface and handles both create_flight and cancel_flight actions Reads the "flight_action" state to determine which action to perform This satisfies the agent framework's requirement for Exec() method
-func (a *AgentFlightAPI) Exec(ctx context.Context, want *Want) (bool, error) {
+// executeFlightAction handles both create_flight and cancel_flight actions
+func executeFlightAction(ctx context.Context, want *Want) error {
 	action, _ := want.GetStateString("flight_action", "")
 	switch action {
 	case "cancel_flight":
 		want.StoreLog("Executing cancel_flight action")
-		if err := a.CancelFlight(ctx, want); err != nil {
-			return false, err
+		if err := cancelFlight(ctx, want); err != nil {
+			return err
 		}
-		// Clear the action after completion
 		want.StoreStateForAgent("flight_action", "")
-		return false, nil
+		return nil
 	case "create_flight":
 		want.StoreLog("Executing create_flight action")
-		if err := a.CreateFlight(ctx, want); err != nil {
-			return false, err
+		if err := createFlight(ctx, want); err != nil {
+			return err
 		}
-		// Clear the action after completion
 		want.StoreStateForAgent("flight_action", "")
-		return false, nil
+		return nil
 	}
 
 	// Default to create_flight if no action specified
-	err := a.CreateFlight(ctx, want)
-	return false, err
+	return createFlight(ctx, want)
 }
 
-// 2. "created" - after successful API response 3. "confirmed" - when monitor api checks the status Supports two date parameter formats: 1. departure_date: "YYYY-MM-DD" (e.g., "2026-12-20") - converted to 8:00 AM on that date
-// 2. departure_time: RFC3339 format - used directly When rebooking (_previous_flight_id exists), generates new flight number and adjusted departure time
-func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
+func createFlight(ctx context.Context, want *Want) error {
+	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
 	params := want.Spec.Params
 	want.StoreStateForAgent("flight_status", "in process")
 	prevFlightID, _ := want.GetStateString("_previous_flight_id", "")
@@ -144,7 +134,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	}
 
 	// Make POST request
-	url := fmt.Sprintf("%s/api/flights", a.ServerURL)
+	url := fmt.Sprintf("%s/api/flights", serverURL)
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create flight: %v", err)
@@ -181,7 +171,7 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Flight reservation has been created for %s (Flight %s, %s → %s)",
 		reservation.FlightNumber, reservation.FlightNumber, reservation.From, reservation.To)
-	want.SetAgentActivity(a.Name, activity)
+	want.SetAgentActivity(flightDoAgentName, activity)
 
 	want.StoreLog("Created flight reservation: %s (ID: %s, Status: %s)",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
@@ -189,14 +179,15 @@ func (a *AgentFlightAPI) CreateFlight(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// CancelFlight implements the cancel_flight capability Cancels a flight reservation via DELETE /api/flights/{id} to the mock server
-func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
+// cancelFlight cancels a flight reservation via DELETE /api/flights/{id}
+func cancelFlight(ctx context.Context, want *Want) error {
+	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
 	flightID, ok := want.GetStateString("flight_id", "")
 	if !ok || flightID == "" {
 		return fmt.Errorf("no flight_id found in state")
 	}
 
-	url := fmt.Sprintf("%s/api/flights/%s", a.ServerURL, flightID)
+	url := fmt.Sprintf("%s/api/flights/%s", serverURL, flightID)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
@@ -226,7 +217,7 @@ func (a *AgentFlightAPI) CancelFlight(ctx context.Context, want *Want) error {
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightID)
-	want.SetAgentActivity(a.Name, activity)
+	want.SetAgentActivity(flightDoAgentName, activity)
 
 	want.StoreLog("Cancelled flight: %s", flightID)
 

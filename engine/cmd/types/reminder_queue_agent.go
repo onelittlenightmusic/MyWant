@@ -8,22 +8,10 @@ import (
 	mywant "mywant/engine/src"
 )
 
-// NewReminderQueueAgent creates a DoAgent that manages reaction queue lifecycle
-// This agent creates queues when reminder enters waiting phase and deletes them when completed/failed
-func NewReminderQueueAgent() *mywant.DoAgent {
-	agent := &mywant.DoAgent{
-		BaseAgent: *mywant.NewBaseAgent(
-			"reminder_queue_manager",
-			[]string{"reminder_queue_management"},
-			mywant.DoAgentType,
-		),
-	}
-
-	agent.Action = func(ctx context.Context, want *mywant.Want) error {
-		return manageReactionQueue(ctx, want)
-	}
-
-	return agent
+func init() {
+	mywant.RegisterDoAgentType("reminder_queue_manager",
+		[]mywant.Capability{mywant.Cap("reminder_queue_management")},
+		manageReactionQueue)
 }
 
 // manageReactionQueue handles queue creation and deletion based on reminder phase
@@ -139,9 +127,3 @@ func deleteReactionQueue(httpClient *mywant.HTTPClient, queueID string) error {
 	return nil
 }
 
-// RegisterReminderQueueAgent registers the reminder queue management agent
-func RegisterReminderQueueAgent(registry *mywant.AgentRegistry) error {
-	agent := NewReminderQueueAgent()
-	registry.RegisterAgent(agent)
-	return nil
-}

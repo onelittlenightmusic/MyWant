@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,42 +11,29 @@ import (
 	mywant "mywant/engine/src"
 )
 
-// KnowledgeAgent handles both monitoring and updating knowledge documents
-type KnowledgeAgent struct {
-	*mywant.DoAgent
-}
-
-// NewKnowledgeAgent creates a new KnowledgeAgent
-func NewKnowledgeAgent() *KnowledgeAgent {
-	baseAgent := mywant.NewBaseAgent(
-		"knowledge_agent",
-		[]string{"knowledge_monitoring", "knowledge_updating"},
-		mywant.DoAgentType,
-	)
-
-	agent := &KnowledgeAgent{
-		DoAgent: &mywant.DoAgent{
-			BaseAgent: *baseAgent,
+func init() {
+	mywant.RegisterDoAgentType("knowledge_agent",
+		[]mywant.Capability{
+			mywant.Cap("knowledge_monitoring"),
+			mywant.Cap("knowledge_updating"),
 		},
-	}
-
-	agent.DoAgent.Action = func(ctx context.Context, want *mywant.Want) error {
-		// Determine which capability is being requested
-		for _, req := range want.Spec.Requires {
-			switch req {
-			case "knowledge_monitoring":
-				return agent.monitor(ctx, want)
-			case "knowledge_updating":
-				return agent.update(ctx, want)
-			}
-		}
-		return fmt.Errorf("no supported capability found in want requirements")
-	}
-
-	return agent
+		executeKnowledgeAction)
 }
 
-func (a *KnowledgeAgent) monitor(ctx context.Context, want *mywant.Want) error {
+// executeKnowledgeAction dispatches to monitor or update based on want requirements
+func executeKnowledgeAction(ctx context.Context, want *mywant.Want) error {
+	for _, req := range want.Spec.Requires {
+		switch req {
+		case "knowledge_monitoring":
+			return knowledgeMonitor(ctx, want)
+		case "knowledge_updating":
+			return knowledgeUpdate(ctx, want)
+		}
+	}
+	return fmt.Errorf("no supported capability found in want requirements")
+}
+
+func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
 	topic := want.Spec.Params["topic"].(string)
 	want.StoreLog("[KNOWLEDGE-AGENT] Monitoring topic: %s", topic)
 
@@ -85,7 +71,7 @@ func (a *KnowledgeAgent) monitor(ctx context.Context, want *mywant.Want) error {
 	return nil
 }
 
-func (a *KnowledgeAgent) update(ctx context.Context, want *mywant.Want) error {
+func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 	topic := want.Spec.Params["topic"].(string)
 	path := want.Spec.Params["output_path"].(string)
 	depth := want.Spec.Params["depth"].(string)
@@ -149,27 +135,4 @@ func (a *KnowledgeAgent) update(ctx context.Context, want *mywant.Want) error {
 	want.StoreState("discovered_updates", nil) // Clear temporary data
 
 	return nil
-}
-
-// RegisterKnowledgeAgents registers the knowledge agents with the registry
-func RegisterKnowledgeAgents(registry *mywant.AgentRegistry) {
-	if registry == nil {
-		return
-	}
-
-	// Register capabilities
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "knowledge_monitoring",
-		Gives: []string{"knowledge_monitoring"},
-	})
-	registry.RegisterCapability(mywant.Capability{
-		Name:  "knowledge_updating",
-		Gives: []string{"knowledge_updating"},
-	})
-
-	// Register agent
-	agent := NewKnowledgeAgent()
-	registry.RegisterAgent(agent)
-
-	log.Printf("[AGENT] KnowledgeAgent registered\n")
 }

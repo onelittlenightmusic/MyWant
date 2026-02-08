@@ -7,6 +7,10 @@ import (
 	. "mywant/engine/src"
 )
 
+func init() {
+	RegisterWantImplementation[FlightMockServerWant, MockServerLocals]("flight_mock_server")
+}
+
 // MockServerPhase constants
 const (
 	MockServerPhaseStarting = "starting"
@@ -32,10 +36,6 @@ type FlightMockServerWant struct {
 
 func (m *FlightMockServerWant) GetLocals() *MockServerLocals {
 	return GetLocals[MockServerLocals](&m.Want)
-}
-
-func init() {
-	RegisterWantImplementation[FlightMockServerWant, MockServerLocals]("flight_mock_server")
 }
 
 // Initialize prepares the mock server want for execution

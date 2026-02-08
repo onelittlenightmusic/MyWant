@@ -43,12 +43,6 @@ func New(config Config) *Server {
 		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
-	// Register mock server capability (ensure it exists before agent registration)
-	agentRegistry.RegisterCapability(mywant.Capability{
-		Name:  "mock_server_management",
-		Gives: []string{"mock_server_management"},
-	})
-
 	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
@@ -74,45 +68,11 @@ func New(config Config) *Server {
 	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
 	mywant.SetGlobalChainBuilder(globalBuilder)
 
-	tempServer := &Server{}
-
-	// Register dynamic agent implementations on global registry This provides the actual Action/Monitor functions for YAML-loaded agents
-	tempServer.registerDynamicAgents(agentRegistry)
-	types.RegisterExecutionAgents(agentRegistry)
-	types.RegisterMCPAgent(agentRegistry)
-	types.RegisterDynamicMCPAgents(agentRegistry) // Register Discovery, Developer, Compiler, Validator agents
+	// Register all agent implementations (auto-registered via init() functions)
+	mywant.RegisterAllKnownAgentImplementations(agentRegistry)
 
 	// Create reaction queue manager for reminders (multi-queue system)
 	reactionQueueManager := types.NewReactionQueueManager()
-
-	// Register reminder queue management agent (DoAgent for queue lifecycle)
-	if err := types.RegisterReminderQueueAgent(agentRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to register reminder queue agent: %v\n", err)
-	}
-
-	// Register mock server management agent (DoAgent for server lifecycle)
-	if err := types.RegisterMockServerAgent(agentRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to register mock server agent: %v\n", err)
-	}
-
-	// Register user reaction monitor agent (MonitorAgent using HTTP API)
-	if err := types.RegisterUserReactionMonitorAgent(agentRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to register user reaction monitor agent: %v\n", err)
-	}
-
-	// Register user reaction do agent
-	if err := types.RegisterUserReactionDoAgent(agentRegistry); err != nil {
-		log.Printf("[SERVER] Warning: Failed to register user reaction do agent: %v\n", err)
-	}
-
-	// Register knowledge management agent
-	types.RegisterKnowledgeAgents(agentRegistry)
-
-	// Register MCP server process management agent
-	types.RegisterMCPServerProcessAgent(agentRegistry)
-
-	// Register Dynamic MCP Agents
-	types.RegisterDynamicMCPAgents(agentRegistry)
 
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
@@ -185,28 +145,6 @@ func (s *Server) Start() error {
 	// (Omitted detailed endpoint logging for brevity in this file, or we can add it back)
 
 	return http.ListenAndServe(addr, s.router)
-}
-
-// registerDynamicAgents registers implementations for special agents loaded from YAML
-func (s *Server) registerDynamicAgents(agentRegistry *mywant.AgentRegistry) {
-	setupFlightAPIAgents(agentRegistry)
-}
-
-func setupFlightAPIAgents(agentRegistry *mywant.AgentRegistry) {
-	if agent, exists := agentRegistry.GetAgent("agent_flight_api"); exists {
-		if doAgent, ok := agent.(*mywant.DoAgent); ok {
-			flightAgent := types.NewAgentFlightAPI(
-				"agent_flight_api",
-				[]string{"flight_api_agency"},
-				[]string{},
-				"http://localhost:8090",
-			)
-			doAgent.Action = func(ctx context.Context, want *mywant.Want) error {
-				_, err := flightAgent.Exec(ctx, want)
-				return err
-			}
-		}
-	}
 }
 
 // corsMiddleware adds CORS headers

@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	types "mywant/engine/cmd/types"
+	_ "mywant/engine/cmd/types" // init() registers agent implementations
 	mywant "mywant/engine/src"
 
 	"github.com/gorilla/mux"
@@ -39,12 +39,6 @@ func New(config Config) *Worker {
 		log.Printf("[WORKER] Warning: Failed to load capabilities: %v\n", err)
 	}
 
-	// Register built-in capabilities
-	agentRegistry.RegisterCapability(mywant.Capability{
-		Name:  "mock_server_management",
-		Gives: []string{"mock_server_management"},
-	})
-
 	// Load agents from YAML files
 	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
 		log.Printf("[WORKER] Warning: Failed to load agents: %v\n", err)
@@ -67,22 +61,8 @@ func New(config Config) *Worker {
 
 // registerDynamicAgents registers code-based agent implementations
 func (w *Worker) registerDynamicAgents() {
-	// Register execution agents (command execution)
-	types.RegisterExecutionAgents(w.agentRegistry)
-
-	// Register MCP agents
-	types.RegisterMCPAgent(w.agentRegistry)
-	types.RegisterDynamicMCPAgents(w.agentRegistry)
-
-	// Register reminder queue agent
-	if err := types.RegisterReminderQueueAgent(w.agentRegistry); err != nil {
-		log.Printf("[WORKER] Warning: Failed to register reminder queue agent: %v\n", err)
-	}
-
-	// Register mock server agent
-	if err := types.RegisterMockServerAgent(w.agentRegistry); err != nil {
-		log.Printf("[WORKER] Warning: Failed to register mock server agent: %v\n", err)
-	}
+	// Register all agent implementations (auto-registered via init() functions)
+	mywant.RegisterAllKnownAgentImplementations(w.agentRegistry)
 
 	log.Printf("[WORKER] Registered %d agents", len(w.agentRegistry.GetAllAgents()))
 }
