@@ -299,32 +299,47 @@ Teamsメッセージ受信時、`Progress()` が `Provide()` で最新メッセ�
 
 ## Teams Outgoing Webhook Setup
 
-### Microsoft Teams側の設定
+> 公式ドキュメント: [Create an Outgoing Webhook - Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook)
 
-1. Wantをデプロイし、Stateから `webhook_url` を取得する:
-   ```bash
-   ./mywant wants create -f yaml/config/config-teams-webhook.yaml
-   ./mywant wants get {want-id}
-   # State内の "webhook_url" フィールド (例: /api/v1/webhooks/{want-id}) を確認
-   ```
-2. Teamsチーム → **Manage team** → **Apps** → **Create an outgoing webhook**
-3. **Name**: 任意の名前 (e.g., "MyWant Bot")
-4. **Callback URL**: `https://{your-server}` + 上記で取得した `webhook_url` の値
-5. **Description**: 任意
-6. 作成完了時に表示される **Security token** を `webhook_secret` パラメータに設定
+### 1. MyWant側の準備
+
+Wantをデプロイし、Stateから `webhook_url` を取得する:
+
+```bash
+./mywant wants create -f yaml/config/config-teams-webhook.yaml
+./mywant wants get {want-id}
+# State内の "webhook_url" フィールド (例: /api/v1/webhooks/{want-id}) を確認
+```
+
+### 2. Microsoft Teams側の設定
+
+1. **Teams** 左ペインからチームを選択 → **•••** (more options) → **Manage team**
+2. **Apps** タブ → **Create an outgoing webhook**
+3. 以下を入力:
+   - **Name**: 任意の名前 (e.g., "MyWant Bot") — チャネルでの @mention 名になる
+   - **Callback URL**: `https://{your-server}` + Stateから取得した `webhook_url` の値
+   - **Description**: 任意の説明
+4. **Create** をクリック
+5. 表示される **Security token** (HMAC) をコピーし、Want の `webhook_secret` パラメータに設定
+
+> **Note**: Security tokenは作成時に一度だけ表示される。期限はなく、設定ごとに固有の値となる。
+
+### 3. 使い方
+
+チャネルで `@MyWant Bot メッセージ` のように @mention すると、Teams が Callback URL に POST リクエストを送信する。MyWant は5秒以内に応答する必要がある。
 
 ### Network Requirements
 
+- Callback URLは **HTTPS必須** (Teamsの要件)
 - MyWantサーバーがインターネットから到達可能であること
-- HTTPS推奨 (Teamsはデフォルトでhttpsを要求)
 - 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
 
 ```bash
 # ngrokでローカルサーバーを公開
 ngrok http 8080
 
-# 表示されたURLをTeamsのCallback URLに設定
-# https://xxxx.ngrok.io/api/v1/webhooks/{want-id}
+# Callback URLの例:
+# https://xxxx.ngrok.io + State の webhook_url 値
 ```
 
 ## Agent System
