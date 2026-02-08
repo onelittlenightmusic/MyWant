@@ -1,0 +1,9 @@
+agents:
+  - name: monitor_teams_webhook
+    runtime: localGo
+    type: monitor
+    description: Monitors incoming Teams webhook messages and performs health checks on the webhook endpoint.
+    version: '1.0'
+    capabilities:
+      - teams_webhook_monitoring
+    role: monitor

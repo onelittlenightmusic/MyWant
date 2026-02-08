@@ -1,0 +1,169 @@
+wantType:
+  metadata:
+    name: teams webhook
+    title: Teams Webhook
+    description: |
+      Receives messages from Microsoft Teams Outgoing Webhooks via HTTP POST.
+
+      The want creates a webhook endpoint at /api/v1/webhooks/{want-id} that accepts
+      Teams Outgoing Webhook payloads. Messages are parsed, stored in state, and
+      forwarded to downstream wants via Provide().
+
+      Supports HMAC-SHA256 signature verification using the webhook_secret parameter.
+      Messages are stored as a FIFO buffer (last 20 messages).
+
+      The same webhook endpoint can also receive generic JSON payloads from non-Teams
+      sources, which are stored as webhook_payload in state.
+    version: '1.0'
+    category: system
+    pattern: generator
+
+  parameters:
+  - name: webhook_secret
+    description: |
+      Base64-encoded secret for HMAC-SHA256 signature verification.
+      Provided by Teams when configuring an Outgoing Webhook.
+      If empty, signature verification is skipped.
+    type: string
+    default: ""
+    required: false
+    example: "dGVhbXMtc2VjcmV0LWtleQ=="
+
+  - name: channel_filter
+    description: |
+      Optional channel ID filter. If set, only messages from this Teams channel
+      are processed. If empty, all channels are accepted.
+    type: string
+    default: ""
+    required: false
+    example: "19:abc123@thread.tacv2"
+
+  state:
+  - name: teams_webhook_status
+    description: Current status of the webhook (active, stopped, error)
+    type: string
+    persistent: true
+    initialValue: "active"
+    example: "active"
+
+  - name: webhook_secret
+    description: HMAC verification secret (stored from params)
+    type: string
+    persistent: true
+    initialValue: ""
+
+  - name: teams_latest_message
+    description: Most recently received Teams message
+    type: object
+    persistent: true
+    initialValue: {}
+    example: '{"sender": "User Name", "text": "Hello", "timestamp": "2026-02-08T12:00:00Z", "channel_id": "19:xxx@thread.tacv2"}'
+
+  - name: teams_message_count
+    description: Total number of messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 5
+
+  - name: teams_messages
+    description: FIFO buffer of last 20 received messages
+    type: "[]object"
+    persistent: true
+    initialValue: []
+    example: '[{"sender": "User", "text": "Hello", "timestamp": "2026-02-08T12:00:00Z", "channel_id": "19:xxx"}]'
+
+  - name: channel_filter
+    description: Active channel filter (from params)
+    type: string
+    persistent: true
+    initialValue: ""
+
+  - name: achieving_percentage
+    description: Progress percentage (50% while active, 100% when stopped)
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 50
+
+  connectivity:
+    outputs:
+    - name: teams_messages
+      type: event
+      description: Incoming Teams messages forwarded to downstream wants
+
+  agents:
+  - name: monitor_teams_webhook
+    role: monitor
+    description: Monitors webhook health and trims message buffer
+
+  constraints:
+  - description: Webhook URL is derived from Want ID
+    validation: Want must be deployed before webhook URL is active
+
+  examples:
+  - name: Basic Teams Inbox
+    description: Simple webhook receiver for Teams messages
+    expectedBehavior: |
+      SETUP:
+      1. Deploy this want to get a Want ID
+      2. Configure Teams Outgoing Webhook URL: POST /api/v1/webhooks/{want-id}
+      3. Messages from Teams are automatically stored in state
+
+      WEBHOOK URL:
+      POST /api/v1/webhooks/{want-id}
+
+      STATE UPDATES:
+      • teams_latest_message: updated with each new message
+      • teams_messages: FIFO buffer (last 20 messages)
+      • teams_message_count: incremented with each message
+
+      TEST WITH CURL:
+      curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+        -H "Content-Type: application/json" \
+        -d '{"type":"message","text":"hello","from":{"name":"Test User"},"channelId":"msteams"}'
+    want:
+      metadata:
+        name: teams-inbox
+        type: teams webhook
+      spec:
+        params:
+          webhook_secret: ""
+          channel_filter: ""
+        capabilities:
+          - teams_webhook_monitoring
+
+  - name: Secured Teams Webhook
+    description: Webhook with HMAC-SHA256 signature verification
+    expectedBehavior: |
+      SETUP:
+      1. Deploy with webhook_secret from Teams configuration
+      2. Teams sends Authorization header: "HMAC <base64-signature>"
+      3. Server verifies HMAC-SHA256 before accepting the message
+      4. Invalid signatures return 401 Unauthorized
+
+      SECURITY:
+      • webhook_secret should be the base64-encoded secret from Teams
+      • Each request body is verified against the HMAC signature
+      • If no secret is configured, verification is skipped
+    want:
+      metadata:
+        name: secured-teams-inbox
+        type: teams webhook
+      spec:
+        params:
+          webhook_secret: "${TEAMS_WEBHOOK_SECRET}"
+          channel_filter: ""
+        capabilities:
+          - teams_webhook_monitoring
+
+  requires:
+    - teams_webhook_monitoring
+
+  relatedTypes:
+  - gmail
+  - reminder
+
+  seeAlso:
+  - Microsoft Teams Outgoing Webhooks documentation
+  - Webhook endpoint API reference

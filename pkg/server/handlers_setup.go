@@ -133,6 +133,13 @@ func (s *Server) setupRoutes() {
 	reactions.HandleFunc("/{id}", s.deleteReactionQueue).Methods("DELETE")
 	reactions.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
 
+	// Webhooks
+	webhooks := api.PathPrefix("/webhooks").Subrouter()
+	webhooks.HandleFunc("/{id}", s.receiveWebhook).Methods("POST")
+	webhooks.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+	webhooks.HandleFunc("", s.listWebhookEndpoints).Methods("GET")
+	webhooks.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 

@@ -1,0 +1,13 @@
+wants:
+  - metadata:
+      name: "teams-inbox"
+      type: teams webhook
+      labels:
+        category: communication
+        source: teams
+    spec:
+      params:
+        webhook_secret: "${TEAMS_WEBHOOK_SECRET}"
+        channel_filter: ""
+      capabilities:
+        - teams_webhook_monitoring
