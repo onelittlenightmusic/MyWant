@@ -297,11 +297,11 @@ wants:
 
 Teamsメッセージ受信時、`Progress()` が `Provide()` で最新メッセージを下流に送信する。
 
-## Teams Outgoing Webhook Setup
+## Teams連携の設定
 
-> 公式ドキュメント: [Create an Outgoing Webhook - Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook)
+MyWantのwebhookエンドポイントにTeamsメッセージを送信する方法は2つある。
 
-### 1. MyWant側の準備
+### 共通: MyWant側の準備
 
 Wantをデプロイし、Stateから `webhook_url` を取得する:
 
@@ -311,7 +311,29 @@ Wantをデプロイし、Stateから `webhook_url` を取得する:
 # State内の "webhook_url" フィールド (例: /api/v1/webhooks/{want-id}) を確認
 ```
 
-### 2. Microsoft Teams側の設定
+### Network Requirements
+
+- Callback URLは **HTTPS必須**
+- MyWantサーバーがインターネットから到達可能であること
+- 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
+
+```bash
+# ngrokでローカルサーバーを公開
+ngrok http 8080
+
+# Callback URLの例:
+# https://xxxx.ngrok-free.app + State の webhook_url 値
+```
+
+---
+
+### 方式A: Outgoing Webhook (@mention必須)
+
+> 公式ドキュメント: [Create an Outgoing Webhook - Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook)
+
+シンプルな設定で、チャネルで `@mention` されたメッセージのみを受信する。
+
+**Teams側の設定:**
 
 1. **Teams** 左ペインからチームを選択 → **•••** (more options) → **Manage team**
 2. **Apps** タブ → **Create an outgoing webhook**
@@ -324,23 +346,47 @@ Wantをデプロイし、Stateから `webhook_url` を取得する:
 
 > **Note**: Security tokenは作成時に一度だけ表示される。期限はなく、設定ごとに固有の値となる。
 
-### 3. 使い方
+**使い方:**
 
 チャネルで `@MyWant Bot メッセージ` のように @mention すると、Teams が Callback URL に POST リクエストを送信する。MyWant は5秒以内に応答する必要がある。
 
-### Network Requirements
+---
 
-- Callback URLは **HTTPS必須** (Teamsの要件)
-- MyWantサーバーがインターネットから到達可能であること
-- 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
+### 方式B: Power Automate (@mention不要)
 
-```bash
-# ngrokでローカルサーバーを公開
-ngrok http 8080
+> 公式ドキュメント: [Microsoft Teams connectors - Power Automate](https://learn.microsoft.com/en-us/connectors/teams/)
 
-# Callback URLの例:
-# https://xxxx.ngrok.io + State の webhook_url 値
-```
+チャネルの全メッセージを自動転送する。@mention不要で、Power Automateライセンスが必要。
+
+**Power Automate側の設定:**
+
+1. [Power Automate](https://make.powerautomate.com/) でフローを新規作成
+2. トリガー: **When a new channel message is added** を選択し、対象のチーム・チャネルを指定
+3. アクション: **HTTP** を追加し、以下を設定:
+   - **Method**: `POST`
+   - **URI**: `https://{your-server}` + Stateから取得した `webhook_url` の値
+   - **Headers**: `Content-Type: application/json`
+   - **Body**: Teams メッセージの動的コンテンツをJSON形式で構成
+     ```json
+     {
+       "type": "message",
+       "text": "@{triggerOutputs()?['body/body/plainTextContent']}",
+       "from": {"name": "@{triggerOutputs()?['body/from/user/displayName']}"},
+       "channelId": "msteams",
+       "timestamp": "@{triggerOutputs()?['body/createdDateTime']}"
+     }
+     ```
+4. フローを保存・有効化
+
+**特徴:**
+
+| | Outgoing Webhook (方式A) | Power Automate (方式B) |
+|---|---|---|
+| @mention | 必須 | 不要 |
+| 対象メッセージ | @mention付きのみ | チャネルの全メッセージ |
+| HMAC署名検証 | あり | なし (Power Automate側で認証) |
+| 設定の容易さ | 簡単 | Power Automateの知識が必要 |
+| ライセンス | Teams標準機能 | Power Automateライセンスが必要 |
 
 ## Agent System
 
