@@ -28,6 +28,15 @@ wantType:
       enum:
       - basic
       - comprehensive
+  - name: provider
+    description: LLM provider to use for synthesis (gemini-cli, claude-code)
+    type: string
+    default: ""
+    validation:
+      enum:
+      - ""
+      - gemini-cli
+      - claude-code
   - name: refresh_interval
     description: Minimum time between update checks
     type: string
@@ -71,6 +80,7 @@ wantType:
         params:
           topic: "Vite and React performance optimization"
           output_path: "notes/web_dev.md"
+          provider: "gemini-cli"
           refresh_interval: "12h"
 
   requires:

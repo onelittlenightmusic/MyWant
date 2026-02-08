@@ -35,7 +35,8 @@ func executeKnowledgeAction(ctx context.Context, want *mywant.Want) error {
 
 func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
 	topic := want.Spec.Params["topic"].(string)
-	want.StoreLog("[KNOWLEDGE-AGENT] Monitoring topic: %s", topic)
+	provider, _ := want.Spec.Params["provider"].(string)
+	want.StoreLog("[KNOWLEDGE-AGENT] Monitoring topic: %s (provider: %s)", topic, provider)
 
 	goose, err := GetGooseManager(ctx)
 	if err != nil {
@@ -44,7 +45,8 @@ func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
 
 	// 1. Search for updates
 	searchResult, err := goose.ExecuteViaGoose(ctx, "google_search", map[string]interface{}{
-		"query": topic,
+		"query":    topic,
+		"provider": provider,
 	})
 	if err != nil {
 		return fmt.Errorf("search failed: %w", err)
@@ -75,11 +77,12 @@ func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 	topic := want.Spec.Params["topic"].(string)
 	path := want.Spec.Params["output_path"].(string)
 	depth := want.Spec.Params["depth"].(string)
+	provider, _ := want.Spec.Params["provider"].(string)
 
 	updates, _ := want.GetState("discovered_updates")
 	updatesJSON, _ := json.MarshalIndent(updates, "", "  ")
 
-	want.StoreLog("[KNOWLEDGE-AGENT] Updating document: %s", path)
+	want.StoreLog("[KNOWLEDGE-AGENT] Updating document: %s (provider: %s)", path, provider)
 
 	// 1. Read existing content if file exists
 	existingContent := ""
@@ -100,6 +103,7 @@ func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 		"existing_content": existingContent,
 		"new_facts":        string(updatesJSON),
 		"depth":            depth,
+		"provider":         provider,
 	})
 	if err != nil {
 		return fmt.Errorf("synthesis failed: %w", err)

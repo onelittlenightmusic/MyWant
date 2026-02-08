@@ -1,5 +1,6 @@
 agents:
   - name: agent_restaurant_premium
+    runtime: localGo
     type: do
     capabilities:
       - restaurant_agency
@@ -11,6 +12,7 @@ agents:
         description: Restaurant reservation schedule with timing details
 
   - name: restaurant_monitor
+    runtime: localGo
     type: monitor
     capabilities:
       - restaurant_agency

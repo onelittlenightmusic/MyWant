@@ -122,8 +122,9 @@ const (
 	WantStatusFailed       WantStatus = "failed"
 	WantStatusTerminated   WantStatus = "terminated"
 	WantStatusDeleting     WantStatus = "deleting"
-	WantStatusConfigError  WantStatus = "config_error"  // Invalid input values or spec configuration
-	WantStatusModuleError  WantStatus = "module_error"  // Want type implementation error (GetState failure, cast failure, etc.)
+	WantStatusConfigError  WantStatus = "config_error"   // Invalid input values or spec configuration
+	WantStatusModuleError  WantStatus = "module_error"   // Want type implementation error (GetState failure, cast failure, etc.)
+	WantStatusPrepareAgent WantStatus = "prepare_agent" // Preparing agent runtime
 )
 
 // ControlTrigger represents a control command sent to a Want

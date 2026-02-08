@@ -20,18 +20,20 @@ The MyWant Agent System provides capability-based, autonomous agents that can ex
 #### DoAgent
 - **Purpose**: Perform actions that change external state
 - **Examples**: Make hotel reservations, process payments, send notifications
-- **Characteristics**:
-  - Typically short-lived
-  - Makes external API calls
-  - Updates want state with results
+- **Execution Characteristic**: **Synchronous**. Triggered via `ExecuteAgents()`, it blocks the progression loop until the action completes.
+- **State Updates**: Typically updates state once upon completion.
 
 #### MonitorAgent
 - **Purpose**: Monitor and validate state
 - **Examples**: Check reservation status, validate payments, monitor resources
-- **Characteristics**:
-  - Can be long-running
-  - Reads from external systems
-  - Updates want state with monitoring data
+- **Execution Characteristic**: **Asynchronous**. Triggered via `ExecuteAgents()`, it runs in a background goroutine and continues monitoring until the want achieves its goal or fails.
+- **State Updates**: Updates state periodically as external conditions change.
+
+#### PollAgent / BackgroundAgent
+- **Purpose**: Long-running or system-level background operations.
+- **Examples**: Task scheduling, continuous health checks, user reaction polling.
+- **Execution Characteristic**: **Persistent**. Registered via `AddBackgroundAgent()`, these agents are initialized when the want starts and remain active throughout the entire lifecycle of the want.
+- **Management**: Managed by the want's internal background registry with explicit `Start`/`Stop` signals.
 
 ## Configuration
 
@@ -53,6 +55,7 @@ capabilities:
 agents:
   - name: agent_premium
     type: do
+    runtime: localGo
     capabilities:
       - hotel_agency
     uses:
@@ -66,6 +69,7 @@ agents:
 
   - name: hotel_monitor
     type: monitor
+    runtime: localGo
     capabilities:
       - hotel_agency
     uses:
@@ -76,6 +80,15 @@ agents:
     tags: ["monitor", "hotel"]
     version: "1.5.0"
 ```
+
+### Runtime Configuration
+
+The `runtime` field specifies the execution environment for the agent:
+
+- **localGo**: (Default) The agent executes as a registered Go function within the same process.
+- **docker**: (Planned) The agent executes inside a dedicated Docker container.
+
+Before an agent starts, the system performs a **Preparation Phase** (`PrepareAgent` status) where it validates the availability of the specified runtime via `bootAgent()`.
 
 ### Want Requirements (`yaml/config/config-*.yaml`)
 
@@ -211,20 +224,41 @@ want.CommitStateChanges()
 
 ### Agent Lifecycle
 
-1. **Discovery**: Want specifies requirements, system finds matching agents
-2. **Execution**: Agents run in separate goroutines with context
-3. **State Updates**: Agents stage changes and commit atomically
-4. **Cleanup**: Want automatically stops agents on completion/failure
+1. **Discovery**: A want specifies requirements, and the `AgentRegistry` finds matching agents based on capabilities.
+2. **Preparation (`PrepareAgent`)**: The want transitions to the `prepare_agent` status. The `bootAgent()` function checks if the required runtime (localGo or Docker) is ready.
+3. **Execution**: Agents are dispatched based on their type:
+   - **DoAgents** are executed synchronously.
+   - **MonitorAgents** are launched in background goroutines.
+4. **State Updates**: Agents perform tasks and stage state changes, which are committed atomically to the want's state.
+5. **Cleanup**: When a want is achieved or fails, it automatically stops all associated agents and background tasks.
+
+### Execution Patterns
+
+| Pattern | Trigger Method | Agent Types | Characteristics |
+| :--- | :--- | :--- | :--- |
+| **Dynamic Task** | `ExecuteAgents()` | `DoAgent`, `MonitorAgent` | Triggered by want logic when specific capabilities are needed. |
+| **Persistent Task** | `AddBackgroundAgent()` | `BackgroundAgent`, `PollAgent` | Constant monitoring or system services that live as long as the want. |
+
+### Status Transitions
+
+During agent execution, a want follows this status flow:
+`Reaching` → **`PrepareAgent`** (booting) → `Executing` (sync/async) → `Reaching` (after boot/sync completion) → `Achieved/Failed` (terminal)
 
 ### Goroutine Management
 
 ```go
-// Agents run with cancellable context
-ctx, cancel := context.WithCancel(context.Background())
-want.runningAgents[agent.GetName()] = cancel
+// Step 1: Preparation
+n.SetStatus(WantStatusPrepareAgent)
+err := n.bootAgent(ctx, agent)
 
-// Automatic cleanup on want completion
-defer want.StopAllAgents()
+// Step 2: Dispatch
+if agent.GetType() == DoAgentType {
+    // Synchronous execution
+    err = executor.Execute(ctx, agent, n)
+} else {
+    // Asynchronous execution
+    go executor.Execute(ctx, agent, n)
+}
 ```
 
 ## Validation

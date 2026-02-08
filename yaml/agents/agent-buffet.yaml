@@ -1,5 +1,6 @@
 agents:
   - name: agent_buffet_premium
+    runtime: localGo
     type: do
     capabilities:
       - buffet_agency
@@ -11,6 +12,7 @@ agents:
         description: Buffet reservation schedule with meal timing details
 
   - name: buffet_monitor
+    runtime: localGo
     type: monitor
     capabilities:
       - buffet_agency

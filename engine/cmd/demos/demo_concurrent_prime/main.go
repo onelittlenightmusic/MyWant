@@ -14,21 +14,13 @@ func main() {
 	log.Println("=== Concurrent Prime Sieve Deployment Test ===")
 	log.Println("Deploying 10 prime sieve instances in parallel...")
 
-	// Load recipe
-	recipe, err := LoadRecipeFromFile("../yaml/recipes/prime-sieve.yaml")
-	if err != nil {
-		log.Fatalf("Failed to load recipe: %v", err)
-	}
-
 	// Create ChainBuilder
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{},
-	})
+	cb := NewChainBuilder(Config{})
 
 	// Register prime types
 
 	// Start reconcile loop
-	go cb.reconcileLoop()
+	cb.Start()
 	defer cb.Stop()
 
 	// Give reconcile loop time to start
@@ -51,11 +43,12 @@ func main() {
 				"prefix":       fmt.Sprintf("prime-%d", idx),
 			}
 
-			wants, err := recipe.Instantiate(params)
+			recipeConfig, err := LoadRecipe("../yaml/recipes/prime-sieve.yaml", params)
 			if err != nil {
 				errors <- fmt.Errorf("instance %d: failed to instantiate: %v", idx, err)
 				return
 			}
+			wants := recipeConfig.Config.Wants
 
 			// Add wants
 			err = cb.AddWantsAsync(wants)
@@ -95,50 +88,41 @@ func main() {
 		time.Sleep(checkInterval)
 
 		// Check all prime sequence wants
-		cb.mu.RLock()
 		allAchieved := true
 		primeSequenceCount := 0
 		notAchievedWants := []string{}
 
-		for _, want := range cb.Wants {
+		wants := cb.GetWants()
+		for _, want := range wants {
 			if want.Metadata.Type == "prime sequence" {
 				primeSequenceCount++
-				prog, ok := cb.progress[want.Metadata.ID]
-				if !ok || !prog.IsAchieved() {
+				if want.GetStatus() != WantStatusAchieved {
 					allAchieved = false
 					notAchievedWants = append(notAchievedWants, want.Metadata.Name)
 
 					// Print detailed state
-					achievedState, hasAchieved := want.State["achieved"]
-					totalProcessed, hasProcessed := want.State["total_processed"]
-					log.Printf("⏳ Want %s not achieved - achieved=%v, total_processed=%v",
-						want.Metadata.Name, achievedState, totalProcessed)
-
-					// Check if it has achieved state but IsAchieved() returns false
-					if hasAchieved && achievedState == true {
-						log.Printf("⚠️  WARNING: Want %s has achieved=true in State but IsAchieved()=false!", want.Metadata.Name)
-					}
+					achievedState, _ := want.GetState("achieved")
+					totalProcessed, _ := want.GetState("total_processed")
+					log.Printf("⏳ Want %s not achieved - status=%s, achieved=%v, total_processed=%v",
+						want.Metadata.Name, want.GetStatus(), achievedState, totalProcessed)
 				}
 			}
 		}
-		cb.mu.RUnlock()
 
 		elapsed := time.Since(startTime)
-		if allAchieved {
+		if allAchieved && primeSequenceCount > 0 {
 			log.Printf("✅ All %d prime sequence wants achieved in %v!", primeSequenceCount, elapsed)
 
 			// Print summary
 			log.Println("\n=== Success Summary ===")
-			cb.mu.RLock()
-			for _, want := range cb.Wants {
+			for _, want := range wants {
 				if want.Metadata.Type == "prime sequence" {
-					primeCount := want.State["primeCount"]
-					totalProcessed := want.State["total_processed"]
+					primeCount, _ := want.GetState("primeCount")
+					totalProcessed, _ := want.GetState("total_processed")
 					log.Printf("  %s: found %v primes (processed %v numbers)",
 						want.Metadata.Name, primeCount, totalProcessed)
 				}
 			}
-			cb.mu.RUnlock()
 			return
 		}
 
@@ -148,14 +132,11 @@ func main() {
 
 	// Timeout - print detailed diagnostics
 	log.Println("\n❌ TIMEOUT - Detailed diagnostics:")
-	cb.mu.RLock()
-	defer cb.mu.RUnlock()
 
 	notAchievedCount := 0
-	for _, want := range cb.Wants {
+	for _, want := range cb.GetWants() {
 		if want.Metadata.Type == "prime sequence" {
-			prog, _ := cb.progress[want.Metadata.ID]
-			isAchieved := prog != nil && prog.IsAchieved()
+			isAchieved := want.GetStatus() == WantStatusAchieved
 
 			if !isAchieved {
 				notAchievedCount++
@@ -167,13 +148,9 @@ func main() {
 				log.Printf("  Using: %+v", want.Spec.Using)
 
 				// Check input connections
-				if prog != nil {
-					if wantProg, ok := prog.(*Want); ok {
-						log.Printf("  Input channels: %d", len(wantProg.InputChannels))
-						for label, ch := range wantProg.InputChannels {
-							log.Printf("    - %s: len=%d, cap=%d", label, len(ch), cap(ch))
-						}
-					}
+				log.Printf("  Input channels: %d", len(want.GetPaths().In))
+				for _, path := range want.GetPaths().In {
+					log.Printf("    - %s: active=%v", path.Name, path.Active)
 				}
 			}
 		}

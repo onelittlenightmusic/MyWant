@@ -1,0 +1,9 @@
+agents:
+  - name: reminder_queue_manager
+    runtime: localGo
+    type: do
+    description: Manages the creation and cleanup of reaction queues for scheduled reminders.
+    version: '1.0'
+    capabilities:
+      - reminder_queue_management
+    role: action

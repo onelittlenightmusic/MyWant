@@ -1,0 +1,16 @@
+agents:
+  - name: mcp_tools
+    runtime: localGo
+    type: do
+    description: Executes MCP tool operations (e.g., Gmail search, read, send) via Goose or Native SDK.
+    version: '1.0'
+    capabilities:
+      - mcp_gmail
+    role: action
+    actions:
+      - name: mcp_gmail_search
+        description: Searches for emails using Gmail MCP.
+      - name: mcp_gmail_read
+        description: Reads a specific email by ID.
+      - name: mcp_gmail_send
+        description: Sends an email via Gmail MCP.

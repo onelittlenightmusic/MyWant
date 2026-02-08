@@ -1,0 +1,21 @@
+agents:
+  - name: execution_command
+    runtime: localGo
+    type: do
+    description: Executes arbitrary shell commands and captures their output and exit codes.
+    version: '1.0'
+    capabilities:
+      - command_execution
+    role: action
+    actions:
+      - name: execute_shell_command
+        description: Executes a single shell command.
+        state_updates:
+          - name: stdout
+            type: string
+          - name: stderr
+            type: string
+          - name: exit_code
+            type: integer
+          - name: final_result
+            type: string

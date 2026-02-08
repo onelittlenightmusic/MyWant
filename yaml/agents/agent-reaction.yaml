@@ -1,0 +1,29 @@
+agents:
+  - name: user_reaction_do
+    runtime: localGo
+    type: do
+    description: Performs automatic approval or rejection of user reactions based on configuration.
+    version: '1.0'
+    capabilities:
+      - reaction_auto_approval
+    role: action
+    actions:
+      - name: auto_approve
+        description: Automatically approves a reaction if criteria are met.
+        state_updates:
+          - name: reaction_result
+            type: string
+            description: Result of the auto-approval (approved)
+
+  - name: user_reaction_monitor
+    runtime: localGo
+    type: monitor
+    description: Monitors for user reactions to reminders and triggers auto-approval if enabled.
+    version: '1.0'
+    capabilities:
+      - reminder_monitoring
+      - reaction_auto_approval
+    role: monitor
+    monitoring:
+      target: reaction_queue_id
+      check_interval: 5 seconds

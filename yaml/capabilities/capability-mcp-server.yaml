@@ -1,0 +1,7 @@
+capabilities:
+  - name: mcp_server_management
+    gives:
+      - mcp_server_management
+  - name: mcp_server_monitoring
+    gives:
+      - mcp_server_monitoring

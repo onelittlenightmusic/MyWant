@@ -1,0 +1,26 @@
+agents:
+  - name: knowledge_agent
+    runtime: localGo
+    type: do
+    description: Maintains and updates knowledge bases in Markdown format by searching the web and synthesizing information.
+    version: '1.0'
+    capabilities:
+      - knowledge_monitoring
+      - knowledge_updating
+    role: action
+    actions:
+      - name: knowledge_monitoring
+        description: Searches for updates on a specific topic and identifies new facts.
+        state_updates:
+          - name: discovered_updates
+            type: array
+            description: New facts found during monitoring
+      - name: knowledge_updating
+        description: Synthesizes new facts into the existing Markdown document.
+        state_updates:
+          - name: knowledge_status
+            type: string
+            description: Status of the knowledge (fresh)
+          - name: last_sync_time
+            type: string
+            description: Timestamp of the last update

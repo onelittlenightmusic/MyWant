@@ -1,5 +1,6 @@
 agents:
   - name: agent_premium
+    runtime: localGo
     type: do
     capabilities:
       - hotel_agency
@@ -11,6 +12,7 @@ agents:
         description: Hotel reservation schedule with check-in/check-out times
 
   - name: hotel_monitor
+    runtime: localGo
     type: monitor
     capabilities:
       - hotel_agency

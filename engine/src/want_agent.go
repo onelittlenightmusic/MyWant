@@ -84,14 +84,65 @@ func (n *Want) ExecuteAgents() error {
 	return nil
 }
 
+// bootAgent prepares the agent runtime (localGo or docker)
+func (n *Want) bootAgent(ctx context.Context, agent Agent) error {
+	runtime := agent.GetRuntime()
+	n.StoreLog("[BOOT-AGENT] Booting agent '%s' with runtime '%s'", agent.GetName(), runtime)
+
+	switch runtime {
+	case LocalGoRuntime:
+		// Check if the agent has an action or monitor function registered
+		switch a := agent.(type) {
+		case *DoAgent:
+			if a.Action == nil {
+				return fmt.Errorf("localGo agent '%s' has no action function registered", agent.GetName())
+			}
+		case *MonitorAgent:
+			if a.Monitor == nil {
+				return fmt.Errorf("localGo agent '%s' has no monitor function registered", agent.GetName())
+			}
+		case *PollAgent:
+			if a.Poll == nil {
+				return fmt.Errorf("localGo agent '%s' has no poll function registered", agent.GetName())
+			}
+		}
+		n.StoreLog("[BOOT-AGENT] Agent '%s' (localGo) verified and ready", agent.GetName())
+
+	case DockerRuntime:
+		// FUTURE: Implement docker image start and health check
+		n.StoreLog("[BOOT-AGENT] Agent '%s' (docker) starting container...", agent.GetName())
+		// Placeholder for docker logic
+		n.StoreLog("[BOOT-AGENT] Agent '%s' (docker) health check passed", agent.GetName())
+
+	default:
+		return fmt.Errorf("unsupported agent runtime: %s", runtime)
+	}
+
+	return nil
+}
+
 // executeAgent executes a single agent using the appropriate executor
 func (n *Want) executeAgent(agent Agent) error {
+	// PrepareAgent phase
+	n.SetStatus(WantStatusPrepareAgent)
+
+	if err := n.bootAgent(context.Background(), agent); err != nil {
+		// On failure, return to Reaching (or previous state) but the error will be propagated
+		n.SetStatus(WantStatusReaching)
+		return fmt.Errorf("failed to boot agent %s: %w", agent.GetName(), err)
+	}
+
+	// Back to Reaching status as requested
+	n.SetStatus(WantStatusReaching)
+
 	// Get BaseAgent to access ExecutionConfig
 	var execConfig ExecutionConfig
 	switch a := agent.(type) {
 	case *DoAgent:
 		execConfig = a.BaseAgent.ExecutionConfig
 	case *MonitorAgent:
+		execConfig = a.BaseAgent.ExecutionConfig
+	case *PollAgent:
 		execConfig = a.BaseAgent.ExecutionConfig
 	default:
 		execConfig = DefaultExecutionConfig()

@@ -15,6 +15,7 @@ type KnowledgeLocals struct {
 	Topic           string
 	OutputPath      string
 	Depth           string
+	Provider        string
 	RefreshInterval time.Duration
 }
 
@@ -52,6 +53,9 @@ func (k *KnowledgeWant) Initialize() {
 
 	// Parse depth
 	locals.Depth = k.GetStringParam("depth", "comprehensive")
+
+	// Parse provider
+	locals.Provider = k.GetStringParam("provider", "")
 
 	// Parse refresh_interval
 	intervalStr := k.GetStringParam("refresh_interval", "24h")

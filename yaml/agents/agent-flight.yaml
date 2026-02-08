@@ -1,6 +1,7 @@
 agents:
   # AgentFlightAPI - Creates and manages flight reservations via REST API
   - name: agent_flight_api
+    runtime: localGo
     type: do
     description: Creates and manages flight reservations via mock flight server API
     version: '1.0'
@@ -108,6 +109,7 @@ agents:
 
   # MonitorFlightAPI - Monitors flight status from mock server
   - name: monitor_flight_api
+    runtime: localGo
     type: monitor
     description: Monitors flight status changes from mock flight server API
     version: '1.0'

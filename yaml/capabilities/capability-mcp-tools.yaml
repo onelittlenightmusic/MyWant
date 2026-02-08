@@ -1,0 +1,7 @@
+capabilities:
+  - name: mcp_gmail
+    gives:
+      - mcp_gmail
+      - mcp_gmail_search
+      - mcp_gmail_read
+      - mcp_gmail_send

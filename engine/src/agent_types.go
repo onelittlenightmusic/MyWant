@@ -14,6 +14,14 @@ const (
 	MonitorAgentType AgentType = "monitor"
 )
 
+// AgentRuntime defines the runtime environment for the agent.
+type AgentRuntime string
+
+const (
+	LocalGoRuntime AgentRuntime = "localGo"
+	DockerRuntime  AgentRuntime = "docker"
+)
+
 // Capability represents an agent's functional capability with its dependencies.
 type Capability struct {
 	Name  string   `yaml:"name"`
@@ -26,13 +34,15 @@ type Agent interface {
 	GetCapabilities() []string
 	GetName() string
 	GetType() AgentType
+	GetRuntime() AgentRuntime
 }
 
 // BaseAgent provides common functionality for all agent types.
 type BaseAgent struct {
-	Name         string    `yaml:"name"`
-	Capabilities []string  `yaml:"capabilities"`
-	Type         AgentType `yaml:"type"`
+	Name         string       `yaml:"name"`
+	Capabilities []string     `yaml:"capabilities"`
+	Type         AgentType    `yaml:"type"`
+	Runtime      AgentRuntime `yaml:"runtime"`
 
 	// Execution configuration (local, webhook, rpc)
 	ExecutionConfig ExecutionConfig `yaml:"execution" json:"execution"`
@@ -44,6 +54,7 @@ func NewBaseAgent(name string, capabilities []string, agentType AgentType) *Base
 		Name:            name,
 		Capabilities:    capabilities,
 		Type:            agentType,
+		Runtime:         LocalGoRuntime,
 		ExecutionConfig: DefaultExecutionConfig(), // Default to local execution
 	}
 }
@@ -58,6 +69,13 @@ func (a *BaseAgent) GetName() string {
 
 func (a *BaseAgent) GetType() AgentType {
 	return a.Type
+}
+
+func (a *BaseAgent) GetRuntime() AgentRuntime {
+	if a.Runtime == "" {
+		return LocalGoRuntime
+	}
+	return a.Runtime
 }
 
 // DoAgent implements an agent that performs specific actions on wants.

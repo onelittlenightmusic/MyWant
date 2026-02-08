@@ -28,6 +28,7 @@ type AgentYAML struct {
 		Capabilities        []string             `yaml:"capabilities"`
 		Uses                []string             `yaml:"uses"`
 		Type                string               `yaml:"type"`
+		Runtime             string               `yaml:"runtime"`
 		TrackedStatusFields []TrackedStatusField `yaml:"tracked_status_fields,omitempty"`
 	} `yaml:"agents"`
 }
@@ -203,6 +204,11 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 		baseAgent := BaseAgent{
 			Name:         agentDef.Name,
 			Capabilities: agentDef.Capabilities,
+			Runtime:      AgentRuntime(agentDef.Runtime),
+		}
+
+		if baseAgent.Runtime == "" {
+			baseAgent.Runtime = LocalGoRuntime
 		}
 
 		switch strings.ToLower(agentDef.Type) {

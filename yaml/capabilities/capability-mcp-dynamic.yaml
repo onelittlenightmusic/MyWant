@@ -1,0 +1,13 @@
+capabilities:
+  - name: mcp_dynamic_discovery
+    gives:
+      - mcp_dynamic_discovery
+  - name: mcp_dynamic_developer
+    gives:
+      - mcp_dynamic_developer
+  - name: mcp_dynamic_compiler
+    gives:
+      - mcp_dynamic_compiler
+  - name: mcp_dynamic_validator
+    gives:
+      - mcp_dynamic_validator
