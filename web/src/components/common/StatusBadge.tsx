@@ -40,7 +40,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         'inline-flex items-center gap-1 font-medium rounded-full border group/status relative',
         sizeClasses[size],
         colorClasses[color as keyof typeof colorClasses],
-        (status === 'reaching') && styles.pulseGlow,
+        (status === 'reaching' || status === 'waiting_user_action') && styles.pulseGlow,
         className
       )}
       title={status}

@@ -403,6 +403,11 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 	// Ensure packet is emitted (handles both transition and restart-while-reaching)
 	r.emitReactionPacketIfNeeded(locals)
 
+	// Set WaitingUserAction status when waiting for user reaction
+	if locals.RequireReaction && r.GetStatus() != WantStatusWaitingUserAction {
+		r.SetStatus(WantStatusWaitingUserAction)
+	}
+
 	// Check if user reaction is available
 	if locals.RequireReaction {
 		// Background monitoring agent continuously polls HTTP API for reactions
@@ -468,6 +473,7 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 	if reactionMap, ok := reactionData.(map[string]any); ok {
 		if approved, ok := reactionMap["approved"].(bool); ok {
 			if approved {
+				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
 				r.StoreLog("📦 Reminder approved by user")
 				r.StoreStateMulti(map[string]any{
 					"reminder_phase":           ReminderPhaseCompleted,
@@ -481,6 +487,7 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 				// Trigger agent to delete queue immediately
 				r.ExecuteAgents()
 			} else {
+				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
 				r.StoreLog("📦 Reminder rejected by user")
 				r.StoreStateMulti(map[string]any{
 					"reminder_phase":           ReminderPhaseFailed,
@@ -501,6 +508,7 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 // handleTimeout handles reaction timeout
 func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	if locals.RequireReaction {
+		r.SetStatus(WantStatusReaching) // Clear WaitingUserAction before transitioning
 		r.StoreLog("📦 Reaction timeout - marking as failed")
 		r.StoreStateMulti(map[string]any{
 			"reminder_phase":           ReminderPhaseFailed,

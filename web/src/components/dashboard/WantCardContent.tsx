@@ -51,11 +51,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
 
-  const isRunning = want.status === 'reaching';
+  const isRunning = want.status === 'reaching' || want.status === 'waiting_user_action';
   const isFailed = want.status === 'failed';
   const hasError = Boolean(isFailed && want.state?.error);
   const isSuspended = want.status === 'suspended';
-  const canControl = want.status === 'reaching' || want.status === 'stopped';
+  const canControl = want.status === 'reaching' || want.status === 'waiting_user_action' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
   const hasScheduling = (want.spec?.when && want.spec.when.length > 0);
 

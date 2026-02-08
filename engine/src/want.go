@@ -124,7 +124,8 @@ const (
 	WantStatusDeleting     WantStatus = "deleting"
 	WantStatusConfigError  WantStatus = "config_error"   // Invalid input values or spec configuration
 	WantStatusModuleError  WantStatus = "module_error"   // Want type implementation error (GetState failure, cast failure, etc.)
-	WantStatusPrepareAgent WantStatus = "prepare_agent" // Preparing agent runtime
+	WantStatusPrepareAgent     WantStatus = "prepare_agent"      // Preparing agent runtime
+	WantStatusWaitingUserAction WantStatus = "waiting_user_action" // Waiting for user action (e.g., reaction approval)
 )
 
 // ControlTrigger represents a control command sent to a Want
@@ -506,7 +507,7 @@ func (n *Want) ShouldRetrigger() bool {
 	// 1. Goroutine is NOT running (Idle, Suspended) AND has pending packets (check UnusedExists)
 	// 2. OR want is already in terminal state (Achieved) but new packets arrived (check UnusedExists)
 	// 3. OR want is currently reaching/running (isGoroutineActive == true) but has new packets (check UnusedExists)
-	if (!isGoroutineActive && (status == WantStatusIdle || status == WantStatusSuspended)) || status == WantStatusAchieved || (isGoroutineActive && status == WantStatusReaching) {
+	if (!isGoroutineActive && (status == WantStatusIdle || status == WantStatusSuspended)) || status == WantStatusAchieved || (isGoroutineActive && (status == WantStatusReaching || status == WantStatusWaitingUserAction)) {
 		// Check for pending packets (non-blocking)
 		// Use 0 timeout since packet should already be in channel if we're called after Provide()
 		hasUnused := n.UnusedExists(0)

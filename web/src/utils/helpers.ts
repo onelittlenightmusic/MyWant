@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Square, CheckCircle, AlertCircle, Clock, RotateCw, Trash2, AlertTriangle } from 'lucide-react';
+import { Play, Pause, Square, CheckCircle, AlertCircle, Clock, RotateCw, Trash2, AlertTriangle, Bell } from 'lucide-react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
 
 export const formatDate = (dateString?: string): string => {
@@ -69,6 +69,7 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
     case 'reaching':
       return 'blue';
     case 'suspended':
+    case 'waiting_user_action':
       return 'yellow';
     case 'achieved':
       return 'green';
@@ -98,6 +99,8 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
       return '▶️';
     case 'suspended':
       return '⏸️';
+    case 'waiting_user_action':
+      return '🔔';
     case 'achieved':
       return '✅';
     case 'failed':
@@ -129,6 +132,8 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase):
       return React.createElement(Play, iconProps);
     case 'suspended':
       return React.createElement(Pause, iconProps);
+    case 'waiting_user_action':
+      return React.createElement(Bell, { ...iconProps, className: classNames(iconProps.className, 'animate-pulse') });
     case 'achieved':
       return React.createElement(CheckCircle, iconProps);
     case 'failed':

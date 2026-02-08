@@ -22,6 +22,7 @@ const getStatusColor = (status: WantExecutionStatus): string => {
       return '#ef4444'; // Red
     case 'config_error':
     case 'stopped':
+    case 'waiting_user_action':
       return '#f59e0b'; // Amber/Yellow
     default:
       return '#d1d5db'; // Gray for created, initializing, suspended
@@ -403,7 +404,7 @@ export const WantCard: React.FC<WantCardProps> = ({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
                 {children!.map((child, idx) => (
-                  <div key={idx} className={`w-2 h-2 rounded-full flex-shrink-0 ${child.status === 'reaching' ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
+                  <div key={idx} className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
                 ))}
               </div>
               <span className="text-blue-600 font-medium">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
