@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	. "mywant/engine/src"
 	"time"
 )
@@ -49,10 +50,12 @@ func (t *TeamsWebhookWant) Initialize() {
 	locals.LastProcessedCount = 0
 
 	// Store initial state
+	webhookURL := fmt.Sprintf("/api/v1/webhooks/%s", t.Metadata.ID)
 	stateMap := map[string]any{
 		"teams_webhook_status": "active",
 		"teams_messages":       []any{},
 		"teams_message_count":  0,
+		"webhook_url":          webhookURL,
 	}
 
 	// Store webhook_secret in state so the webhook handler can read it for HMAC verification
