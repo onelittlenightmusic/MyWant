@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
 import { classNames } from '@/utils/helpers';
@@ -76,8 +76,18 @@ interface MinimapDraftCardProps {
  * Miniature version of a regular Want card
  */
 const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick }) => {
+  const [isBlinking, setIsBlinking] = useState(false);
   const backgroundStyle = getBackgroundStyle(want.metadata?.type, false);
   const statusOverlay = getStatusOverlayColor(want.status);
+
+  const handleClick = useCallback(() => {
+    setIsBlinking(false);
+    // Force re-trigger by toggling off then on in next frame
+    requestAnimationFrame(() => {
+      setIsBlinking(true);
+    });
+    onClick();
+  }, [onClick]);
 
   const minimapCardStyle = {
     ...backgroundStyle.style,
@@ -89,6 +99,7 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick }) 
     'relative rounded border cursor-pointer transition-all duration-200 overflow-hidden',
     'hover:border-blue-500 hover:shadow-md',
     isSelected ? 'border-blue-500 border-2' : 'border-gray-300',
+    isBlinking && styles.minimapBlink,
     backgroundStyle.className
   );
 
@@ -99,7 +110,8 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick }) 
     <div
       className={minimapCardClassName}
       style={minimapCardStyle}
-      onClick={onClick}
+      onClick={handleClick}
+      onAnimationEnd={() => setIsBlinking(false)}
       title={want.metadata?.name || want.metadata?.id || want.id}
     >
       <div

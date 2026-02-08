@@ -219,6 +219,7 @@ export const Dashboard: React.FC = () => {
   const handleMinimapClick = (wantId: string) => {
     const element = document.querySelector(`[data-want-id="${wantId}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    useWantStore.getState().setBlinkingWantId(wantId);
   };
 
   const handleMinimapDraftClick = (draftId: string) => {

@@ -21,6 +21,7 @@ interface WantStore {
   draggingTemplate: DraggingTemplate | null;
   isOverTarget: boolean;
   highlightedLabel: { key: string; value: string } | null;
+  blinkingWantId: string | null;
   isInitialLoad: boolean; // Track if this is the first load
 
   // Actions
@@ -46,6 +47,7 @@ interface WantStore {
   setDraggingTemplate: (template: DraggingTemplate | null) => void;
   setIsOverTarget: (isOver: boolean) => void;
   setHighlightedLabel: (label: { key: string; value: string } | null) => void;
+  setBlinkingWantId: (wantId: string | null) => void;
   reorderWant: (id: string, previousWantId?: string, nextWantId?: string) => Promise<void>;
 }
 
@@ -62,6 +64,7 @@ export const useWantStore = create<WantStore>()(
     draggingTemplate: null,
     isOverTarget: false,
     highlightedLabel: null,
+    blinkingWantId: null,
     isInitialLoad: true,
 
     // Actions
@@ -74,6 +77,14 @@ export const useWantStore = create<WantStore>()(
       if (label) {
         setTimeout(() => {
           set({ highlightedLabel: null });
+        }, 2000);
+      }
+    },
+    setBlinkingWantId: (wantId: string | null) => {
+      set({ blinkingWantId: wantId });
+      if (wantId) {
+        setTimeout(() => {
+          set({ blinkingWantId: null });
         }, 2000);
       }
     },
