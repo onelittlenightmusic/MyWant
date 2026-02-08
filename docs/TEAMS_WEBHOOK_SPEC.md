@@ -64,6 +64,7 @@ Teams Outgoing Webhook → POST /api/v1/webhooks/{want-id}
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `webhook_url` | string | Webhookエンドポイント URL (`/api/v1/webhooks/{want-id}`) |
 | `teams_webhook_status` | string | `active` / `stopped` / `error` |
 | `webhook_secret` | string | HMAC検証用シークレット (params経由) |
 | `teams_latest_message` | object | 最新の受信メッセージ |
@@ -300,11 +301,17 @@ Teamsメッセージ受信時、`Progress()` が `Provide()` で最新メッセ�
 
 ### Microsoft Teams側の設定
 
-1. Teamsチーム → **Manage team** → **Apps** → **Create an outgoing webhook**
-2. **Name**: 任意の名前 (e.g., "MyWant Bot")
-3. **Callback URL**: `https://{your-server}/api/v1/webhooks/{want-id}`
-4. **Description**: 任意
-5. 作成完了時に表示される **Security token** を `webhook_secret` パラメータに設定
+1. Wantをデプロイし、Stateから `webhook_url` を取得する:
+   ```bash
+   ./mywant wants create -f yaml/config/config-teams-webhook.yaml
+   ./mywant wants get {want-id}
+   # State内の "webhook_url" フィールド (例: /api/v1/webhooks/{want-id}) を確認
+   ```
+2. Teamsチーム → **Manage team** → **Apps** → **Create an outgoing webhook**
+3. **Name**: 任意の名前 (e.g., "MyWant Bot")
+4. **Callback URL**: `https://{your-server}` + 上記で取得した `webhook_url` の値
+5. **Description**: 任意
+6. 作成完了時に表示される **Security token** を `webhook_secret` パラメータに設定
 
 ### Network Requirements
 
