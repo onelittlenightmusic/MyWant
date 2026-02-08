@@ -241,27 +241,29 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 
 	// Build state updates batch
 	stateUpdates := map[string]any{
-		"completed":            true,
-		"exit_code":            exitCode,
-		"stdout":               locals.Stdout,
-		"stderr":               locals.Stderr,
-		"final_result":         finalResult,
-		"execution_time_ms":    locals.ExecutionTimeMs,
-		"started_at":           result["started_at"],
-		"completed_at":         result["completed_at"],
-		"achieving_percentage": 100,
+		"exit_code":         exitCode,
+		"stdout":            locals.Stdout,
+		"stderr":            locals.Stderr,
+		"final_result":      finalResult,
+		"execution_time_ms": locals.ExecutionTimeMs,
+		"started_at":        result["started_at"],
+		"completed_at":      result["completed_at"],
 	}
 
-	// Add status based on exit code
+	// Set status based on exit code
 	if exitCode == 0 {
+		stateUpdates["completed"] = true
 		stateUpdates["status"] = "completed"
+		stateUpdates["achieving_percentage"] = 100
 		e.StoreLog("Command executed successfully in %dms", locals.ExecutionTimeMs)
 		locals.Phase = ExecutionPhaseCompleted
 	} else {
+		stateUpdates["completed"] = false
 		stateUpdates["status"] = "failed"
 		stateUpdates["error_message"] = fmt.Sprintf("Exit code: %d", exitCode)
 		e.StoreLog("Command failed with exit code %d", exitCode)
 		locals.Phase = ExecutionPhaseFailed
+		e.SetStatus(WantStatusFailed)
 	}
 
 	// Store all results in batch
