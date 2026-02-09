@@ -29,8 +29,8 @@ jobs:
 
     - name: Verify OpenAPI Spec
       run: |
-        if [ ! -f openapi.yaml ]; then
-          echo "openapi.yaml is missing"
+        if [ ! -f engine/openapi.yaml ]; then
+          echo "engine/openapi.yaml is missing"
           exit 1
         fi
 
