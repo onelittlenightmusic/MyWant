@@ -222,6 +222,12 @@ export const Dashboard: React.FC = () => {
     useWantStore.getState().setBlinkingWantId(wantId);
   };
 
+  const handleMinimapDoubleClick = (wantId: string) => {
+    handleMinimapClick(wantId);
+    const want = wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId));
+    if (want) handleViewWant(want);
+  };
+
   const handleMinimapDraftClick = (draftId: string) => {
     const element = document.querySelector(`[data-draft-id="${draftId}"]`);
     if (element) {
@@ -768,6 +774,7 @@ export const Dashboard: React.FC = () => {
         selectedWantId={selectedWant?.metadata?.id || selectedWant?.id}
         activeDraftId={activeDraftId}
         onWantClick={handleMinimapClick}
+        onWantDoubleClick={handleMinimapDoubleClick}
         onDraftClick={handleMinimapDraftClick}
         isOpen={minimapOpen}
       />

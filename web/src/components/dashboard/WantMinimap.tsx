@@ -56,6 +56,7 @@ interface WantMinimapProps {
   selectedWantId?: string;
   activeDraftId?: string | null;
   onWantClick: (wantId: string) => void;
+  onWantDoubleClick?: (wantId: string) => void;
   onDraftClick: (draftId: string) => void;
   isOpen: boolean; // Mobile toggle control
 }
@@ -64,6 +65,7 @@ interface MinimapCardProps {
   want: Want;
   isSelected: boolean;
   onClick: () => void;
+  onDoubleClick?: () => void;
 }
 
 interface MinimapDraftCardProps {
@@ -75,7 +77,7 @@ interface MinimapDraftCardProps {
 /**
  * Miniature version of a regular Want card
  */
-const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick }) => {
+const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, onDoubleClick }) => {
   const [isBlinking, setIsBlinking] = useState(false);
   const backgroundStyle = getBackgroundStyle(want.metadata?.type, false);
   const statusOverlay = getStatusOverlayColor(want.status);
@@ -111,6 +113,7 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick }) 
       className={minimapCardClassName}
       style={minimapCardStyle}
       onClick={handleClick}
+      onDoubleClick={onDoubleClick}
       onAnimationEnd={() => setIsBlinking(false)}
       title={want.metadata?.name || want.metadata?.id || want.id}
     >
@@ -168,6 +171,7 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
   selectedWantId,
   activeDraftId,
   onWantClick,
+  onWantDoubleClick,
   onDraftClick,
   isOpen
 }) => {
@@ -190,6 +194,7 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
               want={want}
               isSelected={selectedWantId === wantId}
               onClick={() => onWantClick(wantId)}
+              onDoubleClick={onWantDoubleClick ? () => onWantDoubleClick(wantId) : undefined}
             />
           );
         })}
