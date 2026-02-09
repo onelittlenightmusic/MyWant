@@ -37,6 +37,10 @@ test/
 .gemini/
 .playwright-mcp/
 .mcp.json
+PLAN.md
+
+# Generated databases
+codebase_rag.db
 
 # OS
 .DS_Store
