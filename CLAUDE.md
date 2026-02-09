@@ -8,7 +8,7 @@
 
 ## Documentation
 
-[Want System](docs/want-system.md) • [Agent System](docs/agent-system.md) • [Execution Modes](docs/AgentExecutionModes.md) • [Developer Guide](docs/WantDeveloperGuide.md) • [Agent Catalog](AGENTS.md) • [CLI Usage](docs/MYWANT_CLI_USAGE.md) • [Examples](docs/agent-examples.md) • [Teams Webhook](docs/TEAMS_WEBHOOK_SPEC.md) • [Shortcuts](web/SHORTCUTS_AND_MCP_TESTING.md)
+[Want System](docs/want-system.md) • [Agent System](docs/agent-system.md) • [Execution Modes](docs/AgentExecutionModes.md) • [Developer Guide](docs/WantDeveloperGuide.md) • [Agent Catalog](AGENTS.md) • [CLI Usage](docs/MYWANT_CLI_USAGE.md) • [Examples](docs/agent-examples.md) • [Webhook (Teams/Slack)](docs/TEAMS_WEBHOOK_SPEC.md) • [Shortcuts](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Core Architecture
 

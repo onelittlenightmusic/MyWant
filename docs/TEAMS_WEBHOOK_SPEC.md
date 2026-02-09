@@ -1,170 +1,107 @@
-# Teams Webhook Want Specification
+# Webhook 設定ガイド (Teams / Slack)
 
-## Overview
+外部サービスからのメッセージを `/api/v1/webhooks/{want-id}` で受信し、Want stateに保存します。Teams・Slack・汎用JSONペイロードを自動判定して処理します。
 
-Teams Webhook Wantは、Microsoft Teams Outgoing Webhookからのメッセージを受信し、Want stateに保存するWant typeです。汎用的なWebhookエンドポイント `/api/v1/webhooks/{id}` を通じて、Teams以外のサービスからのWebhookも受信できます。
+## Teams Webhook のセットアップ
 
-## Architecture
+### 1. MyWant側の準備
 
-```
-Teams Outgoing Webhook → POST /api/v1/webhooks/{want-id}
-                              ↓
-                         Main Server (handlers_webhook.go)
-                              ↓ payload解析 + HMAC検証
-                         FindWantByID → Want state更新
-                              ↓
-                         TeamsWebhookWant (Progress)
-                           → 新着メッセージ検知 → Provide() で下流送信
-                           → MonitorAgent: バッファ管理 + ヘルスチェック
-```
+```bash
+# サーバー起動
+make restart-all
 
-## Lifecycle
+# Want をデプロイ
+./mywant wants create -f yaml/config/config-teams-webhook.yaml
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                    INITIALIZATION                          │
-│  • Parse params (webhook_secret, channel_filter)          │
-│  • Initialize state (status=active, messages=[], count=0) │
-│  • Start background MonitorAgent (5s interval)            │
-│  • Log webhook URL: POST /api/v1/webhooks/{want-id}      │
-└───────────────────┬───────────────────────────────────────┘
-                    ▼
-┌───────────────────────────────────────────────────────────┐
-│                   ACTIVE PHASE (50%)                       │
-│  Webhook endpoint receives messages → state updated       │
-│  Progress() detects new messages → Provide() to downstream│
-│  MonitorAgent trims buffer, health checks                 │
-└───────────────────┬───────────────────────────────────────┘
-                    ▼
-          teams_webhook_status = "stopped"
-                    ▼
-┌───────────────────────────────────────────────────────────┐
-│                   STOPPED (100%)                           │
-│  IsAchieved() = true                                      │
-│  MonitorAgent stops                                       │
-└───────────────────────────────────────────────────────────┘
+# Want ID を確認
+./mywant wants list
+
+# State の webhook_url を確認 (例: /api/v1/webhooks/{want-id})
+./mywant wants get {want-id}
 ```
 
-## Parameters
+### 2. ネットワーク要件
 
-### webhook_secret (optional)
-- **Type**: `string`
-- **Default**: `""`
-- **Description**: Teams Outgoing Webhook設定時に取得するBase64エンコード済みシークレット。HMAC-SHA256署名検証に使用
-- **Example**: `"dGVhbXMtc2VjcmV0LWtleQ=="`
-- **Note**: 空の場合、署名検証はスキップされる
+- Callback URLは **HTTPS必須**
+- MyWantサーバーがインターネットから到達可能であること
+- 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
 
-### channel_filter (optional)
-- **Type**: `string`
-- **Default**: `""`
-- **Description**: 特定のTeamsチャネルIDのみ受信するフィルタ。空の場合は全チャネルを受信
-- **Example**: `"19:abc123@thread.tacv2"`
-
-## State Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `webhook_url` | string | Webhookエンドポイント URL (`/api/v1/webhooks/{want-id}`) |
-| `teams_webhook_status` | string | `active` / `stopped` / `error` |
-| `webhook_secret` | string | HMAC検証用シークレット (params経由) |
-| `teams_latest_message` | object | 最新の受信メッセージ |
-| `teams_messages` | []object | 直近20件のメッセージバッファ (FIFO) |
-| `teams_message_count` | int | 累計受信メッセージ数 |
-| `channel_filter` | string | チャネルフィルタ (params経由) |
-| `achieving_percentage` | int | 進捗率 (active: 50%, stopped: 100%) |
-
-### teams_latest_message Structure
-
-```json
-{
-  "sender": "User Name",
-  "text": "メッセージ本文",
-  "timestamp": "2026-02-08T12:00:00Z",
-  "channel_id": "19:xxx@thread.tacv2"
-}
+```bash
+ngrok http 8080
+# Callback URL: https://xxxx.ngrok-free.app + webhook_url
 ```
 
-## API Endpoints
+### 3. Teams側の設定
 
-### POST /api/v1/webhooks/{want-id}
+#### 方式A: Outgoing Webhook (@mention必須)
 
-Webhookペイロードを受信し、Want stateに保存する。
+> 公式ドキュメント: [Create an Outgoing Webhook - Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook)
 
-**Teams Payload** (`channelId == "msteams"` で判定):
-- HMAC-SHA256署名検証 (`Authorization: HMAC <base64>`)
-- 構造化パース → `teams_messages` / `teams_latest_message` / `teams_message_count` を更新
-- Teams応答JSON返却
+1. **Teams** 左ペインからチームを選択 → **•••** → **Manage team**
+2. **Apps** タブ → **Create an outgoing webhook**
+3. **Name** (= @mention名)、**Callback URL** (`https://{host}` + `webhook_url`)、**Description** を入力
+4. **Create** → 表示される **Security token** をWantの `webhook_secret` に設定
 
-**Request (Teams形式):**
-```json
-{
-  "type": "message",
-  "text": "Hello from Teams",
-  "from": {"name": "User Name"},
-  "channelId": "msteams",
-  "timestamp": "2026-02-08T12:00:00Z",
-  "conversation": {"id": "19:xxx@thread.tacv2"}
-}
+チャネルで `@MyWant Bot メッセージ` と @mention するとMyWantにPOSTされます。
+
+#### 方式B: Power Automate (@mention不要)
+
+> 公式ドキュメント: [Microsoft Teams connectors - Power Automate](https://learn.microsoft.com/en-us/connectors/teams/)
+
+1. [Power Automate](https://make.powerautomate.com/) でフローを新規作成
+2. トリガー: **When a new channel message is added** → チーム・チャネルを指定
+3. アクション: **HTTP** → POST `https://{host}` + `webhook_url`
+4. Body:
+   ```json
+   {
+     "type": "message",
+     "text": "@{triggerOutputs()?['body/body/plainTextContent']}",
+     "from": {"name": "@{triggerOutputs()?['body/from/user/displayName']}"},
+     "channelId": "msteams",
+     "timestamp": "@{triggerOutputs()?['body/createdDateTime']}"
+   }
+   ```
+
+#### 方式の比較
+
+| | Outgoing Webhook (方式A) | Power Automate (方式B) |
+|---|---|---|
+| @mention | 必須 | 不要 |
+| 対象メッセージ | @mention付きのみ | 全メッセージ |
+| HMAC署名検証 | あり | なし |
+| ライセンス | Teams標準機能 | Power Automate必要 |
+
+### 4. curl でテスト
+
+```bash
+curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "message",
+    "text": "Hello from Teams!",
+    "from": {"name": "Test User"},
+    "channelId": "msteams",
+    "timestamp": "2026-02-09T12:00:00Z"
+  }'
+
+# State を確認
+./mywant wants get {want-id}
 ```
 
-**Response (Teams形式):**
-```json
-{
-  "type": "message",
-  "text": "Received"
-}
+HMAC署名付き:
+
+```bash
+SECRET="dGVhbXMtc2VjcmV0LWtleQ=="
+BODY='{"type":"message","text":"secure message","from":{"name":"User"},"channelId":"msteams"}'
+SIGNATURE=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$(echo $SECRET | base64 -d)" -binary | base64)
+
+curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+  -H "Content-Type: application/json" \
+  -H "Authorization: HMAC $SIGNATURE" \
+  -d "$BODY"
 ```
 
-**Generic Payload** (Teams以外):
-- ペイロード全体を `webhook_payload` + `webhook_received_at` としてstateに保存
-
-**Request (汎用):**
-```json
-{
-  "event": "deployment",
-  "status": "success",
-  "details": "..."
-}
-```
-
-**Response (汎用):**
-```json
-{
-  "status": "received"
-}
-```
-
-**Status Codes:**
-- `200 OK`: ペイロード受信成功
-- `400 Bad Request`: JSONパース失敗
-- `401 Unauthorized`: HMAC署名検証失敗
-- `404 Not Found`: Want IDが存在しない
-
-### GET /api/v1/webhooks
-
-Webhook受信可能なWant一覧を返却する。
-
-**Response:**
-```json
-{
-  "endpoints": [
-    {
-      "want_id": "abc-123",
-      "want_name": "teams-inbox",
-      "want_type": "teams webhook",
-      "url": "/api/v1/webhooks/abc-123",
-      "status": "active"
-    }
-  ],
-  "count": 1
-}
-```
-
-## Usage Examples
-
-### Example 1: Basic Teams Inbox
-
-**Scenario**: Teamsからのメッセージを受信して保存する
+### YAML Config
 
 ```yaml
 wants:
@@ -176,113 +113,156 @@ wants:
         source: teams
     spec:
       params:
-        webhook_secret: ""
+        webhook_secret: "${TEAMS_WEBHOOK_SECRET}"
         channel_filter: ""
       capabilities:
         - teams_webhook_monitoring
 ```
 
-**Setup:**
+---
+
+## Slack Webhook のセットアップ
+
+### 1. MyWant側の準備
+
 ```bash
-# 1. Start server
 make restart-all
-
-# 2. Deploy want
-./mywant wants create -f yaml/config/config-teams-webhook.yaml
-
-# 3. Get want ID
+./mywant wants create -f yaml/config/config-slack-webhook.yaml
 ./mywant wants list
-
-# 4. Test with curl
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "message",
-    "text": "Hello from Teams!",
-    "from": {"name": "Test User"},
-    "channelId": "msteams",
-    "timestamp": "2026-02-08T12:00:00Z"
-  }'
-
-# 5. Verify state
 ./mywant wants get {want-id}
 ```
 
-### Example 2: Secured Webhook with HMAC
+### 2. ネットワーク要件
 
-**Scenario**: 本番環境でHMAC署名検証を有効にする
+- Request URLは **HTTPS必須**
+- **3秒以内**に応答が必要 (Slackのタイムアウト)
+- 開発時は ngrok 等を使用
 
-```yaml
-wants:
-  - metadata:
-      name: secured-teams-inbox
-      type: teams webhook
-    spec:
-      params:
-        webhook_secret: "dGVhbXMtc2VjcmV0LWtleQ=="
-        channel_filter: ""
-      capabilities:
-        - teams_webhook_monitoring
+```bash
+ngrok http 8080
+# Request URL: https://xxxx.ngrok-free.app + webhook_url
 ```
 
-**HMAC付きリクエスト:**
-```bash
-# Generate HMAC signature
-SECRET="dGVhbXMtc2VjcmV0LWtleQ=="
-BODY='{"type":"message","text":"secure message","from":{"name":"User"},"channelId":"msteams"}'
-SIGNATURE=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$(echo $SECRET | base64 -d)" -binary | base64)
+### 3. Slack App の設定
 
+#### 3-1. Slack App の作成
+
+1. [Slack API](https://api.slack.com/apps) → **Create New App** → **From scratch**
+2. App名とワークスペースを選択して **Create App**
+
+#### 3-2. Signing Secret の取得
+
+1. 左メニュー **Basic Information** → **App Credentials**
+2. **Signing Secret** をコピー → Wantの `signing_secret` パラメータに設定
+
+#### 3-3. Event Subscriptions の設定
+
+1. 左メニュー **Event Subscriptions** → **Enable Events** をON
+2. **Request URL** に `https://{host}` + `webhook_url` を入力
+   - SlackがURL verification challengeを送信し、MyWantが自動応答
+   - 「Verified」と表示されればOK
+3. **Subscribe to bot events** で以下を追加:
+   - `message.channels` — パブリックチャネルのメッセージ
+   - `message.groups` — プライベートチャネルのメッセージ (任意)
+   - `message.im` — ダイレクトメッセージ (任意)
+4. **Save Changes**
+
+#### 3-4. Bot Token Scopes の設定
+
+1. 左メニュー **OAuth & Permissions** → **Scopes** → **Bot Token Scopes**
+2. 以下を追加:
+   - `channels:history` — パブリックチャネルのメッセージ読み取り
+   - `groups:history` — プライベートチャネル (任意)
+   - `im:history` — DM (任意)
+
+#### 3-5. ワークスペースへのインストール
+
+1. 左メニュー **Install App** → **Install to Workspace**
+2. 権限を確認して **Allow**
+3. ボットをチャネルに招待: `/invite @YourAppName`
+
+### 4. curl でテスト
+
+URL verification:
+
+```bash
 curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
   -H "Content-Type: application/json" \
-  -H "Authorization: HMAC $SIGNATURE" \
-  -d "$BODY"
+  -d '{"type":"url_verification","challenge":"test_challenge_token"}'
 ```
 
-### Example 3: Generic Webhook (non-Teams)
-
-**Scenario**: CI/CDパイプラインの通知を受信する
+Event callback:
 
 ```bash
-# Any JSON payload (without channelId: "msteams") is stored generically
 curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
   -H "Content-Type: application/json" \
   -d '{
-    "event": "build_complete",
-    "project": "myapp",
-    "status": "success",
-    "commit": "abc123"
+    "type": "event_callback",
+    "event": {
+      "type": "message",
+      "user": "U01ABCDEF",
+      "text": "Hello from Slack!",
+      "channel": "C01ABCDEF23",
+      "ts": "1234567890.123456"
+    }
   }'
+
+# State を確認
+./mywant wants get {want-id}
 ```
 
-**Result state:**
-```json
-{
-  "webhook_payload": {
-    "event": "build_complete",
-    "project": "myapp",
-    "status": "success",
-    "commit": "abc123"
-  },
-  "webhook_received_at": "2026-02-08T12:00:00Z"
-}
+署名付き:
+
+```bash
+SECRET="your_slack_signing_secret"
+TIMESTAMP=$(date +%s)
+BODY='{"type":"event_callback","event":{"type":"message","user":"U01ABCDEF","text":"signed message","channel":"C01ABCDEF23","ts":"1234567890.123456"}}'
+SIG_BASE="v0:${TIMESTAMP}:${BODY}"
+SIGNATURE="v0=$(echo -n "$SIG_BASE" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
+
+curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+  -H "Content-Type: application/json" \
+  -H "X-Slack-Signature: $SIGNATURE" \
+  -H "X-Slack-Request-Timestamp: $TIMESTAMP" \
+  -d "$BODY"
 ```
 
-### Example 4: Pipeline with Downstream Want
-
-**Scenario**: Teamsメッセージを受信し、下流のWantで処理する
+### YAML Config
 
 ```yaml
 wants:
   - metadata:
-      name: teams-inbox
-      type: teams webhook
+      name: slack-inbox
+      type: slack webhook
+      labels:
+        category: communication
+        source: slack
+    spec:
+      params:
+        signing_secret: "${SLACK_SIGNING_SECRET}"
+        channel_filter: ""
+      capabilities:
+        - slack_webhook_monitoring
+```
+
+---
+
+## Pipeline で下流 Want と連携
+
+メッセージを受信し、下流のWantで処理する例:
+
+```yaml
+wants:
+  - metadata:
+      name: slack-inbox
+      type: slack webhook
       labels:
         role: source
     spec:
       params:
-        webhook_secret: ""
+        signing_secret: ""
       capabilities:
-        - teams_webhook_monitoring
+        - slack_webhook_monitoring
 
   - metadata:
       name: message-processor
@@ -295,170 +275,92 @@ wants:
             role: source
 ```
 
-Teamsメッセージ受信時、`Progress()` が `Provide()` で最新メッセージを下流に送信する。
-
-## Teams連携の設定
-
-MyWantのwebhookエンドポイントにTeamsメッセージを送信する方法は2つある。
-
-### 共通: MyWant側の準備
-
-Wantをデプロイし、Stateから `webhook_url` を取得する:
-
-```bash
-./mywant wants create -f yaml/config/config-teams-webhook.yaml
-./mywant wants get {want-id}
-# State内の "webhook_url" フィールド (例: /api/v1/webhooks/{want-id}) を確認
-```
-
-### Network Requirements
-
-- Callback URLは **HTTPS必須**
-- MyWantサーバーがインターネットから到達可能であること
-- 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
-
-```bash
-# ngrokでローカルサーバーを公開
-ngrok http 8080
-
-# Callback URLの例:
-# https://xxxx.ngrok-free.app + State の webhook_url 値
-```
+メッセージ受信時、`Progress()` が `Provide()` で最新メッセージを下流に送信します。
 
 ---
-
-### 方式A: Outgoing Webhook (@mention必須)
-
-> 公式ドキュメント: [Create an Outgoing Webhook - Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook)
-
-シンプルな設定で、チャネルで `@mention` されたメッセージのみを受信する。
-
-**Teams側の設定:**
-
-1. **Teams** 左ペインからチームを選択 → **•••** (more options) → **Manage team**
-2. **Apps** タブ → **Create an outgoing webhook**
-3. 以下を入力:
-   - **Name**: 任意の名前 (e.g., "MyWant Bot") — チャネルでの @mention 名になる
-   - **Callback URL**: `https://{your-server}` + Stateから取得した `webhook_url` の値
-   - **Description**: 任意の説明
-4. **Create** をクリック
-5. 表示される **Security token** (HMAC) をコピーし、Want の `webhook_secret` パラメータに設定
-
-> **Note**: Security tokenは作成時に一度だけ表示される。期限はなく、設定ごとに固有の値となる。
-
-**使い方:**
-
-チャネルで `@MyWant Bot メッセージ` のように @mention すると、Teams が Callback URL に POST リクエストを送信する。MyWant は5秒以内に応答する必要がある。
-
----
-
-### 方式B: Power Automate (@mention不要)
-
-> 公式ドキュメント: [Microsoft Teams connectors - Power Automate](https://learn.microsoft.com/en-us/connectors/teams/)
-
-チャネルの全メッセージを自動転送する。@mention不要で、Power Automateライセンスが必要。
-
-**Power Automate側の設定:**
-
-1. [Power Automate](https://make.powerautomate.com/) でフローを新規作成
-2. トリガー: **When a new channel message is added** を選択し、対象のチーム・チャネルを指定
-3. アクション: **HTTP** を追加し、以下を設定:
-   - **Method**: `POST`
-   - **URI**: `https://{your-server}` + Stateから取得した `webhook_url` の値
-   - **Headers**: `Content-Type: application/json`
-   - **Body**: Teams メッセージの動的コンテンツをJSON形式で構成
-     ```json
-     {
-       "type": "message",
-       "text": "@{triggerOutputs()?['body/body/plainTextContent']}",
-       "from": {"name": "@{triggerOutputs()?['body/from/user/displayName']}"},
-       "channelId": "msteams",
-       "timestamp": "@{triggerOutputs()?['body/createdDateTime']}"
-     }
-     ```
-4. フローを保存・有効化
-
-**特徴:**
-
-| | Outgoing Webhook (方式A) | Power Automate (方式B) |
-|---|---|---|
-| @mention | 必須 | 不要 |
-| 対象メッセージ | @mention付きのみ | チャネルの全メッセージ |
-| HMAC署名検証 | あり | なし (Power Automate側で認証) |
-| 設定の容易さ | 簡単 | Power Automateの知識が必要 |
-| ライセンス | Teams標準機能 | Power Automateライセンスが必要 |
-
-## Agent System
-
-### monitor_teams_webhook (PollAgent)
-
-- **Type**: Monitor (Poll-based)
-- **Capability**: `teams_webhook_monitoring`
-- **Interval**: 5秒
-- **Role**:
-  - メッセージバッファを20件にトリム
-  - `teams_webhook_status` のヘルスチェック
-  - `stopped` 状態で自動停止
-
-### Agent Startup
-
-MonitorAgentは `Initialize()` で自動起動される。`Progress()` でも再起動チェックを行い、サーバーリスタート後も自動復帰する。
-
-```
-Initialize() → StopAllBackgroundAgents() → startMonitoringAgent()
-Progress()   → startMonitoringAgent() (if not running)
-```
 
 ## Monitoring and Debugging
 
-### Check webhook endpoints
 ```bash
+# Webhook endpoint 一覧
 curl http://localhost:8080/api/v1/webhooks
-```
 
-### Check want state
-```bash
+# Want state 確認
 ./mywant wants get {want-id}
-```
 
-### Send multiple test messages
-```bash
+# Teams: 複数メッセージ送信テスト
 for i in $(seq 1 5); do
   curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
     -H "Content-Type: application/json" \
     -d "{\"type\":\"message\",\"text\":\"Message $i\",\"from\":{\"name\":\"Tester\"},\"channelId\":\"msteams\"}"
-  echo ""
 done
-```
 
-### Check logs
-```bash
+# Slack: 複数メッセージ送信テスト
+for i in $(seq 1 5); do
+  curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+    -H "Content-Type: application/json" \
+    -d "{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"user\":\"U01TEST\",\"text\":\"Message $i\",\"channel\":\"C01TEST\",\"ts\":\"123456789$i.000000\"}}"
+done
+
+# ログ確認
 ./mywant logs
 ```
 
-## File Structure
+---
 
-| File | Description |
-|------|-------------|
-| `engine/cmd/types/teams_webhook_types.go` | Want type implementation |
-| `engine/cmd/types/agent_monitor_teams_webhook.go` | PollAgent implementation |
-| `pkg/server/handlers_webhook.go` | Webhook HTTP handlers |
-| `pkg/server/handlers_setup.go` | Route registration |
-| `yaml/agents/agent-teams-webhook.yaml` | Agent YAML definition |
-| `yaml/config/config-teams-webhook.yaml` | Sample config |
-| `yaml/want_types/system/teams_webhook.yaml` | Want type definition |
+## リファレンス
 
-## Limitations and Future Work
+### Parameters
 
-### Current Limitations
-- メッセージバッファはin-memory (サーバーリスタートで消失、ただしstateが永続化されている場合は復元)
-- `channel_filter` はWant type内では未実装 (ハンドラ側でのフィルタリングは今後追加)
-- Teams Adaptive Cardレスポンスは未対応
+| | Teams | Slack |
+|---|---|---|
+| シークレット | `webhook_secret` (Base64エンコード済み) | `signing_secret` (平文) |
+| チャネルフィルタ | `channel_filter` | `channel_filter` |
 
-### Planned Enhancements
-- [ ] チャネルフィルタリング (channel_filter param)
-- [ ] Adaptive Card形式のレスポンス
-- [ ] メッセージ検索 API
-- [ ] メッセージごとのリアクション (reply) 機能
-- [ ] Slack Webhook対応 (同じエンドポイントで)
-- [ ] Webhook payload validation schema
+### State Fields
+
+TeamsとSlackでstate keyのプレフィックスが異なります (`teams_` / `slack_`)。
+
+| Field | Teams | Slack | Type |
+|---|---|---|---|
+| status | `teams_webhook_status` | `slack_webhook_status` | string (`active`/`stopped`/`error`) |
+| latest message | `teams_latest_message` | `slack_latest_message` | object |
+| messages | `teams_messages` | `slack_messages` | []object (FIFO, 最大20件) |
+| message count | `teams_message_count` | `slack_message_count` | int |
+
+メッセージ構造 (共通):
+
+```json
+{
+  "sender": "User Name or User ID",
+  "text": "メッセージ本文",
+  "timestamp": "2026-02-09T12:00:00Z",
+  "channel_id": "channel identifier"
+}
+```
+
+> Teamsでは `sender` はユーザー表示名、Slackでは `sender` はユーザーID (`U01ABCDEF`)。
+
+### 署名検証の比較
+
+| | Teams | Slack |
+|---|---|---|
+| ヘッダー | `Authorization: HMAC <base64>` | `X-Slack-Signature: v0=<hex>` + `X-Slack-Request-Timestamp` |
+| アルゴリズム | HMAC-SHA256 | HMAC-SHA256 |
+| シークレット | Base64デコード → バイト列 | Signing Secretをそのまま使用 |
+| ベース文字列 | リクエストボディ全体 | `v0:{timestamp}:{body}` |
+| 出力形式 | Base64 | `v0=` + hex |
+| リプレイ攻撃防止 | なし | 5分以内のタイムスタンプチェック |
+
+### API Endpoints
+
+**POST /api/v1/webhooks/{want-id}** — ペイロード受信。自動判定で Teams/Slack/汎用 に振り分け。
+
+| Status Code | 説明 |
+|---|---|
+| `200 OK` | 受信成功 |
+| `400 Bad Request` | JSONパース失敗 |
+| `401 Unauthorized` | 署名検証失敗 |
+| `404 Not Found` | Want IDが存在しない |
+
+**GET /api/v1/webhooks** — Webhook受信可能なWant一覧 (Teams + Slack)。

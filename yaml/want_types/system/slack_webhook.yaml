@@ -1,0 +1,172 @@
+wantType:
+  metadata:
+    name: slack webhook
+    title: Slack Webhook
+    description: |
+      Receives messages from Slack via the Events API (HTTP POST).
+
+      The want creates a webhook endpoint at /api/v1/webhooks/{want-id} that accepts
+      Slack Event Subscriptions payloads. Messages are parsed, stored in state, and
+      forwarded to downstream wants via Provide().
+
+      Supports Slack request signing verification using the signing_secret parameter.
+      Messages are stored as a FIFO buffer (last 20 messages).
+
+      Handles Slack URL verification challenge automatically.
+    version: '1.0'
+    category: system
+    pattern: generator
+
+  parameters:
+  - name: signing_secret
+    description: |
+      Slack Signing Secret for request signature verification.
+      Found in your Slack App settings under "Basic Information" > "App Credentials".
+      If empty, signature verification is skipped.
+    type: string
+    default: ""
+    required: false
+    example: "8f742231b10e8888abcd99yyyzzz85a5"
+
+  - name: channel_filter
+    description: |
+      Optional Slack channel ID filter. If set, only messages from this channel
+      are processed. If empty, all channels are accepted.
+    type: string
+    default: ""
+    required: false
+    example: "C01ABCDEF23"
+
+  state:
+  - name: slack_webhook_status
+    description: Current status of the webhook (active, stopped, error)
+    type: string
+    persistent: true
+    initialValue: "active"
+    example: "active"
+
+  - name: webhook_secret
+    description: Signing secret (stored from params)
+    type: string
+    persistent: true
+    initialValue: ""
+
+  - name: slack_latest_message
+    description: Most recently received Slack message
+    type: object
+    persistent: true
+    initialValue: {}
+    example: '{"sender": "U01ABCDEF", "text": "Hello", "timestamp": "2026-02-09T12:00:00Z", "channel_id": "C01ABCDEF23"}'
+
+  - name: slack_message_count
+    description: Total number of messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 5
+
+  - name: slack_messages
+    description: FIFO buffer of last 20 received messages
+    type: "[]object"
+    persistent: true
+    initialValue: []
+    example: '[{"sender": "U01ABCDEF", "text": "Hello", "timestamp": "2026-02-09T12:00:00Z", "channel_id": "C01ABCDEF23"}]'
+
+  - name: channel_filter
+    description: Active channel filter (from params)
+    type: string
+    persistent: true
+    initialValue: ""
+
+  - name: achieving_percentage
+    description: Progress percentage (50% while active, 100% when stopped)
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 50
+
+  connectivity:
+    outputs:
+    - name: slack_messages
+      type: event
+      description: Incoming Slack messages forwarded to downstream wants
+
+  agents:
+  - name: monitor_slack_webhook
+    role: monitor
+    description: Monitors webhook health and trims message buffer
+
+  constraints:
+  - description: Webhook URL is derived from Want ID
+    validation: Want must be deployed before webhook URL is active
+
+  examples:
+  - name: Basic Slack Inbox
+    description: Simple webhook receiver for Slack messages
+    expectedBehavior: |
+      SETUP:
+      1. Create a Slack App with Event Subscriptions enabled
+      2. Deploy this want to get a Want ID
+      3. Set the Request URL in Slack to: POST http://<host>/api/v1/webhooks/{want-id}
+      4. Subscribe to message.channels and/or message.im events
+      5. Messages from Slack are automatically stored in state
+
+      WEBHOOK URL:
+      POST /api/v1/webhooks/{want-id}
+
+      STATE UPDATES:
+      • slack_latest_message: updated with each new message
+      • slack_messages: FIFO buffer (last 20 messages)
+      • slack_message_count: incremented with each message
+
+      TEST WITH CURL:
+      curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+        -H "Content-Type: application/json" \
+        -d '{"type":"event_callback","event":{"type":"message","user":"U01ABCDEF","text":"hello","channel":"C01ABCDEF23","ts":"1234567890.123456"}}'
+    want:
+      metadata:
+        name: slack-inbox
+        type: slack webhook
+      spec:
+        params:
+          signing_secret: ""
+          channel_filter: ""
+        capabilities:
+          - slack_webhook_monitoring
+
+  - name: Secured Slack Webhook
+    description: Webhook with Slack signature verification
+    expectedBehavior: |
+      SETUP:
+      1. Deploy with signing_secret from Slack App settings
+      2. Slack sends X-Slack-Signature and X-Slack-Request-Timestamp headers
+      3. Server verifies HMAC-SHA256 before accepting the message
+      4. Invalid signatures return 401 Unauthorized
+      5. Requests older than 5 minutes are rejected (replay attack prevention)
+
+      SECURITY:
+      • signing_secret is the Signing Secret from Slack App credentials
+      • Signature base string: v0:{timestamp}:{body}
+      • If no secret is configured, verification is skipped
+    want:
+      metadata:
+        name: secured-slack-inbox
+        type: slack webhook
+      spec:
+        params:
+          signing_secret: "${SLACK_SIGNING_SECRET}"
+          channel_filter: ""
+        capabilities:
+          - slack_webhook_monitoring
+
+  requires:
+    - slack_webhook_monitoring
+
+  relatedTypes:
+  - teams webhook
+  - gmail
+  - reminder
+
+  seeAlso:
+  - Slack Events API documentation
+  - Webhook endpoint API reference

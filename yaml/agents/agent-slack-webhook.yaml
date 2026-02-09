@@ -1,0 +1,9 @@
+agents:
+  - name: monitor_slack_webhook
+    runtime: localGo
+    type: monitor
+    description: Monitors incoming Slack webhook messages and performs health checks on the webhook endpoint.
+    version: '1.0'
+    capabilities:
+      - slack_webhook_monitoring
+    role: monitor

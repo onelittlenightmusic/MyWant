@@ -1,0 +1,13 @@
+wants:
+  - metadata:
+      name: "slack-inbox"
+      type: slack webhook
+      labels:
+        category: communication
+        source: slack
+    spec:
+      params:
+        signing_secret: "${SLACK_SIGNING_SECRET}"
+        channel_filter: ""
+      capabilities:
+        - slack_webhook_monitoring
