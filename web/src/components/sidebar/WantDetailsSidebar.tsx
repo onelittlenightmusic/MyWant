@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -1038,6 +1038,26 @@ const ArrayItemRenderer: React.FC<{ item: any; index: number; depth: number }> =
   );
 };
 
+// Copy button for state values
+const CopyValueButton: React.FC<{ value: string }> = ({ value }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="opacity-0 group-hover/kv:opacity-100 flex-shrink-0 p-0.5 rounded hover:bg-gray-200 transition-opacity"
+      title="Copy value"
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
+    </button>
+  );
+};
+
 // Helper to render key-value pairs recursively
 const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => {
   const items: React.ReactNode[] = [];
@@ -1101,6 +1121,7 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
           <div className="flex items-center gap-1 min-w-0">
             <span className="text-gray-400 text-xs flex-shrink-0">{dots}</span>
             <span className="text-gray-800 font-semibold text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
+            <CopyValueButton value={valueStr} />
           </div>
         </div>
       );
