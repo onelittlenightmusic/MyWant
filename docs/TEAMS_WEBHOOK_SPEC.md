@@ -199,51 +199,22 @@ ngrok http 8080
 2. 左メニュー **Install App** → **Install to Workspace** → 権限を確認して **Allow**
 3. ボットをチャネルに招待: `/invite @YourAppName`
 
-### 4. curl でテスト
+### 6. 動作確認
 
-URL verification:
+1. ボットを招待したSlackチャネルで、任意のメッセージを投稿する（例: `Hello from Slack!`）
+2. WantのStateを確認:
 
-```bash
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -d '{"type":"url_verification","challenge":"test_challenge_token"}'
-```
+   ```bash
+   ./mywant wants get {want-id}
+   ```
 
-Event callback:
+3. `slack_latest_message` に投稿したメッセージが反映されていればOK:
 
-```bash
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "event_callback",
-    "event": {
-      "type": "message",
-      "user": "U01ABCDEF",
-      "text": "Hello from Slack!",
-      "channel": "C01ABCDEF23",
-      "ts": "1234567890.123456"
-    }
-  }'
+   ```
+   slack_latest_message ... {"sender":"U01ABCDEF","text":"Hello from Slack!","timestamp":"...","channel_id":"C01ABCDEF23"}
+   ```
 
-# State を確認
-./mywant wants get {want-id}
-```
-
-署名付き:
-
-```bash
-SECRET="your_slack_signing_secret"
-TIMESTAMP=$(date +%s)
-BODY='{"type":"event_callback","event":{"type":"message","user":"U01ABCDEF","text":"signed message","channel":"C01ABCDEF23","ts":"1234567890.123456"}}'
-SIG_BASE="v0:${TIMESTAMP}:${BODY}"
-SIGNATURE="v0=$(echo -n "$SIG_BASE" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
-
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -H "X-Slack-Signature: $SIGNATURE" \
-  -H "X-Slack-Request-Timestamp: $TIMESTAMP" \
-  -d "$BODY"
-```
+   > ダッシュボードのWant Detailからも `slack_latest_message` の値をマウスオーバーで確認できます。
 
 ### YAML Config
 
