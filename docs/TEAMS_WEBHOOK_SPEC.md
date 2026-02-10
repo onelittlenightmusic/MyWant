@@ -123,62 +123,80 @@ wants:
 
 ## Slack Webhook のセットアップ
 
-### 1. MyWant側の準備
-
-```bash
-make restart-all
-./mywant wants create -f yaml/config/config-slack-webhook.yaml
-./mywant wants list
-./mywant wants get {want-id}
-```
-
-### 2. ネットワーク要件
-
-- Request URLは **HTTPS必須**
-- **3秒以内**に応答が必要 (Slackのタイムアウト)
-- 開発時は ngrok 等を使用
-
-```bash
-ngrok http 8080
-# Request URL: https://xxxx.ngrok-free.app + webhook_url
-```
-
-### 3. Slack App の設定
-
-#### 3-1. Slack App の作成
+### 1. Slack App の作成
 
 1. [Slack API](https://api.slack.com/apps) → **Create New App** → **From scratch**
 2. App名とワークスペースを選択して **Create App**
+3. 左メニュー **Basic Information** → **App Credentials** → **Signing Secret** をコピーしておく
 
-#### 3-2. Signing Secret の取得
+### 2. MyWant側の準備
 
-1. 左メニュー **Basic Information** → **App Credentials**
-2. **Signing Secret** をコピー → Wantの `signing_secret` パラメータに設定
+1. YAML設定の `signing_secret` にステップ1で取得した Signing Secret を設定:
 
-#### 3-3. Event Subscriptions の設定
+   ```yaml
+   # yaml/config/config-slack-webhook.yaml
+   wants:
+     - metadata:
+         name: slack-inbox
+         type: slack webhook
+       spec:
+         params:
+           signing_secret: "取得したSigning Secret"
+   ```
 
-1. 左メニュー **Event Subscriptions** → **Enable Events** をON
-2. **Request URL** に `https://{host}` + `webhook_url` を入力
-   - SlackがURL verification challengeを送信し、MyWantが自動応答
-   - 「Verified」と表示されればOK
-3. **Subscribe to bot events** で以下を追加:
+2. サーバー起動 & Want をデプロイ:
+
+   ```bash
+   make restart-all
+   ./mywant wants create -f yaml/config/config-slack-webhook.yaml
+   ```
+
+3. Want の State から `webhook_url` を確認:
+
+   ```bash
+   ./mywant wants get {want-id}
+   ```
+
+   State内に以下のようなパスが表示されます:
+   ```
+   webhook_url ... /api/v1/webhooks/{want-id}
+   ```
+
+   > ダッシュボードのWant DetailでState値をマウスオーバーし、右のコピーアイコンからコピーすると便利です。
+
+### 3. ngrok でトンネルを起動
+
+SlackからのWebhookはHTTPSが必須のため、開発環境では ngrok を使います。
+
+```bash
+ngrok http 8080
+```
+
+表示されるURLをメモします（例: `https://xxxx.ngrok-free.app`）。
+
+### 4. Slack App の Event Subscriptions を設定
+
+1. [Slack API](https://api.slack.com/apps) で作成したAppを開く
+2. 左メニュー **Event Subscriptions** → **Enable Events** をON
+3. **Request URL** に、ngrokのURL + ステップ2でコピーした `webhook_url` を結合して入力:
+   ```
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   ```
+   - SlackがURL verification challengeを送信し、MyWantが自動応答します
+   - 「**Verified**」と表示されればOK
+4. **Subscribe to bot events** で受信したいイベントを追加:
    - `message.channels` — パブリックチャネルのメッセージ
    - `message.groups` — プライベートチャネルのメッセージ (任意)
    - `message.im` — ダイレクトメッセージ (任意)
-4. **Save Changes**
+5. **Save Changes**
 
-#### 3-4. Bot Token Scopes の設定
+### 5. Bot Token Scopes の設定 & インストール
 
-1. 左メニュー **OAuth & Permissions** → **Scopes** → **Bot Token Scopes**
-2. 以下を追加:
+1. 左メニュー **OAuth & Permissions** → **Scopes** → **Bot Token Scopes** で以下を追加:
    - `channels:history` — パブリックチャネルのメッセージ読み取り
    - `groups:history` — プライベートチャネル (任意)
    - `im:history` — DM (任意)
-
-#### 3-5. ワークスペースへのインストール
-
-1. 左メニュー **Install App** → **Install to Workspace**
-2. 権限を確認して **Allow**
+2. 左メニュー **Install App** → **Install to Workspace** → 権限を確認して **Allow**
 3. ボットをチャネルに招待: `/invite @YourAppName`
 
 ### 4. curl でテスト
