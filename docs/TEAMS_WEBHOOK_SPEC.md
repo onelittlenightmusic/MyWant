@@ -4,32 +4,46 @@
 
 ## Teams Webhook のセットアップ
 
+Teams からのメッセージ受信には2つの方式があります。
+
+| | Outgoing Webhook (方式A) | Power Automate (方式B) |
+|---|---|---|
+| @mention | 必須 | 不要 |
+| 対象メッセージ | @mention付きのみ | 全メッセージ |
+| HMAC署名検証 | あり | なし |
+| ライセンス | Teams標準機能 | Power Automate必要 |
+
 ### 1. MyWant側の準備
 
-```bash
-# サーバー起動
-make restart-all
+1. サーバー起動 & Want をデプロイ:
 
-# Want をデプロイ
-./mywant wants create -f yaml/config/config-teams-webhook.yaml
+   ```bash
+   make restart-all
+   ./mywant wants create -f yaml/config/config-teams-webhook.yaml
+   ```
 
-# Want ID を確認
-./mywant wants list
+2. Want の State から `webhook_url` を確認:
 
-# State の webhook_url を確認 (例: /api/v1/webhooks/{want-id})
-./mywant wants get {want-id}
-```
+   ```bash
+   ./mywant wants get {want-id}
+   ```
 
-### 2. ネットワーク要件
+   State内に以下のようなパスが表示されます:
+   ```
+   webhook_url ... /api/v1/webhooks/{want-id}
+   ```
 
-- Callback URLは **HTTPS必須**
-- MyWantサーバーがインターネットから到達可能であること
-- 開発時は [ngrok](https://ngrok.com/) 等のトンネリングツールを使用
+   > ダッシュボードのWant DetailでState値をマウスオーバーし、右のコピーアイコンからコピーすると便利です。
+
+### 2. ngrok でトンネルを起動
+
+TeamsからのWebhookはHTTPSが必須のため、開発環境では ngrok を使います。
 
 ```bash
 ngrok http 8080
-# Callback URL: https://xxxx.ngrok-free.app + webhook_url
 ```
+
+表示されるURLをメモします（例: `https://xxxx.ngrok-free.app`）。
 
 ### 3. Teams側の設定
 
@@ -39,10 +53,12 @@ ngrok http 8080
 
 1. **Teams** 左ペインからチームを選択 → **•••** → **Manage team**
 2. **Apps** タブ → **Create an outgoing webhook**
-3. **Name** (= @mention名)、**Callback URL** (`https://{host}` + `webhook_url`)、**Description** を入力
-4. **Create** → 表示される **Security token** をWantの `webhook_secret` に設定
-
-チャネルで `@MyWant Bot メッセージ` と @mention するとMyWantにPOSTされます。
+3. **Callback URL** に、ngrokのURL + ステップ1でコピーした `webhook_url` を結合して入力:
+   ```
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   ```
+4. **Name** (= @mention名) と **Description** を入力
+5. **Create** → 表示される **Security token** をWantの `webhook_secret` パラメータに設定
 
 #### 方式B: Power Automate (@mention不要)
 
@@ -50,7 +66,10 @@ ngrok http 8080
 
 1. [Power Automate](https://make.powerautomate.com/) でフローを新規作成
 2. トリガー: **When a new channel message is added** → チーム・チャネルを指定
-3. アクション: **HTTP** → POST `https://{host}` + `webhook_url`
+3. アクション: **HTTP** → POST に、ngrokのURL + ステップ1でコピーした `webhook_url` を結合して入力:
+   ```
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   ```
 4. Body:
    ```json
    {
@@ -62,44 +81,24 @@ ngrok http 8080
    }
    ```
 
-#### 方式の比較
+### 4. 動作確認
 
-| | Outgoing Webhook (方式A) | Power Automate (方式B) |
-|---|---|---|
-| @mention | 必須 | 不要 |
-| 対象メッセージ | @mention付きのみ | 全メッセージ |
-| HMAC署名検証 | あり | なし |
-| ライセンス | Teams標準機能 | Power Automate必要 |
+1. Teamsチャネルでメッセージを投稿する
+   - 方式A: `@MyWantBot Hello from Teams!` と @mention 付きで投稿
+   - 方式B: 任意のメッセージを投稿
+2. WantのStateを確認:
 
-### 4. curl でテスト
+   ```bash
+   ./mywant wants get {want-id}
+   ```
 
-```bash
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "message",
-    "text": "Hello from Teams!",
-    "from": {"name": "Test User"},
-    "channelId": "msteams",
-    "timestamp": "2026-02-09T12:00:00Z"
-  }'
+3. `teams_latest_message` に投稿したメッセージが反映されていればOK:
 
-# State を確認
-./mywant wants get {want-id}
-```
+   ```
+   teams_latest_message ... {"sender":"Test User","text":"Hello from Teams!","timestamp":"...","channel_id":"..."}
+   ```
 
-HMAC署名付き:
-
-```bash
-SECRET="dGVhbXMtc2VjcmV0LWtleQ=="
-BODY='{"type":"message","text":"secure message","from":{"name":"User"},"channelId":"msteams"}'
-SIGNATURE=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$(echo $SECRET | base64 -d)" -binary | base64)
-
-curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
-  -H "Content-Type: application/json" \
-  -H "Authorization: HMAC $SIGNATURE" \
-  -d "$BODY"
-```
+   > ダッシュボードのWant Detailからも `teams_latest_message` の値をマウスオーバーで確認できます。
 
 ### YAML Config
 
