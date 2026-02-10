@@ -173,7 +173,18 @@ func verifyTeamsHMAC(body []byte, signature string, secret string) bool {
 // --- Slack Webhook Handler ---
 
 func (s *Server) handleSlackWebhook(w http.ResponseWriter, r *http.Request, want *mywant.Want, body []byte, payload map[string]any) {
-	// Slack signature verification
+	payloadType, _ := payload["type"].(string)
+
+	// Handle URL verification challenge (must respond before signature check
+	// so that Slack can verify the endpoint during initial setup)
+	if payloadType == "url_verification" {
+		challenge, _ := payload["challenge"].(string)
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, challenge)
+		return
+	}
+
+	// Slack signature verification (event_callback and other events)
 	slackSignature := r.Header.Get("X-Slack-Signature")
 	slackTimestamp := r.Header.Get("X-Slack-Request-Timestamp")
 	if slackSignature != "" && slackTimestamp != "" {
@@ -184,16 +195,6 @@ func (s *Server) handleSlackWebhook(w http.ResponseWriter, r *http.Request, want
 				return
 			}
 		}
-	}
-
-	payloadType, _ := payload["type"].(string)
-
-	// Handle URL verification challenge
-	if payloadType == "url_verification" {
-		challenge, _ := payload["challenge"].(string)
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, challenge)
-		return
 	}
 
 	// Handle event_callback
