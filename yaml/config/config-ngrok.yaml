@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: ngrok-tunnel
+      type: ngrok
+      labels:
+        service: tunnel
+    spec:
+      params:
+        port: "8080"
