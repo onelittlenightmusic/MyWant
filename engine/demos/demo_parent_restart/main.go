@@ -69,7 +69,7 @@ func main() {
 						if target, ok := exec.(*mywant.Target); ok {
 							fmt.Printf("🔄 Changing service_time from 0.1 to 0.05\n")
 							target.UpdateParameter("service_time", 0.05)
-							fmt.Println("✅ Parameter updated and pushed to children\n")
+							fmt.Println("✅ Parameter updated and pushed to children")
 						}
 					}
 				}
