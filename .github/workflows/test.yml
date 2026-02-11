@@ -23,8 +23,9 @@ jobs:
 
     - name: Tidy dependencies
       run: |
-        go mod tidy
         cd engine
+        go mod tidy
+        cd ../client
         go mod tidy
 
     - name: Verify OpenAPI Spec
@@ -39,16 +40,12 @@ jobs:
         mkdir -p web/dist
         touch web/dist/index.html
 
-    - name: Run Backend Tests
-      run: go test -v ./pkg/server/...
-
     - name: Run Engine Tests
       run: |
         cd engine
-        go test -v ./src/...
+        go test -v ./...
 
     - name: Run Client Tests
-      run: go test -v ./pkg/client/...
-
-    - name: Run CLI Tests
-      run: go test -v ./cmd/mywant/...
+      run: |
+        cd client
+        go test -v ./...
