@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	types "mywant/engine/cmd/types"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
 )
@@ -32,7 +32,7 @@ type Server struct {
 // Go doesn't support struct overriding in same package easily, so we update the one in types.go or use this one internally.
 // Let's reuse the one in types.go but cast Builder/Config when needed, OR import types.go into server.go properly.
 // Since they are in same package 'server', they share types.
-// We should update pkg/server/types.go to import mywant/engine/src and use proper types.
+// We should update pkg/server/types.go to import mywant/engine/core and use proper types.
 
 // New creates a new MyWant server
 func New(config Config) *Server {

@@ -2,7 +2,7 @@ package mywant
 
 import (
 	"log"
-	"mywant/engine/src/chain"
+	"mywant/engine/core/chain"
 	"time"
 )
 

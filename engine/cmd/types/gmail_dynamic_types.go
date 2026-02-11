@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

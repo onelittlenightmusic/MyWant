@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 func init() {

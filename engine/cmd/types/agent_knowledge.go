@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

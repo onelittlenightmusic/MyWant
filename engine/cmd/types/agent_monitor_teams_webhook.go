@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 func init() {

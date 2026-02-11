@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
-	pb "mywant/engine/src/proto"
+	pb "mywant/engine/core/proto"
 )
 
 // Mock gRPC server for testing

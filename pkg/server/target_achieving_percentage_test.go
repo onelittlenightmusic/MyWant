@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -8,13 +8,13 @@ fmt:
 
 vet:
 	@echo "🔍 Running go vet..."
-	go vet -C engine ./src/...
+	go vet -C engine ./core/...
 	go vet ./pkg/... ./cmd/mywant/...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run -C engine ./src/...; \
+		golangci-lint run -C engine ./core/...; \
 		golangci-lint run ./pkg/... ./cmd/mywant/...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
@@ -24,7 +24,7 @@ lint:
 
 test:
 	@echo "🧪 Running tests..."
-	go test -C engine -v ./src/... || echo "⚠️  Engine tests failed"
+	go test -C engine -v ./core/... || echo "⚠️  Engine tests failed"
 	go test -v ./pkg/... ./cmd/mywant/... || echo "⚠️  CLI/Package tests failed"
 
 check: fmt vet test
@@ -45,10 +45,10 @@ release: build-gui build-cli
 # Build the mywant library
 build: check
 	@echo "🔨 Building mywant library..."
-	go build -C engine ./src/...
+	go build -C engine ./core/...
 # Test that module builds correctly
 test-build:
-	cd engine && go mod tidy && go build ./src/...
+	cd engine && go mod tidy && go build ./core/...
 
 run-fibonacci-loop:
 	go run -C engine ./cmd/demos/demo_fibonacci_loop ../yaml/config/config-fibonacci-loop.yaml

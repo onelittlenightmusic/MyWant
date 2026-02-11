@@ -1,7 +1,7 @@
 package mywant
 
 import (
-	"mywant/engine/src/chain"
+	"mywant/engine/core/chain"
 )
 
 // in, connectionAvailable := w.GetInputChannel(0) if !connectionAvailable { return true }

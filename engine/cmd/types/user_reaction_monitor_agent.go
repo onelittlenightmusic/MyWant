@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 const userReactionMonitorAgentName = "user_reaction_monitor"

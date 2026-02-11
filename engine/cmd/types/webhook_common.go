@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 	"time"
 )
 

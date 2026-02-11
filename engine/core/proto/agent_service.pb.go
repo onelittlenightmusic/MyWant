@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.4
-// source: engine/src/proto/agent_service.proto
+// source: engine/core/proto/agent_service.proto
 
 package agentpb
 
@@ -399,7 +399,7 @@ var File_engine_src_proto_agent_service_proto protoreflect.FileDescriptor
 
 const file_engine_src_proto_agent_service_proto_rawDesc = "" +
 	"\n" +
-	"$engine/src/proto/agent_service.proto\x12\fmywant.agent\"\x90\x03\n" +
+	"$engine/core/proto/agent_service.proto\x12\fmywant.agent\"\x90\x03\n" +
 	"\x0eExecuteRequest\x12\x17\n" +
 	"\awant_id\x18\x01 \x01(\tR\x06wantId\x12\x1d\n" +
 	"\n" +
@@ -446,7 +446,7 @@ const file_engine_src_proto_agent_service_proto_rawDesc = "" +
 	"\fAgentService\x12F\n" +
 	"\aExecute\x12\x1c.mywant.agent.ExecuteRequest\x1a\x1d.mywant.agent.ExecuteResponse\x12K\n" +
 	"\fStartMonitor\x12\x1c.mywant.agent.MonitorRequest\x1a\x1d.mywant.agent.MonitorResponse\x12R\n" +
-	"\vStopMonitor\x12 .mywant.agent.StopMonitorRequest\x1a!.mywant.agent.StopMonitorResponseB!Z\x1fmywant/engine/src/proto/agentpbb\x06proto3"
+	"\vStopMonitor\x12 .mywant.agent.StopMonitorRequest\x1a!.mywant.agent.StopMonitorResponseB!Z\x1fmywant/engine/core/proto/agentpbb\x06proto3"
 
 var (
 	file_engine_src_proto_agent_service_proto_rawDescOnce sync.Once

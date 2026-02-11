@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 	"time"
 )
 

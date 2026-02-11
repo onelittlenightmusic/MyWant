@@ -10,7 +10,7 @@ import (
 	"time"
 
 	_ "mywant/engine/cmd/types" // init() registers agent implementations
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
 )

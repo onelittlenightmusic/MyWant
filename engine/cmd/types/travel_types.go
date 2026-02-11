@@ -3,7 +3,7 @@ package types
 import (
 	"fmt"
 	"math/rand"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 	"strings"
 	"time"
 )

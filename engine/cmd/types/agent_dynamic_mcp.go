@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

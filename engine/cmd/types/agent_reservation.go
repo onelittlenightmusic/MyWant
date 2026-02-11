@@ -1,6 +1,6 @@
 package types
 
-import . "mywant/engine/src"
+import . "mywant/engine/core"
 
 // ActivityFormatter formats activity and log messages from a schedule
 type ActivityFormatter func(schedule interface{}) (activity, logMessage string)

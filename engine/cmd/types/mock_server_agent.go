@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

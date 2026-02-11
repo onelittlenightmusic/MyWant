@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 // LoggerWant is a simple want that logs execution attempts

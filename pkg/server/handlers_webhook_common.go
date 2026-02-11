@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/json"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 // webhookMessage represents a parsed incoming webhook message from any platform.

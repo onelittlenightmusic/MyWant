@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"mywant/engine/src"
+	"mywant/engine/core"
 	"mywant/web"
 
 	"gopkg.in/yaml.v3"

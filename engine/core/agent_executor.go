@@ -12,7 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	pb "mywant/engine/src/proto"
+	pb "mywant/engine/core/proto"
 )
 
 // AgentExecutor defines the interface for executing agents

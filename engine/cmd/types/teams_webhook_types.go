@@ -1,7 +1,7 @@
 package types
 
 import (
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 var teamsWebhookConfig = WebhookWantConfig{

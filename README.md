@@ -87,7 +87,7 @@ curl http://localhost:8080/api/v1/wants/{id}/status
 ## Go Library Usage
 
 ```go
-import "mywant/engine/src"
+import "mywant/engine/core"
 
 config, _ := src.LoadConfigFromYAML("config.yaml")
 builder := src.NewChainBuilder(config)

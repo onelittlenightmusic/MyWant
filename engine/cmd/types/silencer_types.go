@@ -2,7 +2,7 @@ package types
 
 import (
 	"encoding/json"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 func init() {

@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"sync"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

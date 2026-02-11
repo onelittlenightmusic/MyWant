@@ -1,7 +1,7 @@
 package server
 
 import (
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 // Config holds server configuration

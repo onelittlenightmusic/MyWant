@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	_ "mywant/engine/cmd/types"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 	"os"
 )
 

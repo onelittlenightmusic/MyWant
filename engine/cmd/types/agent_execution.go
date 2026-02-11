@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 // executeCommand performs the actual command execution

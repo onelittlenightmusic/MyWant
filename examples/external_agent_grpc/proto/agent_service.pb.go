@@ -446,7 +446,7 @@ const file_proto_agent_service_proto_rawDesc = "" +
 	"\fAgentService\x12F\n" +
 	"\aExecute\x12\x1c.mywant.agent.ExecuteRequest\x1a\x1d.mywant.agent.ExecuteResponse\x12K\n" +
 	"\fStartMonitor\x12\x1c.mywant.agent.MonitorRequest\x1a\x1d.mywant.agent.MonitorResponse\x12R\n" +
-	"\vStopMonitor\x12 .mywant.agent.StopMonitorRequest\x1a!.mywant.agent.StopMonitorResponseB!Z\x1fmywant/engine/src/proto/agentpbb\x06proto3"
+	"\vStopMonitor\x12 .mywant.agent.StopMonitorRequest\x1a!.mywant.agent.StopMonitorResponseB!Z\x1fmywant/engine/core/proto/agentpbb\x06proto3"
 
 var (
 	file_proto_agent_service_proto_rawDescOnce sync.Once

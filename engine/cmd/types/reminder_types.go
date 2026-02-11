@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 	"strings"
 	"time"
 )

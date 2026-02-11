@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func init() {

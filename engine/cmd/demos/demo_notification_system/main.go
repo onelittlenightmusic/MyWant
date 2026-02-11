@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	_ "mywant/engine/cmd/types"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 	"os"
 	"path/filepath"
 	"time"

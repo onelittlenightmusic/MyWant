@@ -5,7 +5,7 @@ import (
 	"time"
 
 	_ "mywant/engine/cmd/types"
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 )
 
 func main() {

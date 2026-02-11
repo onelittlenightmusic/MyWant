@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	mywant "mywant/engine/src"
+	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"

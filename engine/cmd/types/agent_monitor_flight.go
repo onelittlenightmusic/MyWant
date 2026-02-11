@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 const flightMonitorAgentName = "monitor_flight_api"

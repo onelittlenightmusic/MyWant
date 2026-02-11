@@ -409,7 +409,7 @@ MyWant logs all external agent interactions:
 Run executor tests:
 
 ```bash
-go test -v mywant/engine/src -run "TestLocalExecutor|TestWebhookExecutor|TestNewExecutor"
+go test -v mywant/engine/core -run "TestLocalExecutor|TestWebhookExecutor|TestNewExecutor"
 ```
 
 ### Integration Testing

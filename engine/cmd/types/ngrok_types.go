@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 )
 
 func init() {

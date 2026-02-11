@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
-	. "mywant/engine/src"
+	. "mywant/engine/core"
 	"time"
 )
 
