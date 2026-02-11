@@ -1,0 +1,7 @@
+agents:
+  - name: live_server_manager
+    runtime: localGo
+    type: do
+    capabilities:
+      - live_server_management
+    description: "Manages generic server/process lifecycle (start/stop). Starts a command in the background with optional health checking and log file output."

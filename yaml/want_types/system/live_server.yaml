@@ -1,0 +1,147 @@
+wantType:
+  metadata:
+    name: live_server
+    title: Live Server
+    description: |
+      Manages the lifecycle of a generic server or long-running process.
+
+      This want type starts, monitors, and stops any command-line process.
+      It supports optional log file output and HTTP health check polling.
+
+      The process is managed by a DoAgent that handles startup, optional
+      health checking, and graceful shutdown (SIGTERM → SIGKILL) when the
+      want is deleted.
+
+      Use this for ngrok tunnels, mock servers, dev servers, or any
+      long-running process that needs lifecycle management.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: command
+    description: Command to execute (PATH lookup or file path)
+    type: string
+    required: true
+    example: ngrok
+
+  - name: args
+    description: List of command arguments
+    type: list
+    required: false
+    default: []
+    example: ["http", "8080"]
+
+  - name: log_file
+    description: Path to log file (empty = no file logging)
+    type: string
+    required: false
+    default: ""
+    example: logs/flight-server.log
+
+  - name: health_check_url
+    description: URL to poll for readiness (empty = PID-only success)
+    type: string
+    required: false
+    default: ""
+    example: http://127.0.0.1:4040/api/tunnels
+
+  - name: health_check_interval
+    description: Polling interval for health check
+    type: string
+    required: false
+    default: "500ms"
+    example: "1s"
+
+  - name: health_check_max_retries
+    description: Maximum number of health check retries
+    type: int
+    required: false
+    default: 15
+    example: 30
+
+  state:
+  - name: server_phase
+    description: Current phase of the server lifecycle
+    type: string
+    persistent: true
+    initialValue: starting
+    example: running
+
+  - name: server_pid
+    description: Process ID of the running server (0 if not running)
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 12345
+
+  - name: health_check_response
+    description: Response body from the last successful health check
+    type: string
+    persistent: true
+    initialValue: ''
+    example: '{"tunnels":[...]}'
+
+  - name: error_message
+    description: Error message if server failed to start
+    type: string
+    persistent: true
+    initialValue: ''
+    example: 'command not found: ngrok'
+
+  connectivity:
+    inputs: []
+    outputs: []
+
+  require:
+    connectivity: none
+
+  requires:
+    - live_server_management
+
+  agents:
+  - name: live_server_management
+    role: action
+    description: DoAgent that starts and stops the server process
+    example: Starts server on first execution, stops on want deletion
+
+  constraints:
+  - description: Command must be found in PATH or exist as a file
+    validation: command must be resolvable via exec.LookPath or os.Stat
+  - description: Log file directory must be writable (if log_file is set)
+    validation: log_file parent directory must have write permissions
+
+  examples:
+  - name: ngrok_tunnel
+    description: Start an ngrok tunnel with health check
+    want:
+      metadata:
+        name: ngrok-tunnel
+        type: live_server
+        labels:
+          service: tunnel
+      spec:
+        params:
+          command: "ngrok"
+          args: ["http", "8080", "--log=stdout"]
+          health_check_url: "http://127.0.0.1:4040/api/tunnels"
+
+  - name: mock_server
+    description: Start a mock server with log file
+    want:
+      metadata:
+        name: flight-mock-server
+        type: live_server
+        labels:
+          service: mock
+          component: flight-api
+      spec:
+        params:
+          command: "./bin/flight-server"
+          log_file: "logs/flight-server.log"
+
+  relatedTypes:
+  - execution_result
+  - reminder
+
+  seeAlso: []

@@ -1,9 +1,11 @@
 wants:
   - metadata:
       name: ngrok-tunnel
-      type: ngrok
+      type: live_server
       labels:
         service: tunnel
     spec:
       params:
-        port: "8080"
+        command: "ngrok"
+        args: ["http", "8080", "--log=stdout"]
+        health_check_url: "http://127.0.0.1:4040/api/tunnels"

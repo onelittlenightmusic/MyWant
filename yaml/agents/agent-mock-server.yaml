@@ -1,7 +1,0 @@
-agents:
-  - name: mock_server_manager
-    runtime: localGo
-    type: do
-    capabilities:
-      - mock_server_management
-    description: "Manages Flight Mock Server lifecycle (start/stop). Starts the server binary in background and stops it on cleanup."
