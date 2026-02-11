@@ -7,6 +7,10 @@ bin/
 engine/cmd/server/mywant-server
 engine/mywant-server
 mcp/server/mywant-mcp-server
+engine/main
+engine/engine/server
+engine/demo_*
+!engine/demos/
 
 # External agent binaries
 examples/external_agent_grpc/external-agent-grpc
@@ -45,6 +49,7 @@ codebase_rag.db
 # OS
 .DS_Store
 Thumbs.db
+/mywant
 
 # Memory dumps (runtime data)
 memory/
