@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"mywant/pkg/client"
+	"mywant/client"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

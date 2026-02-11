@@ -3,7 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"mywant/pkg/client"
+	"mywant/client"
 	"os"
 	"strings"
 	"text/tabwriter"
