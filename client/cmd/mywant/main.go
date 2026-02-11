@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"mywant/cmd/mywant/commands"
+	"mywant/client/cmd/mywant/commands"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

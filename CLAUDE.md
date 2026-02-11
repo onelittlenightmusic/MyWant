@@ -80,7 +80,7 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 
 ## File Organization
 
-`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client) • `docs/` • `web/` (React frontend)
+`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client + HTTP client library) • `client/cmd/mywant/` (CLI entrypoint) • `docs/` • `web/` (React frontend + embedded assets)
 
 ## Coding Rules
 
@@ -131,7 +131,7 @@ mock_flight_port: 8090
 
 **Server Flow:**
 ```
-./mywant start -D → cmd/mywant/commands/start.go → server.New() → engine/server/server.go
+./mywant start -D → client/cmd/mywant/commands/start.go → server.New() → engine/server/server.go
 ```
 
 **When modifying server**:

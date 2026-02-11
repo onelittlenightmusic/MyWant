@@ -9,13 +9,13 @@ fmt:
 vet:
 	@echo "🔍 Running go vet..."
 	go vet -C engine ./core/...
-	go vet ./pkg/... ./cmd/mywant/...
+	go vet -C client ./...
 
 lint:
 	@echo "🧹 Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run -C engine ./core/...; \
-		golangci-lint run ./pkg/... ./cmd/mywant/...; \
+		golangci-lint run -C client ./...; \
 	else \
 		echo "⚠️  golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
 		echo "📋 Running basic checks instead..."; \
@@ -25,7 +25,7 @@ lint:
 test:
 	@echo "🧪 Running tests..."
 	go test -C engine -v ./core/... || echo "⚠️  Engine tests failed"
-	go test -v ./pkg/... ./cmd/mywant/... || echo "⚠️  CLI/Package tests failed"
+	go test -C client -v ./... || echo "⚠️  Client tests failed"
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
@@ -37,7 +37,7 @@ build-gui:
 
 build-cli:
 	@echo "🔨 Building mywant with embedded GUI..."
-	go build -o mywant ./cmd/mywant
+	go build -C client -o ../mywant ./cmd/mywant
 
 release: build-gui build-cli
 	@echo "🚀 Release build complete: mywant"
