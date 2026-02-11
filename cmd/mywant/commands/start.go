@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"mywant/pkg/server"
-	"mywant/pkg/worker"
+	"mywant/engine/server"
+	"mywant/engine/worker"
+	"mywant/web"
 
 	"github.com/spf13/cobra"
 )
@@ -135,6 +136,7 @@ var StartCmd = &cobra.Command{
 			Port:  port,
 			Host:  host,
 			Debug: debug,
+			WebFS: web.GetFileSystem(!debug),
 		}
 
 		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)

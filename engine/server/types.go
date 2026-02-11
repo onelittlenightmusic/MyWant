@@ -1,14 +1,17 @@
 package server
 
 import (
+	"net/http"
+
 	mywant "mywant/engine/core"
 )
 
 // Config holds server configuration
 type Config struct {
-	Port  int    `json:"port"`
-	Host  string `json:"host"`
-	Debug bool   `json:"debug"`
+	Port  int              `json:"port"`
+	Host  string           `json:"host"`
+	Debug bool             `json:"debug"`
+	WebFS http.FileSystem  `json:"-"` // Embedded web assets filesystem (injected by caller)
 }
 
 type ErrorHistoryEntry struct {

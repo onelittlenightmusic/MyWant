@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"mywant/engine/core"
-	"mywant/web"
 
 	"gopkg.in/yaml.v3"
 )
@@ -144,10 +143,9 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 
 	// Static files (embedded React GUI)
-	// If debug mode is enabled, use local files to allow live updates without rebuilding the binary.
-	// Otherwise use embedded assets for a self-contained experience.
-	useEmbedded := !s.config.Debug
-	s.router.PathPrefix("/").Handler(http.FileServer(web.GetFileSystem(useEmbedded))).Methods("GET", "HEAD")
+	if s.config.WebFS != nil {
+		s.router.PathPrefix("/").Handler(http.FileServer(s.config.WebFS)).Methods("GET", "HEAD")
+	}
 }
 
 // loadRecipeFilesIntoRegistry loads recipe YAML files into the recipe registry for the API

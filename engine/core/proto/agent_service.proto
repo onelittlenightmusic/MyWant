@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package mywant.agent;
 
-option go_package = "mywant/engine/core/proto/agentpb";
+option go_package = "mywant/engine/core/proto";
 
 // AgentService defines RPC methods for external agent execution
 service AgentService {
