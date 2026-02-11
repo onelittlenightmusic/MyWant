@@ -60,6 +60,7 @@ engine/memory/
 **/auth.json
 
 logs/
+!web/src/components/logs/
 tmp/
 *.log
 *.pid
