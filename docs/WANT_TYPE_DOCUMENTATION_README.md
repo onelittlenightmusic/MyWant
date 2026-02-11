@@ -131,23 +131,23 @@ func NewMyWant(metadata Metadata, spec WantSpec) interface{} {
 
 ### Travel Domain
 - RestaurantWant, HotelWant, BuffetWant, FlightWant, TravelCoordinatorWant
-- File: `/engine/cmd/types/travel_types.go`
+- File: `/engine/types/travel_types.go`
 
 ### Queue/Network Domain
 - Numbers (generator), Queue (processor), Combiner, Sink
-- File: `/engine/cmd/types/qnet_types.go`
+- File: `/engine/types/qnet_types.go`
 
 ### Mathematical Domain
 - FibonacciNumbers, FibonacciSequence
-- File: `/engine/cmd/types/fibonacci_types.go`
+- File: `/engine/types/fibonacci_types.go`
 - PrimeNumbers, PrimeSequence, PrimeSink
-- File: `/engine/cmd/types/prime_types.go`
+- File: `/engine/types/prime_types.go`
 
 ### System Domain
 - OwnerWant (dynamic want creation)
-- File: `/engine/src/owner_types.go`
+- File: `/engine/core/owner_types.go`
 - CustomTargetWant (recipe-based types)
-- File: `/engine/src/custom_target_types.go`
+- File: `/engine/core/custom_target_types.go`
 
 ## Common Implementation Checklist
 
@@ -216,10 +216,10 @@ See WANT_TYPE_SYSTEM_ANALYSIS.md Section 11 for details.
 ## Additional Resources
 
 For implementation, also refer to:
-- `/engine/src/want.go` - Core Want type definition
-- `/engine/src/chain_builder.go` - ChainBuilder and registration
-- `/engine/cmd/types/travel_types.go` - Reference implementations (5 types)
-- `/engine/cmd/types/qnet_types.go` - Reference implementations (4 types)
+- `/engine/core/want.go` - Core Want type definition
+- `/engine/core/chain_builder.go` - ChainBuilder and registration
+- `/engine/types/travel_types.go` - Reference implementations (5 types)
+- `/engine/types/qnet_types.go` - Reference implementations (4 types)
 - `/yaml/config/config-*.yaml` - Configuration examples
 - `/yaml/recipes/*.yaml` - Recipe examples
 

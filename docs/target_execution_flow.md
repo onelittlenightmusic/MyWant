@@ -8,7 +8,7 @@ Target wants are parent wants that create and manage child wants from recipe fil
 
 ## 1. Target Execution Entry Point
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
 
 **Method:** `Target.Exec()` (Lines 268-342)
 
@@ -44,7 +44,7 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 
 ## 2. Child Want Creation with OwnerReferences
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
 
 **Method:** `Target.CreateChildWants()` (Lines 227-265)
 
@@ -106,7 +106,7 @@ func (t *Target) CreateChildWants() []*Want {
 
 ## 3. Recipe Loading Process
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/recipe_loader_generic.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/recipe_loader_generic.go`
 
 **Method:** `GenericRecipeLoader.LoadConfigFromRecipe()` (Lines 212-219)
 
@@ -135,7 +135,7 @@ The OwnerReferences are added by `Target.CreateChildWants()` AFTER loading.
 
 ## 4. Want Function Creation with OwnerAware Wrapping
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/chain_builder.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/chain_builder.go`
 
 **Method:** `ChainBuilder.createWantFunction()` (Lines 233-273)
 
@@ -179,7 +179,7 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 ## 5. Custom Target Type Creation
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/chain_builder.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/chain_builder.go`
 
 **Method:** `ChainBuilder.createCustomTargetWant()` (Lines 281-310)
 
@@ -224,7 +224,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (interface{}, error) 
 
 ## 6. OwnerAwareWant Wrapper
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
 
 **Struct:** `OwnerAwareWant` (Lines 577-664)
 
@@ -286,7 +286,7 @@ func (oaw *OwnerAwareWant) emitOwnerCompletionEvent() {
 
 ## 7. Parent-Child Completion Event Flow
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
 
 **Type:** `TargetCompletionSubscription` (Lines 95-145)
 
@@ -342,7 +342,7 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 ## 8. Async Want Addition via Reconcile Loop
 
-**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/chain_builder.go`
+**File:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/chain_builder.go`
 
 **Method:** `ChainBuilder.reconcileLoop()` (Lines 404-462)
 

@@ -2,7 +2,7 @@
 
 ## Where OwnerReferences are SET
 
-**Location:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+**Location:** `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
 **Method:** `Target.CreateChildWants()` 
 **Lines:** 244-261
 

@@ -100,7 +100,7 @@ You should see:
 
 ## Protocol Buffers Definition
 
-The gRPC service is defined in `engine/src/proto/agent_service.proto`:
+The gRPC service is defined in `engine/core/proto/agent_service.proto`:
 
 ```protobuf
 service AgentService {
@@ -142,21 +142,21 @@ message ExecuteResponse {
 ```bash
 protoc --go_out=. --go_opt=paths=source_relative \
        --go-grpc_out=. --go-grpc_opt=paths=source_relative \
-       engine/src/proto/agent_service.proto
+       engine/core/proto/agent_service.proto
 ```
 
 **Python:**
 ```bash
 python -m grpc_tools.protoc -I. \
   --python_out=. --grpc_python_out=. \
-  engine/src/proto/agent_service.proto
+  engine/core/proto/agent_service.proto
 ```
 
 **Node.js:**
 ```bash
 grpc_tools_node_protoc --js_out=import_style=commonjs:. \
   --grpc_out=grpc_js:. \
-  engine/src/proto/agent_service.proto
+  engine/core/proto/agent_service.proto
 ```
 
 ### Step 2: Implement the AgentService

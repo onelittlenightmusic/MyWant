@@ -3,7 +3,7 @@
 ## 1. CORE TYPE HIERARCHY
 
 ### 1.1 Metadata (Want Identification)
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/want.go:21`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/want.go:21`
 
 ```go
 type Metadata struct {
@@ -22,7 +22,7 @@ type Metadata struct {
 - **OwnerReferences**: Parent-child relationships for lifecycle management
 
 ### 1.2 WantSpec (Desire Configuration)
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/want.go:30`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/want.go:30`
 
 ```go
 type WantSpec struct {
@@ -40,7 +40,7 @@ type WantSpec struct {
 - **Requires**: Agent capability requirements (e.g., ["flight_reservation"])
 
 ### 1.3 Want (Base Type)
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/want.go:70`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/want.go:70`
 
 ```go
 type Want struct {
@@ -78,7 +78,7 @@ type Want struct {
 ## 2. WANT TYPE FACTORY PATTERN
 
 ### 2.1 WantFactory Interface
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/want.go:67`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/want.go:67`
 
 ```go
 type WantFactory func(metadata Metadata, spec WantSpec) interface{}
@@ -101,7 +101,7 @@ restaurant := NewRestaurantWant(metadata, spec).(*RestaurantWant)
 ## 3. WANT TYPE DEFINITION PATTERNS
 
 ### 3.1 Travel Domain Example: RestaurantWant
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/travel_types.go:35`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/travel_types.go:35`
 
 **Structure**:
 ```go
@@ -155,7 +155,7 @@ func NewRestaurantWant(metadata Metadata, spec WantSpec) interface{} {
 5. Return as `interface{}`
 
 ### 3.2 Number Processing Example: Numbers (QNet)
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/qnet_types.go:62`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/qnet_types.go:62`
 
 **Highlights Different Pattern**:
 ```go
@@ -200,7 +200,7 @@ func PacketNumbers(metadata mywant.Metadata, spec mywant.WantSpec) interface{} {
 - Implements batching mechanism for state history optimization
 
 ### 3.3 Fibonacci Example: FibonacciNumbers
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/fibonacci_types.go:14`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/fibonacci_types.go:14`
 
 **Simple Pattern**:
 ```go
@@ -235,7 +235,7 @@ func NewFibonacciNumbers(metadata Metadata, spec WantSpec) interface{} {
 ## 4. WANT TYPE REGISTRATION SYSTEM
 
 ### 4.1 ChainBuilder Registry
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/chain_builder.go:36-133`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/chain_builder.go:36-133`
 
 ```go
 type ChainBuilder struct {
@@ -255,7 +255,7 @@ func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
 4. Factory called during want instantiation
 
 ### 4.2 Travel Registration Example
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/travel_types.go:989`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/travel_types.go:989`
 
 ```go
 func RegisterTravelWantTypes(builder *ChainBuilder) {
@@ -283,7 +283,7 @@ func RegisterTravelWantTypesWithAgents(builder *ChainBuilder, agentRegistry *Age
 - Each want type gets its own registration call
 
 ### 4.3 QNet Registration
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/qnet_types.go:526`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/qnet_types.go:526`
 
 ```go
 func RegisterQNetWantTypes(builder *mywant.ChainBuilder) {
@@ -379,7 +379,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 ## 6. EXECUTION INTERFACES
 
 ### 6.1 Progressable Interface
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:116`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/declarative.go:116`
 
 ```go
 type Progressable interface {
@@ -400,7 +400,7 @@ func (r *RestaurantWant) Exec(using []chain.Chan, outputs []chain.Chan) bool {
 ```
 
 ### 6.2 Packet Handler Interface
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:101`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/declarative.go:101`
 
 ```go
 type PacketHandler interface {
@@ -423,7 +423,7 @@ func (q *Queue) OnEnded(packet mywant.Packet) error {
 ## 7. CONNECTIVITY METADATA SYSTEM
 
 ### 7.1 ConnectivityMetadata Type
-**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/declarative.go:193`
+**File**: `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/declarative.go:193`
 
 ```go
 type ConnectivityMetadata struct {
@@ -809,23 +809,23 @@ wants:
 ## 15. WANT TYPE FILES IN CODEBASE
 
 **Travel Domain**:
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/travel_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/travel_types.go`
   - RestaurantWant, HotelWant, BuffetWant, FlightWant, TravelCoordinatorWant
 
 **Queue/Network Domain**:
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/qnet_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/qnet_types.go`
   - Numbers (generator), Queue (processor), Combiner
 
 **Mathematical Domain**:
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/fibonacci_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/fibonacci_types.go`
   - FibonacciNumbers, FibonacciSequence
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/cmd/types/prime_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/types/prime_types.go`
   - PrimeNumbers, PrimeSequence
 
 **System Domain**:
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/owner_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/owner_types.go`
   - OwnerWant (dynamic want creation from recipes)
-- `/Users/hiroyukiosaki/work/golang/MyWant/engine/src/custom_target_types.go`
+- `/Users/hiroyukiosaki/work/golang/MyWant/engine/core/custom_target_types.go`
   - CustomTargetWant (dynamic recipe-based types)
 
 ---

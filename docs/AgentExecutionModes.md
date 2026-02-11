@@ -491,11 +491,11 @@ func handleFlightExecute(w http.ResponseWriter, r *http.Request) {
 
 ### Core Implementation
 
-- `engine/src/agent_execution_config.go` - Execution configuration types
-- `engine/src/agent_executor.go` - Executor implementations (Local, Webhook, RPC)
-- `engine/src/agent_types.go` - Extended BaseAgent with ExecutionConfig
-- `engine/src/want_agent.go` - Modified to use executor pattern
-- `engine/src/declarative.go` - AgentExecution with execution_mode field
+- `engine/core/agent_execution_config.go` - Execution configuration types
+- `engine/core/agent_executor.go` - Executor implementations (Local, Webhook, RPC)
+- `engine/core/agent_types.go` - Extended BaseAgent with ExecutionConfig
+- `engine/core/want_agent.go` - Modified to use executor pattern
+- `engine/core/declarative.go` - AgentExecution with execution_mode field
 
 ### Server API
 
@@ -510,7 +510,7 @@ func handleFlightExecute(w http.ResponseWriter, r *http.Request) {
 
 ### Tests
 
-- `engine/src/agent_executor_test.go` - Executor unit tests
+- `engine/core/agent_executor_test.go` - Executor unit tests
 
 ## References
 

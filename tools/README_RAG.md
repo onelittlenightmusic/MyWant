@@ -56,8 +56,8 @@ Output example:
   By Type: {'file': 45, 'function': 180, 'struct': 31}
 
   Top Files:
-    - engine/src/chain_builder.go: 25 entities
-    - engine/cmd/types/travel_types.go: 18 entities
+    - engine/core/chain_builder.go: 25 entities
+    - engine/types/travel_types.go: 18 entities
     ...
 ```
 
@@ -148,12 +148,12 @@ CREATE TABLE search_index (
 🔎 Search: want execution lifecycle
 Results:
 1. Exec (function)
-   📁 engine/src/chain.go:123
+   📁 engine/core/chain.go:123
    📝 Main execution method for want processing
    ⚙️  func (w *Want) Exec() bool { ...
 
 2. BeginProgressCycle (function)
-   📁 engine/src/chain.go:89
+   📁 engine/core/chain.go:89
    📝 Start batching state changes for execution
    ...
 ```
@@ -164,12 +164,12 @@ Results:
 🔎 Search: func:GetInputChannel
 Results:
 1. GetInputChannel (function)
-   📁 engine/src/chain_helpers.go:16
+   📁 engine/core/chain_helpers.go:16
    📝 Get input channel by index, returns (channel, connectionAvailable)
    ⚙️  func (n *Want) GetInputChannel(index int) (chain.Chan, bool) {
 
 2. GetFirstInputChannel (function)
-   📁 engine/src/chain_helpers.go:48
+   📁 engine/core/chain_helpers.go:48
    📝 Get first input channel from paths
    ...
 ```

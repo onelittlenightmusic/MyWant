@@ -5,17 +5,17 @@ Successfully refactored the Want execution model to remove channel parameters fr
 
 ## Changes Made
 
-### 1. Interface Changes (engine/src/declarative.go)
+### 1. Interface Changes (engine/core/declarative.go)
 - **Before**: `type Progressable interface { Exec(using []Chan, outputs []Chan) bool }`
 - **After**: `type Progressable interface { Exec() bool }`
 
 This change moves channel management from method parameters to internal state accessed through the Want struct's `paths` field.
 
-### 2. Type System Updates (engine/src/declarative.go)
+### 2. Type System Updates (engine/core/declarative.go)
 - Updated `PathInfo.Channel` type from `chan interface{}` to `chain.Chan`
 - Ensures type-safe channel operations throughout the system
 
-### 3. New Channel Helper Methods (engine/src/chain_helpers.go)
+### 3. New Channel Helper Methods (engine/core/chain_helpers.go)
 
 Added comprehensive helper methods to the Want struct for safe, index-based channel access:
 
@@ -38,7 +38,7 @@ All methods return `(channel, skipExec bool)` where:
 - `channel` is the requested channel (or nil if not available)
 - `skipExec` is true if the channel is not available (caller should return true)
 
-### 4. Chain Builder Updates (engine/src/chain_builder.go)
+### 4. Chain Builder Updates (engine/core/chain_builder.go)
 - Modified to set `paths` on want before calling `Exec()`
 - Changed from: `chainWant.Exec(usingChans, outputChans)`
 - Changed to:
@@ -65,7 +65,7 @@ All three want types in this file have been fully refactored:
 - Uses `GetOutputChannel(0)` for single output
 - Uses `GetInCount()` and `GetOutCount()` for validation
 
-### 6. OwnerAwareWant.Exec() (engine/src/owner_types.go)
+### 6. OwnerAwareWant.Exec() (engine/core/owner_types.go)
 - Updated wrapper method signature to match new interface
 - Changed from: `func (oaw *OwnerAwareWant) Exec(using []Chan, outputs []Chan) bool`
 - Changed to: `func (oaw *OwnerAwareWant) Exec() bool`
@@ -74,12 +74,12 @@ All three want types in this file have been fully refactored:
 
 ### Files with Old Signatures (Still Compiling)
 The following files still have Exec() methods with the old `(using []Chan, outputs []Chan)` parameter signatures:
-- engine/cmd/types/fibonacci_types.go (2 methods)
-- engine/cmd/types/prime_types.go (3 methods)
-- engine/cmd/types/qnet_types.go (4 methods)
-- engine/cmd/types/travel_types.go (4 methods)
-- engine/cmd/types/approval_types.go (4 methods)
-- engine/cmd/types/flight_types.go (1 method)
+- engine/types/fibonacci_types.go (2 methods)
+- engine/types/prime_types.go (3 methods)
+- engine/types/qnet_types.go (4 methods)
+- engine/types/travel_types.go (4 methods)
+- engine/types/approval_types.go (4 methods)
+- engine/types/flight_types.go (1 method)
 
 These compile successfully because:
 1. They don't directly implement the Progressable interface
@@ -139,13 +139,13 @@ If full refactoring of all type files is needed in the future:
 ## Files Modified
 
 ### Core System
-- `engine/src/declarative.go` - Type definitions
-- `engine/src/chain_builder.go` - Execution logic
-- `engine/src/chain_helpers.go` - Helper methods
-- `engine/src/owner_types.go` - Owner-aware wrapper
+- `engine/core/declarative.go` - Type definitions
+- `engine/core/chain_builder.go` - Execution logic
+- `engine/core/chain_helpers.go` - Helper methods
+- `engine/core/owner_types.go` - Owner-aware wrapper
 
 ### Implementation Examples
-- `engine/cmd/types/fibonacci_loop_types.go` - Complete refactoring example
+- `engine/types/fibonacci_loop_types.go` - Complete refactoring example
 
 ## Commit Hash
 `6483a46` - refactor: Remove using/outputs parameters from Exec() methods and add channel helpers

@@ -92,7 +92,7 @@ CLIを使用して、実行時のエージェントの状態を確認できま�
 
 ## 開発者向けガイド
 
-新しいエージェントをGoで実装する場合は、`engine/cmd/types/` 配下の既存実装（例：`agent_flight_api.go`）を参考にしてください。
+新しいエージェントをGoで実装する場合は、`engine/types/` 配下の既存実装（例：`agent_flight_api.go`）を参考にしてください。
 
 1.  `mywant.BaseAgent` を埋め込んだ構造体を作成。
 2.  `Exec` または `Monitor` メソッドを実装。

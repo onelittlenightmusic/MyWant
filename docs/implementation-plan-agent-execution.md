@@ -19,7 +19,7 @@ This document outlines the implementation plan for the unified Agent execution s
 
 #### 1.1 Want State Synchronization (2-3 hours)
 
-**File**: `engine/src/want.go`
+**File**: `engine/core/want.go`
 
 **Tasks**:
 
@@ -82,7 +82,7 @@ This document outlines the implementation plan for the unified Agent execution s
    - `callbackURL string`
    - `agentName string`
 
-**Tests**: `engine/src/want_test.go`
+**Tests**: `engine/core/want_test.go`
 - Test GetPendingStateChanges() with various scenarios
 - Test concurrent access safety
 - Test SetRemoteCallback() and SendCallback()
@@ -248,7 +248,7 @@ This document outlines the implementation plan for the unified Agent execution s
 
 #### 1.3 WebhookExecutor Improvements (3-4 hours)
 
-**File**: `engine/src/agent_executor.go` (existing)
+**File**: `engine/core/agent_executor.go` (existing)
 
 **Tasks**:
 
@@ -336,7 +336,7 @@ This document outlines the implementation plan for the unified Agent execution s
    }
    ```
 
-**Tests**: `engine/src/agent_executor_test.go` (existing)
+**Tests**: `engine/core/agent_executor_test.go` (existing)
 - Test executeMonitorWithSync with mock server
 - Test fetchLatestWantState
 - Test state synchronization
@@ -345,7 +345,7 @@ This document outlines the implementation plan for the unified Agent execution s
 
 ### Phase 2: MonitorAgent Periodic Execution (3-4 hours)
 
-**File**: `engine/src/agent_executor.go` (existing)
+**File**: `engine/core/agent_executor.go` (existing)
 
 **Tasks**:
 
@@ -378,7 +378,7 @@ This document outlines the implementation plan for the unified Agent execution s
    - Stop monitors when Want is stopped/deleted
    - Handle graceful shutdown
 
-**Tests**: `engine/src/agent_executor_test.go`
+**Tests**: `engine/core/agent_executor_test.go`
 - Test periodic execution
 - Test lifecycle management
 - Test graceful shutdown
@@ -387,7 +387,7 @@ This document outlines the implementation plan for the unified Agent execution s
 
 ### Phase 3: Integration Testing (4-5 hours)
 
-**File**: `engine/src/agent_execution_e2e_test.go` (new)
+**File**: `engine/core/agent_execution_e2e_test.go` (new)
 
 **Tasks**:
 
@@ -458,7 +458,7 @@ This document outlines the implementation plan for the unified Agent execution s
    - Test network failure
    - Test timeout handling
 
-**Tests**: `engine/src/agent_execution_e2e_test.go`
+**Tests**: `engine/core/agent_execution_e2e_test.go`
 - Multiple execution modes with same implementation
 - MonitorAgent state sync and callbacks
 - Error scenarios
@@ -483,7 +483,7 @@ This document outlines the implementation plan for the unified Agent execution s
 
 #### 4.2 Practical Examples (3-4 hours)
 
-**File**: `engine/cmd/demos/demo_agent_modes/main.go` (new)
+**File**: `engine/demos/demo_agent_modes/main.go` (new)
 
 **Tasks**:
 - Implement Flight Booking Agent in 3 modes

@@ -12,7 +12,7 @@
 
 ## Core Architecture
 
-**Components:** `declarative.go` (types) • `recipe_loader_generic.go` • `*_types.go` (engine/cmd/types/) • `chain_builder.go` • `yaml/agents/`
+**Components:** `declarative.go` (types) • `recipe_loader_generic.go` • `*_types.go` (engine/types/) • `chain_builder.go` • `yaml/agents/`
 
 **Types:** `Want` (Metadata/Spec/State/Status) • `WantSpec` (Params/Using/Recipe) • `ChainBuilder` • `Agent` (Capabilities)
 
@@ -65,7 +65,7 @@ make run-queue-system-recipe # Pipeline demo
 make run-qnet-recipe         # Multi-stream demo
 ```
 
-**Note:** `make restart-all` builds and starts the correct server (`./mywant` via `pkg/server`).
+**Note:** `make restart-all` builds and starts the correct server (`./mywant` via `engine/server`).
 
 ## Key Patterns
 
@@ -80,12 +80,12 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 
 ## File Organization
 
-`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/src/` (core) • `engine/cmd/types/` (*_types.go) • `pkg/server/` (HTTP API) • `docs/` • `web/` (React frontend)
+`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client) • `docs/` • `web/` (React frontend)
 
 ## Coding Rules
 
 1. Max 7s sleep in build/test
-2. **Server modifications**: Edit `pkg/server/handlers_*.go`, NOT `engine/cmd/server/` (deleted)
+2. **Server modifications**: Edit `engine/server/handlers_*.go`
 3. Always `StoreState(k,v)` / `GetState(k)` for state access
 4. Initialize StateHistory: `if want.History.StateHistory == nil { want.History.StateHistory = make([]StateHistoryEntry, 0) }`
 
@@ -129,21 +129,18 @@ mock_flight_port: 8090
 
 ## Server Implementation
 
-**CRITICAL**: MyWant uses `pkg/server` package for the HTTP server. `engine/cmd/server/` was deleted (legacy).
-
 **Server Flow:**
 ```
-./mywant start -D → cmd/mywant/commands/start.go → server.New() → pkg/server/server.go
+./mywant start -D → cmd/mywant/commands/start.go → server.New() → engine/server/server.go
 ```
 
 **When modifying server**:
-- ✅ Edit `pkg/server/handlers_*.go` (want, agent, recipe handlers)
-- ✅ Edit `pkg/server/server.go` (server setup)
-- ❌ NEVER edit `engine/cmd/server/*` (deleted - was legacy standalone server)
+- ✅ Edit `engine/server/handlers_*.go` (want, agent, recipe handlers)
+- ✅ Edit `engine/server/server.go` (server setup)
 
 **Build & Run:**
-- `make restart-all` - Builds `./mywant` (includes `pkg/server`) and starts it
-- `./mywant start -D` - Starts server using `pkg/server` implementation
+- `make restart-all` - Builds `./mywant` (includes `engine/server`) and starts it
+- `./mywant start -D` - Starts server using `engine/server` implementation
 
 ## Pending Improvements
 

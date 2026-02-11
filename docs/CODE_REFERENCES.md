@@ -2,7 +2,7 @@
 
 ## 1. Target.Exec() - Entry Point
 
-**File:** engine/src/owner_types.go
+**File:** engine/core/owner_types.go
 **Lines:** 268-342
 
 ```go
@@ -86,7 +86,7 @@ func (t *Target) Exec(inputs []chain.Chan, outputs []chain.Chan) bool {
 
 ## 2. Target.CreateChildWants() - WHERE OwnerReferences ARE SET
 
-**File:** engine/src/owner_types.go
+**File:** engine/core/owner_types.go
 **Lines:** 227-265
 
 ```go
@@ -143,7 +143,7 @@ func (t *Target) CreateChildWants() []*Want {
 
 ## 3. ChainBuilder.createWantFunction() - Automatic OwnerAwareWant Wrapping
 
-**File:** engine/src/chain_builder.go
+**File:** engine/core/chain_builder.go
 **Lines:** 233-273
 
 ```go
@@ -200,7 +200,7 @@ func (cb *ChainBuilder) createWantFunction(want *Want) (interface{}, error) {
 
 ## 4. OwnerAwareWant.Exec() - Child Completion Notification
 
-**File:** engine/src/owner_types.go
+**File:** engine/core/owner_types.go
 **Lines:** 603-620
 
 ```go
@@ -234,7 +234,7 @@ func (oaw *OwnerAwareWant) Exec(inputs []chain.Chan, outputs []chain.Chan) bool 
 
 ## 5. TargetCompletionSubscription.OnEvent() - Parent Receives Completion
 
-**File:** engine/src/owner_types.go
+**File:** engine/core/owner_types.go
 **Lines:** 105-145
 
 ```go
@@ -291,7 +291,7 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 ## 6. ChainBuilder.reconcileLoop() - Async Want Addition
 
-**File:** engine/src/chain_builder.go
+**File:** engine/core/chain_builder.go
 **Lines:** 422-435
 
 ```go
@@ -321,7 +321,7 @@ case newWants := <-cb.addWantsChan:
 
 ## 7. GenericRecipeLoader.LoadConfigFromRecipe() - Recipe Loading (No OwnerReferences)
 
-**File:** engine/src/recipe_loader_generic.go
+**File:** engine/core/recipe_loader_generic.go
 **Lines:** 212-219
 
 ```go
