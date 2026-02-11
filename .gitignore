@@ -49,7 +49,6 @@ codebase_rag.db
 # OS
 .DS_Store
 Thumbs.db
-/mywant
 
 # Memory dumps (runtime data)
 memory/
@@ -69,7 +68,6 @@ logs/
 tmp/
 *.log
 *.pid
-/mywant
 build_error.log
 drag_drop_success.png
 

@@ -26,7 +26,7 @@ make build
 MyWantサーバーが起動していること:
 
 ```sh
-./mywant start -D
+./bin/mywant start -D
 ```
 
 ### Claude Code (`.mcp.json`)

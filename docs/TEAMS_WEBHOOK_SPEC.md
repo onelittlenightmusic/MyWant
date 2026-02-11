@@ -19,13 +19,13 @@ Teams からのメッセージ受信には2つの方式があります。
 
    ```bash
    make restart-all
-   ./mywant wants create -f yaml/config/config-teams-webhook.yaml
+   ./bin/mywant wants create -f yaml/config/config-teams-webhook.yaml
    ```
 
 2. Want の State から `webhook_url` を確認:
 
    ```bash
-   ./mywant wants get {want-id}
+   ./bin/mywant wants get {want-id}
    ```
 
    State内に以下のようなパスが表示されます:
@@ -89,7 +89,7 @@ ngrok http 8080
 2. WantのStateを確認:
 
    ```bash
-   ./mywant wants get {want-id}
+   ./bin/mywant wants get {want-id}
    ```
 
 3. `teams_latest_message` に投稿したメッセージが反映されていればOK:
@@ -147,13 +147,13 @@ wants:
 
    ```bash
    make restart-all
-   ./mywant wants create -f yaml/config/config-slack-webhook.yaml
+   ./bin/mywant wants create -f yaml/config/config-slack-webhook.yaml
    ```
 
 3. Want の State から `webhook_url` を確認:
 
    ```bash
-   ./mywant wants get {want-id}
+   ./bin/mywant wants get {want-id}
    ```
 
    State内に以下のようなパスが表示されます:
@@ -204,7 +204,7 @@ ngrok http 8080
 2. WantのStateを確認:
 
    ```bash
-   ./mywant wants get {want-id}
+   ./bin/mywant wants get {want-id}
    ```
 
 3. `slack_latest_message` に投稿したメッセージが反映されていればOK:
@@ -274,7 +274,7 @@ wants:
 curl http://localhost:8080/api/v1/webhooks
 
 # Want state 確認
-./mywant wants get {want-id}
+./bin/mywant wants get {want-id}
 
 # Teams: 複数メッセージ送信テスト
 for i in $(seq 1 5); do
@@ -291,7 +291,7 @@ for i in $(seq 1 5); do
 done
 
 # ログ確認
-./mywant logs
+./bin/mywant logs
 ```
 
 ---

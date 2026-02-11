@@ -52,7 +52,7 @@ make troubleshoot-mcp
 
 使用方法:
 ```bash
-./scripts/fix-gmail-mcp.sh
+./tools/scripts/fix-gmail-mcp.sh
 # または
 make fix-mcp
 ```
@@ -79,7 +79,7 @@ make fix-mcp
 
 使用方法:
 ```bash
-./scripts/troubleshoot-gmail-mcp.sh
+./tools/scripts/troubleshoot-gmail-mcp.sh
 # または
 make troubleshoot-mcp
 ```

@@ -54,7 +54,7 @@ Server will start on port 9000 with endpoints:
 export WEBHOOK_AUTH_TOKEN=test123
 
 # Start MyWant server
-./mywant start -D --port 8080
+./bin/mywant start -D --port 8080
 ```
 
 ### 3. Deploy a Want with Webhook Agent
@@ -89,7 +89,7 @@ agents:
 Deploy:
 
 ```bash
-./mywant wants create -f test-webhook-agent.yaml
+./bin/mywant wants create -f test-webhook-agent.yaml
 ```
 
 ### 4. Verify Execution
@@ -97,7 +97,7 @@ Deploy:
 Check want status:
 
 ```bash
-./mywant wants get test-webhook-flight --history
+./bin/mywant wants get test-webhook-flight --history
 ```
 
 You should see:

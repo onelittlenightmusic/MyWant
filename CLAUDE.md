@@ -26,34 +26,34 @@
 
 **Configuration:**
 ```sh
-./mywant config set/get/reset
-./mywant --config /path/to/config.yaml config get  # Custom config (~/.mywant/config.yaml default)
+./bin/mywant config set/get/reset
+./bin/mywant --config /path/to/config.yaml config get  # Custom config (~/.mywant/config.yaml default)
 ```
 
 **Quick Start:**
 ```sh
 make release                                        # Build CLI
-./mywant start -D [--port 8080]                     # Start server
-./mywant start --worker -D                          # Agent service
-./mywant start --dev                                # Dev mode
-./mywant wants create -f yaml/config/config-travel.yaml
-./mywant wants list
-./mywant ps
-./mywant stop
+./bin/mywant start -D [--port 8080]                     # Start server
+./bin/mywant start --worker -D                          # Agent service
+./bin/mywant start --dev                                # Dev mode
+./bin/mywant wants create -f yaml/config/config-travel.yaml
+./bin/mywant wants list
+./bin/mywant ps
+./bin/mywant stop
 ```
 
 **Management:**
 ```sh
 # Wants
-./mywant wants get/delete/suspend/resume <ID>
+./bin/mywant wants get/delete/suspend/resume <ID>
 
 # Recipes
-./mywant recipes list/create -f recipe.yaml
-./mywant recipes from-want <ID> --name "my-recipe"
+./bin/mywant recipes list/create -f recipe.yaml
+./bin/mywant recipes from-want <ID> --name "my-recipe"
 
 # System
-./mywant types/agents/capabilities list
-./mywant logs
+./bin/mywant types/agents/capabilities list
+./bin/mywant logs
 ```
 
 **Make Commands:**
@@ -65,7 +65,7 @@ make run-queue-system-recipe # Pipeline demo
 make run-qnet-recipe         # Multi-stream demo
 ```
 
-**Note:** `make restart-all` builds and starts the correct server (`./mywant` via `engine/server`).
+**Note:** `make restart-all` builds and starts the correct server (`./bin/mywant` via `engine/server`).
 
 ## Key Patterns
 
@@ -111,7 +111,7 @@ description: "Luxury hotel bookings with automated upgrades."
 
 **Patterns:** Monitor & Retrigger (detect change → replan) • Silencer (auto-approval during user wait)
 
-**Commands:** `./mywant agents list` • `./mywant capabilities list` • `./mywant wants get <ID> --history`
+**Commands:** `./bin/mywant agents list` • `./bin/mywant capabilities list` • `./bin/mywant wants get <ID> --history`
 
 ## System Directories
 
@@ -131,7 +131,7 @@ mock_flight_port: 8090
 
 **Server Flow:**
 ```
-./mywant start -D → client/cmd/mywant/commands/start.go → server.New() → engine/server/server.go
+./bin/mywant start -D → client/cmd/mywant/commands/start.go → server.New() → engine/server/server.go
 ```
 
 **When modifying server**:
@@ -139,8 +139,8 @@ mock_flight_port: 8090
 - ✅ Edit `engine/server/server.go` (server setup)
 
 **Build & Run:**
-- `make restart-all` - Builds `./mywant` (includes `engine/server`) and starts it
-- `./mywant start -D` - Starts server using `engine/server` implementation
+- `make restart-all` - Builds `./bin/mywant` (includes `engine/server`) and starts it
+- `./bin/mywant start -D` - Starts server using `engine/server` implementation
 
 ## Pending Improvements
 

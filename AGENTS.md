@@ -79,13 +79,13 @@ CLIを使用して、実行時のエージェントの状態を確認できま�
 
 ```bash
 # 登録されている全エージェントを表示
-./mywant agents list
+./bin/mywant agents list
 
 # 利用可能な能力の一覧を表示
-./mywant capabilities list
+./bin/mywant capabilities list
 
 # 特定のWantでどのアージェントが動いたか履歴を確認
-./mywant wants get <WANT_ID> --history
+./bin/mywant wants get <WANT_ID> --history
 ```
 
 ---

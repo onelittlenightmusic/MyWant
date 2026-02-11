@@ -32,7 +32,7 @@ mywant --config /path/to/custom-config.yaml start -D
 Set configuration values interactively:
 
 ```bash
-./mywant config set
+./bin/mywant config set
 ```
 
 Example session:
@@ -63,8 +63,8 @@ Mock Flight Server Port [8090]:
 Display the current configuration:
 
 ```bash
-./mywant config get
-# Aliases: ./mywant config show, ./mywant cfg g
+./bin/mywant config get
+# Aliases: ./bin/mywant config show, ./bin/mywant cfg g
 ```
 
 Output:
@@ -84,8 +84,8 @@ Config file: /Users/user/.mywant/config.yaml
 Reset configuration to default values:
 
 ```bash
-./mywant config reset
-# Alias: ./mywant cfg r
+./bin/mywant config reset
+# Alias: ./bin/mywant cfg r
 ```
 
 ### Edit Configuration File
@@ -94,8 +94,8 @@ Edit the configuration file directly:
 
 ```bash
 # Opens config file in $EDITOR (default: vim)
-./mywant config edit
-# Alias: ./mywant cfg e
+./bin/mywant config edit
+# Alias: ./bin/mywant cfg e
 
 # Or edit manually
 vim ~/.mywant/config.yaml
@@ -125,8 +125,8 @@ server_port: 8080
 
 **Usage:**
 ```bash
-./mywant config set  # Select option 1
-./mywant start -D
+./bin/mywant config set  # Select option 1
+./bin/mywant start -D
 ```
 
 ### 2. Webhook Mode
@@ -154,13 +154,13 @@ agent_service_port: 8081
 **Usage:**
 ```bash
 # Configure webhook mode
-./mywant config set  # Select option 2
+./bin/mywant config set  # Select option 2
 
 # Start main server
-./mywant start -D
+./bin/mywant start -D
 
 # Start agent service
-./mywant start --worker -D
+./bin/mywant start --worker -D
 ```
 
 ### 3. gRPC Mode (Planned)
@@ -191,21 +191,21 @@ agent_service_port: 8081
 
 1. **Set up configuration:**
    ```bash
-   ./mywant config set
+   ./bin/mywant config set
    ```
 
 2. **Verify configuration:**
    ```bash
-   ./mywant config get
+   ./bin/mywant config get
    ```
 
 3. **Start services:**
    ```bash
    # Main server (uses config automatically)
-   ./mywant start -D
+   ./bin/mywant start -D
 
    # Agent service (if using webhook/grpc mode)
-   ./mywant start --worker -D
+   ./bin/mywant start --worker -D
    ```
 
 ### Override Configuration
@@ -214,13 +214,13 @@ Command-line flags override configuration file values:
 
 ```bash
 # Use config file values
-./mywant start -D
+./bin/mywant start -D
 
 # Override port (ignores config file)
-./mywant start -D --port 9090
+./bin/mywant start -D --port 9090
 
 # Override host and port
-./mywant start -D --host 0.0.0.0 --port 9090
+./bin/mywant start -D --host 0.0.0.0 --port 9090
 ```
 
 ### Custom Configuration File
@@ -229,26 +229,26 @@ Use a different configuration file with the `--config` flag:
 
 ```bash
 # Use custom config file
-./mywant --config /path/to/custom-config.yaml config get
+./bin/mywant --config /path/to/custom-config.yaml config get
 
 # Start with custom config
-./mywant --config /path/to/custom-config.yaml start -D
+./bin/mywant --config /path/to/custom-config.yaml start -D
 
 # All commands support --config flag
-./mywant --config ./dev-config.yaml ps
-./mywant --config ./prod-config.yaml wants list
+./bin/mywant --config ./dev-config.yaml ps
+./bin/mywant --config ./prod-config.yaml wants list
 ```
 
 **Example: Multiple Environments**
 ```bash
 # Development
-./mywant --config ~/.mywant/dev-config.yaml start -D
+./bin/mywant --config ~/.mywant/dev-config.yaml start -D
 
 # Staging
-./mywant --config ~/.mywant/staging-config.yaml start -D
+./bin/mywant --config ~/.mywant/staging-config.yaml start -D
 
 # Production
-./mywant --config ~/.mywant/prod-config.yaml start -D
+./bin/mywant --config ~/.mywant/prod-config.yaml start -D
 ```
 
 ### Multiple Environments
@@ -257,11 +257,11 @@ Create environment-specific configurations:
 
 ```bash
 # Development (local mode)
-./mywant config set
+./bin/mywant config set
 # Select: local mode, port 8080
 
 # Production (webhook mode, remote server)
-./mywant config set
+./bin/mywant config set
 # Select: webhook mode, port 80, agent service on 8081
 ```
 
@@ -314,22 +314,22 @@ cat ~/.mywant/config.yaml
 
 Reset to defaults and reconfigure:
 ```bash
-./mywant config reset
-./mywant config set
+./bin/mywant config reset
+./bin/mywant config set
 ```
 
 ### Port Conflicts
 
 Check which ports are in use:
 ```bash
-./mywant ps
+./bin/mywant ps
 lsof -i :8080
 lsof -i :8081
 ```
 
 Change ports in configuration:
 ```bash
-./mywant config set
+./bin/mywant config set
 # Enter new port numbers
 ```
 
@@ -337,13 +337,13 @@ Change ports in configuration:
 
 1. Verify agent service is running:
    ```bash
-   ./mywant ps
+   ./bin/mywant ps
    curl http://localhost:8081/health
    ```
 
 2. Check configuration:
    ```bash
-   ./mywant config get
+   ./bin/mywant config get
    ```
 
 3. Verify agent service host/port:
@@ -354,7 +354,7 @@ Change ports in configuration:
 ## Best Practices
 
 1. **Use configuration file for consistency:**
-   - Configure once with `./mywant config set`
+   - Configure once with `./bin/mywant config set`
    - Avoid hardcoding ports in scripts
 
 2. **Override only when necessary:**
@@ -367,9 +367,9 @@ Change ports in configuration:
 
 4. **Test after configuration changes:**
    ```bash
-   ./mywant config get
-   ./mywant start -D
-   ./mywant ps
+   ./bin/mywant config get
+   ./bin/mywant start -D
+   ./bin/mywant ps
    ```
 
 5. **Use webhook mode for production:**

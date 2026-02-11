@@ -45,7 +45,7 @@ Server will start on port 9001.
 ### 2. Start MyWant Server
 
 ```bash
-./mywant start -D --port 8080
+./bin/mywant start -D --port 8080
 ```
 
 ### 3. Deploy a Want with gRPC Agent
@@ -80,17 +80,17 @@ agents:
 Deploy:
 
 ```bash
-./mywant wants create -f test-grpc-agent.yaml
+./bin/mywant wants create -f test-grpc-agent.yaml
 ```
 
 ### 4. Verify Execution
 
 ```bash
 # Check want status
-./mywant wants get grpc-flight-test --history
+./bin/mywant wants get grpc-flight-test --history
 
 # View agent execution history
-./mywant wants get grpc-flight-test | jq '.history.agent_history'
+./bin/mywant wants get grpc-flight-test | jq '.history.agent_history'
 ```
 
 You should see:

@@ -2,8 +2,8 @@
 #
 # Before running:
 # 1. Start external agent server: cd examples/external_agent_webhook && WEBHOOK_AUTH_TOKEN=test123 go run main.go
-# 2. Start MyWant server: WEBHOOK_AUTH_TOKEN=test123 ./mywant start -D --port 8080
-# 3. Deploy this config: ./mywant wants create -f yaml/config/test-webhook-agent.yaml
+# 2. Start MyWant server: WEBHOOK_AUTH_TOKEN=test123 ./bin/mywant start -D --port 8080
+# 3. Deploy this config: ./bin/mywant wants create -f yaml/config/test-webhook-agent.yaml
 
 wants:
   - name: webhook-flight-test

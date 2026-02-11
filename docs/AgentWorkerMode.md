@@ -27,30 +27,30 @@
 
 ```bash
 # メインサーバーを起動
-./mywant start --port 8080
+./bin/mywant start --port 8080
 
 # または、バックグラウンドで起動
-./mywant start --port 8080 -D
+./bin/mywant start --port 8080 -D
 ```
 
 ### 2. Workerモード（Agent Service）
 
 ```bash
 # Agent Serviceをworkerモードで起動
-./mywant start --worker --port 8081
+./bin/mywant start --worker --port 8081
 
 # または、バックグラウンドで起動
-./mywant start --worker --port 8081 -D
+./bin/mywant start --worker --port 8081 -D
 ```
 
 ### 3. 両方を起動（分散構成）
 
 ```bash
 # ターミナル1: メインサーバー
-./mywant start --port 8080 -D
+./bin/mywant start --port 8080 -D
 
 # ターミナル2: Agent Service
-./mywant start --worker --port 8081 -D
+./bin/mywant start --worker --port 8081 -D
 ```
 
 ## API エンドポイント

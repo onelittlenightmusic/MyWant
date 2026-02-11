@@ -38,10 +38,11 @@ build-gui:
 
 build-cli:
 	@echo "🔨 Building mywant with embedded GUI..."
-	go build -C client -o ../mywant ./cmd/mywant
+	@mkdir -p bin
+	go build -C client -o ../bin/mywant ./cmd/mywant
 
 release: build-gui build-cli
-	@echo "🚀 Release build complete: mywant"
+	@echo "🚀 Release build complete: bin/mywant"
 
 # Build the mywant library
 build: check
@@ -118,7 +119,7 @@ test-all: restart-all
 build-mock:
 	@echo "🏗️  Building mock flight server..."
 	@mkdir -p bin
-	@cd mock && go build -o ../bin/flight-server
+	@cd tools/mock && go build -o ../../bin/flight-server
 
 # Run the mock flight server
 run-mock: build-mock
@@ -128,7 +129,7 @@ clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -rf bin/
 	@rm -f qnet
-	@rm -f mock/flight-server
+	@rm -f tools/mock/flight-server
 	@rm -f mywant
 	@rm -f engine/main
 	@rm -f engine/engine/server
@@ -192,7 +193,7 @@ all: build
 restart-all:
 	@echo "🔄 Restarting MyWant server and mock server..."
 	@echo "🛑 Stopping existing processes..."
-	@./mywant stop 2>/dev/null || echo "  Server not running"
+	@./bin/mywant stop 2>/dev/null || echo "  Server not running"
 	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
 	@echo "🧹 Cleaning logs..."
 	@rm -f ~/.mywant/server.log
@@ -204,7 +205,7 @@ restart-all:
 	@mkdir -p ~/.mywant
 	@$(MAKE) build-mock
 	@echo "🚀 Starting MyWant server via mywant..."
-	@nohup ./mywant start -D --port 8080 > /dev/null 2>&1 &
+	@nohup ./bin/mywant start -D --port 8080 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
 	@echo ""
@@ -217,17 +218,17 @@ restart-all:
 	@echo "✈️  Mock Server: http://localhost:8090"
 	@echo ""
 	@echo "📋 Server management:"
-	@echo "  Stop: ./mywant stop"
-	@echo "  View status: ./mywant ps"
+	@echo "  Stop: ./bin/mywant stop"
+	@echo "  View status: ./bin/mywant ps"
 
 # Gmail MCP troubleshooting targets
 troubleshoot-mcp:
 	@echo "🔍 Running Gmail MCP troubleshooting..."
-	@./scripts/troubleshoot-gmail-mcp.sh
+	@./tools/scripts/troubleshoot-gmail-mcp.sh
 
 fix-mcp:
 	@echo "🔧 Quick fix for Gmail MCP..."
-	@./scripts/fix-gmail-mcp.sh
+	@./tools/scripts/fix-gmail-mcp.sh
 
 # Default target
 .DEFAULT_GOAL := help

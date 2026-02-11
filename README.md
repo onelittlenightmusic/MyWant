@@ -29,9 +29,9 @@ make release
 
 ```bash
 # Start backend and GUI together in background
-./mywant start -D
+./bin/mywant start -D
 # Check status
-./mywant ps
+./bin/mywant ps
 ```
 
 ### 3. Access the Dashboard
@@ -58,7 +58,7 @@ wants:
 
 **Run:**
 ```bash
-./mywant wants create -f yaml/config/config-reminder.yaml
+./bin/mywant wants create -f yaml/config/config-reminder.yaml
 ```
 The new want execution will immediately appear on your dashboard.
 
@@ -67,9 +67,9 @@ The new want execution will immediately appear on your dashboard.
 Explore more complex scenarios using pre-defined configurations:
 
 ```bash
-./mywant wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
-./mywant wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
-./mywant wants create -f yaml/config/config-reminder.yaml        # Simple reminder
+./bin/mywant wants create -f yaml/config/config-travel-recipe.yaml    # Travel planning
+./bin/mywant wants create -f yaml/config/config-fibonacci-recipe.yaml # Fibonacci sequence
+./bin/mywant wants create -f yaml/config/config-reminder.yaml        # Simple reminder
 ```
 
 ## API Usage

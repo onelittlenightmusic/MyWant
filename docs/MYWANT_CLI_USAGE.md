@@ -64,19 +64,19 @@ Start, monitor, and stop the integrated MyWant services (API and GUI).
 
 ```bash
 # Start MyWant server (API and GUI) in background
-./mywant start --detach
+./bin/mywant start --detach
 # Short version:
-./mywant s -D
+./bin/mywant s -D
 
 # Check status of all processes
-./mywant ps
+./bin/mywant ps
 # Short version:
-./mywant p
+./bin/mywant p
 
 # Stop the server
-./mywant stop
+./bin/mywant stop
 # Short version:
-./mywant st
+./bin/mywant st
 ```
 
 ### Want Management
@@ -85,33 +85,33 @@ List, view, and manage lifecycle of wants.
 
 ```bash
 # List all wants
-./mywant wants list
+./bin/mywant wants list
 # Short version:
-./mywant w l
+./bin/mywant w l
 
 # Get detailed status of a specific want
-./mywant wants get <WANT_ID>
+./bin/mywant wants get <WANT_ID>
 # Short version:
-./mywant w g <WANT_ID>
+./bin/mywant w g <WANT_ID>
 
 # Create/Deploy a new want from YAML file
-./mywant wants create -f config.yaml
+./bin/mywant wants create -f config.yaml
 # Short version:
-./mywant w c -f config.yaml
+./bin/mywant w c -f config.yaml
 
 # Delete a want
-./mywant wants delete <WANT_ID>
+./bin/mywant wants delete <WANT_ID>
 # Short version:
-./mywant w d <WANT_ID>
+./bin/mywant w d <WANT_ID>
 
 # Batch lifecycle operations
-./mywant wants suspend <ID1> <ID2>
-./mywant w sus <ID1> <ID2>
+./bin/mywant wants suspend <ID1> <ID2>
+./bin/mywant w sus <ID1> <ID2>
 
 # Export/Import wants
-./mywant wants export -o backup.yaml
+./bin/mywant wants export -o backup.yaml
 # Short version:
-./mywant w e -o backup.yaml
+./bin/mywant w e -o backup.yaml
 ```
 
 ### Recipe Management
@@ -120,19 +120,19 @@ Handle reusable templates.
 
 ```bash
 # List available recipes
-./mywant recipes list
+./bin/mywant recipes list
 # Short version:
-./mywant r l
+./bin/mywant r l
 
 # Create a new recipe from a file
-./mywant recipes create -f recipe.yaml
+./bin/mywant recipes create -f recipe.yaml
 # Short version:
-./mywant r c -f recipe.yaml
+./bin/mywant r c -f recipe.yaml
 
 # Generate a recipe from an existing deployed want
-./mywant recipes from-want <WANT_ID> --name "my-new-recipe"
+./bin/mywant recipes from-want <WANT_ID> --name "my-new-recipe"
 # Short version:
-./mywant r fw <WANT_ID> -n "my-new-recipe"
+./bin/mywant r fw <WANT_ID> -n "my-new-recipe"
 ```
 
 ### System Inspection
@@ -141,23 +141,23 @@ Explore available types and agents.
 
 ```bash
 # List available want types
-./mywant types list
+./bin/mywant types list
 # Short version:
-./mywant t l
+./bin/mywant t l
 
 # List registered agents
-./mywant agents list
+./bin/mywant agents list
 # Short version:
-./mywant a l
+./bin/mywant a l
 ```
 
 ### Utilities
 
 ```bash
 # View API operation logs
-./mywant logs
+./bin/mywant logs
 # Short version:
-./mywant l
+./bin/mywant l
 ```
 
 ## Shell Completion
@@ -166,7 +166,7 @@ Explore available types and agents.
 
 To enable completion in your current session (Zsh example):
 ```zsh
-source <(./mywant completion zsh)
+source <(./bin/mywant completion zsh)
 ```
 
 ## Global Flags

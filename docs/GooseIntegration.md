@@ -179,7 +179,7 @@ wants:
 
 ```bash
 # Check want status
-./mywant wants get <want-id>
+./bin/mywant wants get <want-id>
 
 # View logs
 tail -f logs/server.log | grep "GMAIL-DYNAMIC"
