@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "mywant/engine/cmd/types"
+	_ "mywant/engine/types"
 	. "mywant/engine/core"
 )
 

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	_ "mywant/engine/cmd/types"
+	_ "mywant/engine/types"
 
 	"github.com/stretchr/testify/assert"
 )

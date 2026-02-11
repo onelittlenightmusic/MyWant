@@ -2,7 +2,7 @@ package demos_moved
 
 import (
 	"fmt"
-	_ "mywant/engine/cmd/types"
+	_ "mywant/engine/types"
 	. "mywant/engine/core"
 	"os"
 )

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	_ "mywant/engine/cmd/types"
+	_ "mywant/engine/types"
 	mywant "mywant/engine/core"
 	"os"
 )

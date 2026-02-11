@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	_ "mywant/engine/cmd/types" // init() registers agent implementations
+	_ "mywant/engine/types" // init() registers agent implementations
 	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"

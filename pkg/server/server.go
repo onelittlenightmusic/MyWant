@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	types "mywant/engine/cmd/types"
+	types "mywant/engine/types"
 	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
