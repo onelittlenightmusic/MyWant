@@ -24,8 +24,9 @@ lint:
 
 test:
 	@echo "🧪 Running tests..."
-	go test -C engine -v ./core/... || echo "⚠️  Engine tests failed"
-	go test -C client -v ./... || echo "⚠️  Client tests failed"
+	@-(go test -C engine -v ./core/... ./server/... ./core/chain/... ./core/pubsub/... && \
+	   go test -C client -v ./...) || (echo "⚠️  Some tests failed"; $(MAKE) clean; exit 1)
+	@$(MAKE) clean
 
 check: fmt vet test
 	@echo "✅ All code quality checks completed"
@@ -128,6 +129,11 @@ clean:
 	@rm -rf bin/
 	@rm -f qnet
 	@rm -f mock/flight-server
+	@rm -f mywant
+	@rm -f engine/main
+	@rm -f engine/engine/server
+	@rm -f engine/demo_*
+	@rm -f engine/server-packet-test.log
 	@go clean
 
 help:
