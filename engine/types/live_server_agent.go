@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,7 +45,7 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 			want.StoreLog("[INFO] Started server with PID %d", pid)
 
 			// If health_check_url is configured, poll for readiness
-			healthCheckURL := getStringParam(want, "health_check_url", "")
+			healthCheckURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
 			if healthCheckURL != "" {
 				body, err := waitForHealthCheck(ctx, want, healthCheckURL)
 				if err != nil {
@@ -78,14 +79,14 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 	return nil
 }
 
-// startLiveServer starts a server process using command and args from params
+// startLiveServer starts a server process using command and args from state (fallback: params)
 func startLiveServer(want *mywant.Want) (int, error) {
-	command := getStringParam(want, "command", "")
+	command := getConfigString(want, "server_command", "command", "")
 	if command == "" {
 		return 0, fmt.Errorf("command parameter is required")
 	}
-	args := getArgsParam(want)
-	logFile := getStringParam(want, "log_file", "")
+	args := getConfigArgs(want)
+	logFile := getConfigString(want, "server_log_file", "log_file", "")
 
 	// Binary lookup: LookPath first, then os.Stat fallback
 	binPath, err := exec.LookPath(command)
@@ -137,13 +138,13 @@ func startLiveServer(want *mywant.Want) (int, error) {
 
 // waitForHealthCheck polls the health check URL until it responds successfully
 func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (string, error) {
-	intervalStr := getStringParam(want, "health_check_interval", "500ms")
+	intervalStr := getConfigString(want, "server_health_check_interval", "health_check_interval", "500ms")
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {
 		interval = 500 * time.Millisecond
 	}
 
-	maxRetries := getIntParam(want, "health_check_max_retries", 15)
+	maxRetries := getConfigInt(want, "server_health_check_max_retries", "health_check_max_retries", 15)
 
 	client := &http.Client{Timeout: 2 * time.Second}
 
@@ -176,6 +177,35 @@ func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (str
 	}
 
 	return "", fmt.Errorf("timed out waiting for health check at %s", url)
+}
+
+// getConfigString reads a value from state (stateKey) first, then falls back to params (paramKey).
+// Want types store derived config in state; direct YAML usage stores in params.
+func getConfigString(want *mywant.Want, stateKey, paramKey, defaultVal string) string {
+	if v, ok := want.GetStateString(stateKey, ""); ok && v != "" {
+		return v
+	}
+	return getStringParam(want, paramKey, defaultVal)
+}
+
+// getConfigInt reads an int from state first, then falls back to params.
+func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) int {
+	if v, ok := want.GetStateInt(stateKey, 0); ok && v != 0 {
+		return v
+	}
+	return getIntParam(want, paramKey, defaultVal)
+}
+
+// getConfigArgs reads args from state (JSON string) first, then falls back to params.
+func getConfigArgs(want *mywant.Want) []string {
+	if v, ok := want.GetStateString("server_args", ""); ok && v != "" {
+		// Stored as JSON array string
+		var args []string
+		if json.Unmarshal([]byte(v), &args) == nil {
+			return args
+		}
+	}
+	return getArgsParam(want)
 }
 
 // getStringParam gets a string parameter from want params with a default value

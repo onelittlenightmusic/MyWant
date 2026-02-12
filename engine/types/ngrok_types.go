@@ -2,9 +2,11 @@ package types
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
+	"syscall"
 	"time"
 
 	. "mywant/engine/core"
@@ -25,15 +27,12 @@ const (
 
 // NgrokLocals holds type-specific local state for NgrokWant
 type NgrokLocals struct {
-	Phase         string
-	Port          string
-	Protocol      string
-	LogFile       string
-	ServerPID     int
-	NgrokURL      string
-	LastCheckTime time.Time
-	RetryCount    int
-	MaxRetries    int
+	Phase     string
+	Port      string
+	Protocol  string
+	LogFile   string
+	ServerPID int
+	NgrokURL  string
 }
 
 // NgrokWant manages an ngrok tunnel lifecycle using the live_server_manager agent
@@ -63,15 +62,12 @@ func (n *NgrokWant) Initialize() {
 		n.Locals = locals
 	}
 	locals.Phase = NgrokPhaseStarting
-	locals.LastCheckTime = time.Now()
 	locals.ServerPID = 0
 	locals.NgrokURL = ""
-	locals.RetryCount = 0
 
 	// Read ngrok-specific params
 	locals.Port = getStringParam(&n.Want, "port", "8080")
 	locals.Protocol = getStringParam(&n.Want, "protocol", "http")
-	locals.MaxRetries = getIntParam(&n.Want, "max_retries", 30)
 
 	// Set up log file for capturing ngrok stdout
 	logFile := getStringParam(&n.Want, "log_file", "")
@@ -80,19 +76,15 @@ func (n *NgrokWant) Initialize() {
 	}
 	locals.LogFile = logFile
 
-	// Inject params that live_server_manager agent expects
-	if n.Spec.Params == nil {
-		n.Spec.Params = make(map[string]interface{})
-	}
-	n.Spec.Params["command"] = "ngrok"
-	n.Spec.Params["args"] = []interface{}{locals.Protocol, locals.Port, "--log=stdout"}
-	n.Spec.Params["log_file"] = logFile
-
-	// Store initial state
+	// Store config in state for live_server_manager agent to read
+	argsJSON, _ := json.Marshal([]string{locals.Protocol, locals.Port, "--log=stdout"})
 	n.StoreStateMulti(map[string]any{
-		"server_phase": locals.Phase,
-		"server_pid":   0,
-		"ngrok_url":    "",
+		"server_phase":    locals.Phase,
+		"server_pid":      0,
+		"ngrok_url":       "",
+		"server_command":  "ngrok",
+		"server_args":     string(argsJSON),
+		"server_log_file": logFile,
 	})
 
 	n.Locals = locals
@@ -146,26 +138,12 @@ func (n *NgrokWant) Progress() {
 			}
 		}
 
-		// Check if process started
+		// Check if process started, then wait for forwarding URL
 		if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
 			locals.ServerPID = pid
 
-			// Try to parse forwarding URL from log file
-			url := parseNgrokURL(locals.LogFile)
-			if url != "" {
-				locals.NgrokURL = url
-				n.StoreState("ngrok_url", url)
-				n.StoreState("server_phase", NgrokPhaseRunning)
-				n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
-				locals.Phase = NgrokPhaseRunning
-				n.updateLocals(locals)
-				n.ProvideDone()
-				return
-			}
-
-			// URL not found yet
-			locals.RetryCount++
-			if locals.RetryCount > locals.MaxRetries {
+			url := n.waitForNgrokURL(locals.LogFile)
+			if url == "" {
 				n.StoreLog("[ERROR] Timed out waiting for ngrok forwarding URL")
 				n.StoreState("server_phase", NgrokPhaseFailed)
 				n.StoreState("error_message", "timed out waiting for ngrok forwarding URL")
@@ -174,8 +152,14 @@ func (n *NgrokWant) Progress() {
 				n.Status = "failed"
 				return
 			}
-			n.StoreLog("[DEBUG] Waiting for ngrok URL (attempt %d/%d)...", locals.RetryCount, locals.MaxRetries)
+
+			locals.NgrokURL = url
+			n.StoreState("ngrok_url", url)
+			n.StoreState("server_phase", NgrokPhaseRunning)
+			n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
+			locals.Phase = NgrokPhaseRunning
 			n.updateLocals(locals)
+			n.ProvideDone()
 		}
 
 	case NgrokPhaseRunning:
@@ -203,12 +187,16 @@ func (n *NgrokWant) Progress() {
 func (n *NgrokWant) OnDelete() {
 	n.StoreLog("[NGROK] Want is being deleted, stopping tunnel")
 
-	n.StoreState("server_phase", NgrokPhaseStopping)
-
-	if err := n.ExecuteAgents(); err != nil {
-		n.StoreLog("[ERROR] Failed to stop tunnel during deletion: %v", err)
-	} else {
-		n.StoreLog("[NGROK] Tunnel stopped successfully")
+	// Kill process directly — don't rely on agent round-trip through state
+	if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
+		n.StoreLog("[NGROK] Killing ngrok process PID %d", pid)
+		if proc, err := os.FindProcess(pid); err == nil {
+			if err := proc.Signal(syscall.SIGTERM); err != nil {
+				n.StoreLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
+				proc.Kill()
+			}
+		}
+		n.StoreState("server_pid", 0)
 	}
 
 	if err := n.StopAllBackgroundAgents(); err != nil {
@@ -220,6 +208,21 @@ func (n *NgrokWant) OnDelete() {
 	if locals.LogFile != "" {
 		os.Remove(locals.LogFile)
 	}
+}
+
+// waitForNgrokURL polls the log file until the forwarding URL appears
+func (n *NgrokWant) waitForNgrokURL(logFile string) string {
+	const maxRetries = 30
+	const interval = 500 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		if url := parseNgrokURL(logFile); url != "" {
+			return url
+		}
+		n.StoreLog("[DEBUG] Waiting for ngrok URL (attempt %d/%d)...", i+1, maxRetries)
+		time.Sleep(interval)
+	}
+	return ""
 }
 
 // parseNgrokURL reads the log file and extracts the ngrok forwarding URL
@@ -252,8 +255,7 @@ func (n *NgrokWant) getOrInitializeLocals() *NgrokLocals {
 	}
 
 	locals := &NgrokLocals{
-		Phase:         NgrokPhaseStarting,
-		LastCheckTime: time.Now(),
+		Phase: NgrokPhaseStarting,
 	}
 
 	n.GetStateMulti(Dict{
@@ -264,7 +266,6 @@ func (n *NgrokWant) getOrInitializeLocals() *NgrokLocals {
 
 	locals.Port = getStringParam(&n.Want, "port", "8080")
 	locals.Protocol = getStringParam(&n.Want, "protocol", "http")
-	locals.MaxRetries = getIntParam(&n.Want, "max_retries", 30)
 	logFile := getStringParam(&n.Want, "log_file", "")
 	if logFile == "" {
 		logFile = fmt.Sprintf("/tmp/ngrok-%s.log", n.Metadata.Name)
