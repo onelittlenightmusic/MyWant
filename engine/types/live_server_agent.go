@@ -178,6 +178,53 @@ func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (str
 	return "", fmt.Errorf("timed out waiting for health check at %s", url)
 }
 
+// getStringParam gets a string parameter from want params with a default value
+func getStringParam(want *mywant.Want, key, defaultVal string) string {
+	if v, ok := want.Spec.Params[key]; ok {
+		return fmt.Sprintf("%v", v)
+	}
+	return defaultVal
+}
+
+// getIntParam gets an int parameter from want params with a default value
+func getIntParam(want *mywant.Want, key string, defaultVal int) int {
+	v, ok := want.Spec.Params[key]
+	if !ok {
+		return defaultVal
+	}
+	switch n := v.(type) {
+	case int:
+		return n
+	case float64:
+		return int(n)
+	case string:
+		var result int
+		if _, err := fmt.Sscanf(n, "%d", &result); err == nil {
+			return result
+		}
+	}
+	return defaultVal
+}
+
+// getArgsParam extracts the args parameter as []string from a Want
+func getArgsParam(want *mywant.Want) []string {
+	raw, ok := want.Spec.Params["args"]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []interface{}:
+		args := make([]string, len(v))
+		for i, a := range v {
+			args[i] = fmt.Sprintf("%v", a)
+		}
+		return args
+	case []string:
+		return v
+	}
+	return nil
+}
+
 // stopLiveServer stops the server process by PID
 func stopLiveServer(pid int, want *mywant.Want) error {
 	process, err := os.FindProcess(pid)

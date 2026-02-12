@@ -1,0 +1,119 @@
+wantType:
+  metadata:
+    name: ngrok
+    title: Ngrok Tunnel
+    description: |
+      Manages an ngrok tunnel lifecycle to expose a local service via a public URL.
+
+      Automatically starts an ngrok process, parses the forwarding URL from stdout,
+      and stores it in the ngrok_url state. Uses the live_server_manager agent for
+      process lifecycle management (start/stop/SIGTERM).
+
+      The forwarding URL is parsed from ngrok's output (both TUI "Forwarding" format
+      and logfmt "url=" format are supported).
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: port
+    description: Local port to expose through the ngrok tunnel
+    type: string
+    required: false
+    default: "8080"
+    example: "3000"
+
+  - name: protocol
+    description: Protocol for the ngrok tunnel (http, tcp, tls)
+    type: string
+    required: false
+    default: "http"
+
+  - name: log_file
+    description: Path to capture ngrok stdout (auto-generated if empty)
+    type: string
+    required: false
+    default: ""
+    example: /tmp/ngrok-tunnel.log
+
+  - name: max_retries
+    description: Maximum retries to wait for forwarding URL in log
+    type: int
+    required: false
+    default: 30
+
+  state:
+  - name: server_phase
+    description: Current phase of the tunnel lifecycle
+    type: string
+    persistent: true
+    initialValue: starting
+    example: running
+
+  - name: server_pid
+    description: Process ID of the running ngrok process (0 if not running)
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 12345
+
+  - name: ngrok_url
+    description: Public forwarding URL assigned by ngrok
+    type: string
+    persistent: true
+    initialValue: ""
+    example: "https://torchy-maxine-condensible.ngrok-free.dev"
+
+  - name: error_message
+    description: Error message if tunnel failed to start
+    type: string
+    persistent: true
+    initialValue: ''
+
+  connectivity:
+    inputs: []
+    outputs: []
+
+  require:
+    connectivity: none
+
+  requires:
+    - live_server_management
+
+  agents:
+  - name: live_server_management
+    role: action
+    description: DoAgent that starts and stops the ngrok process
+
+  constraints:
+  - description: ngrok must be installed and available in PATH
+    validation: ngrok command must be resolvable via exec.LookPath
+
+  examples:
+  - name: basic_http_tunnel
+    description: Expose a local HTTP server on port 8080
+    want:
+      metadata:
+        name: ngrok-tunnel
+        type: ngrok
+        labels:
+          service: tunnel
+      spec:
+        params:
+          port: "8080"
+
+  - name: custom_port_tunnel
+    description: Expose a local service on a custom port
+    want:
+      metadata:
+        name: ngrok-api-tunnel
+        type: ngrok
+        labels:
+          service: api-tunnel
+      spec:
+        params:
+          port: "3000"
+          protocol: "http"
+
+  relatedTypes: []
+  seeAlso: []
