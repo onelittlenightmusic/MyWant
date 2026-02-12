@@ -117,6 +117,21 @@ func (n *NgrokWant) CalculateAchievingPercentage() int {
 	}
 }
 
+// setPhase transitions phase and syncs locals + state
+func (n *NgrokWant) setPhase(locals *NgrokLocals, phase string) {
+	locals.Phase = phase
+	n.StoreState("server_phase", phase)
+	n.Locals = locals
+}
+
+// failWithError transitions to failed phase with an error message
+func (n *NgrokWant) failWithError(locals *NgrokLocals, msg string) {
+	n.StoreLog("[ERROR] %s", msg)
+	n.setPhase(locals, NgrokPhaseFailed)
+	n.StoreState("error_message", msg)
+	n.Status = "failed"
+}
+
 // Progress implements Progressable for NgrokWant
 func (n *NgrokWant) Progress() {
 	locals := n.getOrInitializeLocals()
@@ -125,61 +140,41 @@ func (n *NgrokWant) Progress() {
 
 	switch locals.Phase {
 	case NgrokPhaseStarting:
-		// Execute live_server_manager agent to start ngrok process
 		if n.GetAgentRegistry() != nil {
 			if err := n.ExecuteAgents(); err != nil {
-				n.StoreLog("[ERROR] Failed to execute agents: %v", err)
-				n.StoreState("server_phase", NgrokPhaseFailed)
-				n.StoreState("error_message", fmt.Sprintf("Agent execution failed: %v", err))
-				locals.Phase = NgrokPhaseFailed
-				n.updateLocals(locals)
-				n.Status = "failed"
+				n.failWithError(locals, fmt.Sprintf("Agent execution failed: %v", err))
 				return
 			}
 		}
 
-		// Check if process started, then wait for forwarding URL
 		if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
 			locals.ServerPID = pid
 
 			url := n.waitForNgrokURL(locals.LogFile)
 			if url == "" {
-				n.StoreLog("[ERROR] Timed out waiting for ngrok forwarding URL")
-				n.StoreState("server_phase", NgrokPhaseFailed)
-				n.StoreState("error_message", "timed out waiting for ngrok forwarding URL")
-				locals.Phase = NgrokPhaseFailed
-				n.updateLocals(locals)
-				n.Status = "failed"
+				n.failWithError(locals, "timed out waiting for ngrok forwarding URL")
 				return
 			}
 
 			locals.NgrokURL = url
 			n.StoreState("ngrok_url", url)
-			n.StoreState("server_phase", NgrokPhaseRunning)
+			n.setPhase(locals, NgrokPhaseRunning)
 			n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
-			locals.Phase = NgrokPhaseRunning
-			n.updateLocals(locals)
 			n.ProvideDone()
 		}
 
-	case NgrokPhaseRunning:
-		break
-
 	case NgrokPhaseStopping:
 		if pid, _ := n.GetStateInt("server_pid", 0); pid == 0 {
-			n.StoreLog("[NGROK] Tunnel stopped successfully")
-			n.StoreState("server_phase", NgrokPhaseStopped)
 			n.StoreState("ngrok_url", "")
-			locals.Phase = NgrokPhaseStopped
-			n.updateLocals(locals)
+			n.setPhase(locals, NgrokPhaseStopped)
+			n.StoreLog("[NGROK] Tunnel stopped successfully")
 		}
 
-	case NgrokPhaseStopped, NgrokPhaseFailed:
-		break
+	case NgrokPhaseRunning, NgrokPhaseStopped, NgrokPhaseFailed:
+		// Nothing to do
 
 	default:
 		n.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
-		n.updateLocals(locals)
 	}
 }
 
@@ -275,7 +270,3 @@ func (n *NgrokWant) getOrInitializeLocals() *NgrokLocals {
 	return locals
 }
 
-// updateLocals updates the in-memory locals
-func (n *NgrokWant) updateLocals(locals *NgrokLocals) {
-	n.Locals = locals
-}
