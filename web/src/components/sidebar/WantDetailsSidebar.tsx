@@ -71,7 +71,7 @@ const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-o
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
-  initialTab = 'settings',
+  initialTab = 'results',
   onWantUpdate,
   onHeaderStateChange,
   onRegisterHeaderActions,
@@ -105,7 +105,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     loading
   } = useWantStore();
 
-  const [activeTab, setActiveTab] = useState<TabType>('settings');
+  const [activeTab, setActiveTab] = useState<TabType>('results');
   const [prevTabIndex, setPrevTabIndex] = useState(0);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -403,8 +403,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }
 
   const tabs = [
-    { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'results' as TabType, label: 'Results', icon: Database },
+    { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'logs' as TabType, label: 'Logs', icon: FileText },
     { id: 'agents' as TabType, label: 'Agents', icon: Bot },
   ];

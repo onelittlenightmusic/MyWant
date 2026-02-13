@@ -33,7 +33,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     loading
   } = useWantStore();
 
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('results');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState<string>('');
@@ -120,11 +120,11 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     (Array.isArray(wantDetails?.state?.agent_history) && (wantDetails?.state?.agent_history as any[]).length > 0));
 
   const tabs = [
+    { id: 'results', label: 'Results', icon: BarChart3 },
     { id: 'overview', label: 'Overview', icon: Eye },
     { id: 'config', label: 'Configuration', icon: Bot },
     { id: 'logs', label: 'Logs', icon: Clock },
     ...(hasAgentData ? [{ id: 'agents', label: 'Agents', icon: Users }] : []),
-    { id: 'results', label: 'Results', icon: BarChart3 },
   ];
 
   const footer = (
