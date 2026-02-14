@@ -176,3 +176,16 @@ export const debounce = <T extends (...args: unknown[]) => void>(
 export const classNames = (...classes: (string | undefined | null | false)[]): string => {
   return classes.filter(Boolean).join(' ');
 };
+
+/**
+ * Suppresses the default browser drag image.
+ * Useful when implementing a custom drag overlay.
+ */
+export const suppressDragImage = (e: React.DragEvent | DragEvent) => {
+  const img = new Image();
+  img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  
+  if ('dataTransfer' in e && e.dataTransfer) {
+    e.dataTransfer.setDragImage(img, 0, 0);
+  }
+};

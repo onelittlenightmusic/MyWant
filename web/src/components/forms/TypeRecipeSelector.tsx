@@ -4,6 +4,7 @@ import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
+import { suppressDragImage } from '@/utils/helpers';
 
 export interface TypeRecipeSelectorItem {
   id: string;
@@ -380,6 +381,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     draggable
                     onClick={() => handleSelect(item)}
                     onDragStart={(e) => {
+                      suppressDragImage(e);
                       e.dataTransfer.effectAllowed = 'copy';
                       const data = JSON.stringify({
                         id: item.id,
@@ -457,6 +459,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     draggable
                     onClick={() => handleSelect(item)}
                     onDragStart={(e) => {
+                      suppressDragImage(e);
                       e.dataTransfer.effectAllowed = 'copy';
                       const data = JSON.stringify({
                         id: item.id,

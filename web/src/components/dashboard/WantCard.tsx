@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, CheckSquare, Square, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
-import { classNames } from '@/utils/helpers';
+import { classNames, suppressDragImage } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
@@ -173,6 +173,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const handleDragStart = (e: React.DragEvent) => {
     if (isSelectMode || isBeingProcessed) return;
+    suppressDragImage(e);
     const id = want.metadata?.id || want.id;
     if (!id) return;
     setDraggingWant(id);
@@ -504,6 +505,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   draggable={true && !isBeingProcessed}
                   onDragStart={(e) => {
                     e.stopPropagation();
+                    suppressDragImage(e);
                     const id = child.metadata?.id || child.id;
                     if (!id) return;
                     setDraggingWant(id);
