@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Zap, Package } from 'lucide-react';
 import { useWantStore } from '@/stores/wantStore';
 import { classNames } from '@/utils/helpers';
+import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 
 export const DragOverlay: React.FC = () => {
   const { wants, draggingWant, draggingTemplate, isOverTarget } = useWantStore();
@@ -9,6 +10,11 @@ export const DragOverlay: React.FC = () => {
 
   const want = wants.find(w => (w.metadata?.id === draggingWant) || (w.id === draggingWant));
   const isTemplateMode = !!draggingTemplate && !draggingWant;
+
+  // Background style for template or want
+  const backgroundStyle = isTemplateMode 
+    ? getBackgroundStyle(draggingTemplate.id)
+    : getBackgroundStyle(want?.metadata?.type);
 
   useEffect(() => {
     const handleDragOver = (e: DragEvent) => {
@@ -45,20 +51,29 @@ export const DragOverlay: React.FC = () => {
           transform: `translate(-50%, -50%) ${isOverTarget ? 'scale(0.6)' : 'scale(1)'}`,
         }}
       >
-        <div className={classNames(
-          `bg-white rounded-lg shadow-2xl border-2 ${borderColor} p-4 w-48 overflow-hidden transition-all duration-300`,
-          isOverTarget ? "opacity-90" : "opacity-100"
-        )}>
-          <div className="flex items-center gap-2 mb-2">
-            {icon}
-            <h4 className="text-sm font-bold text-gray-900 truncate">
-              {draggingTemplate.name}
-            </h4>
+        <div 
+          className={classNames(
+            `rounded-lg shadow-2xl border-2 ${borderColor} p-4 w-48 overflow-hidden transition-all duration-300 relative`,
+            backgroundStyle.className,
+            isOverTarget ? "opacity-90" : "opacity-100"
+          )}
+          style={backgroundStyle.style}
+        >
+          {backgroundStyle.hasBackgroundImage && (
+            <div className={getBackgroundOverlayClass()}></div>
+          )}
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-2">
+              {icon}
+              <h4 className="text-sm font-bold text-gray-900 truncate">
+                {draggingTemplate.name}
+              </h4>
+            </div>
+            <p className="text-xs text-gray-500">
+              {draggingTemplate.type === 'want-type' ? 'Want Type' : 'Recipe'}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Drop to create</p>
           </div>
-          <p className="text-xs text-gray-500">
-            {draggingTemplate.type === 'want-type' ? 'Want Type' : 'Recipe'}
-          </p>
-          <p className="text-xs text-gray-400 mt-1">Drop to create</p>
         </div>
       </div>
     );
@@ -76,14 +91,23 @@ export const DragOverlay: React.FC = () => {
         transform: `translate(-50%, -50%) ${isOverTarget ? 'scale(0.6)' : 'scale(1)'}`,
       }}
     >
-      <div className={classNames(
-        "bg-white rounded-lg shadow-2xl border-2 border-blue-500 p-4 w-48 overflow-hidden transition-all duration-300",
-        isOverTarget ? "opacity-90 border-blue-600" : "opacity-100"
-      )}>
-        <h4 className="text-sm font-bold text-gray-900 truncate">
-          {want.metadata?.name || 'Unnamed Want'}
-        </h4>
-        <p className="text-xs text-gray-500">{want.metadata?.type || 'Unknown Type'}</p>
+      <div 
+        className={classNames(
+          "rounded-lg shadow-2xl border-2 border-blue-500 p-4 w-48 overflow-hidden transition-all duration-300 relative",
+          backgroundStyle.className,
+          isOverTarget ? "opacity-90 border-blue-600" : "opacity-100"
+        )}
+        style={backgroundStyle.style}
+      >
+        {backgroundStyle.hasBackgroundImage && (
+          <div className={getBackgroundOverlayClass()}></div>
+        )}
+        <div className="relative z-10">
+          <h4 className="text-sm font-bold text-gray-900 truncate">
+            {want.metadata?.name || 'Unnamed Want'}
+          </h4>
+          <p className="text-xs text-gray-500">{want.metadata?.type || 'Unknown Type'}</p>
+        </div>
       </div>
     </div>
   );
