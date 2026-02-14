@@ -762,8 +762,11 @@ func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Printf("[ORDERKEY:DEBUG] Generating key between prev='%s' and next='%s'\n", prevKey, nextKey)
+
 	// Generate new order key between the two
 	newOrderKey := mywant.GenerateOrderKeyBetween(prevKey, nextKey)
+	log.Printf("[ORDERKEY:DEBUG] Generated NEW key: '%s' (for want %s)\n", newOrderKey, want.Metadata.Name)
 	want.Metadata.OrderKey = newOrderKey
 
 	// Update the want (this will trigger persistence)

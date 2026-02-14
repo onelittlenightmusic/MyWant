@@ -114,11 +114,13 @@ func GenerateOrderKeyBetween(keyA, keyB string) string {
 				return keyA + string(baseChars[midCharIndex])
 			}
 
-			// nextChar is '0', need to append to keyA
+			// nextChar is '0', we need something between keyA and keyA + "0..."
+			// The only way is to append to keyA but with a very small increment,
+			// or in this case, just append to keyA.
 			return keyA + string(baseChars[base/2])
 		}
 
-		// keyA is longer or equal, append to keyA
+		// keyA is longer or equal (should not happen if keyA < keyB), append to keyA
 		return GenerateOrderKeyAfter(keyA)
 	}
 
@@ -135,8 +137,11 @@ func GenerateOrderKeyBetween(keyA, keyB string) string {
 	}
 
 	// Characters are adjacent, need to go deeper
-	midCharIndex := base / 2
-	return keyA[:i+1] + string(baseChars[midCharIndex])
+	// To ensure the new key is strictly between keyA and keyB,
+	// we just append a middle character to the end of keyA.
+	// Since keyB starts with keyA[:i] + charB and charB > charA,
+	// any string starting with keyA[:i] + charA will be < keyB.
+	return keyA + string(baseChars[base/2])
 }
 
 // GenerateSequentialOrderKeys generates multiple sequential keys
