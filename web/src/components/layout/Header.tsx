@@ -25,7 +25,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
-  title = 'MyWant Dashboard',
+  title = 'MyWant',
   createButtonLabel = 'Add Want',
   itemCount,
   itemLabel,
