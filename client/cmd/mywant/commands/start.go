@@ -137,6 +137,7 @@ var StartCmd = &cobra.Command{
 			Host:           host,
 			Debug:          debug,
 			HeaderPosition: config.HeaderPosition,
+			ColorMode:      config.ColorMode,
 			WebFS:          web.GetFileSystem(!debug),
 		}
 

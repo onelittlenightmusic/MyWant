@@ -21,6 +21,7 @@ type MyWantConfig struct {
 	AgentServicePort int    `yaml:"agent_service_port"` // Agent service port (for webhook mode)
 	MockFlightPort   int    `yaml:"mock_flight_port"`   // Mock flight server port
 	HeaderPosition   string `yaml:"header_position"`   // top or bottom
+	ColorMode        string `yaml:"color_mode"`        // light, dark, system
 }
 
 // DefaultConfig returns the default configuration
@@ -33,6 +34,7 @@ func DefaultConfig() *MyWantConfig {
 		AgentServicePort: 8081,
 		MockFlightPort:   8090,
 		HeaderPosition:   "top",
+		ColorMode:        "system",
 	}
 }
 

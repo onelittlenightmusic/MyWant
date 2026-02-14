@@ -12,6 +12,7 @@ type Config struct {
 	Host           string          `json:"host"`
 	Debug          bool            `json:"debug"`
 	HeaderPosition string          `json:"header_position"`
+	ColorMode      string          `json:"color_mode"`
 	WebFS          http.FileSystem `json:"-"` // Embedded web assets filesystem (injected by caller)
 }
 

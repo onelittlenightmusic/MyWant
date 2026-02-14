@@ -124,6 +124,7 @@ func (s *Server) setupRoutes() {
 
 	// Config endpoint
 	api.HandleFunc("/config", s.getConfig).Methods("GET", "OPTIONS")
+	api.HandleFunc("/config", s.updateConfig).Methods("PUT", "OPTIONS")
 
 	// Reactions endpoints
 	reactions := api.PathPrefix("/reactions").Subrouter()

@@ -40,7 +40,7 @@ export const LogsPage: React.FC = () => {
       />
 
       {/* Main content area */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 lg:mr-[480px] mr-0 relative">
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
             {/* Tab Navigation */}

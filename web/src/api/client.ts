@@ -137,6 +137,11 @@ class MyWantApiClient {
     return this.deduplicatedGet<ServerConfig>('/api/v1/config');
   }
 
+  async updateServerConfig(config: Partial<ServerConfig>): Promise<ServerConfig> {
+    const response = await this.client.put<ServerConfig>('/api/v1/config', config);
+    return response.data;
+  }
+
   // Want management
   async createWant(request: CreateWantRequest): Promise<Want> {
     const response = await this.client.post<Want>('/api/v1/wants', request);

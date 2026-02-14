@@ -3,4 +3,5 @@ export interface ServerConfig {
   host: string;
   debug: boolean;
   header_position: 'top' | 'bottom';
+  color_mode: 'light' | 'dark' | 'system';
 }

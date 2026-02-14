@@ -63,15 +63,15 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       <div className="flex min-h-full items-center justify-center p-4">
         <div 
           className={classNames(
-            "relative w-full transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all",
+            "relative w-full transform overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-2xl transition-all",
             sizeClasses[size]
           )}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 px-6 py-4">
               {title ? (
-                <h3 className="text-lg font-bold text-gray-900 leading-none">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-none">
                   {title}
                 </h3>
               ) : <div />}
@@ -79,7 +79,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -94,7 +94,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
           {/* Footer */}
           {footer && (
-            <div className="border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <div className="border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 px-6 py-4">
               {footer}
             </div>
           )}
