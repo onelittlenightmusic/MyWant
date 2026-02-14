@@ -230,7 +230,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         onKeyDown={handleHeaderKeyDown}
         className={`
           focusable-section-header
-          w-full text-left px-4 py-3 rounded-lg border-2
+          w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2
           transition-all duration-200 focus:outline-none
           relative
           ${getHeaderColorClasses(colorScheme)}
@@ -248,18 +248,18 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
           <div className="flex items-center gap-2">
             {/* Collapse/Expand Icon */}
             {isCollapsed ? (
-              <ChevronRight className="w-5 h-5 text-gray-500" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             )}
 
             {/* Section Icon */}
-            <span className="text-gray-700">
-              {icon}
+            <span className="text-gray-700 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+              {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
             </span>
 
             {/* Section Title */}
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               {title}
             </h3>
 
@@ -287,7 +287,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
 
       {/* Section Content (Expanded) */}
       {!isCollapsed && (
-        <div className="pl-4 space-y-3">
+        <div className="pl-2 sm:pl-4 space-y-2 sm:space-y-3">
           {/* Chips Display */}
           {items.length > 0 && !isEditing && (
             <div className="flex flex-wrap gap-2">
@@ -322,7 +322,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
               type="button"
               onClick={onAddItem}
               className={`
-                px-4 py-2 text-sm font-medium rounded-lg
+                px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-lg
                 border-2 border-dashed transition-colors
                 focus:outline-none focus:ring-2
                 ${colorScheme === 'blue'

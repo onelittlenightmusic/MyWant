@@ -193,7 +193,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
         onKeyDown={handleHeaderKeyDown}
         className={`
           focusable-section-header
-          w-full text-left px-4 py-3 rounded-lg border-2
+          w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2
           transition-all duration-200 focus:outline-none
           relative bg-blue-50 border-blue-200 hover:bg-blue-100
 
@@ -209,16 +209,16 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           <div className="flex items-center gap-2">
             {/* Collapse/Expand Icon */}
             {isCollapsed ? (
-              <ChevronRight className="w-5 h-5 text-gray-500" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             )}
 
             {/* Section Icon */}
-            <Settings className="w-5 h-5 text-gray-700" />
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
 
             {/* Section Title */}
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               Parameters
             </h3>
 
@@ -250,16 +250,16 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
 
       {/* Section Content (Expanded) */}
       {!isCollapsed && (
-        <div className="pl-4 space-y-3">
+        <div className="pl-2 sm:pl-4 space-y-2 sm:space-y-3">
           {parameterDefinitions && parameterDefinitions.length > 0 ? (
             <>
               {/* Parameters from want type definition */}
-              <div className="space-y-2">
+              <div className="space-y-1 sm:space-y-2">
                 {filteredParams.map((param, index) => (
-                  <div key={param.name} className="space-y-1">
-                    <div className="flex gap-2 items-start">
-                      <div className="w-32 flex-shrink-0">
-                        <label className="block text-sm font-medium text-gray-700 pt-2">
+                  <div key={param.name} className="space-y-0.5 sm:space-y-1">
+                    <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-start sm:items-center">
+                      <div className="w-full sm:w-32 flex-shrink-0">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 pt-1 sm:pt-2">
                           {param.name}
                           {param.required && <span className="text-red-600 ml-1">*</span>}
                         </label>
@@ -284,12 +284,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                             }
                           }
                         }}
-                        className="flex-1"
+                        className="flex-1 w-full"
                         placeholder={param.description || 'Enter value'}
                       />
                     </div>
                     {param.description && (
-                      <p className="text-xs text-gray-600 ml-32">{param.description}</p>
+                      <p className="text-[10px] sm:text-xs text-gray-600 sm:ml-32">{param.description}</p>
                     )}
                   </div>
                 ))}

@@ -57,14 +57,14 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
         disabled={!canStart || loading}
         title={canStart ? (isSuspended ? 'Resume execution' : 'Start execution') : 'Cannot start in current state'}
         className={classNames(
-          'p-2 rounded-md transition-colors flex items-center gap-2',
+          'p-1.5 sm:p-2 rounded-md transition-colors flex items-center gap-2',
           canStart && !loading
             ? 'bg-green-100 text-green-600 hover:bg-green-200'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         )}
       >
-        <Play className="h-4 w-4" />
-        {showLabels && <span className="text-sm font-medium">{labels.start}</span>}
+        <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        {showLabels && <span className="text-xs sm:text-sm font-medium">{labels.start}</span>}
       </button>
 
       {/* Suspend */}
@@ -75,14 +75,14 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
           style={{ display: !onSuspend && !canSuspend ? 'none' : undefined }}
           title="Suspend execution"
           className={classNames(
-            'p-2 rounded-md transition-colors flex items-center gap-2',
+            'p-1.5 sm:p-2 rounded-md transition-colors flex items-center gap-2',
             canSuspend && !loading
               ? 'bg-orange-100 text-orange-600 hover:bg-orange-200'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           )}
         >
-          <Pause className="h-4 w-4" />
-          {showLabels && <span className="text-sm font-medium">{labels.suspend}</span>}
+          <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          {showLabels && <span className="text-xs sm:text-sm font-medium">{labels.suspend}</span>}
         </button>
       )}
 
@@ -92,14 +92,14 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
         disabled={!canStop || loading}
         title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
         className={classNames(
-          'p-2 rounded-md transition-colors flex items-center gap-2',
+          'p-1.5 sm:p-2 rounded-md transition-colors flex items-center gap-2',
           canStop && !loading
             ? 'bg-red-100 text-red-600 hover:bg-red-200'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         )}
       >
-        <Square className="h-4 w-4" />
-        {showLabels && <span className="text-sm font-medium">{labels.stop}</span>}
+        <Square className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        {showLabels && <span className="text-xs sm:text-sm font-medium">{labels.stop}</span>}
       </button>
 
       {/* Save Recipe */}
@@ -109,14 +109,14 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
           disabled={!canSaveRecipe || loading}
           title={canSaveRecipe ? 'Save as recipe' : 'Only target wants can be saved as recipes'}
           className={classNames(
-            'p-2 rounded-md transition-colors flex items-center gap-2',
+            'p-1.5 sm:p-2 rounded-md transition-colors flex items-center gap-2',
             canSaveRecipe && !loading
               ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           )}
         >
-          <BookOpen className="h-4 w-4" />
-          {showLabels && <span className="text-sm font-medium">{labels.saveRecipe}</span>}
+          <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          {showLabels && <span className="text-xs sm:text-sm font-medium">{labels.saveRecipe}</span>}
         </button>
       )}
 
@@ -126,14 +126,14 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
         disabled={!canDelete || loading}
         title={canDelete ? 'Delete want' : 'No want selected'}
         className={classNames(
-          'p-2 rounded-md transition-colors flex items-center gap-2',
+          'p-1.5 sm:p-2 rounded-md transition-colors flex items-center gap-2',
           canDelete && !loading
             ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
         )}
       >
-        <Trash2 className="h-4 w-4" />
-        {showLabels && <span className="text-sm font-medium">{labels.delete}</span>}
+        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        {showLabels && <span className="text-xs sm:text-sm font-medium">{labels.delete}</span>}
       </button>
     </div>
   );

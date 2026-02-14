@@ -14,10 +14,17 @@ export const Layout: React.FC<LayoutProps> = ({
   sidebarMinimized: controlledMinimized,
   onSidebarMinimizedChange
 }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for mobile
   const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Open sidebar by default on large screens
+  useEffect(() => {
+    if (window.innerWidth >= 1024) {
+      setSidebarOpen(true);
+    }
+  }, []);
 
   const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : internalMinimized;
 

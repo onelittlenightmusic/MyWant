@@ -119,8 +119,8 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
   }
 };
 
-export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase): React.ReactNode => {
-  const iconProps = { className: 'h-4 w-4' };
+export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase, className: string = 'h-4 w-4'): React.ReactNode => {
+  const iconProps = { className };
 
   switch (status) {
     case 'created':

@@ -74,7 +74,7 @@ export const Dashboard: React.FC = () => {
   const [dragCounter, setDragCounter] = useState(0);
 
   // Minimap state
-  const [minimapOpen, setMinimapOpen] = useState(true); // Desktop default: true
+  const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
 
   const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
   const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
@@ -650,7 +650,7 @@ export const Dashboard: React.FC = () => {
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
       />
       <main
-        className="flex-1 flex overflow-hidden bg-gray-50 mt-16 lg:mr-[480px] mr-0 relative"
+        className="flex-1 flex overflow-hidden bg-gray-50 mt-[3.5rem] sm:mt-16 lg:mr-[480px] mr-0 relative"
         onDragEnter={handleGlobalDragEnter}
         onDragOver={handleGlobalDragOver}
         onDragLeave={handleGlobalDragLeave}
@@ -699,7 +699,7 @@ export const Dashboard: React.FC = () => {
           />
         )}
         <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 border-4 border-dashed border-blue-400 border-inset")}>
-          <div className="p-6 pb-24 flex flex-col h-full min-h-screen">
+          <div className="p-3 sm:p-6 pb-24 flex flex-col h-full min-h-screen">
             <React.Fragment>
               {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">

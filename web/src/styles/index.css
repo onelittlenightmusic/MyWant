@@ -4,21 +4,26 @@
 
 @layer base {
   html {
-    font-family: system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    -webkit-text-size-adjust: auto;
+    -ms-text-size-adjust: auto;
   }
 
   body {
     @apply bg-gray-50 text-gray-900;
+    /* Optional: can help with Dynamic Type in some contexts */
+    font: -apple-system-body;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-6;
   }
 
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium py-1.5 px-3 sm:py-2 sm:px-4 rounded-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 text-sm sm:text-base;
   }
 
   .btn-secondary {

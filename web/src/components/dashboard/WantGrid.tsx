@@ -268,7 +268,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   return (
     <div 
-      className="grid grid-cols-3 gap-6" 
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6" 
       id="want-grid-container"
       onDragOver={handleGridDragOver}
       onDragLeave={handleGridDragLeave}
@@ -283,7 +283,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
             key={wantId || `want-${index}`}
             data-want-id={wantId}
             data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-            className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'col-span-3' : '')}
+            className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
           >
             {/* Drop Indicator Before */}
             {dragOverGap === index && (
@@ -344,14 +344,14 @@ export const WantGrid: React.FC<WantGridProps> = ({
             handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
           }
         }}
-        className="flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[200px]"
+        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[8rem] sm:min-h-[12.5rem]"
       >
-        <div className="w-16 h-16 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors mb-3">
-          <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         </div>
-        <p className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors font-medium">Add Want</p>
+        <p className="text-xs sm:text-sm text-gray-600 group-hover:text-blue-600 transition-colors font-medium">Add Want</p>
       </button>
     </div>
   );

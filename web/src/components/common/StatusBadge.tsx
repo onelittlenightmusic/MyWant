@@ -17,14 +17,22 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   className
 }) => {
   const color = getStatusColor(status);
-  const icon = getStatusIconComponent(status);
 
   const sizeClasses = {
-    xs: 'px-1.5 py-0.5 text-xs',
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-2.5 py-1.5 text-sm',
+    xs: 'px-1 py-0.5 text-[10px]',
+    sm: 'px-1.5 py-0.5 text-xs',
+    md: 'px-2 py-1 text-sm',
     lg: 'px-3 py-2 text-base'
   };
+
+  const iconSizes = {
+    xs: 'h-2.5 w-2.5',
+    sm: 'h-3 w-3',
+    md: 'h-4 w-4',
+    lg: 'h-5 w-5'
+  };
+
+  const icon = getStatusIconComponent(status, iconSizes[size]);
 
   const colorClasses = {
     gray: 'bg-gray-100 text-gray-800 border-gray-200',

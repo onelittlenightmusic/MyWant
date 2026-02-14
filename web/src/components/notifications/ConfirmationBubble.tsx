@@ -121,8 +121,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
     <div
       className={classNames(
         'flex items-end gap-3',
-        isDashboardRight ? 'fixed top-24 right-[500px] z-[100] h-auto pr-6 items-start' : (
-          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto'
+        isDashboardRight ? 'fixed top-24 right-4 sm:right-[500px] z-[100] h-auto pr-0 sm:pr-6 items-start' : (
+          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto w-[calc(100%-2rem)] sm:w-auto'
         ),
         isAnimating ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         !isDashboardRight && !isInlineHeader ? 'transition-opacity duration-300' : ''
@@ -179,12 +179,12 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
       {!isInlineHeader && !isDashboardRight && (
         <>
           <div className="flex-shrink-0">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg">
-              <Bot className="h-6 w-6 text-white" />
+            <div className="flex items-center justify-center h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-600 shadow-lg">
+              <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
           </div>
 
-          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-md min-w-[320px]">
+          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-full max-w-md sm:min-w-[320px]">
             <div className="absolute left-0 bottom-3 transform -translate-x-2">
               <div
                 className="w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white"
@@ -207,20 +207,20 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                   onClick={handleCancel}
                   disabled={isLoading || loading}
                   className={classNames(
-                    'flex items-center justify-center w-14 h-14 aspect-square flex-shrink-0 rounded-xl shadow-sm border border-gray-200',
+                    'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-sm border border-gray-200',
                     'bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-red-600',
                     'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300',
                     'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
                   )}
                   title="Cancel (N or Esc)"
                 >
-                  <X className="h-7 w-7" />
+                  <X className="h-6 w-6 sm:h-7 sm:w-7" />
                 </button>
                 <button
                   onClick={handleConfirm}
                   disabled={isLoading || loading}
                   className={classNames(
-                    'flex items-center justify-center w-14 h-14 aspect-square flex-shrink-0 rounded-xl shadow-md',
+                    'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-md',
                     'bg-blue-600 text-white hover:bg-blue-700',
                     'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500',
                     'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
@@ -230,7 +230,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                   {isLoading || loading ? (
                     <LoadingSpinner size="md" color="white" />
                   ) : (
-                    <Check className="h-7 w-7" />
+                    <Check className="h-6 w-6 sm:h-7 sm:w-7" />
                   )}
                 </button>
               </div>
@@ -242,14 +242,14 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
       {/* Layout 3: Dashboard Right */}
       {isDashboardRight && (
         <div className={classNames(
-          'flex items-stretch gap-0 transition-all duration-300',
+          'flex flex-col sm:flex-row items-center sm:items-stretch gap-2 sm:gap-0 transition-all duration-300 w-full max-w-[calc(100vw-2rem)] sm:max-w-none',
           (isAnimatingRobot || isAnimatingBubble) ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
         )}>
-          <div className="flex items-center justify-center flex-shrink-0 w-16 h-16 bg-blue-600 rounded-full shadow-lg">
-            <Bot className="h-9 w-9 text-white" />
+          <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 bg-blue-600 rounded-full shadow-lg">
+            <Bot className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
           </div>
 
-          <div className="flex-1 ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex flex-col justify-center min-w-[250px] max-w-sm">
+          <div className="flex-1 sm:ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex flex-col justify-center min-w-0 sm:min-w-[250px] max-w-full sm:max-w-sm">
             <p className="text-sm font-semibold text-gray-900 truncate">
               {title}
             </p>
@@ -258,24 +258,24 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-2 ml-3 h-full">
+          <div className="flex gap-2 sm:ml-3 h-auto sm:h-full">
             <button
               onClick={handleCancel}
               disabled={isLoading || loading}
               className={classNames(
-                'flex items-center justify-center w-16 h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
+                'flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
                 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-red-500',
                 'disabled:opacity-50 disabled:cursor-not-allowed transition-all'
               )}
               title="Cancel (N)"
             >
-              <X className="h-7 w-7" />
+              <X className="h-6 w-6 sm:h-7 sm:w-7" />
             </button>
             <button
               onClick={handleConfirm}
               disabled={isLoading || loading}
               className={classNames(
-                'flex items-center justify-center w-16 h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
+                'flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
                 'bg-blue-600 text-white hover:bg-blue-700',
                 'disabled:opacity-50 disabled:cursor-not-allowed transition-all'
               )}
@@ -284,7 +284,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
               {isLoading || loading ? (
                 <LoadingSpinner size="md" color="white" />
               ) : (
-                <Check className="h-7 w-7" />
+                <Check className="h-6 w-6 sm:h-7 sm:w-7" />
               )}
             </button>
           </div>

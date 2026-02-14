@@ -594,8 +594,8 @@ export const WantForm: React.FC<WantFormProps> = ({
             {selectedTypeId && (
               <>
                 {/* Want Name with Auto-generation */}
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="bg-blue-50 rounded-lg p-3 sm:p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Want Name *
                   </label>
                   <div className="space-y-2">

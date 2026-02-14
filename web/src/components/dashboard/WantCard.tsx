@@ -355,7 +355,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       data-keyboard-nav-id={wantId}
       data-is-target={isTargetWant}
       className={classNames(
-        'card hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full min-h-[200px] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
+        'card hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
         selected ? 'border-blue-500 border-2' : 'border-gray-200',
         (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100',
         isHighlighted && styles.highlighted,
@@ -408,36 +408,36 @@ export const WantCard: React.FC<WantCardProps> = ({
             className={classNames("flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors", isBeingProcessed && 'pointer-events-none')}
             disabled={isBeingProcessed}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1 sm:gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
                 {children!.map((child, idx) => (
-                  <div key={idx} className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
+                  <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
                 ))}
               </div>
-              <span className="text-blue-600 font-medium">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+              <span className="text-blue-600 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
             </div>
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
           </button>
         </div>
       )}
 
       {hasChildren && displayIsExpanded && (
-        <div ref={expandedContainerRef} className="relative z-10 mt-4 pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
+        <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <h4 className="text-xs sm:text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
                 else setLocalIsExpanded(false);
               }}
-              className={classNames("text-xs text-gray-500 hover:text-gray-700", isBeingProcessed && 'pointer-events-none')}
+              className={classNames("text-[10px] sm:text-xs text-gray-500 hover:text-gray-700", isBeingProcessed && 'pointer-events-none')}
               disabled={isBeingProcessed}
             >
               Collapse
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-3 transition-all duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0, transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)' } as React.CSSProperties}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 transition-all duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0, transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)' } as React.CSSProperties}>
             {children!.sort((a, b) => (a.metadata?.id || a.id || '').localeCompare(b.metadata?.id || b.id || '')).map((child, index) => {
               const childId = child.metadata?.id || child.id || '';
               const isChildSelected = isSelectMode ? (selectedWantIds?.has(childId)) : (selectedWant && ((selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) || (selectedWant.id && selectedWant.id === child.id)));
@@ -538,7 +538,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-4 w-full h-full relative z-10">
+                  <div className="p-2 sm:p-4 w-full h-full relative z-10">
                     <WantCardContent want={child} isChild={true} onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults} />
                   </div>
                 </div>

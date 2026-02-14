@@ -238,7 +238,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               onArrowDown();
             }
           }}
-          className={`focusable-section-header w-full border-2 rounded-lg p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
+          className={`focusable-section-header w-full border-2 rounded-lg p-3 sm:p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
             selectedItem.type === 'want-type'
               ? 'border-blue-500 bg-blue-50 focus:ring-blue-500'
               : 'border-green-500 bg-green-50 focus:ring-green-500'
@@ -249,21 +249,21 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
             <div className={getBackgroundOverlayClass()}></div>
           )}
           <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {selectedItem.type === 'want-type' ? (
-                <Zap className="w-5 h-5 text-blue-500" />
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
               ) : (
-                <Package className="w-5 h-5 text-green-500" />
+                <Package className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               )}
-              <div>
-                <h4 className="font-medium text-gray-900">{selectedItem.title}</h4>
+              <div className="text-left">
+                <h4 className="text-sm sm:text-base font-medium text-gray-900">{selectedItem.title}</h4>
                 {selectedItem.category && (
-                  <p className="text-xs text-gray-600 mt-1">{selectedItem.category}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1">{selectedItem.category}</p>
                 )}
               </div>
             </div>
             <span
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
                 selectedItem.type === 'want-type'
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-green-100 text-green-700'
@@ -332,7 +332,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
           <button
             type="button"
             onClick={() => setSelectedCategory(null)}
-            className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors ${
+            className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors ${
               selectedCategory === null
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -345,7 +345,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               key={category}
               type="button"
               onClick={() => setSelectedCategory(category)}
-              className={`px-3 py-1.5 text-sm rounded-full font-medium transition-colors capitalize ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors capitalize ${
                 selectedCategory === category
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -358,7 +358,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 flex-1 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-white min-h-0">
+      <div className="space-y-2 flex-1 overflow-y-auto border border-gray-200 rounded-lg p-2 sm:p-4 bg-white min-h-0">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
@@ -408,7 +408,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition-colors relative overflow-hidden ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors relative overflow-hidden ${
                       selectedId === item.id
                         ? 'border-blue-500 bg-blue-50'
                         : isFocused
@@ -422,9 +422,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     )}
                     <div className="flex items-center justify-between relative z-10">
                       <div className="flex-1 flex items-center gap-2">
-                        <h4 className="font-medium text-gray-900">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900">{item.title}</h4>
                         {item.category && (
-                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{item.category}</span>
+                          <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{item.category}</span>
                         )}
                       </div>
                       {selectedId === item.id && (
@@ -486,7 +486,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors ${
                       selectedId === item.id
                         ? 'border-green-500 bg-green-50'
                         : isFocused
@@ -496,9 +496,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                   >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{item.title}</h4>
+                      <h4 className="text-sm sm:font-medium text-gray-900">{item.title}</h4>
                       {item.description && (
-                        <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                        <p className="text-xs text-gray-600 mt-0.5 sm:mt-1">{item.description}</p>
                       )}
                     </div>
                     {selectedId === item.id && (

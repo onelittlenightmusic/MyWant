@@ -37,7 +37,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
+          'fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
@@ -67,10 +67,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         )}
 
         {/* Header */}
-        <div className="flex-shrink-0 bg-white px-8 py-6 flex items-center justify-between z-20 border-b border-gray-200 gap-4 relative">
+        <div className="flex-shrink-0 bg-white px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 border-b border-gray-200 gap-4 relative">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
-              <h2 className="text-xl font-semibold text-gray-900 truncate">{title}</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{title}</h2>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -90,7 +90,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className={`flex-1 h-full px-8 py-6 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={`flex-1 h-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </div>
       </div>

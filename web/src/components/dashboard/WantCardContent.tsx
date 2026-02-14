@@ -158,31 +158,31 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   };
 
   const sizes: SizeConfig = isChild ? {
-    titleClass: 'text-sm font-semibold',
-    typeClass: 'text-xs',
-    idClass: 'text-xs',
-    iconSize: 'h-3 w-3',
+    titleClass: 'text-[11px] sm:text-sm font-semibold',
+    typeClass: 'text-[9px] sm:text-xs',
+    idClass: 'text-[9px] sm:text-xs',
+    iconSize: 'h-2.5 w-2.5 sm:h-3 w-3',
     statusSize: 'xs' as const,
-    agentDotSize: 'w-1.5 h-1.5',
-    errorIconSize: 'h-3 w-3',
-    errorTextSize: 'text-xs',
-    textTruncate: 25
+    agentDotSize: 'w-1 h-1 sm:w-1.5 h-1.5',
+    errorIconSize: 'h-2.5 w-2.5',
+    errorTextSize: 'text-[10px]',
+    textTruncate: 20
   } : {
-    titleClass: 'text-lg font-semibold',
-    typeClass: 'text-sm',
-    idClass: 'text-xs',
-    iconSize: 'h-4 w-4',
-    statusSize: 'sm' as const,
-    agentDotSize: 'w-2 h-2',
-    errorIconSize: 'h-4 w-4',
-    errorTextSize: 'text-sm',
-    textTruncate: 30
+    titleClass: 'text-xs sm:text-lg font-semibold',
+    typeClass: 'text-[10px] sm:text-sm',
+    idClass: 'text-[10px] sm:text-xs',
+    iconSize: 'h-3 w-3 sm:h-4 w-4',
+    statusSize: 'xs' as const,
+    agentDotSize: 'w-1.5 h-1.5 sm:w-2 h-2',
+    errorIconSize: 'h-3.5 w-3.5 sm:h-4 w-4',
+    errorTextSize: 'text-[11px] sm:text-sm',
+    textTruncate: 25
   };
 
   return (
     <>
       {/* Header */}
-      <div className="mb-4">
+      <div className="mb-2 sm:mb-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
@@ -195,7 +195,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 ml-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
             {/* Agent indicator - clickable */}
             {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
               <button
@@ -341,7 +341,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`${isChild ? 'text-base' : 'text-lg'} font-semibold text-gray-700 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
+            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-semibold text-gray-700 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
             title="Click to view results"
           >
             {truncateText(

@@ -67,7 +67,7 @@ interface WantDetailsSidebarProps {
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
 
 // Unified section container styling for all metadata/state sections
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50 overflow-hidden p-4';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50 overflow-hidden p-3 sm:p-4';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
@@ -432,7 +432,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {want && (
-        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2">
+        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-1 sm:py-2">
           <WantControlButtons
             onStart={handleStartClick}
             onStop={handleStopClick}
@@ -451,7 +451,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       )}
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200 px-8 py-4">
+      <div className="border-b border-gray-200 px-3 sm:px-8 py-2 sm:py-4">
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-hidden">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -770,24 +770,24 @@ const SettingsTab: React.FC<{
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-8 focusable-container">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-8 focusable-container">
         {configMode === 'form' ? (
           <div className="space-y-2">
             {/* Metadata Section */}
             <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-base font-medium text-gray-900 mb-4">Metadata</h4>
-              <div className="space-y-3">
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Metadata</h4>
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Name:</span>
-                  <span className="font-medium text-sm">{want.metadata?.name || 'N/A'}</span>
+                  <span className="text-gray-600 text-xs sm:text-sm">Name:</span>
+                  <span className="font-medium text-xs sm:text-sm">{want.metadata?.name || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">Type:</span>
-                  <span className="font-medium text-sm">{want.metadata?.type || 'N/A'}</span>
+                  <span className="text-gray-600 text-xs sm:text-sm">Type:</span>
+                  <span className="font-medium text-xs sm:text-sm">{want.metadata?.type || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-sm">ID:</span>
-                  <span className="font-mono text-xs break-all">{want.metadata?.id || want.id || 'N/A'}</span>
+                  <span className="text-gray-600 text-xs sm:text-sm">ID:</span>
+                  <span className="font-mono text-[10px] sm:text-xs break-all ml-4 text-right">{want.metadata?.id || want.id || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -808,30 +808,30 @@ const SettingsTab: React.FC<{
             {/* Timeline */}
             {want.stats && (
               <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-base font-medium text-gray-900 mb-4">Timeline</h4>
-                <div className="space-y-3">
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Timeline</h4>
+                <div className="space-y-2 sm:space-y-3">
                   {want.stats.created_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Created:</span>
-                      <span className="text-sm">{formatDate(want.stats.created_at)}</span>
+                      <span className="text-gray-600 text-xs sm:text-sm">Created:</span>
+                      <span className="text-xs sm:text-sm">{formatDate(want.stats.created_at)}</span>
                     </div>
                   )}
                   {want.stats.started_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Started:</span>
-                      <span className="text-sm">{formatDate(want.stats.started_at)}</span>
+                      <span className="text-gray-600 text-xs sm:text-sm">Started:</span>
+                      <span className="text-xs sm:text-sm">{formatDate(want.stats.started_at)}</span>
                     </div>
                   )}
                   {want.stats.completed_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Achieved:</span>
-                      <span className="text-sm">{formatDate(want.stats.completed_at)}</span>
+                      <span className="text-gray-600 text-xs sm:text-sm">Achieved:</span>
+                      <span className="text-xs sm:text-sm">{formatDate(want.stats.completed_at)}</span>
                     </div>
                   )}
                   {want.stats.started_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Duration:</span>
-                      <span className="text-sm">{formatDuration(want.stats.started_at, want.stats.completed_at)}</span>
+                      <span className="text-gray-600 text-xs sm:text-sm">Duration:</span>
+                      <span className="text-xs sm:text-sm">{formatDuration(want.stats.started_at, want.stats.completed_at)}</span>
                     </div>
                   )}
                 </div>
@@ -1097,8 +1097,8 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
       // For nested objects, show key with collapsible content
       items.push(
         <div key={key} className="space-y-1">
-          <div className="font-medium text-gray-800 text-sm">{key}:</div>
-          <div className="ml-4 border-l border-gray-200 pl-3">
+          <div className="font-medium text-gray-800 text-xs sm:text-sm">{key}:</div>
+          <div className="ml-2 sm:ml-4 border-l border-gray-200 pl-2 sm:pl-3">
             {renderKeyValuePairs(value, depth + 1)}
           </div>
         </div>
@@ -1116,11 +1116,11 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
       const dots = '.'.repeat(Math.max(minDots, Math.min(dotsNeeded, 30)));
 
       items.push(
-        <div key={key} className="flex justify-between items-center text-sm gap-2 group/kv">
-          <span className="text-gray-600 font-normal text-xs whitespace-nowrap flex-shrink-0">{key}</span>
+        <div key={key} className="flex justify-between items-center text-xs sm:text-sm gap-2 group/kv">
+          <span className="text-gray-600 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0">{key}</span>
           <div className="flex items-center gap-1 min-w-0">
-            <span className="text-gray-400 text-xs flex-shrink-0">{dots}</span>
-            <span className="text-gray-800 font-semibold text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
+            <span className="text-gray-400 text-[10px] sm:text-xs flex-shrink-0">{dots}</span>
+            <span className="text-gray-800 font-semibold text-sm sm:text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
             <CopyValueButton value={valueStr} />
           </div>
         </div>
@@ -1137,28 +1137,28 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
 
   return (
-    <div className="px-4 py-8 h-full overflow-y-auto">
+    <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
       {hasState || hasHiddenState ? (
         <div className="space-y-2">
           {/* Execution Result Metadata */}
           <div className={SECTION_CONTAINER_CLASS}>
-            <h4 className="text-base font-medium text-gray-900 mb-4">Execution Result</h4>
-            <div className="space-y-3">
+            <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Execution Result</h4>
+            <div className="space-y-2 sm:space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Status:</span>
-                <span className="font-medium text-sm">{want.status || 'N/A'}</span>
+                <span className="text-gray-600 text-xs sm:text-sm">Status:</span>
+                <span className="font-medium text-xs sm:text-sm">{want.status || 'N/A'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Final Result:</span>
-                <span className="font-medium text-sm">{want.state?.final_result ? JSON.stringify(want.state.final_result) : 'N/A'}</span>
+                <span className="text-gray-600 text-xs sm:text-sm">Final Result:</span>
+                <span className="font-medium text-xs sm:text-sm">{want.state?.final_result ? (typeof want.state.final_result === 'string' ? truncateText(want.state.final_result, 30) : 'Object') : 'N/A'}</span>
               </div>
             </div>
           </div>
 
           {hasState && (
             <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-base font-medium text-gray-900 mb-4">Want State</h4>
-              <div className="space-y-4">
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Want State</h4>
+              <div className="space-y-3 sm:space-y-4">
                 {renderKeyValuePairs(want.state)}
               </div>
             </div>
@@ -1254,15 +1254,15 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
   };
 
   return (
-    <div className="px-4 py-8 space-y-2">
+    <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
       {/* Current Agent */}
       {want.current_agent && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
           <div className="flex items-center">
-            <Bot className="h-5 w-5 text-blue-600 mr-2" />
+            <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
             <div>
-              <h4 className="text-sm font-medium text-blue-900">Current Agent</h4>
-              <p className="text-sm text-blue-700">{want.current_agent}</p>
+              <h4 className="text-xs sm:text-sm font-medium text-blue-900">Current Agent</h4>
+              <p className="text-xs sm:text-sm text-blue-700">{want.current_agent}</p>
             </div>
             <div className="ml-auto">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Reaching" />
@@ -1601,12 +1601,12 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasLogs = results?.logs && results.logs.length > 0;
 
   return (
-    <div className="px-4 py-8 space-y-2">
+    <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
       {/* Parameter History Section */}
       {hasParameterHistory && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-base font-medium text-gray-900 mb-4">Parameter History</h4>
-          <div className="space-y-3">
+          <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Parameter History</h4>
+          <div className="space-y-2 sm:space-y-3">
             {want.history!.parameterHistory!.map((entry, index) => (
               <ParameterHistoryItem key={index} entry={entry} index={index} />
             ))}

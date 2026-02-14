@@ -178,7 +178,7 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
   return (
     <div
       className={classNames(
-        "fixed top-16 right-0 w-[480px] h-[calc(100vh-4rem)] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300",
+        "fixed top-16 right-0 w-full sm:w-[480px] h-[calc(100vh-4rem)] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300",
         "lg:translate-x-0", // Desktop: always visible
         isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0", // Mobile: toggle
         "z-30" // Below RightSidebar (z-40)
