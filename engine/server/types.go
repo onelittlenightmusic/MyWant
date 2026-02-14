@@ -8,10 +8,11 @@ import (
 
 // Config holds server configuration
 type Config struct {
-	Port  int              `json:"port"`
-	Host  string           `json:"host"`
-	Debug bool             `json:"debug"`
-	WebFS http.FileSystem  `json:"-"` // Embedded web assets filesystem (injected by caller)
+	Port           int             `json:"port"`
+	Host           string          `json:"host"`
+	Debug          bool            `json:"debug"`
+	HeaderPosition string          `json:"header_position"`
+	WebFS          http.FileSystem `json:"-"` // Embedded web assets filesystem (injected by caller)
 }
 
 type ErrorHistoryEntry struct {

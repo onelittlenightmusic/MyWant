@@ -20,6 +20,7 @@ type MyWantConfig struct {
 	AgentServiceHost string `yaml:"agent_service_host"` // Agent service host (for webhook mode)
 	AgentServicePort int    `yaml:"agent_service_port"` // Agent service port (for webhook mode)
 	MockFlightPort   int    `yaml:"mock_flight_port"`   // Mock flight server port
+	HeaderPosition   string `yaml:"header_position"`   // top or bottom
 }
 
 // DefaultConfig returns the default configuration
@@ -31,6 +32,7 @@ func DefaultConfig() *MyWantConfig {
 		AgentServiceHost: "localhost",
 		AgentServicePort: 8081,
 		MockFlightPort:   8090,
+		HeaderPosition:   "top",
 	}
 }
 
@@ -194,6 +196,26 @@ var configSetCmd = &cobra.Command{
 		}
 		fmt.Println()
 
+		// 6. Header Position
+		fmt.Printf("Header Position [%s]:\n", config.HeaderPosition)
+		fmt.Println("  1) top    - Display header at the top (default)")
+		fmt.Println("  2) bottom - Display header at the bottom (better for mobile)")
+		fmt.Print("Select (1-2) or press Enter to keep current: ")
+
+		posInput, _ := reader.ReadString('\n')
+		posInput = strings.TrimSpace(posInput)
+		if posInput != "" {
+			switch posInput {
+			case "1":
+				config.HeaderPosition = "top"
+			case "2":
+				config.HeaderPosition = "bottom"
+			default:
+				fmt.Println("Invalid selection, keeping current value")
+			}
+		}
+		fmt.Println()
+
 		// Save configuration
 		if err := config.Save(); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
@@ -277,6 +299,7 @@ func displayConfig(config *MyWantConfig) {
 	}
 
 	fmt.Printf("Mock Flight Port:   %d\n", config.MockFlightPort)
+	fmt.Printf("Header Position:    %s\n", config.HeaderPosition)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("Config file: %s\n", getConfigPath())
 }

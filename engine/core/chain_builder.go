@@ -2298,6 +2298,50 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.dumpWantMemoryToYAML()
 }
 
+// Shutdown stops all wants and the reconcile loop
+func (cb *ChainBuilder) Shutdown() {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+
+	log.Printf("[ChainBuilder] Shutting down: stopping %d wants\n", len(cb.wants))
+
+	for _, rw := range cb.wants {
+		// Call OnDelete() if the want implements OnDeletable interface
+		if deletable, ok := rw.function.(OnDeletable); ok {
+			deletable.OnDelete()
+		}
+
+		if rw.want.stopChannel == nil {
+			rw.want.stopChannel = make(chan struct{})
+		}
+
+		// Use select with default to avoid panicking if already closed
+		select {
+		case <-rw.want.stopChannel:
+			// already closed
+		default:
+			close(rw.want.stopChannel)
+		}
+	}
+
+	// Stop reconcile loop
+	select {
+	case cb.reconcileStop <- true:
+	default:
+	}
+
+	// Stop suspension control loop
+	select {
+	case cb.controlStop <- true:
+	default:
+	}
+
+	cb.running = false
+
+	// Final memory dump - ensure it completes before returning (silent - routine operation)
+	cb.dumpWantMemoryToYAML()
+}
+
 // GetAllWantStates returns a map of all current want objects across all executions
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	// Deadlock-resilient: Uses TryRLock to avoid hanging if called recursively during reconciliation

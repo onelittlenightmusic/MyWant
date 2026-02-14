@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
+import { useConfigStore } from '@/stores/configStore';
 
 interface RightSidebarProps {
   isOpen: boolean;
@@ -23,6 +24,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   headerActions,
   overflowHidden = false
 }) => {
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
   return (
     <>
       {/* Backdrop */}
@@ -67,7 +71,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         )}
 
         {/* Header */}
-        <div className="flex-shrink-0 bg-white px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 border-b border-gray-200 gap-4 relative">
+        <div className={classNames(
+          "flex-shrink-0 bg-white px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 gap-4 relative",
+          isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
+        )} style={isBottom ? { paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' } : {}}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{title}</h2>

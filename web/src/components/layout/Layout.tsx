@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Menu, ChevronRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { Sidebar } from './Sidebar';
+import { useConfigStore } from '@/stores/configStore';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,8 @@ export const Layout: React.FC<LayoutProps> = ({
   sidebarMinimized: controlledMinimized,
   onSidebarMinimizedChange
 }) => {
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for mobile
   const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -100,9 +103,13 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main content */}
       <div className={classNames(
         "flex-1 flex flex-col relative transition-all duration-300 ease-in-out min-w-0",
-        sidebarMinimized ? "lg:ml-20" : "lg:ml-44"
+        sidebarMinimized ? "lg:ml-20" : "lg:ml-44",
+        isBottom ? "pb-16 sm:pb-20" : "pt-16 sm:pt-20"
       )}>
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={classNames(
+          "flex-1 flex flex-col min-w-0",
+          isBottom ? "pb-safe" : ""
+        )} style={isBottom ? { paddingBottom: 'env(safe-area-inset-bottom)' } : {}}>
           {children}
         </div>
       </div>

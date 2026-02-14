@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Plus, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
+import { useConfigStore } from '@/stores/configStore';
 
 interface HeaderProps {
   onCreateWant: () => void;
@@ -42,6 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
   showMinimap = false,
   onMinimapToggle
 }) => {
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
@@ -86,9 +89,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={classNames(
-      "bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out left-0",
+      "bg-white px-3 sm:px-6 py-2 sm:py-4 fixed right-0 z-40 transition-all duration-300 ease-in-out left-0",
+      isBottom ? "bottom-0 border-t border-gray-200" : "top-0 border-b border-gray-200",
       sidebarMinimized ? "lg:left-20" : "lg:left-44"
-    )}>
+    )} style={isBottom ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' } : {}}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4 min-w-0">
           <h1 className="text-lg sm:text-2xl font-bold text-gray-900 whitespace-nowrap">{title}</h1>
@@ -107,7 +111,10 @@ export const Header: React.FC<HeaderProps> = ({
             "lg:flex lg:items-center",
             // Mobile behavior: absolute overlay or hidden
             showBubbleOnMobile 
-              ? "flex items-center absolute inset-x-0 top-full bg-white p-4 border-b border-gray-200 shadow-lg z-50 animate-slide-in" 
+              ? classNames(
+                  "flex items-center absolute inset-x-0 bg-white p-4 border-gray-200 shadow-lg z-50 animate-slide-in",
+                  isBottom ? "bottom-full mb-px border-t" : "top-full border-b"
+                )
               : "hidden lg:flex"
           )} ref={selectRef}>
             <div className={classNames(

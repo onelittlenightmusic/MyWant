@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	types "mywant/engine/types"
 	mywant "mywant/engine/core"
+	types "mywant/engine/types"
 
 	"github.com/gorilla/mux"
 )
@@ -26,6 +30,7 @@ type Server struct {
 	router               *mux.Router
 	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
+	httpServer           *http.Server                // HTTP server instance
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -141,10 +146,52 @@ func (s *Server) Start() error {
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
-	log.Printf("🚀 MyWant server starting on %s\n", addr)
-	// (Omitted detailed endpoint logging for brevity in this file, or we can add it back)
+	s.httpServer = &http.Server{
+		Addr:    addr,
+		Handler: s.router,
+	}
 
-	return http.ListenAndServe(addr, s.router)
+	// Handle signals for graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-stop
+		log.Printf("Received signal: %v. Shutting down server gracefully...\n", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := s.Shutdown(ctx); err != nil {
+			log.Printf("Error during shutdown: %v\n", err)
+		}
+	}()
+
+	log.Printf("🚀 MyWant server starting on %s\n", addr)
+
+	if err := s.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+		return err
+	}
+
+	log.Println("Server stopped")
+	return nil
+}
+
+// Shutdown performs a graceful shutdown of the server and its components
+func (s *Server) Shutdown(ctx context.Context) error {
+	log.Println("Shutting down components...")
+
+	// 1. Shutdown ChainBuilder (this triggers OnDelete for all wants)
+	if s.globalBuilder != nil {
+		s.globalBuilder.Shutdown()
+	}
+
+	// 2. Shutdown HTTP server
+	if s.httpServer != nil {
+		return s.httpServer.Shutdown(ctx)
+	}
+
+	return nil
 }
 
 // corsMiddleware adds CORS headers

@@ -7,10 +7,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	_ "mywant/engine/types" // init() registers agent implementations
 	mywant "mywant/engine/core"
+	_ "mywant/engine/types" // init() registers agent implementations
 
 	"github.com/gorilla/mux"
 )
@@ -27,6 +29,7 @@ type Worker struct {
 	config        Config
 	agentRegistry *mywant.AgentRegistry
 	router        *mux.Router
+	httpServer    *http.Server
 }
 
 // New creates a new Agent Service worker
@@ -91,10 +94,45 @@ func (w *Worker) registerRoutes() {
 // Start starts the Agent Service worker
 func (w *Worker) Start() error {
 	addr := fmt.Sprintf("%s:%d", w.config.Host, w.config.Port)
+
+	w.httpServer = &http.Server{
+		Addr:    addr,
+		Handler: w.router,
+	}
+
+	// Handle signals for graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-stop
+		log.Printf("[WORKER] Received signal: %v. Shutting down gracefully...\n", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := w.Shutdown(ctx); err != nil {
+			log.Printf("[WORKER] Error during shutdown: %v\n", err)
+		}
+	}()
+
 	log.Printf("[WORKER] Agent Service listening on %s", addr)
 	log.Printf("[WORKER] Available agents: %d", len(w.agentRegistry.GetAllAgents()))
 
-	return http.ListenAndServe(addr, w.router)
+	if err := w.httpServer.ListenAndServe(); err != http.ErrServerClosed {
+		return err
+	}
+
+	log.Println("[WORKER] Service stopped")
+	return nil
+}
+
+// Shutdown performs a graceful shutdown of the worker
+func (w *Worker) Shutdown(ctx context.Context) error {
+	if w.httpServer != nil {
+		return w.httpServer.Shutdown(ctx)
+	}
+	return nil
 }
 
 // ============================================================================

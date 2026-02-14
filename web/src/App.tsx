@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
@@ -5,8 +6,15 @@ import { LogsPage } from '@/pages/ErrorHistoryPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import RecipePage from '@/pages/RecipePage';
 import WantTypePage from '@/pages/WantTypePage';
+import { useConfigStore } from '@/stores/configStore';
 
 function App() {
+  const fetchConfig = useConfigStore(state => state.fetchConfig);
+
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
+
   return (
     <ErrorBoundary>
       <Router>

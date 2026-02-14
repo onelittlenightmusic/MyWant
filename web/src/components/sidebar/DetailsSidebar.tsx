@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
+import { useConfigStore } from '@/stores/configStore';
 
 export interface TabConfig {
   id: string;
@@ -29,6 +30,8 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
   headerContent,
   onTabChange
 }) => {
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
   const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || '');
 
   useEffect(() => {
@@ -45,7 +48,10 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="border-b border-gray-200 px-6 py-4">
+      <div className={classNames(
+        "px-6 py-4",
+        isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
+      )}>
         {/* Badge and Title */}
         <div className="flex items-center space-x-3 mb-4">
           {badge}

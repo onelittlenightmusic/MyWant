@@ -28,12 +28,21 @@ var StopCmd = &cobra.Command{
 					// Try SIGTERM first
 					process.Signal(syscall.SIGTERM)
 
-					// Wait a moment and check if it's still alive
-					time.Sleep(1 * time.Second)
-					if err := process.Signal(syscall.Signal(0)); err == nil {
-						// Still alive, force kill
-						fmt.Println("Process still alive, sending SIGKILL...")
-						process.Kill()
+					// Wait for graceful shutdown (up to 12 seconds)
+					fmt.Print("Waiting for graceful shutdown...")
+					for i := 0; i < 12; i++ {
+						time.Sleep(1 * time.Second)
+						if err := process.Signal(syscall.Signal(0)); err != nil {
+							// Process is gone
+							fmt.Println(" Done.")
+							break
+						}
+						fmt.Print(".")
+						if i == 11 {
+							// Still alive after 12 seconds, force kill
+							fmt.Println("\nProcess still alive after timeout, sending SIGKILL...")
+							process.Kill()
+						}
 					}
 				}
 			}

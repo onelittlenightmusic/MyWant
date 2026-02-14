@@ -122,6 +122,9 @@ func (s *Server) setupRoutes() {
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 
+	// Config endpoint
+	api.HandleFunc("/config", s.getConfig).Methods("GET", "OPTIONS")
+
 	// Reactions endpoints
 	reactions := api.PathPrefix("/reactions").Subrouter()
 	reactions.HandleFunc("/", s.createReactionQueue).Methods("POST")

@@ -16,6 +16,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config
+func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.config)
+}
+
 // Health Check
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

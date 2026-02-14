@@ -133,10 +133,11 @@ var StartCmd = &cobra.Command{
 		}
 
 		cfg := server.Config{
-			Port:  port,
-			Host:  host,
-			Debug: debug,
-			WebFS: web.GetFileSystem(!debug),
+			Port:           port,
+			Host:           host,
+			Debug:          debug,
+			HeaderPosition: config.HeaderPosition,
+			WebFS:          web.GetFileSystem(!debug),
 		}
 
 		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)

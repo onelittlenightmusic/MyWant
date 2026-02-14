@@ -43,6 +43,7 @@ import {
   UpdateDraftWantData,
   DRAFT_WANT_LABEL,
 } from '@/types/draft';
+import { ServerConfig } from '@/types/config';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -129,6 +130,11 @@ class MyWantApiClient {
   // Health check
   async healthCheck(): Promise<HealthCheck> {
     return this.deduplicatedGet<HealthCheck>('/health');
+  }
+
+  // Config management
+  async getServerConfig(): Promise<ServerConfig> {
+    return this.deduplicatedGet<ServerConfig>('/api/v1/config');
   }
 
   // Want management
