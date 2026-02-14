@@ -177,13 +177,17 @@ func (n *NgrokWant) Progress() {
 func (n *NgrokWant) OnDelete() {
 	n.StoreLog("[NGROK] Want is being deleted, stopping tunnel")
 
-	// Kill process directly
+	// Kill process directly (and its process group)
 	if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
-		n.StoreLog("[NGROK] Killing ngrok process PID %d", pid)
-		if proc, err := os.FindProcess(pid); err == nil {
-			if err := proc.Signal(syscall.SIGTERM); err != nil {
-				n.StoreLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
-				proc.Kill()
+		n.StoreLog("[NGROK] Killing ngrok process group PID %d", pid)
+		// Try to kill process group first (since live_server_manager starts with Setpgid: true)
+		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+			n.StoreLog("[DEBUG] SIGTERM to process group %d failed: %v, trying individual process", pid, err)
+			if proc, err := os.FindProcess(pid); err == nil {
+				if err := proc.Signal(syscall.SIGTERM); err != nil {
+					n.StoreLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
+					proc.Kill()
+				}
 			}
 		}
 		n.StoreState("server_pid", 0)

@@ -255,8 +255,17 @@ func getArgsParam(want *mywant.Want) []string {
 	return nil
 }
 
-// stopLiveServer stops the server process by PID
+// stopLiveServer stops the server process by PID (and its process group)
 func stopLiveServer(pid int, want *mywant.Want) error {
+	// Try to kill process group first (since we start with Setpgid: true)
+	// On Unix, sending signal to -pid sends it to the entire process group
+	err := syscall.Kill(-pid, syscall.SIGTERM)
+	if err == nil {
+		want.StoreLog("[INFO] Sent SIGTERM to process group %d", pid)
+		return nil
+	}
+
+	// Fallback to single process if group killing failed
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return fmt.Errorf("failed to find process %d: %w", pid, err)

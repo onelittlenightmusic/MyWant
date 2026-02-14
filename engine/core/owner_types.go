@@ -806,6 +806,13 @@ func (oaw *OwnerAwareWant) Progress() {
 	}
 }
 
+// OnDelete delegates to the wrapped want if it implements OnDeletable
+func (oaw *OwnerAwareWant) OnDelete() {
+	if deletable, ok := oaw.BaseWant.(OnDeletable); ok {
+		deletable.OnDelete()
+	}
+}
+
 // BeginProgressCycle delegates to the stored Want to start batching state changes
 func (oaw *OwnerAwareWant) BeginProgressCycle() {
 	if oaw.Want != nil {
