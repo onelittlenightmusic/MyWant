@@ -650,7 +650,7 @@ export const Dashboard: React.FC = () => {
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
       />
       <main
-        className="flex-1 flex overflow-hidden bg-gray-50 lg:mr-[480px] mr-0 relative"
+        className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0 relative"
         onDragEnter={handleGlobalDragEnter}
         onDragOver={handleGlobalDragOver}
         onDragLeave={handleGlobalDragLeave}

@@ -72,7 +72,7 @@ export const Layout: React.FC<LayoutProps> = ({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
       {/* Mobile sidebar toggle - only show when sidebar is closed */}
       {!sidebarOpen && (
         <div className="lg:hidden fixed top-1/2 left-0 -translate-y-1/2 z-40">

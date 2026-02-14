@@ -229,7 +229,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner size="lg" />
-        <span className="ml-3 text-gray-600">Loading wants...</span>
+        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading wants...</span>
       </div>
     );
   }
@@ -237,15 +237,15 @@ export const WantGrid: React.FC<WantGridProps> = ({
   if (!hasUserWants) {
     return (
       <div className="flex items-center justify-center py-16">
-        <button onClick={onCreateWant} className="flex flex-col items-center gap-4 p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group">
-          <div className="w-24 h-24 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors">
-            <svg className="w-12 h-12 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button onClick={onCreateWant} className="flex flex-col items-center gap-4 p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group">
+          <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors">
+            <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </div>
           <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No wants yet</h3>
-            <p className="text-gray-600">Click the plus icon to create your first want configuration.</p>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No wants yet</h3>
+            <p className="text-gray-600 dark:text-gray-400">Click the plus icon to create your first want configuration.</p>
           </div>
         </button>
       </div>
@@ -255,13 +255,13 @@ export const WantGrid: React.FC<WantGridProps> = ({
   if (filteredWants.length === 0 && drafts.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-12 h-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
-        <p className="text-gray-600">No wants match your current search and filter criteria.</p>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No matches found</h3>
+        <p className="text-gray-600 dark:text-gray-400">No wants match your current search and filter criteria.</p>
       </div>
     );
   }
@@ -344,14 +344,14 @@ export const WantGrid: React.FC<WantGridProps> = ({
             handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
           }
         }}
-        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors group h-full min-h-[8rem] sm:min-h-[12.5rem]"
+        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[8rem] sm:min-h-[12.5rem]"
       >
-        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 group-hover:bg-blue-50 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
-          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         </div>
-        <p className="text-xs sm:text-sm text-gray-600 group-hover:text-blue-600 transition-colors font-medium">Add Want</p>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
       </button>
     </div>
   );

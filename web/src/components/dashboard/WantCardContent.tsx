@@ -186,11 +186,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
-              className={`${sizes.titleClass} text-gray-900 truncate group-hover:text-primary-600 transition-colors`}
+              className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors`}
             >
               {wantType}
             </h3>
-            <p className={`${sizes.typeClass} text-gray-500 mt-1 truncate`}>
+            <p className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}>
               {truncateText(wantName, sizes.textTruncate)}
             </p>
           </div>
@@ -205,10 +205,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                     onViewAgents(want);
                   }
                 }}
-                className="flex items-center space-x-1 p-1 rounded-md hover:bg-blue-50 transition-colors cursor-pointer"
+                className="flex items-center space-x-1 p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
                 title="Click to view agent details"
               >
-                <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800`} />
+                <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`} />
                 {want.current_agent && (
                   <div className={`${sizes.agentDotSize} bg-green-500 rounded-full ${styles.pulseGlow}`} title="Agent running" />
                 )}
@@ -236,7 +236,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                   sizes.statusSize === 'sm' ? 'px-2 py-1 text-xs' :
                   sizes.statusSize === 'md' ? 'px-2.5 py-1.5 text-sm' :
                   'px-3 py-2 text-base',
-                  'bg-amber-100 text-amber-800 border-amber-200'
+                  'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700'
                 )}
                 title="Click to view scheduling settings"
               >
@@ -262,7 +262,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                   e.stopPropagation();
                   onDelete(want);
                 }}
-                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all ml-1"
+                className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all ml-1"
                 title="Delete"
               >
                 <Trash2 className={sizes.iconSize} />
@@ -276,7 +276,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Timeline - only for parent cards - DISABLED to keep consistent height */}
       {false && !isChild && (
-        <div className="space-y-2 text-sm text-gray-600">
+        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           {createdAt && (
             <div className="flex justify-between">
               <span>Created:</span>
@@ -308,17 +308,17 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
       {/* Error indicator */}
       {hasError && (
-        <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-md">
+        <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
           <div className="flex items-start">
-            <AlertTriangle className={`${sizes.errorIconSize} text-red-600 mt-0.5 mr-2 flex-shrink-0`} />
+            <AlertTriangle className={`${sizes.errorIconSize} text-red-600 dark:text-red-400 mt-0.5 mr-2 flex-shrink-0`} />
             <div className="flex-1 min-w-0">
-              <p className={`${sizes.errorTextSize} font-medium text-red-800`}>Execution Failed</p>
-              <p className={`${sizes.errorTextSize} text-red-600 mt-1 truncate`}>
+              <p className={`${sizes.errorTextSize} font-medium text-red-800 dark:text-red-200`}>Execution Failed</p>
+              <p className={`${sizes.errorTextSize} text-red-600 dark:text-red-400 mt-1 truncate`}>
                 {truncateText(typeof want.state?.error === 'string' ? want.state.error : 'Unknown error', isChild ? 60 : 100)}
               </p>
               <button
                 onClick={() => onView(want)}
-                className="text-xs text-red-700 hover:text-red-800 underline mt-1"
+                className="text-xs text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 underline mt-1"
               >
                 View details →
               </button>
@@ -329,8 +329,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Results summary */}
       {want.results && Object.keys(want.results).length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <p className={`${sizes.errorTextSize} text-gray-600`}>
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <p className={`${sizes.errorTextSize} text-gray-600 dark:text-gray-400`}>
             Results: {Object.keys(want.results).length} item{Object.keys(want.results).length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -338,10 +338,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
+        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-semibold text-gray-700 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
+            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-semibold text-gray-700 dark:text-gray-300 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
             title="Click to view results"
           >
             {truncateText(
@@ -356,14 +356,14 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Reminder Reaction Buttons */}
       {shouldShowReactionButtons && (
-        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200"}>
+        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"}>
           <div className="flex gap-2">
             <button
               onClick={handleDenyClick}
               disabled={isSubmittingReaction}
               className={classNames(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
-                'bg-red-100 text-red-700 hover:bg-red-200',
+                'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-colors'
               )}
@@ -377,7 +377,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               disabled={isSubmittingReaction}
               className={classNames(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
-                'bg-green-100 text-green-700 hover:bg-green-200',
+                'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-colors'
               )}
@@ -387,7 +387,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               <span className={isChild ? 'hidden' : ''}>Approve</span>
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-2 text-center">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
             Waiting for your decision...
           </p>
         </div>

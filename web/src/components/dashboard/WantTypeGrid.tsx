@@ -28,7 +28,7 @@ export const WantTypeGrid: React.FC<WantTypeGridProps> = ({
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading want types...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading want types...</p>
         </div>
       </div>
     );
@@ -36,10 +36,10 @@ export const WantTypeGrid: React.FC<WantTypeGridProps> = ({
 
   if (wantTypes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 bg-white rounded-lg border-2 border-dashed border-gray-300">
+      <div className="flex items-center justify-center h-64 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">No want types found</p>
-          <p className="text-sm text-gray-500 mt-1">Try adjusting your filters</p>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">No want types found</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Try adjusting your filters</p>
         </div>
       </div>
     );

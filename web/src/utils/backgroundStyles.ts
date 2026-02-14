@@ -79,8 +79,8 @@ export const getBackgroundStyle = (
   const shouldApplySemiTransparent = isParentWant || hasBackgroundImage;
 
   const className = shouldApplySemiTransparent
-    ? 'bg-white bg-opacity-70'
-    : 'bg-white';
+    ? 'bg-white bg-opacity-70 dark:bg-gray-800 dark:bg-opacity-80'
+    : 'bg-white dark:bg-gray-800';
 
   const style: React.CSSProperties | undefined = backgroundImage
     ? {
@@ -106,7 +106,7 @@ export const getBackgroundStyle = (
  * @returns CSS class for overlay
  */
 export const getBackgroundOverlayClass = (): string => {
-  return 'absolute inset-0 bg-white bg-opacity-70 z-0 pointer-events-none';
+  return 'absolute inset-0 bg-white bg-opacity-70 dark:bg-gray-900 dark:bg-opacity-80 z-0 pointer-events-none';
 };
 
 /**

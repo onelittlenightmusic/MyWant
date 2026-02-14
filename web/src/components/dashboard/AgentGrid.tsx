@@ -68,7 +68,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
     return (
       <div className="flex items-center justify-center py-16">
         <LoadingSpinner size="lg" />
-        <span className="ml-3 text-gray-600">Loading agents...</span>
+        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading agents...</span>
       </div>
     );
   }
@@ -76,9 +76,9 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   if (agents.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+        <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
           <svg
-            className="w-12 h-12 text-gray-400"
+            className="w-12 h-12 text-gray-400 dark:text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -91,8 +91,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No agents yet</h3>
-        <p className="text-gray-600 mb-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No agents yet</h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
           Get started by creating your first agent.
         </p>
       </div>
@@ -102,9 +102,9 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
   if (filteredAgents.length === 0) {
     return (
       <div className="text-center py-16">
-        <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+        <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
           <svg
-            className="w-12 h-12 text-gray-400"
+            className="w-12 h-12 text-gray-400 dark:text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -117,8 +117,8 @@ export const AgentGrid: React.FC<AgentGridProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
-        <p className="text-gray-600">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No matches found</h3>
+        <p className="text-gray-600 dark:text-gray-400">
           No agents match your current search and filter criteria.
         </p>
       </div>

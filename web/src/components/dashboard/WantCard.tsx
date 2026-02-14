@@ -355,9 +355,9 @@ export const WantCard: React.FC<WantCardProps> = ({
       data-keyboard-nav-id={wantId}
       data-is-target={isTargetWant}
       className={classNames(
-        'card hover:shadow-md transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-inset',
-        selected ? 'border-blue-500 border-2' : 'border-gray-200',
-        (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100',
+        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset',
+        selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
+        (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
         isHighlighted && styles.highlighted,
         isBlinking && styles.minimapBlink,
         isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed',
@@ -370,14 +370,14 @@ export const WantCard: React.FC<WantCardProps> = ({
       <div style={blackOverlayStyle}></div>
 
       <div className={classNames(
-        "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none",
+        "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 dark:bg-blue-900 transition-all duration-400 ease-out pointer-events-none",
         isDragOverWant && isTargetWant && !draggedOverChildId && !isBeingProcessed ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0"
       )}>
         <div className={classNames(
-          "bg-white p-4 rounded-full shadow-2xl border-4 border-blue-600 transform transition-all duration-400 ease-out",
+          "bg-white dark:bg-gray-800 p-4 rounded-full shadow-2xl border-4 border-blue-600 dark:border-blue-500 transform transition-all duration-400 ease-out",
           isDragOverWant && isTargetWant && !draggedOverChildId && !isBeingProcessed ? "scale-100 opacity-100" : "scale-[2.5] opacity-0"
         )}>
-          <Plus className="w-16 h-12 text-blue-700" />
+          <Plus className="w-16 h-12 text-blue-700 dark:text-blue-400" />
         </div>
       </div>
 
@@ -398,14 +398,14 @@ export const WantCard: React.FC<WantCardProps> = ({
       </div>
 
       {hasChildren && !displayIsExpanded && (
-        <div className="relative z-10 mt-auto pt-3 border-t border-gray-200">
+        <div className="relative z-10 mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={(e) => {
               e.stopPropagation();
               if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
               else setLocalIsExpanded(true);
             }}
-            className={classNames("flex items-center justify-between w-full text-sm text-gray-600 hover:text-gray-900 transition-colors", isBeingProcessed && 'pointer-events-none')}
+            className={classNames("flex items-center justify-between w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors", isBeingProcessed && 'pointer-events-none')}
             disabled={isBeingProcessed}
           >
             <div className="flex items-center gap-2 sm:gap-3">
@@ -414,24 +414,24 @@ export const WantCard: React.FC<WantCardProps> = ({
                   <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
                 ))}
               </div>
-              <span className="text-blue-600 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
             </div>
-            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 dark:text-gray-500" />
           </button>
         </div>
       )}
 
       {hasChildren && displayIsExpanded && (
-        <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-200 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
+        <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-200 dark:border-gray-700 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
           <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <h4 className="text-xs sm:text-sm font-medium text-gray-900">Child Wants ({children!.length})</h4>
+            <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Child Wants ({children!.length})</h4>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
                 else setLocalIsExpanded(false);
               }}
-              className={classNames("text-[10px] sm:text-xs text-gray-500 hover:text-gray-700", isBeingProcessed && 'pointer-events-none')}
+              className={classNames("text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200", isBeingProcessed && 'pointer-events-none')}
               disabled={isBeingProcessed}
             >
               Collapse
