@@ -18,6 +18,7 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: generator
+  finalResultField: sent_count
   parameters:
   - name: count
     description: Number of Fibonacci values to generate

@@ -1,8 +1,6 @@
 package types
 
 import (
-	"fmt"
-
 	. "mywant/engine/core"
 )
 
@@ -59,10 +57,9 @@ func (g *FibonacciNumbers) Progress() {
 		// Send end signal
 		g.ProvideDone()
 		g.StoreStateMulti(Dict{
-			"final_result":         fmt.Sprintf("Generated %d fibonacci numbers", count),
 			"achieving_percentage": 100,
 			"achieved":             true,
-			"completed":            true, // Explicitly set completed to true
+			"completed":            true,
 		})
 	}
 
@@ -133,7 +130,6 @@ func (f *FibonacciFilter) Progress() {
 			"total_processed":      totalProcessed,
 			"achieved":             true,
 			"achieving_percentage": 100,
-			"final_result":         fmt.Sprintf("Filtered %d fibonacci numbers (min: %d, max: %d)", len(locals.filtered), f.GetIntParam("min_value", 0), f.GetIntParam("max_value", 1000000)),
 		})
 		return
 	}

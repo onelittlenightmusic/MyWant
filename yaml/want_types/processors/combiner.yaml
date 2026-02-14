@@ -17,6 +17,7 @@ wantType:
     version: '1.0'
     category: queue
     pattern: processor
+  finalResultField: total_processed
   parameters:
   - name: operation
     description: Combination strategy (merge, interleave, round-robin)

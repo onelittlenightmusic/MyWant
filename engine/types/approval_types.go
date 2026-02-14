@@ -78,12 +78,12 @@ func (e *EvidenceWant) Progress() {
 		Timestamp:   time.Now(),
 	}
 	e.StoreStateMulti(Dict{
+		"evidence":             evidence,
 		"evidence_type":        locals.EvidenceType,
 		"approval_id":          locals.ApprovalID,
 		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
 		"total_processed":      1,
 		"achieving_percentage": 100,
-		"final_result":         evidence,
 	})
 
 	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount())
@@ -168,7 +168,6 @@ func (d *DescriptionWant) Progress() {
 		"description_provided_at": descriptionData.Timestamp.Format(time.RFC3339),
 		"total_processed":         1,
 		"achieving_percentage":    100,
-		"final_result":            description,
 	})
 
 	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, d.GetOutCount())

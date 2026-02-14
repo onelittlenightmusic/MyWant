@@ -6,6 +6,7 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: generator
+  finalResultField: current_count
   parameters:
   - name: start
     description: Starting number

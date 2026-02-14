@@ -9,6 +9,8 @@ wantType:
     category: system
     pattern: independent
 
+  finalResultField: mcp_result
+
   parameters:
   - name: prompt
     description: Natural language instruction for Gmail operation.

@@ -1,8 +1,6 @@
 package types
 
 import (
-	"fmt"
-
 	. "mywant/engine/core"
 )
 
@@ -72,10 +70,9 @@ func (g *PrimeNumbers) Progress() {
 		// Send end signal
 		g.ProvideDone()
 		g.StoreStateMulti(Dict{
-			"final_result":         fmt.Sprintf("Generated %d numbers from %d to %d", end-start+1, start, end),
 			"achieving_percentage": 100,
 			"achieved":             true,
-			"completed":            true, // Explicitly set completed to true
+			"completed":            true,
 		})
 	}
 }
@@ -163,7 +160,6 @@ func (f *PrimeSequence) Progress() {
 			"total_processed":      totalProcessed,
 			"achieved":             true,
 			"achieving_percentage": 100,
-			"final_result":         fmt.Sprintf("Found %d prime numbers", len(locals.foundPrimes)),
 		})
 		f.ProvideDone()
 		return

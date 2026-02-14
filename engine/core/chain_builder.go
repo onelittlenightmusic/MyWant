@@ -1751,6 +1751,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 				DebugLog("[CHAIN-BUILDER] Applied requires from want type definition for '%s': %v\n",
 					wantConfig.Metadata.Type, typeDef.Requires)
 			}
+			// Apply FinalResultField from want type definition if not already set
+			if wantConfig.Spec.FinalResultField == "" && typeDef.FinalResultField != "" {
+				wantConfig.Spec.FinalResultField = typeDef.FinalResultField
+			}
 		}
 	}
 

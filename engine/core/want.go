@@ -93,6 +93,7 @@ type WantSpec struct {
 	NotificationFilters []NotificationFilter `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
 	Requires            []string             `json:"requires,omitempty" yaml:"requires,omitempty"`
 	When                []WhenSpec           `json:"when,omitempty" yaml:"when,omitempty"`
+	FinalResultField    string               `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`
 }
 
 // WantHistory contains both parameter and state history
@@ -423,11 +424,23 @@ func (n *Want) EndProgressCycle() {
 		n.stateMutex.Unlock()
 	}
 
-	n.stateMutex.Lock()
-	changeCount := len(n.pendingStateChanges)
-	n.stateMutex.Unlock()
-
-	if changeCount > 0 {
+	// Auto-override final_result from FinalResultField if configured
+	if field := n.Spec.FinalResultField; field != "" {
+		if val, ok := n.GetState(field); ok && val != nil {
+			// Skip zero values to avoid overwriting with initial defaults
+			skip := false
+			switch v := val.(type) {
+			case string:
+				skip = v == ""
+			case int:
+				skip = v == 0
+			case float64:
+				skip = v == 0
+			}
+			if !skip {
+				n.StoreState("final_result", val)
+			}
+		}
 	}
 
 	n.AggregateChanges()
@@ -471,6 +484,11 @@ func (n *Want) AggregateChanges() {
 
 		// Clear pending parameter changes after aggregating
 		n.pendingParameterChanges = make(map[string]any)
+	}
+
+	// Commit any pending logs at this checkpoint
+	if len(n.pendingLogs) > 0 {
+		n.addAggregatedLogHistory()
 	}
 }
 
@@ -2018,6 +2036,11 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 
 	n.stateMutex.Lock()
 	defer n.stateMutex.Unlock()
+
+	// Apply default FinalResultField from type definition if not set in spec
+	if n.Spec.FinalResultField == "" && typeDef.FinalResultField != "" {
+		n.Spec.FinalResultField = typeDef.FinalResultField
+	}
 
 	// Extract provided state field names and initialize with default values
 	n.ProvidedStateFields = make([]string, 0, len(typeDef.State))

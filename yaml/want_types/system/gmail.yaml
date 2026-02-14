@@ -17,6 +17,8 @@ wantType:
     category: system
     pattern: independent
 
+  finalResultField: gmail_result
+
   parameters:
   - name: prompt
     description: |

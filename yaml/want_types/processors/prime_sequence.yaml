@@ -17,6 +17,7 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: processor
+  finalResultField: foundPrimes
   parameters:
   - name: prime
     description: Prime number for sieve (not actively used, for configuration)

@@ -6,6 +6,7 @@ wantType:
     version: '1.0'
     category: queue
     pattern: processor
+  finalResultField: average_wait_time
   parameters:
   - name: service_time
     description: Time to process each item in seconds

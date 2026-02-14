@@ -19,6 +19,7 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: generator
+  finalResultField: current_number
   parameters:
   - name: start
     description: Starting number of range (inclusive)

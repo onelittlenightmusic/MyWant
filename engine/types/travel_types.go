@@ -196,7 +196,6 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		"reservation_name":           newEvent.Name,
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
-		"final_result":               newEvent.Name,
 	})
 	r.StoreLog("📦 Restaurant reservation created: %s", newEvent.Name)
 	return newSchedule
@@ -235,7 +234,6 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 		"reservation_name":           s.ReservationName,
 		"total_processed":            1,
 		"schedule_date":              s.ReservationTime.Format("2006-01-02"),
-		"final_result":               s.ReservationName,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
@@ -420,7 +418,6 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
 		"reservation_name":     newEvent.Name,
-		"final_result":         newEvent.Name,
 		"achieving_percentage": 100,
 	})
 	h.StoreLog("📦 Hotel reservation created: %s", newEvent.Name)
@@ -498,7 +495,6 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
 		"buffet_duration_hours": buffetLocals.Duration.Hours(),
 		"reservation_name":      newEvent.Name,
-		"final_result":          newEvent.Name,
 		"achieving_percentage":  100,
 	})
 	b.StoreLog("📦 Buffet reservation created: %s", newEvent.Name)
@@ -537,7 +533,6 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 		"buffet_duration_hours": s.DurationHours,
 		"reservation_name":      s.ReservationName,
 		"total_processed":       1,
-		"final_result":          s.ReservationName,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
@@ -890,7 +885,6 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		"total_processed":       1,
 		"schedule_date":         s.DepartureTime.Format("2006-01-02"),
 		"achieving_percentage":  100,
-		"final_result":          s.ReservationName,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true
@@ -1001,7 +995,6 @@ func (h *HotelWant) SetSchedule(schedule any) {
 		"stay_duration_hours": s.StayDurationHours,
 		"reservation_name":    s.ReservationName,
 		"total_processed":     1,
-		"final_result":        s.ReservationName,
 	}
 	if s.PremiumLevel != "" {
 		stateUpdates["premium_processed"] = true

@@ -16,6 +16,7 @@ wantType:
     version: '1.0'
     category: approval
     pattern: independent
+  finalResultField: evidence
   parameters:
   - name: evidence_type
     description: Classification of evidence (document, report, certification, audit)

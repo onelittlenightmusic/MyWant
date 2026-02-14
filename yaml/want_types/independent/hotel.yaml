@@ -19,6 +19,7 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+  finalResultField: reservation_name
   parameters:
   - name: hotel_type
     description: Classification of hotel (standard, luxury, budget, boutique)

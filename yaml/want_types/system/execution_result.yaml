@@ -7,6 +7,8 @@ wantType:
     category: system
     pattern: independent
 
+  finalResultField: stdout
+
   parameters:
   - name: command
     description: Shell command to execute (required)

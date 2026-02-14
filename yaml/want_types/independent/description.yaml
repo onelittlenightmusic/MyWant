@@ -17,6 +17,7 @@ wantType:
     version: '1.0'
     category: approval
     pattern: independent
+  finalResultField: description
   parameters:
   - name: description_format
     description: Template string for formatting description (supports %s substitution)

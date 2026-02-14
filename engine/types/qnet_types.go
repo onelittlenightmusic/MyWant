@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	mywant "mywant/engine/core"
@@ -168,7 +167,6 @@ func (g *Numbers) Progress() {
 		g.StoreLog("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount)
 		g.StoreStateMulti(mywant.Dict{
 			"achieving_percentage": 100,
-			"final_result":         fmt.Sprintf("Generated %d packets", paramCount),
 		})
 
 		g.ProvideDone()
@@ -333,7 +331,6 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 		"total_wait_time":          locals.waitTimeSum,
 		"current_server_free_time": locals.serverFreeTime,
 		"achieving_percentage":     100,
-		"final_result":             fmt.Sprintf("%.2f", avgWaitTime),
 	})
 
 	return nil
@@ -438,7 +435,6 @@ func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 		"total_processed":   processed,
 		"average_wait_time": 0.0, // Combiners don't add wait time
 		"total_wait_time":   0.0,
-		"final_result":      fmt.Sprintf("Combined %d packets", processed),
 	})
 
 	return nil

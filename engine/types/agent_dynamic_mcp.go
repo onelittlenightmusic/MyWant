@@ -252,7 +252,7 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	json.Unmarshal(finalResRaw, &finalRes)
 
 	want.StoreLog("[VALIDATOR][SUCCESS] Validation passed. Final result: %v", finalRes)
-	want.StoreState("final_result", finalRes)
+	want.StoreState("mcp_result", finalRes)
 	want.StoreState("validation_success", true)
 	want.StoreState("error_feedback", "") // Clear any previous error feedback
 	return nil

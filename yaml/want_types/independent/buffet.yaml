@@ -19,6 +19,7 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+  finalResultField: reservation_name
   parameters:
   - name: buffet_type
     description: Type of breakfast buffet (continental, full, asian, vegetarian)

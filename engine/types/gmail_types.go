@@ -214,8 +214,7 @@ func (g *GmailWant) Progress() {
 			}
 		}
 
-		// Store final result as a clean array of email objects
-		g.StoreState("final_result", emails)
+		g.StoreState("gmail_result", emails)
 		g.StoreState("gmail_status", "completed")
 		g.StoreLog("📦 Gmail search completed for '%s': found %d emails", locals.Prompt, len(emails))
 

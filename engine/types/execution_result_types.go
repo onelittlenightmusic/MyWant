@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	. "mywant/engine/core"
-	"strings"
 	"time"
 )
 
@@ -66,7 +65,6 @@ func (e *ExecutionResultWant) Initialize() {
 		"stderr":               "",
 		"error_message":        "",
 		"exit_code":            0,
-		"final_result":         "",
 		"started_at":           "",
 		"completed_at":         "",
 		"execution_time_ms":    0,
@@ -236,15 +234,11 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		locals.ExecutionTimeMs = int64(etm)
 	}
 
-	// Build final result
-	finalResult := e.buildFinalResult(locals)
-
 	// Build state updates batch
 	stateUpdates := map[string]any{
 		"exit_code":         exitCode,
 		"stdout":            locals.Stdout,
 		"stderr":            locals.Stderr,
-		"final_result":      finalResult,
 		"execution_time_ms": locals.ExecutionTimeMs,
 		"started_at":        result["started_at"],
 		"completed_at":      result["completed_at"],
@@ -270,24 +264,6 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	e.StoreStateMulti(stateUpdates)
 	e.updateLocals(locals)
 	e.ProvideDone()
-}
-
-// buildFinalResult combines stdout and stderr into final result
-func (e *ExecutionResultWant) buildFinalResult(locals *ExecutionResultWantLocals) string {
-	var result strings.Builder
-
-	if locals.Stdout != "" {
-		result.WriteString(locals.Stdout)
-	}
-
-	if locals.Stderr != "" {
-		if result.Len() > 0 && !strings.HasSuffix(result.String(), "\n") {
-			result.WriteString("\n")
-		}
-		result.WriteString(locals.Stderr)
-	}
-
-	return result.String()
 }
 
 // getOrInitializeLocals gets or initializes locals for this want

@@ -15,6 +15,7 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+  finalResultField: reservation_name
   parameters:
   - name: flight_type
     description: Flight class for alternative booking

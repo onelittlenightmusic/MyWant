@@ -6,6 +6,7 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+  finalResultField: reservation_name
   parameters:
   - name: restaurant_type
     description: Type of restaurant cuisine or service style

@@ -160,6 +160,109 @@ func TestSendCallback(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 }
 
+// TestFinalResultFieldAutoOverride tests that EndProgressCycle automatically sets final_result from FinalResultField
+func TestFinalResultFieldAutoOverride(t *testing.T) {
+	// Test 1: FinalResultField copies named state to final_result
+	want := NewWantWithLocals(
+		Metadata{Name: "test-want"},
+		WantSpec{FinalResultField: "reservation_name"},
+		nil,
+		"base",
+	)
+
+	want.BeginProgressCycle()
+	want.StoreState("reservation_name", "Le Bernardin")
+	want.EndProgressCycle()
+
+	val, exists := want.GetState("final_result")
+	if !exists {
+		t.Fatal("Expected final_result to exist after EndProgressCycle")
+	}
+	if val != "Le Bernardin" {
+		t.Errorf("Expected final_result='Le Bernardin', got %v", val)
+	}
+
+	// Test 2: Empty FinalResultField does nothing
+	want2 := NewWantWithLocals(
+		Metadata{Name: "test-want-2"},
+		WantSpec{},
+		nil,
+		"base",
+	)
+
+	want2.BeginProgressCycle()
+	want2.StoreState("some_field", "some_value")
+	want2.EndProgressCycle()
+
+	_, exists = want2.GetState("final_result")
+	if exists {
+		t.Error("Expected final_result NOT to exist when FinalResultField is empty")
+	}
+
+	// Test 3: Zero-value field is skipped (empty string)
+	want3 := NewWantWithLocals(
+		Metadata{Name: "test-want-3"},
+		WantSpec{FinalResultField: "result"},
+		nil,
+		"base",
+	)
+
+	want3.BeginProgressCycle()
+	want3.StoreState("result", "")
+	want3.EndProgressCycle()
+
+	val, exists = want3.GetState("final_result")
+	if exists && val != nil && val != "" {
+		t.Errorf("Expected final_result to be empty/nonexistent for zero-value, got %v", val)
+	}
+
+	// Test 4: Non-string values work (int)
+	want4 := NewWantWithLocals(
+		Metadata{Name: "test-want-4"},
+		WantSpec{FinalResultField: "count"},
+		nil,
+		"base",
+	)
+
+	want4.BeginProgressCycle()
+	want4.StoreState("count", 42)
+	want4.EndProgressCycle()
+
+	val, exists = want4.GetState("final_result")
+	if !exists {
+		t.Fatal("Expected final_result to exist for int value")
+	}
+	if val != 42 {
+		t.Errorf("Expected final_result=42, got %v", val)
+	}
+
+	// Test 5: Value from previous cycle (already in State, not in pendingStateChanges)
+	want5 := NewWantWithLocals(
+		Metadata{Name: "test-want-5"},
+		WantSpec{FinalResultField: "url"},
+		nil,
+		"base",
+	)
+
+	// First cycle: set the url
+	want5.BeginProgressCycle()
+	want5.StoreState("url", "https://example.ngrok.io")
+	want5.EndProgressCycle()
+
+	// Second cycle: don't change url, but EndProgressCycle should still copy it
+	want5.BeginProgressCycle()
+	// Don't store anything new
+	want5.EndProgressCycle()
+
+	val, exists = want5.GetState("final_result")
+	if !exists {
+		t.Fatal("Expected final_result to persist from previous cycle")
+	}
+	if val != "https://example.ngrok.io" {
+		t.Errorf("Expected final_result='https://example.ngrok.io', got %v", val)
+	}
+}
+
 // TestGetPendingStateChangesIsolation tests that returned map is a copy
 func TestGetPendingStateChangesIsolation(t *testing.T) {
 	want := NewWantWithLocals(
