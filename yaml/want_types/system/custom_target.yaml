@@ -8,63 +8,17 @@ wantType:
     pattern: independent
     system_type: true
   parameters:
-  - name: target_name
-    description: Name/identifier of the custom target
-    type: string
-    required: true
-    example: travel-itinerary-complete
-  - name: target_type
-    description: Classification of target (goal, constraint, metric, threshold)
-    type: string
-    default: goal
-    required: false
-    validation:
-      enum:
-      - goal
-      - constraint
-      - metric
-      - threshold
-      - checkpoint
-    example: goal
   - name: target_value
     description: Desired value or state for this target
     type: interface{}
     required: false
     example: all-reservations-confirmed
   state:
-  - name: target_name
-    description: Target identifier
-    type: string
-    persistent: true
-    example: travel-itinerary-complete
-    initialValue: ''
-  - name: target_type
-    description: Type of target
-    type: string
-    persistent: true
-    example: goal
-    initialValue: ''
   - name: target_value
     description: Current target value
     type: interface{}
     persistent: true
     initialValue: null
-  - name: is_satisfied
-    description: Whether target has been satisfied
-    type: bool
-    persistent: true
-    example: true
-    initialValue: false
-  - name: satisfaction_timestamp
-    description: When target was satisfied
-    type: string
-    persistent: true
-    initialValue: ''
-  - name: satisfaction_metrics
-    description: Metrics used to determine satisfaction
-    type: map[string]interface{}
-    persistent: true
-    initialValue: {}
   - name: final_result
     description: Final result computed from child wants (for recipe-based targets)
     type: interface{}
@@ -76,11 +30,7 @@ wantType:
     persistent: true
     initialValue: {}
   agents: []
-  constraints:
-  - description: Target name must be non-empty
-    validation: target_name length > 0
-  - description: Target type must be valid
-    validation: target_type in [goal, constraint, metric, threshold, checkpoint]
+  constraints: []
   examples:
   - name: Travel Itinerary Goal
     description: Custom target for complete travel planning
@@ -92,8 +42,6 @@ wantType:
 
       4. Marks target satisfied when done
 
-      5. Records satisfaction timestamp
-
       '
     want:
       metadata:
@@ -102,8 +50,6 @@ wantType:
         labels: {}
       spec:
         params:
-          target_name: travel-itinerary-complete
-          target_type: goal
           target_value: all-reservations-confirmed
   - name: Prime Computation Threshold
     description: Custom metric target for prime computation
@@ -123,8 +69,6 @@ wantType:
         labels: {}
       spec:
         params:
-          target_name: prime-count-threshold
-          target_type: threshold
           target_value: 100
   - name: Fibonacci Sequence Checkpoint
     description: Custom checkpoint in Fibonacci computation
@@ -144,8 +88,6 @@ wantType:
         labels: {}
       spec:
         params:
-          target_name: fibonacci-position-20
-          target_type: checkpoint
           target_value: 20
   relatedTypes:
   - owner
