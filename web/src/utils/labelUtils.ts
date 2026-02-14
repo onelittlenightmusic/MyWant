@@ -21,7 +21,7 @@ export async function addLabelToRegistry(key: string, value: string): Promise<bo
       return false;
     }
 
-    const response = await fetch('http://localhost:8080/api/v1/labels', {
+    const response = await fetch('/api/v1/labels', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -321,7 +321,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       }
 
       // Fetch want type specification from backend
-      const specResponse = await fetch(`http://localhost:8080/api/v1/want-types/${wantType}`);
+      const specResponse = await fetch(`/api/v1/want-types/${wantType}`);
       let spec: WantTypeDefinition | undefined;
 
       if (specResponse.ok) {
@@ -1222,7 +1222,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
         setLoadingGrouped(true);
         try {
           const response = await fetch(
-            `http://localhost:8080/api/v1/wants/${want.metadata.id}?groupBy=${groupBy}`
+            `/api/v1/wants/${want.metadata.id}?groupBy=${groupBy}`
           );
           if (response.ok) {
             const data = await response.json();

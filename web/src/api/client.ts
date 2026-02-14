@@ -423,6 +423,6 @@ class MyWantApiClient {
 }
 
 // Export singleton instance
-export const apiClient = new MyWantApiClient('http://localhost:8080');
+export const apiClient = new MyWantApiClient('');
 
 export default MyWantApiClient;

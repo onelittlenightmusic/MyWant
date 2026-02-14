@@ -103,7 +103,7 @@ export const Dashboard: React.FC = () => {
 
   const fetchLabels = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/v1/labels');
+      const response = await fetch('/api/v1/labels');
       if (response.ok) {
         const data = await response.json();
         const labelsMap = new Map<string, Set<string>>();
@@ -282,13 +282,13 @@ export const Dashboard: React.FC = () => {
     useWantStore.getState().setHighlightedLabel({ key, value });
 
     try {
-      const r = await fetch('http://localhost:8080/api/v1/labels');
+      const r = await fetch('/api/v1/labels');
       if (!r.ok) return;
       const d = await r.json();
       if (d.labelValues && d.labelValues[key]) {
         const info = d.labelValues[key].find((i: any) => i.value === value);
         if (info) {
-          const wr = await fetch('http://localhost:8080/api/v1/wants');
+          const wr = await fetch('/api/v1/wants');
           if (wr.ok) {
             const wd = await wr.json();
             setLabelOwners(wd.wants.filter((w: Want) => info.owners.includes(w.metadata?.id || w.id || '')));
@@ -458,7 +458,7 @@ export const Dashboard: React.FC = () => {
   const handleExportWants = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch('http://localhost:8080/api/v1/wants/export', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const response = await fetch('/api/v1/wants/export', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
       if (!response.ok) throw new Error(`Export failed: ${response.statusText}`);
       const contentDisposition = response.headers.get('Content-Disposition');
       let filename = 'wants-export.yaml';
@@ -481,7 +481,7 @@ export const Dashboard: React.FC = () => {
     setIsImporting(true);
     try {
       const fileText = await file.text();
-      const response = await fetch('http://localhost:8080/api/v1/wants/import', { method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: fileText });
+      const response = await fetch('/api/v1/wants/import', { method: 'POST', headers: { 'Content-Type': 'application/yaml' }, body: fileText });
       if (!response.ok) { const errorData = await response.text(); throw new Error(`Import failed: ${errorData || response.statusText}`); }
       const result = await response.json();
       showNotification(`✓ Imported ${result.wants} want(s)`);

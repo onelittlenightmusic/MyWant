@@ -309,7 +309,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       const wantId = want.metadata?.id || want.id;
       if (!wantId) return;
 
-      fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
+      fetch(`/api/v1/wants/${wantId}/labels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })
@@ -488,7 +488,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                   const labelData = e.dataTransfer.getData('application/json');
                   if (!labelData) return;
                   const { key, value } = JSON.parse(labelData);
-                  fetch(`http://localhost:8080/api/v1/wants/${childId}/labels`, {
+                  fetch(`/api/v1/wants/${childId}/labels`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ key, value })

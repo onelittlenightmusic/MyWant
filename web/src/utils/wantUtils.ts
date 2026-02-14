@@ -61,7 +61,7 @@ export async function updateWantLabels(
 
   // Remove deleted labels
   for (const key of removed) {
-    await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels/${key}`, {
+    await fetch(`/api/v1/wants/${wantId}/labels/${key}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -69,7 +69,7 @@ export async function updateWantLabels(
 
   // Add new labels
   for (const key of added) {
-    await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
+    await fetch(`/api/v1/wants/${wantId}/labels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: newLabels[key] })
@@ -78,11 +78,11 @@ export async function updateWantLabels(
 
   // Update changed labels (delete old + add new)
   for (const key of updated) {
-    await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels/${key}`, {
+    await fetch(`/api/v1/wants/${wantId}/labels/${key}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' }
     });
-    await fetch(`http://localhost:8080/api/v1/wants/${wantId}/labels`, {
+    await fetch(`/api/v1/wants/${wantId}/labels`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: newLabels[key] })
@@ -103,7 +103,7 @@ export async function updateWantDependencies(
   for (const dep of oldUsing) {
     const key = Object.keys(dep)[0];
     if (key) {
-      await fetch(`http://localhost:8080/api/v1/wants/${wantId}/using/${key}`, {
+      await fetch(`/api/v1/wants/${wantId}/using/${key}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -114,7 +114,7 @@ export async function updateWantDependencies(
   for (const dep of newUsing) {
     const [key, value] = Object.entries(dep)[0];
     if (key) {
-      await fetch(`http://localhost:8080/api/v1/wants/${wantId}/using`, {
+      await fetch(`/api/v1/wants/${wantId}/using`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })

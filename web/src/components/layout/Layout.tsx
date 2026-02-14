@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { Sidebar } from './Sidebar';
 
@@ -63,15 +63,18 @@ export const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Mobile sidebar toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-md bg-white shadow-md border border-gray-200 text-gray-600 hover:text-gray-900"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      </div>
+      {/* Mobile sidebar toggle - only show when sidebar is closed */}
+      {!sidebarOpen && (
+        <div className="lg:hidden fixed top-1/2 left-0 -translate-y-1/2 z-40">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-1 rounded-r-md bg-white shadow-md border border-l-0 border-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center h-12 w-6"
+            aria-label="Open menu"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
+      )}
 
       {/* Sidebar wrapper with hover handlers */}
       <div
