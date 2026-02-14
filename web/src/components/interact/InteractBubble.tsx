@@ -7,13 +7,15 @@ interface InteractBubbleProps {
   isThinking: boolean;
   disabled?: boolean;
   onRobotClick?: () => void;
+  autoFocus?: boolean;
 }
 
 export const InteractBubble: React.FC<InteractBubbleProps> = ({
   onSubmit,
   isThinking,
   disabled = false,
-  onRobotClick
+  onRobotClick,
+  autoFocus = false
 }) => {
   const [message, setMessage] = useState('');
   const [isComposing, setIsComposing] = useState(false);
@@ -28,7 +30,15 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
-  // Rotate placeholder every 3 seconds
+  // Auto-focus input when it becomes visible on mobile or requested
+  useEffect(() => {
+    if (autoFocus || (window.innerWidth < 1024 && inputRef.current)) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300); // Wait for slide-in animation
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
   useEffect(() => {
     const interval = setInterval(() => {
       setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
@@ -110,7 +120,7 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
             disabled={disabled}
             className={classNames(
               'bg-transparent border-none outline-none',
-              'text-sm placeholder-gray-400',
+              'text-base placeholder-gray-400',
               'w-64 focus:ring-0'
             )}
           />

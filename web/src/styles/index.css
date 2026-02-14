@@ -35,7 +35,17 @@
   }
 
   .input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base sm:text-sm;
+  }
+
+  /* Target all inputs to prevent iOS zoom */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  @media (min-width: 640px) {
+    input, textarea, select {
+      font-size: inherit !important;
+    }
   }
 
   .label {

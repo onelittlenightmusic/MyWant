@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, BarChart3, ListChecks, Map } from 'lucide-react';
+import { Plus, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 
@@ -43,25 +43,47 @@ export const Header: React.FC<HeaderProps> = ({
   onMinimapToggle
 }) => {
   const [showProviderSelect, setShowProviderSelect] = useState(false);
+  const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
 
-  // Hide provider select when clicking outside
+  // Hide provider select and mobile bubble when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
         setShowProviderSelect(false);
+        if (window.innerWidth < 1024) {
+          setShowBubbleOnMobile(false);
+        }
       }
     };
 
-    if (showProviderSelect) {
+    if (showProviderSelect || showBubbleOnMobile) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showProviderSelect]);
+  }, [showProviderSelect, showBubbleOnMobile]);
 
   const handleRobotClick = () => {
-    setShowProviderSelect(prev => !prev);
+    if (window.innerWidth < 1024) {
+      if (!showBubbleOnMobile) {
+        setShowBubbleOnMobile(true);
+        setShowProviderSelect(true); // Always show provider select when opening bubble on mobile
+      } else {
+        setShowBubbleOnMobile(false);
+        setShowProviderSelect(false);
+      }
+    } else {
+      setShowProviderSelect(prev => !prev);
+    }
   };
+
+  const handleInteractSubmitInternal = (message: string) => {
+    onInteractSubmit?.(message);
+    if (window.innerWidth < 1024) {
+      setShowBubbleOnMobile(false);
+    }
+  };
+
   return (
     <header className={classNames(
       "bg-white border-b border-gray-200 px-3 sm:px-6 py-2 sm:py-4 fixed top-0 right-0 z-40 transition-all duration-300 ease-in-out left-0",
@@ -71,15 +93,23 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center space-x-4 min-w-0">
           <h1 className="text-lg sm:text-2xl font-bold text-gray-900 whitespace-nowrap">{title}</h1>
           {itemLabel && (
-            <div className="text-sm text-gray-500 whitespace-nowrap">
+            <div className="hidden sm:block text-sm text-gray-500 whitespace-nowrap">
               {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}
             </div>
           )}
         </div>
 
-        {/* InteractBubble - shown on desktop */}
+        {/* InteractBubble - now shown on mobile via toggle */}
         {onInteractSubmit && (
-          <div className="hidden lg:flex items-center flex-1 justify-center max-w-xl gap-2" ref={selectRef}>
+          <div className={classNames(
+            "flex-1 justify-center max-w-xl gap-2",
+            // Desktop behavior: always flex
+            "lg:flex lg:items-center",
+            // Mobile behavior: absolute overlay or hidden
+            showBubbleOnMobile 
+              ? "flex items-center absolute inset-x-0 top-full bg-white p-4 border-b border-gray-200 shadow-lg z-50 animate-slide-in" 
+              : "hidden lg:flex"
+          )} ref={selectRef}>
             <div className={classNames(
               "transition-all duration-300 ease-in-out overflow-hidden",
               showProviderSelect ? "opacity-100 max-w-xs" : "opacity-0 max-w-0"
@@ -94,14 +124,29 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
             </div>
             <InteractBubble
-              onSubmit={onInteractSubmit}
+              onSubmit={handleInteractSubmitInternal}
               isThinking={isInteractThinking}
               onRobotClick={handleRobotClick}
+              autoFocus={showBubbleOnMobile}
             />
           </div>
         )}
 
         <div className="flex items-center space-x-3 flex-shrink-0">
+          {/* Robot toggle for mobile - only shown when onInteractSubmit is present */}
+          {onInteractSubmit && (
+            <button
+              onClick={handleRobotClick}
+              className={classNames(
+                "lg:hidden p-2 rounded-full transition-colors bg-blue-600 shadow-md",
+                showBubbleOnMobile ? "ring-2 ring-blue-400" : ""
+              )}
+              title="Speak to Agent"
+            >
+              <Bot className="h-5 w-5 text-white" />
+            </button>
+          )}
+
           {/* Minimap toggle button - only shown on mobile (lg:hidden) */}
           {onMinimapToggle && (
             <button
