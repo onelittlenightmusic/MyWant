@@ -185,6 +185,9 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		}
 		DebugLog("[RECIPE-LOADER] Processing %d wants with prefix '%s' for recipe %s\n", len(recipeContent.Wants), prefix, recipePath)
 
+		// Generate sequential order keys for all wants in the recipe
+		orderKeys := GenerateSequentialOrderKeys(len(recipeContent.Wants), "")
+
 		for i, recipeWant := range recipeContent.Wants {
 			want := recipeWant.ConvertToWant()
 			DebugLog("[RECIPE-LOADER] Converted recipe want %d (type: %s) to Want struct\n", i+1, want.Metadata.Type)
@@ -200,6 +203,10 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 				want.Metadata.ID = generateUUID()
 				DebugLog("[RECIPE-LOADER] Generated want ID: %s\n", want.Metadata.ID)
 			}
+
+			// Assign sequential order key for stable sorting in UI
+			want.Metadata.OrderKey = orderKeys[i]
+			DebugLog("[RECIPE-LOADER] Assigned order key: %s\n", want.Metadata.OrderKey)
 
 			// Namespace labels and using selectors with prefix to isolate child wants
 			grl.namespaceWantConnections(want, prefix)

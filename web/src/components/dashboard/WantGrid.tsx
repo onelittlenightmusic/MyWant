@@ -70,8 +70,15 @@ export const WantGrid: React.FC<WantGridProps> = ({
   selectedWantIds = new Set(),
   onSelectWant
 }) => {
-  const { reorderWant } = useWantStore();
+  const { reorderWant, draggingWant } = useWantStore();
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+
+  // Clear drag indicator when dragging stops
+  React.useEffect(() => {
+    if (!draggingWant) {
+      setDragOverGap(null);
+    }
+  }, [draggingWant]);
 
   const handleReorderDragOver = (index: number, position: 'before' | 'after' | 'inside' | null) => {
     if (position === 'before') {
@@ -79,6 +86,54 @@ export const WantGrid: React.FC<WantGridProps> = ({
     } else if (position === 'after') {
       setDragOverGap(index + 1);
     } else {
+      setDragOverGap(null);
+    }
+  };
+
+  const handleGridDragOver = (e: React.DragEvent) => {
+    const isWantDrag = !!draggingWant || e.dataTransfer.types.includes('application/mywant-id');
+    if (!isWantDrag) return;
+
+    e.preventDefault();
+    
+    // If we are over a card, it's already handled by the card's onReorderDragOver
+    if ((e.target as HTMLElement).closest('[data-want-id]')) return;
+
+    // We are in a gap or over the grid background
+    // Find the closest card and determine the gap
+    const container = e.currentTarget as HTMLElement;
+    const cardElements = Array.from(container.querySelectorAll('[data-want-id]')) as HTMLElement[];
+    if (cardElements.length === 0) return;
+
+    let closestIndex = -1;
+    let minDistance = Infinity;
+    let isAfter = false;
+
+    cardElements.forEach((el, idx) => {
+      const rect = el.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+      
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = idx;
+        isAfter = e.clientX > centerX;
+      }
+    });
+
+    if (closestIndex !== -1) {
+      setDragOverGap(isAfter ? closestIndex + 1 : closestIndex);
+    }
+  };
+
+  const handleGridDragLeave = (e: React.DragEvent) => {
+    // Only clear if we are actually leaving the grid container (not just moving to a child)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x <= rect.left || x >= rect.right || y <= rect.top || y >= rect.bottom) {
       setDragOverGap(null);
     }
   };
@@ -212,7 +267,12 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-6" id="want-grid-container">
+    <div 
+      className="grid grid-cols-3 gap-6" 
+      id="want-grid-container"
+      onDragOver={handleGridDragOver}
+      onDragLeave={handleGridDragLeave}
+    >
       {filteredWants.map((want, index) => {
         const wantId = want.metadata?.id || want.id;
         const isExpanded = expandedParents?.has(wantId || '') ?? false;

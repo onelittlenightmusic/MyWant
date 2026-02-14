@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -60,6 +61,22 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 		}
 		allWants = append(allWants, want)
 	}
+
+	// Explicitly sort for stable ordering
+	sort.Slice(allWants, func(i, j int) bool {
+		keyI := allWants[i].Metadata.OrderKey
+		if keyI == "" {
+			keyI = allWants[i].Metadata.ID
+		}
+		keyJ := allWants[j].Metadata.OrderKey
+		if keyJ == "" {
+			keyJ = allWants[j].Metadata.ID
+		}
+		if keyI != keyJ {
+			return keyI < keyJ
+		}
+		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
+	})
 
 	config := mywant.Config{Wants: allWants}
 	yamlData, err := yaml.Marshal(&config)

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -231,6 +232,23 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		want.Hash = mywant.CalculateWantHash(want)
 		allWants = append(allWants, want)
 	}
+
+	// Explicitly sort for stable ordering
+	sort.Slice(allWants, func(i, j int) bool {
+		keyI := allWants[i].Metadata.OrderKey
+		if keyI == "" {
+			keyI = allWants[i].Metadata.ID
+		}
+		keyJ := allWants[j].Metadata.OrderKey
+		if keyJ == "" {
+			keyJ = allWants[j].Metadata.ID
+		}
+		if keyI != keyJ {
+			return keyI < keyJ
+		}
+		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
+	})
+
 	response := map[string]any{
 		"timestamp":    time.Now().Format(time.RFC3339),
 		"execution_id": fmt.Sprintf("api-dump-%d", time.Now().Unix()),

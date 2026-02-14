@@ -201,7 +201,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
     if (isWantDrag) {
       e.preventDefault();
-      e.stopPropagation();
       setIsDragOver(false);
 
       // Determine position within the card for reordering vs child-drop
@@ -211,12 +210,17 @@ export const WantCard: React.FC<WantCardProps> = ({
       
       let position: 'before' | 'after' | 'inside' | null = null;
       
-      if (x < edgeThreshold) {
-        position = 'before';
-      } else if (x > rect.width - edgeThreshold) {
-        position = 'after';
-      } else if (isTargetWant) {
-        position = 'inside';
+      if (isTargetWant) {
+        if (x < edgeThreshold) {
+          position = 'before';
+        } else if (x > rect.width - edgeThreshold) {
+          position = 'after';
+        } else {
+          position = 'inside';
+        }
+      } else {
+        // For non-target wants, always show reorder position based on which side we're closer to
+        position = x < rect.width / 2 ? 'before' : 'after';
       }
 
       if (onReorderDragOver) {
@@ -234,7 +238,6 @@ export const WantCard: React.FC<WantCardProps> = ({
       }
     } else if (isLabelDrag) {
       e.preventDefault();
-      e.stopPropagation();
       setIsDragOverWant(false);
       setIsOverTarget(false);
       e.dataTransfer.dropEffect = 'copy';
@@ -248,9 +251,8 @@ export const WantCard: React.FC<WantCardProps> = ({
     setIsDragOverWant(false);
     setIsOverTarget(false);
     setDraggedOverChildId(null);
-    if (onReorderDragOver) {
-      onReorderDragOver(index, null);
-    }
+    // Note: We don't call onReorderDragOver(index, null) here to prevent flickering 
+    // when moving between cards or into gaps. The Grid container handles clearing.
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -341,7 +343,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   return (
     <div
       ref={cardRef}
-      draggable={!isSelectMode && !isTargetWant && !isBeingProcessed}
+      draggable={!isSelectMode && !isBeingProcessed}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleCardClick}
@@ -452,7 +454,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                 if (isTemplateDrag) return; // Bubble to Dashboard
 
                 if (isWantDrag) {
-                  e.preventDefault(); e.stopPropagation();
+                  e.preventDefault();
                   if (isChildTarget) {
                     e.dataTransfer.dropEffect = 'move';
                     setIsDragOverWant(true); setIsOverTarget(true); setDraggedOverChildId(childId);
@@ -461,7 +463,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                     setIsDragOverWant(true); setIsOverTarget(true); setDraggedOverChildId(null);
                   }
                 } else if (e.dataTransfer.types.includes('application/json')) {
-                  e.preventDefault(); e.stopPropagation();
+                  e.preventDefault();
                   setIsDragOverWant(false); setIsOverTarget(false);
                   e.dataTransfer.dropEffect = 'copy'; setIsDragOver(true);
                 }
