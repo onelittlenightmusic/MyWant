@@ -1460,6 +1460,7 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 				Type:            want.Metadata.Type,
 				Labels:          want.GetLabels(),
 				OwnerReferences: copyOwnerReferences(want.Metadata.OwnerReferences),
+				OrderKey:        want.Metadata.OrderKey,
 			},
 			Spec: WantSpec{
 				Params:              copyInterfaceMap(want.Spec.Params),
@@ -2165,6 +2166,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
+			want.Metadata.OrderKey = runtimeWant.want.Metadata.OrderKey // Sync order key
 
 			// Lock state when copying to prevent concurrent map access
 			runtimeWant.want.stateMutex.RLock()

@@ -277,29 +277,45 @@ func (n *Want) executeAgent(agent Agent) error {
 
 // StopAllAgents stops all running agents for this want
 func (n *Want) StopAllAgents() {
-	if n.runningAgents == nil {
+	n.agentStateMutex.Lock()
+	if n.runningAgents == nil || len(n.runningAgents) == 0 {
+		n.agentStateMutex.Unlock()
 		return
 	}
 
-	for agentName, cancel := range n.runningAgents {
-		log.Printf("Stopping agent: %s\n", agentName)
-		cancel()
+	// Copy cancel functions to a slice to execute outside the lock
+	type agentCancel struct {
+		name   string
+		cancel context.CancelFunc
+	}
+	cancels := make([]agentCancel, 0, len(n.runningAgents))
+	for name, cancel := range n.runningAgents {
+		cancels = append(cancels, agentCancel{name: name, cancel: cancel})
+	}
 
-		// Update agent execution records
+	// Clear the maps and lists while holding the lock
+	n.runningAgents = make(map[string]context.CancelFunc)
+	n.RunningAgents = make([]string, 0)
+	n.CurrentAgent = ""
+	n.agentStateMutex.Unlock()
+
+	// Execute cancels outside the lock
+	for _, ac := range cancels {
+		log.Printf("Stopping agent: %s\n", ac.name)
+		ac.cancel()
+
+		// Update agent execution records (these are protected by stateMutex usually, but history might need care)
+		n.stateMutex.Lock()
 		for i := range n.History.AgentHistory {
-			if n.History.AgentHistory[i].AgentName == agentName && n.History.AgentHistory[i].Status == "running" {
+			if n.History.AgentHistory[i].AgentName == ac.name && n.History.AgentHistory[i].Status == "running" {
 				endTime := time.Now()
 				n.History.AgentHistory[i].EndTime = &endTime
 				n.History.AgentHistory[i].Status = "terminated"
 				break
 			}
 		}
+		n.stateMutex.Unlock()
 	}
-
-	// Clear the maps and lists
-	n.runningAgents = make(map[string]context.CancelFunc)
-	n.RunningAgents = make([]string, 0)
-	n.CurrentAgent = ""
 }
 
 // StopAgent stops a specific running agent
