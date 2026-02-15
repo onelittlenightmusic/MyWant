@@ -3140,12 +3140,14 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.deleteWantByID(wantID)
 
 	// Also remove from config so detectConfigChanges sees the deletion
-	for i, cfgWant := range cb.config.Wants {
-		if cfgWant.Metadata.ID == wantID {
-			cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
-			break
+	// Remove ALL occurrences of the want ID (handles duplicates in config)
+	newWants := make([]*Want, 0, len(cb.config.Wants))
+	for _, cfgWant := range cb.config.Wants {
+		if cfgWant.Metadata.ID != wantID {
+			newWants = append(newWants, cfgWant)
 		}
 	}
+	cb.config.Wants = newWants
 
 	// Persist configuration change to memory file
 	if err := cb.copyConfigToMemory(); err != nil {
