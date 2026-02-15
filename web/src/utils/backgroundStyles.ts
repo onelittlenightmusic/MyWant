@@ -14,22 +14,24 @@ export interface BackgroundStyle {
  * @param type - Want type (flight, hotel, restaurant, buffet, etc.)
  * @returns Image URL or undefined
  */
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/onelittlenightmusic/MyWant/master/web/public/resources';
+
 export const getBackgroundImage = (type?: string): string | undefined => {
   if (!type) return undefined;
 
   const imageMap: Record<string, string> = {
-    flight: '/resources/flight.png',
-    hotel: '/resources/hotel.png',
-    restaurant: '/resources/restaurant.png',
-    buffet: '/resources/buffet.png',
-    evidence: '/resources/evidence.png',
+    flight: `${GITHUB_RAW_BASE}/flight.png`,
+    hotel: `${GITHUB_RAW_BASE}/hotel.png`,
+    restaurant: `${GITHUB_RAW_BASE}/restaurant.png`,
+    buffet: `${GITHUB_RAW_BASE}/buffet.png`,
+    evidence: `${GITHUB_RAW_BASE}/evidence.png`,
     // Mathematics category types and recipes
-    'prime numbers': '/resources/numbers.png',
-    'prime sequence': '/resources/numbers.png',
-    'fibonacci numbers': '/resources/numbers.png',
-    'fibonacci filter': '/resources/numbers.png',
-    'fibonacci sequence': '/resources/numbers.png',
-    'prime sieve': '/resources/numbers.png',
+    'prime numbers': `${GITHUB_RAW_BASE}/numbers.png`,
+    'prime sequence': `${GITHUB_RAW_BASE}/numbers.png`,
+    'fibonacci numbers': `${GITHUB_RAW_BASE}/numbers.png`,
+    'fibonacci filter': `${GITHUB_RAW_BASE}/numbers.png`,
+    'fibonacci sequence': `${GITHUB_RAW_BASE}/numbers.png`,
+    'prime sieve': `${GITHUB_RAW_BASE}/numbers.png`,
   };
 
   // Check exact type match first
@@ -39,7 +41,7 @@ export const getBackgroundImage = (type?: string): string | undefined => {
 
   // Check if type ends with 'coordinator'
   if (type.endsWith('coordinator')) {
-    return '/resources/agent.png';
+    return `${GITHUB_RAW_BASE}/agent.png`;
   }
 
   // System/Execution category - applies to scheduler, execution_result, execution result, and related types
@@ -52,7 +54,7 @@ export const getBackgroundImage = (type?: string): string | undefined => {
   ];
 
   if (systemTypes.includes(type.toLowerCase()) || type.toLowerCase().includes('execution') || type.toLowerCase().includes('scheduler')) {
-    return '/resources/screen.png';
+    return `${GITHUB_RAW_BASE}/screen.png`;
   }
 
   return undefined;

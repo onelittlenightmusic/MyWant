@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2, Zap } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { classNames, truncateText } from '@/utils/helpers';
+import { getBackgroundImage } from '@/utils/backgroundStyles';
 import { apiClient } from '@/api/client';
 import { validateYaml } from '@/utils/yaml';
 import {
@@ -389,16 +390,7 @@ const RecipeWantCard: React.FC<RecipeWantCardProps> = ({ want, index }) => {
   const params = want.params || want.spec?.params || {};
   const using = want.using || want.spec?.using || [];
 
-  // Get background image based on want type (same logic as WantCard)
-  const getBackgroundImage = (type: string) => {
-    if (type === 'flight') return '/resources/flight.png';
-    if (type === 'hotel') return '/resources/hotel.png';
-    if (type === 'restaurant') return '/resources/restaurant.png';
-    if (type === 'buffet') return '/resources/buffet.png';
-    if (type === 'evidence') return '/resources/evidence.png';
-    if (type?.endsWith('coordinator')) return '/resources/agent.png';
-    return undefined;
-  };
+  // Get background image based on want type - uses shared utility from backgroundStyles
 
   const backgroundImage = getBackgroundImage(wantType);
 

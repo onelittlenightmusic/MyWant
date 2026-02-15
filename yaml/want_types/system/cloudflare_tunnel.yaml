@@ -1,0 +1,120 @@
+wantType:
+  metadata:
+    name: cloudflare_tunnel
+    title: Cloudflare Tunnel
+    description: |
+      Manages a Cloudflare Tunnel (cloudflared) lifecycle to expose a local service via a public URL.
+
+      Automatically starts a cloudflared process, parses the forwarding URL from its log,
+      and stores it in the tunnel_url state. Uses the live_server_manager agent for
+      process lifecycle management (start/stop/SIGTERM).
+
+      The forwarding URL is parsed from cloudflared's output (Quick Tunnel format).
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: tunnel_url
+
+  parameters:
+  - name: port
+    description: Local port to expose through the Cloudflare tunnel
+    type: string
+    required: false
+    default: "8080"
+    example: "3000"
+
+  - name: protocol
+    description: Protocol for the local service (http, tcp, tls)
+    type: string
+    required: false
+    default: "http"
+
+  - name: log_file
+    description: Path to capture cloudflared output (auto-generated if empty)
+    type: string
+    required: false
+    default: ""
+    example: /tmp/cloudflare-tunnel.log
+
+  - name: max_retries
+    description: Maximum retries to wait for tunnel URL in log
+    type: int
+    required: false
+    default: 40
+
+  state:
+  - name: server_phase
+    description: Current phase of the tunnel lifecycle
+    type: string
+    persistent: true
+    initialValue: starting
+    example: running
+
+  - name: server_pid
+    description: Process ID of the running cloudflared process (0 if not running)
+    type: int
+    persistent: true
+    initialValue: 0
+    example: 12345
+
+  - name: tunnel_url
+    description: Public forwarding URL assigned by Cloudflare (trycloudflare.com)
+    type: string
+    persistent: true
+    initialValue: ""
+    example: "https://torchy-maxine-condensible.trycloudflare.com"
+
+  - name: error_message
+    description: Error message if tunnel failed to start
+    type: string
+    persistent: true
+    initialValue: ''
+
+  connectivity:
+    inputs: []
+    outputs: []
+
+  require:
+    connectivity: none
+
+  requires:
+    - live_server_management
+
+  agents:
+  - name: live_server_management
+    role: action
+    description: DoAgent that starts and stops the cloudflared process
+
+  constraints:
+  - description: cloudflared must be installed and available in PATH
+    validation: cloudflared command must be resolvable via exec.LookPath
+
+  examples:
+  - name: basic_cloudflare_tunnel
+    description: Expose a local HTTP server on port 8080 via Cloudflare
+    want:
+      metadata:
+        name: cloudflare-tunnel
+        type: cloudflare_tunnel
+        labels:
+          service: tunnel
+      spec:
+        params:
+          port: "8080"
+
+  - name: custom_port_cloudflare_tunnel
+    description: Expose a local service on a custom port via Cloudflare
+    want:
+      metadata:
+        name: cloudflare-api-tunnel
+        type: cloudflare_tunnel
+        labels:
+          service: api-tunnel
+      spec:
+        params:
+          port: "3000"
+          protocol: "http"
+
+  relatedTypes: [ngrok]
+  seeAlso: []

@@ -1,0 +1,5 @@
+name: cloudflare-tunnel
+type: cloudflare_tunnel
+spec:
+  params:
+    port: "8080"

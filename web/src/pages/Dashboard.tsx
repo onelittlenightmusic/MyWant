@@ -10,6 +10,7 @@ import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
+import { getBackgroundImage } from '@/utils/backgroundStyles';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 import { generateUniqueWantName } from '@/utils/nameGenerator';
 import { apiClient } from '@/api/client';
@@ -610,19 +611,7 @@ export const Dashboard: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleCreateWant, handleToggleSelectMode, sidebar, sidebar.showForm, isSelectMode, filteredWants]);
 
-  const getWantBackgroundImage = (type?: string) => {
-    if (!type) return undefined;
-    const lowerType = type.toLowerCase();
-    if (lowerType === 'flight') return '/resources/flight.png';
-    if (lowerType === 'hotel') return '/resources/hotel.png';
-    if (lowerType === 'restaurant') return '/resources/restaurant.png';
-    if (lowerType === 'buffet') return '/resources/buffet.png';
-    if (lowerType === 'evidence') return '/resources/evidence.png';
-    if (lowerType.includes('coordinator')) return '/resources/agent.png';
-    if (lowerType.includes('prime') || lowerType.includes('fibonacci') || lowerType.includes('numbers')) return '/resources/numbers.png';
-    if (lowerType === 'scheduler' || lowerType.includes('execution')) return '/resources/screen.png';
-    return undefined;
-  };
+  const getWantBackgroundImage = getBackgroundImage;
 
   const wantBackgroundImage = getWantBackgroundImage(selectedWant?.metadata?.type);
   const headerActions = headerState ? (
