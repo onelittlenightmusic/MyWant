@@ -7,6 +7,7 @@ import { AgentsPage } from '@/pages/AgentsPage';
 import RecipePage from '@/pages/RecipePage';
 import WantTypePage from '@/pages/WantTypePage';
 import { useConfigStore } from '@/stores/configStore';
+import { Layout } from '@/components/layout/Layout';
 
 function App() {
   const fetchConfig = useConfigStore(state => state.fetchConfig);
@@ -19,15 +20,17 @@ function App() {
     <ErrorBoundary>
       <Router>
         <div className="App">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/agents" element={<AgentsPage />} />
-            <Route path="/recipes" element={<RecipePage />} />
-            <Route path="/want-types" element={<WantTypePage />} />
-            <Route path="/logs" element={<LogsPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/agents" element={<AgentsPage />} />
+              <Route path="/recipes" element={<RecipePage />} />
+              <Route path="/want-types" element={<WantTypePage />} />
+              <Route path="/logs" element={<LogsPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Layout>
         </div>
       </Router>
     </ErrorBoundary>

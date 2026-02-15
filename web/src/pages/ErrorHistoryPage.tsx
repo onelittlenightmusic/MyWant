@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Activity, CheckCircle, XCircle } from 'lucide-react';
-import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { ErrorHistory } from '@/components/error/ErrorHistory';
 import { LogHistory } from '@/components/logs/LogHistory';
 import { useLogStore } from '@/stores/logStore';
 import { useErrorHistoryStore } from '@/stores/errorHistoryStore';
+import { useUIStore } from '@/stores/uiStore';
 import { classNames } from '@/utils/helpers';
 
 type TabType = 'errors' | 'logs';
 
 export const LogsPage: React.FC = () => {
-  const [sidebarMinimized, setSidebarMinimized] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('logs');
   const [showSummary, setShowSummary] = useState(false);
 
@@ -25,15 +24,11 @@ export const LogsPage: React.FC = () => {
   const errorResolvedCount = errors.filter(e => e.resolved).length;
 
   return (
-    <Layout
-      sidebarMinimized={sidebarMinimized}
-      onSidebarMinimizedChange={setSidebarMinimized}
-    >
+    <>
       {/* Header */}
       <Header
         title="Logs"
         onCreateWant={() => {}}
-        sidebarMinimized={sidebarMinimized}
         showSummary={showSummary}
         onSummaryToggle={() => setShowSummary(!showSummary)}
         hideCreateButton={true}
@@ -181,6 +176,6 @@ export const LogsPage: React.FC = () => {
           </div>
         </div>
       </RightSidebar>
-    </Layout>
+    </>
   );
 };

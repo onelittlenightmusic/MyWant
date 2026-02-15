@@ -3,6 +3,7 @@ import { Plus, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
+import { useUIStore } from '@/stores/uiStore';
 
 interface HeaderProps {
   onCreateWant: () => void;
@@ -32,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
   itemLabel,
   showSummary = false,
   onSummaryToggle,
-  sidebarMinimized = false,
+  sidebarMinimized: controlledMinimized,
   hideCreateButton = false,
   showSelectMode = false,
   onToggleSelectMode,
@@ -44,6 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
   onMinimapToggle
 }) => {
   const config = useConfigStore(state => state.config);
+  const { sidebarMinimized: storeMinimized } = useUIStore();
+  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : storeMinimized;
+  
   const isBottom = config?.header_position === 'bottom';
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);

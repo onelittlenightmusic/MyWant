@@ -3,6 +3,7 @@ import { Menu, ChevronRight } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { Sidebar } from './Sidebar';
 import { useConfigStore } from '@/stores/configStore';
+import { useUIStore } from '@/stores/uiStore';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,9 +17,10 @@ export const Layout: React.FC<LayoutProps> = ({
   onSidebarMinimizedChange
 }) => {
   const config = useConfigStore(state => state.config);
+  const { sidebarMinimized: storeMinimized, setSidebarMinimized: setStoreMinimized } = useUIStore();
+  
   const isBottom = config?.header_position === 'bottom';
   const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for mobile
-  const [internalMinimized, setInternalMinimized] = useState(true); // Start minimized
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -29,15 +31,18 @@ export const Layout: React.FC<LayoutProps> = ({
     }
   }, []);
 
-  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : internalMinimized;
+  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : storeMinimized;
+
+  const updateMinimized = (value: boolean) => {
+    if (onSidebarMinimizedChange) {
+      onSidebarMinimizedChange(value);
+    } else {
+      setStoreMinimized(value);
+    }
+  };
 
   const handleMinimizeToggle = () => {
-    const newValue = !sidebarMinimized;
-    if (onSidebarMinimizedChange) {
-      onSidebarMinimizedChange(newValue);
-    } else {
-      setInternalMinimized(newValue);
-    }
+    updateMinimized(!sidebarMinimized);
   };
 
   // Handle mouse enter - expand sidebar
@@ -45,21 +50,13 @@ export const Layout: React.FC<LayoutProps> = ({
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
-    if (onSidebarMinimizedChange) {
-      onSidebarMinimizedChange(false);
-    } else {
-      setInternalMinimized(false);
-    }
+    updateMinimized(false);
   };
 
   // Handle mouse leave - collapse sidebar after a delay
   const handleSidebarMouseLeave = () => {
     hoverTimeoutRef.current = setTimeout(() => {
-      if (onSidebarMinimizedChange) {
-        onSidebarMinimizedChange(true);
-      } else {
-        setInternalMinimized(true);
-      }
+      updateMinimized(true);
     }, 300); // 300ms delay before auto-collapse
   };
 

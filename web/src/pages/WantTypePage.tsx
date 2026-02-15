@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
+import { useUIStore } from '@/stores/uiStore';
 import { WantTypeListItem, ExampleDef, WantConfiguration } from '@/types/wantType';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -9,7 +10,6 @@ import { WantTypeDetailsSidebar } from '@/components/sidebar/WantTypeDetailsSide
 import { WantTypeStatsOverview } from '@/components/dashboard/WantTypeStatsOverview';
 import { WantTypeFilters } from '@/components/dashboard/WantTypeFilters';
 import { RightSidebar } from '@/components/layout/RightSidebar';
-import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { classNames } from '@/utils/helpers';
 import { apiClient } from '@/api/client';
@@ -34,7 +34,6 @@ export default function WantTypePage() {
 
   // UI State
   const sidebar = useRightSidebarExclusivity<WantTypeListItem>();
-  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [filteredWantTypes, setFilteredWantTypes] = useState<WantTypeListItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,10 +125,7 @@ export default function WantTypePage() {
   });
 
   return (
-    <Layout
-      sidebarMinimized={sidebarMinimized}
-      onSidebarMinimizedChange={setSidebarMinimized}
-    >
+    <>
       {/* Header */}
       <Header
         onCreateWant={() => {}}
@@ -138,7 +134,6 @@ export default function WantTypePage() {
         itemLabel="type"
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
-        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -269,6 +264,6 @@ export default function WantTypePage() {
           <span className="text-sm font-medium">{notification.message}</span>
         </div>
       )}
-    </Layout>
+    </>
   );
 }

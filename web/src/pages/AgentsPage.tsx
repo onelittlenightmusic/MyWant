@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AgentResponse } from '@/types/agent';
 import { useAgentStore } from '@/stores/agentStore';
+import { useUIStore } from '@/stores/uiStore';
 
 import { classNames } from '@/utils/helpers';
 import { useKeyboardNavigation } from '@/hooks/useKeyboardNavigation';
@@ -8,7 +9,6 @@ import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 
 // Components
-import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { AgentFilters } from '@/components/dashboard/AgentFilters';
@@ -29,7 +29,6 @@ export const AgentsPage: React.FC = () => {
 
   // UI State
   const sidebar = useRightSidebarExclusivity<AgentResponse>();
-  const [sidebarMinimized, setSidebarMinimized] = useState(true); // Start minimized
   const [editingAgent, setEditingAgent] = useState<AgentResponse | null>(null);
   const [deleteAgentState, setDeleteAgentState] = useState<AgentResponse | null>(null);
   const [filteredAgents, setFilteredAgents] = useState<AgentResponse[]>([]);
@@ -126,10 +125,7 @@ export const AgentsPage: React.FC = () => {
   };
 
   return (
-    <Layout
-      sidebarMinimized={sidebarMinimized}
-      onSidebarMinimizedChange={setSidebarMinimized}
-    >
+    <>
       {/* Header */}
       <Header
         onCreateWant={handleCreateAgent}
@@ -139,7 +135,6 @@ export const AgentsPage: React.FC = () => {
         itemLabel="agent"
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
-        sidebarMinimized={sidebarMinimized}
       />
 
       {/* Main content area with sidebar-aware layout */}
@@ -249,6 +244,6 @@ export const AgentsPage: React.FC = () => {
         title="Delete Agent"
         message={`Are you sure you want to delete the agent "${deleteAgentState?.name}"? This action cannot be undone.`}
       />
-    </Layout>
+    </>
   );
 };

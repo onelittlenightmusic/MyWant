@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Heart, Bot, BookOpen, AlertTriangle, Activity, Zap, ChevronsLeft, ChevronsRight, Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 
@@ -15,27 +16,26 @@ interface MenuItem {
   label: string;
   icon: React.ComponentType<any>;
   href: string;
-  active: boolean;
+  // active: boolean; // Not needed with useLocation
   disabled?: boolean;
 }
 
 // Get current path for active state
-const getCurrentPath = () => {
-  if (typeof window !== 'undefined') {
-    return window.location.pathname;
-  }
-  return '/dashboard';
-};
+// const getCurrentPath = () => {
+//   if (typeof window !== 'undefined') {
+//     return window.location.pathname;
+//   }
+//   return '/dashboard';
+// };
 
-const getMenuItems = (): MenuItem[] => {
-  const currentPath = getCurrentPath();
+const getMenuItems = (currentPath: string): MenuItem[] => {
   return [
     {
       id: 'wants',
       label: 'Wants',
       icon: Heart,
       href: '/dashboard',
-      active: currentPath === '/dashboard',
+      // active: currentPath === '/dashboard',
       disabled: false
     },
     {
@@ -43,21 +43,20 @@ const getMenuItems = (): MenuItem[] => {
       label: 'Agents',
       icon: Bot,
       href: '/agents',
-      active: currentPath === '/agents',
+      // active: currentPath === '/agents',
       disabled: false
     }
   ];
 };
 
-const getAdvancedItems = (): MenuItem[] => {
-  const currentPath = getCurrentPath();
+const getAdvancedItems = (currentPath: string): MenuItem[] => {
   return [
     {
       id: 'wantTypes',
       label: 'Want Types',
       icon: Zap,
       href: '/want-types',
-      active: currentPath === '/want-types',
+      // active: currentPath === '/want-types',
       disabled: false
     },
     {
@@ -65,7 +64,7 @@ const getAdvancedItems = (): MenuItem[] => {
       label: 'Recipes',
       icon: BookOpen,
       href: '/recipes',
-      active: currentPath === '/recipes',
+      // active: currentPath === '/recipes',
       disabled: false
     },
     {
@@ -73,7 +72,7 @@ const getAdvancedItems = (): MenuItem[] => {
       label: 'Logs',
       icon: Activity,
       href: '/logs',
-      active: currentPath === '/logs'
+      // active: currentPath === '/logs'
     }
   ];
 };
@@ -85,7 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onMinimizeToggle
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const menuItems = getMenuItems();
+  const location = useLocation();
+  const menuItems = getMenuItems(location.pathname);
 
   return (
     <>
@@ -128,90 +128,91 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </h1>
           </div>
 
-          {/* Navigation */}
-          <div className="flex-1 px-4 py-6 space-y-8 overflow-y-auto flex flex-col">
-            {/* Main Menu */}
-            <nav className="space-y-2">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    className={classNames(
-                      'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                      item.active 
-                        ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300' 
-                        : (!item.disabled 
-                            ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200' 
-                            : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'),
-                      isMinimized && "justify-center"
-                    )}
-                    onClick={(e) => item.disabled && e.preventDefault()}
-                    title={isMinimized ? item.label : undefined}
-                  >
-                    <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
-                    {!isMinimized && item.label}
-                    {!isMinimized && item.disabled && (
-                      <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">Soon</span>
-                    )}
-                  </a>
-                );
-              })}
-            </nav>
-
-            {/* Advanced Section */}
-            <div className="flex-1">
-              <h3 className={classNames(
-                "px-3 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3",
-                isMinimized && "text-center"
-              )}>
-                {isMinimized ? "Adv" : "Advanced"}
-              </h3>
-              <nav className="space-y-2">
-                {getAdvancedItems().map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <a
-                      key={item.id}
-                      href={item.href}
-                      className={classNames(
-                        'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                        item.active 
-                          ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300' 
-                          : (!item.disabled 
-                              ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200' 
-                              : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'),
-                        isMinimized && "justify-center"
-                      )}
-                      onClick={(e) => item.disabled && e.preventDefault()}
-                      title={isMinimized ? item.label : undefined}
-                    >
-                      <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
-                      {!isMinimized && item.label}
-                      {!isMinimized && item.disabled && (
-                        <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">Soon</span>
-                      )}
-                    </a>
-                  );
-                })}
-                
-                {/* Settings Button - Moved here from the bottom */}
-                <button
-                  onClick={() => setIsSettingsOpen(true)}
-                  className={classNames(
-                    'w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200',
-                    isMinimized && "justify-center"
-                  )}
-                  title={isMinimized ? "Settings" : undefined}
-                >
-                  <Settings className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
-                  {!isMinimized && "Settings"}
-                </button>
-              </nav>
-            </div>
-          </div>
+                    {/* Navigation */}
+                    <div className="flex-1 px-4 py-6 space-y-8 overflow-y-auto flex flex-col">
+                      {/* Main Menu */}
+                      <nav className="space-y-2">
+                        {menuItems.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = location.pathname === item.href;
+                          return (
+                            <Link
+                              key={item.id}
+                              to={item.href}
+                              className={classNames(
+                                'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                                isActive
+                                  ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                                  : (!item.disabled
+                                      ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200'
+                                      : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'),
+                                isMinimized && "justify-center"
+                              )}
+                              onClick={(e) => item.disabled && e.preventDefault()}
+                              title={isMinimized ? item.label : undefined}
+                            >
+                              <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
+                              {!isMinimized && item.label}
+                              {!isMinimized && item.disabled && (
+                                <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">Soon</span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </nav>
+          
+                      {/* Advanced Section */}
+                      <div className="flex-1">
+                        <h3 className={classNames(
+                          "px-3 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider mb-3",
+                          isMinimized && "text-center"
+                        )}>
+                          {isMinimized ? "Adv" : "Advanced"}
+                        </h3>
+                        <nav className="space-y-2">
+                          {getAdvancedItems(location.pathname).map((item) => {
+                            const Icon = item.icon;
+                            const isActive = location.pathname === item.href;
+                            return (
+                              <Link
+                                key={item.id}
+                                to={item.href}
+                                className={classNames(
+                                  'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                                  isActive
+                                    ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                                    : (!item.disabled
+                                        ? 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'),
+                                  isMinimized && "justify-center"
+                                )}
+                                onClick={(e) => item.disabled && e.preventDefault()}
+                                title={isMinimized ? item.label : undefined}
+                              >
+                                <Icon className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
+                                {!isMinimized && item.label}
+                                {!isMinimized && item.disabled && (
+                                  <span className="ml-auto text-xs text-gray-400 dark:text-gray-600">Soon</span>
+                                )}
+                              </Link>
+                            );
+                          })}
+                          
+                          {/* Settings Button - Moved here from the bottom */}
+                          <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className={classNames(
+                              'w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                              'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-200',
+                              isMinimized && "justify-center"
+                            )}
+                            title={isMinimized ? "Settings" : undefined}
+                          >
+                            <Settings className={classNames("h-5 w-5", !isMinimized && "mr-3")} />
+                            {!isMinimized && "Settings"}
+                          </button>
+                        </nav>
+                      </div>          </div>
         </div>
       </div>
 

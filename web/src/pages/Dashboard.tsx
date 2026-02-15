@@ -4,6 +4,7 @@ import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
+import { useUIStore } from '@/stores/uiStore';
 import { usePolling } from '@/hooks/usePolling';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -18,7 +19,6 @@ import { Recommendation, ConfigModifications } from '@/types/interact';
 import { DraftWant, wantToDraft, isDraftWant } from '@/types/draft';
 
 // Components
-import { Layout } from '@/components/layout/Layout';
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { WantGrid } from '@/components/dashboard/WantGrid';
@@ -52,7 +52,6 @@ export const Dashboard: React.FC = () => {
   const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
   const [reactionAction, setReactionAction] = useState<'approve' | 'deny' | null>(null);
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const [sidebarMinimized, setSidebarMinimized] = useState(true);
   const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
@@ -623,12 +622,11 @@ export const Dashboard: React.FC = () => {
   ) : null;
 
   return (
-    <Layout sidebarMinimized={sidebarMinimized} onSidebarMinimizedChange={setSidebarMinimized}>
+    <>
       <Header
         onCreateWant={handleCreateWant}
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
-        sidebarMinimized={sidebarMinimized}
         showSelectMode={isSelectMode}
         onToggleSelectMode={handleToggleSelectMode}
         onInteractSubmit={handleInteractSubmit}
@@ -780,6 +778,6 @@ export const Dashboard: React.FC = () => {
         className="hidden"
         accept=".yaml,.yml"
       />
-    </Layout>
+    </>
   );
 };
