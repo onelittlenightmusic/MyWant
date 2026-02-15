@@ -3147,6 +3147,12 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 		}
 	}
 
+	// Persist configuration change to memory file
+	if err := cb.copyConfigToMemory(); err != nil {
+		// Log error but don't fail the deletion operation itself as in-memory state is correct
+		fmt.Printf("[ERROR] Failed to persist config after deleting want %s: %v\n", wantID, err)
+	}
+
 	cb.reconcileMutex.Unlock()
 
 	return nil
