@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Zap, Settings, Database, Share2, BookOpen, FileText, List, Download, Play, Rocket } from 'lucide-react';
 import { WantTypeDefinition, ExampleDef } from '@/types/wantType';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 import {
@@ -104,7 +105,7 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {wantType && (
-        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-2 flex gap-1 justify-center">
+        <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex gap-1 justify-center">
           {/* Deploy first example */}
           {wantType.examples.length > 0 && (
             <button
@@ -142,8 +143,8 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
       )}
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200 px-6 py-4">
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-x-auto">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 py-2 sm:py-4">
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -151,14 +152,14 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={classNames(
-                  'flex items-center justify-center space-x-1 px-2 py-2 text-sm font-medium rounded-md transition-colors flex-shrink-0',
+                  'flex items-center justify-center space-x-1 px-2 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-colors flex-shrink-0',
                   activeTab === tab.id
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 )}
               >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate text-xs whitespace-nowrap">{tab.label}</span>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate text-[10px] sm:text-xs whitespace-nowrap">{tab.label}</span>
               </button>
             );
           })}
@@ -190,7 +191,7 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
 const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
     <TabSection title="Metadata">
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         <InfoRow label="Name" value={wantType.metadata.name} />
         <InfoRow label="Title" value={wantType.metadata.title} />
         <InfoRow label="Version" value={<span className="font-mono">{wantType.metadata.version}</span>} />
@@ -200,11 +201,11 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
     </TabSection>
 
     <TabSection title="Description">
-      <p className="text-sm text-gray-600 whitespace-pre-wrap">{wantType.metadata.description}</p>
+      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed">{wantType.metadata.description}</p>
     </TabSection>
 
     <TabSection title="Summary">
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         <InfoRow label="Parameters" value={wantType.parameters.length} />
         <InfoRow label="State Keys" value={wantType.state.length} />
         <InfoRow label="Require Type" value={wantType.require?.type || 'none'} />
@@ -215,9 +216,9 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
 
     {wantType.relatedTypes && wantType.relatedTypes.length > 0 && (
       <TabSection title="Related Types">
-        <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
           {wantType.relatedTypes.map((type) => (
-            <div key={type} className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700">
+            <div key={type} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
               {type}
             </div>
           ))}
@@ -230,44 +231,46 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
 const ParametersTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
     {wantType.parameters && wantType.parameters.length > 0 ? (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {wantType.parameters.map((param) => (
           <TabSection key={param.name} title={param.name}>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-gray-600">Type:</span>
-                <span className="ml-2 font-mono text-gray-900">{param.type}</span>
+            <div className="space-y-2 text-xs sm:text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Type:</span>
+                <span className="font-mono text-gray-900 dark:text-gray-200">{param.type}</span>
               </div>
               {param.default !== undefined && (
-                <div>
-                  <span className="text-gray-600">Default:</span>
-                  <span className="ml-2 font-mono text-gray-900">{String(param.default)}</span>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Default:</span>
+                  <span className="font-mono text-gray-900 dark:text-gray-200">{String(param.default)}</span>
                 </div>
               )}
-              <div>
-                <span className="text-gray-600">Required:</span>
-                <span className="ml-2 text-gray-900">{param.required ? 'Yes' : 'No'}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Required:</span>
+                <span className="text-gray-900 dark:text-gray-200">{param.required ? 'Yes' : 'No'}</span>
               </div>
               {param.description && (
-                <div>
-                  <span className="text-gray-600">Description:</span>
-                  <p className="mt-1 text-gray-700">{param.description}</p>
+                <div className="pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Description:</span>
+                  <p className="mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">{param.description}</p>
                 </div>
               )}
               {param.validation && (
-                <div className="mt-2 p-2 bg-gray-50 rounded">
-                  <span className="text-gray-600 text-xs">Validation Rules:</span>
-                  {param.validation.min !== undefined && (
-                    <div className="text-xs text-gray-700">Min: {param.validation.min}</div>
-                  )}
-                  {param.validation.max !== undefined && (
-                    <div className="text-xs text-gray-700">Max: {param.validation.max}</div>
-                  )}
-                  {param.validation.enum && (
-                    <div className="text-xs text-gray-700">
-                      Enum: {param.validation.enum.join(', ')}
-                    </div>
-                  )}
+                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-gray-600 dark:text-gray-400 text-[10px] sm:text-xs font-medium uppercase tracking-wider">Validation Rules:</span>
+                  <div className="mt-1 space-y-1">
+                    {param.validation.min !== undefined && (
+                      <div className="text-[10px] sm:text-xs text-gray-700 dark:text-gray-300">Min: {param.validation.min}</div>
+                    )}
+                    {param.validation.max !== undefined && (
+                      <div className="text-[10px] sm:text-xs text-gray-700 dark:text-gray-300">Max: {param.validation.max}</div>
+                    )}
+                    {param.validation.enum && (
+                      <div className="text-[10px] sm:text-xs text-gray-700 dark:text-gray-300">
+                        Enum: {param.validation.enum.join(', ')}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -283,22 +286,22 @@ const ParametersTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType })
 const StateTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
     {wantType.state && wantType.state.length > 0 ? (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {wantType.state.map((state) => (
           <TabSection key={state.name} title={state.name}>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-gray-600">Type:</span>
-                <span className="ml-2 font-mono text-gray-900">{state.type}</span>
+            <div className="space-y-2 text-xs sm:text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Type:</span>
+                <span className="font-mono text-gray-900 dark:text-gray-200">{state.type}</span>
               </div>
-              <div>
-                <span className="text-gray-600">Persistent:</span>
-                <span className="ml-2 text-gray-900">{state.persistent ? 'Yes' : 'No'}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Persistent:</span>
+                <span className="text-gray-900 dark:text-gray-200">{state.persistent ? 'Yes' : 'No'}</span>
               </div>
               {state.description && (
-                <div>
-                  <span className="text-gray-600">Description:</span>
-                  <p className="mt-1 text-gray-700">{state.description}</p>
+                <div className="pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Description:</span>
+                  <p className="mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">{state.description}</p>
                 </div>
               )}
             </div>
@@ -315,25 +318,26 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
   <TabContent>
     {wantType.require && (
       <TabSection title="Require">
-        <div className="space-y-3 text-sm">
-          <div>
-            <span className="text-gray-600">Type:</span>
-            <span className="ml-2 font-semibold capitalize">{wantType.require.type}</span>
+        <div className="space-y-3 text-xs sm:text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">Type:</span>
+            <span className="font-semibold capitalize text-gray-900 dark:text-gray-200">{wantType.require.type}</span>
           </div>
 
           {wantType.require.providers && wantType.require.providers.length > 0 && (
             <div>
-              <span className="text-gray-600">Providers (Input Connections):</span>
+              <span className="text-gray-600 dark:text-gray-400">Providers (Input Connections):</span>
               <div className="mt-2 space-y-2">
                 {wantType.require.providers.map((provider) => (
-                  <div key={provider.name} className="p-2 bg-blue-50 rounded">
-                    <div className="font-semibold text-blue-900">{provider.name}</div>
-                    <div className="text-xs text-blue-700">{provider.type}</div>
+                  <div key={provider.name} className="p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800/50">
+                    <div className="font-semibold text-blue-900 dark:text-blue-300">{provider.name}</div>
+                    <div className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400 font-mono mt-0.5">{provider.type}</div>
                     {provider.description && (
-                      <p className="text-xs text-blue-800 mt-1">{provider.description}</p>
+                      <p className="text-[10px] sm:text-xs text-blue-800 dark:text-blue-300/80 mt-1.5 leading-relaxed">{provider.description}</p>
                     )}
-                    <div className="text-xs text-blue-700 mt-1">
-                      Required: {provider.required ? 'Yes' : 'No'}, Multiple: {provider.multiple ? 'Yes' : 'No'}
+                    <div className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400 mt-2 flex gap-3">
+                      <span>Required: <span className="font-medium">{provider.required ? 'Yes' : 'No'}</span></span>
+                      <span>Multiple: <span className="font-medium">{provider.multiple ? 'Yes' : 'No'}</span></span>
                     </div>
                   </div>
                 ))}
@@ -343,17 +347,18 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
 
           {wantType.require.users && wantType.require.users.length > 0 && (
             <div>
-              <span className="text-gray-600">Users (Output Connections):</span>
+              <span className="text-gray-600 dark:text-gray-400">Users (Output Connections):</span>
               <div className="mt-2 space-y-2">
                 {wantType.require.users.map((user) => (
-                  <div key={user.name} className="p-2 bg-green-50 rounded">
-                    <div className="font-semibold text-green-900">{user.name}</div>
-                    <div className="text-xs text-green-700">{user.type}</div>
+                  <div key={user.name} className="p-2.5 bg-green-50 dark:bg-green-900/20 rounded border border-green-100 dark:border-green-800/50">
+                    <div className="font-semibold text-green-900 dark:text-green-300">{user.name}</div>
+                    <div className="text-[10px] sm:text-xs text-green-700 dark:text-green-400 font-mono mt-0.5">{user.type}</div>
                     {user.description && (
-                      <p className="text-xs text-green-800 mt-1">{user.description}</p>
+                      <p className="text-[10px] sm:text-xs text-green-800 dark:text-green-300/80 mt-1.5 leading-relaxed">{user.description}</p>
                     )}
-                    <div className="text-xs text-green-700 mt-1">
-                      Required: {user.required ? 'Yes' : 'No'}, Multiple: {user.multiple ? 'Yes' : 'No'}
+                    <div className="text-[10px] sm:text-xs text-green-700 dark:text-green-400 mt-2 flex gap-3">
+                      <span>Required: <span className="font-medium">{user.required ? 'Yes' : 'No'}</span></span>
+                      <span>Multiple: <span className="font-medium">{user.multiple ? 'Yes' : 'No'}</span></span>
                     </div>
                   </div>
                 ))}
@@ -366,37 +371,37 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
 
     <TabSection title="Inputs (Legacy)">
       {wantType.connectivity?.inputs && wantType.connectivity.inputs.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {wantType.connectivity.inputs.map((input) => (
-            <div key={input.name} className="p-2 bg-blue-50 rounded">
-              <div className="font-semibold text-blue-900">{input.name}</div>
-              <div className="text-xs text-blue-700">{input.type}</div>
+            <div key={input.name} className="p-2.5 bg-blue-50 dark:bg-blue-900/10 rounded border border-blue-100/50 dark:border-blue-900/30">
+              <div className="font-semibold text-blue-900 dark:text-blue-300 text-xs sm:text-sm">{input.name}</div>
+              <div className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400 font-mono">{input.type}</div>
               {input.description && (
-                <p className="text-xs text-blue-800 mt-1">{input.description}</p>
+                <p className="text-[10px] sm:text-xs text-blue-800 dark:text-blue-400/80 mt-1">{input.description}</p>
               )}
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No inputs</p>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 italic">No legacy inputs</p>
       )}
     </TabSection>
 
     <TabSection title="Outputs (Legacy)">
       {wantType.connectivity?.outputs && wantType.connectivity.outputs.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {wantType.connectivity.outputs.map((output) => (
-            <div key={output.name} className="p-2 bg-green-50 rounded">
-              <div className="font-semibold text-green-900">{output.name}</div>
-              <div className="text-xs text-green-700">{output.type}</div>
+            <div key={output.name} className="p-2.5 bg-green-50 dark:bg-green-900/10 rounded border border-green-100/50 dark:border-green-900/30">
+              <div className="font-semibold text-green-900 dark:text-green-300 text-xs sm:text-sm">{output.name}</div>
+              <div className="text-[10px] sm:text-xs text-green-700 dark:text-green-400 font-mono">{output.type}</div>
               {output.description && (
-                <p className="text-xs text-green-800 mt-1">{output.description}</p>
+                <p className="text-[10px] sm:text-xs text-green-800 dark:text-green-400/80 mt-1">{output.description}</p>
               )}
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No outputs</p>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 italic">No legacy outputs</p>
       )}
     </TabSection>
   </TabContent>
@@ -405,24 +410,24 @@ const ConnectivityTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType 
 const AgentsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
     {wantType.agents && wantType.agents.length > 0 ? (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {wantType.agents.map((agent) => (
           <TabSection key={agent.name} title={agent.name}>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-gray-600">Role:</span>
-                <span className="ml-2 font-semibold text-gray-900 capitalize">{agent.role}</span>
+            <div className="space-y-2 text-xs sm:text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Role:</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-200 capitalize">{agent.role}</span>
               </div>
               {agent.description && (
-                <div>
-                  <span className="text-gray-600">Description:</span>
-                  <p className="mt-1 text-gray-700">{agent.description}</p>
+                <div className="pt-1">
+                  <span className="text-gray-600 dark:text-gray-400">Description:</span>
+                  <p className="mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">{agent.description}</p>
                 </div>
               )}
               {agent.example && (
-                <div className="mt-2 p-2 bg-gray-50 rounded">
-                  <span className="text-gray-600 text-xs">Example:</span>
-                  <p className="text-xs text-gray-700">{agent.example}</p>
+                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-gray-600 dark:text-gray-400 text-[10px] sm:text-xs font-medium uppercase tracking-wider">Example:</span>
+                  <p className="mt-1 text-[10px] sm:text-xs text-gray-700 dark:text-gray-300 font-mono break-all">{agent.example}</p>
                 </div>
               )}
             </div>
@@ -442,43 +447,48 @@ const ExamplesTab: React.FC<{
 }> = ({ wantType, onDeployExample, deployingExample }) => (
   <TabContent>
     {wantType.examples && wantType.examples.length > 0 ? (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {wantType.examples.map((example, index) => (
           <TabSection key={index} title={example.name}>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-xs sm:text-sm">
               <div>
-                <span className="text-gray-600">Description:</span>
-                <p className="mt-1 text-gray-700">{example.description}</p>
+                <span className="text-gray-600 dark:text-gray-400">Description:</span>
+                <p className="mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">{example.description}</p>
               </div>
               <div>
-                <span className="text-gray-600">Want Configuration:</span>
-                <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto">
-                  {JSON.stringify(example.want, null, 2)}
-                </pre>
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Want Configuration:</span>
+                <div className="mt-1.5 relative group">
+                  <pre className="text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-900 p-2.5 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto font-mono text-gray-800 dark:text-gray-200 max-h-48">
+                    {JSON.stringify(example.want, null, 2)}
+                  </pre>
+                </div>
               </div>
               {example.expectedBehavior && (
                 <div>
-                  <span className="text-gray-600">Expected Behavior:</span>
-                  <p className="mt-1 text-gray-700 whitespace-pre-wrap text-xs">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium">Expected Behavior:</span>
+                  <p className="mt-1 text-gray-700 dark:text-gray-300 whitespace-pre-wrap text-[10px] sm:text-xs leading-relaxed italic">
                     {example.expectedBehavior}
                   </p>
                 </div>
               )}
               {onDeployExample && (
-                <div className="mt-3 pt-2 border-t border-gray-200">
+                <div className="mt-2 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
                   <button
                     onClick={() => onDeployExample(example)}
                     disabled={deployingExample === example.name}
-                    title={`Deploy ${example.name} example`}
                     className={classNames(
-                      'flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors',
+                      'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all shadow-sm',
                       deployingExample === example.name
-                        ? 'bg-gray-200 text-gray-600 cursor-wait'
-                        : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-wait'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
                     )}
                   >
-                    <Play className="h-3 w-3" />
-                    {deployingExample === example.name ? 'Deploying...' : 'Deploy'}
+                    {deployingExample === example.name ? (
+                      <LoadingSpinner size="sm" />
+                    ) : (
+                      <Play className="h-3 w-3 fill-current" />
+                    )}
+                    {deployingExample === example.name ? 'Deploying...' : 'Deploy Example'}
                   </button>
                 </div>
               )}
@@ -495,17 +505,17 @@ const ExamplesTab: React.FC<{
 const ConstraintsTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) => (
   <TabContent>
     {wantType.constraints && wantType.constraints.length > 0 ? (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {wantType.constraints.map((constraint, index) => (
           <TabSection key={index} title={`Constraint ${index + 1}`}>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-xs sm:text-sm">
               <div>
-                <span className="text-gray-600">Description:</span>
-                <p className="mt-1 text-gray-700">{constraint.description}</p>
+                <span className="text-gray-600 dark:text-gray-400">Description:</span>
+                <p className="mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">{constraint.description}</p>
               </div>
-              <div>
-                <span className="text-gray-600">Validation:</span>
-                <pre className="mt-1 text-xs bg-gray-50 p-2 rounded font-mono">
+              <div className="mt-2">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Validation:</span>
+                <pre className="mt-1 text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 font-mono text-pink-600 dark:text-pink-400 overflow-x-auto">
                   {constraint.validation}
                 </pre>
               </div>

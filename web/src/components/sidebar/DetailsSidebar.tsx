@@ -49,31 +49,31 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className={classNames(
-        "px-6 py-4",
+        "px-4 sm:px-6 py-3 sm:py-4",
         isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
       )}>
         {/* Badge and Title */}
-        <div className="flex items-center space-x-3 mb-4">
+        <div className="flex items-center space-x-3 mb-2 sm:mb-4">
           {badge}
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
             {title}
           </h3>
           {subtitle && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
           )}
         </div>
 
         {/* Additional header content */}
         {headerContent && (
-          <div className="mt-4">
+          <div className="mt-2 sm:mt-4">
             {headerContent}
           </div>
         )}
 
         {/* Tab navigation */}
-        <div className="mt-4">
+        <div className="mt-3 sm:mt-4">
           <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -82,14 +82,14 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   className={classNames(
-                    'flex-1 flex items-center justify-center space-x-1 px-2 py-2 text-sm font-medium rounded-md transition-colors min-w-0',
+                    'flex-1 flex items-center justify-center space-x-1 px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-colors min-w-0',
                     activeTab === tab.id
                       ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                   )}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate text-xs">{tab.label}</span>
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate text-[10px] sm:text-xs">{tab.label}</span>
                 </button>
               );
             })}
@@ -111,8 +111,8 @@ export const TabSection: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ title, children, className }) => (
-  <div className={classNames('bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4', className)}>
-    <h4 className="font-medium text-gray-900 dark:text-white mb-3">{title}</h4>
+  <div className={classNames('bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 sm:p-4', className)}>
+    <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-3">{title}</h4>
     {children}
   </div>
 );
@@ -122,8 +122,8 @@ export const TabGrid: React.FC<{
   columns?: number;
 }> = ({ children, columns = 1 }) => (
   <div className={classNames(
-    'space-y-3',
-    columns > 1 && 'md:grid md:gap-6 md:space-y-0',
+    'space-y-2 sm:space-y-3',
+    columns > 1 && 'md:grid md:gap-4 sm:gap-6 md:space-y-0',
     columns === 2 && 'md:grid-cols-2',
     columns === 3 && 'lg:grid-cols-3'
   )}>
@@ -134,7 +134,7 @@ export const TabGrid: React.FC<{
 export const TabContent: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => (
-  <div className="p-6 space-y-6">
+  <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
     {children}
   </div>
 );
@@ -143,9 +143,9 @@ export const EmptyState: React.FC<{
   icon: LucideIcon;
   message: string;
 }> = ({ icon: Icon, message }) => (
-  <div className="text-center py-8">
-    <Icon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-    <p className="text-gray-500 dark:text-gray-400">{message}</p>
+  <div className="text-center py-6 sm:py-8">
+    <Icon className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 dark:text-gray-600 mx-auto mb-3 sm:mb-4" />
+    <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
   </div>
 );
 
@@ -153,8 +153,8 @@ export const InfoRow: React.FC<{
   label: string;
   value: React.ReactNode;
 }> = ({ label, value }) => (
-  <div className="flex justify-between">
-    <dt className="text-sm text-gray-600 dark:text-gray-400">{label}:</dt>
-    <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">{value}</dd>
+  <div className="flex justify-between items-center text-xs sm:text-sm">
+    <dt className="text-gray-600 dark:text-gray-400">{label}:</dt>
+    <dd className="font-medium text-gray-900 dark:text-gray-200">{value}</dd>
   </div>
 );

@@ -83,7 +83,7 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantType.name}
       className={classNames(
-        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset',
+        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[8rem] sm:min-h-[12.5rem]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
         className || ''
       )}
@@ -98,17 +98,17 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3
-            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
+            className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
             onClick={() => onView(wantType)}
           >
-            <Zap className="h-4 w-4 flex-shrink-0 text-yellow-500" />
+            <Zap className="h-3 w-3 sm:h-4 w-4 flex-shrink-0 text-yellow-500" />
             {truncateText(wantType.title, 30)}
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
             {wantType.name}
           </p>
           {wantType.version && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-[9px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1">
               Version: {wantType.version}
             </p>
           )}

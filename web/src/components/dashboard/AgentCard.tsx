@@ -77,7 +77,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={agentName}
       className={classNames(
-        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset bg-white dark:bg-gray-800',
+        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset bg-white dark:bg-gray-800 h-full flex flex-col min-h-[8rem] sm:min-h-[12.5rem]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
         className
       )}>
@@ -85,15 +85,15 @@ export const AgentCard: React.FC<AgentCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3
-            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5"
+            className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5"
             onClick={() => onView(agent)}
           >
-            <Bot className="h-4 w-4 flex-shrink-0 text-blue-500" />
+            <Bot className="h-3 w-3 sm:h-4 w-4 flex-shrink-0 text-blue-500" />
             {truncateText(agentName, 30)}
           </h3>
           <div className="flex items-center mt-2">
             <div className={classNames(
-              'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
+              'inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium',
               getTypeColor()
             )}>
               {getTypeIcon()}
