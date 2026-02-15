@@ -67,7 +67,18 @@ func New(config Config) *Server {
 	}
 	globalBuilder := mywant.NewChainBuilderWithPaths(config.ConfigPath, config.MemoryPath)
 
-	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
+	// Load initial configuration from memory file if it exists (persistence)
+	initialConfig := mywant.Config{Wants: []*mywant.Want{}}
+	if config.MemoryPath != "" {
+		if _, err := os.Stat(config.MemoryPath); err == nil {
+			if loadedConfig, err := mywant.LoadConfigFromYAML(config.MemoryPath); err == nil {
+				initialConfig = loadedConfig
+				log.Printf("[SERVER] Restored %d wants from %s\n", len(initialConfig.Wants), config.MemoryPath)
+			}
+		}
+	}
+
+	globalBuilder.SetConfigInternal(initialConfig)
 	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
 	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes
