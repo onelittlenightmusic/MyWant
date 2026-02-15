@@ -98,9 +98,10 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3
-            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer"
+            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
             onClick={() => onView(wantType)}
           >
+            <Zap className="h-4 w-4 flex-shrink-0 text-yellow-500" />
             {truncateText(wantType.title, 30)}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

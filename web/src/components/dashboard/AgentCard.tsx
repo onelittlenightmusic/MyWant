@@ -85,9 +85,10 @@ export const AgentCard: React.FC<AgentCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
           <h3
-            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors"
+            className="text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5"
             onClick={() => onView(agent)}
           >
+            <Bot className="h-4 w-4 flex-shrink-0 text-blue-500" />
             {truncateText(agentName, 30)}
           </h3>
           <div className="flex items-center mt-2">

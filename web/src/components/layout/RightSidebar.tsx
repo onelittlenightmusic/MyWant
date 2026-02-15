@@ -1,5 +1,5 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { LucideIcon, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
 
@@ -7,6 +7,8 @@ interface RightSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  titleIcon?: LucideIcon;
+  titleIconClassName?: string;
   children: React.ReactNode;
   className?: string;
   backgroundStyle?: React.CSSProperties;
@@ -18,6 +20,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   isOpen,
   onClose,
   title,
+  titleIcon: TitleIcon,
+  titleIconClassName,
   children,
   className,
   backgroundStyle,
@@ -76,7 +80,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         )} style={isBottom ? { paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' } : {}}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">{title}</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate flex items-center gap-2">
+                {TitleIcon && <TitleIcon className={classNames("h-5 w-5 flex-shrink-0", titleIconClassName || "")} />}
+                {title}
+              </h2>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Bot, Pause, Clock, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -186,8 +186,9 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
-              className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors`}
+              className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}
             >
+              <Heart className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
               {wantType}
             </h3>
             <p className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}>

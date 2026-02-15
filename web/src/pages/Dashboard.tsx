@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -718,7 +718,9 @@ export const Dashboard: React.FC = () => {
           else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } 
           else { sidebar.clearSelection(); } 
         }} 
-        title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')} 
+        title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
+        titleIcon={!isSelectMode && selectedWant ? Heart : undefined}
+        titleIconClassName={!isSelectMode && selectedWant ? 'text-pink-500' : undefined}
         backgroundStyle={!isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} 
         headerActions={!isSelectMode && selectedWant ? headerActions : undefined}
       >

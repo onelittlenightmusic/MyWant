@@ -88,7 +88,7 @@ export const LogHistory: React.FC<LogHistoryProps> = ({ className = '' }) => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">API Logs</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><Activity className="h-6 w-6 flex-shrink-0 text-emerald-500" />API Logs</h2>
           <p className="text-gray-600 dark:text-gray-300 mt-1">
             View API operations (POST, PUT, DELETE)
           </p>
