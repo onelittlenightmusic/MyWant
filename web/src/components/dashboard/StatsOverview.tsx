@@ -17,16 +17,14 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2">
     <div className="flex items-center">
-      <div className={`flex-shrink-0 p-3 rounded-full ${color}`}>
-        <div className="text-xl">
-          {icon}
-        </div>
+      <div className={`flex-shrink-0 p-2 rounded-full ${color}`}>
+        {icon}
       </div>
-      <div className="ml-4">
-        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+      <div className="ml-3">
+        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">{title}</p>
+        <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
       </div>
     </div>
   </div>
@@ -41,8 +39,8 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
     return (
       <div className={gridClass}>
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-center h-16">
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2">
+            <div className="flex items-center justify-center h-10">
               <LoadingSpinner size="md" />
             </div>
           </div>
@@ -63,25 +61,25 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
       title: 'Total Wants',
       value: stats.total,
       color: 'bg-blue-100 dark:bg-blue-900/30',
-      icon: <ClipboardList className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+      icon: <ClipboardList className="h-5 w-5 text-blue-600 dark:text-blue-400" />
     },
     {
       title: 'Reaching',
       value: stats.running,
       color: 'bg-green-100 dark:bg-green-900/30',
-      icon: <Play className="h-6 w-6 text-green-600 dark:text-green-400" />
+      icon: <Play className="h-5 w-5 text-green-600 dark:text-green-400" />
     },
     {
       title: 'Achieved',
       value: stats.completed,
       color: 'bg-green-100 dark:bg-green-900/30',
-      icon: <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+      icon: <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
     },
     {
       title: 'Failed',
       value: stats.failed,
       color: 'bg-red-100 dark:bg-red-900/30',
-      icon: <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+      icon: <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
     }
   ];
 
