@@ -782,6 +782,13 @@ export const Dashboard: React.FC = () => {
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileInputChange}
+        className="hidden"
+        accept=".yaml,.yml"
+      />
     </Layout>
   );
 };
