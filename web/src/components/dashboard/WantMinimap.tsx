@@ -181,12 +181,16 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
   return (
     <div
       className={classNames(
-        "fixed right-0 w-full sm:w-[480px] h-[calc(100vh-4rem)] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300 dark:bg-gray-950 dark:border-gray-800",
-        isHeaderBottom ? "top-0" : "top-16",
+        "fixed right-0 w-full sm:w-[480px] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300 dark:bg-gray-950 dark:border-gray-800",
         "lg:translate-x-0", // Desktop: always visible
         isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0", // Mobile: toggle
         "z-30" // Below RightSidebar (z-40)
       )}
+      style={{
+        top: isHeaderBottom ? 'env(safe-area-inset-top, 0px)' : 'calc(env(safe-area-inset-top, 0px) + 4rem)',
+        bottom: 'env(safe-area-inset-bottom, 0px)',
+        height: 'auto'
+      }}
     >
       <div className="grid grid-cols-3 gap-2 auto-rows-min">
         {/* Parent cards (filteredWants) */}

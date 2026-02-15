@@ -98,11 +98,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Sidebar */}
-      <div className={classNames(
-        'fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transform transition-all duration-300 ease-in-out lg:flex lg:flex-col lg:h-screen',
-        isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-        isMinimized ? 'w-20' : 'w-44'
-      )}>
+      <div 
+        className={classNames(
+          'fixed left-0 z-50 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transform transition-all duration-300 ease-in-out lg:flex lg:flex-col',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isMinimized ? 'w-20' : 'w-44'
+        )}
+        style={{ 
+          top: 'env(safe-area-inset-top, 0px)', 
+          bottom: 'env(safe-area-inset-bottom, 0px)',
+          height: 'auto'
+        }}
+      >
         <div className="flex flex-col h-full">
           {/* Mobile Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-gray-800 lg:hidden">

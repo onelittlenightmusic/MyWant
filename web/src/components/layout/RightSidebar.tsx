@@ -45,10 +45,15 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
+          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
+        style={{
+          top: 'env(safe-area-inset-top, 0px)',
+          bottom: 'env(safe-area-inset-bottom, 0px)',
+          height: 'auto'
+        }}
       >
         {/* Background image - covers entire sidebar */}
         {backgroundStyle && (

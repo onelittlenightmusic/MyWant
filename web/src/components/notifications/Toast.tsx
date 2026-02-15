@@ -65,10 +65,11 @@ export const Toast: React.FC<ToastProps> = ({
     <div
       className={classNames(
         'fixed flex items-center gap-3 transition-opacity duration-300',
-        'bottom-8 left-1/2 transform -translate-x-1/2',
+        'left-1/2 transform -translate-x-1/2',
         isAnimating ? 'opacity-100' : 'opacity-0',
         'z-50 pointer-events-auto'
       )}
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' }}
     >
       <div className="flex-shrink-0">
         <div className={classNames("flex items-center justify-center h-10 w-10 rounded-full shadow-lg", getBgColor(severity))}>

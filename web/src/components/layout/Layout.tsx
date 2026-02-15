@@ -98,11 +98,14 @@ export const Layout: React.FC<LayoutProps> = ({
       </div>
 
       {/* Main content */}
-      <div className={classNames(
-        "flex-1 flex flex-col relative transition-all duration-300 ease-in-out min-w-0",
-        sidebarMinimized ? "lg:ml-20" : "lg:ml-44",
-        isBottom ? "pb-16 sm:pb-20" : "pt-16 sm:pt-20"
-      )}>
+      <div 
+        className={classNames(
+          "flex-1 flex flex-col relative transition-all duration-300 ease-in-out min-w-0",
+          sidebarMinimized ? "lg:ml-20" : "lg:ml-44",
+          isBottom ? "pb-16 sm:pb-20" : "pt-16 sm:pt-20"
+        )}
+        style={isBottom ? {} : { marginTop: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div className={classNames(
           "flex-1 flex flex-col min-w-0",
           isBottom ? "pb-safe" : ""

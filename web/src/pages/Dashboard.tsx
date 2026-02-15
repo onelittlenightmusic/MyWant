@@ -220,6 +220,11 @@ export const Dashboard: React.FC = () => {
     const element = document.querySelector(`[data-want-id="${wantId}"]`);
     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     useWantStore.getState().setBlinkingWantId(wantId);
+    
+    // Close minimap on mobile after selection
+    if (window.innerWidth < 1024) {
+      setMinimapOpen(false);
+    }
   };
 
   const handleMinimapDoubleClick = (wantId: string) => {
@@ -236,6 +241,11 @@ export const Dashboard: React.FC = () => {
     // Also activate the draft (same behavior as clicking the draft card)
     const draft = drafts.find(d => d.id === draftId);
     if (draft) handleDraftClick(draft);
+
+    // Close minimap on mobile after selection
+    if (window.innerWidth < 1024) {
+      setMinimapOpen(false);
+    }
   };
 
   const handleDraftDelete = (draft: DraftWant) => { setDeleteDraftState(draft); setShowDeleteDraftConfirmation(true); };

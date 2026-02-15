@@ -121,12 +121,13 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
     <div
       className={classNames(
         'flex items-end gap-3',
-        isDashboardRight ? 'fixed top-24 right-4 sm:right-[500px] z-[100] h-auto pr-0 sm:pr-6 items-start' : (
-          isInlineHeader ? 'relative' : 'fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto w-[calc(100%-2rem)] sm:w-auto'
+        isDashboardRight ? 'fixed right-4 sm:right-[500px] z-[100] h-auto pr-0 sm:pr-6 items-start' : (
+          isInlineHeader ? 'relative' : 'fixed left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto w-[calc(100%-2rem)] sm:w-auto'
         ),
         isAnimating ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
         !isDashboardRight && !isInlineHeader ? 'transition-opacity duration-300' : ''
       )}
+      style={isDashboardRight ? { top: 'calc(env(safe-area-inset-top, 0px) + 6rem)' } : (!isInlineHeader ? { bottom: 'calc(env(safe-area-inset-bottom, 0px) + 2rem)' } : {})}
     >
       {/* Layout 1: Inline Header */}
       {isInlineHeader && (
