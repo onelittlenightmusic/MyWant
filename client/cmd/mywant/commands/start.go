@@ -138,6 +138,8 @@ var StartCmd = &cobra.Command{
 			Debug:          debug,
 			HeaderPosition: config.HeaderPosition,
 			ColorMode:      config.ColorMode,
+			ConfigPath:     getConfigPath(),
+			MemoryPath:     filepath.Join(getMyWantDir(), "state.yaml"),
 			WebFS:          web.GetFileSystem(!debug),
 		}
 

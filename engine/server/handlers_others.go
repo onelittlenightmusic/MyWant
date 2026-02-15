@@ -30,30 +30,12 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update in-memory config (excluding fields we don't want to change via API if any)
+	// Update in-memory config
 	s.config.HeaderPosition = newConfig.HeaderPosition
 	s.config.ColorMode = newConfig.ColorMode
 
-	// Persist to ~/.mywant/config.yaml
-	home, err := os.UserHomeDir()
-	if err == nil {
-		configPath := fmt.Sprintf("%s/.mywant/config.yaml", home)
-		
-		// Load existing file to preserve other fields like AgentMode, ServerHost etc.
-		data, err := os.ReadFile(configPath)
-		if err == nil {
-			var fullConfig map[string]any
-			if err := yaml.Unmarshal(data, &fullConfig); err == nil {
-				fullConfig["header_position"] = s.config.HeaderPosition
-				fullConfig["color_mode"] = s.config.ColorMode
-				
-				newData, err := yaml.Marshal(fullConfig)
-				if err == nil {
-					os.WriteFile(configPath, newData, 0644)
-				}
-			}
-		}
-	}
+	// Persist to ~/.mywant/config.yaml using the helper
+	s.saveFrontendConfig()
 
 	json.NewEncoder(w).Encode(s.config)
 }

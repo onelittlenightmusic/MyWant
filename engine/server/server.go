@@ -14,6 +14,7 @@ import (
 	types "mywant/engine/types"
 
 	"github.com/gorilla/mux"
+	"gopkg.in/yaml.v3"
 )
 
 var GlobalDebugEnabled bool
@@ -64,7 +65,8 @@ func New(config Config) *Server {
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}
-	globalBuilder := mywant.NewChainBuilderWithPaths("", "engine/memory/memory-0000-latest.yaml")
+	globalBuilder := mywant.NewChainBuilderWithPaths(config.ConfigPath, config.MemoryPath)
+
 	globalBuilder.SetConfigInternal(mywant.Config{Wants: []*mywant.Want{}})
 	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
@@ -225,4 +227,39 @@ func InfoLog(format string, v ...any) {
 // ErrorLog always prints logs
 func ErrorLog(format string, v ...any) {
 	log.Printf(format, v...)
+}
+
+// saveFrontendConfig saves the UI settings to the CLI config file
+func (s *Server) saveFrontendConfig() {
+	if s.config.ConfigPath == "" {
+		return
+	}
+
+	// 1. Read existing config to preserve other settings
+	data, err := os.ReadFile(s.config.ConfigPath)
+	var fullConfig map[string]any
+	if err == nil {
+		_ = yaml.Unmarshal(data, &fullConfig)
+	}
+	if fullConfig == nil {
+		fullConfig = make(map[string]any)
+	}
+
+	// 2. Update only the frontend sections
+	fullConfig["header_position"] = s.config.HeaderPosition
+	fullConfig["color_mode"] = s.config.ColorMode
+
+	// 3. Save back to file
+	newData, err := yaml.Marshal(fullConfig)
+	if err != nil {
+		log.Printf("[SERVER] Error marshaling config for saving: %v\n", err)
+		return
+	}
+
+	err = os.WriteFile(s.config.ConfigPath, newData, 0644)
+	if err != nil {
+		log.Printf("[SERVER] Error saving config to %s: %v\n", s.config.ConfigPath, err)
+	} else {
+		log.Printf("[SERVER] Saved frontend settings to %s\n", s.config.ConfigPath)
+	}
 }
