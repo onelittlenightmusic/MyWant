@@ -75,7 +75,9 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 }
 
 func initConfig() {
+	configPath := ""
 	if cfgFile != "" {
+		configPath = cfgFile
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := os.UserHomeDir()
@@ -86,12 +88,18 @@ func initConfig() {
 
 		// Use ~/.mywant/config.yaml
 		mywantDir := filepath.Join(home, ".mywant")
+		configPath = filepath.Join(mywantDir, "config.yaml")
 		viper.AddConfigPath(mywantDir)
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 	}
 
 	viper.AutomaticEnv()
+
+	// Log the config path before reading
+	if _, err := os.Stat(configPath); err == nil {
+		fmt.Printf("Reading config from: %s\n", configPath)
+	}
 
 	if err := viper.ReadInConfig(); err == nil {
 		// fmt.Println("Using config file:", viper.ConfigFileUsed())
