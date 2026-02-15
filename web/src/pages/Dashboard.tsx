@@ -628,8 +628,8 @@ export const Dashboard: React.FC = () => {
   const headerActions = headerState ? (
     <div className="flex items-center gap-2">
       <StatusBadge status={headerState.status} size="sm" />
-      <button onClick={() => sidebar.toggleHeaderAction?.('autoRefresh')} className={`p-2 rounded-md transition-colors ${headerState.autoRefresh ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`} title={headerState.autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}><RefreshCw className="h-4 w-4" /></button>
-      <button onClick={() => sidebar.toggleHeaderAction?.('refresh')} disabled={headerState.loading} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50" title="Refresh"><RefreshCw className={classNames('h-4 w-4', headerState.loading && 'animate-spin')} /></button>
+      <button onClick={() => sidebar.toggleHeaderAction?.('autoRefresh')} className={`p-2 rounded-md transition-colors ${headerState.autoRefresh ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800'}`} title={headerState.autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}><RefreshCw className="h-4 w-4" /></button>
+      <button onClick={() => sidebar.toggleHeaderAction?.('refresh')} disabled={headerState.loading} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-md transition-colors disabled:opacity-50" title="Refresh"><RefreshCw className={classNames('h-4 w-4', headerState.loading && 'animate-spin')} /></button>
     </div>
   ) : null;
 
@@ -698,10 +698,10 @@ export const Dashboard: React.FC = () => {
             layout="dashboard-right"
           />
         )}
-        <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 border-4 border-dashed border-blue-400 border-inset")}>
+        <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
           <div className="p-3 sm:p-6 pb-24 flex flex-col h-full min-h-screen">
             <React.Fragment>
-              {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
+              {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">
                 <WantGrid
                   wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleShowDeleteConfirmation} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant}

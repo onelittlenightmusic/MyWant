@@ -327,7 +327,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   const whiteProgressBarStyle = {
     position: 'absolute' as const,
     top: 0, left: 0, height: '100%', width: `${achievingPercentage}%`,
-    background: 'rgba(255, 255, 255, 0.5)',
+    background: 'var(--progress-bg-light)',
     transition: 'width 0.3s ease-out',
     zIndex: 0, pointerEvents: 'none' as const
   };
@@ -335,7 +335,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   const blackOverlayStyle = {
     position: 'absolute' as const,
     top: 0, left: `${achievingPercentage}%`, height: '100%', width: `${100 - achievingPercentage}%`,
-    background: 'rgba(0, 0, 0, 0.2)',
+    background: 'var(--progress-bg-dark)',
     transition: 'width 0.3s ease-out, left 0.3s ease-out',
     zIndex: 0, pointerEvents: 'none' as const
   };
@@ -529,8 +529,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                   onDragLeave={() => setDraggedOverChildId(null)}
                   onDrop={handleChildDrop}
                 >
-                  <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${childAchievingPercentage}%`, background: 'rgba(255, 255, 255, 0.5)', transition: 'width 0.3s ease-out', zIndex: 0, pointerEvents: 'none' }}></div>
-                  <div style={{ position: 'absolute', top: 0, left: `${childAchievingPercentage}%`, height: '100%', width: `${100 - childAchievingPercentage}%`, background: 'rgba(0, 0, 0, 0.2)', transition: 'width 0.3s ease-out, left 0.3s ease-out', zIndex: 0, pointerEvents: 'none' }}></div>
+                  <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${childAchievingPercentage}%`, background: 'var(--progress-bg-light)', transition: 'width 0.3s ease-out', zIndex: 0, pointerEvents: 'none' }}></div>
+                  <div style={{ position: 'absolute', top: 0, left: `${childAchievingPercentage}%`, height: '100%', width: `${100 - childAchievingPercentage}%`, background: 'var(--progress-bg-dark)', transition: 'width 0.3s ease-out, left 0.3s ease-out', zIndex: 0, pointerEvents: 'none' }}></div>
                   
                   <div className={classNames("absolute inset-0 z-30 flex items-center justify-center bg-blue-700 transition-all duration-400 ease-out pointer-events-none", isDragOverWant && draggedOverChildId === childId && isChildTarget && !isBeingProcessed ? "bg-opacity-60 opacity-100" : "bg-opacity-0 opacity-0")}>
                     <div className={classNames("bg-white p-2 rounded-full shadow-xl border-2 border-blue-600 transform transition-all duration-400 ease-out", isDragOverWant && draggedOverChildId === childId && isChildTarget && !isBeingProcessed ? "scale-100 opacity-100" : "scale-[2.5] opacity-0")}>

@@ -32,15 +32,15 @@ export const CreateSidebar: React.FC<CreateSidebarProps> = ({
       {/* Sidebar */}
       <div
         className={classNames(
-          'fixed top-0 right-0 h-full w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
+          'fixed top-0 right-0 h-full w-[480px] bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white px-8 py-6 border-b border-gray-200 z-10">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 px-8 py-6 border-b border-gray-200 dark:border-gray-700 z-10">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold text-gray-900 truncate">{title}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white truncate">{title}</h2>
             <div className="flex items-center gap-2 flex-shrink-0">
               {headerAction && (
                 <div>
@@ -49,7 +49,7 @@ export const CreateSidebar: React.FC<CreateSidebarProps> = ({
               )}
               <button
                 onClick={onClose}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors"
                 title="Close sidebar"
               >
                 <X className="h-5 w-5" />

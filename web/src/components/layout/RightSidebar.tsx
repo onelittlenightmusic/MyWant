@@ -41,7 +41,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 flex flex-col overflow-hidden',
+          'fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
@@ -58,12 +58,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           />
         )}
 
-        {/* White semi-transparent overlay on background image */}
+        {/* Semi-transparent overlay on background image */}
         {backgroundStyle && (
           <div
-            className="absolute inset-0 w-full pointer-events-none"
+            className="absolute inset-0 w-full pointer-events-none bg-white/60 dark:bg-gray-900/70"
             style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.6)',
               minHeight: '100vh',
               zIndex: 1
             }}
@@ -72,12 +71,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
         {/* Header */}
         <div className={classNames(
-          "flex-shrink-0 bg-white px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 gap-4 relative",
-          isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
+          "flex-shrink-0 bg-white dark:bg-gray-900 px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 gap-4 relative",
+          isBottom ? "order-last border-t border-gray-200 dark:border-gray-700" : "border-b border-gray-200 dark:border-gray-700"
         )} style={isBottom ? { paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' } : {}}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{title}</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">{title}</h2>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -88,7 +87,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             )}
             <button
               onClick={onClose}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
               title="Close sidebar"
             >
               <X className="h-5 w-5" />

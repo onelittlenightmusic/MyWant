@@ -131,13 +131,13 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
       {/* Layout 1: Inline Header */}
       {isInlineHeader && (
         <>
-          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 px-3 py-2">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-3 py-2">
             <div className="flex items-center gap-2 pr-6">
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-900 inline">
+                <p className="text-xs font-semibold text-gray-900 dark:text-white inline">
                   {title}:&nbsp;
                 </p>
-                <div className="inline text-xs text-gray-700">
+                <div className="inline text-xs text-gray-700 dark:text-gray-200">
                   {children || (message ? truncateText(message, 40) : '')}
                 </div>
               </div>
@@ -146,7 +146,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                 <button
                   onClick={handleCancel}
                   disabled={isLoading || loading}
-                  className="flex items-center justify-center h-6 w-6 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                  className="flex items-center justify-center h-6 w-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
                   title="Cancel (N)"
                 >
                   <X className="h-3 w-3" />
@@ -154,7 +154,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                 <button
                   onClick={handleConfirm}
                   disabled={isLoading || loading}
-                  className="flex items-center justify-center h-6 w-6 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50 transition-colors"
+                  className="flex items-center justify-center h-6 w-6 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50 transition-colors"
                   title="Confirm (Y)"
                 >
                   {isLoading || loading ? (
@@ -184,7 +184,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             </div>
           </div>
 
-          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-full max-w-md sm:min-w-[320px]">
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 w-full max-w-md sm:min-w-[320px]">
             <div className="absolute left-0 bottom-3 transform -translate-x-2">
               <div
                 className="w-0 h-0 border-t-8 border-b-8 border-r-8 border-t-transparent border-b-transparent border-r-white"
@@ -194,10 +194,10 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
 
             <div className="flex items-start gap-6">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-gray-900 mb-2">
+                <p className="text-sm font-bold text-gray-900 dark:text-white mb-2">
                   {title}
                 </p>
-                <div className="text-sm text-gray-600 leading-relaxed break-words">
+                <div className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed break-words">
                   {children || message}
                 </div>
               </div>
@@ -207,8 +207,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                   onClick={handleCancel}
                   disabled={isLoading || loading}
                   className={classNames(
-                    'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-sm border border-gray-200',
-                    'bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-red-600',
+                    'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700',
+                    'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-600',
                     'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300',
                     'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
                   )}
@@ -249,11 +249,11 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             <Bot className="h-7 w-7 sm:h-9 sm:w-9 text-white" />
           </div>
 
-          <div className="flex-1 sm:ml-3 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-3 flex flex-col justify-center min-w-0 sm:min-w-[250px] max-w-full sm:max-w-sm">
-            <p className="text-sm font-semibold text-gray-900 truncate">
+          <div className="flex-1 sm:ml-3 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 px-4 py-3 flex flex-col justify-center min-w-0 sm:min-w-[250px] max-w-full sm:max-w-sm">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
               {title}
             </p>
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-700 dark:text-gray-200">
               {children || (message ? truncateText(message, 50) : '')}
             </div>
           </div>
@@ -264,7 +264,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
               disabled={isLoading || loading}
               className={classNames(
                 'flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
-                'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-red-500',
+                'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-500',
                 'disabled:opacity-50 disabled:cursor-not-allowed transition-all'
               )}
               title="Cancel (N)"

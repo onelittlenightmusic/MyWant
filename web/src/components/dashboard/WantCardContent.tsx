@@ -341,7 +341,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-semibold text-gray-700 dark:text-gray-300 opacity-60 hover:opacity-100 truncate w-full text-left transition-opacity cursor-pointer`}
+            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-bold text-gray-900 dark:text-white truncate w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400`}
             title="Click to view results"
           >
             {truncateText(

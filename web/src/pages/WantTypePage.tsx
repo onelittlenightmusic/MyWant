@@ -148,7 +148,7 @@ export default function WantTypePage() {
           <div className="p-6 pb-24">
             {/* Error Message */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <svg

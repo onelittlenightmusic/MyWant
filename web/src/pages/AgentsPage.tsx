@@ -143,13 +143,13 @@ export const AgentsPage: React.FC = () => {
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 lg:mr-[480px] mr-0">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
             {/* Error message */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
                     <svg
@@ -165,7 +165,7 @@ export const AgentsPage: React.FC = () => {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
                   </div>
                   <div className="ml-auto">
                     <button
@@ -210,7 +210,7 @@ export const AgentsPage: React.FC = () => {
         >
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Statistics</h3>
               <div>
                 <AgentStatsOverview agents={agents} loading={loading} />
               </div>
@@ -218,7 +218,7 @@ export const AgentsPage: React.FC = () => {
 
             {/* Filters section */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filters</h3>
               <AgentFilters
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}

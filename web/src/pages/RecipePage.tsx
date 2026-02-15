@@ -208,20 +208,20 @@ export default function RecipePage() {
       />
 
       {/* Main content area with sidebar-aware layout */}
-      <main className="flex-1 flex overflow-hidden bg-gray-50 lg:mr-[480px] mr-0">
+      <main className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0">
         {/* Left content area - main dashboard */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6 pb-24">
           {/* Loading State */}
           {loading && (
             <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">Loading recipes...</div>
+              <div className="text-gray-500 dark:text-gray-400">Loading recipes...</div>
             </div>
           )}
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <svg
@@ -237,7 +237,7 @@ export default function RecipePage() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-red-700">{error}</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
                 </div>
                 <div className="ml-auto">
                   <button
@@ -283,7 +283,7 @@ export default function RecipePage() {
       >
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Statistics</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Statistics</h3>
             <div>
               <RecipeStatsOverview recipes={recipes} loading={loading} />
             </div>
@@ -291,7 +291,7 @@ export default function RecipePage() {
 
           {/* Filters section */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Search</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Search</h3>
             <RecipeFilters
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -323,15 +323,15 @@ export default function RecipePage() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Delete Recipe</h3>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Delete Recipe</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               Are you sure you want to delete the recipe "{selectedRecipe?.recipe.metadata.name}"? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -351,8 +351,8 @@ export default function RecipePage() {
         <div className={classNames(
           'fixed top-4 right-4 px-4 py-3 rounded-md shadow-lg flex items-center space-x-2 z-50 animate-fade-in',
           notification.type === 'success'
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : 'bg-red-50 text-red-800 border border-red-200'
+            ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800'
+            : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
         )}>
           {notification.type === 'success' ? (
             <Check className="h-5 w-5" />

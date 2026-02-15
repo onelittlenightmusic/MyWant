@@ -107,3 +107,19 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Added Dark Mode Styles */
+/* Applying dark mode styles to elements when the 'dark' class is present on an ancestor */
+.dark .minimapBlink {
+  box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7), 0 0 0 4px rgba(96, 165, 250, 0.4); /* Adjusted blue for dark mode */
+  background-color: rgba(96, 165, 250, 0.15);
+}
+
+.dark .dropIndicator {
+  background-color: #60a5fa; /* Lighter blue for dark mode */
+}
+
+.dark .plusIconContainer {
+  background-color: #60a5fa; /* Lighter blue for dark mode */
+  color: #f0f9ff; /* Lighter text color for dark mode */
+}

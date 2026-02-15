@@ -90,20 +90,20 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
 
       {/* Speech Bubble */}
       <div className={classNames(
-        'relative flex items-center gap-2 px-4 py-2 bg-white rounded-2xl shadow-lg',
+        'relative flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-lg',
         'border-2 transition-all duration-200',
-        isThinking ? 'border-blue-400 bg-blue-50' : 'border-blue-500'
+        isThinking ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-blue-500 dark:border-blue-600'
       )}>
         {/* Triangle pointer (left side) */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[7px]">
           <div className="w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-blue-500" />
-          <div className="absolute top-[1px] left-[2px] w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-white" />
+          <div className="absolute top-[1px] left-[2px] w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-white dark:border-r-gray-800" />
         </div>
 
         {/* Always show input field for parallel draft creation */}
         <>
           {isThinking && (
-            <span className="text-gray-600 text-xs animate-pulse mr-2">
+            <span className="text-gray-600 dark:text-gray-400 text-xs animate-pulse mr-2">
               処理中...
             </span>
           )}
@@ -120,7 +120,7 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
             disabled={disabled}
             className={classNames(
               'bg-transparent border-none outline-none',
-              'text-base placeholder-gray-400',
+              'text-base text-gray-900 dark:text-gray-100 placeholder-gray-400',
               'w-64 focus:ring-0'
             )}
           />

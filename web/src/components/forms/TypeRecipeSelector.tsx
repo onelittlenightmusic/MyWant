@@ -240,8 +240,8 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
           }}
           className={`focusable-section-header w-full border-2 rounded-lg p-3 sm:p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
             selectedItem.type === 'want-type'
-              ? 'border-blue-500 bg-blue-50 focus:ring-blue-500'
-              : 'border-green-500 bg-green-50 focus:ring-green-500'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 focus:ring-blue-500'
+              : 'border-green-500 bg-green-50 dark:bg-green-900/20 focus:ring-green-500'
           } ${backgroundStyle.className}`}
           style={backgroundStyle.style}
         >
@@ -256,17 +256,17 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 <Package className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
               )}
               <div className="text-left">
-                <h4 className="text-sm sm:text-base font-medium text-gray-900">{selectedItem.title}</h4>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">{selectedItem.title}</h4>
                 {selectedItem.category && (
-                  <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1">{selectedItem.category}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-300 mt-0.5 sm:mt-1">{selectedItem.category}</p>
                 )}
               </div>
             </div>
             <span
               className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
                 selectedItem.type === 'want-type'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-green-100 text-green-700'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
               }`}
             >
               Change
@@ -283,7 +283,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       {/* Search Input with Icon */}
       {showSearch && (
         <div className="relative flex-shrink-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500 pointer-events-none" />
           <input
             ref={searchInputRef}
             type="text"
@@ -307,7 +307,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 handleKeyNavigation(e);
               }
             }}
-            className="focusable-section-header w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="focusable-section-header w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"
             autoFocus
           />
           {searchQuery && (
@@ -317,7 +317,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                 setSearchQuery('');
                 searchInputRef.current?.focus();
               }}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               title="Clear search"
             >
               <X className="w-4 h-4" />
@@ -335,7 +335,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
             className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors ${
               selectedCategory === null
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             All
@@ -348,7 +348,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors capitalize ${
                 selectedCategory === category
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               {category}
@@ -358,11 +358,11 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 flex-1 overflow-y-auto border border-gray-200 rounded-lg p-2 sm:p-4 bg-white min-h-0">
+      <div className="space-y-2 flex-1 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2 sm:p-4 bg-white dark:bg-gray-800 min-h-0">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-2">
               <Zap className="w-4 h-4" />
               Want Types ({groupedItems.wantTypes.length})
             </h3>
@@ -410,10 +410,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors relative overflow-hidden ${
                       selectedId === item.id
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                         : isFocused
-                        ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-300'
-                        : 'border-gray-200 hover:border-gray-300 hover:cursor-move'
+                        ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-300'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     } ${backgroundStyle.className}`}
                     style={backgroundStyle.style}
                   >
@@ -422,9 +422,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     )}
                     <div className="flex items-center justify-between relative z-10">
                       <div className="flex-1 flex items-center gap-2">
-                        <h4 className="text-sm sm:font-medium text-gray-900">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
                         {item.category && (
-                          <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{item.category}</span>
+                          <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full">{item.category}</span>
                         )}
                       </div>
                       {selectedId === item.id && (
@@ -440,8 +440,8 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
         {/* Recipes Section */}
         {groupedItems.recipes.length > 0 && (
-          <div className="pt-2 border-t border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 flex items-center gap-2">
               <Package className="w-4 h-4" />
               Recipes ({groupedItems.recipes.length})
             </h3>
@@ -488,17 +488,17 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors ${
                       selectedId === item.id
-                        ? 'border-green-500 bg-green-50'
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                         : isFocused
-                        ? 'border-green-400 bg-green-50 ring-2 ring-green-300'
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:cursor-move'
+                        ? 'border-green-400 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-300'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     }`}
                   >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h4 className="text-sm sm:font-medium text-gray-900">{item.title}</h4>
+                      <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
                       {item.description && (
-                        <p className="text-xs text-gray-600 mt-0.5 sm:mt-1">{item.description}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 sm:mt-1">{item.description}</p>
                       )}
                     </div>
                     {selectedId === item.id && (
@@ -513,7 +513,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
         )}
 
         {filteredItems.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <p>No want types or recipes found matching "{searchQuery}"</p>
           </div>
         )}

@@ -33,13 +33,13 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
     <div className="space-y-4">
       {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+        <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400 dark:text-gray-500" />
         <input
           type="text"
           placeholder="Search want types by name or title..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
       </div>
 
@@ -49,8 +49,8 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
         className={classNames(
           'w-full flex items-center justify-between px-4 py-2 rounded-md border transition-colors',
           showFilters
-            ? 'bg-blue-50 border-blue-300 text-blue-700'
-            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 text-blue-700 dark:text-blue-400'
+            : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
         )}
       >
         <div className="flex items-center gap-2">
@@ -82,10 +82,10 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="bg-white border border-gray-200 rounded-md p-4 space-y-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-4 space-y-4">
           {/* Category Filter */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Category</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Category</h3>
             <div className="space-y-2">
               <label className="flex items-center">
                 <input
@@ -94,7 +94,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
                   onChange={() => onCategoryChange(undefined)}
                   className="w-4 h-4 text-blue-600 cursor-pointer"
                 />
-                <span className="ml-2 text-sm text-gray-700">All Categories</span>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">All Categories</span>
               </label>
               {categories.map((category) => (
                 <label key={category} className="flex items-center">
@@ -104,7 +104,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
                     onChange={() => onCategoryChange(category)}
                     className="w-4 h-4 text-blue-600 cursor-pointer"
                   />
-                  <span className="ml-2 text-sm text-gray-700 capitalize">{category}</span>
+                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-200 capitalize">{category}</span>
                 </label>
               ))}
             </div>
@@ -112,7 +112,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
 
           {/* Pattern Filter */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Pattern</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Pattern</h3>
             <div className="space-y-2">
               <label className="flex items-center">
                 <input
@@ -121,7 +121,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
                   onChange={() => onPatternChange(undefined)}
                   className="w-4 h-4 text-blue-600 cursor-pointer"
                 />
-                <span className="ml-2 text-sm text-gray-700">All Patterns</span>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-200">All Patterns</span>
               </label>
               {patterns.map((pattern) => (
                 <label key={pattern} className="flex items-center">
@@ -131,7 +131,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
                     onChange={() => onPatternChange(pattern)}
                     className="w-4 h-4 text-blue-600 cursor-pointer"
                   />
-                  <span className="ml-2 text-sm text-gray-700 capitalize">{pattern}</span>
+                  <span className="ml-2 text-sm text-gray-700 dark:text-gray-200 capitalize">{pattern}</span>
                 </label>
               ))}
             </div>
@@ -141,7 +141,7 @@ export const WantTypeMenu: React.FC<WantTypeMenuProps> = ({
           {hasActiveFilters && (
             <button
               onClick={onClearFilters}
-              className="w-full px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
             >
               <X className="h-4 w-4" />
               Clear Filters

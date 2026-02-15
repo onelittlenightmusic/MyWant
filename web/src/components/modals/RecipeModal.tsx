@@ -449,15 +449,15 @@ export default function RecipeModal({
         {/* View Mode Toggle */}
         <div className="mb-8">
           <div className="flex items-center space-x-4">
-            <span className="text-sm font-medium text-gray-700">Edit Mode:</span>
-            <div className="flex rounded-lg bg-gray-100 p-1">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Edit Mode:</span>
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
               <button
                 type="button"
                 onClick={() => handleViewModeSwitch('form')}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'form'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <FileText className="w-4 h-4 inline mr-1" />
@@ -468,8 +468,8 @@ export default function RecipeModal({
                 onClick={() => handleViewModeSwitch('yaml')}
                 className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
                   viewMode === 'yaml'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 <Code className="w-4 h-4 inline mr-1" />
@@ -484,11 +484,11 @@ export default function RecipeModal({
             <>
               {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium text-gray-900">Basic Information</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Basic Information</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                   Name *
                 </label>
                 <input
@@ -496,47 +496,47 @@ export default function RecipeModal({
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   placeholder="recipe-name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                   Version
                 </label>
                 <input
                   type="text"
                   value={formData.version}
                   onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   placeholder="1.0.0"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Description
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="Describe what this recipe does..."
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 Custom Type
               </label>
               <input
                 type="text"
                 value={formData.custom_type}
                 onChange={(e) => setFormData({ ...formData, custom_type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="custom target type name"
               />
             </div>
@@ -545,7 +545,7 @@ export default function RecipeModal({
           {/* Parameters */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">Parameters</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Parameters</h3>
               <button
                 type="button"
                 onClick={addParameterEntry}
@@ -564,7 +564,7 @@ export default function RecipeModal({
                     placeholder="Parameter name"
                     value={entry.key}
                     onChange={(e) => updateParameterEntry(index, 'key', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
                 <div className="col-span-4">
@@ -573,14 +573,14 @@ export default function RecipeModal({
                     placeholder="Default value"
                     value={entry.value}
                     onChange={(e) => updateParameterEntry(index, 'value', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
                 <div className="col-span-3">
                   <select
                     value={entry.type}
                     onChange={(e) => updateParameterEntry(index, 'type', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   >
                     <option value="string">String</option>
                     <option value="number">Number</option>
@@ -605,7 +605,7 @@ export default function RecipeModal({
           {/* Wants */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">Wants</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Wants</h3>
               <button
                 type="button"
                 onClick={addWant}
@@ -617,9 +617,9 @@ export default function RecipeModal({
             </div>
 
             {formData.wants.map((want, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4">
+              <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium text-gray-900">Want {index + 1}</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-white">Want {index + 1}</h4>
                   {formData.wants.length > 1 && (
                     <button
                       type="button"
@@ -633,7 +633,7 @@ export default function RecipeModal({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                       Type *
                     </label>
                     <input
@@ -641,13 +641,13 @@ export default function RecipeModal({
                       required
                       value={want.type}
                       onChange={(e) => updateWant(index, 'type', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                       placeholder="sequence, queue, sink, etc."
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                       Parameters (JSON)
                     </label>
                     <textarea
@@ -661,7 +661,7 @@ export default function RecipeModal({
                         }
                       }}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white font-mono text-sm"
                       placeholder='{"count": 100}'
                     />
                   </div>
@@ -675,8 +675,8 @@ export default function RecipeModal({
             /* YAML Editor View */
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">YAML Configuration</h3>
-                <div className="text-sm text-gray-500">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">YAML Configuration</h3>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   Edit the complete recipe configuration in YAML format
                 </div>
               </div>
@@ -686,14 +686,14 @@ export default function RecipeModal({
                 onChange={setYamlContent}
                 height="500px"
                 placeholder={`# Recipe YAML configuration...\nrecipe:\n  metadata:\n    name: "my-recipe"\n  parameters:\n    count: 100\n  wants:\n    - type: "sequence"\n      params:\n        count: count`}
-                className="border border-gray-300 rounded-md"
+                className="border border-gray-300 dark:border-gray-600 rounded-md"
               />
 
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">YAML Format Guidelines:</h4>
-                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">YAML Format Guidelines:</h4>
+                <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-disc list-inside">
                   <li>Use proper YAML indentation (2 spaces)</li>
-                  <li>Reference parameters by name (e.g., <code className="bg-blue-100 px-1 rounded">count: count</code>)</li>
+                  <li>Reference parameters by name (e.g., <code className="bg-blue-100 dark:bg-blue-900/30 px-1 rounded">count: count</code>)</li>
                   <li>Include all required metadata fields (name, etc.)</li>
                   <li>Define wants with type, params, and optional using connections</li>
                 </ul>

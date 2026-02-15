@@ -67,7 +67,7 @@ interface WantDetailsSidebarProps {
 type TabType = 'settings' | 'results' | 'logs' | 'agents';
 
 // Unified section container styling for all metadata/state sections
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 rounded-lg bg-white bg-opacity-50 overflow-hidden p-3 sm:p-4';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
@@ -395,8 +395,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Eye className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">Select a want to view details</p>
+          <Eye className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">Select a want to view details</p>
         </div>
       </div>
     );
@@ -432,7 +432,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {want && (
-        <div className="flex-shrink-0 border-b border-gray-200 px-4 py-1 sm:py-2">
+        <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-1 sm:py-2">
           <WantControlButtons
             onStart={handleStartClick}
             onStop={handleStopClick}
@@ -451,8 +451,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       )}
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200 px-3 sm:px-8 py-2 sm:py-4">
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 overflow-hidden">
+      <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-8 py-2 sm:py-4">
+        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-hidden">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -462,8 +462,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 className={classNames(
                   'flex-1 flex items-center justify-center space-x-1 px-2 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap min-w-0',
                   activeTab === tab.id
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-300'
                 )}
               >
                 <Icon className="h-4 w-4 flex-shrink-0" />
@@ -775,18 +775,18 @@ const SettingsTab: React.FC<{
           <div className="space-y-2">
             {/* Metadata Section */}
             <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Metadata</h4>
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Metadata</h4>
               <div className="space-y-2 sm:space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs sm:text-sm">Name:</span>
+                  <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Name:</span>
                   <span className="font-medium text-xs sm:text-sm">{want.metadata?.name || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs sm:text-sm">Type:</span>
+                  <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Type:</span>
                   <span className="font-medium text-xs sm:text-sm">{want.metadata?.type || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 text-xs sm:text-sm">ID:</span>
+                  <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">ID:</span>
                   <span className="font-mono text-[10px] sm:text-xs break-all ml-4 text-right">{want.metadata?.id || want.id || 'N/A'}</span>
                 </div>
               </div>
@@ -808,29 +808,29 @@ const SettingsTab: React.FC<{
             {/* Timeline */}
             {want.stats && (
               <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Timeline</h4>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Timeline</h4>
                 <div className="space-y-2 sm:space-y-3">
                   {want.stats.created_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-xs sm:text-sm">Created:</span>
+                      <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Created:</span>
                       <span className="text-xs sm:text-sm">{formatDate(want.stats.created_at)}</span>
                     </div>
                   )}
                   {want.stats.started_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-xs sm:text-sm">Started:</span>
+                      <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Started:</span>
                       <span className="text-xs sm:text-sm">{formatDate(want.stats.started_at)}</span>
                     </div>
                   )}
                   {want.stats.completed_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-xs sm:text-sm">Achieved:</span>
+                      <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Achieved:</span>
                       <span className="text-xs sm:text-sm">{formatDate(want.stats.completed_at)}</span>
                     </div>
                   )}
                   {want.stats.started_at && (
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-xs sm:text-sm">Duration:</span>
+                      <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Duration:</span>
                       <span className="text-xs sm:text-sm">{formatDuration(want.stats.started_at, want.stats.completed_at)}</span>
                     </div>
                   )}
@@ -879,12 +879,12 @@ const SettingsTab: React.FC<{
 
             {/* Error Information */}
             {want.status === 'failed' && want.state?.error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
                 <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-base font-medium text-red-800 mb-3">Error Details</h4>
-                    <p className="text-sm text-red-600 break-words leading-relaxed">
+                    <h4 className="text-base font-medium text-red-800 dark:text-red-300 mb-3">Error Details</h4>
+                    <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">
                       {typeof want.state.error === 'string' ? want.state.error : JSON.stringify(want.state.error)}
                     </p>
                   </div>
@@ -898,10 +898,10 @@ const SettingsTab: React.FC<{
             {!isEditing ? (
               <div className="flex flex-col flex-1">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-medium text-gray-900">Configuration</h4>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">Configuration</h4>
                   <button
                     onClick={onEdit}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <Edit className="h-3 w-3 mr-1" />
                     Edit
@@ -922,12 +922,12 @@ const SettingsTab: React.FC<{
             ) : (
               <div className="flex flex-col flex-1">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-sm font-medium text-gray-900">Edit Configuration</h4>
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">Edit Configuration</h4>
                   <div className="flex space-x-2">
                     <button
                       onClick={onCancel}
                       disabled={updateLoading}
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 shadow-sm text-xs font-medium rounded text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -977,18 +977,18 @@ const CollapsibleArray: React.FC<{ label: string; items: any[]; depth: number }>
     <div className="space-y-1">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 font-medium text-gray-800 text-sm hover:text-gray-900 py-1"
+        className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-100 text-sm hover:text-gray-900 dark:hover:text-gray-300 py-1"
       >
         {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-500" />
+          <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         )}
         {label}:
-        {!isExpanded && <span className="text-xs text-gray-400 ml-1">Array({items.length})</span>}
+        {!isExpanded && <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">Array({items.length})</span>}
       </button>
       {isExpanded && (
-        <div className="ml-4 border-l border-gray-200 pl-3 space-y-2">
+        <div className="ml-4 border-l border-gray-200 dark:border-gray-700 pl-3 space-y-2">
           {items.map((item, index) => (
             <ArrayItemRenderer key={index} item={item} index={index} depth={depth + 1} />
           ))}
@@ -1005,26 +1005,26 @@ const ArrayItemRenderer: React.FC<{ item: any; index: number; depth: number }> =
 
   if (!isNested) {
     return (
-      <div className="text-sm text-gray-700 font-mono ml-4">
+      <div className="text-sm text-gray-700 dark:text-gray-200 font-mono ml-4">
         [{index}]: {String(item)}
       </div>
     );
   }
 
   return (
-    <div className="border-l border-gray-300 pl-3 ml-2">
+    <div className="border-l border-gray-300 dark:border-gray-600 pl-3 ml-2">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 py-1"
+        className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-300 py-1"
       >
         {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-gray-500" />
+          <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-gray-500" />
+          <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
         )}
-        <span className="text-xs text-gray-500">[{index}]</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">[{index}]</span>
         {!isExpanded && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {Array.isArray(item) ? `Array(${item.length})` : 'Object'}
           </span>
         )}
@@ -1050,7 +1050,7 @@ const CopyValueButton: React.FC<{ value: string }> = ({ value }) => {
   return (
     <button
       onClick={handleCopy}
-      className="opacity-0 group-hover/kv:opacity-100 flex-shrink-0 p-0.5 rounded hover:bg-gray-200 transition-opacity"
+      className="opacity-0 group-hover/kv:opacity-100 flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-opacity"
       title="Copy value"
     >
       {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-gray-400" />}
@@ -1063,12 +1063,12 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
   const items: React.ReactNode[] = [];
 
   if (obj === null || obj === undefined) {
-    return [<span key="null" className="text-gray-500 italic">null</span>];
+    return [<span key="null" className="text-gray-500 dark:text-gray-400 italic">null</span>];
   }
 
   if (typeof obj !== 'object') {
     return [
-      <span key="value" className="text-gray-700 font-mono break-all">
+      <span key="value" className="text-gray-700 dark:text-gray-200 font-mono break-all">
         {String(obj)}
       </span>
     ];
@@ -1097,8 +1097,8 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
       // For nested objects, show key with collapsible content
       items.push(
         <div key={key} className="space-y-1">
-          <div className="font-medium text-gray-800 text-xs sm:text-sm">{key}:</div>
-          <div className="ml-2 sm:ml-4 border-l border-gray-200 pl-2 sm:pl-3">
+          <div className="font-medium text-gray-800 dark:text-gray-100 text-xs sm:text-sm">{key}:</div>
+          <div className="ml-2 sm:ml-4 border-l border-gray-200 dark:border-gray-700 pl-2 sm:pl-3">
             {renderKeyValuePairs(value, depth + 1)}
           </div>
         </div>
@@ -1117,10 +1117,10 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 
       items.push(
         <div key={key} className="flex justify-between items-center text-xs sm:text-sm gap-2 group/kv">
-          <span className="text-gray-600 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0">{key}</span>
+          <span className="text-gray-600 dark:text-gray-300 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0">{key}</span>
           <div className="flex items-center gap-1 min-w-0">
-            <span className="text-gray-400 text-[10px] sm:text-xs flex-shrink-0">{dots}</span>
-            <span className="text-gray-800 font-semibold text-sm sm:text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
+            <span className="text-gray-400 dark:text-gray-500 text-[10px] sm:text-xs flex-shrink-0">{dots}</span>
+            <span className="text-gray-800 dark:text-gray-100 font-semibold text-sm sm:text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
             <CopyValueButton value={valueStr} />
           </div>
         </div>
@@ -1142,14 +1142,14 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
         <div className="space-y-2">
           {/* Execution Result Metadata */}
           <div className={SECTION_CONTAINER_CLASS}>
-            <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Execution Result</h4>
+            <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Execution Result</h4>
             <div className="space-y-2 sm:space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-xs sm:text-sm">Status:</span>
+                <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Status:</span>
                 <span className="font-medium text-xs sm:text-sm">{want.status || 'N/A'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-xs sm:text-sm">Final Result:</span>
+                <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Final Result:</span>
                 <span className="font-medium text-xs sm:text-sm">{want.state?.final_result ? (typeof want.state.final_result === 'string' ? truncateText(want.state.final_result, 30) : 'Object') : 'N/A'}</span>
               </div>
             </div>

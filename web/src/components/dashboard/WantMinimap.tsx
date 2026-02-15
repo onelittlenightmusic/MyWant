@@ -3,6 +3,7 @@ import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
+import { useConfigStore } from '@/stores/configStore';
 import styles from './WantCard.module.css';
 
 /**
@@ -37,7 +38,6 @@ const getStatusOverlayColor = (status: WantExecutionStatus): string => {
     case 'reaching':
       return 'rgba(147, 51, 234, 0.25)';   // Purple
     case 'failed':
-    case 'module_error':
       return 'rgba(239, 68, 68, 0.25)';    // Red
     case 'config_error':
     case 'stopped':
@@ -99,8 +99,8 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, on
 
   const minimapCardClassName = classNames(
     'relative rounded border cursor-pointer transition-all duration-200 overflow-hidden',
-    'hover:border-blue-500 hover:shadow-md',
-    isSelected ? 'border-blue-500 border-2' : 'border-gray-300',
+    'hover:border-blue-500 hover:shadow-md dark:hover:border-blue-400',
+    isSelected ? 'border-blue-500 border-2 dark:border-blue-400' : 'border-gray-300 dark:border-gray-700',
     isBlinking && styles.minimapBlink,
     backgroundStyle.className
   );
@@ -139,9 +139,9 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, on
 const MinimapDraftCard: React.FC<MinimapDraftCardProps> = ({ draft, isSelected, onClick }) => {
   const minimapDraftCardClassName = classNames(
     'rounded border-2 border-dashed cursor-pointer transition-all duration-200',
-    'bg-gray-100 hover:bg-gray-200',
-    'hover:border-blue-400',
-    isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-400',
+    'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700',
+    'hover:border-blue-400 dark:hover:border-blue-300',
+    isSelected ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30' : 'border-gray-400 dark:border-gray-600',
     draft.isThinking && 'animate-pulse' // Thinking state animation
   );
 
@@ -175,10 +175,14 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
   onDraftClick,
   isOpen
 }) => {
+  const config = useConfigStore(state => state.config);
+  const isHeaderBottom = config?.header_position === 'bottom';
+
   return (
     <div
       className={classNames(
-        "fixed top-16 right-0 w-full sm:w-[480px] h-[calc(100vh-4rem)] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300",
+        "fixed right-0 w-full sm:w-[480px] h-[calc(100vh-4rem)] bg-gray-50 border-l border-gray-200 p-4 overflow-hidden transition-transform duration-300 dark:bg-gray-950 dark:border-gray-800",
+        isHeaderBottom ? "top-0" : "top-16",
         "lg:translate-x-0", // Desktop: always visible
         isOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0", // Mobile: toggle
         "z-30" // Below RightSidebar (z-40)
@@ -211,7 +215,7 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
 
         {/* Add Want button placeholder (for layout consistency with WantGrid) */}
         <div
-          className="rounded border border-dashed border-gray-300 bg-gray-100 opacity-50"
+          className="rounded border border-dashed border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800 opacity-50"
           style={{ height: '40px' }}
           title="Add Want (placeholder)"
         />

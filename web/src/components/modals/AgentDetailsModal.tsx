@@ -46,11 +46,11 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
   const getTypeColor = () => {
     switch (agent.type) {
       case 'do':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-700';
       case 'monitor':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-700';
     }
   };
 
@@ -65,7 +65,7 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
     <div className="flex justify-end">
       <button
         onClick={onClose}
-        className="px-6 py-2 text-sm font-bold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+        className="px-6 py-2 text-sm font-bold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
       >
         Close
       </button>
@@ -93,7 +93,7 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-100">
+        <div className="border-b border-gray-100 dark:border-gray-700">
           <nav className="flex space-x-8">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -104,8 +104,8 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
                   className={classNames(
                     'flex items-center py-4 px-1 border-b-2 font-bold text-sm transition-all',
                     activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200'
+                      ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-200 dark:hover:border-gray-600'
                   )}
                 >
                   <Icon className="h-4 w-4 mr-2" />
@@ -121,7 +121,7 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
           {loading && (
             <div className="flex flex-col items-center justify-center py-12">
               <LoadingSpinner size="lg" />
-              <span className="mt-4 text-sm font-medium text-gray-500">Loading agent details...</span>
+              <span className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400">Loading agent details...</span>
             </div>
           )}
 
@@ -135,19 +135,19 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
           {/* Overview Tab */}
           {activeTab === 'overview' && !loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Basic Information</h4>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+                <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-wider">Basic Information</h4>
                 <dl className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <dt className="text-sm text-gray-500">Name</dt>
-                    <dd className="text-sm font-bold text-gray-900">{agent.name}</dd>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Name</dt>
+                    <dd className="text-sm font-bold text-gray-900 dark:text-white">{agent.name}</dd>
                   </div>
                   <div className="flex justify-between items-center">
-                    <dt className="text-sm text-gray-500">Type</dt>
-                    <dd className="text-sm font-bold text-gray-900 capitalize">{agent.type}</dd>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Type</dt>
+                    <dd className="text-sm font-bold text-gray-900 dark:text-white capitalize">{agent.type}</dd>
                   </div>
                   <div className="flex justify-between items-center">
-                    <dt className="text-sm text-gray-500">Status</dt>
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Status</dt>
                     <dd className="flex items-center">
                       <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse" />
                       <span className="text-sm text-green-600 font-bold">Active</span>
@@ -156,18 +156,18 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
                 </dl>
               </div>
 
-              <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Statistics</h4>
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+                <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-wider">Statistics</h4>
                 <dl className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <dt className="text-sm text-gray-500">Capabilities</dt>
-                    <dd className="text-sm font-bold text-gray-900 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Capabilities</dt>
+                    <dd className="text-sm font-bold text-gray-900 dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
                       {agent.capabilities.length}
                     </dd>
                   </div>
                   <div className="flex justify-between items-center">
-                    <dt className="text-sm text-gray-500">Dependencies</dt>
-                    <dd className="text-sm font-bold text-gray-900 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Dependencies</dt>
+                    <dd className="text-sm font-bold text-gray-900 dark:text-white bg-white dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
                       {agent.uses.length}
                     </dd>
                   </div>
@@ -179,16 +179,16 @@ export const AgentDetailsModal: React.FC<AgentDetailsModalProps> = ({
           {/* Capabilities Tab */}
           {activeTab === 'capabilities' && !loading && (
             <div className="animate-in fade-in slide-in-from-bottom-2">
-              <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Agent Capabilities</h4>
+              <h4 className="font-bold text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-wider">Agent Capabilities</h4>
               {agent.capabilities.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {agent.capabilities.map((capability, index) => (
                     <div
                       key={index}
-                      className="bg-purple-50 border border-purple-100 rounded-xl p-4 flex items-center group hover:bg-purple-100 transition-colors"
+                      className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl p-4 flex items-center group hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
                     >
                       <Settings className="h-5 w-5 text-purple-600 mr-3" />
-                      <span className="text-sm font-bold text-purple-900">
+                      <span className="text-sm font-bold text-purple-900 dark:text-purple-300">
                         {capability}
                       </span>
                     </div>

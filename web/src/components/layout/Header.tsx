@@ -89,15 +89,15 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className={classNames(
-      "bg-white px-3 sm:px-6 py-2 sm:py-4 fixed right-0 z-40 transition-all duration-300 ease-in-out left-0",
-      isBottom ? "bottom-0 border-t border-gray-200" : "top-0 border-b border-gray-200",
+      "bg-white dark:bg-gray-900 px-3 sm:px-6 py-2 sm:py-4 fixed right-0 z-40 transition-all duration-300 ease-in-out left-0",
+      isBottom ? "bottom-0 border-t border-gray-200 dark:border-gray-700" : "top-0 border-b border-gray-200 dark:border-gray-700",
       sidebarMinimized ? "lg:left-20" : "lg:left-44"
     )} style={isBottom ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' } : {}}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4 min-w-0">
-          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 whitespace-nowrap">{title}</h1>
+          <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">{title}</h1>
           {itemLabel && (
-            <div className="hidden sm:block text-sm text-gray-500 whitespace-nowrap">
+            <div className="hidden sm:block text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}
             </div>
           )}
@@ -112,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
             // Mobile behavior: absolute overlay or hidden
             showBubbleOnMobile 
               ? classNames(
-                  "flex items-center absolute inset-x-0 bg-white p-4 border-gray-200 shadow-lg z-50 animate-slide-in",
+                  "flex items-center absolute inset-x-0 bg-white dark:bg-gray-900 p-4 border-gray-200 dark:border-gray-700 shadow-lg z-50 animate-slide-in",
                   isBottom ? "bottom-full mb-px border-t" : "top-full border-b"
                 )
               : "hidden lg:flex"
@@ -124,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
               <select
                 value={gooseProvider}
                 onChange={(e) => onProviderChange?.(e.target.value)}
-                className="text-xs border border-gray-300 rounded-md py-1.5 pl-2 pr-8 focus:ring-primary-500 focus:border-primary-500 bg-white whitespace-nowrap"
+                className="text-xs border border-gray-300 dark:border-gray-600 rounded-md py-1.5 pl-2 pr-8 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 dark:text-gray-200 whitespace-nowrap"
               >
                 <option value="claude-code">Claude</option>
                 <option value="gemini-cli">Gemini</option>
@@ -160,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onMinimapToggle}
               className={classNames(
                 "lg:hidden p-2 rounded-md transition-colors",
-                showMinimap ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-100"
+                showMinimap ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               )}
               title={showMinimap ? "Hide minimap" : "Show minimap"}
             >
@@ -173,8 +173,8 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onToggleSelectMode}
               className={`inline-flex items-center px-3 sm:px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
                 showSelectMode
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500'
-                  : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500'
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
               }`}
               title={showSelectMode ? 'Exit Select Mode' : 'Enter Select Mode'}
             >
@@ -188,8 +188,8 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onSummaryToggle}
               className={`inline-flex items-center px-3 sm:px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
                 showSummary
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500'
-                  : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-primary-500'
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
               }`}
               title={showSummary ? 'Hide summary' : 'Show summary'}
             >

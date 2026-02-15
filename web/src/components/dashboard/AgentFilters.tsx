@@ -37,12 +37,12 @@ export const AgentFilters: React.FC<AgentFiltersProps> = ({
   const hasActiveFilters = selectedTypes.length > 0 || searchQuery.trim();
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-4 mb-6">
       <div className="flex items-center gap-4 flex-wrap">
         {/* Search */}
         <div className="flex-1 min-w-[280px]">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               value={searchQuery}

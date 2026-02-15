@@ -195,7 +195,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           focusable-section-header
           w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2
           transition-all duration-200 focus:outline-none
-          relative bg-blue-50 border-blue-200 hover:bg-blue-100
+          relative bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30
 
           before:absolute before:left-0 before:top-0
           before:bottom-0 before:w-1 before:rounded-l-md
@@ -209,22 +209,22 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           <div className="flex items-center gap-2">
             {/* Collapse/Expand Icon */}
             {isCollapsed ? (
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
             ) : (
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
             )}
 
             {/* Section Icon */}
-            <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+            <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-200" />
 
             {/* Section Title */}
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
               Parameters
             </h3>
 
             {/* Parameter Count Badge */}
             {Object.keys(parameters).length > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
                 {Object.keys(parameters).length}
               </span>
             )}
@@ -234,12 +234,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           {isCollapsed && Object.entries(parameters).length > 0 && (
             <div className="flex flex-wrap gap-2 ml-4">
               {Object.entries(parameters).slice(0, 3).map(([key, value]) => (
-                <span key={key} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                <span key={key} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full">
                   {key}: {String(value)}
                 </span>
               ))}
               {Object.entries(parameters).length > 3 && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   +{Object.entries(parameters).length - 3} more
                 </span>
               )}
