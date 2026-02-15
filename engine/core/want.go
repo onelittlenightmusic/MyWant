@@ -212,7 +212,7 @@ type Want struct {
 	Status      WantStatus     `json:"status,omitempty" yaml:"status,omitempty"`
 	State       map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
 	HiddenState map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
-	History     WantHistory    `json:"history" yaml:"history"`
+	History     WantHistory    `json:"history" yaml:"-"`
 	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// Agent execution information
