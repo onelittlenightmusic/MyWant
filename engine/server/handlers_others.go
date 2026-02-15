@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	mywant "mywant/engine/core"
@@ -40,12 +43,72 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(s.config)
 }
 
+// System Controls
+func (s *Server) stopServer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	log.Printf("[SYSTEM] Stop requested via API from %s", r.RemoteAddr)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Server stopping..."})
+
+	// Use a goroutine to send the signal after the response is sent
+	go func() {
+		time.Sleep(1 * time.Second)
+		log.Printf("[SYSTEM] Sending SIGTERM to self (PID: %d)", os.Getpid())
+		syscall.Kill(os.Getpid(), syscall.SIGTERM)
+	}()
+}
+
+func (s *Server) restartServer(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	log.Printf("[SYSTEM] Restart requested via API from %s", r.RemoteAddr)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Server restarting..."})
+
+	go func() {
+		// Wait a moment for the response to be sent
+		time.Sleep(500 * time.Millisecond)
+		log.Printf("[SYSTEM] Attempting self-restart via shell...")
+
+		executable, err := os.Executable()
+		if err != nil {
+			log.Printf("[SYSTEM] Error getting executable path: %v", err)
+			return
+		}
+
+		// Prepare arguments (exclude the executable itself)
+		args := os.Args[1:]
+		
+		// Build the command line. We need to escape arguments properly if they contain spaces
+		// but for MyWant common flags it should be simple.
+		cmdParts := []string{executable}
+		cmdParts = append(cmdParts, args...)
+		
+		// Join parts into a single command line
+		fullCmd := strings.Join(cmdParts, " ")
+
+		// Use a shell to wait for this process to exit, then start the new one
+		// We use nohup and redirect output to the same log file if possible
+		// or just let the new process handle its own logging (like -D mode does)
+		restartCmd := exec.Command("sh", "-c", fmt.Sprintf("sleep 1 && %s", fullCmd))
+		
+		if err := restartCmd.Start(); err != nil {
+			log.Printf("[SYSTEM] Error starting restart shell: %v", err)
+			return
+		}
+
+		log.Printf("[SYSTEM] Restart shell spawned, exiting current process")
+		os.Exit(0)
+	}()
+}
+
 // Health Check
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	s.wantsMu.RLock()
+	wantsCount := len(s.wants)
+	s.wantsMu.RUnlock()
+
 	health := map[string]any{
 		"status":  "healthy",
-		"wants":   len(s.wants),
+		"wants":   wantsCount,
 		"version": "1.0.0",
 		"server":  "mywant",
 	}
@@ -672,6 +735,8 @@ func (s *Server) logError(r *http.Request, status int, message, errorType, detai
 		RequestData: requestData,
 		UserAgent:   r.Header.Get("User-Agent"),
 	}
+	s.errorMu.Lock()
+	defer s.errorMu.Unlock()
 	s.errorHistory = append(s.errorHistory, entry)
 	if len(s.errorHistory) > 1000 {
 		s.errorHistory = s.errorHistory[len(s.errorHistory)-1000:]

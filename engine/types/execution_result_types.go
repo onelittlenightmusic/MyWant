@@ -284,4 +284,3 @@ func (e *ExecutionResultWant) getOrInitializeLocals() *ExecutionResultWantLocals
 func (e *ExecutionResultWant) updateLocals(locals *ExecutionResultWantLocals) {
 	e.Locals = locals
 }
-

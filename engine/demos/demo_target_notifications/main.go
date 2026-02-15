@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	_ "mywant/engine/types"
 	mywant "mywant/engine/core"
+	_ "mywant/engine/types"
 	"os"
 	"path/filepath"
 	"time"

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	_ "mywant/engine/types"
 	mywant "mywant/engine/core"
+	_ "mywant/engine/types"
 
 	"github.com/stretchr/testify/assert"
 )

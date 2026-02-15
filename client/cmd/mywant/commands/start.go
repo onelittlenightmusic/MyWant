@@ -51,6 +51,12 @@ var StartCmd = &cobra.Command{
 			}
 		}
 
+		// Validation: Ensure port is not 0
+		if port <= 0 {
+			fmt.Printf("Warning: Invalid port %d detected, falling back to default 8080\n", port)
+			port = 8080
+		}
+
 		// Worker mode: Start Agent Service only
 		if worker {
 			startAgentService(host, port, debug, detach)

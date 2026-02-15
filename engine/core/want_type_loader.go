@@ -15,20 +15,20 @@ import (
 
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition struct {
-	Metadata     WantTypeMetadata `json:"metadata" yaml:"metadata"`
-	Parameters   []ParameterDef   `json:"parameters" yaml:"parameters"`
-	State        []StateDef       `json:"state" yaml:"state"`
-	Connectivity ConnectivityDef  `json:"connectivity" yaml:"connectivity"`
-	Connect      *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`       // New connectivity requirement field
-	Require      *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`       // Structured connectivity requirement (deprecated)
-	UsageLimit   *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"` // Deprecated: use connect instead
-	Requires         []string         `json:"requires,omitempty" yaml:"requires,omitempty"`         // Agent capability requirements
+	Metadata         WantTypeMetadata `json:"metadata" yaml:"metadata"`
+	Parameters       []ParameterDef   `json:"parameters" yaml:"parameters"`
+	State            []StateDef       `json:"state" yaml:"state"`
+	Connectivity     ConnectivityDef  `json:"connectivity" yaml:"connectivity"`
+	Connect          *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`                   // New connectivity requirement field
+	Require          *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`                   // Structured connectivity requirement (deprecated)
+	UsageLimit       *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`             // Deprecated: use connect instead
+	Requires         []string         `json:"requires,omitempty" yaml:"requires,omitempty"`                 // Agent capability requirements
 	FinalResultField string           `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"` // Default state key for final_result
 	Agents           []AgentDef       `json:"agents" yaml:"agents"`
-	Constraints  []ConstraintDef  `json:"constraints" yaml:"constraints"`
-	Examples     []ExampleDef     `json:"examples" yaml:"examples"`
-	RelatedTypes []string         `json:"relatedTypes" yaml:"relatedTypes"`
-	SeeAlso      []string         `json:"seeAlso" yaml:"seeAlso"`
+	Constraints      []ConstraintDef  `json:"constraints" yaml:"constraints"`
+	Examples         []ExampleDef     `json:"examples" yaml:"examples"`
+	RelatedTypes     []string         `json:"relatedTypes" yaml:"relatedTypes"`
+	SeeAlso          []string         `json:"seeAlso" yaml:"seeAlso"`
 }
 
 // WantTypeMetadata contains want type identity and classification
@@ -237,6 +237,7 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 
 	return def, nil
 }
+
 // validateWithSpec validates want type YAML against OpenAPI spec
 func (w *WantTypeLoader) validateWithSpec(filePath string, yamlData []byte) error {
 	// Load the OpenAPI spec for want types

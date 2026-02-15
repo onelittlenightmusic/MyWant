@@ -120,10 +120,15 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		Status:  "created",
 		Builder: s.globalBuilder,
 	}
+	s.wantsMu.Lock()
 	s.wants[executionID] = execution
+	s.wantsMu.Unlock()
+
 	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
 	if err != nil {
+		s.wantsMu.Lock()
 		delete(s.wants, executionID)
+		s.wantsMu.Unlock()
 		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
 		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusConflict, errorMsg, "duplicate_name")
 		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
@@ -187,7 +192,15 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 
 	wantsByID := make(map[string]*mywant.Want)
 
-	for _, execution := range s.wants {
+	s.wantsMu.RLock()
+	// Copy execution pointers to avoid holding RLock while calling into builders
+	executions := make([]*WantExecution, 0, len(s.wants))
+	for _, exec := range s.wants {
+		executions = append(executions, exec)
+	}
+	s.wantsMu.RUnlock()
+
+	for _, execution := range executions {
 		if execution.Builder != nil && execution.Builder != s.globalBuilder { // Avoid duplicate if globalBuilder is also in s.wants
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
@@ -269,11 +282,19 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[DEBUG] getWant: Looking for want ID: %s (includeConnectivity=%v)\n", wantID, includeConnectivity)
 
 	// 1. Search in runtime wants across all executions
-	for i, execution := range s.wants {
+	s.wantsMu.RLock()
+	// Create a copy of pointers to avoid holding the lock while iterating and potentially calling deep logic
+	executions := make([]*WantExecution, 0, len(s.wants))
+	for _, exec := range s.wants {
+		executions = append(executions, exec)
+	}
+	s.wantsMu.RUnlock()
+
+	for _, execution := range executions {
 		// First try searching in the builder's internal state
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				log.Printf("[DEBUG] getWant: Found %s in runtime of execution %s\n", wantID, i)
+				log.Printf("[DEBUG] getWant: Found %s in runtime\n", wantID)
 
 				var wantCopy *mywant.Want
 				if includeConnectivity {
@@ -310,7 +331,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		// Fallback: If not in runtime yet, check the execution's config wants
 		for j, want := range execution.Config.Wants {
 			if want.Metadata.ID == wantID {
-				log.Printf("[DEBUG] getWant: Found %s in config of execution %s at index %d\n", wantID, i, j)
+				log.Printf("[DEBUG] getWant: Found %s in config at index %d\n", wantID, j)
 				// Return the config version (it's not running yet, so no status/history)
 				if groupBy != "" {
 					response := buildWantResponse(want, groupBy)
@@ -374,10 +395,11 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	var targetWantIndex int = -1
 	var foundWant *mywant.Want
 
-	for i, execution := range s.wants {
+	s.wantsMu.RLock()
+	// Loop over wants while holding read lock to find the target execution
+	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				log.Printf("[API:UPDATE] Found want in execution %s\n", i)
 				targetExecution = execution
 				foundWant = want
 
@@ -394,7 +416,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		// Fallback: search in config wants directly
 		for j, configWant := range execution.Config.Wants {
 			if configWant.Metadata.ID == wantID {
-				log.Printf("[API:UPDATE] Found want in config of execution %s\n", i)
 				targetExecution = execution
 				foundWant = configWant
 				targetWantIndex = j
@@ -405,6 +426,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	s.wantsMu.RUnlock()
 
 	if targetExecution == nil || foundWant == nil {
 		if s.globalBuilder != nil {
@@ -488,33 +510,40 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
-	for executionID, execution := range s.wants {
-		var foundInBuilder bool
+	var targetBuilder *mywant.ChainBuilder
+	var targetExecutionID string
 
+	s.wantsMu.RLock()
+	for executionID, execution := range s.wants {
 		if execution.Builder != nil {
 			currentStates := execution.Builder.GetAllWantStates()
 			for _, want := range currentStates {
 				if want.Metadata.ID == wantID {
-					foundInBuilder = true
+					targetBuilder = execution.Builder
+					targetExecutionID = executionID
 					break
 				}
 			}
 		}
-
-		if foundInBuilder {
-			if execution.Builder != nil {
-				execution.Builder.DeleteWantsAsyncWithTracking([]string{wantID})
-				s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued")
-			}
-
-			// Clean up config if empty
-			if len(execution.Config.Wants) == 0 {
-				delete(s.wants, executionID)
-			}
-
-			w.WriteHeader(http.StatusNoContent)
-			return
+		if targetBuilder != nil {
+			break
 		}
+	}
+	s.wantsMu.RUnlock()
+
+	if targetBuilder != nil {
+		targetBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued")
+
+		// Check if we need to clean up empty config
+		s.wantsMu.Lock()
+		if execution, exists := s.wants[targetExecutionID]; exists && len(execution.Config.Wants) == 0 {
+			delete(s.wants, targetExecutionID)
+		}
+		s.wantsMu.Unlock()
+
+		w.WriteHeader(http.StatusNoContent)
+		return
 	}
 
 	if s.globalBuilder != nil {

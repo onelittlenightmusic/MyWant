@@ -1088,4 +1088,3 @@ func flattenMCPContent(contents []mcp.Content) []string {
 	}
 	return results
 }
-

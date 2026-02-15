@@ -168,7 +168,7 @@ func (n *Want) executeAgent(agent Agent) error {
 		// Store current agent state
 		n.StoreState("_current_agent", agent.GetName())
 		n.StoreState("_running_agents", n.RunningAgents)
-		
+
 		// Commit these changes to history as a distinct entry without ending the cycle
 		// This ensures we record the "agent started" event immediately
 		n.AggregateChanges()

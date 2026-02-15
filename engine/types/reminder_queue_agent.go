@@ -126,4 +126,3 @@ func deleteReactionQueue(httpClient *mywant.HTTPClient, queueID string) error {
 
 	return nil
 }
-

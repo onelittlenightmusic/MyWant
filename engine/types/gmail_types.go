@@ -263,4 +263,3 @@ func parseEmails(text string) []map[string]string {
 	}
 	return emails
 }
-

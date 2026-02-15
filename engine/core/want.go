@@ -115,17 +115,17 @@ type LogHistoryEntry struct {
 type WantStatus string
 
 const (
-	WantStatusIdle         WantStatus = "idle"
-	WantStatusInitializing WantStatus = "initializing"
-	WantStatusReaching     WantStatus = "reaching"
-	WantStatusSuspended    WantStatus = "suspended"
-	WantStatusAchieved     WantStatus = "achieved"
-	WantStatusFailed       WantStatus = "failed"
-	WantStatusTerminated   WantStatus = "terminated"
-	WantStatusDeleting     WantStatus = "deleting"
-	WantStatusConfigError  WantStatus = "config_error"   // Invalid input values or spec configuration
-	WantStatusModuleError  WantStatus = "module_error"   // Want type implementation error (GetState failure, cast failure, etc.)
-	WantStatusPrepareAgent     WantStatus = "prepare_agent"      // Preparing agent runtime
+	WantStatusIdle              WantStatus = "idle"
+	WantStatusInitializing      WantStatus = "initializing"
+	WantStatusReaching          WantStatus = "reaching"
+	WantStatusSuspended         WantStatus = "suspended"
+	WantStatusAchieved          WantStatus = "achieved"
+	WantStatusFailed            WantStatus = "failed"
+	WantStatusTerminated        WantStatus = "terminated"
+	WantStatusDeleting          WantStatus = "deleting"
+	WantStatusConfigError       WantStatus = "config_error"        // Invalid input values or spec configuration
+	WantStatusModuleError       WantStatus = "module_error"        // Want type implementation error (GetState failure, cast failure, etc.)
+	WantStatusPrepareAgent      WantStatus = "prepare_agent"       // Preparing agent runtime
 	WantStatusWaitingUserAction WantStatus = "waiting_user_action" // Waiting for user action (e.g., reaction approval)
 )
 

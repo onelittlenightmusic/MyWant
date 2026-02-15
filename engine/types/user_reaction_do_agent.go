@@ -58,4 +58,3 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 
 	return nil
 }
-

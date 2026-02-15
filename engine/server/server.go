@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,11 +24,13 @@ var GlobalDebugEnabled bool
 type Server struct {
 	config               Config
 	wants                map[string]*WantExecution        // Store active want executions
+	wantsMu              sync.RWMutex                     // Protects wants map
 	globalBuilder        *mywant.ChainBuilder             // Global builder with running reconcile loop for server mode
 	agentRegistry        *mywant.AgentRegistry            // Agent and capability registry
 	recipeRegistry       *mywant.CustomTargetTypeRegistry // Recipe registry
 	wantTypeLoader       *mywant.WantTypeLoader           // Want type definitions loader
 	errorHistory         []ErrorHistoryEntry              // Store error history
+	errorMu              sync.Mutex                       // Protects errorHistory slice
 	router               *mux.Router
 	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager

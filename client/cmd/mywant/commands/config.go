@@ -20,8 +20,8 @@ type MyWantConfig struct {
 	AgentServiceHost string `yaml:"agent_service_host"` // Agent service host (for webhook mode)
 	AgentServicePort int    `yaml:"agent_service_port"` // Agent service port (for webhook mode)
 	MockFlightPort   int    `yaml:"mock_flight_port"`   // Mock flight server port
-	HeaderPosition   string `yaml:"header_position"`   // top or bottom
-	ColorMode        string `yaml:"color_mode"`        // light, dark, system
+	HeaderPosition   string `yaml:"header_position"`    // top or bottom
+	ColorMode        string `yaml:"color_mode"`         // light, dark, system
 }
 
 // DefaultConfig returns the default configuration
@@ -57,10 +57,11 @@ func getConfigPath() string {
 // LoadConfig loads configuration from file or returns default
 func LoadConfig() (*MyWantConfig, error) {
 	configPath := getConfigPath()
+	config := DefaultConfig()
 
 	// If config doesn't exist, return default
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return DefaultConfig(), nil
+		return config, nil
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -68,12 +69,12 @@ func LoadConfig() (*MyWantConfig, error) {
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var config MyWantConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	// Unmarshal into the default config to preserve defaults for missing fields
+	if err := yaml.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return &config, nil
+	return config, nil
 }
 
 // SaveConfig saves configuration to file

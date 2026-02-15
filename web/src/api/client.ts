@@ -80,6 +80,13 @@ class MyWantApiClient {
           code: error.code,
         };
 
+        // Handle specific Axios error codes
+        if (error.code === 'ECONNABORTED') {
+          apiError.message = 'Request timed out or was aborted. The server might be slow or restarting.';
+        } else if (error.code === 'ERR_NETWORK') {
+          apiError.message = 'Network error. Please check if the server is running.';
+        }
+
         // Handle string error responses (from our Go server)
         if (error.response?.data && typeof error.response.data === 'string') {
           apiError.message = error.response.data;
@@ -139,6 +146,16 @@ class MyWantApiClient {
 
   async updateServerConfig(config: Partial<ServerConfig>): Promise<ServerConfig> {
     const response = await this.client.put<ServerConfig>('/api/v1/config', config);
+    return response.data;
+  }
+
+  async stopServer(): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/v1/system/stop');
+    return response.data;
+  }
+
+  async restartServer(): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/v1/system/restart');
     return response.data;
   }
 

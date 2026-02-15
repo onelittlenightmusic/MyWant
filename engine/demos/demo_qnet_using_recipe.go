@@ -2,8 +2,8 @@ package demos_moved
 
 import (
 	"fmt"
-	_ "mywant/engine/types"
 	. "mywant/engine/core"
+	_ "mywant/engine/types"
 	"os"
 )
 

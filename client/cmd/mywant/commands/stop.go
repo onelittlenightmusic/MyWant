@@ -15,7 +15,20 @@ var StopCmd = &cobra.Command{
 	Aliases: []string{"st"},
 	Short:   "Stop the MyWant server",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Load configuration
+		config, _ := LoadConfig()
+
 		port, _ := cmd.Flags().GetInt("port")
+
+		// Use config value if flag not explicitly set
+		if !cmd.Flags().Changed("port") && config != nil {
+			port = config.ServerPort
+		}
+
+		// Validation: Ensure port is not 0
+		if port <= 0 {
+			port = 8080
+		}
 
 		// 1. Try stopping via PID file
 		data, err := os.ReadFile(pidFile)

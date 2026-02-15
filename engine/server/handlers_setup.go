@@ -122,6 +122,10 @@ func (s *Server) setupRoutes() {
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 
+	// System controls
+	api.HandleFunc("/system/stop", s.stopServer).Methods("POST", "OPTIONS")
+	api.HandleFunc("/system/restart", s.restartServer).Methods("POST", "OPTIONS")
+
 	// Config endpoint
 	api.HandleFunc("/config", s.getConfig).Methods("GET", "OPTIONS")
 	api.HandleFunc("/config", s.updateConfig).Methods("PUT", "OPTIONS")

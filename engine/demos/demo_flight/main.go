@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	_ "mywant/engine/types"
 	. "mywant/engine/core"
+	_ "mywant/engine/types"
 )
 
 func main() {
