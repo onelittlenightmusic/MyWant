@@ -594,8 +594,8 @@ export const WantForm: React.FC<WantFormProps> = ({
             {selectedTypeId && (
               <>
                 {/* Want Name with Auto-generation */}
-                <div className="bg-blue-50 rounded-lg p-3 sm:p-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
                     Want Name *
                   </label>
                   <div className="space-y-2">
@@ -612,11 +612,11 @@ export const WantForm: React.FC<WantFormProps> = ({
                           handleArrowKeyNavigation(e);
                         }
                       }}
-                      className="focusable-section-header w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
                       placeholder="Auto-generated or enter custom name"
                       required
                     />
-                    <div className="text-xs text-gray-600">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
                       <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
                       {!isValidWantName(name) && name.trim() && (
                         <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>

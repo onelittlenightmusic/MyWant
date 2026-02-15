@@ -219,9 +219,16 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 			agent = doAgent
 		case "monitor":
 			baseAgent.Type = MonitorAgentType
-			monitorAgent := &MonitorAgent{BaseAgent: baseAgent}
-			r.setAgentMonitor(monitorAgent)
-			agent = monitorAgent
+			// Check if it's actually a PollAgent (has a registered poll function)
+			if _, isPoll := pollActionRegistry[baseAgent.Name]; isPoll {
+				pollAgent := &PollAgent{BaseAgent: baseAgent}
+				r.setAgentPoll(pollAgent)
+				agent = pollAgent
+			} else {
+				monitorAgent := &MonitorAgent{BaseAgent: baseAgent}
+				r.setAgentMonitor(monitorAgent)
+				agent = monitorAgent
+			}
 		default:
 			return fmt.Errorf("unknown agent type: %s", agentDef.Type)
 		}
@@ -237,13 +244,38 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 }
 
 func (r *AgentRegistry) setAgentAction(agent *DoAgent) {
+	// Look up specific implementation from registry
+	if action, ok := doActionRegistry[agent.Name]; ok {
+		agent.Action = action
+		InfoLog("[AGENT] Linked agent '%s' to registered Go implementation (Do)", agent.Name)
+		return
+	}
+
 	// All DoAgents use the same generic action - just initialize state
 	agent.Action = r.genericDoAction
 }
 
 func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent) {
+	// Look up specific implementation from registry
+	if monitor, ok := monitorActionRegistry[agent.Name]; ok {
+		agent.Monitor = monitor
+		InfoLog("[AGENT] Linked agent '%s' to registered Go implementation (Monitor)", agent.Name)
+		return
+	}
+
 	// All MonitorAgents use the same generic monitor - just log monitoring
 	agent.Monitor = r.genericMonitorAction
+}
+
+func (r *AgentRegistry) setAgentPoll(agent *PollAgent) {
+	// Look up specific implementation from registry
+	if poll, ok := pollActionRegistry[agent.Name]; ok {
+		agent.Poll = poll
+		InfoLog("[AGENT] Linked agent '%s' to registered Go implementation (Poll)", agent.Name)
+		return
+	}
+
+	// PollAgent doesn't have a generic fallback as it needs to return shouldStop
 }
 
 // genericDoAction is the default action for all DoAgents Agents don't need special implementations - state initialization is externalized to want types

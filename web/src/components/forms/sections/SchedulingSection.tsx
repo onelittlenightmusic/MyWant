@@ -232,7 +232,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
     <div className="space-y-3">
       {/* At (time) - Optional */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           At (optional - e.g., "7am", "17:30", "midnight")
         </label>
         <CommitInput
@@ -256,7 +256,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
 
       {/* Every (frequency) */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Every (required)
         </label>
         <div className="flex gap-2 items-end">
@@ -284,7 +284,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
             <select
               value={editingDraft.everyUnit}
               onChange={(e) => setEditingDraft(prev => ({ ...prev, everyUnit: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm dark:bg-gray-800 dark:text-gray-100"
             >
               <option value="seconds">seconds</option>
               <option value="minutes">minutes</option>
@@ -300,14 +300,14 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
         <button
           type="button"
           onClick={handleSave}
-          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-amber-700 dark:hover:bg-amber-600"
         >
           Save
         </button>
         <button
           type="button"
           onClick={handleCancel}
-          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
         >
           Cancel
         </button>
@@ -330,7 +330,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
             : `every ${parsed.value} ${parsed.unit}`;
 
           return (
-            <span key={index} className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full flex items-center gap-1">
+            <span key={index} className="text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-1 rounded-full flex items-center gap-1">
               <Clock className="w-3 h-3" />
               {display}
             </span>

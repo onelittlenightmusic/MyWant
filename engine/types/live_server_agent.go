@@ -16,9 +16,7 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgentType("live_server_manager",
-		[]mywant.Capability{mywant.Cap("live_server_management")},
-		manageLiveServer)
+	mywant.RegisterDoAgent("live_server_manager", manageLiveServer)
 }
 
 // manageLiveServer handles server start and stop based on want phase

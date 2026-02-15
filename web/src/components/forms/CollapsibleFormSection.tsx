@@ -75,11 +75,11 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   const getHeaderColorClasses = (scheme: ColorScheme): string => {
     switch (scheme) {
       case 'blue':
-        return 'bg-blue-50 border-blue-200 hover:bg-blue-100';
+        return 'bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/30';
       case 'amber':
-        return 'bg-amber-50 border-amber-200 hover:bg-amber-100';
+        return 'bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/30';
       case 'green':
-        return 'bg-green-50 border-green-200 hover:bg-green-100';
+        return 'bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30';
     }
   };
 
@@ -248,18 +248,18 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
           <div className="flex items-center gap-2">
             {/* Collapse/Expand Icon */}
             {isCollapsed ? (
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
             ) : (
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
             )}
 
             {/* Section Icon */}
-            <span className="text-gray-700 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+            <span className="text-gray-700 dark:text-gray-300 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
               {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
             </span>
 
             {/* Section Title */}
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
               {title}
             </h3>
 
@@ -267,9 +267,9 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
             {items.length > 0 && (
               <span className={`
                 px-2 py-0.5 text-xs font-medium rounded-full
-                ${colorScheme === 'blue' ? 'bg-blue-100 text-blue-700' :
-                  colorScheme === 'amber' ? 'bg-amber-100 text-amber-700' :
-                  'bg-green-100 text-green-700'}
+                ${colorScheme === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                  colorScheme === 'amber' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}
               `}>
                 {items.length}
               </span>
@@ -278,7 +278,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
 
           {/* Collapsed Summary */}
           {isCollapsed && items.length > 0 && (
-            <div className="text-sm text-gray-600 ml-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400 ml-4">
               {renderCollapsedSummary()}
             </div>
           )}
@@ -326,10 +326,10 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
                 border-2 border-dashed transition-colors
                 focus:outline-none focus:ring-2
                 ${colorScheme === 'blue'
-                  ? 'border-blue-300 text-blue-600 hover:bg-blue-50 focus:ring-blue-300'
+                  ? 'border-blue-300 text-blue-600 hover:bg-blue-50 focus:ring-blue-300 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20'
                   : colorScheme === 'amber'
-                  ? 'border-amber-300 text-amber-600 hover:bg-amber-50 focus:ring-amber-300'
-                  : 'border-green-300 text-green-600 hover:bg-green-50 focus:ring-green-300'}
+                  ? 'border-amber-300 text-amber-600 hover:bg-amber-50 focus:ring-amber-300 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20'
+                  : 'border-green-300 text-green-600 hover:bg-green-50 focus:ring-green-300 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20'}
               `}
               aria-label={`Add new ${title.toLowerCase()} item (or press 'a' on header)`}
             >
@@ -339,7 +339,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
 
           {/* Empty State */}
           {items.length === 0 && !isEditing && (
-            <p className="text-sm text-gray-500 italic">
+            <p className="text-sm text-gray-500 dark:text-gray-400 italic">
               No {title.toLowerCase()} added yet. Press 'a' on the header or click the button below to add.
             </p>
           )}

@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	RegisterDoAgentType("user_reaction_do",
-		[]Capability{Cap("reaction_auto_approval")},
-		performAutoApproval)
+	RegisterDoAgent("user_reaction_do", performAutoApproval)
 }
 
 // performAutoApproval performs automatic approval if configured

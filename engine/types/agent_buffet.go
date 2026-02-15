@@ -10,9 +10,7 @@ import (
 const agentBuffetName = "agent_buffet_premium"
 
 func init() {
-	RegisterDoAgentType(agentBuffetName,
-		[]Capability{Cap("buffet_reservation")},
-		executeBuffetReservation)
+	RegisterDoAgent(agentBuffetName, executeBuffetReservation)
 }
 
 // executeBuffetReservation performs a premium buffet reservation

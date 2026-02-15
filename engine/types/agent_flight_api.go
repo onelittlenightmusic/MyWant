@@ -16,9 +16,7 @@ import (
 const flightDoAgentName = "agent_flight_api"
 
 func init() {
-	RegisterDoAgentType(flightDoAgentName,
-		[]Capability{Cap("flight_api_agency")},
-		executeFlightAction)
+	RegisterDoAgent(flightDoAgentName, executeFlightAction)
 }
 
 // FlightReservation represents a flight booking from the mock server

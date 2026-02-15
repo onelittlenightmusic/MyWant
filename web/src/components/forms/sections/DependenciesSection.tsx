@@ -206,14 +206,14 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
         <button
           type="button"
           onClick={handleSave}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600"
         >
           Save
         </button>
         <button
           type="button"
           onClick={handleCancel}
-          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
         >
           Cancel
         </button>
@@ -232,7 +232,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
         {dependencies.map((dep, index) => {
           const [key, value] = Object.entries(dep)[0];
           return (
-            <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+            <span key={index} className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded-full">
               {key}: {value}
             </span>
           );

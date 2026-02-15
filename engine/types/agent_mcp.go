@@ -18,12 +18,7 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgentType("mcp_tools",
-		[]mywant.Capability{{
-			Name:  "mcp_gmail",
-			Gives: []string{"mcp_gmail_search", "mcp_gmail_read", "mcp_gmail_send"},
-		}},
-		executeMCPOperation)
+	mywant.RegisterDoAgent("mcp_tools", executeMCPOperation)
 }
 
 // ============ NativeMCPManager ============

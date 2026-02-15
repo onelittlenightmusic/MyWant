@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
       "bg-white dark:bg-gray-900 px-3 sm:px-6 py-2 sm:py-4 fixed right-0 z-40 transition-all duration-300 ease-in-out left-0",
       isBottom ? "bottom-0 border-t border-gray-200 dark:border-gray-700" : "top-0 border-b border-gray-200 dark:border-gray-700",
       sidebarMinimized ? "lg:left-20" : "lg:left-44"
-    )} style={isBottom ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' } : {}}>
+    )}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center space-x-4 min-w-0">
           <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">{title}</h1>
@@ -209,6 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
+      {isBottom && <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />}
     </header>
   );
 };

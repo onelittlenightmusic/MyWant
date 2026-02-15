@@ -10,12 +10,7 @@ import (
 const userReactionMonitorAgentName = "user_reaction_monitor"
 
 func init() {
-	RegisterPollAgentType(userReactionMonitorAgentName,
-		[]Capability{
-			Cap("reminder_monitoring"),
-			Cap("reaction_auto_approval"),
-		},
-		pollUserReactions)
+	RegisterPollAgent(userReactionMonitorAgentName, pollUserReactions)
 }
 
 // pollUserReactions is a PollFunc — includes stop logic

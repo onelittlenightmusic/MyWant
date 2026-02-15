@@ -9,9 +9,7 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgentType("reminder_queue_manager",
-		[]mywant.Capability{mywant.Cap("reminder_queue_management")},
-		manageReactionQueue)
+	mywant.RegisterDoAgent("reminder_queue_manager", manageReactionQueue)
 }
 
 // manageReactionQueue handles queue creation and deletion based on reminder phase

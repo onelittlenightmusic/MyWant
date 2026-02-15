@@ -8,9 +8,7 @@ import (
 
 func init() {
 	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
-	RegisterDoAgentType("execution_command",
-		[]Capability{{Name: "command_execution", Gives: []string{"execute_shell_command"}}},
-		executeCommand)
+	RegisterDoAgent("execution_command", executeCommand)
 }
 
 // ExecutionResultWantLocals holds type-specific local state for ExecutionResultWant

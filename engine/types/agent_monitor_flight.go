@@ -16,9 +16,7 @@ import (
 const flightMonitorAgentName = "monitor_flight_api"
 
 func init() {
-	RegisterMonitorAgentType(flightMonitorAgentName,
-		[]Capability{Cap("flight_api_agency")},
-		monitorFlightStatus)
+	RegisterMonitorAgent(flightMonitorAgentName, monitorFlightStatus)
 }
 
 // monitorFlightStatus polls the mock server for flight status updates.

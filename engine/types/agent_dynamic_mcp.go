@@ -13,21 +13,10 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgentType("discovery_agent",
-		[]mywant.Capability{mywant.Cap("mcp_dynamic_discovery")},
-		executeDiscoveryAction)
-
-	mywant.RegisterDoAgentType("developer_agent",
-		[]mywant.Capability{mywant.Cap("mcp_dynamic_developer")},
-		executeDeveloperAction)
-
-	mywant.RegisterDoAgentType("compiler_agent",
-		[]mywant.Capability{mywant.Cap("mcp_dynamic_compiler")},
-		executeCompilerAction)
-
-	mywant.RegisterDoAgentType("validator_agent",
-		[]mywant.Capability{mywant.Cap("mcp_dynamic_validator")},
-		executeValidatorAction)
+	mywant.RegisterDoAgent("discovery_agent", executeDiscoveryAction)
+	mywant.RegisterDoAgent("developer_agent", executeDeveloperAction)
+	mywant.RegisterDoAgent("compiler_agent", executeCompilerAction)
+	mywant.RegisterDoAgent("validator_agent", executeValidatorAction)
 }
 
 // --- Discovery Action ---

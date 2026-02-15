@@ -181,14 +181,14 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
         <button
           type="button"
           onClick={handleSave}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600"
         >
           Save
         </button>
         <button
           type="button"
           onClick={handleCancel}
-          className="px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
         >
           Cancel
         </button>
@@ -206,7 +206,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
     return (
       <div className="flex flex-wrap gap-2">
         {entries.map(([key, value]) => (
-          <span key={key} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+          <span key={key} className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded-full">
             {key}: {value}
           </span>
         ))}

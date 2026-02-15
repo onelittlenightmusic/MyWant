@@ -12,12 +12,7 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgentType("knowledge_agent",
-		[]mywant.Capability{
-			mywant.Cap("knowledge_monitoring"),
-			mywant.Cap("knowledge_updating"),
-		},
-		executeKnowledgeAction)
+	mywant.RegisterDoAgent("knowledge_agent", executeKnowledgeAction)
 }
 
 // executeKnowledgeAction dispatches to monitor or update based on want requirements

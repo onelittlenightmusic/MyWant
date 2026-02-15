@@ -17,7 +17,7 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-6">
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
     <div className="flex items-center">
       <div className={`flex-shrink-0 p-3 rounded-full ${color}`}>
         <div className="text-xl">
@@ -25,8 +25,8 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, color, icon }) => (
         </div>
       </div>
       <div className="ml-4">
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+        <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
       </div>
     </div>
   </div>
@@ -41,7 +41,7 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
     return (
       <div className={gridClass}>
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white rounded-lg border border-gray-200 p-6">
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center justify-center h-16">
               <LoadingSpinner size="md" />
             </div>
@@ -62,26 +62,26 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
     {
       title: 'Total Agents',
       value: stats.total,
-      color: 'bg-blue-100',
-      icon: <Bot className="h-6 w-6 text-blue-600" />
+      color: 'bg-blue-100 dark:bg-blue-900/30',
+      icon: <Bot className="h-6 w-6 text-blue-600 dark:text-blue-400" />
     },
     {
       title: 'Do Agents',
       value: stats.doAgents,
-      color: 'bg-green-100',
-      icon: <Zap className="h-6 w-6 text-green-600" />
+      color: 'bg-green-100 dark:bg-green-900/30',
+      icon: <Zap className="h-6 w-6 text-green-600 dark:text-green-400" />
     },
     {
       title: 'Monitor Agents',
       value: stats.monitorAgents,
-      color: 'bg-purple-100',
-      icon: <Eye className="h-6 w-6 text-purple-600" />
+      color: 'bg-purple-100 dark:bg-purple-900/30',
+      icon: <Eye className="h-6 w-6 text-purple-600 dark:text-purple-400" />
     },
     {
       title: 'Total Capabilities',
       value: stats.totalCapabilities,
-      color: 'bg-orange-100',
-      icon: <Target className="h-6 w-6 text-orange-600" />
+      color: 'bg-orange-100 dark:bg-orange-900/30',
+      icon: <Target className="h-6 w-6 text-orange-600 dark:text-orange-400" />
     }
   ];
 

@@ -7,9 +7,7 @@ import (
 )
 
 func init() {
-	RegisterPollAgentType("monitor_slack_webhook",
-		[]Capability{Cap("slack_webhook_monitoring")},
-		func(ctx context.Context, want *Want) (bool, error) {
-			return PollWebhook(ctx, want, slackWebhookConfig)
-		})
+	RegisterPollAgent("monitor_slack_webhook", func(ctx context.Context, want *Want) (bool, error) {
+		return PollWebhook(ctx, want, slackWebhookConfig)
+	})
 }
