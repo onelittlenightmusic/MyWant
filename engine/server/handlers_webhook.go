@@ -57,7 +57,7 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	want := s.findWantByID(wantID)
+	want := s.findWantByIDOrName(wantID)
 	if want == nil {
 		http.Error(w, `{"error":"want not found"}`, http.StatusNotFound)
 		return
@@ -90,16 +90,26 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// findWantByID searches for a Want across globalBuilder and execution builders
-func (s *Server) findWantByID(wantID string) *mywant.Want {
+// findWantByIDOrName searches for a Want across globalBuilder and execution builders by ID or Name
+func (s *Server) findWantByIDOrName(idOrName string) *mywant.Want {
 	if s.globalBuilder != nil {
-		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+		// Try by ID first
+		if want, _, found := s.globalBuilder.FindWantByID(idOrName); found {
+			return want
+		}
+		// Try by Name
+		if want, found := s.globalBuilder.FindWantByName(idOrName); found {
 			return want
 		}
 	}
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
-			if want, _, found := execution.Builder.FindWantByID(wantID); found {
+			// Try by ID first
+			if want, _, found := execution.Builder.FindWantByID(idOrName); found {
+				return want
+			}
+			// Try by Name
+			if want, found := execution.Builder.FindWantByName(idOrName); found {
 				return want
 			}
 		}
@@ -304,7 +314,7 @@ func (s *Server) listWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
 					WantID:   want.Metadata.ID,
 					WantName: want.Metadata.Name,
 					WantType: want.Metadata.Type,
-					URL:      fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.ID),
+					URL:      fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name),
 					Status:   status,
 				})
 				break

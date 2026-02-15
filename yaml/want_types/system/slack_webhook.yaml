@@ -5,7 +5,7 @@ wantType:
     description: |
       Receives messages from Slack via the Events API (HTTP POST).
 
-      The want creates a webhook endpoint at /api/v1/webhooks/{want-id} that accepts
+      The want creates a webhook endpoint at /api/v1/webhooks/{want-name} that accepts
       Slack Event Subscriptions payloads. Messages are parsed, stored in state, and
       forwarded to downstream wants via Provide().
 
@@ -97,7 +97,7 @@ wantType:
     description: Monitors webhook health and trims message buffer
 
   constraints:
-  - description: Webhook URL is derived from Want ID
+  - description: Webhook URL is derived from Want Name
     validation: Want must be deployed before webhook URL is active
 
   examples:
@@ -106,13 +106,13 @@ wantType:
     expectedBehavior: |
       SETUP:
       1. Create a Slack App with Event Subscriptions enabled
-      2. Deploy this want to get a Want ID
-      3. Set the Request URL in Slack to: POST http://<host>/api/v1/webhooks/{want-id}
+      2. Deploy this want to get a Want Name
+      3. Set the Request URL in Slack to: POST http://<host>/api/v1/webhooks/{want-name}
       4. Subscribe to message.channels and/or message.im events
       5. Messages from Slack are automatically stored in state
 
       WEBHOOK URL:
-      POST /api/v1/webhooks/{want-id}
+      POST /api/v1/webhooks/{want-name}
 
       STATE UPDATES:
       • slack_latest_message: updated with each new message
@@ -120,7 +120,7 @@ wantType:
       • slack_message_count: incremented with each message
 
       TEST WITH CURL:
-      curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+      curl -X POST http://localhost:8080/api/v1/webhooks/{want-name} \
         -H "Content-Type: application/json" \
         -d '{"type":"event_callback","event":{"type":"message","user":"U01ABCDEF","text":"hello","channel":"C01ABCDEF23","ts":"1234567890.123456"}}'
     want:

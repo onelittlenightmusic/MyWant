@@ -61,7 +61,7 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 	locals.ChannelFilter = want.GetStringParam("channel_filter", "")
 	locals.LastProcessedCount = 0
 
-	webhookURL := fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.ID)
+	webhookURL := fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name)
 	stateMap := map[string]any{
 		cfg.StatusKey():       "active",
 		cfg.MessagesKey():     []any{},
@@ -77,7 +77,7 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 	want.StoreStateMulti(stateMap)
 	want.Locals = locals
 
-	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.ID)
+	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
 	StartWebhookMonitor(want, cfg)
 }

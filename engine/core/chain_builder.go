@@ -1933,6 +1933,26 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	return nil, "", false
 }
 
+// FindWantByName searches for a want by its metadata name
+func (cb *ChainBuilder) FindWantByName(wantName string) (*Want, bool) {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
+	// First search in runtime wants
+	if runtimeWant, exists := cb.wants[wantName]; exists {
+		return runtimeWant.want, true
+	}
+
+	// If not found in runtime, search in config wants
+	for _, configWant := range cb.config.Wants {
+		if configWant.Metadata.Name == wantName {
+			return configWant, true
+		}
+	}
+
+	return nil, false
+}
+
 // UpdateWant updates an existing want's configuration (params, labels, using fields, etc.) Automatically triggers reconciliation to process topology changes Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	cb.reconcileMutex.Lock()

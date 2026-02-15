@@ -5,7 +5,7 @@ wantType:
     description: |
       Receives messages from Microsoft Teams Outgoing Webhooks via HTTP POST.
 
-      The want creates a webhook endpoint at /api/v1/webhooks/{want-id} that accepts
+      The want creates a webhook endpoint at /api/v1/webhooks/{want-name} that accepts
       Teams Outgoing Webhook payloads. Messages are parsed, stored in state, and
       forwarded to downstream wants via Provide().
 
@@ -98,7 +98,7 @@ wantType:
     description: Monitors webhook health and trims message buffer
 
   constraints:
-  - description: Webhook URL is derived from Want ID
+  - description: Webhook URL is derived from Want Name
     validation: Want must be deployed before webhook URL is active
 
   examples:
@@ -106,12 +106,12 @@ wantType:
     description: Simple webhook receiver for Teams messages
     expectedBehavior: |
       SETUP:
-      1. Deploy this want to get a Want ID
-      2. Configure Teams Outgoing Webhook URL: POST /api/v1/webhooks/{want-id}
+      1. Deploy this want to get a Want Name
+      2. Configure Teams Outgoing Webhook URL: POST /api/v1/webhooks/{want-name}
       3. Messages from Teams are automatically stored in state
 
       WEBHOOK URL:
-      POST /api/v1/webhooks/{want-id}
+      POST /api/v1/webhooks/{want-name}
 
       STATE UPDATES:
       • teams_latest_message: updated with each new message
@@ -119,7 +119,7 @@ wantType:
       • teams_message_count: incremented with each message
 
       TEST WITH CURL:
-      curl -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+      curl -X POST http://localhost:8080/api/v1/webhooks/{want-name} \
         -H "Content-Type: application/json" \
         -d '{"type":"message","text":"hello","from":{"name":"Test User"},"channelId":"msteams"}'
     want:

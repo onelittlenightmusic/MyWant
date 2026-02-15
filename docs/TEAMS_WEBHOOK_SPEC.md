@@ -1,6 +1,6 @@
 # Webhook 設定ガイド (Teams / Slack)
 
-外部サービスからのメッセージを `/api/v1/webhooks/{want-id}` で受信し、Want stateに保存します。Teams・Slack・汎用JSONペイロードを自動判定して処理します。
+外部サービスからのメッセージを `/api/v1/webhooks/{want-name}` で受信し、Want stateに保存します。Teams・Slack・汎用JSONペイロードを自動判定して処理します。
 
 ## Teams Webhook のセットアップ
 
@@ -25,12 +25,12 @@ Teams からのメッセージ受信には2つの方式があります。
 2. Want の State から `webhook_url` を確認:
 
    ```bash
-   ./bin/mywant wants get {want-id}
+   ./bin/mywant wants get {want-name}
    ```
 
    State内に以下のようなパスが表示されます:
    ```
-   webhook_url ... /api/v1/webhooks/{want-id}
+   webhook_url ... /api/v1/webhooks/{want-name}
    ```
 
    > ダッシュボードのWant DetailでState値をマウスオーバーし、右のコピーアイコンからコピーすると便利です。
@@ -55,7 +55,7 @@ ngrok http 8080
 2. **Apps** タブ → **Create an outgoing webhook**
 3. **Callback URL** に、ngrokのURL + ステップ1でコピーした `webhook_url` を結合して入力:
    ```
-   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-name}
    ```
 4. **Name** (= @mention名) と **Description** を入力
 5. **Create** → 表示される **Security token** をWantの `webhook_secret` パラメータに設定
@@ -68,7 +68,7 @@ ngrok http 8080
 2. トリガー: **When a new channel message is added** → チーム・チャネルを指定
 3. アクション: **HTTP** → POST に、ngrokのURL + ステップ1でコピーした `webhook_url` を結合して入力:
    ```
-   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-name}
    ```
 4. Body:
    ```json
@@ -89,7 +89,7 @@ ngrok http 8080
 2. WantのStateを確認:
 
    ```bash
-   ./bin/mywant wants get {want-id}
+   ./bin/mywant wants get {want-name}
    ```
 
 3. `teams_latest_message` に投稿したメッセージが反映されていればOK:
@@ -153,12 +153,12 @@ wants:
 3. Want の State から `webhook_url` を確認:
 
    ```bash
-   ./bin/mywant wants get {want-id}
+   ./bin/mywant wants get {want-name}
    ```
 
    State内に以下のようなパスが表示されます:
    ```
-   webhook_url ... /api/v1/webhooks/{want-id}
+   webhook_url ... /api/v1/webhooks/{want-name}
    ```
 
    > ダッシュボードのWant DetailでState値をマウスオーバーし、右のコピーアイコンからコピーすると便利です。
@@ -179,7 +179,7 @@ ngrok http 8080
 2. 左メニュー **Event Subscriptions** → **Enable Events** をON
 3. **Request URL** に、ngrokのURL + ステップ2でコピーした `webhook_url` を結合して入力:
    ```
-   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-id}
+   https://xxxx.ngrok-free.app/api/v1/webhooks/{want-name}
    ```
    - SlackがURL verification challengeを送信し、MyWantが自動応答します
    - 「**Verified**」と表示されればOK
@@ -204,7 +204,7 @@ ngrok http 8080
 2. WantのStateを確認:
 
    ```bash
-   ./bin/mywant wants get {want-id}
+   ./bin/mywant wants get {want-name}
    ```
 
 3. `slack_latest_message` に投稿したメッセージが反映されていればOK:
@@ -274,18 +274,18 @@ wants:
 curl http://localhost:8080/api/v1/webhooks
 
 # Want state 確認
-./bin/mywant wants get {want-id}
+./bin/mywant wants get {want-name}
 
 # Teams: 複数メッセージ送信テスト
 for i in $(seq 1 5); do
-  curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+  curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-name} \
     -H "Content-Type: application/json" \
     -d "{\"type\":\"message\",\"text\":\"Message $i\",\"from\":{\"name\":\"Tester\"},\"channelId\":\"msteams\"}"
 done
 
 # Slack: 複数メッセージ送信テスト
 for i in $(seq 1 5); do
-  curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-id} \
+  curl -s -X POST http://localhost:8080/api/v1/webhooks/{want-name} \
     -H "Content-Type: application/json" \
     -d "{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"user\":\"U01TEST\",\"text\":\"Message $i\",\"channel\":\"C01TEST\",\"ts\":\"123456789$i.000000\"}}"
 done
@@ -342,13 +342,13 @@ TeamsとSlackでstate keyのプレフィックスが異なります (`teams_` / 
 
 ### API Endpoints
 
-**POST /api/v1/webhooks/{want-id}** — ペイロード受信。自動判定で Teams/Slack/汎用 に振り分け。
+**POST /api/v1/webhooks/{want-name}** — ペイロード受信。自動判定で Teams/Slack/汎用 に振り分け。
 
 | Status Code | 説明 |
 |---|---|
 | `200 OK` | 受信成功 |
 | `400 Bad Request` | JSONパース失敗 |
 | `401 Unauthorized` | 署名検証失敗 |
-| `404 Not Found` | Want IDが存在しない |
+| `404 Not Found` | Want Nameが存在しない |
 
 **GET /api/v1/webhooks** — Webhook受信可能なWant一覧 (Teams + Slack)。
