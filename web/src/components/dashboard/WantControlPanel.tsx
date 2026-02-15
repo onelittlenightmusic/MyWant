@@ -61,7 +61,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
 
   return (
     <div className={classNames(
-      "fixed bottom-0 right-0 bg-blue-50 border-t border-blue-200 shadow-lg z-30 transition-all duration-300 ease-in-out",
+      "fixed bottom-0 right-0 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-800 shadow-lg z-30 transition-all duration-300 ease-in-out",
       sidebarMinimized ? "lg:left-20" : "lg:left-64",
       "left-0"
     )}>
@@ -77,7 +77,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
                 'flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
                 canStart && !loading
                   ? 'bg-green-600 text-white hover:bg-green-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
               )}
               title={canStart ? (isSuspended ? 'Resume execution' : 'Start execution') : 'Cannot start in current state'}
             >
@@ -93,7 +93,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
                 'flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
                 canSuspend && !loading
                   ? 'bg-orange-600 text-white hover:bg-orange-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
               )}
               title={canSuspend ? 'Suspend execution' : 'Cannot suspend in current state'}
             >
@@ -109,7 +109,7 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
                 'flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
                 canStop && !loading
                   ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
               )}
               title={canStop ? 'Stop execution' : 'Cannot stop in current state'}
             >
@@ -124,8 +124,8 @@ export const WantControlPanel: React.FC<WantControlPanelProps> = ({
               className={classNames(
                 'flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors border',
                 canDelete && !loading
-                  ? 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  : 'border-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed'
               )}
               title={canDelete ? 'Delete want' : 'No want selected'}
             >

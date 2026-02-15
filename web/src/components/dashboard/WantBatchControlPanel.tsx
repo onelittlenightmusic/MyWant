@@ -64,16 +64,16 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
   }, [selectedCount, loading, onBatchDelete, onBatchStart, onBatchStop]);
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between sticky top-0 z-10">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-between sticky top-0 z-10">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Batch Actions</h2>
-          <p className="text-sm text-gray-500">{selectedCount} item{selectedCount !== 1 ? 's' : ''} selected</p>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Batch Actions</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{selectedCount} item{selectedCount !== 1 ? 's' : ''} selected</p>
         </div>
         <button
           onClick={onBatchCancel}
-          className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+          className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           title="Exit Select Mode"
         >
           <XCircle className="w-6 h-6" />
@@ -81,7 +81,7 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="border-b border-gray-200 px-4 py-2">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2">
           <WantControlButtons
             onStart={onBatchStart}
             onStop={onBatchStop}
@@ -94,7 +94,7 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
           />
         </div>
         
-        <div className="p-6 text-center text-sm text-gray-500">
+        <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>{selectedCount} item{selectedCount !== 1 ? 's' : ''} selected</p>
           <p className="mt-1">Apply actions to all selected wants.</p>
         </div>

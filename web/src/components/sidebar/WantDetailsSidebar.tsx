@@ -1257,12 +1257,12 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
     <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
       {/* Current Agent */}
       {want.current_agent && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4">
           <div className="flex items-center">
-            <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mr-2" />
+            <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mr-2" />
             <div>
-              <h4 className="text-xs sm:text-sm font-medium text-blue-900">Current Agent</h4>
-              <p className="text-xs sm:text-sm text-blue-700">{want.current_agent}</p>
+              <h4 className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-300">Current Agent</h4>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-400">{want.current_agent}</p>
             </div>
             <div className="ml-auto">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Reaching" />
@@ -1274,11 +1274,11 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
       {/* Running Agents */}
       {want.running_agents && want.running_agents.length > 0 && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-sm font-medium text-gray-900 mb-3">Running Agents</h4>
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Running Agents</h4>
           <div className="space-y-2">
             {want.running_agents.map((agent, index) => (
               <div key={index} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">{agent}</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{agent}</span>
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
               </div>
             ))}
@@ -1290,7 +1290,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
       {groupedAgents && Object.keys(groupedAgents).length > 0 && (
         <div className={SECTION_CONTAINER_CLASS}>
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm font-medium text-gray-900">Agent Execution History</h4>
+            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Agent Execution History</h4>
             <div className="flex space-x-2">
               <button
                 onClick={() => setGroupBy('name')}
@@ -1298,7 +1298,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                   'px-3 py-1 text-xs rounded-md font-medium transition-colors',
                   groupBy === 'name'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                    : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
                 )}
               >
                 By Name
@@ -1309,7 +1309,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                   'px-3 py-1 text-xs rounded-md font-medium transition-colors',
                   groupBy === 'type'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                    : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
                 )}
               >
                 By Type
@@ -1326,35 +1326,35 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
           {!loadingGrouped && (
             <div className="space-y-3">
               {Object.entries(groupedAgents).map(([groupName, executions]) => (
-                <div key={groupName} className="border border-gray-200 rounded-md overflow-hidden">
+                <div key={groupName} className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
                   {/* Group Header */}
                   <button
                     onClick={() => toggleGroup(groupName)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <div className="flex items-center space-x-2">
                       {expandedGroups[groupName] ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
+                        <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600" />
+                        <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       )}
-                      <span className="font-medium text-sm text-gray-900">{groupName}</span>
-                      <span className="text-xs text-gray-500">({executions.length})</span>
+                      <span className="font-medium text-sm text-gray-900 dark:text-white">{groupName}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">({executions.length})</span>
                     </div>
                   </button>
 
                   {/* Group Content */}
                   {expandedGroups[groupName] && (
-                    <div className="px-3 py-2 bg-white border-t border-gray-200 space-y-2">
+                    <div className="px-3 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 space-y-2">
                       {executions.map((execution, index) => (
                         <div
                           key={index}
-                          className="p-2 bg-gray-50 rounded border border-gray-200 text-xs"
+                          className="p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 text-xs"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-gray-800">{execution.agent_name}</span>
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{execution.agent_name}</span>
                             <div className="flex items-center space-x-2">
-                              <span className="text-gray-500 text-xs">{execution.agent_type}</span>
+                              <span className="text-gray-500 dark:text-gray-400 text-xs">{execution.agent_type}</span>
                               <div className={classNames(
                                 'w-2 h-2 rounded-full',
                                 execution.status === 'achieved' && 'bg-green-500',
@@ -1368,19 +1368,19 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                           {/* Activity Label */}
                           {execution.activity && (
                             <div className="mb-2">
-                              <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                              <span className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
                                 {execution.activity}
                               </span>
                             </div>
                           )}
 
-                          <div className="text-gray-600 space-y-1">
+                          <div className="text-gray-600 dark:text-gray-400 space-y-1">
                             <div>Start: {formatDate(execution.start_time)}</div>
                             {execution.end_time && (
                               <div>End: {formatDate(execution.end_time)}</div>
                             )}
                             {execution.error && (
-                              <div className="text-red-600">Error: {execution.error}</div>
+                              <div className="text-red-600 dark:text-red-400">Error: {execution.error}</div>
                             )}
                           </div>
                         </div>
@@ -1410,7 +1410,7 @@ const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
   const items: React.ReactNode[] = [];
 
   if (obj === null || obj === undefined) {
-    return [<span key="null" className="text-gray-600">null</span>];
+    return [<span key="null" className="text-gray-600 dark:text-gray-400">null</span>];
   }
 
   if (typeof obj !== 'object') {
@@ -1425,7 +1425,7 @@ const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
     if (isNested || isArray) {
       items.push(
         <div key={key} className={`${depth > 0 ? 'ml-4' : ''} mb-2`}>
-          <div className="font-medium text-gray-800 text-xs mb-1">{key}:</div>
+          <div className="font-medium text-gray-800 dark:text-gray-200 text-xs mb-1">{key}:</div>
           <div className="ml-3 space-y-1">
             {renderStateAsItems(value, depth + 1)}
           </div>
@@ -1433,8 +1433,8 @@ const renderStateAsItems = (obj: any, depth: number = 0): React.ReactNode[] => {
       );
     } else {
       items.push(
-        <div key={key} className={`${depth > 0 ? 'ml-4' : ''} text-xs text-gray-700 mb-1`}>
-          <span className="font-medium text-gray-800">{key}:</span> <span className="text-gray-600">{String(value)}</span>
+        <div key={key} className={`${depth > 0 ? 'ml-4' : ''} text-xs text-gray-700 dark:text-gray-300 mb-1`}>
+          <span className="font-medium text-gray-800 dark:text-gray-200">{key}:</span> <span className="text-gray-600 dark:text-gray-400">{String(value)}</span>
         </div>
       );
     }
@@ -1449,11 +1449,11 @@ const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, 
   const paramTimestamp = entry.timestamp;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
       {/* Collapsed/Header View */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center space-x-3 flex-1 text-left">
           {isExpanded ? (
@@ -1463,7 +1463,7 @@ const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, 
           )}
           <div className="flex-1 min-w-0">
             {paramTimestamp && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 {formatDate(paramTimestamp)}
               </div>
             )}
@@ -1473,8 +1473,8 @@ const ParameterHistoryItem: React.FC<{ entry: any; index: number }> = ({ entry, 
 
       {/* Expanded View - Itemized Format */}
       {isExpanded && (
-        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border space-y-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded p-3 text-xs overflow-auto max-h-96 border dark:border-gray-700 space-y-2">
             {renderStateAsItems(entry.stateValue || {})}
           </div>
         </div>
@@ -1494,15 +1494,15 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
 
   // Determine agent badge color based on action_by_agent type
   const isMonitorAgent = actionByAgent?.includes('Monitor');
-  const agentBgColor = isMonitorAgent ? 'bg-green-100' : 'bg-blue-100';
-  const agentTextColor = isMonitorAgent ? 'text-green-700' : 'text-blue-700';
+  const agentBgColor = isMonitorAgent ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30';
+  const agentTextColor = isMonitorAgent ? 'text-green-700 dark:text-green-400' : 'text-blue-700 dark:text-blue-400';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
       {/* Collapsed/Header View */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center space-x-2 flex-1 text-left">
           {isExpanded ? (
@@ -1511,11 +1511,11 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
           )}
           <div className="flex items-center space-x-1 min-w-0">
-            <div className="text-xs font-medium text-gray-900">
+            <div className="text-xs font-medium text-gray-900 dark:text-white">
               #{index + 1}
             </div>
             {stateTimestamp && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 {formatRelativeTime(stateTimestamp)}
               </div>
             )}
@@ -1537,8 +1537,8 @@ const StateHistoryItem: React.FC<{ state: any; index: number }> = ({ state, inde
 
       {/* Expanded View - Itemized Format (only stateValue contents) */}
       {isExpanded && (
-        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border space-y-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded p-3 text-xs overflow-auto max-h-96 border dark:border-gray-700 space-y-2">
             {renderStateAsItems(state.stateValue || {})}
           </div>
         </div>
@@ -1556,11 +1556,11 @@ const LogHistoryItem: React.FC<{ logEntry: any; index: number }> = ({ logEntry, 
   const logLines = logsText.split('\n').filter((line: string) => line.trim().length > 0);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
       {/* Collapsed/Header View */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center space-x-2 flex-1 text-left">
           {isExpanded ? (
@@ -1569,11 +1569,11 @@ const LogHistoryItem: React.FC<{ logEntry: any; index: number }> = ({ logEntry, 
             <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
           )}
           <div className="flex items-center space-x-1 min-w-0">
-            <div className="text-xs font-medium text-gray-900">
+            <div className="text-xs font-medium text-gray-900 dark:text-white">
               #{index + 1} - {logLines.length} line{logLines.length !== 1 ? 's' : ''}
             </div>
             {logTimestamp && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 {formatRelativeTime(logTimestamp)}
               </div>
             )}
@@ -1583,9 +1583,9 @@ const LogHistoryItem: React.FC<{ logEntry: any; index: number }> = ({ logEntry, 
 
       {/* Expanded View - Display Logs */}
       {isExpanded && (
-        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <div className="bg-white rounded p-3 text-xs overflow-auto max-h-96 border">
-            <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words font-mono">
+        <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-gray-50 dark:bg-gray-900">
+          <div className="bg-white dark:bg-gray-800 rounded p-3 text-xs overflow-auto max-h-96 border dark:border-gray-700">
+            <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words font-mono">
               {logsText}
             </pre>
           </div>
@@ -1605,7 +1605,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       {/* Parameter History Section */}
       {hasParameterHistory && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Parameter History</h4>
+          <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Parameter History</h4>
           <div className="space-y-2 sm:space-y-3">
             {want.history!.parameterHistory!.map((entry, index) => (
               <ParameterHistoryItem key={index} entry={entry} index={index} />
@@ -1617,11 +1617,11 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       {/* Execution Logs Section */}
       {hasLogs && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-base font-medium text-gray-900 mb-4">Execution Logs</h4>
+          <h4 className="text-base font-medium text-gray-900 dark:text-white mb-4">Execution Logs</h4>
           <div className="space-y-2">
             {results.logs.map((log: string, index: number) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-md p-3">
-                <pre className="text-xs text-gray-800 whitespace-pre-wrap break-words">
+              <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-3">
+                <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
                   {log}
                 </pre>
               </div>
@@ -1633,7 +1633,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       {/* State History Section */}
       {want.history?.stateHistory && want.history.stateHistory.length > 0 && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-base font-medium text-gray-900 mb-4">State History</h4>
+          <h4 className="text-base font-medium text-gray-900 dark:text-white mb-4">State History</h4>
           <div className="space-y-0">
             {want.history.stateHistory.slice().reverse().map((state, index) => (
               <StateHistoryItem key={index} state={state} index={want.history.stateHistory.length - index - 1} />
@@ -1645,7 +1645,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
       {/* Log History Section */}
       {hasLogHistory && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <h4 className="text-base font-medium text-gray-900 mb-4">Log History</h4>
+          <h4 className="text-base font-medium text-gray-900 dark:text-white mb-4">Log History</h4>
           <div className="space-y-0">
             {want.history!.logHistory!.slice().reverse().map((logEntry, index) => (
               <LogHistoryItem key={index} logEntry={logEntry} index={want.history!.logHistory!.length - index - 1} />

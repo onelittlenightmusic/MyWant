@@ -15,14 +15,14 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
   onModeChange
 }) => {
   return (
-    <div className="flex items-center justify-end space-x-1 bg-gray-100 rounded-3xl p-1">
+    <div className="flex items-center justify-end space-x-1 bg-gray-100 dark:bg-gray-800 rounded-3xl p-1">
       <button
         type="button"
         onClick={() => onModeChange('form')}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl text-sm font-medium transition-colors ${
           mode === 'form'
-            ? 'bg-white text-blue-600 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
         }`}
         title="Edit using form"
       >
@@ -34,8 +34,8 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
         onClick={() => onModeChange('yaml')}
         className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl text-sm font-medium transition-colors ${
           mode === 'yaml'
-            ? 'bg-white text-blue-600 shadow-sm'
-            : 'text-gray-600 hover:text-gray-900'
+            ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
         }`}
         title="Edit as YAML"
       >
