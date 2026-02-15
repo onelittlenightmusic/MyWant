@@ -45,8 +45,8 @@ func (n *CloudflareTunnelWant) GetLocals() *CloudflareTunnelLocals {
 
 // regex patterns for extracting cloudflare tunnel URL
 var (
-	// Example: |  Your quick tunnel has been created! Visit it at https://xxx.trycloudflare.com
-	cloudflareURLPattern = regexp.MustCompile(`Your quick tunnel has been created! Visit it at\s+(https?://\S+)`)
+	// Example: |  https://disclaimers-gmt-windsor-hero.trycloudflare.com                                    |
+	cloudflareURLPattern = regexp.MustCompile(`\|\s+(https://[a-zA-Z0-9-]+\.trycloudflare\.com)\s+`)
 )
 
 // Initialize starts the cloudflared process and waits for the forwarding URL
