@@ -228,9 +228,9 @@ export const useWantStore = create<WantStore>()(
       try {
         await apiClient.deleteWant(id);
         set(state => ({
-          wants: state.wants.filter(w => w.id !== id),
-          selectedWant: state.selectedWant?.id === id ? null : state.selectedWant,
-          selectedWantDetails: state.selectedWantDetails?.id === id ? null : state.selectedWantDetails,
+          wants: state.wants.filter(w => w.metadata?.id !== id && w.id !== id),
+          selectedWant: (state.selectedWant?.metadata?.id === id || state.selectedWant?.id === id) ? null : state.selectedWant,
+          selectedWantDetails: (state.selectedWantDetails?.metadata?.id === id || state.selectedWantDetails?.id === id) ? null : state.selectedWantDetails,
           selectedWantResults: null,
           loading: false
         }));
