@@ -22,9 +22,9 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   };
 
   const getErrorColor = () => {
-    if (errorObj.type === 'validation') return 'border-yellow-200 bg-yellow-50 text-yellow-800';
-    if (errorObj.status >= 500) return 'border-red-200 bg-red-50 text-red-800';
-    return 'border-orange-200 bg-orange-50 text-orange-800';
+    if (errorObj.type === 'validation') return 'border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
+    if (errorObj.status >= 500) return 'border-red-200 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300';
+    return 'border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
   };
 
   const handleCopyError = () => {
@@ -47,7 +47,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
               <div className="space-y-2">
                 <p>{errorObj.details}</p>
                 {errorObj.details.includes('Available standard types:') && (
-                  <div className="bg-white bg-opacity-50 p-3 rounded border">
+                  <div className="bg-white bg-opacity-50 dark:bg-black dark:bg-opacity-20 p-3 rounded border dark:border-current">
                     <p className="font-medium mb-2">This error occurs when:</p>
                     <ul className="list-disc list-inside space-y-1 text-xs">
                       <li>A want type is misspelled or doesn't exist</li>
