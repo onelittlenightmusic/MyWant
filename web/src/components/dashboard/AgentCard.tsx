@@ -82,7 +82,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({
         className
       )}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-2 sm:mb-4">
         <div className="flex-1 min-w-0">
           <h3
             className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5"
@@ -91,18 +91,26 @@ export const AgentCard: React.FC<AgentCardProps> = ({
             <Bot className="h-3 w-3 sm:h-4 w-4 flex-shrink-0 text-blue-500" />
             {truncateText(agentName, 30)}
           </h3>
-          <div className="flex items-center mt-2">
-            <div className={classNames(
-              'inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium',
-              getTypeColor()
-            )}>
-              {getTypeIcon()}
-              <span className="ml-1 capitalize">{agentType}</span>
-            </div>
-          </div>
+          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
+            {capabilities.length} capabilities · {uses.length} deps
+          </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
+          {/* Type badge */}
+          <div className={classNames(
+            'inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium',
+            getTypeColor()
+          )}>
+            {getTypeIcon()}
+            <span className="ml-1 capitalize">{agentType}</span>
+          </div>
+
+          {/* Status indicator */}
+          <div className="flex items-center">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500" title="Active" />
+          </div>
+
           {/* Actions dropdown */}
           <div className="relative group/menu">
             <button className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -146,74 +154,6 @@ export const AgentCard: React.FC<AgentCardProps> = ({
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Capabilities */}
-      {capabilities.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Capabilities</h4>
-          <div className="flex flex-wrap gap-1">
-            {capabilities.slice(0, 3).map((capability) => (
-              <span
-                key={capability}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-              >
-                {capability}
-              </span>
-            ))}
-            {capabilities.length > 3 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                +{capabilities.length - 3} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Dependencies */}
-      {uses.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Uses</h4>
-          <div className="flex flex-wrap gap-1">
-            {uses.slice(0, 3).map((use) => (
-              <span
-                key={use}
-                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
-              >
-                {use}
-              </span>
-            ))}
-            {uses.length > 3 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                +{uses.length - 3} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Agent Details */}
-      <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-        <div className="flex justify-between">
-          <span>Capabilities:</span>
-          <span className="font-medium">{capabilities.length}</span>
-        </div>
-
-        <div className="flex justify-between">
-          <span>Dependencies:</span>
-          <span className="font-medium">{uses.length}</span>
-        </div>
-      </div>
-
-      {/* Status indicator */}
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
-          <div className="flex items-center">
-            <div className="w-2 h-2 rounded-full bg-green-500 mr-2" />
-            <span className="text-sm text-green-600 dark:text-green-400 font-medium">Active</span>
           </div>
         </div>
       </div>

@@ -95,7 +95,7 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       {/* Card content */}
       <div className="relative z-10">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-2 sm:mb-4">
         <div className="flex-1 min-w-0">
           <h3
             className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -104,17 +104,23 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
             <Zap className="h-3 w-3 sm:h-4 w-4 flex-shrink-0 text-yellow-500" />
             {truncateText(wantType.title, 30)}
           </h3>
-          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
             {wantType.name}
           </p>
-          {wantType.version && (
-            <p className="text-[9px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Version: {wantType.version}
-            </p>
-          )}
         </div>
 
-        <div className="flex items-center space-x-2 flex-shrink-0">
+        <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2 flex-shrink-0">
+          {/* Pattern badge */}
+          <span className={classNames('inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium', patternColors[wantType.pattern] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
+            {patternIcons[wantType.pattern]}
+            <span className="capitalize">{wantType.pattern}</span>
+          </span>
+
+          {/* Category badge */}
+          <span className={classNames('inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
+            {wantType.category}
+          </span>
+
           {/* Actions menu */}
           <div className="relative group/menu">
             <button className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
@@ -134,30 +140,6 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Pattern and Category Stats */}
-      <div className="space-y-2 mb-4">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Pattern:</span>
-          <span className={classNames('inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium', patternColors[wantType.pattern] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
-            {patternIcons[wantType.pattern]}
-            <span className="capitalize">{wantType.pattern}</span>
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Category:</span>
-          <span className={classNames('inline-block px-2.5 py-1 rounded text-xs font-medium', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
-            {wantType.category}
-          </span>
-        </div>
-      </div>
-
-      {/* Summary */}
-      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <p className="text-xs text-gray-600 dark:text-gray-400">
-          {wantType.pattern} pattern in {wantType.category} category
-        </p>
       </div>
       </div>
     </div>

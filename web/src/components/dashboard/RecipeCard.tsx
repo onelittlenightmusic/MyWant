@@ -94,7 +94,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         className || ''
       )}>
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-2 sm:mb-4">
         <div className="flex-1 min-w-0">
           <h3
             className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -103,21 +103,23 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-indigo-500" />
             {truncateText(recipeName, 30)}
           </h3>
-          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {description ? truncateText(description, 60) : 'No description'}
+          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
+            {wantsCount} wants · {parametersCount} params
           </p>
-          {version && (
-            <p className="text-[9px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Version: {version}
-            </p>
-          )}
         </div>
 
-        <div className="flex items-center space-x-2">
-          {/* Recipe type icon */}
-          <div className="flex items-center space-x-1" title="Recipe template">
-            <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          </div>
+        <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
+          {/* Deploy button */}
+          {onDeploy && (
+            <button
+              onClick={handleDeploy}
+              disabled={isDeploying}
+              className="inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={isDeploying ? 'Deploying...' : 'Deploy'}
+            >
+              <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            </button>
+          )}
 
           {/* Actions menu */}
           <div className="relative group/menu">
@@ -180,37 +182,6 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Recipe Stats */}
-      <div className="space-y-2 mb-4">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Wants:</span>
-          <span className="text-gray-900 dark:text-white font-medium">{wantsCount}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Parameters:</span>
-          <span className="text-gray-900 dark:text-white font-medium">{parametersCount}</span>
-        </div>
-      </div>
-
-      {/* Custom Type Badge (if available) */}
-      {recipe.recipe.metadata.custom_type && (
-        <div className="mb-4">
-          <span
-            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-            title={recipe.recipe.metadata.custom_type.length > 20 ? recipe.recipe.metadata.custom_type : undefined}
-          >
-            {truncateText(recipe.recipe.metadata.custom_type, 20)}
-          </span>
-        </div>
-      )}
-
-      {/* Recipe Summary */}
-      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <p className="text-xs text-gray-600 dark:text-gray-400">
-          Template with {wantsCount} want{wantsCount !== 1 ? 's' : ''} and {parametersCount} parameter{parametersCount !== 1 ? 's' : ''}
-        </p>
       </div>
     </div>
   );
