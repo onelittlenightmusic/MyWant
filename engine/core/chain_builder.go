@@ -1994,7 +1994,8 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	}
 }
 
-// deleteWantByID removes a want from runtime and signals its goroutines to stop
+// deleteWantByID removes a want from runtime and signals its goroutines to stop.
+// Cascade-deletes child wants that have an OwnerReference pointing to this want.
 func (cb *ChainBuilder) deleteWantByID(wantID string) {
 	var targetWantName string
 	for name, rw := range cb.wants {
@@ -2014,6 +2015,20 @@ func (cb *ChainBuilder) deleteWantByID(wantID string) {
 	}
 	if targetWantName != "" {
 		delete(cb.wants, targetWantName)
+	}
+
+	// Cascade: collect child want IDs owned by this want
+	var childIDs []string
+	for _, rw := range cb.wants {
+		for _, ownerRef := range rw.want.Metadata.OwnerReferences {
+			if ownerRef.ID == wantID && ownerRef.BlockOwnerDeletion {
+				childIDs = append(childIDs, rw.want.Metadata.ID)
+				break
+			}
+		}
+	}
+	for _, childID := range childIDs {
+		cb.deleteWantByID(childID)
 	}
 }
 

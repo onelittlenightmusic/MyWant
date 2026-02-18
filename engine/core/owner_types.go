@@ -691,9 +691,13 @@ func (t *Target) computeTemplateResult() {
 
 	for i, resultSpec := range *recipeResult {
 		resultValue := t.getResultFromSpec(resultSpec, childWantsByName)
-		statName := strings.TrimPrefix(resultSpec.StatName, ".")
+		// Prefer state_field over stat_name as the metric key suffix
+		statName := strings.TrimPrefix(resultSpec.StateField, ".")
 		if statName == "" {
-			statName = "all_metrics"
+			statName = strings.TrimPrefix(resultSpec.StatName, ".")
+		}
+		if statName == "" {
+			statName = "result"
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		metrics[metricKey] = resultValue
@@ -704,18 +708,17 @@ func (t *Target) computeTemplateResult() {
 		}
 	}
 	for i, resultSpec := range *recipeResult {
-		statName := strings.TrimPrefix(resultSpec.StatName, ".")
+		statName := strings.TrimPrefix(resultSpec.StateField, ".")
 		if statName == "" {
-			statName = "all_metrics"
+			statName = strings.TrimPrefix(resultSpec.StatName, ".")
+		}
+		if statName == "" {
+			statName = "result"
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		t.StoreState(metricKey, metrics[metricKey])
 		if i == 0 {
-			statLabel := strings.TrimPrefix(resultSpec.StatName, ".")
-			if statLabel == "" {
-				statLabel = resultSpec.Description
-			}
-			t.StoreState("result", fmt.Sprintf("%s: %v", statLabel, primaryResult))
+			t.StoreState("result", fmt.Sprintf("%v", primaryResult))
 		}
 	}
 	t.childCount = len(childWantsByName)
@@ -918,41 +921,33 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 		t.StoreLog("[TARGET] ⚠️  Target %s: Want '%s' not found for result computation (available: %v)\n", t.Metadata.Name, spec.WantName, availableNames)
 		return 0
 	}
-	statName := spec.StatName
-	if strings.HasPrefix(statName, ".") {
-		return t.extractValueByPath(want.State, statName)
+
+	// Prefer state_field over stat_name
+	fieldName := strings.TrimPrefix(spec.StateField, ".")
+	if fieldName == "" {
+		fieldName = spec.StatName
 	}
 
-	// Try to get the specified stat from the want's dynamic Stats map
+	if strings.HasPrefix(fieldName, ".") {
+		return t.extractValueByPath(want.State, fieldName)
+	}
+
+	// Try to get the specified stat from the want's State map
 	if want.State != nil {
-		// Try exact stat name first
-		if value, ok := want.State[statName]; ok {
+		if value, ok := want.State[fieldName]; ok {
 			return value
 		}
-		// Try lowercase version
-		if value, ok := want.State[strings.ToLower(statName)]; ok {
+		if value, ok := want.State[strings.ToLower(fieldName)]; ok {
 			return value
 		}
-		// Try common variations
-		if spec.StatName == "TotalProcessed" {
+		if fieldName == "TotalProcessed" {
 			if value, ok := want.GetStateInt("total_processed", 0); ok {
 				return value
 			}
-			if value, ok := want.GetStateInt("totalprocessed", 0); ok {
-				return value
-			}
 		}
 	}
 
-	// Fallback: try to get from State map
-	if value, ok := want.State[spec.StatName]; ok {
-		return value
-	}
-	if value, ok := want.State[strings.ToLower(spec.StatName)]; ok {
-		return value
-	}
-
-	t.StoreLog("[TARGET] ⚠️  Target %s: Stat '%s' not found in want '%s' (available stats: %v)\n", t.Metadata.Name, spec.StatName, spec.WantName, want.State)
+	t.StoreLog("[TARGET] ⚠️  Target %s: Field '%s' not found in want '%s' (available: %v)\n", t.Metadata.Name, fieldName, spec.WantName, want.State)
 	return 0
 }
 

@@ -58,7 +58,7 @@ recipe:
           hotel_type: hotel_type
           cost: hotel_cost
 
-  # Coordinator-level state fields reported by child agents via MergeParentState
+  # Coordinator-level state fields: MergeParentState aggregation + computeTemplateResult output
   state:
     - name: costs
       description: "Map of child want names to their reported costs"
@@ -69,14 +69,26 @@ recipe:
     - name: remaining_budget
       description: "Budget minus total cost"
       type: float64
+    - name: result
+      description: "Primary result summary (first result entry)"
+      type: string
+    - name: budget_budget_summary
+      description: "Budget tracking summary from budget want"
+      type: string
+    - name: restaurant_final_result
+      description: "Restaurant reservation result"
+      type: string
+    - name: hotel_final_result
+      description: "Hotel booking result"
+      type: string
 
   result:
-    - want_name: "budget-1"
+    - want_name: "budget"
       state_field: "budget_summary"
       description: "Budget tracking summary"
-    - want_name: "restaurant-2"
+    - want_name: "restaurant"
       state_field: "final_result"
       description: "Restaurant reservation result"
-    - want_name: "hotel-3"
+    - want_name: "hotel"
       state_field: "final_result"
       description: "Hotel booking result"
