@@ -412,6 +412,18 @@ func (t *Target) Progress() {
 			return
 		}
 		t.childrenCreated = true
+
+		// Register recipe-defined state fields into ProvidedStateFields so they
+		// appear as regular state (not hidden_state) in the frontend.
+		if t.recipeLoader != nil {
+			if stateDefs, err := t.recipeLoader.GetRecipeState(t.RecipePath); err == nil {
+				for _, def := range stateDefs {
+					if !Contains(t.ProvidedStateFields, def.Name) {
+						t.ProvidedStateFields = append(t.ProvidedStateFields, def.Name)
+					}
+				}
+			}
+		}
 		return
 	}
 

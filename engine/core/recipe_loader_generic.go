@@ -52,6 +52,8 @@ type RecipeContent struct {
 	Parameters map[string]any        `yaml:"parameters,omitempty" json:"parameters,omitempty"`
 	Result     *RecipeResult         `yaml:"result,omitempty" json:"result,omitempty"`
 	Example    *RecipeExample        `yaml:"example,omitempty" json:"example,omitempty"`
+	// State defines coordinator-level state fields that will be added to Target's ProvidedStateFields
+	State []StateDef `yaml:"state,omitempty" json:"state,omitempty"`
 }
 
 func (rw RecipeWant) ConvertToWant() *Want {
@@ -416,6 +418,18 @@ func (grl *GenericRecipeLoader) GetRecipeResult(recipePath string) (*RecipeResul
 func GetRecipeResult(recipePath string) (*RecipeResult, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.GetRecipeResult(recipePath)
+}
+
+func (grl *GenericRecipeLoader) GetRecipeState(recipePath string) ([]StateDef, error) {
+	data, err := os.ReadFile(recipePath)
+	if err != nil {
+		return nil, err
+	}
+	var genericRecipe GenericRecipe
+	if err := yaml.Unmarshal(data, &genericRecipe); err != nil {
+		return nil, err
+	}
+	return genericRecipe.Recipe.State, nil
 }
 
 // substituteParams performs parameter substitution in want params
