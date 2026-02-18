@@ -174,6 +174,12 @@ func createFlight(ctx context.Context, want *Want) error {
 	want.StoreLog("Created flight reservation: %s (ID: %s, Status: %s)",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
 
+	// Report cost to parent want for budget tracking
+	flightCost := want.GetFloatParam("cost", 1200.0)
+	want.MergeParentState(map[string]any{
+		"costs": map[string]any{want.Metadata.Name: flightCost},
+	})
+
 	return nil
 }
 

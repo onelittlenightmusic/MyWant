@@ -246,6 +246,9 @@ type Want struct {
 	// State synchronization
 	stateMutex sync.RWMutex `json:"-" yaml:"-"`
 
+	// Hook called after MergeState completes (used by Target to signal stateNotify)
+	onMergeState func() `json:"-" yaml:"-"`
+
 	// Remote execution mode (for external agent execution via webhook/grpc)
 	remoteMode  bool   `json:"-" yaml:"-"` // True when executing in external agent service
 	callbackURL string `json:"-" yaml:"-"` // Callback URL for state updates
@@ -280,6 +283,10 @@ type Want struct {
 	// ChainBuilder sets this via SetGoroutineActive() to inform Want when goroutine starts/stops
 	goroutineActive   bool         `json:"-" yaml:"-"`
 	goroutineActiveMu sync.RWMutex `json:"-" yaml:"-"`
+
+	// Cached parent want pointer (resolved from OwnerReferences)
+	cachedParentWant   *Want  `json:"-" yaml:"-"`
+	cachedParentWantID string `json:"-" yaml:"-"`
 
 	// Packet cache for non-consuming checks
 	cachedPacket *CachedPacket `json:"-" yaml:"-"`
@@ -984,6 +991,69 @@ func (n *Want) MergeState(updates map[string]any) {
 		// For non-map values or when no existing value, just set directly
 		n.pendingStateChanges[key] = value
 	}
+
+	// Signal hook (e.g. Target.stateNotify) — buffered channel so non-blocking
+	if n.onMergeState != nil {
+		n.onMergeState()
+	}
+}
+
+func (n *Want) getParentWant() *Want {
+	if len(n.Metadata.OwnerReferences) == 0 {
+		return nil
+	}
+	var parentID string
+	for _, ref := range n.Metadata.OwnerReferences {
+		if ref.Controller && ref.Kind == "Want" {
+			parentID = ref.ID
+			break
+		}
+	}
+	if parentID == "" {
+		return nil
+	}
+	if n.cachedParentWant != nil && n.cachedParentWantID == parentID {
+		return n.cachedParentWant
+	}
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return nil
+	}
+	parent, _, found := cb.FindWantByID(parentID)
+	if !found {
+		return nil
+	}
+	n.cachedParentWant = parent
+	n.cachedParentWantID = parentID
+	return parent
+}
+
+func (n *Want) GetParentWant() *Want { return n.getParentWant() }
+
+func (n *Want) GetParentState(key string) (any, bool) {
+	parent := n.getParentWant()
+	if parent == nil {
+		return nil, false
+	}
+	return parent.GetState(key)
+}
+
+func (n *Want) StoreParentState(key string, value any) {
+	parent := n.getParentWant()
+	if parent == nil {
+		log.Printf("[WARN] Want '%s' has no parent, cannot store parent state '%s'", n.Metadata.Name, key)
+		return
+	}
+	parent.StoreState(key, value)
+}
+
+func (n *Want) MergeParentState(updates map[string]any) {
+	parent := n.getParentWant()
+	if parent == nil {
+		log.Printf("[WARN] Want '%s' has no parent, cannot merge parent state", n.Metadata.Name)
+		return
+	}
+	parent.MergeState(updates)
 }
 
 // "description_received": true, "description_text": "some text", "description_provided": true, })

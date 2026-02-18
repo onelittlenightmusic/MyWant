@@ -16,7 +16,7 @@ func init() {
 // executeHotelReservation performs a premium hotel reservation
 func executeHotelReservation(ctx context.Context, want *Want) error {
 	schedule := generateHotelSchedule(want)
-	return executeReservation(want, agentPremiumName, schedule, func(s interface{}) (string, string) {
+	err := executeReservation(want, agentPremiumName, schedule, func(s interface{}) (string, string) {
 		sch := s.(HotelSchedule)
 		activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",
 			sch.HotelType,
@@ -27,6 +27,17 @@ func executeHotelReservation(ctx context.Context, want *Want) error {
 			sch.HotelType, sch.CheckInTime.Format("15:04 Jan 2"), sch.CheckOutTime.Format("15:04 Jan 2"))
 		return activity, logMsg
 	})
+	if err != nil {
+		return err
+	}
+
+	// Report cost to parent want for budget tracking
+	hotelCost := want.GetFloatParam("cost", 800.0)
+	want.MergeParentState(map[string]any{
+		"costs": map[string]any{want.Metadata.Name: hotelCost},
+	})
+
+	return nil
 }
 
 // generateHotelSchedule creates a premium hotel schedule

@@ -1,0 +1,85 @@
+wantType:
+  metadata:
+    name: budget
+    title: Budget Tracker
+    description: Tracks and aggregates costs reported by child wants against a budget limit.
+    version: '1.0'
+    category: travel
+    pattern: independent
+  finalResultField: budget_summary
+  parameters:
+  - name: budget
+    description: Total budget amount
+    type: float64
+    default: 5000.0
+    required: false
+    validation:
+      min: 0
+    example: 5000.0
+  - name: currency
+    description: Currency code
+    type: string
+    default: USD
+    required: false
+    validation:
+      enum:
+      - USD
+      - EUR
+      - JPY
+      - GBP
+    example: USD
+  state:
+  - name: budget
+    description: Total budget amount
+    type: float64
+    persistent: true
+    initialValue: 5000.0
+  - name: currency
+    description: Currency code
+    type: string
+    persistent: true
+    initialValue: USD
+  - name: costs
+    description: Map of child want names to their reported costs
+    type: map
+    persistent: true
+    initialValue: {}
+  - name: total_cost
+    description: Sum of all reported costs
+    type: float64
+    persistent: true
+    initialValue: 0.0
+  - name: remaining_budget
+    description: Budget minus total cost
+    type: float64
+    persistent: true
+    initialValue: 0.0
+  - name: budget_exceeded
+    description: Whether total cost exceeds budget
+    type: bool
+    persistent: true
+    initialValue: false
+  - name: budget_summary
+    description: Human-readable budget summary
+    type: string
+    persistent: true
+    initialValue: ''
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    initialValue: 0
+  - name: final_result
+    description: Final result summary
+    type: string
+    persistent: true
+    initialValue: ''
+  agents: []
+  connect:
+    type: none
+  requires: []
+  relatedTypes:
+  - restaurant
+  - hotel
+  - buffet
+  - flight

@@ -16,7 +16,7 @@ func init() {
 // executeBuffetReservation performs a premium buffet reservation
 func executeBuffetReservation(ctx context.Context, want *Want) error {
 	schedule := generateBuffetSchedule(want)
-	return executeReservation(want, agentBuffetName, schedule, func(s interface{}) (string, string) {
+	err := executeReservation(want, agentBuffetName, schedule, func(s interface{}) (string, string) {
 		sch := s.(BuffetSchedule)
 		activity := fmt.Sprintf("Buffet reservation has been confirmed for %s buffet at %s for %.1f hours",
 			sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
@@ -24,6 +24,17 @@ func executeBuffetReservation(ctx context.Context, want *Want) error {
 			sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
 		return activity, logMsg
 	})
+	if err != nil {
+		return err
+	}
+
+	// Report cost to parent want for budget tracking
+	buffetCost := want.GetFloatParam("cost", 150.0)
+	want.MergeParentState(map[string]any{
+		"costs": map[string]any{want.Metadata.Name: buffetCost},
+	})
+
+	return nil
 }
 
 // generateBuffetSchedule creates a buffet reservation schedule

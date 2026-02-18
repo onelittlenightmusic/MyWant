@@ -41,6 +41,7 @@ type Target struct {
 	childrenDone           chan bool            // Signal when all children complete
 	childrenCreated        bool                 // Track if child wants have been created
 	childCount             int                  // Count of child wants
+	stateNotify            chan struct{}         // Notified when MergeParentState writes pending state
 }
 
 // NewTarget creates a new target want
@@ -57,7 +58,17 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		RecipeParams: make(map[string]any), parameterSubscriptions: make(map[string][]string),
 		childWants:        make([]*Want, 0),
 		completedChildren: make(map[string]bool),
-		childrenDone:      make(chan bool, 1), // Signal channel for subscription system
+		childrenDone: make(chan bool, 1), // Signal channel for subscription system
+		stateNotify:  make(chan struct{}, 64),
+	}
+
+	// Hook: whenever Want.MergeState is called on the embedded Want, signal stateNotify.
+	// This works even when the caller holds a *Want pointer (not *Target) due to embedding.
+	target.Want.onMergeState = func() {
+		select {
+		case target.stateNotify <- struct{}{}:
+		default:
+		}
 	}
 
 	// Extract target-specific configuration from params
@@ -131,24 +142,18 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 
 	allComplete := tcs.target.checkAllChildrenComplete()
 
-	// If all children are complete, set Status to achieved
-	// SetStatus() will automatically set achieving_percentage = 100
+	// If all children are complete, wake up Target.Progress() so it can finalize
 	if allComplete {
-		// Set Status to achieved (this automatically sets achieving_percentage = 100)
-		tcs.target.SetStatus(WantStatusAchieved)
-
-		// Trigger retrigger so Progress() can also process this state
-		cb := GetGlobalChainBuilder()
-		if cb != nil {
-			cb.RetriggerReceiverWant(tcs.target.Metadata.Name)
+		// Signal stateNotify so Progress() unblocks and checks completion
+		select {
+		case tcs.target.stateNotify <- struct{}{}:
+		default:
 		}
 
-		// Also signal the target via channel (legacy support)
+		// Also signal the legacy channel (kept for compatibility)
 		select {
 		case tcs.target.childrenDone <- true:
-			// Signal sent (legacy support)
 		default:
-			// Channel already has signal, ignore
 		}
 	}
 
@@ -179,10 +184,19 @@ func (t *Target) checkAllChildrenComplete() bool {
 	return true
 }
 
+// BeginProgressCycle overrides Want.BeginProgressCycle to NOT wipe pendingStateChanges.
+// Target accumulates MergeParentState writes across iterations; wiping would lose async data.
+func (t *Target) BeginProgressCycle() {
+	t.inExecCycle = true
+	t.execCycleCount++
+	// Do NOT wipe pendingStateChanges — preserve accumulated MergeParentState data
+	// pendingLogs and pendingParameterChanges are still reset each cycle
+	t.pendingParameterChanges = make(map[string]any)
+	t.pendingLogs = make([]string, 0)
+}
+
 // EndProgressCycle calls parent implementation
-// (achieving_percentage = 100 is already set by SetStatus() when target is achieved)
 func (t *Target) EndProgressCycle() {
-	// Call parent implementation
 	t.Want.EndProgressCycle()
 }
 
@@ -301,33 +315,14 @@ func (t *Target) CreateChildWants() []*Want {
 	return t.childWants
 }
 
-// IsAchieved checks if target is complete (all children created and completed)
 // Initialize resets state before execution begins
 func (t *Target) Initialize() {
 	// No state reset needed for target wants
 }
 
+// IsAchieved reports true only after Progress() has set Status to Achieved.
 func (t *Target) IsAchieved() bool {
-	// Check the Status field which was set by Progress() when all children completed
-	// This is more reliable than re-checking children completion, which can be slow or racy
-	if t.Status == WantStatusAchieved {
-		// CRITICAL: If achieved, achieving_percentage MUST be 100%
-		// Always enforce this consistency to ensure proper reporting
-		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
-		t.StoreState("achieving_percentage", 100.0)
-		return true
-	}
-
-	// During normal execution, check if children are complete
-	if !t.childrenCreated {
-		return false
-	}
-
-	t.childCompletionMutex.Lock()
-	allComplete := t.checkAllChildrenComplete()
-	t.childCompletionMutex.Unlock()
-
-	return allComplete
+	return t.Status == WantStatusAchieved
 }
 
 // DisownChild removes a want from this target's tracking
@@ -394,12 +389,17 @@ func (t *Target) AdoptChild(want *Want) {
 	}
 }
 
-// Progress implements the Progressable interface for Target with direct execution
+// Progress implements the Progressable interface for Target.
+//
+// Lifecycle:
+//  1. Phase 1 (first call): create child wants.
+//  2. Phase 2 (subsequent calls): block on stateNotify until MergeParentState data
+//     arrives (or a child-completion signal) with a 100 ms piggyback window.
+//     EndProgressCycle() flushes pendingStateChanges → State after each return.
+//  3. When all children are achieved, finalize and set Status = Achieved.
 func (t *Target) Progress() {
-	// GUARD: If already achieved, ensure achieving_percentage is 100 and skip heavy processing
+	// Guard: already achieved
 	if t.Status == WantStatusAchieved {
-		// Consistency check: If achieved, achieving_percentage must be 100%
-		// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 		t.StoreState("achieving_percentage", 100.0)
 		return
 	}
@@ -411,108 +411,118 @@ func (t *Target) Progress() {
 			t.StoreLog("[TARGET] ⚠️  Warning: Failed to send child wants: %v", err)
 			return
 		}
-
-		// Mark that we've created children
 		t.childrenCreated = true
-		return // Not complete yet, waiting for children
+		return
 	}
 
-	// Phase 2: Check if all children have completed
-	if t.childrenCreated {
-		t.childCompletionMutex.Lock()
-		allComplete := t.checkAllChildrenComplete()
-
-		// Snapshot completedChildren state while holding lock to avoid race conditions
-		completedSnapshot := make(map[string]bool)
-		for k, v := range t.completedChildren {
-			completedSnapshot[k] = v
-		}
-		t.childCompletionMutex.Unlock()
-
-		// Calculate achieving_percentage based on achieved children count (outside of lock)
-		if len(t.childWants) > 0 {
-			achievedCount := 0
-			for _, child := range t.childWants {
-				// Check both snapshot AND actual child Status
-				// This handles cases where events might have been missed
-				completed := completedSnapshot[child.Metadata.Name] || child.Status == WantStatusAchieved
-				if completed {
-					achievedCount++
-					// Update completedChildren map if we found a completed child not in snapshot
-					if !completedSnapshot[child.Metadata.Name] {
-						t.childCompletionMutex.Lock()
-						t.completedChildren[child.Metadata.Name] = true
-						t.childCompletionMutex.Unlock()
-					}
-				}
-			}
-			achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
-			t.StoreState("achieving_percentage", achievingPercentage)
-		} else {
-			// No children - target is immediately complete at 100%
-			t.StoreState("achieving_percentage", 100.0)
-		}
-
-		if allComplete {
-			// All children complete: SetStatus() will automatically set achieving_percentage = 100
-			t.SetStatus(WantStatusAchieved)
-
-			// Send completion packet to parent/upstream wants (only once)
-			// Check if we've already sent the completion packet
-			alreadySent, _ := t.GetStateBool("completion_packet_sent", false)
-			if !alreadySent {
-				// Construct ApprovalData for the parent coordinator
-				approvalID := t.GetStringParam("approval_id", t.Metadata.ID) // Assuming approval_id is a parameter or metadata
-
-				// Extract relevant status from children (e.g., if level 2 approval passed or failed)
-				// For simplicity, let's assume it's "approved" if all children achieved
-				approvalStatus := "approved"
-				if t.Status == WantStatusFailed { // If target itself failed
-					approvalStatus = "failed"
-				}
-
-				// Get the final result from the template result
-				var finalResultDescription string
-				if res, ok := t.State["result"].(string); ok {
-					finalResultDescription = res
-				} else {
-					finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
-				}
-
-				// For complex structures, marshal to JSON and then to map[string]any if needed
-				var evidenceMap map[string]any
-				if ev, ok := t.State["final_itinerary"]; ok { // Example: if target computes an itinerary
-					if bytes, err := json.Marshal(ev); err == nil {
-						json.Unmarshal(bytes, &evidenceMap)
-					}
-				}
-				if evidenceMap == nil {
-					evidenceMap = map[string]any{"status": approvalStatus} // Default evidence
-				}
-
-				approvalData := &ApprovalData{
-					ApprovalID:  approvalID,
-					Evidence:    evidenceMap, // Or more detailed evidence from children
-					Description: finalResultDescription,
-					Timestamp:   time.Now(),
-				}
-
-				t.Provide(approvalData) // Use the constructed ApprovalData
-				t.ProvideDone()
-				time.Sleep(10 * time.Millisecond)            // Add short sleep after providing
-				t.StoreState("completion_packet_sent", true) // Mark that we've sent the completion packet
-
-				t.StoreLog("✅ Target %s completed and sent results to parent", t.Metadata.Name)
-			}
-
-			// Compute and store recipe result (this part remains)
-			t.computeTemplateResult()
-
-			return
-		}
-
-		// Children not all complete yet
+	if !t.childrenCreated {
 		return
+	}
+
+	// Phase 2: Wait for MergeParentState data or child-completion signal
+	// Block until at least one notification arrives, then piggyback 100 ms.
+	select {
+	case <-t.stateNotify:
+		// Piggyback: collect additional writes that arrive within 100 ms
+		timer := time.NewTimer(100 * time.Millisecond)
+	piggyback:
+		for {
+			select {
+			case <-t.stateNotify:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(100 * time.Millisecond)
+			case <-timer.C:
+				break piggyback
+			}
+		}
+	case <-time.After(500 * time.Millisecond):
+		// Timeout: fall through to check children completion
+	}
+
+	// Drain any remaining notifications without blocking
+	for {
+		select {
+		case <-t.stateNotify:
+		default:
+			goto drained
+		}
+	}
+drained:
+
+	// Update achieving_percentage
+	t.childCompletionMutex.Lock()
+	allComplete := t.checkAllChildrenComplete()
+	completedSnapshot := make(map[string]bool)
+	for k, v := range t.completedChildren {
+		completedSnapshot[k] = v
+	}
+	t.childCompletionMutex.Unlock()
+
+	if len(t.childWants) > 0 {
+		achievedCount := 0
+		for _, child := range t.childWants {
+			completed := completedSnapshot[child.Metadata.Name] || child.Status == WantStatusAchieved
+			if completed {
+				achievedCount++
+				if !completedSnapshot[child.Metadata.Name] {
+					t.childCompletionMutex.Lock()
+					t.completedChildren[child.Metadata.Name] = true
+					t.childCompletionMutex.Unlock()
+				}
+			}
+		}
+		achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
+		t.StoreState("achieving_percentage", achievingPercentage)
+	} else {
+		t.StoreState("achieving_percentage", 100.0)
+		allComplete = true
+	}
+
+	if allComplete {
+		t.SetStatus(WantStatusAchieved)
+
+		// Send completion packet to parent/upstream wants (only once)
+		alreadySent, _ := t.GetStateBool("completion_packet_sent", false)
+		if !alreadySent {
+			approvalID := t.GetStringParam("approval_id", t.Metadata.ID)
+			approvalStatus := "approved"
+			if t.Status == WantStatusFailed {
+				approvalStatus = "failed"
+			}
+			var finalResultDescription string
+			if res, ok := t.State["result"].(string); ok {
+				finalResultDescription = res
+			} else {
+				finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
+			}
+			var evidenceMap map[string]any
+			if ev, ok := t.State["final_itinerary"]; ok {
+				if bytes, err := json.Marshal(ev); err == nil {
+					json.Unmarshal(bytes, &evidenceMap)
+				}
+			}
+			if evidenceMap == nil {
+				evidenceMap = map[string]any{"status": approvalStatus}
+			}
+			approvalData := &ApprovalData{
+				ApprovalID:  approvalID,
+				Evidence:    evidenceMap,
+				Description: finalResultDescription,
+				Timestamp:   time.Now(),
+			}
+			t.Provide(approvalData)
+			t.ProvideDone()
+			time.Sleep(10 * time.Millisecond)
+			t.StoreState("completion_packet_sent", true)
+			t.StoreLog("✅ Target %s completed and sent results to parent", t.Metadata.Name)
+		}
+
+		t.computeTemplateResult()
 	}
 }
 

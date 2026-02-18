@@ -1,0 +1,16 @@
+wants:
+  - metadata:
+      name: travel budget planner
+      type: travel budget system
+      labels:
+        role: budget-planner
+    spec:
+      params:
+        prefix: vacation
+        budget: 3000.0
+        currency: USD
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        restaurant_cost: 350.0
+        hotel_cost: 900.0
+      recipe: travel-budget
