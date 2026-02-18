@@ -130,7 +130,7 @@ type RestaurantWant struct {
 }
 
 func (r *RestaurantWant) GetLocals() *RestaurantWantLocals {
-	return GetLocals[RestaurantWantLocals](&r.Want)
+	return CheckLocalsInitialized[RestaurantWantLocals](&r.Want)
 }
 
 // Initialize prepares the restaurant want for execution
@@ -349,7 +349,7 @@ type HotelWant struct {
 }
 
 func (h *HotelWant) GetLocals() *HotelWantLocals {
-	return GetLocals[HotelWantLocals](&h.Want)
+	return CheckLocalsInitialized[HotelWantLocals](&h.Want)
 }
 
 // NewHotelWant creates a new hotel reservation want
@@ -430,7 +430,7 @@ type BuffetWant struct {
 }
 
 func (b *BuffetWant) GetLocals() *BuffetWantLocals {
-	return GetLocals[BuffetWantLocals](&b.Want)
+	return CheckLocalsInitialized[BuffetWantLocals](&b.Want)
 }
 
 // Initialize prepares the buffet want for execution
@@ -590,13 +590,8 @@ type FlightWant struct {
 func (f *FlightWant) Initialize() {
 	f.BaseTravelWant.executor = f
 
-	// Get or initialize locals
-	locals, ok := f.Locals.(*FlightWantLocals)
-	if !ok {
-		locals = &FlightWantLocals{}
-		f.Locals = locals
-	}
-
+	// Get locals (guaranteed to be initialized by framework)
+	locals := f.GetLocals()
 	locals.monitoringDone = make(chan struct{})
 }
 
@@ -608,7 +603,7 @@ func (f *FlightWant) IsAchieved() bool {
 
 // GetLocals returns the FlightWantLocals from this want
 func (f *FlightWant) GetLocals() *FlightWantLocals {
-	return GetLocals[FlightWantLocals](&f.Want)
+	return CheckLocalsInitialized[FlightWantLocals](&f.Want)
 }
 
 // extractFlightSchedule converts agent_result from state to FlightSchedule
@@ -659,7 +654,7 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 // 4. Canceling: Cancel the flight, reset state, return to Booking for rebooking
 // 5. Completed: Final state after successful completion
 func (f *FlightWant) Progress() {
-	locals := CheckLocalsInitialized[FlightWantLocals](&f.Want)
+	locals := f.GetLocals()
 
 	_, connectionAvailable := f.GetFirstOutputChannel()
 

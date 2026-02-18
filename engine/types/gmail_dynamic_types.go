@@ -31,7 +31,7 @@ type GmailDynamicWant struct {
 }
 
 func (g *GmailDynamicWant) GetLocals() *GmailDynamicLocals {
-	return mywant.GetLocals[GmailDynamicLocals](&g.Want)
+	return mywant.CheckLocalsInitialized[GmailDynamicLocals](&g.Want)
 }
 
 func (g *GmailDynamicWant) Initialize() {

@@ -29,25 +29,20 @@ type GmailWant struct {
 }
 
 func (g *GmailWant) GetLocals() *GmailLocals {
-	return GetLocals[GmailLocals](&g.Want)
+	return CheckLocalsInitialized[GmailLocals](&g.Want)
 }
 
 // Initialize prepares the Gmail want for execution
 func (g *GmailWant) Initialize() {
 	g.StoreLog("[GMAIL] Initializing Gmail want: %s", g.Metadata.Name)
 
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := g.GetLocals()
-	if locals == nil {
-		locals = &GmailLocals{}
-		g.Locals = locals
-	}
 
 	// Parse and validate required parameters using ConfigError pattern
 	promptParam := g.GetStringParam("prompt", "")
 	if promptParam == "" {
 		g.SetConfigError("prompt", "Missing required parameter 'prompt'")
-		g.Locals = locals
 		return
 	}
 	locals.Prompt = promptParam
@@ -98,7 +93,6 @@ func (g *GmailWant) Initialize() {
 		g.StoreLog("Warning: claude command not found. Claude Code CLI features may be limited.")
 	}
 
-	g.Locals = locals
 	g.StoreState("gmail_status", "initialized")
 }
 
@@ -127,7 +121,7 @@ func (g *GmailWant) CalculateAchievingPercentage() float64 {
 
 // Progress executes the Gmail operation via MCP Agent
 func (g *GmailWant) Progress() {
-	locals := CheckLocalsInitialized[GmailLocals](&g.Want)
+	locals := g.GetLocals()
 
 	// Check if already achieved
 	if g.IsAchieved() {

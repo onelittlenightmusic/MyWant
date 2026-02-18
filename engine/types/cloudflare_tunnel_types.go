@@ -40,7 +40,7 @@ type CloudflareTunnelWant struct {
 }
 
 func (n *CloudflareTunnelWant) GetLocals() *CloudflareTunnelLocals {
-	return GetLocals[CloudflareTunnelLocals](&n.Want)
+	return CheckLocalsInitialized[CloudflareTunnelLocals](&n.Want)
 }
 
 // regex patterns for extracting cloudflare tunnel URL
@@ -53,11 +53,8 @@ var (
 func (n *CloudflareTunnelWant) Initialize() {
 	n.StoreLog("[CLOUDFLARE] Initializing: %s", n.Metadata.Name)
 
+	// Get locals (guaranteed to be initialized by framework)
 	locals := n.GetLocals()
-	if locals == nil {
-		locals = &CloudflareTunnelLocals{}
-		n.Locals = locals
-	}
 	locals.ServerPID = 0
 	locals.TunnelURL = ""
 
@@ -114,7 +111,6 @@ func (n *CloudflareTunnelWant) Initialize() {
 		"server_phase": CloudflareTunnelPhaseRunning,
 	})
 	n.StoreLog("[CLOUDFLARE] Tunnel running - PID: %d, URL: %s", pid, url)
-	n.Locals = locals
 }
 
 // IsAchieved checks if the cloudflare tunnel is running with a public URL
@@ -148,13 +144,12 @@ func (n *CloudflareTunnelWant) failWithError(locals *CloudflareTunnelLocals, msg
 	locals.Phase = CloudflareTunnelPhaseFailed
 	n.StoreState("server_phase", CloudflareTunnelPhaseFailed)
 	n.StoreState("error_message", msg)
-	n.Locals = locals
 	n.Status = "failed"
 }
 
 // Progress implements Progressable for CloudflareTunnelWant
 func (n *CloudflareTunnelWant) Progress() {
-	locals := n.getOrInitializeLocals()
+	locals := n.GetLocals()
 	n.StoreState("achieving_percentage", n.CalculateAchievingPercentage())
 
 	switch locals.Phase {
@@ -166,7 +161,6 @@ func (n *CloudflareTunnelWant) Progress() {
 			n.StoreState("tunnel_url", "")
 			locals.Phase = CloudflareTunnelPhaseStopped
 			n.StoreState("server_phase", CloudflareTunnelPhaseStopped)
-			n.Locals = locals
 			n.StoreLog("[CLOUDFLARE] Tunnel stopped successfully")
 		}
 
@@ -200,7 +194,7 @@ func (n *CloudflareTunnelWant) OnDelete() {
 	}
 
 	// Clean up log file
-	locals := n.getOrInitializeLocals()
+	locals := n.GetLocals()
 	if locals.LogFile != "" {
 		os.Remove(locals.LogFile)
 	}
@@ -237,29 +231,4 @@ func parseCloudflareURL(logFile string) string {
 		}
 	}
 	return ""
-}
-
-// getOrInitializeLocals retrieves or initializes the locals
-func (n *CloudflareTunnelWant) getOrInitializeLocals() *CloudflareTunnelLocals {
-	if locals := n.GetLocals(); locals != nil {
-		return locals
-	}
-
-	locals := &CloudflareTunnelLocals{}
-
-	n.GetStateMulti(Dict{
-		"server_phase": &locals.Phase,
-		"server_pid":   &locals.ServerPID,
-		"tunnel_url":   &locals.TunnelURL,
-	})
-
-	locals.Port = getStringParam(&n.Want, "port", "8080")
-	locals.Protocol = getStringParam(&n.Want, "protocol", "http")
-	logFile := getStringParam(&n.Want, "log_file", "")
-	if logFile == "" {
-		logFile = fmt.Sprintf("/tmp/cloudflare-%s.log", n.Metadata.Name)
-	}
-	locals.LogFile = logFile
-
-	return locals
 }

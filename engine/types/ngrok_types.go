@@ -40,7 +40,7 @@ type NgrokWant struct {
 }
 
 func (n *NgrokWant) GetLocals() *NgrokLocals {
-	return GetLocals[NgrokLocals](&n.Want)
+	return CheckLocalsInitialized[NgrokLocals](&n.Want)
 }
 
 // regex patterns for extracting ngrok forwarding URL
@@ -55,20 +55,17 @@ var (
 func (n *NgrokWant) Initialize() {
 	n.StoreLog("[NGROK] Initializing: %s", n.Metadata.Name)
 
+	// Get locals (guaranteed to be initialized by framework)
 	locals := n.GetLocals()
-	if locals == nil {
-		locals = &NgrokLocals{}
-		n.Locals = locals
-	}
 	locals.ServerPID = 0
 	locals.NgrokURL = ""
 
 	// Read ngrok-specific params
-	locals.Port = getStringParam(&n.Want, "port", "8080")
-	locals.Protocol = getStringParam(&n.Want, "protocol", "http")
+	locals.Port = n.GetStringParam("port", "8080")
+	locals.Protocol = n.GetStringParam("protocol", "http")
 
 	// Set up log file for capturing ngrok stdout
-	logFile := getStringParam(&n.Want, "log_file", "")
+	logFile := n.GetStringParam("log_file", "")
 	if logFile == "" {
 		logFile = fmt.Sprintf("/tmp/ngrok-%s.log", n.Metadata.Name)
 	}
@@ -112,7 +109,6 @@ func (n *NgrokWant) Initialize() {
 		"server_phase": NgrokPhaseRunning,
 	})
 	n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
-	n.Locals = locals
 }
 
 // IsAchieved checks if the ngrok tunnel is running with a public URL
@@ -146,13 +142,12 @@ func (n *NgrokWant) failWithError(locals *NgrokLocals, msg string) {
 	locals.Phase = NgrokPhaseFailed
 	n.StoreState("server_phase", NgrokPhaseFailed)
 	n.StoreState("error_message", msg)
-	n.Locals = locals
 	n.Status = "failed"
 }
 
 // Progress implements Progressable for NgrokWant
 func (n *NgrokWant) Progress() {
-	locals := n.getOrInitializeLocals()
+	locals := n.GetLocals()
 	n.StoreState("achieving_percentage", n.CalculateAchievingPercentage())
 
 	switch locals.Phase {
@@ -164,7 +159,6 @@ func (n *NgrokWant) Progress() {
 			n.StoreState("ngrok_url", "")
 			locals.Phase = NgrokPhaseStopped
 			n.StoreState("server_phase", NgrokPhaseStopped)
-			n.Locals = locals
 			n.StoreLog("[NGROK] Tunnel stopped successfully")
 		}
 
@@ -198,7 +192,7 @@ func (n *NgrokWant) OnDelete() {
 	}
 
 	// Clean up log file
-	locals := n.getOrInitializeLocals()
+	locals := n.GetLocals()
 	if locals.LogFile != "" {
 		os.Remove(locals.LogFile)
 	}
@@ -238,29 +232,4 @@ func parseNgrokURL(logFile string) string {
 		}
 	}
 	return ""
-}
-
-// getOrInitializeLocals retrieves or initializes the locals
-func (n *NgrokWant) getOrInitializeLocals() *NgrokLocals {
-	if locals := n.GetLocals(); locals != nil {
-		return locals
-	}
-
-	locals := &NgrokLocals{}
-
-	n.GetStateMulti(Dict{
-		"server_phase": &locals.Phase,
-		"server_pid":   &locals.ServerPID,
-		"ngrok_url":    &locals.NgrokURL,
-	})
-
-	locals.Port = getStringParam(&n.Want, "port", "8080")
-	locals.Protocol = getStringParam(&n.Want, "protocol", "http")
-	logFile := getStringParam(&n.Want, "log_file", "")
-	if logFile == "" {
-		logFile = fmt.Sprintf("/tmp/ngrok-%s.log", n.Metadata.Name)
-	}
-	locals.LogFile = logFile
-
-	return locals
 }

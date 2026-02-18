@@ -26,12 +26,12 @@ type TeamsWebhookWant struct {
 }
 
 func (t *TeamsWebhookWant) GetLocals() *TeamsWebhookLocals {
-	return GetLocals[TeamsWebhookLocals](&t.Want)
+	return CheckLocalsInitialized[TeamsWebhookLocals](&t.Want)
 }
 
 func (t *TeamsWebhookWant) Initialize() {
-	locals := &TeamsWebhookLocals{}
-	t.Locals = locals
+	// Initialize locals (guaranteed to be initialized by framework)
+	locals := t.GetLocals()
 	InitializeWebhook(&t.Want, teamsWebhookConfig, &locals.WebhookLocals)
 }
 
@@ -44,16 +44,6 @@ func (t *TeamsWebhookWant) CalculateAchievingPercentage() int {
 }
 
 func (t *TeamsWebhookWant) Progress() {
-	locals := t.getOrInitializeLocals()
+	locals := t.GetLocals()
 	ProgressWebhook(&t.Want, teamsWebhookConfig, &locals.WebhookLocals)
-}
-
-func (t *TeamsWebhookWant) getOrInitializeLocals() *TeamsWebhookLocals {
-	if locals := t.GetLocals(); locals != nil {
-		return locals
-	}
-	common := RestoreWebhookLocals(&t.Want, teamsWebhookConfig)
-	locals := &TeamsWebhookLocals{WebhookLocals: *common}
-	t.Locals = locals
-	return locals
 }

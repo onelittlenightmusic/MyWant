@@ -21,7 +21,7 @@ type PrimeNumbers struct {
 }
 
 func (g *PrimeNumbers) GetLocals() *PrimeNumbersLocals {
-	return GetLocals[PrimeNumbersLocals](&g.Want)
+	return CheckLocalsInitialized[PrimeNumbersLocals](&g.Want)
 }
 
 // Initialize resets state before execution begins
@@ -89,17 +89,13 @@ type PrimeSequence struct {
 }
 
 func (f *PrimeSequence) GetLocals() *PrimeSequenceLocals {
-	return GetLocals[PrimeSequenceLocals](&f.Want)
+	return CheckLocalsInitialized[PrimeSequenceLocals](&f.Want)
 }
 
 // Initialize resets state before execution begins
 func (f *PrimeSequence) Initialize() {
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := f.GetLocals()
-	if locals == nil {
-		locals = &PrimeSequenceLocals{}
-		f.Locals = locals
-	}
 	if locals.foundPrimes == nil {
 		locals.foundPrimes = make([]int, 0)
 	}
@@ -115,7 +111,7 @@ func (f *PrimeSequence) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *PrimeSequence) Progress() {
-	locals := CheckLocalsInitialized[PrimeSequenceLocals](&f.Want)
+	locals := f.GetLocals()
 
 	achieved, _ := f.GetStateBool("achieved", false)
 	if achieved {

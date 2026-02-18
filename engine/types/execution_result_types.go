@@ -50,7 +50,7 @@ type ExecutionResultWant struct {
 }
 
 func (e *ExecutionResultWant) GetLocals() *ExecutionResultWantLocals {
-	return GetLocals[ExecutionResultWantLocals](&e.Want)
+	return CheckLocalsInitialized[ExecutionResultWantLocals](&e.Want)
 }
 
 // Initialize resets execution state before starting
@@ -70,12 +70,8 @@ func (e *ExecutionResultWant) Initialize() {
 		"_phase":               string(ExecutionPhaseInitial),
 	})
 
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()
-	if locals == nil {
-		locals = &ExecutionResultWantLocals{}
-		e.Locals = locals
-	}
 	locals.Phase = ExecutionPhaseInitial
 	locals.Timeout = 30
 	locals.Shell = "/bin/bash"
@@ -89,8 +85,8 @@ func (e *ExecutionResultWant) IsAchieved() bool {
 
 // Progress implements Progressable for ExecutionResultWant
 func (e *ExecutionResultWant) Progress() {
-	// Get or initialize locals
-	locals := e.getOrInitializeLocals()
+	// Get locals (guaranteed to be initialized by framework)
+	locals := e.GetLocals()
 
 	switch locals.Phase {
 	case ExecutionPhaseInitial:
@@ -107,7 +103,6 @@ func (e *ExecutionResultWant) Progress() {
 
 	default:
 		e.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
-		e.updateLocals(locals)
 	}
 }
 
@@ -118,7 +113,6 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	if !ok || command == "" {
 		e.SetConfigError("command", "Missing required parameter 'command'")
 		locals.Phase = ExecutionPhaseFailed
-		e.updateLocals(locals)
 		return
 	}
 
@@ -155,7 +149,6 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 
 	// Transition to executing phase
 	locals.Phase = ExecutionPhaseExecuting
-	e.updateLocals(locals)
 }
 
 // tryAgentExecution delegates command execution to ExecutionAgent
@@ -193,7 +186,6 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		e.StoreState("error_message", fmt.Sprintf("Agent execution error: %v", err))
 		e.StoreLog("ERROR: Agent execution failed: %v", err)
 		locals.Phase = ExecutionPhaseFailed
-		e.updateLocals(locals)
 		return
 	}
 
@@ -203,7 +195,6 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 		e.StoreState("error_message", "Agent returned nil result")
 		e.StoreLog("ERROR: Agent returned nil result")
 		locals.Phase = ExecutionPhaseFailed
-		e.updateLocals(locals)
 		return
 	}
 
@@ -260,25 +251,5 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 
 	// Store all results in batch
 	e.StoreStateMulti(stateUpdates)
-	e.updateLocals(locals)
 	e.ProvideDone()
-}
-
-// getOrInitializeLocals gets or initializes locals for this want
-func (e *ExecutionResultWant) getOrInitializeLocals() *ExecutionResultWantLocals {
-	if locals := e.GetLocals(); locals != nil {
-		return locals
-	}
-
-	e.Locals = &ExecutionResultWantLocals{
-		Phase:   ExecutionPhaseInitial,
-		Timeout: 30,
-		Shell:   "/bin/bash",
-	}
-	return e.GetLocals()
-}
-
-// updateLocals updates the locals
-func (e *ExecutionResultWant) updateLocals(locals *ExecutionResultWantLocals) {
-	e.Locals = locals
 }

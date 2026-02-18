@@ -15,7 +15,7 @@ type SilencerWant struct {
 }
 
 func (s *SilencerWant) GetLocals() *SilencerLocals {
-	return GetLocals[SilencerLocals](&s.Want)
+	return CheckLocalsInitialized[SilencerLocals](&s.Want)
 }
 
 // SilencerLocals holds type-specific local state for SilencerWant
@@ -27,12 +27,8 @@ type SilencerLocals struct {
 func (s *SilencerWant) Initialize() {
 	s.StoreLog("[SILENCER] Initializing silencer: %s\n", s.Metadata.Name)
 
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := s.GetLocals()
-	if locals == nil {
-		locals = &SilencerLocals{}
-		s.Locals = locals
-	}
 	locals.Policy = s.GetStringParam("policy", "all_true")
 
 	// Initialize state

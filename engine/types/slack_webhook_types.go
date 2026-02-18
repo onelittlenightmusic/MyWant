@@ -26,12 +26,12 @@ type SlackWebhookWant struct {
 }
 
 func (s *SlackWebhookWant) GetLocals() *SlackWebhookLocals {
-	return GetLocals[SlackWebhookLocals](&s.Want)
+	return CheckLocalsInitialized[SlackWebhookLocals](&s.Want)
 }
 
 func (s *SlackWebhookWant) Initialize() {
-	locals := &SlackWebhookLocals{}
-	s.Locals = locals
+	// Initialize locals (guaranteed to be initialized by framework)
+	locals := s.GetLocals()
 	InitializeWebhook(&s.Want, slackWebhookConfig, &locals.WebhookLocals)
 }
 
@@ -44,16 +44,6 @@ func (s *SlackWebhookWant) CalculateAchievingPercentage() int {
 }
 
 func (s *SlackWebhookWant) Progress() {
-	locals := s.getOrInitializeLocals()
+	locals := s.GetLocals()
 	ProgressWebhook(&s.Want, slackWebhookConfig, &locals.WebhookLocals)
-}
-
-func (s *SlackWebhookWant) getOrInitializeLocals() *SlackWebhookLocals {
-	if locals := s.GetLocals(); locals != nil {
-		return locals
-	}
-	common := RestoreWebhookLocals(&s.Want, slackWebhookConfig)
-	locals := &SlackWebhookLocals{WebhookLocals: *common}
-	s.Locals = locals
-	return locals
 }

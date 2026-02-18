@@ -33,17 +33,13 @@ type EvidenceWant struct {
 }
 
 func (e *EvidenceWant) GetLocals() *EvidenceWantLocals {
-	return GetLocals[EvidenceWantLocals](&e.Want)
+	return CheckLocalsInitialized[EvidenceWantLocals](&e.Want)
 }
 
 // Initialize resets state before execution begins
 func (e *EvidenceWant) Initialize() {
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()
-	if locals == nil {
-		locals = &EvidenceWantLocals{}
-		e.Locals = locals
-	}
 
 	// Populate locals from parameters
 	locals.EvidenceType = e.GetStringParam("evidence_type", "")
@@ -57,7 +53,7 @@ func (e *EvidenceWant) IsAchieved() bool {
 }
 
 func (e *EvidenceWant) Progress() {
-	locals := CheckLocalsInitialized[EvidenceWantLocals](&e.Want)
+	locals := e.GetLocals()
 
 	provided, _ := e.GetStateBool("evidence_provided", false)
 	if provided {
@@ -117,17 +113,13 @@ type DescriptionWant struct {
 }
 
 func (d *DescriptionWant) GetLocals() *DescriptionWantLocals {
-	return GetLocals[DescriptionWantLocals](&d.Want)
+	return CheckLocalsInitialized[DescriptionWantLocals](&d.Want)
 }
 
 // Initialize resets state before execution begins
 func (d *DescriptionWant) Initialize() {
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := d.GetLocals()
-	if locals == nil {
-		locals = &DescriptionWantLocals{}
-		d.Locals = locals
-	}
 
 	// Populate locals from parameters
 	locals.DescriptionFormat = d.GetStringParam("description_format", "")
@@ -141,7 +133,7 @@ func (d *DescriptionWant) IsAchieved() bool {
 }
 
 func (d *DescriptionWant) Progress() {
-	locals := CheckLocalsInitialized[DescriptionWantLocals](&d.Want)
+	locals := d.GetLocals()
 
 	provided, _ := d.GetStateBool("description_provided", false)
 	if provided {

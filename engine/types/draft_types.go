@@ -18,7 +18,7 @@ type DraftWant struct {
 }
 
 func (d *DraftWant) GetLocals() *DraftLocals {
-	return GetLocals[DraftLocals](&d.Want)
+	return CheckLocalsInitialized[DraftLocals](&d.Want)
 }
 
 // Initialize prepares the draft want

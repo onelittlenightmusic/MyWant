@@ -25,17 +25,13 @@ type KnowledgeWant struct {
 }
 
 func (k *KnowledgeWant) GetLocals() *KnowledgeLocals {
-	return GetLocals[KnowledgeLocals](&k.Want)
+	return CheckLocalsInitialized[KnowledgeLocals](&k.Want)
 }
 
 // Initialize prepares the Knowledge want for execution
 func (k *KnowledgeWant) Initialize() {
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := k.GetLocals()
-	if locals == nil {
-		locals = &KnowledgeLocals{}
-		k.Locals = locals
-	}
 
 	// Parse and validate required parameters using ConfigError pattern
 	locals.Topic = k.GetStringParam("topic", "")
@@ -65,8 +61,6 @@ func (k *KnowledgeWant) Initialize() {
 		interval = 24 * time.Hour
 	}
 	locals.RefreshInterval = interval
-
-	k.Locals = locals
 
 	// Initial state setup
 	if _, exists := k.GetState("knowledge_status"); !exists {
@@ -134,10 +128,6 @@ func (k *KnowledgeWant) shouldRefresh() bool {
 	}
 
 	locals := k.GetLocals()
-	if locals == nil {
-		return true
-	}
-
 	return time.Since(lastTime) > locals.RefreshInterval
 }
 

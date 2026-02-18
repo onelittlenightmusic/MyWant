@@ -18,7 +18,7 @@ type FibonacciNumbers struct {
 }
 
 func (g *FibonacciNumbers) GetLocals() *FibonacciNumbersLocals {
-	return GetLocals[FibonacciNumbersLocals](&g.Want)
+	return CheckLocalsInitialized[FibonacciNumbersLocals](&g.Want)
 }
 
 // Initialize resets state before execution begins
@@ -76,17 +76,13 @@ type FibonacciFilter struct {
 }
 
 func (f *FibonacciFilter) GetLocals() *FibonacciFilterLocals {
-	return GetLocals[FibonacciFilterLocals](&f.Want)
+	return CheckLocalsInitialized[FibonacciFilterLocals](&f.Want)
 }
 
 // Initialize resets state before execution begins
 func (f *FibonacciFilter) Initialize() {
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := f.GetLocals()
-	if locals == nil {
-		locals = &FibonacciFilterLocals{}
-		f.Locals = locals
-	}
 	if locals.filtered == nil {
 		locals.filtered = make([]int, 0)
 	}
@@ -102,7 +98,7 @@ func (f *FibonacciFilter) IsAchieved() bool {
 // Processes one packet per call and returns false to yield control
 // Returns true only when end signal (-1) is received
 func (f *FibonacciFilter) Progress() {
-	locals := CheckLocalsInitialized[FibonacciFilterLocals](&f.Want)
+	locals := f.GetLocals()
 
 	totalProcessed, _ := f.GetStateInt("total_processed", 0)
 

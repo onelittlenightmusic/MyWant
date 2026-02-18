@@ -80,7 +80,7 @@ type Numbers struct {
 }
 
 func (g *Numbers) GetLocals() *NumbersLocals {
-	return mywant.GetLocals[NumbersLocals](&g.Want)
+	return mywant.CheckLocalsInitialized[NumbersLocals](&g.Want)
 }
 
 // Initialize resets state before execution begins
@@ -91,9 +91,6 @@ func (g *Numbers) Initialize() {
 // IsAchieved checks if numbers generator is complete (all packets sent)
 func (g *Numbers) IsAchieved() bool {
 	locals := g.GetLocals()
-	if locals == nil {
-		return false
-	}
 	paramCount := g.GetIntParam("count", locals.Count)
 	isAchieved := locals.currentCount >= paramCount
 	if isAchieved {
@@ -104,7 +101,7 @@ func (g *Numbers) IsAchieved() bool {
 
 // Progress executes the numbers generator directly with dynamic parameter reading
 func (g *Numbers) Progress() {
-	locals := mywant.CheckLocalsInitialized[NumbersLocals](&g.Want)
+	locals := g.GetLocals()
 
 	useDeterministic := g.GetBoolParam("deterministic", false)
 	paramCount := g.GetIntParam("count", locals.Count)
@@ -197,7 +194,7 @@ type Queue struct {
 }
 
 func (q *Queue) GetLocals() *QueueLocals {
-	return mywant.GetLocals[QueueLocals](&q.Want)
+	return mywant.CheckLocalsInitialized[QueueLocals](&q.Want)
 }
 
 // NewQueue creates a new queue want
@@ -208,10 +205,6 @@ func (q *Queue) Initialize() {
 
 // IsAchieved checks if queue is complete (end signal received)
 func (q *Queue) IsAchieved() bool {
-	locals := q.GetLocals()
-	if locals == nil {
-		return false
-	}
 	completed, _ := q.GetStateBool("completed", false)
 	if completed {
 		q.StoreLog("[QUEUE-ISACHIEVED] Completed! Shifting to achieved")
@@ -221,7 +214,7 @@ func (q *Queue) IsAchieved() bool {
 
 // Progress executes the queue processing directly with batch mechanism
 func (q *Queue) Progress() {
-	locals := mywant.CheckLocalsInitialized[QueueLocals](&q.Want)
+	locals := q.GetLocals()
 
 	// Initialize missing fields if needed
 	if locals.batchUpdateInterval == 0 {
@@ -341,9 +334,6 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 // Otherwise, returns 100 when complete, 50 during processing, 0 when idle
 func (q *Queue) CalculateAchievingPercentage() int {
 	locals := q.GetLocals()
-	if locals == nil {
-		return 0
-	}
 
 	// Check if count parameter is provided
 	totalCount := q.GetIntParam("count", -1)
@@ -376,7 +366,7 @@ type Combiner struct {
 }
 
 func (c *Combiner) GetLocals() *CombinerLocals {
-	return mywant.GetLocals[CombinerLocals](&c.Want)
+	return mywant.CheckLocalsInitialized[CombinerLocals](&c.Want)
 }
 
 // Initialize resets state before execution begins
@@ -386,17 +376,13 @@ func (c *Combiner) Initialize() {
 
 // IsAchieved checks if combiner is complete (end signal received)
 func (c *Combiner) IsAchieved() bool {
-	locals := c.GetLocals()
-	if locals == nil {
-		return false
-	}
 	completed, _ := c.GetStateBool("completed", false)
 	return completed
 }
 
 // Progress executes the combiner directly
 func (c *Combiner) Progress() {
-	locals := mywant.CheckLocalsInitialized[CombinerLocals](&c.Want)
+	locals := c.GetLocals()
 
 	processed, _ := c.GetStateInt("processed", 0)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {

@@ -39,7 +39,7 @@ type ReminderWant struct {
 }
 
 func (r *ReminderWant) GetLocals() *ReminderLocals {
-	return GetLocals[ReminderLocals](&r.Want)
+	return CheckLocalsInitialized[ReminderLocals](&r.Want)
 }
 
 // Initialize prepares the reminder want for execution
@@ -52,12 +52,8 @@ func (r *ReminderWant) Initialize() {
 		r.StoreLog("ERROR: Failed to stop existing background agents: %v", err)
 	}
 
-	// Get or initialize locals
+	// Get locals (guaranteed to be initialized by framework)
 	locals := r.GetLocals()
-	if locals == nil {
-		locals = &ReminderLocals{}
-		r.Locals = locals
-	}
 	locals.Phase = ReminderPhaseWaiting
 	locals.LastCheckTime = time.Now()
 	locals.TimeoutSeconds = 300 // 5 minutes default timeout
@@ -67,7 +63,6 @@ func (r *ReminderWant) Initialize() {
 	locals.Message = r.GetStringParam("message", "")
 	if locals.Message == "" {
 		r.SetConfigError("message", "Missing required parameter 'message'")
-		r.Locals = locals
 		return
 	}
 
@@ -78,7 +73,6 @@ func (r *ReminderWant) Initialize() {
 	aheadDuration, err := parseDurationString(locals.Ahead)
 	if err != nil {
 		r.SetConfigError("ahead", fmt.Sprintf("Invalid ahead parameter '%s': %v", locals.Ahead, err))
-		r.Locals = locals
 		return
 	}
 
@@ -91,7 +85,6 @@ func (r *ReminderWant) Initialize() {
 	// Check for mutually exclusive parameters
 	if eventTimeStr != "" && durationFromNowStr != "" {
 		r.SetConfigError("event_time/duration_from_now", "Cannot provide both 'event_time' and 'duration_from_now'")
-		r.Locals = locals
 		return
 	}
 
@@ -103,7 +96,6 @@ func (r *ReminderWant) Initialize() {
 		eventTime, parseErr = time.Parse(time.RFC3339, eventTimeStr)
 		if parseErr != nil {
 			r.SetConfigError("event_time", fmt.Sprintf("Invalid event_time format (use RFC3339): %v", parseErr))
-			r.Locals = locals
 			return
 		}
 	} else if durationFromNowStr != "" {
@@ -111,14 +103,12 @@ func (r *ReminderWant) Initialize() {
 		duration, parseErr := parseDurationString(durationFromNowStr)
 		if parseErr != nil {
 			r.SetConfigError("duration_from_now", fmt.Sprintf("Invalid duration_from_now format: %v", parseErr))
-			r.Locals = locals
 			return
 		}
 		eventTime = time.Now().Add(duration)
 		locals.DurationFromNow = durationFromNowStr
 	} else if !r.hasWhenSpec() {
 		r.SetConfigError("timing", "Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
-		r.Locals = locals
 		return
 	}
 
@@ -239,7 +229,7 @@ func (r *ReminderWant) CalculateAchievingPercentage() int {
 
 // Progress implements Progressable for ReminderWant
 func (r *ReminderWant) Progress() {
-	locals := r.getOrInitializeLocals()
+	locals := r.GetLocals()
 
 	// Update achieving percentage based on current phase
 	r.StoreState("achieving_percentage", r.CalculateAchievingPercentage())
@@ -265,7 +255,6 @@ func (r *ReminderWant) Progress() {
 
 	default:
 		r.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
-		r.updateLocals(locals)
 	}
 }
 
@@ -361,7 +350,6 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 		})
 
 		locals.Phase = ReminderPhaseReaching
-		r.updateLocals(locals)
 
 		// Trigger agent to create new queue immediately
 		r.ExecuteAgents()
@@ -500,7 +488,6 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 				// Trigger agent to delete queue immediately
 				r.ExecuteAgents()
 			}
-			r.updateLocals(locals)
 		}
 	}
 }
@@ -534,36 +521,6 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 		// Trigger agent to delete queue immediately (if any existed)
 		r.ExecuteAgents()
 	}
-	r.updateLocals(locals)
-}
-
-// getOrInitializeLocals retrieves or initializes the locals
-func (r *ReminderWant) getOrInitializeLocals() *ReminderLocals {
-	if locals := r.GetLocals(); locals != nil {
-		return locals
-	}
-
-	// Initialize from state
-	locals := &ReminderLocals{
-		Phase:         ReminderPhaseWaiting,
-		LastCheckTime: time.Now(),
-	}
-
-	r.GetStateMulti(Dict{
-		"reminder_phase":   &locals.Phase,
-		"message":          &locals.Message,
-		"ahead":            &locals.Ahead,
-		"require_reaction": &locals.RequireReaction,
-		"reaching_time":    &locals.ReachingTime,
-		"event_time":       &locals.EventTime,
-	})
-
-	return locals
-}
-
-// updateLocals updates the in-memory locals
-func (r *ReminderWant) updateLocals(locals *ReminderLocals) {
-	r.Locals = locals
 }
 
 // parseDurationString parses duration strings like "5 minutes", "10 seconds", etc.
