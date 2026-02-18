@@ -78,10 +78,14 @@ func (b *BudgetWant) Progress() {
 	b.aggregate()
 }
 
-// IsAchieved returns true when costs exist and budget is not exceeded
+// IsAchieved returns true when costs exist and budget is not exceeded.
+// Reads already-aggregated state written by Progress() to avoid calling aggregate() twice.
 func (b *BudgetWant) IsAchieved() bool {
-	costs, allReported := b.aggregate()
-	return len(costs) > 0 && allReported
+	costsRaw, _ := b.GetState("costs")
+	costs, _ := costsRaw.(map[string]any)
+	exceeded, _ := b.GetState("budget_exceeded")
+	budgetExceeded, _ := exceeded.(bool)
+	return len(costs) > 0 && !budgetExceeded
 }
 
 // CalculateAchievingPercentage returns progress percentage
@@ -89,7 +93,7 @@ func (b *BudgetWant) CalculateAchievingPercentage() int {
 	if b.IsAchieved() {
 		return 100
 	}
-	costsRaw, _ := b.GetParentState("costs")
+	costsRaw, _ := b.GetState("costs")
 	if m, ok := costsRaw.(map[string]any); ok && len(m) > 0 {
 		return 50
 	}
