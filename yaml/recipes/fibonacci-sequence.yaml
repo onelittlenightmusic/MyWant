@@ -47,6 +47,8 @@ recipe:
         using:
           - role: generator
 
+  finalResultField: "fibonacci filter_filtered"
+
   # Recipe result definition - specifies how to compute fibonacci results
   result:
     - want_name: "fibonacci filter"

@@ -27,5 +27,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          'ui': ['@headlessui/react', '@heroicons/react', 'lucide-react'],
+          'editor': ['codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/lang-yaml', '@codemirror/theme-one-dark'],
+          'utils': ['axios', 'zustand', 'zod', 'js-yaml'],
+        },
+      },
+    },
   }
 })

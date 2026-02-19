@@ -39,6 +39,8 @@ recipe:
         using:
           - role: reminder
 
+  finalResultField: auto_reminder_reminder_phase
+
   result:
     - want_name: "auto_reminder"
       state_field: "reminder_phase"

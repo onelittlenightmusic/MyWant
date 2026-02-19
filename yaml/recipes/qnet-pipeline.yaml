@@ -130,7 +130,7 @@ recipe:
         state_field: "."
         description: "All metrics in final queue"
 
-  finalResultField: result
+  finalResultField: "queue-primary_average_wait_time"
 
   # Example deployment - one-click deployment configuration
   example:

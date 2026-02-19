@@ -683,10 +683,9 @@ func (t *Target) computeTemplateResult() {
 	}
 
 	// Stats are now stored in State - no separate initialization needed
-	var primaryResult any
 	metrics := make(map[string]any)
 
-	for i, resultSpec := range *recipeResult {
+	for _, resultSpec := range *recipeResult {
 		resultValue := t.getResultFromSpec(resultSpec, childWantsByName)
 		// Prefer state_field over stat_name as the metric key suffix
 		statName := strings.TrimPrefix(resultSpec.StateField, ".")
@@ -698,13 +697,8 @@ func (t *Target) computeTemplateResult() {
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		metrics[metricKey] = resultValue
-
-		// Use first result as primary result for backward compatibility
-		if i == 0 {
-			primaryResult = resultValue
-		}
 	}
-	for i, resultSpec := range *recipeResult {
+	for _, resultSpec := range *recipeResult {
 		statName := strings.TrimPrefix(resultSpec.StateField, ".")
 		if statName == "" {
 			statName = strings.TrimPrefix(resultSpec.StatName, ".")
@@ -714,8 +708,10 @@ func (t *Target) computeTemplateResult() {
 		}
 		metricKey := resultSpec.WantName + "_" + statName
 		t.StoreState(metricKey, metrics[metricKey])
-		if i == 0 {
-			t.StoreState("result", fmt.Sprintf("%v", primaryResult))
+
+		// Auto-register the computed key into ProvidedStateFields so it shows as explicit (not hidden)
+		if !Contains(t.ProvidedStateFields, metricKey) {
+			t.ProvidedStateFields = append(t.ProvidedStateFields, metricKey)
 		}
 	}
 	t.childCount = len(childWantsByName)

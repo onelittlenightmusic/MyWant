@@ -54,6 +54,8 @@ recipe:
         params:
           command: fail_command
           timeout: 5
+  finalResultField: simple_echo_final_result
+
   result:
     - want_name: "simple_echo"
       state_field: ".final_result"

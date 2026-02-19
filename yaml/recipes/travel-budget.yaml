@@ -69,9 +69,6 @@ recipe:
     - name: remaining_budget
       description: "Budget minus total cost"
       type: float64
-    - name: result
-      description: "Primary result summary (first result entry)"
-      type: string
     - name: budget_budget_summary
       description: "Budget tracking summary from budget want"
       type: string
@@ -82,7 +79,7 @@ recipe:
       description: "Hotel booking result"
       type: string
 
-  finalResultField: result
+  finalResultField: budget_budget_summary
 
   result:
     - want_name: "budget"

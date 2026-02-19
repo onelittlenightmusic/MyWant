@@ -57,10 +57,12 @@ recipe:
           coordinator_level: 2
           level2_authority: level2_authority
 
+  finalResultField: "level 2 approval_final_result"
+
   # Recipe result definition
   result:
-    - want_name: "level2_approval"
-      state_field: ".approval_status"
+    - want_name: "level 2 approval"
+      state_field: "final_result"
       description: "Level 2 approval status"
   # Example deployment - one-click deployment configuration
   example:

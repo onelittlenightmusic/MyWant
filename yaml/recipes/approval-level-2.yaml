@@ -42,12 +42,14 @@ recipe:
           description_format: "Level 2 Approval: %s"
           approval_id: approval_id
 
+  finalResultField: evidence_evidence_provided
+
   # Recipe result definition
   result:
-    - want_name: "evidence-1"
+    - want_name: "evidence"
       state_field: "evidence_provided"
       description: "Evidence has been provided"
-    - want_name: "description-2"
+    - want_name: "description"
       state_field: "description_provided"
       description: "Description has been provided"
   # Example deployment - one-click deployment configuration

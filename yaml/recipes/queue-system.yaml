@@ -52,13 +52,15 @@ recipe:
         using:
           - category: queue-producer  # Connect to generator via recipe-defined label
 
+  finalResultField: queue_average_wait_time
+
   # Recipe result definition - specifies which want and state field to use for result
   result:
     - want_name: "queue"
-      state_field: "avg_wait_time"
+      state_field: "average_wait_time"
       description: "Average wait time in the queue system"
     - want_name: "numbers"
-      state_field: "generated_count"
+      state_field: "total_processed"
       description: "Items generated"
     - want_name: "queue"
       state_field: "."

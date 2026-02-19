@@ -44,12 +44,14 @@ recipe:
         using:
           - role: generator
 
+  finalResultField: "prime sequence_foundPrimes"
+
   # Recipe result definition - specifies how to compute prime sieve results
   result:
-    - want_name: "prime sequence-2"
+    - want_name: "prime sequence"
       state_field: "foundPrimes"
       description: "List of prime numbers found"
-    - want_name: "prime sequence-2"
+    - want_name: "prime sequence"
       state_field: "primeCount"
       description: "Count of prime numbers found"
   # Example deployment - one-click deployment configuration
