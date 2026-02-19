@@ -51,6 +51,7 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 	checkOutTime := GenerateRandomTimeInRange(nextDay, CheckOutRange)
 
 	hotelType := want.GetStringParam("hotel_type", "luxury")
+	hotelCost := want.GetFloatParam("cost", 800.0)
 	premiumLevel := want.GetStringParam("premium_level", "platinum")
 	serviceTier := want.GetStringParam("service_tier", "premium")
 
@@ -60,6 +61,7 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 		HotelType:         hotelType,
 		StayDurationHours: checkOutTime.Sub(checkInTime).Hours(),
 		ReservationName:   fmt.Sprintf("%s stay at %s hotel", want.Metadata.Name, hotelType),
+		Cost:              hotelCost,
 		PremiumLevel:      premiumLevel,
 		ServiceTier:       serviceTier,
 		PremiumAmenities:  []string{"spa_access", "concierge_service", "room_upgrade"},

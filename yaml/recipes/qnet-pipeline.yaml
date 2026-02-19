@@ -129,6 +129,9 @@ recipe:
       - want_name: "queue-final"
         state_field: "."
         description: "All metrics in final queue"
+
+  finalResultField: result
+
   # Example deployment - one-click deployment configuration
   example:
     wants:

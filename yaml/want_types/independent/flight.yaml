@@ -45,7 +45,19 @@ wantType:
     default: '2024-01-01'
     required: false
     example: '2024-12-25'
+  - name: cost
+    description: Estimated or actual cost of the flight
+    type: float64
+    default: 0.0
+    required: false
+    example: 1200.0
   state:
+  - name: cost
+    description: Reported cost for this booking
+    type: float64
+    persistent: true
+    example: 1200.0
+    initialValue: 0.0
   - name: flight_type
     description: Class of flight booked
     type: string

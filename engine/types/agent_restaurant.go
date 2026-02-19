@@ -52,6 +52,7 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 
 	restaurantName := generateRealisticRestaurantName(restaurantType)
 	partySize := want.GetIntParam("party_size", 2)
+	restaurantCost := want.GetFloatParam("cost", 300.0)
 	reservationReference := generateReservationReference()
 	formattedReservationName := fmt.Sprintf("%s - Party of %d (%s)", restaurantName, partySize, reservationReference)
 
@@ -60,6 +61,7 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 		DurationHours:    durationHours,
 		RestaurantType:   restaurantType,
 		ReservationName:  formattedReservationName,
+		Cost:             restaurantCost,
 		PremiumLevel:     premiumLevel,
 		ServiceTier:      serviceTier,
 		PremiumAmenities: []string{"wine_pairing", "chef_special", "priority_seating"},

@@ -33,7 +33,19 @@ wantType:
       - asian
       - vegetarian
     example: full
+  - name: cost
+    description: Estimated or actual cost of the buffet
+    type: float64
+    default: 0.0
+    required: false
+    example: 45.0
   state:
+  - name: cost
+    description: Reported cost for this reservation
+    type: float64
+    persistent: true
+    example: 45.0
+    initialValue: 0.0
   - name: total_processed
     description: Count of successful buffet reservations
     type: int

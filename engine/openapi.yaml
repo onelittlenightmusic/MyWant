@@ -110,6 +110,27 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/WantExecution'
+    delete:
+      summary: Delete all wants
+      description: Deletes all want executions from the server.
+      operationId: deleteWants
+      tags:
+        - Wants
+      responses:
+        '204':
+          description: All wants deleted successfully
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/wants/{id}:
     get:
@@ -679,6 +700,57 @@ paths:
         '202':
           description: Label removal queued
 
+  /api/v1/wants/{id}/order:
+    put:
+      summary: Update want order
+      description: Updates the order of a specific want in an execution flow.
+      operationId: updateWantOrder
+      tags:
+        - Wants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the want execution
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newOrder:
+                  type: integer
+                  description: The new order position for the want.
+                  example: 1
+              required:
+                - newOrder
+      responses:
+        '200':
+          description: Want order updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Want order updated"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/wants/{id}/using:
     post:
       summary: Add using dependency to want
@@ -1004,6 +1076,27 @@ paths:
         '204':
           description: Error deleted
 
+  /api/v1/spec:
+    get:
+      summary: Get OpenAPI specification
+      description: Returns the OpenAPI specification for the MyWant API.
+      operationId: getOpenAPISpec
+      tags:
+        - Utilities
+      responses:
+        '200':
+          description: OpenAPI specification in YAML format
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/reactions/:
     post:
       summary: Create reaction queue
@@ -1065,6 +1158,316 @@ paths:
       responses:
         '204':
           description: Queue deleted
+
+  /api/v1/webhooks:
+    get:
+      summary: List webhook endpoints
+      description: Returns a list of all registered webhook endpoints.
+      operationId: listWebhookEndpoints
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: List of webhook endpoints retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string # Assuming it returns a list of webhook IDs or URLs
+
+  /api/v1/webhooks/{id}:
+    post:
+      summary: Receive webhook payload
+      description: Receives and processes a webhook payload for a given webhook ID.
+      operationId: receiveWebhook
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the webhook endpoint
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true # Webhook payload can be arbitrary JSON
+          application/xml:
+            schema:
+              type: string # Some webhooks might send XML
+          text/plain:
+            schema:
+              type: string # Some webhooks might send plain text
+      responses:
+        '200':
+          description: Webhook payload received and processed successfully
+        '400':
+          description: Invalid request or payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Webhook endpoint not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/system/stop:
+    post:
+      summary: Stop the MyWant server
+      description: Initiates a graceful shutdown of the MyWant server.
+      operationId: stopServer
+      tags:
+        - System
+      responses:
+        '202':
+          description: Server shutdown initiated
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/system/restart:
+    post:
+      summary: Restart the MyWant server
+      description: Initiates a graceful restart of the MyWant server.
+      operationId: restartServer
+      tags:
+        - System
+      responses:
+        '202':
+          description: Server restart initiated
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/config:
+    get:
+      summary: Get server configuration
+      description: Retrieves the current server configuration.
+      operationId: getConfig
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object # Assuming config is a generic JSON object
+                additionalProperties: true
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update server configuration
+      description: Updates the server configuration.
+      operationId: updateConfig
+      tags:
+        - System
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object # Assuming config is a generic JSON object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Server configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object # Assuming config is a generic JSON object
+                additionalProperties: true
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+tags:
+  - name: Health
+    description: Server health monitoring endpoints
+  - name: Wants
+    description: Want configuration management (creation automatically triggers execution)
+  - name: Recipes
+    description: Recipe template management for reusable want configurations
+  - name: Monitoring
+    description: Want execution status and results monitoring
+  - name: Webhooks
+    description: Webhook endpoint management
+  - name: System
+    description: System administration and configuration
+
+  /api/v1/webhooks:
+    get:
+      summary: List webhook endpoints
+      description: Returns a list of all registered webhook endpoints.
+      operationId: listWebhookEndpoints
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: List of webhook endpoints retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string # Assuming it returns a list of webhook IDs or URLs
+
+  /api/v1/webhooks/{id}:
+    post:
+      summary: Receive webhook payload
+      description: Receives and processes a webhook payload for a given webhook ID.
+      operationId: receiveWebhook
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the webhook endpoint
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true # Webhook payload can be arbitrary JSON
+          application/xml:
+            schema:
+              type: string # Some webhooks might send XML
+          text/plain:
+            schema:
+              type: string # Some webhooks might send plain text
+      responses:
+        '200':
+          description: Webhook payload received and processed successfully
+        '400':
+          description: Invalid request or payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Webhook endpoint not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/system/stop:
+    post:
+      summary: Stop the MyWant server
+      description: Initiates a graceful shutdown of the MyWant server.
+      operationId: stopServer
+      tags:
+        - System
+      responses:
+        '202':
+          description: Server shutdown initiated
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/system/restart:
+    post:
+      summary: Restart the MyWant server
+      description: Initiates a graceful restart of the MyWant server.
+      operationId: restartServer
+      tags:
+        - System
+      responses:
+        '202':
+          description: Server restart initiated
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/config:
+    get:
+      summary: Get server configuration
+      description: Retrieves the current server configuration.
+      operationId: getConfig
+      tags:
+        - System
+      responses:
+        '200':
+          description: Server configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object # Assuming config is a generic JSON object
+                additionalProperties: true
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update server configuration
+      description: Updates the server configuration.
+      operationId: updateConfig
+      tags:
+        - System
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object # Assuming config is a generic JSON object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Server configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object # Assuming config is a generic JSON object
+                additionalProperties: true
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -1635,6 +2038,10 @@ components:
                       type: object
                       additionalProperties:
                         type: string
+                  state:
+                    type: object
+                    additionalProperties: true
+                    description: Initial state of the want
             result:
               type: array
               description: Result computation specifications
@@ -1952,5 +2359,10 @@ tags:
     description: Want configuration management (creation automatically triggers execution)
   - name: Recipes
     description: Recipe template management for reusable want configurations
-  - name: Monitoring
-    description: Want execution status and results monitoring
+      - name: Monitoring
+        description: Want execution status and results monitoring
+      - name: System
+        description: System administration and configuration
+      - name: Webhooks
+        description: Webhook endpoint management
+    

@@ -82,6 +82,8 @@ recipe:
       description: "Hotel booking result"
       type: string
 
+  finalResultField: result
+
   result:
     - want_name: "budget"
       state_field: "budget_summary"

@@ -33,7 +33,19 @@ wantType:
       - budget
       - boutique
     example: luxury
+  - name: cost
+    description: Estimated or actual cost of the hotel stay
+    type: float64
+    default: 0.0
+    required: false
+    example: 800.0
   state:
+  - name: cost
+    description: Reported cost for this reservation
+    type: float64
+    persistent: true
+    example: 800.0
+    initialValue: 0.0
   - name: total_processed
     description: Count of successful reservations
     type: int

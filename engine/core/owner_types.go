@@ -423,6 +423,14 @@ func (t *Target) Progress() {
 					}
 				}
 			}
+
+			// Apply FinalResultField from recipe if not already set in spec
+			if t.Spec.FinalResultField == "" {
+				if field, err := t.recipeLoader.GetRecipeFinalResultField(t.RecipePath); err == nil && field != "" {
+					t.Spec.FinalResultField = field
+					t.StoreLog("[TARGET] Applied FinalResultField '%s' from recipe", field)
+				}
+			}
 		}
 		return
 	}

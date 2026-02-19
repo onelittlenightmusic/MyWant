@@ -36,13 +36,31 @@ components:
             count: 1000
             rate: 10.0
             service_time: 0.1
+        parameter_descriptions:
+          type: object
+          description: Human-readable descriptions for recipe parameters
+          additionalProperties:
+            type: string
+          example:
+            prefix: "Prefix used for naming wants"
+            count: "Number of packets to generate"
         wants:
           type: array
           description: Array of recipe want definitions
           items:
             $ref: '#/components/schemas/RecipeWant'
+        state:
+          type: array
+          description: "Coordinator-level state fields that will be added to the Target's ProvidedStateFields"
+          items:
+            $ref: '#/components/schemas/StateDef'
         result:
           $ref: '#/components/schemas/RecipeResult'
+        finalResultField:
+          type: string
+          description: State field name to use as the primary result for this recipe
+        example:
+          $ref: '#/components/schemas/RecipeExample'
         templates:
           type: object
           description: "Legacy support for existing template formats (deprecated)"
@@ -81,13 +99,18 @@ components:
           example: "system"
       additionalProperties: false
     
-    # Recipe want definition (flattened structure)
+    # Recipe want definition (supports both structured and flattened)
     RecipeWant:
       type: object
-      description: Want definition in recipe format with flattened structure
-      required:
-        - type
+      description: Want definition in recipe format. Supports structured (metadata/spec) or flattened structure.
       properties:
+        # Structured format (preferred)
+        metadata:
+          $ref: '#/components/schemas/WantMetadata'
+        spec:
+          $ref: '#/components/schemas/WantSpec'
+        
+        # Legacy flattened fields
         name:
           type: string
           description: Want name (optional, auto-generated if not provided)
@@ -122,6 +145,14 @@ components:
               type: string
             example:
               role: "source"
+        requires:
+          type: array
+          description: Agent capability requirements
+          items:
+            type: string
+        recipeAgent:
+          type: boolean
+          description: If true, enables auto-connection logic for this want
       additionalProperties: false
     
     # Recipe result specification (new array format)
@@ -166,6 +197,125 @@ components:
           type: string
           description: Human-readable description of this result metric
           example: "Total items processed through the queue system"
+      additionalProperties: false
+
+    # Want metadata (structured)
+    WantMetadata:
+      type: object
+      description: Want identification and classification info
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the want
+        name:
+          type: string
+          description: Human-readable name
+        type:
+          type: string
+          description: Want type identifier
+        labels:
+          type: object
+          description: Metadata labels for connection and classification
+          additionalProperties:
+            type: string
+        orderKey:
+          type: string
+          description: Fractional index for custom ordering
+      additionalProperties: false
+
+    # Want specification (structured)
+    WantSpec:
+      type: object
+      description: Desired state configuration for a want
+      properties:
+        params:
+          type: object
+          description: Want-specific parameters
+          additionalProperties: true
+        using:
+          type: array
+          description: Label selectors for connections
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        recipe:
+          type: string
+          description: Path to recipe file if this is a composite want
+        requires:
+          type: array
+          description: Agent capability requirements
+          items:
+            type: string
+        when:
+          type: array
+          description: Conditional execution rules
+          items:
+            $ref: '#/components/schemas/WhenSpec'
+        finalResultField:
+          type: string
+          description: State field name to use as the primary result
+      additionalProperties: false
+
+    # When rule specification
+    WhenSpec:
+      type: object
+      description: Conditional rule for want execution or state transitions
+      required:
+        - state
+        - operator
+        - value
+      properties:
+        state:
+          type: string
+          description: State key to monitor
+        operator:
+          type: string
+          description: Comparison operator
+          enum: [eq, ne, gt, gte, lt, lte, contains, exists]
+        value:
+          description: Value to compare against
+      additionalProperties: false
+
+    # State field definition
+    StateDef:
+      type: object
+      description: State field definition for coordinator-level states
+      required:
+        - name
+        - description
+        - type
+      properties:
+        name:
+          type: string
+          description: State field name
+          pattern: '^[a-z][a-z0-9_]*$'
+        description:
+          type: string
+          description: State field description
+        type:
+          type: string
+          description: State field type (int, float64, string, bool, map, etc.)
+        persistent:
+          type: boolean
+          description: Whether state persists across restarts
+          default: false
+        initialValue:
+          description: Initial value
+        example:
+          description: Example value
+      additionalProperties: false
+
+    # Recipe example for one-click deployment
+    RecipeExample:
+      type: object
+      description: Example deployment configuration
+      properties:
+        wants:
+          type: array
+          description: Wants to deploy in the example
+          items:
+            $ref: '#/components/schemas/RecipeWant'
       additionalProperties: false
 
 paths: {}  # No REST API paths, this is just for schema validation

@@ -63,27 +63,6 @@ components:
             restaurant_type: "fine dining"
       additionalProperties: false
     
-    # Individual want configuration
-    Want:
-      type: object
-      description: Individual processing unit configuration
-      required:
-        - metadata
-        - spec
-      properties:
-        metadata:
-          $ref: '#/components/schemas/Metadata'
-        spec:
-          $ref: '#/components/schemas/WantSpec'
-        stats:
-          $ref: '#/components/schemas/WantStats'
-        status:
-          $ref: '#/components/schemas/WantStatus'
-        state:
-          type: object
-          description: Runtime state information (map[string]interface{})
-          additionalProperties: true
-      additionalProperties: false
     
     # Want metadata with name, type, labels, owner references
     Metadata:

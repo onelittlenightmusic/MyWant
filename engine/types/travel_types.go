@@ -194,6 +194,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		"reservation_end_time":       newEvent.End.Format("15:04"),
 		"reservation_duration_hours": restaurantLocals.Duration.Hours(),
 		"reservation_name":           newEvent.Name,
+		"cost":                       r.GetFloatParam("cost", 0.0),
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
 	})
@@ -208,6 +209,7 @@ type RestaurantSchedule struct {
 	DurationHours    float64   `json:"duration_hours"`
 	RestaurantType   string    `json:"restaurant_type"`
 	ReservationName  string    `json:"reservation_name"`
+	Cost             float64   `json:"cost"`
 	PremiumLevel     string    `json:"premium_level,omitempty"`
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
@@ -232,6 +234,7 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 		"restaurant_type":            s.RestaurantType,
 		"reservation_duration_hours": s.DurationHours,
 		"reservation_name":           s.ReservationName,
+		"cost":                       s.Cost,
 		"total_processed":            1,
 		"schedule_date":              s.ReservationTime.Format("2006-01-02"),
 	}
@@ -418,6 +421,7 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
 		"reservation_name":     newEvent.Name,
+		"cost":                 h.GetFloatParam("cost", 0.0),
 		"achieving_percentage": 100,
 	})
 	h.StoreLog("📦 Hotel reservation created: %s", newEvent.Name)
@@ -495,6 +499,7 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
 		"buffet_duration_hours": buffetLocals.Duration.Hours(),
 		"reservation_name":      newEvent.Name,
+		"cost":                  b.GetFloatParam("cost", 0.0),
 		"achieving_percentage":  100,
 	})
 	b.StoreLog("📦 Buffet reservation created: %s", newEvent.Name)
@@ -508,6 +513,7 @@ type BuffetSchedule struct {
 	DurationHours    float64   `json:"duration_hours"`
 	BuffetType       string    `json:"buffet_type"`
 	ReservationName  string    `json:"reservation_name"`
+	Cost             float64   `json:"cost"`
 	PremiumLevel     string    `json:"premium_level,omitempty"`
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
@@ -532,6 +538,7 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 		"buffet_type":           s.BuffetType,
 		"buffet_duration_hours": s.DurationHours,
 		"reservation_name":      s.ReservationName,
+		"cost":                  s.Cost,
 		"total_processed":       1,
 	}
 	if s.PremiumLevel != "" {
@@ -629,6 +636,11 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 		}
 		if rn, ok := v["reservation_name"].(string); ok {
 			schedule.ReservationName = rn
+		}
+		if c, ok := v["cost"].(float64); ok {
+			schedule.Cost = c
+		} else if ci, ok := v["cost"].(int); ok {
+			schedule.Cost = float64(ci)
 		}
 		if pl, ok := v["premium_level"].(string); ok {
 			schedule.PremiumLevel = pl
@@ -852,6 +864,7 @@ type FlightSchedule struct {
 	FlightType       string    `json:"flight_type"`
 	FlightNumber     string    `json:"flight_number"`
 	ReservationName  string    `json:"reservation_name"`
+	Cost             float64   `json:"cost"`
 	PremiumLevel     string    `json:"premium_level,omitempty"`
 	ServiceTier      string    `json:"service_tier,omitempty"`
 	PremiumAmenities []string  `json:"premium_amenities,omitempty"`
@@ -877,6 +890,7 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		"flight_duration_hours": s.ArrivalTime.Sub(s.DepartureTime).Hours(),
 		"flight_number":         s.FlightNumber,
 		"reservation_name":      s.ReservationName,
+		"cost":                  s.Cost,
 		"total_processed":       1,
 		"schedule_date":         s.DepartureTime.Format("2006-01-02"),
 		"achieving_percentage":  100,
@@ -927,6 +941,7 @@ func (f *FlightWant) ResetFlightState() {
 		"canceled_at",
 		"_previous_flight_status",
 		"_monitor_state_hash",
+		"cost",
 		// NOTE: _previous_flight_id is NOT reset - it's used to detect rebooking state
 	}
 
@@ -965,6 +980,7 @@ type HotelSchedule struct {
 	HotelType         string    `json:"hotel_type"`
 	StayDurationHours float64   `json:"stay_duration_hours"`
 	ReservationName   string    `json:"reservation_name"`
+	Cost              float64   `json:"cost"`
 	PremiumLevel      string    `json:"premium_level,omitempty"`
 	ServiceTier       string    `json:"service_tier,omitempty"`
 	PremiumAmenities  []string  `json:"premium_amenities,omitempty"`
@@ -989,6 +1005,7 @@ func (h *HotelWant) SetSchedule(schedule any) {
 		"hotel_type":          s.HotelType,
 		"stay_duration_hours": s.StayDurationHours,
 		"reservation_name":    s.ReservationName,
+		"cost":                s.Cost,
 		"total_processed":     1,
 	}
 	if s.PremiumLevel != "" {
