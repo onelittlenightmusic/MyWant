@@ -215,6 +215,9 @@ type Want struct {
 	History     WantHistory    `json:"history" yaml:"-"`
 	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
+	// Lifecycle control
+	PreservePendingState bool `json:"-" yaml:"-"` // If true, BeginProgressCycle won't wipe pendingStateChanges
+
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
@@ -411,7 +414,10 @@ func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
 	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
-	n.pendingStateChanges = make(map[string]any)
+	// pendingStateChanges is only wiped if PreservePendingState is false
+	if !n.PreservePendingState {
+		n.pendingStateChanges = make(map[string]any)
+	}
 	n.pendingParameterChanges = make(map[string]any)
 	n.pendingLogs = make([]string, 0)
 }
@@ -952,26 +958,31 @@ func (n *Want) MergeState(updates map[string]any) {
 	defer n.stateMutex.Unlock()
 
 	// Stage all updates in pending state changes for batch processing
-	// Multiple async calls each add their updates; all are preserved
 	if n.pendingStateChanges == nil {
 		n.pendingStateChanges = make(map[string]any)
 	}
+
+	// Helper function to extract map from any
+	extractMap := func(v any) (map[string]any, bool) {
+		if m, ok := v.(map[string]any); ok {
+			return m, true
+		}
+		if m, ok := v.(map[string]interface{}); ok {
+			return m, true
+		}
+		return nil, false
+	}
+
 	for key, value := range updates {
-		// CRITICAL FIX: Deep merge for map[string]any values
-		// If the new value is a map and existing pending value is also a map, merge them
-		// This prevents race conditions where concurrent packets overwrite each other's data
-		if valueMap, isMap := value.(map[string]any); isMap {
+		valueMap, isValueMap := extractMap(value)
+
+		if isValueMap {
 			// Check pending state first, then fall back to persisted State
 			var existingMap map[string]any
 			if existingVal, exists := n.pendingStateChanges[key]; exists {
-				if pendingMap, ok := existingVal.(map[string]any); ok {
-					existingMap = pendingMap
-				}
+				existingMap, _ = extractMap(existingVal)
 			} else if stateVal, exists := n.State[key]; exists {
-				// Read from persisted State if not in pending
-				if persistedMap, ok := stateVal.(map[string]any); ok {
-					existingMap = persistedMap
-				}
+				existingMap, _ = extractMap(stateVal)
 			}
 
 			// If we found an existing map, merge it
@@ -1012,9 +1023,12 @@ func (n *Want) getParentWant() *Want {
 	if parentID == "" {
 		return nil
 	}
-	if n.cachedParentWant != nil && n.cachedParentWantID == parentID {
-		return n.cachedParentWant
-	}
+
+	// DO NOT CACHE Parent Want pointer.
+	// Caching can lead to using stale Want objects if the parent is recreated
+	// during reconciliation or if it was initially found in Config but later promoted to Runtime.
+	// Always look up the latest runtime instance from the global builder.
+
 	cb := GetGlobalChainBuilder()
 	if cb == nil {
 		return nil
@@ -1023,8 +1037,6 @@ func (n *Want) getParentWant() *Want {
 	if !found {
 		return nil
 	}
-	n.cachedParentWant = parent
-	n.cachedParentWantID = parentID
 	return parent
 }
 

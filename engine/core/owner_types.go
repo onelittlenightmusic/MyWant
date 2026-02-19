@@ -41,25 +41,26 @@ type Target struct {
 	childrenDone           chan bool            // Signal when all children complete
 	childrenCreated        bool                 // Track if child wants have been created
 	childCount             int                  // Count of child wants
-	stateNotify            chan struct{}         // Notified when MergeParentState writes pending state
+	stateNotify            chan struct{}        // Notified when MergeParentState writes pending state
 }
 
 // NewTarget creates a new target want
 func NewTarget(metadata Metadata, spec WantSpec) *Target {
 	target := &Target{
 		Want: Want{
-			Metadata: metadata,
-			Spec:     spec,
-			Status:   WantStatusIdle,
-			State:    make(map[string]any),
+			Metadata:             metadata,
+			Spec:                 spec,
+			Status:               WantStatusIdle,
+			State:                make(map[string]any),
+			PreservePendingState: true, // Target aggregates MergeParentState writes across iterations
 		},
 		MaxDisplay:   1000,
 		RecipePath:   filepath.Join(RecipesDir, "empty.yaml"), // Relative to project root
 		RecipeParams: make(map[string]any), parameterSubscriptions: make(map[string][]string),
 		childWants:        make([]*Want, 0),
 		completedChildren: make(map[string]bool),
-		childrenDone: make(chan bool, 1), // Signal channel for subscription system
-		stateNotify:  make(chan struct{}, 64),
+		childrenDone:      make(chan bool, 1), // Signal channel for subscription system
+		stateNotify:       make(chan struct{}, 64),
 	}
 
 	// Hook: whenever Want.MergeState is called on the embedded Want, signal stateNotify.
@@ -182,22 +183,6 @@ func (t *Target) checkAllChildrenComplete() bool {
 
 	// All children are complete
 	return true
-}
-
-// BeginProgressCycle overrides Want.BeginProgressCycle to NOT wipe pendingStateChanges.
-// Target accumulates MergeParentState writes across iterations; wiping would lose async data.
-func (t *Target) BeginProgressCycle() {
-	t.inExecCycle = true
-	t.execCycleCount++
-	// Do NOT wipe pendingStateChanges — preserve accumulated MergeParentState data
-	// pendingLogs and pendingParameterChanges are still reset each cycle
-	t.pendingParameterChanges = make(map[string]any)
-	t.pendingLogs = make([]string, 0)
-}
-
-// EndProgressCycle calls parent implementation
-func (t *Target) EndProgressCycle() {
-	t.Want.EndProgressCycle()
 }
 
 func (t *Target) SetBuilder(builder *ChainBuilder) {
@@ -543,6 +528,10 @@ drained:
 		}
 
 		t.computeTemplateResult()
+
+		// Signal a status change to self to trigger immediate re-save and event emission
+		// This ensures frontend and dependent wants see the latest aggregated results
+		t.SetStatus(WantStatusAchieved)
 	}
 }
 
