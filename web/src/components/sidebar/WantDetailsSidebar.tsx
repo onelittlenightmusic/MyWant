@@ -1106,8 +1106,12 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
     } else {
       // For simple key-value pairs, display in left-right format with dots
       const valueStr = String(value);
+
+      // Truncate key if too long
+      const displayKey = key.length > 25 ? key.slice(0, 25) + '~' : key;
+      
       // Calculate spacing to fill with dots
-      const keyLength = key.length;
+      const keyLength = displayKey.length;
       const valueLength = valueStr.length;
       const minDots = 3;
       // Estimate: key (small) + value (large) + spacing
@@ -1117,7 +1121,7 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 
       items.push(
         <div key={key} className="flex justify-between items-center text-xs sm:text-sm gap-2 group/kv">
-          <span className="text-gray-600 dark:text-gray-300 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0">{key}</span>
+          <span className="text-gray-600 dark:text-gray-300 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0" title={key}>{displayKey}</span>
           <div className="flex items-center gap-1 min-w-0">
             <span className="text-gray-400 dark:text-gray-500 text-[10px] sm:text-xs flex-shrink-0">{dots}</span>
             <span className="text-gray-800 dark:text-gray-100 font-semibold text-sm sm:text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={valueStr}>{valueStr}</span>
@@ -1157,7 +1161,7 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
 
           {hasState && (
             <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-4">Want State</h4>
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Want State</h4>
               <div className="space-y-3 sm:space-y-4">
                 {renderKeyValuePairs(want.state)}
               </div>
@@ -1168,15 +1172,15 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
             <>
               <button
                 onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
-                className="flex items-center gap-2 font-medium text-gray-800 text-sm hover:text-gray-900 py-2 mt-4"
+                className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm hover:text-gray-900 dark:hover:text-white py-2 mt-4 transition-colors"
               >
                 {isHiddenStateExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                 )}
                 Hidden State
-                <span className="text-xs text-gray-400 ml-1">({Object.keys(want.hidden_state).length})</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({Object.keys(want.hidden_state).length})</span>
               </button>
               {isHiddenStateExpanded && (
                 <div className={SECTION_CONTAINER_CLASS}>
