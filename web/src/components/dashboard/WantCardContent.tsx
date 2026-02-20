@@ -339,18 +339,23 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"}>
+        <div className={isChild ? "mt-2" : "mt-4"}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`${isChild ? 'text-xs sm:text-base' : 'text-sm sm:text-lg'} font-bold text-gray-900 dark:text-white truncate w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400`}
+            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-purple-700 dark:text-purple-300 bg-purple-500/15 dark:bg-purple-900/30 border border-purple-400/40 dark:border-purple-800 rounded-full px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400`}
             title="Click to view results"
           >
-            {truncateText(
-              typeof want.state.final_result === 'string'
-                ? want.state.final_result
-                : JSON.stringify(want.state.final_result),
-              isChild ? 40 : 50
-            )}
+            <svg xmlns="http://www.w3.org/2000/svg" className={isChild ? "h-3 w-3 shrink-0" : "h-4 w-4 shrink-0"} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+            </svg>
+            <span className="truncate">
+              {truncateText(
+                typeof want.state.final_result === 'string'
+                  ? want.state.final_result
+                  : JSON.stringify(want.state.final_result),
+                isChild ? 40 : 50
+              )}
+            </span>
           </button>
         </div>
       )}

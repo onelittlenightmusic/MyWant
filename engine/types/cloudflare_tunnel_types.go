@@ -26,12 +26,12 @@ const (
 
 // CloudflareTunnelLocals holds type-specific local state for CloudflareTunnelWant
 type CloudflareTunnelLocals struct {
-	Phase      string
-	Port       string
-	Protocol   string
-	LogFile    string
-	ServerPID  int
-	TunnelURL  string
+	Phase     string
+	Port      string
+	Protocol  string
+	LogFile   string
+	ServerPID int
+	TunnelURL string
 }
 
 // CloudflareTunnelWant manages a Cloudflare Tunnel (cloudflared) lifecycle using the live_server_manager agent

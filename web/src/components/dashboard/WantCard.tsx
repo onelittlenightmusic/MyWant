@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, CheckSquare, Square, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckSquare, Square, Plus } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
@@ -398,45 +398,42 @@ export const WantCard: React.FC<WantCardProps> = ({
       </div>
 
       {hasChildren && !displayIsExpanded && (
-        <div className="relative z-10 mt-auto pt-3 border-t border-gray-200 dark:border-gray-700">
+        <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={(e) => {
               e.stopPropagation();
               if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
               else setLocalIsExpanded(true);
             }}
-            className={classNames("flex items-center justify-between w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors", isBeingProcessed && 'pointer-events-none')}
+            className={classNames("flex items-center gap-2 sm:gap-3 w-full pt-3 pb-1 px-1 rounded-b-xl text-sm text-gray-600 dark:text-gray-400 bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/20 transition-colors", isBeingProcessed && 'pointer-events-none')}
             disabled={isBeingProcessed}
           >
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1 sm:gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
-                {children!.map((child, idx) => (
-                  <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
-                ))}
-              </div>
-              <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
+            <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-1 sm:gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
+              {children!.map((child, idx) => (
+                <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
+              ))}
             </div>
-            <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 dark:text-gray-500" />
           </button>
         </div>
       )}
 
       {hasChildren && displayIsExpanded && (
-        <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-200 dark:border-gray-700 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Child Wants ({children!.length})</h4>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
-                else setLocalIsExpanded(false);
-              }}
-              className={classNames("text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200", isBeingProcessed && 'pointer-events-none')}
-              disabled={isBeingProcessed}
-            >
-              Collapse
-            </button>
-          </div>
+        <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 border-t border-gray-200 dark:border-gray-700 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
+              else setLocalIsExpanded(false);
+            }}
+            className={classNames("flex items-center gap-1.5 w-full pt-2 sm:pt-3 pb-2 px-1 mb-1 text-xs sm:text-sm font-medium text-gray-900 dark:text-white bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/20 transition-colors", isBeingProcessed && 'pointer-events-none')}
+            disabled={isBeingProcessed}
+          >
+            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
+            Child Wants ({children!.length})
+          </button>
+          <div className="pt-1 sm:pt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 transition-all duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0, transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)' } as React.CSSProperties}>
             {children!.sort((a, b) => (a.metadata?.id || a.id || '').localeCompare(b.metadata?.id || b.id || '')).map((child, index) => {
               const childId = child.metadata?.id || child.id || '';
@@ -544,6 +541,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}

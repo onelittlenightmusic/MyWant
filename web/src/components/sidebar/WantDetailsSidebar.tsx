@@ -30,6 +30,7 @@ import {
 interface WantDetailsSidebarProps {
   want: Want | null;
   initialTab?: 'settings' | 'results' | 'logs' | 'agents';
+  initialTabVersion?: number;
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
   onRegisterHeaderActions?: (handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => void;
@@ -72,6 +73,7 @@ const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rou
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'results',
+  initialTabVersion = 0,
   onWantUpdate,
   onHeaderStateChange,
   onRegisterHeaderActions,
@@ -189,15 +191,15 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }, [wantId, fetchWantDetails, fetchWantResults]);
 
   // Reset state when initialTab prop changes (from parent handling onViewResults)
-  // Only depends on initialTab, not on want, to avoid infinite loops from polling
+  // initialTabVersion ensures the effect fires even when the tab value is the same
+  // wantId is included so that when a new want is selected with a specific initialTab, it applies correctly
   useEffect(() => {
     if (want) {
       setIsEditing(false);
       setUpdateError(null);
-      // Only reset tab if initialTab has changed from outside
       setActiveTab(initialTab);
     }
-  }, [initialTab]);
+  }, [initialTab, initialTabVersion, wantId]);
 
   // Keyboard shortcuts for want control buttons and tab switching
   useEffect(() => {

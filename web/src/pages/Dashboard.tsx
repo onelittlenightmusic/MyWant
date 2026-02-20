@@ -52,7 +52,8 @@ export const Dashboard: React.FC = () => {
   const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
   const [reactionAction, setReactionAction] = useState<'approve' | 'deny' | null>(null);
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('settings');
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('results');
+  const [sidebarTabVersion, setSidebarTabVersion] = useState(0);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
   const [labelOwners, setLabelOwners] = useState<Want[]>([]);
@@ -196,14 +197,14 @@ export const Dashboard: React.FC = () => {
     const wantToView = 'metadata' in want ? want : wants.find(w => (w.metadata?.id === want.id) || (w.id === want.id));
     if (wantToView) {
       sidebar.selectItem(wantToView);
-      setSidebarInitialTab('settings');
+      setSidebarInitialTab('results');
       const wantId = wantToView.metadata?.id || wantToView.id;
       if (wantId) setLastSelectedWantId(wantId);
     }
   };
 
   const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
-  const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
+  const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
 
   const handleDraftClick = (draft: DraftWant) => {
     setActiveDraftId(draft.id);
@@ -731,9 +732,10 @@ export const Dashboard: React.FC = () => {
             loading={isBatchProcessing} 
           />
         ) : (
-          <WantDetailsSidebar 
-            want={selectedWant} 
-            initialTab={sidebarInitialTab} 
+          <WantDetailsSidebar
+            want={selectedWant}
+            initialTab={sidebarInitialTab}
+            initialTabVersion={sidebarTabVersion}
             onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} 
             onHeaderStateChange={setHeaderState} 
             onRegisterHeaderActions={sidebar.registerHeaderActions} 
