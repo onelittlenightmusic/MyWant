@@ -246,6 +246,7 @@ func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	actionsJSON, _ := json.Marshal(actions)
 	want.StoreStateMultiForAgent(map[string]any{
 		"replay_script":            script,
+		"final_result":             script,
 		"replay_actions":           string(actionsJSON),
 		"replay_start_url":         startURL,
 		"recording_active":         false,
@@ -363,6 +364,7 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 	actionsJSON, _ := json.Marshal(actions)
 	stateUpdate := map[string]any{
 		"replay_script":                  script,
+		"final_result":                   script,
 		"replay_actions":                 string(actionsJSON),
 		"replay_start_url":               startURL,
 		"debug_recording_active":         false,
