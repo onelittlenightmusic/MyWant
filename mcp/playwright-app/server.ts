@@ -381,8 +381,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   if (name === 'start_recording_debug') {
-    // Normalize localhost → 127.0.0.1 to avoid IPv6 resolution issues on macOS
-    const cdpUrl = ((args?.cdp_url as string | undefined) ?? 'http://localhost:9222').replace(/\blocalhost\b/, '127.0.0.1');
+    const cdpUrl = (args?.cdp_url as string | undefined) ?? 'http://localhost:9222';
     const targetUrl = (args?.target_url as string | undefined) ?? '';
     const sessionId = crypto.randomUUID();
 

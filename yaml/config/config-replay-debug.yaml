@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: replay_debug_test
+      type: replay
+    spec:
+      params:
+        target_url: "https://www.google.com"
+        debug_chrome_host: "localhost"
+        debug_chrome_port: "9222"
