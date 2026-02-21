@@ -481,7 +481,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       {/* Replay type: Replay button (shown after recording is done and replay_actions available) */}
-      {isReplay && hasFinalResult && hasReplayActions && !replayActive && replayWebhookId && (
+      {isReplay && hasReplayActions && !replayActive && replayWebhookId && (
         <div className={isChild ? "mt-2" : "mt-4"}>
           <button
             onClick={(e) => { e.stopPropagation(); handleStartReplay(); }}
