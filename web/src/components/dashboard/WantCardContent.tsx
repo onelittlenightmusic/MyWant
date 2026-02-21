@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2 } from 'lucide-react';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
+import { BrowserFrame } from '@/components/replay/BrowserFrame';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import styles from './WantCard.module.css';
 
@@ -44,6 +45,61 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const queueId = want.state?.reaction_queue_id as string | undefined;
   const requireReaction = want.spec?.params?.require_reaction !== false; // Default to true
   const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && queueId && requireReaction;
+
+  // Replay-specific state
+  const isReplay = wantType === 'replay';
+  const recordingActive = want.state?.recording_active === true;
+  const debugRecordingActive = want.state?.debug_recording_active === true;
+  const iframeUrl = want.state?.recording_iframe_url as string | undefined;
+  const hasFinalResult = Boolean(want.state?.final_result);
+
+
+  // Webhook IDs: prefer state value (set by MonitorAgent), fall back to predictable pattern from want ID.
+  // This ensures the Record button appears immediately after want creation, before the MonitorAgent runs.
+  const wantId = want.metadata?.id ?? '';
+  const startWebhookId = (want.state?.startWebhookId as string | undefined) || (wantId ? `${wantId}-start` : undefined);
+  const stopWebhookId = (want.state?.stopWebhookId as string | undefined) || (wantId ? `${wantId}-stop` : undefined);
+  const debugStartWebhookId = (want.state?.debugStartWebhookId as string | undefined) || (wantId ? `${wantId}-debug-start` : undefined);
+  const debugStopWebhookId = (want.state?.debugStopWebhookId as string | undefined) || (wantId ? `${wantId}-debug-stop` : undefined);
+
+  const handleStartRecording = async () => {
+    if (!startWebhookId) return;
+    try {
+      await fetch(`/api/v1/webhooks/${startWebhookId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start_recording' }),
+      });
+    } catch (err) {
+      console.error('[WantCard] start recording webhook failed:', err);
+    }
+  };
+
+  const handleStartDebugRecording = async () => {
+    if (!debugStartWebhookId) return;
+    try {
+      await fetch(`/api/v1/webhooks/${debugStartWebhookId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start_debug_recording' }),
+      });
+    } catch (err) {
+      console.error('[WantCard] start debug recording webhook failed:', err);
+    }
+  };
+
+  const handleFinishDebugRecording = async () => {
+    if (!debugStopWebhookId) return;
+    try {
+      await fetch(`/api/v1/webhooks/${debugStopWebhookId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop_debug_recording' }),
+      });
+    } catch (err) {
+      console.error('[WantCard] stop debug recording webhook failed:', err);
+    }
+  };
 
   // Confirmation dialog state
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -334,6 +390,58 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           <p className={`${sizes.errorTextSize} text-gray-600 dark:text-gray-400`}>
             Results: {Object.keys(want.results).length} item{Object.keys(want.results).length !== 1 ? 's' : ''}
           </p>
+        </div>
+      )}
+
+      {/* Replay type: Record / Record in debug buttons (shown when idle, no final result yet) */}
+      {isReplay && !recordingActive && !debugRecordingActive && !hasFinalResult && (
+        <div className={`flex items-center gap-2 ${isChild ? "mt-2" : "mt-4"}`}>
+          {startWebhookId && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleStartRecording(); }}
+              className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-red-600 text-white hover:bg-red-700 transition-colors"
+              title="Start browser recording (new browser window)"
+            >
+              <Circle className="w-3 h-3 fill-current" />
+              Record
+            </button>
+          )}
+          {debugStartWebhookId && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleStartDebugRecording(); }}
+              className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+              title="Record in debug Chrome (port 9222)"
+            >
+              <Circle className="w-3 h-3 fill-current" />
+              Record in debug
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Replay type: iframe shown while normal recording is active */}
+      {isReplay && recordingActive && iframeUrl && (
+        <BrowserFrame
+          iframeUrl={iframeUrl}
+          wantId={want.metadata?.id ?? ''}
+          stopWebhookId={stopWebhookId ?? ''}
+        />
+      )}
+
+      {/* Replay type: Finish button shown while debug recording is active (no iframe) */}
+      {isReplay && debugRecordingActive && (
+        <div className={isChild ? "mt-2" : "mt-4"}>
+          <div className="flex items-center gap-2 p-2 rounded bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+            <span className="inline-block w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
+            <span className="text-xs text-orange-700 dark:text-orange-300 flex-1">Recording debug Chrome…</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleFinishDebugRecording(); }}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-orange-600 text-white hover:bg-orange-700 transition-colors flex-shrink-0"
+              title="Finish debug recording"
+            >
+              Finish
+            </button>
+          </div>
         </div>
       )}
 

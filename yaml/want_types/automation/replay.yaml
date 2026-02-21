@@ -1,0 +1,164 @@
+wantType:
+  metadata:
+    name: replay
+    title: Browser Replay
+    description: |
+      Records user browser interactions via an embedded Playwright browser session
+      and stores the recording as a Playwright .spec.ts test script.
+
+      When the want is created, two webhook endpoints are registered in state:
+        - startWebhookId  → POST /api/v1/webhooks/{want_id}-start  to begin recording
+        - stopWebhookId   → POST /api/v1/webhooks/{want_id}-stop   to finish recording
+
+      The frontend "Record" button calls the start endpoint. An iframe is then shown
+      with the Playwright MCP App Server UI, where the user interacts with a real browser.
+      Clicking "Finish" (in the iframe or via the stop endpoint) saves the generated
+      Playwright script to `replay_script` / `final_result`.
+
+      The "Record in debug" button attaches to an existing Chrome running with
+      --remote-debugging-port (configurable via debug_chrome_host / debug_chrome_port).
+      No iframe is shown; a Finish button appears in the card instead.
+    version: '1.0'
+    category: automation
+    pattern: independent
+
+  parameters:
+  - name: target_url
+    description: Starting URL opened when recording begins (both normal and debug mode)
+    type: string
+    required: false
+    default: "https://example.com"
+    example: "https://myapp.example.com/login"
+
+  - name: debug_chrome_host
+    description: Hostname or IP address of the Chrome running with --remote-debugging-port. Used only by "Record in debug" mode.
+    type: string
+    required: false
+    default: "localhost"
+    example: "192.168.1.100"
+
+  - name: debug_chrome_port
+    description: Remote debugging port of the debug Chrome instance.
+    type: string
+    required: false
+    default: "9222"
+    example: "9222"
+
+  state:
+  - name: startWebhookId
+    description: Webhook ID for triggering start_recording ("want-id-start")
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: stopWebhookId
+    description: Webhook ID for triggering stop_recording ("want-id-stop")
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: start_recording_requested
+    description: Signal set by the start webhook handler; consumed by the MonitorAgent
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: stop_recording_requested
+    description: Signal set by the stop webhook handler; consumed by the MonitorAgent
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: start_debug_recording_requested
+    description: Signal set by the debug-start webhook handler; consumed by the MonitorAgent
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: stop_debug_recording_requested
+    description: Signal set by the debug-stop webhook handler; consumed by the MonitorAgent
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: recording_active
+    description: True while a Playwright recording session is in progress
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: recording_session_id
+    description: Session identifier returned by the Playwright MCP App Server
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: recording_iframe_url
+    description: URL of the Playwright App Server UI to embed in an iframe
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_script
+    description: The recorded Playwright .spec.ts script
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: final_result
+    description: Mirrors replay_script once recording completes (set via FinalResultField)
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: debugStartWebhookId
+    description: Webhook ID for triggering start_debug_recording ("want-id-debug-start")
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: debugStopWebhookId
+    description: Webhook ID for triggering stop_debug_recording ("want-id-debug-stop")
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: debug_recording_active
+    description: True while a debug Chrome recording session is in progress
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: debug_recording_session_id
+    description: Session identifier for the debug recording session
+    type: string
+    persistent: true
+    initialValue: ''
+
+  requires:
+    - playwright_recording
+
+  finalResultField: replay_script
+
+  examples:
+  - name: Simple Browser Recording
+    description: Records interactions on the default example site
+    want:
+      metadata:
+        name: record_example
+        type: replay
+      spec:
+        params:
+          target_url: "https://www.google.com"
+          debug_chrome_host: "192.168.2.212"
+          debug_chrome_port: "9222"
+
+  - name: App Login Flow Recording
+    description: Records a login flow for automated replay testing
+    want:
+      metadata:
+        name: record_login_flow
+        type: replay
+      spec:
+        params:
+          target_url: "https://myapp.example.com/login"

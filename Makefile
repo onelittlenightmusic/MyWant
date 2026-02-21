@@ -1,4 +1,4 @@
-.PHONY: clean build build-gui build-cli release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -41,8 +41,18 @@ build-cli:
 	@mkdir -p bin
 	go build -C client -o ../bin/mywant ./cmd/mywant
 
-release: build-gui build-cli
-	@echo "🚀 Release build complete: bin/mywant"
+build-playwright-app:
+	@echo "🎭 Building Playwright MCP App Server..."
+	@cd mcp/playwright-app && npm install && npm run build
+	@echo "✅ playwright-app built: mcp/playwright-app/dist/server.js"
+
+install-playwright-browsers:
+	@echo "🌐 Installing Playwright browsers (Chromium)..."
+	@cd mcp/playwright-app && npx playwright install chromium
+	@echo "✅ Playwright browsers installed"
+
+release: build-gui build-cli build-playwright-app
+	@echo "🚀 Release build complete: bin/mywant + mcp/playwright-app/dist/server.js"
 
 # Build the mywant library
 build: check
@@ -135,6 +145,7 @@ clean:
 	@rm -f engine/engine/server
 	@rm -f engine/demo_*
 	@rm -f engine/server-packet-test.log
+	@rm -rf mcp/playwright-app/dist/
 	@go clean
 
 help:
@@ -149,9 +160,11 @@ help:
 	@echo "  test-all-runs  - Test all run targets (with 10s timeout each)"
 	@echo ""
 	@echo "🔨 Build:"
-	@echo "  build        - Build mywant library (with quality checks)"
-	@echo "  test-build   - Quick build test"
-	@echo "  build-mock   - Build mock flight server"
+	@echo "  build                     - Build mywant library (with quality checks)"
+	@echo "  test-build                - Quick build test"
+	@echo "  build-mock                - Build mock flight server"
+	@echo "  build-playwright-app      - Build Playwright MCP App Server (Node.js)"
+	@echo "  install-playwright-browsers - Install Chromium for Playwright (first-time setup)"
 	@echo ""
 	@echo "🏃 Run Examples:"
 	@echo "  run-qnet              - Queue network example"

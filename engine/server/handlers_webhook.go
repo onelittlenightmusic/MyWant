@@ -57,6 +57,12 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// [replay webhook] Detect -start / -stop suffix for replay want type recording control
+	if want, action := s.findWantAndActionByWebhookID(wantID); want != nil {
+		s.handleReplayWebhook(w, want, action)
+		return
+	}
+
 	want := s.findWantByIDOrName(wantID)
 	if want == nil {
 		http.Error(w, `{"error":"want not found"}`, http.StatusNotFound)
@@ -88,6 +94,70 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "received",
 	})
+}
+
+// findWantAndActionByWebhookID detects -start / -stop / -debug-start / -debug-stop suffixes
+// used by replay want type. Returns the matching Want and action string, or (nil, "") if no match.
+func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) {
+	// Check longer suffixes first to avoid ambiguity
+	if strings.HasSuffix(id, "-debug-start") {
+		baseID := strings.TrimSuffix(id, "-debug-start")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "start_debug_recording"
+		}
+	}
+	if strings.HasSuffix(id, "-debug-stop") {
+		baseID := strings.TrimSuffix(id, "-debug-stop")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "stop_debug_recording"
+		}
+	}
+	if strings.HasSuffix(id, "-start") {
+		baseID := strings.TrimSuffix(id, "-start")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "start_recording"
+		}
+	}
+	if strings.HasSuffix(id, "-stop") {
+		baseID := strings.TrimSuffix(id, "-stop")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "stop_recording"
+		}
+	}
+	return nil, ""
+}
+
+// handleReplayWebhook sets start/stop recording signal flags on a replay want's state.
+func (s *Server) handleReplayWebhook(w http.ResponseWriter, want *mywant.Want, action string) {
+	switch action {
+	case "start_recording":
+		want.StoreStateMultiForAgent(map[string]any{
+			"start_recording_requested": true,
+			"stop_recording_requested":  false,
+			"action_by_agent":           "webhook_handler",
+		})
+		log.Printf("[REPLAY-WEBHOOK] start_recording signal set for want %s\n", want.Metadata.ID)
+	case "stop_recording":
+		want.StoreStateMultiForAgent(map[string]any{
+			"stop_recording_requested": true,
+			"action_by_agent":          "webhook_handler",
+		})
+		log.Printf("[REPLAY-WEBHOOK] stop_recording signal set for want %s\n", want.Metadata.ID)
+	case "start_debug_recording":
+		want.StoreStateMultiForAgent(map[string]any{
+			"start_debug_recording_requested": true,
+			"stop_debug_recording_requested":  false,
+			"action_by_agent":                 "webhook_handler",
+		})
+		log.Printf("[REPLAY-WEBHOOK] start_debug_recording signal set for want %s\n", want.Metadata.ID)
+	case "stop_debug_recording":
+		want.StoreStateMultiForAgent(map[string]any{
+			"stop_debug_recording_requested": true,
+			"action_by_agent":                "webhook_handler",
+		})
+		log.Printf("[REPLAY-WEBHOOK] stop_debug_recording signal set for want %s\n", want.Metadata.ID)
+	}
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "action": action})
 }
 
 // findWantByIDOrName searches for a Want across globalBuilder and execution builders by ID or Name

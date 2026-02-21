@@ -53,6 +53,12 @@ func (r *MCPServerRegistry) Get(name string) (*MCPServerProcess, bool) {
 	return p, ok
 }
 
+func (r *MCPServerRegistry) Unregister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.processes, name)
+}
+
 // startMCPServer (DoAgent Action) サーバを起動する
 func startMCPServer(ctx context.Context, want *mywant.Want) error {
 	serverName := want.GetStringParam("mcp_server_name", "default")
