@@ -43,8 +43,9 @@ interface DebugRecordingSession {
   browser: Browser;  // connected via CDP (do NOT close)
   page: Page;
   startUrl: string;
+  allActions: string[];    // accumulated actions across all page navigations
   pollTimer: ReturnType<typeof setInterval>;
-  lastActionIndex: number;
+  lastActionIndex: number; // index into current page's actions array
 }
 
 interface ReplayResult {
@@ -473,24 +474,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Inject recorder script into the page
     await injectDebugRecorder(page);
 
-    // Poll for new actions every 500ms
-    const pollTimer = setInterval(async () => {
-      // Keep the recorder injected across navigations
-      try {
-        await injectDebugRecorder(page);
-      } catch {
-        // Page may be navigating
-      }
-    }, 2000);
-
+    // Accumulate actions from current page before it navigates away, then re-inject
     const session: DebugRecordingSession = {
       sessionId,
       browser,
       page,
       startUrl,
-      pollTimer,
+      allActions: [],
+      pollTimer: null as any,
       lastActionIndex: 0,
     };
+
+    const pollTimer = setInterval(async () => {
+      try {
+        // Harvest new actions since last poll
+        const currentActions: string[] = await page.evaluate(
+          () => (window as any).__playwright_recorder__?.actions ?? []
+        );
+        if (currentActions.length > session.lastActionIndex) {
+          const newActions = currentActions.slice(session.lastActionIndex);
+          session.allActions.push(...newActions);
+          session.lastActionIndex = currentActions.length;
+        }
+        // Re-inject recorder (handles post-navigation page context reset)
+        await injectDebugRecorder(page);
+      } catch {
+        // Page may be navigating — reset index so next poll starts fresh
+        session.lastActionIndex = 0;
+      }
+    }, 500);
+
+    session.pollTimer = pollTimer;
     debugSessions.set(sessionId, session);
 
     return {
@@ -510,8 +524,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     clearInterval(session.pollTimer);
 
-    // Harvest all recorded actions and the current selection/focus state from the page
-    let actions: string[] = [];
+    // Harvest remaining actions from the current page and capture selection/focus state
     let targetObject: Record<string, any> = {};
     try {
       const harvested = await session.page.evaluate(() => {
@@ -542,7 +555,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { actions, selectedText, activeElement, url: window.location.href };
       });
 
-      actions = harvested.actions;
+      // Append any actions not yet harvested by pollTimer
+      if (harvested.actions.length > session.lastActionIndex) {
+        session.allActions.push(...harvested.actions.slice(session.lastActionIndex));
+      }
       targetObject = {
         selected_text: harvested.selectedText,
         active_element: harvested.activeElement,
@@ -552,6 +568,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // Page may be closed
     }
 
+    // Use accumulated actions across all navigations
+    const actions = session.allActions;
     const script = buildPlaywrightScript(session.startUrl, actions);
     const startUrl = session.startUrl;
     debugSessions.delete(sessionId);
