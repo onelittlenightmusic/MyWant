@@ -262,7 +262,9 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Calling start_recording_debug: cdp=%s target=%s", cdpURL, targetURL)
-	result, err := mgr.ExecuteTool(ctx,
+	toolCtx, toolCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer toolCancel()
+	result, err := mgr.ExecuteTool(toolCtx,
 		"playwright-mcp-app",
 		"node", []string{serverPath},
 		"start_recording_debug",
@@ -273,7 +275,9 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 		if restartErr := ensurePlaywrightServer(ctx, serverPath, true); restartErr != nil {
 			return fmt.Errorf("failed to restart playwright-app server: %w", restartErr)
 		}
-		result, err = mgr.ExecuteTool(ctx,
+		toolCtx2, toolCancel2 := context.WithTimeout(ctx, 30*time.Second)
+		defer toolCancel2()
+		result, err = mgr.ExecuteTool(toolCtx2,
 			"playwright-mcp-app",
 			"node", []string{serverPath},
 			"start_recording_debug",

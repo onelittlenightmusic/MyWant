@@ -52,6 +52,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const debugRecordingActive = want.state?.debug_recording_active === true;
   const iframeUrl = want.state?.recording_iframe_url as string | undefined;
   const hasFinalResult = Boolean(want.state?.final_result);
+  const debugRecordingError = want.state?.debug_recording_error as string | undefined;
 
 
   // Webhook IDs: prefer state value (set by MonitorAgent), fall back to predictable pattern from want ID.
@@ -441,6 +442,17 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             >
               Finish
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Replay type: debug recording error */}
+      {isReplay && debugRecordingError && !debugRecordingActive && (
+        <div className={isChild ? "mt-2" : "mt-4"}>
+          <div className="flex items-start gap-2 p-2 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <span className="text-xs text-red-700 dark:text-red-300 flex-1 break-all">
+              Debug recording failed: {debugRecordingError}
+            </span>
           </div>
         </div>
       )}

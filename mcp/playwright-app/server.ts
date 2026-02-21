@@ -387,7 +387,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     let browser: Browser;
     try {
-      browser = await chromium.connectOverCDP(cdpUrl);
+      browser = await chromium.connectOverCDP(cdpUrl, { timeout: 10000 });
     } catch (err) {
       return {
         content: [{ type: 'text', text: JSON.stringify({ error: `Failed to connect to Chrome at ${cdpUrl}: ${err}` }) }],

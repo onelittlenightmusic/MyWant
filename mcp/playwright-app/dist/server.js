@@ -356,7 +356,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
         const sessionId = crypto.randomUUID();
         let browser;
         try {
-            browser = await playwright_1.chromium.connectOverCDP(cdpUrl);
+            browser = await playwright_1.chromium.connectOverCDP(cdpUrl, { timeout: 10000 });
         }
         catch (err) {
             return {
