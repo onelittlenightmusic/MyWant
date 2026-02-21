@@ -54,6 +54,7 @@ const http = __importStar(require("http"));
 const crypto = __importStar(require("crypto"));
 const sessions = new Map();
 const debugSessions = new Map();
+const replaySessions = new Map();
 // ---------------------------------------------------------------------------
 // HTTP + WebSocket server for the browser UI
 // ---------------------------------------------------------------------------
@@ -63,6 +64,13 @@ const wss = new ws_1.WebSocketServer({ port: WS_PORT });
 wss.on('connection', (ws, req) => {
     const url = new URL(req.url ?? '/', `http://localhost:${WS_PORT}`);
     const sessionId = url.searchParams.get('session') ?? '';
+    // Replay sessions: screenshot-only, no user input accepted
+    const replaySession = replaySessions.get(sessionId);
+    if (replaySession) {
+        replaySession.clients.add(ws);
+        ws.on('close', () => { replaySession.clients.delete(ws); });
+        return;
+    }
     const session = sessions.get(sessionId);
     if (!session) {
         ws.close(1008, 'session not found');
@@ -129,6 +137,22 @@ function startScreenshotStream(session) {
         catch {
             // Page may be navigating
         }
+    }, 200);
+}
+function startReplayScreenshotStream(session) {
+    session.screenshotTimer = setInterval(async () => {
+        if (session.clients.size === 0)
+            return;
+        try {
+            const buf = await session.page.screenshot({ type: 'png' });
+            const b64 = buf.toString('base64');
+            const msg = JSON.stringify({ type: 'screenshot', data: b64 });
+            for (const client of session.clients) {
+                if (client.readyState === ws_1.WebSocket.OPEN)
+                    client.send(msg);
+            }
+        }
+        catch { }
     }, 200);
 }
 // ---------------------------------------------------------------------------
@@ -286,6 +310,29 @@ server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => ({
                 required: ['session_id'],
             },
         },
+        {
+            name: 'run_replay',
+            description: 'Start replaying a recorded script in a new browser. Returns session_id and ui_url immediately; execution runs in background.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    start_url: { type: 'string', description: 'URL to navigate to before executing actions' },
+                    actions: { type: 'array', items: { type: 'string' }, description: 'Recorded Playwright action strings' },
+                },
+                required: ['start_url', 'actions'],
+            },
+        },
+        {
+            name: 'check_replay',
+            description: 'Poll for replay completion. Returns { done, result?, error? }. Cleans up the session when done=true.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    session_id: { type: 'string', description: 'Session ID returned by run_replay' },
+                },
+                required: ['session_id'],
+            },
+        },
     ],
 }));
 server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
@@ -341,13 +388,15 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
         for (const client of session.clients) {
             client.close();
         }
-        const script = buildPlaywrightScript((await session.page.url()) || 'about:blank', session.actions);
+        const startUrl = (await session.page.url()) || 'about:blank';
+        const script = buildPlaywrightScript(startUrl, session.actions);
+        const actions = session.actions;
         // Cleanup browser resources
         await session.context.close();
         await session.browser.close();
         sessions.delete(sessionId);
         return {
-            content: [{ type: 'text', text: JSON.stringify({ script }) }],
+            content: [{ type: 'text', text: JSON.stringify({ script, actions, start_url: startUrl }) }],
         };
     }
     if (name === 'start_recording_debug') {
@@ -447,10 +496,95 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
             // Page may be closed
         }
         const script = buildPlaywrightScript(session.startUrl, actions);
+        const startUrl = session.startUrl;
         debugSessions.delete(sessionId);
         // Note: do NOT close the browser since we connected to an existing Chrome
         return {
-            content: [{ type: 'text', text: JSON.stringify({ script, target_object: targetObject }) }],
+            content: [{ type: 'text', text: JSON.stringify({ script, actions, start_url: startUrl, target_object: targetObject }) }],
+        };
+    }
+    if (name === 'run_replay') {
+        const startUrl = args?.start_url ?? 'https://example.com';
+        const actions = args?.actions ?? [];
+        const sessionId = crypto.randomUUID();
+        const browser = await playwright_1.chromium.launch({ headless: false });
+        const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+        const page = await context.newPage();
+        const replaySession = {
+            sessionId, browser, context, page,
+            screenshotTimer: null, clients: new Set(),
+            done: false,
+        };
+        replaySessions.set(sessionId, replaySession);
+        startReplayScreenshotStream(replaySession);
+        const uiUrl = `http://localhost:${HTTP_PORT}/?session=${encodeURIComponent(sessionId)}`;
+        // Execute actions in background
+        (async () => {
+            try {
+                await page.goto(startUrl);
+                for (const action of actions) {
+                    const trimmed = action.trim();
+                    if (!trimmed || trimmed.startsWith('//'))
+                        continue;
+                    // eslint-disable-next-line no-new-func
+                    const fn = new Function('page', `return (async () => { ${trimmed} })()`);
+                    await fn(page);
+                }
+                const result = await page.evaluate(() => {
+                    const sel = window.getSelection();
+                    const activeEl = document.activeElement;
+                    let activeElement = null;
+                    if (activeEl && activeEl !== document.body && activeEl !== document.documentElement) {
+                        const el = activeEl;
+                        activeElement = {
+                            tag: el.tagName.toLowerCase(),
+                            value: el.value ?? null,
+                            text: el.textContent?.trim().substring(0, 500) ?? null,
+                        };
+                    }
+                    return {
+                        selected_text: sel?.toString() ?? '',
+                        active_element: activeElement,
+                        url: window.location.href,
+                    };
+                });
+                replaySession.result = result;
+            }
+            catch (err) {
+                replaySession.error = String(err);
+            }
+            finally {
+                replaySession.done = true;
+            }
+        })();
+        return {
+            content: [{ type: 'text', text: JSON.stringify({ session_id: sessionId, ui_url: uiUrl }) }],
+        };
+    }
+    if (name === 'check_replay') {
+        const sessionId = args?.session_id ?? '';
+        const replaySession = replaySessions.get(sessionId);
+        if (!replaySession) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({ error: 'replay session not found', done: true }) }],
+                isError: true,
+            };
+        }
+        if (!replaySession.done) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({ done: false }) }],
+            };
+        }
+        // Done: clean up
+        if (replaySession.screenshotTimer)
+            clearInterval(replaySession.screenshotTimer);
+        for (const client of replaySession.clients)
+            client.close();
+        await replaySession.context.close();
+        await replaySession.browser.close();
+        replaySessions.delete(sessionId);
+        return {
+            content: [{ type: 'text', text: JSON.stringify({ done: true, result: replaySession.result, error: replaySession.error }) }],
         };
     }
     return {
@@ -484,7 +618,33 @@ async function injectDebugRecorder(page) {
             }
             return null;
         }
+        // Track mouse drag for text selection recording
+        let __mouseDownX = 0, __mouseDownY = 0, __isDragSelect = false;
+        document.addEventListener('mousedown', (e) => {
+            __mouseDownX = Math.round(e.clientX);
+            __mouseDownY = Math.round(e.clientY);
+            __isDragSelect = false;
+        }, true);
+        document.addEventListener('mouseup', (e) => {
+            const dx = Math.abs(Math.round(e.clientX) - __mouseDownX);
+            const dy = Math.abs(Math.round(e.clientY) - __mouseDownY);
+            if (dx > 5 || dy > 5) {
+                const sel = window.getSelection();
+                if (sel && sel.toString().trim()) {
+                    __isDragSelect = true;
+                    const ex = Math.round(e.clientX), ey = Math.round(e.clientY);
+                    actions.push(`  await page.mouse.move(${__mouseDownX}, ${__mouseDownY});`);
+                    actions.push(`  await page.mouse.down();`);
+                    actions.push(`  await page.mouse.move(${ex}, ${ey});`);
+                    actions.push(`  await page.mouse.up();`);
+                }
+            }
+        }, true);
         document.addEventListener('click', (e) => {
+            if (__isDragSelect) {
+                __isDragSelect = false;
+                return;
+            }
             const target = e.target;
             const sel = getSelector(target);
             if (sel) {

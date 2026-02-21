@@ -100,6 +100,12 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 // used by replay want type. Returns the matching Want and action string, or (nil, "") if no match.
 func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) {
 	// Check longer suffixes first to avoid ambiguity
+	if strings.HasSuffix(id, "-replay") {
+		baseID := strings.TrimSuffix(id, "-replay")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "start_replay"
+		}
+	}
 	if strings.HasSuffix(id, "-debug-start") {
 		baseID := strings.TrimSuffix(id, "-debug-start")
 		if want := s.findWantByIDOrName(baseID); want != nil {
@@ -156,6 +162,12 @@ func (s *Server) handleReplayWebhook(w http.ResponseWriter, want *mywant.Want, a
 			"action_by_agent":                "webhook_handler",
 		})
 		log.Printf("[REPLAY-WEBHOOK] stop_debug_recording signal set for want %s\n", want.Metadata.ID)
+	case "start_replay":
+		want.StoreStateMultiForAgent(map[string]any{
+			"start_replay_requested": true,
+			"action_by_agent":        "webhook_handler",
+		})
+		log.Printf("[REPLAY-WEBHOOK] start_replay signal set for want %s\n", want.Metadata.ID)
 	}
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "action": action})
 }

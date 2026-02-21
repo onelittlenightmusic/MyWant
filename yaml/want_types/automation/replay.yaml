@@ -135,6 +135,60 @@ wantType:
     persistent: true
     initialValue: ''
 
+  - name: replayWebhookId
+    description: Webhook ID for triggering replay ("want-id-replay")
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: start_replay_requested
+    description: Signal set by replay webhook; consumed by MonitorAgent
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: replay_active
+    description: True while replay is executing in the background
+    type: bool
+    persistent: true
+    initialValue: false
+
+  - name: replay_session_id
+    description: Session ID for the active replay
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_iframe_url
+    description: URL of the MCP App UI iframe showing the replay
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_result
+    description: JSON result captured after replay (selected_text, active_element, url)
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_error
+    description: Error message if replay failed
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_actions
+    description: JSON array of raw recorded action strings used for replay
+    type: string
+    persistent: true
+    initialValue: ''
+
+  - name: replay_start_url
+    description: Starting URL for replay execution
+    type: string
+    persistent: true
+    initialValue: ''
+
   requires:
     - playwright_recording
 

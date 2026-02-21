@@ -42,14 +42,15 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	startID, _ := want.GetStateString("startWebhookId", "")
 	if startID == "" {
 		want.StoreStateMultiForAgent(map[string]any{
-			"startWebhookId":       want.Metadata.ID + "-start",
-			"stopWebhookId":        want.Metadata.ID + "-stop",
-			"debugStartWebhookId":  want.Metadata.ID + "-debug-start",
-			"debugStopWebhookId":   want.Metadata.ID + "-debug-stop",
-			"action_by_agent":      playwrightRecordAgentName,
+			"startWebhookId":      want.Metadata.ID + "-start",
+			"stopWebhookId":       want.Metadata.ID + "-stop",
+			"debugStartWebhookId": want.Metadata.ID + "-debug-start",
+			"debugStopWebhookId":  want.Metadata.ID + "-debug-stop",
+			"replayWebhookId":     want.Metadata.ID + "-replay",
+			"action_by_agent":     playwrightRecordAgentName,
 		})
-		want.StoreLog("[PLAYWRIGHT-RECORD] Registered webhook IDs: %s-start / %s-stop / %s-debug-start / %s-debug-stop",
-			want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID)
+		want.StoreLog("[PLAYWRIGHT-RECORD] Registered webhook IDs: %s-start / %s-stop / %s-debug-start / %s-debug-stop / %s-replay",
+			want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID)
 		return nil
 	}
 
@@ -59,7 +60,10 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	debugActive, _ := want.GetState("debug_recording_active")
 	isDebugActive, _ := debugActive.(bool)
 
-	if !isActive && !isDebugActive {
+	replayActive, _ := want.GetState("replay_active")
+	isReplayActive, _ := replayActive.(bool)
+
+	if !isActive && !isDebugActive && !isReplayActive {
 		// Waiting for normal start signal
 		startReq, _ := want.GetState("start_recording_requested")
 		if req, ok := startReq.(bool); ok && req {
@@ -71,6 +75,12 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 		if req, ok := debugStartReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_debug_recording_requested=true, starting debug recording...")
 			return startDebugRecording(ctx, want)
+		}
+		// Waiting for replay signal
+		replayReq, _ := want.GetState("start_replay_requested")
+		if req, ok := replayReq.(bool); ok && req {
+			want.StoreLog("[PLAYWRIGHT-RECORD] start_replay_requested=true, starting replay...")
+			return startReplay(ctx, want)
 		}
 		// Idle - nothing to do
 		return nil
@@ -96,6 +106,11 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 		}
 		want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording active, waiting for finish signal...")
 		return nil
+	}
+
+	if isReplayActive {
+		// Replay in progress - poll for completion
+		return pollReplay(ctx, want)
 	}
 
 	return nil
@@ -225,11 +240,14 @@ func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 		return fmt.Errorf("stop_recording MCP tool failed: %w", err)
 	}
 
-	script := parseStopRecordingResult(result)
+	script, actions, startURL := parseStopRecordingResult(result)
 	want.StoreLog("[PLAYWRIGHT-RECORD] Recording stopped, script length=%d bytes", len(script))
 
+	actionsJSON, _ := json.Marshal(actions)
 	want.StoreStateMultiForAgent(map[string]any{
 		"replay_script":            script,
+		"replay_actions":           string(actionsJSON),
+		"replay_start_url":         startURL,
 		"recording_active":         false,
 		"stop_recording_requested": false,
 		"action_by_agent":          playwrightRecordAgentName,
@@ -339,11 +357,14 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 		return fmt.Errorf("stop_recording_debug MCP tool failed: %w", err)
 	}
 
-	script, targetObject := parseDebugStopResult(result)
+	script, actions, startURL, targetObject := parseDebugStopResult(result)
 	want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording stopped, script=%d bytes target_object=%v", len(script), targetObject != nil)
 
+	actionsJSON, _ := json.Marshal(actions)
 	stateUpdate := map[string]any{
 		"replay_script":                  script,
+		"replay_actions":                 string(actionsJSON),
+		"replay_start_url":               startURL,
 		"debug_recording_active":         false,
 		"stop_debug_recording_requested": false,
 		"action_by_agent":                playwrightRecordAgentName,
@@ -353,6 +374,109 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 	}
 	want.StoreStateMultiForAgent(stateUpdate)
 	want.SetStatus(mywant.WantStatusAchieved)
+	return nil
+}
+
+// startReplay launches a replay session via the run_replay MCP tool.
+func startReplay(ctx context.Context, want *mywant.Want) error {
+	actionsJSON, _ := want.GetStateString("replay_actions", "[]")
+	startURL, _ := want.GetStateString("replay_start_url", "")
+	if startURL == "" {
+		startURL = want.GetStringParam("target_url", "https://example.com")
+	}
+
+	var actions []string
+	if err := json.Unmarshal([]byte(actionsJSON), &actions); err != nil || len(actions) == 0 {
+		want.StoreLog("[PLAYWRIGHT-RECORD] No replay_actions available for replay")
+		want.StoreStateMultiForAgent(map[string]any{"start_replay_requested": false, "action_by_agent": playwrightRecordAgentName})
+		return nil
+	}
+
+	serverPath := resolvePlaywrightServerPath()
+	if serverPath == "" {
+		return fmt.Errorf("[PLAYWRIGHT-RECORD] playwright-app server not found")
+	}
+	mgr := GetNativeMCPManager(ctx)
+	if err := ensurePlaywrightServer(ctx, serverPath, false); err != nil {
+		return err
+	}
+
+	want.StoreLog("[PLAYWRIGHT-RECORD] Starting replay: start_url=%s actions=%d", startURL, len(actions))
+	toolCtx, toolCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer toolCancel()
+	result, err := mgr.ExecuteTool(toolCtx, "playwright-mcp-app", "node", []string{serverPath},
+		"run_replay", map[string]any{"start_url": startURL, "actions": actions})
+	if err != nil {
+		return fmt.Errorf("run_replay MCP tool failed: %w", err)
+	}
+
+	sessionID, uiURL := parseStartRecordingResult(result)
+	if sessionID == "" {
+		return fmt.Errorf("run_replay returned no session_id")
+	}
+
+	want.StoreLog("[PLAYWRIGHT-RECORD] Replay started: session=%s ui=%s", sessionID, uiURL)
+	want.StoreStateMultiForAgent(map[string]any{
+		"replay_session_id":     sessionID,
+		"replay_iframe_url":     uiURL,
+		"replay_active":         true,
+		"start_replay_requested": false,
+		"action_by_agent":       playwrightRecordAgentName,
+	})
+	return nil
+}
+
+// pollReplay checks the replay status via check_replay MCP tool.
+func pollReplay(ctx context.Context, want *mywant.Want) error {
+	sessionID, _ := want.GetStateString("replay_session_id", "")
+	if sessionID == "" {
+		want.StoreStateMultiForAgent(map[string]any{"replay_active": false, "action_by_agent": playwrightRecordAgentName})
+		return nil
+	}
+
+	serverPath := resolvePlaywrightServerPath()
+	mgr := GetNativeMCPManager(ctx)
+
+	toolCtx, toolCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer toolCancel()
+	result, err := mgr.ExecuteTool(toolCtx, "playwright-mcp-app", "node", []string{serverPath},
+		"check_replay", map[string]any{"session_id": sessionID})
+	if err != nil {
+		want.StoreLog("[PLAYWRIGHT-RECORD] check_replay error: %v", err)
+		return nil
+	}
+
+	texts := flattenMCPContent(result.Content)
+	for _, text := range texts {
+		var inner struct {
+			Done   bool           `json:"done"`
+			Result map[string]any `json:"result"`
+			Error  string         `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(text), &inner); err == nil {
+			if !inner.Done {
+				want.StoreLog("[PLAYWRIGHT-RECORD] Replay in progress...")
+				return nil
+			}
+			// Replay complete
+			replayResultJSON, _ := json.Marshal(inner.Result)
+			stateUpdate := map[string]any{
+				"replay_active":     false,
+				"replay_session_id": "",
+				"replay_iframe_url": "",
+				"action_by_agent":   playwrightRecordAgentName,
+			}
+			if inner.Error != "" {
+				stateUpdate["replay_error"] = inner.Error
+				want.StoreLog("[PLAYWRIGHT-RECORD] Replay failed: %s", inner.Error)
+			} else {
+				stateUpdate["replay_result"] = string(replayResultJSON)
+				want.StoreLog("[PLAYWRIGHT-RECORD] Replay complete: result=%s", string(replayResultJSON))
+			}
+			want.StoreStateMultiForAgent(stateUpdate)
+			return nil
+		}
+	}
 	return nil
 }
 
@@ -419,41 +543,44 @@ func extractMCPErrorText(result *mcp.CallToolResult) string {
 	return "unknown error"
 }
 
-// parseDebugStopResult extracts the Playwright script and target_object from stop_recording_debug result.
-func parseDebugStopResult(result *mcp.CallToolResult) (script string, targetObject map[string]any) {
+// parseDebugStopResult extracts the Playwright script, raw actions, startURL, and target_object from stop_recording_debug result.
+func parseDebugStopResult(result *mcp.CallToolResult) (script string, actions []string, startURL string, targetObject map[string]any) {
 	if result == nil {
-		return "", nil
+		return "", nil, "", nil
 	}
 	texts := flattenMCPContent(result.Content)
 	for _, text := range texts {
 		var inner struct {
 			Script       string         `json:"script"`
+			Actions      []string       `json:"actions"`
+			StartURL     string         `json:"start_url"`
 			TargetObject map[string]any `json:"target_object"`
 		}
 		if err := json.Unmarshal([]byte(text), &inner); err == nil && inner.Script != "" {
-			return inner.Script, inner.TargetObject
+			return inner.Script, inner.Actions, inner.StartURL, inner.TargetObject
 		}
 	}
-	return "", nil
+	return "", nil, "", nil
 }
 
-// parseStopRecordingResult extracts the Playwright script from MCP CallToolResult content.
-func parseStopRecordingResult(result *mcp.CallToolResult) string {
+// parseStopRecordingResult extracts the Playwright script, raw actions, and startURL from stop_recording result.
+func parseStopRecordingResult(result *mcp.CallToolResult) (script string, actions []string, startURL string) {
 	if result == nil {
-		return ""
+		return "", nil, ""
 	}
 	texts := flattenMCPContent(result.Content)
 	for _, text := range texts {
 		var inner struct {
-			Script string `json:"script"`
+			Script   string   `json:"script"`
+			Actions  []string `json:"actions"`
+			StartURL string   `json:"start_url"`
 		}
 		if err := json.Unmarshal([]byte(text), &inner); err == nil && inner.Script != "" {
-			return inner.Script
+			return inner.Script, inner.Actions, inner.StartURL
 		}
-		// Return raw text if not JSON-wrapped
 		if text != "" {
-			return text
+			return text, nil, ""
 		}
 	}
-	return ""
+	return "", nil, ""
 }
