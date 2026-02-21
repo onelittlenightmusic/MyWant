@@ -78,6 +78,7 @@ debug_repro.txt
 demo-restart.sh
 *.json
 !mcp/playwright-app/package.json
+!mcp/playwright-app/tsconfig.json
 demo_*.yaml
 
 # Demo binaries
