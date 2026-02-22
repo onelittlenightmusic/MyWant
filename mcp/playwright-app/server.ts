@@ -46,12 +46,14 @@ interface DebugRecordingSession {
   allActions: string[];    // accumulated actions across all page navigations
   pollTimer: ReturnType<typeof setInterval>;
   lastActionIndex: number; // index into current page's actions array
+  lastKnownUrl: string;   // tracks URL to detect page navigations
 }
 
 interface ReplayResult {
   selected_text: string;
   active_element: Record<string, any> | null;
   url: string;
+  screenshot_path?: string;
 }
 
 interface ReplaySession {
@@ -483,6 +485,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       allActions: [],
       pollTimer: null as any,
       lastActionIndex: 0,
+      lastKnownUrl: startUrl,
     };
 
     const pollTimer = setInterval(async () => {
@@ -495,6 +498,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const newActions = currentActions.slice(session.lastActionIndex);
           session.allActions.push(...newActions);
           session.lastActionIndex = currentActions.length;
+        }
+        // Detect page navigation by URL change and record page.goto()
+        const currentUrl = page.url();
+        if (currentUrl && currentUrl !== 'about:blank' && currentUrl !== session.lastKnownUrl) {
+          session.allActions.push(`  await page.goto(${JSON.stringify(currentUrl)});`);
+          session.lastKnownUrl = currentUrl;
+          session.lastActionIndex = 0; // reset for new page's recorder
         }
         // Re-inject recorder (handles post-navigation page context reset)
         await injectDebugRecorder(page);
@@ -585,7 +595,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const actions = (args?.actions as string[] | undefined) ?? [];
     const sessionId = crypto.randomUUID();
 
-    const browser = await chromium.launch({ headless: false });
+    const browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
 
@@ -610,7 +620,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const fn = new Function('page', `return (async () => { ${trimmed} })()`);
           await (fn as (p: typeof page) => Promise<void>)(page);
         }
-        const result: ReplayResult = await page.evaluate(() => {
+        const evalResult = await page.evaluate(() => {
           const sel = window.getSelection();
           const activeEl = document.activeElement;
           let activeElement: Record<string, any> | null = null;
@@ -628,6 +638,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             url: window.location.href,
           };
         });
+        const screenshotBuf = await page.screenshot({ type: 'png' });
+        let screenshotPath: string | undefined;
+        try {
+          const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '/tmp';
+          const screenshotDir = `${homeDir}/.mywant/screenshots`;
+          fs.mkdirSync(screenshotDir, { recursive: true });
+          screenshotPath = `${screenshotDir}/${sessionId}.png`;
+          fs.writeFileSync(screenshotPath, screenshotBuf);
+        } catch {
+          screenshotPath = undefined;
+        }
+        const result: ReplayResult = {
+          ...evalResult,
+          ...(screenshotPath ? { screenshot_path: screenshotPath } : {}),
+        };
         replaySession.result = result;
       } catch (err) {
         replaySession.error = String(err);

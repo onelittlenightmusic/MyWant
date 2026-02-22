@@ -147,6 +147,9 @@ func (s *Server) setupRoutes() {
 	webhooks.HandleFunc("", s.listWebhookEndpoints).Methods("GET")
 	webhooks.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
+	// Screenshots (replay)
+	api.HandleFunc("/screenshots/{filename}", s.serveReplayScreenshot).Methods("GET")
+
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 

@@ -177,6 +177,12 @@ wantType:
     persistent: true
     initialValue: ''
 
+  - name: replay_screenshot_url
+    description: API URL of the screenshot taken at the end of replay
+    type: string
+    persistent: true
+    initialValue: ''
+
   - name: replay_actions
     description: JSON array of raw recorded action strings used for replay
     type: string

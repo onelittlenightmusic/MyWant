@@ -721,6 +721,33 @@ func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Screenshots
+func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	// Basic safety check: only allow alphanumeric, hyphens, underscores, dots
+	for _, c := range filename {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
+			http.Error(w, "invalid filename", http.StatusBadRequest)
+			return
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	filePath := home + "/.mywant/screenshots/" + filename
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "max-age=86400")
+	w.Write(data)
+}
+
 // Error Logging Helper
 func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData any) {
 	entry := ErrorHistoryEntry{

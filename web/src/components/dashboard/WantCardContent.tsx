@@ -62,6 +62,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     if (!replayResultRaw) return null;
     try { return JSON.parse(replayResultRaw); } catch { return null; }
   })();
+  const replayScreenshotUrl = want.state?.replay_screenshot_url as string | undefined;
 
 
   // Webhook IDs: prefer state value (set by MonitorAgent), fall back to predictable pattern from want ID.
@@ -521,6 +522,13 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             )}
             {replayResult.url && (
               <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 truncate">URL: {replayResult.url}</p>
+            )}
+            {replayScreenshotUrl && (
+              <img
+                src={replayScreenshotUrl}
+                alt="Replay screenshot"
+                className="mt-2 w-full rounded border border-green-200 dark:border-green-800"
+              />
             )}
           </div>
         </div>

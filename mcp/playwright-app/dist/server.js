@@ -51,6 +51,7 @@ const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
 const playwright_1 = require("playwright");
 const ws_1 = require("ws");
 const http = __importStar(require("http"));
+const fs = __importStar(require("fs"));
 const crypto = __importStar(require("crypto"));
 const sessions = new Map();
 const debugSessions = new Map();
@@ -433,6 +434,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
             allActions: [],
             pollTimer: null,
             lastActionIndex: 0,
+            lastKnownUrl: startUrl,
         };
         const pollTimer = setInterval(async () => {
             try {
@@ -442,6 +444,13 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
                     const newActions = currentActions.slice(session.lastActionIndex);
                     session.allActions.push(...newActions);
                     session.lastActionIndex = currentActions.length;
+                }
+                // Detect page navigation by URL change and record page.goto()
+                const currentUrl = page.url();
+                if (currentUrl && currentUrl !== 'about:blank' && currentUrl !== session.lastKnownUrl) {
+                    session.allActions.push(`  await page.goto(${JSON.stringify(currentUrl)});`);
+                    session.lastKnownUrl = currentUrl;
+                    session.lastActionIndex = 0; // reset for new page's recorder
                 }
                 // Re-inject recorder (handles post-navigation page context reset)
                 await injectDebugRecorder(page);
@@ -521,7 +530,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
         const startUrl = args?.start_url ?? 'https://example.com';
         const actions = args?.actions ?? [];
         const sessionId = crypto.randomUUID();
-        const browser = await playwright_1.chromium.launch({ headless: false });
+        const browser = await playwright_1.chromium.launch({ headless: true });
         const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
         const page = await context.newPage();
         const replaySession = {
@@ -544,7 +553,7 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
                     const fn = new Function('page', `return (async () => { ${trimmed} })()`);
                     await fn(page);
                 }
-                const result = await page.evaluate(() => {
+                const evalResult = await page.evaluate(() => {
                     const sel = window.getSelection();
                     const activeEl = document.activeElement;
                     let activeElement = null;
@@ -562,6 +571,22 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
                         url: window.location.href,
                     };
                 });
+                const screenshotBuf = await page.screenshot({ type: 'png' });
+                let screenshotPath;
+                try {
+                    const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '/tmp';
+                    const screenshotDir = `${homeDir}/.mywant/screenshots`;
+                    fs.mkdirSync(screenshotDir, { recursive: true });
+                    screenshotPath = `${screenshotDir}/${sessionId}.png`;
+                    fs.writeFileSync(screenshotPath, screenshotBuf);
+                }
+                catch {
+                    screenshotPath = undefined;
+                }
+                const result = {
+                    ...evalResult,
+                    ...(screenshotPath ? { screenshot_path: screenshotPath } : {}),
+                };
                 replaySession.result = result;
             }
             catch (err) {

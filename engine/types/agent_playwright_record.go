@@ -473,6 +473,18 @@ func pollReplay(ctx context.Context, want *mywant.Want) error {
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay failed: %s", inner.Error)
 			} else {
 				stateUpdate["replay_result"] = string(replayResultJSON)
+				// Set final_result to the selected_text from the replay result
+				if selectedText, ok := inner.Result["selected_text"].(string); ok && selectedText != "" {
+					stateUpdate["final_result"] = selectedText
+				}
+				// Move screenshot from MCP-written path to want-specific path
+				if screenshotPath, ok := inner.Result["screenshot_path"].(string); ok && screenshotPath != "" {
+					if screenshotURL, err := moveReplayScreenshot(screenshotPath, want.Metadata.ID); err == nil {
+						stateUpdate["replay_screenshot_url"] = screenshotURL
+					} else {
+						want.StoreLog("[PLAYWRIGHT-RECORD] Failed to save screenshot: %s", err)
+					}
+				}
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay complete: result=%s", string(replayResultJSON))
 			}
 			want.StoreStateMultiForAgent(stateUpdate)
@@ -480,6 +492,33 @@ func pollReplay(ctx context.Context, want *mywant.Want) error {
 		}
 	}
 	return nil
+}
+
+// moveReplayScreenshot moves the MCP-written screenshot to ~/.mywant/screenshots/<wantID>.png.
+// Returns the API URL path for serving the image.
+func moveReplayScreenshot(srcPath, wantID string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine home dir: %w", err)
+	}
+	dir := filepath.Join(home, ".mywant", "screenshots")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("could not create screenshots dir: %w", err)
+	}
+	filename := wantID + ".png"
+	dstPath := filepath.Join(dir, filename)
+	// Try rename first (same filesystem), fall back to copy
+	if err := os.Rename(srcPath, dstPath); err != nil {
+		data, readErr := os.ReadFile(srcPath)
+		if readErr != nil {
+			return "", fmt.Errorf("could not read screenshot: %w", readErr)
+		}
+		if writeErr := os.WriteFile(dstPath, data, 0644); writeErr != nil {
+			return "", fmt.Errorf("could not write screenshot: %w", writeErr)
+		}
+		os.Remove(srcPath)
+	}
+	return "/api/v1/screenshots/" + filename, nil
 }
 
 // resolvePlaywrightServerPath returns the absolute path to the playwright-app server.js.
