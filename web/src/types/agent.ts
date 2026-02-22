@@ -1,20 +1,20 @@
 export interface Agent {
   name: string;
-  type: 'do' | 'monitor';
+  type: 'do' | 'monitor' | 'think';
   capabilities: string[];
   uses: string[];
 }
 
 export interface AgentResponse {
   name: string;
-  type: 'do' | 'monitor';
+  type: 'do' | 'monitor' | 'think';
   capabilities: string[];
   uses: string[];
 }
 
 export interface CreateAgentRequest {
   name: string;
-  type: 'do' | 'monitor';
+  type: 'do' | 'monitor' | 'think';
   capabilities: string[];
   uses: string[];
 }

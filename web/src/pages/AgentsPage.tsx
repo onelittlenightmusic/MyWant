@@ -35,7 +35,7 @@ export const AgentsPage: React.FC = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilters, setTypeFilters] = useState<('do' | 'monitor')[]>([]);
+  const [typeFilters, setTypeFilters] = useState<('do' | 'monitor' | 'think')[]>([]);
 
   // Load initial data
   useEffect(() => {

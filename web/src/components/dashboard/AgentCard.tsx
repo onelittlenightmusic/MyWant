@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Edit, Trash2, MoreHorizontal, Bot, Monitor, Zap, Settings } from 'lucide-react';
+import { Eye, Edit, Trash2, MoreHorizontal, Bot, Monitor, Zap, Settings, Brain } from 'lucide-react';
 import { Agent } from '@/types/agent';
 import { truncateText, classNames } from '@/utils/helpers';
 
@@ -53,6 +53,8 @@ export const AgentCard: React.FC<AgentCardProps> = ({
         return <Zap className="h-4 w-4" />;
       case 'monitor':
         return <Monitor className="h-4 w-4" />;
+      case 'think':
+        return <Brain className="h-4 w-4" />;
       default:
         return <Bot className="h-4 w-4" />;
     }
@@ -64,6 +66,8 @@ export const AgentCard: React.FC<AgentCardProps> = ({
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
       case 'monitor':
         return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      case 'think':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }

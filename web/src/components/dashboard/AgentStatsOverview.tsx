@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Zap, Eye, Target } from 'lucide-react';
+import { Bot, Zap, Eye, Target, Brain } from 'lucide-react';
 import { AgentResponse } from '@/types/agent';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -40,7 +40,7 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
   if (loading && agents.length === 0) {
     return (
       <div className={gridClass}>
-        {[...Array(4)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center justify-center h-16">
               <LoadingSpinner size="md" />
@@ -55,6 +55,7 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
     total: agents.length,
     doAgents: agents.filter(a => a.type === 'do').length,
     monitorAgents: agents.filter(a => a.type === 'monitor').length,
+    thinkAgents: agents.filter(a => a.type === 'think').length,
     totalCapabilities: agents.reduce((acc, agent) => acc + agent.capabilities.length, 0)
   };
 
@@ -74,8 +75,14 @@ export const AgentStatsOverview: React.FC<AgentStatsOverviewProps> = ({ agents, 
     {
       title: 'Monitor Agents',
       value: stats.monitorAgents,
+      color: 'bg-teal-100 dark:bg-teal-900/30',
+      icon: <Eye className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+    },
+    {
+      title: 'Think Agents',
+      value: stats.thinkAgents,
       color: 'bg-purple-100 dark:bg-purple-900/30',
-      icon: <Eye className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+      icon: <Brain className="h-6 w-6 text-purple-600 dark:text-purple-400" />
     },
     {
       title: 'Total Capabilities',

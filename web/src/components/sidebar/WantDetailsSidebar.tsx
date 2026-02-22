@@ -1360,7 +1360,13 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
                           <div className="flex items-center justify-between mb-2">
                             <span className="font-medium text-gray-800 dark:text-gray-200">{execution.agent_name}</span>
                             <div className="flex items-center space-x-2">
-                              <span className="text-gray-500 dark:text-gray-400 text-xs">{execution.agent_type}</span>
+                              <span className={classNames(
+                                'text-xs px-1.5 py-0.5 rounded font-medium',
+                                execution.agent_type === 'do' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                                execution.agent_type === 'monitor' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                                execution.agent_type === 'think' && 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+                                !['do', 'monitor', 'think'].includes(execution.agent_type) && 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                              )}>{execution.agent_type}</span>
                               <div className={classNames(
                                 'w-2 h-2 rounded-full',
                                 execution.status === 'achieved' && 'bg-green-500',

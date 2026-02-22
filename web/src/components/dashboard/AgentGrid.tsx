@@ -7,7 +7,7 @@ interface AgentGridProps {
   agents: AgentResponse[];
   loading: boolean;
   searchQuery: string;
-  typeFilters: ('do' | 'monitor')[];
+  typeFilters: ('do' | 'monitor' | 'think')[];
   selectedAgent?: AgentResponse | null;
   onViewAgent: (agent: AgentResponse) => void;
   onEditAgent: (agent: AgentResponse) => void;

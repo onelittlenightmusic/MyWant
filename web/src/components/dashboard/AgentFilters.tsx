@@ -1,7 +1,7 @@
-import { Search, Filter, X, Monitor, Zap } from 'lucide-react';
+import { Search, Filter, X, Monitor, Zap, Brain } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
-type AgentType = 'do' | 'monitor';
+type AgentType = 'do' | 'monitor' | 'think';
 
 interface AgentFiltersProps {
   searchQuery: string;
@@ -12,7 +12,8 @@ interface AgentFiltersProps {
 
 const TYPE_OPTIONS: { value: AgentType; label: string; icon: React.ElementType; color: string }[] = [
   { value: 'do', label: 'Do Agent', icon: Zap, color: 'blue' },
-  { value: 'monitor', label: 'Monitor Agent', icon: Monitor, color: 'green' }
+  { value: 'monitor', label: 'Monitor Agent', icon: Monitor, color: 'green' },
+  { value: 'think', label: 'Think Agent', icon: Brain, color: 'purple' }
 ];
 
 export const AgentFilters: React.FC<AgentFiltersProps> = ({
