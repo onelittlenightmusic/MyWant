@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera } from 'lucide-react';
 import { Want } from '@/types/want';
@@ -132,6 +132,23 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const [showScreenshotBubble, setShowScreenshotBubble] = useState(false);
   const [replayBubbleStyle, setReplayBubbleStyle] = useState<React.CSSProperties>({});
   const [screenshotBubbleStyle, setScreenshotBubbleStyle] = useState<React.CSSProperties>({});
+  const replayBubbleRef = useRef<HTMLDivElement>(null);
+  const screenshotBubbleRef = useRef<HTMLDivElement>(null);
+
+  // Close bubbles on outside click
+  useEffect(() => {
+    if (!showReplayBubble && !showScreenshotBubble) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (showReplayBubble && replayBubbleRef.current && !replayBubbleRef.current.contains(e.target as Node)) {
+        setShowReplayBubble(false);
+      }
+      if (showScreenshotBubble && screenshotBubbleRef.current && !screenshotBubbleRef.current.contains(e.target as Node)) {
+        setShowScreenshotBubble(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [showReplayBubble, showScreenshotBubble]);
 
   // Auto-close replay bubble when replay finishes
   useEffect(() => {
@@ -671,6 +688,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {/* Floating Replay Bubble - portal, no backdrop, anchored near card */}
       {showReplayBubble && createPortal(
         <div
+          ref={replayBubbleRef}
           className="z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
           style={replayBubbleStyle}
         >
@@ -712,6 +730,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {/* Floating Screenshot Bubble - portal, no backdrop, anchored near card */}
       {showScreenshotBubble && replayScreenshotUrl && createPortal(
         <div
+          ref={screenshotBubbleRef}
           className="z-[9999] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden"
           style={screenshotBubbleStyle}
         >
