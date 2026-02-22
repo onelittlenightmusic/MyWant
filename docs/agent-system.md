@@ -35,6 +35,134 @@ The MyWant Agent System provides capability-based, autonomous agents that can ex
 - **Execution Characteristic**: **Persistent**. Registered via `AddBackgroundAgent()`, these agents are initialized when the want starts and remain active throughout the entire lifecycle of the want.
 - **Management**: Managed by the want's internal background registry with explicit `Start`/`Stop` signals.
 
+#### ThinkAgent
+- **Purpose**: React to state changes and propagate computed values across want boundaries.
+- **Examples**: Register in coordinator itinerary, await budget allocation, propagate reservation costs to parent want.
+- **Execution Characteristic**: **Background Ticker**. Registered via `AddBackgroundAgent()`, it runs a `ThinkFunc` on a configurable interval (default 2s). Unlike PollAgent, it has no explicit stop signal — it runs until the want terminates.
+- **State Access**: Reads and writes own State *and* reads/writes **ParentState** via `GetParentState()` / `MergeParentState()`, enabling cross-want coordination.
+- **Flush on Completion**: When a want achieves its goal, all ThinkAgents are **flushed** (run once synchronously) before being stopped — ensuring in-flight state updates are not lost even for wants that complete in a single Progress cycle.
+
+### State-Centric Architecture
+
+All agent types interact with a want's **State** as the central integration point. The diagrams below show each agent type's read/write access pattern and how ThinkAgent uniquely crosses want boundaries via **ParentState**.
+
+#### Agent–State Access Patterns
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                              Want                                     │
+│                                                                       │
+│  Triggered via ExecuteAgents()                                       │
+│  ┌──────────────────┐  write    ┌──────────────────────────────┐    │
+│  │    DoAgent       │──────────►│                              │    │
+│  │  (sync, one-shot)│           │           State              │    │
+│  └──────────────────┘           │        (key-value store)     │    │
+│                                 │                              │    │
+│  ┌──────────────────┐  r/w      │                              │    │
+│  │  MonitorAgent    │◄─────────►│                              │    │
+│  │ (async, contin.) │           │                              │    │
+│  └──────────────────┘           └──────────────────────────────┘    │
+│                                              ▲                       │
+│  Registered via AddBackgroundAgent()         │                       │
+│  ┌──────────────────┐  r/w                   │                       │
+│  │    PollAgent     │◄──────────────────────►│                       │
+│  │ (bg, stop signal)│                        │                       │
+│  └──────────────────┘                        │ read / write          │
+│                                              │                       │
+│  ┌──────────────────┐  r/w                   │                       │
+│  │   ThinkAgent     │◄──────────────────────►│                       │
+│  │ (bg ticker, 2s)  │                        │                       │
+│  └────────┬─────────┘                        │                       │
+│           │                                  │                       │
+└───────────┼──────────────────────────────────┴───────────────────────┘
+            │
+            │  GetParentState() / MergeParentState()
+            │  (ThinkAgent only)
+            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Parent Want State                             │
+│    e.g. itinerary, target_budgets, costs  (coordinator namespace)    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+#### Agent Access Pattern Summary
+
+| Agent Type | Trigger | Execution | Own State | Parent State |
+|:-----------|:--------|:----------|:----------|:-------------|
+| DoAgent | `ExecuteAgents()` | Sync, one-shot | write | — |
+| MonitorAgent | `ExecuteAgents()` | Async goroutine, continuous | read/write | — |
+| PollAgent | `AddBackgroundAgent()` | Persistent bg, stop signal | read/write | — |
+| **ThinkAgent** | `AddBackgroundAgent()` | **Persistent bg, ticker (2s)** | **read/write** | **read/write** |
+
+#### Parent–Child State Coordination
+
+When a want has a parent coordinator, ThinkAgents enable state sharing across the want hierarchy. The example below shows how `ConditionThinker` (on each child want) and `BudgetThinker` (on the budget want) collaborate through the coordinator's State:
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│                        Coordinator Want                                │
+│                                                                        │
+│  ┌─────────────────────────────────────────────────────────────┐      │
+│  │                         State                               │      │
+│  │  itinerary:      { hotel: {type, name}, flight: {...}, ... }│◄──┐  │
+│  │  target_budgets: { hotel: {budget:1666}, flight: {...}, ... }│   │  │
+│  │  costs:          { hotel: 450, flight: 800 }                 │   │  │
+│  └─────────────────────────────────────────────────────────────┘   │  │
+│          ▲ MergeParentState              │ GetParentState           │  │
+│          │                              │                  ThinkAgent  │
+│          │                     (BudgetThinker)             reads+writes│
+└──────────┼──────────────────────────────┼───────────────────────────┘
+           │                              │
+  ┌────────┼──────────────────────────────┼──────────────────┐
+  │        │       Child Want (hotel)     │                  │
+  │        │                             ▼                   │
+  │  ┌─────────────────────────────────────────────────────┐ │
+  │  │                      State                          │ │
+  │  │  good_to_reserve: true                              │ │
+  │  │  target_budget:   1666.67                           │◄┤ ThinkAgent
+  │  │  cost:            450.00                            │ │ (ConditionThinker)
+  │  │  _thinker_*:      (internal flags)                  │ │ reads+writes own
+  │  └─────────────────────────────────────────────────────┘ │ + parent state
+  └──────────────────────────────────────────────────────────┘
+```
+
+##### Coordination Sequence (ConditionThinker ↔ BudgetThinker)
+
+```
+Child ConditionThinker          Parent BudgetThinker
+        │                               │
+  [Phase 1: register]                   │
+        │                               │
+        ├─ MergeParentState ───────────►│  itinerary: {hotel: {type, name}}
+        │                               │
+        │                         [Phase 1: allocate]
+        │                               │
+        │                  GetParentState(itinerary)
+        │                               │
+        │                  MergeParentState ──────────► target_budgets: {hotel: {budget: 1666}}
+        │
+  [Phase 2: await budget]
+        │
+        ├── GetParentState(target_budgets) ──────────────────────────────►
+        │
+        ├─ StoreState ── good_to_reserve = true, target_budget = 1666
+        │
+  (DoAgent executes reservation)
+        │
+        ├─ StoreState ── cost = 450
+        │
+  [Phase 3: propagate cost]
+        │
+        ├─ MergeParentState ───────────►│  costs: {hotel: 450}
+        │                               │
+        │                         [Phase 2: aggregate]
+        │                               │
+        │                  GetParentState(costs)
+        │                               │
+        │                  StoreState ─────────────────► total_cost = 450
+        │                                                remaining_budget = 1216
+```
+
 ## Configuration
 
 ### Capability Definition (`yaml/capabilities/capability-*.yaml`)
@@ -238,6 +366,7 @@ want.CommitStateChanges()
 | :--- | :--- | :--- | :--- |
 | **Dynamic Task** | `ExecuteAgents()` | `DoAgent`, `MonitorAgent` | Triggered by want logic when specific capabilities are needed. |
 | **Persistent Task** | `AddBackgroundAgent()` | `BackgroundAgent`, `PollAgent` | Constant monitoring or system services that live as long as the want. |
+| **State-Reactive** | `AddBackgroundAgent()` | `ThinkAgent` | Ticker-based background loop that reads/writes own State and ParentState for cross-want coordination. |
 
 ### Status Transitions
 
@@ -359,7 +488,7 @@ Hotel reservation monitor checking status for want: luxury-hotel-booking
 2. **Validation Failures**
    - Ensure YAML follows OpenAPI schema
    - Check required fields are present
-   - Validate agent types are 'do' or 'monitor'
+   - Validate agent types are `do`, `monitor`, or `think`
 
 3. **State Not Updated**
    - Confirm agent calls `CommitStateChanges()`
