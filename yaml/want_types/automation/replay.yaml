@@ -213,7 +213,7 @@ wantType:
           debug_chrome_host: "192.168.2.212"
           debug_chrome_port: "9222"
 
-  - name: App Login Flow Recording
+  - name: Simple Browser Recording with Local Debug Chrome
     description: Records a login flow for automated replay testing
     want:
       metadata:
@@ -221,4 +221,6 @@ wantType:
         type: replay
       spec:
         params:
-          target_url: "https://myapp.example.com/login"
+          target_url: "https://www.google.com"
+          debug_chrome_host: "127.0.0.1"
+          debug_chrome_port: "9222"

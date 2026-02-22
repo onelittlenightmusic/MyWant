@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, Plus, X, Code, Edit3, ChevronDown, Clock, Bot } from 'lucide-react';
+import { Save, Plus, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -62,6 +62,9 @@ export const WantForm: React.FC<WantFormProps> = ({
   const schedulingSectionRef = useRef<HTMLButtonElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const lastFocusedFieldRef = useRef<HTMLElement | null>(null);
+  const exampleMenuRef = useRef<HTMLDivElement>(null);
+
+  const [showExampleMenu, setShowExampleMenu] = useState(false);
 
   // UI state
   const [editMode, setEditMode] = useState<'form' | 'yaml'>('form');
@@ -287,6 +290,18 @@ export const WantForm: React.FC<WantFormProps> = ({
     setApiError(null);
     setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
   };
+
+  // Close example menu on outside click
+  useEffect(() => {
+    if (!showExampleMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exampleMenuRef.current && !exampleMenuRef.current.contains(e.target as Node)) {
+        setShowExampleMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showExampleMenu]);
 
   // Update form when want type is selected
   useEffect(() => {
@@ -711,6 +726,46 @@ export const WantForm: React.FC<WantFormProps> = ({
 
         {error && (
           <ErrorDisplay error={error} />
+        )}
+
+        {/* Example loader button - bottom right, shown when want type with examples is selected */}
+        {selectedTypeId && selectedItemType === 'want-type' && editMode === 'form' &&
+          selectedWantType?.examples && selectedWantType.examples.length > 0 && (
+          <div className="sticky bottom-2 flex justify-end pointer-events-none">
+            <div ref={exampleMenuRef} className="relative pointer-events-auto">
+              {showExampleMenu && (
+                <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[220px] max-h-64 overflow-y-auto">
+                  <p className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+                    Load Example
+                  </p>
+                  {selectedWantType.examples.map((example, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        setParams(example.want?.spec?.params || {});
+                        setShowExampleMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
+                      {example.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowExampleMenu(v => !v)}
+                className="p-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                title="Load example"
+              >
+                <FolderOpen className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         )}
       </form>
     </RightSidebar>
