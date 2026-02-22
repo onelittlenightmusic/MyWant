@@ -146,7 +146,6 @@ func createFlight(ctx context.Context, want *Want) error {
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-	// Report cost to parent want for budget tracking
 	flightCost := want.GetFloatParam("cost", 1200.0)
 
 	want.StoreStateMultiForAgent(map[string]any{
@@ -177,10 +176,6 @@ func createFlight(ctx context.Context, want *Want) error {
 
 	want.StoreLog("Created flight reservation: %s (ID: %s, Status: %s)",
 		reservation.FlightNumber, reservation.ID, reservation.Status)
-
-	want.MergeParentState(map[string]any{
-		"costs": map[string]any{want.Metadata.Name: flightCost},
-	})
 
 	return nil
 }

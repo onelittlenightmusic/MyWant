@@ -143,6 +143,7 @@ components:
           enum:
             - "do"
             - "monitor"
+            - "think"
           example: "do"
         capabilities:
           type: array

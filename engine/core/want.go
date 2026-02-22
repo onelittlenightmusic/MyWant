@@ -780,6 +780,8 @@ func (n *Want) StartProgressionLoop(
 			// 8.6. Check if want is achieved AFTER execution cycle (catch state changes from Progress)
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
+				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)
+				n.FlushThinkingAgents(context.Background())
 				// Stop all background agents when want is achieved
 				if err := n.StopAllBackgroundAgents(); err != nil {
 					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
@@ -1041,6 +1043,11 @@ func (n *Want) getParentWant() *Want {
 }
 
 func (n *Want) GetParentWant() *Want { return n.getParentWant() }
+
+// HasParent returns true if this want has a parent coordinator.
+func (n *Want) HasParent() bool {
+	return n.getParentWant() != nil
+}
 
 func (n *Want) GetParentState(key string) (any, bool) {
 	parent := n.getParentWant()

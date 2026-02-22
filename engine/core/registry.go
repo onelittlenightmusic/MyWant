@@ -16,6 +16,7 @@ var (
 	doActionRegistry      = make(map[string]func(context.Context, *Want) error)
 	monitorActionRegistry = make(map[string]func(context.Context, *Want) error)
 	pollActionRegistry    = make(map[string]PollFunc)
+	thinkActionRegistry   = make(map[string]ThinkFunc)
 )
 
 // RegisterDoAgent registers a DoAgent implementation logic by agent name.
@@ -31,6 +32,11 @@ func RegisterMonitorAgent(agentName string, monitor func(context.Context, *Want)
 // RegisterPollAgent registers a PollAgent implementation logic by agent name.
 func RegisterPollAgent(agentName string, poll PollFunc) {
 	pollActionRegistry[agentName] = poll
+}
+
+// RegisterThinkAgent registers a ThinkAgent implementation logic by agent name.
+func RegisterThinkAgent(agentName string, think ThinkFunc) {
+	thinkActionRegistry[agentName] = think
 }
 
 // Global registry for agent implementation factories
@@ -106,6 +112,27 @@ func RegisterPollAgentType(name string, capabilities []Capability, poll PollFunc
 		agent := &PollAgent{
 			BaseAgent: *NewBaseAgent(name, capNames, MonitorAgentType),
 			Poll:      poll,
+		}
+		registry.RegisterAgent(agent)
+	})
+}
+
+// RegisterThinkAgentType is a declarative API that registers a ThinkAgent in one call.
+// It registers capabilities, creates the ThinkAgent, and wires it into the agent factory registry.
+func RegisterThinkAgentType(name string, capabilities []Capability, think ThinkFunc) {
+	RegisterThinkAgent(name, think)
+
+	capNames := make([]string, len(capabilities))
+	for i, c := range capabilities {
+		capNames[i] = c.Name
+	}
+	RegisterAgentImplementation(name, func(registry *AgentRegistry) {
+		for _, c := range capabilities {
+			registry.RegisterCapability(c)
+		}
+		agent := &ThinkAgent{
+			BaseAgent: *NewBaseAgent(name, capNames, ThinkAgentType),
+			Think:     think,
 		}
 		registry.RegisterAgent(agent)
 	})

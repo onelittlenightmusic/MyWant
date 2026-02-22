@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // AgentType defines the type of agent for execution strategies.
@@ -12,7 +13,12 @@ type AgentType string
 const (
 	DoAgentType      AgentType = "do"
 	MonitorAgentType AgentType = "monitor"
+	ThinkAgentType   AgentType = "think"
 )
+
+// ThinkFunc defines the signature for think logic executed by a ThinkingAgent.
+// Unlike PollFunc, it does not return shouldStop - the agent runs indefinitely.
+type ThinkFunc func(ctx context.Context, want *Want) error
 
 // AgentRuntime defines the runtime environment for the agent.
 type AgentRuntime string
@@ -153,6 +159,31 @@ func (a *PollAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 		return shouldStop, err
 	}
 	return false, fmt.Errorf("no poll function defined for PollAgent %s", a.Name)
+}
+
+// ThinkAgent implements an agent that reacts to state changes by running a ThinkFunc.
+// It is executed synchronously (like DoAgent) but registers a ThinkingAgent as a BackgroundAgent.
+type ThinkAgent struct {
+	BaseAgent
+	Think ThinkFunc
+}
+
+func (a *ThinkAgent) Exec(ctx context.Context, want *Want) (bool, error) {
+	if a.Think == nil {
+		return false, fmt.Errorf("no think function defined for ThinkAgent %s", a.Name)
+	}
+
+	id := "think-" + a.Name + "-" + want.Metadata.ID
+	if _, exists := want.GetBackgroundAgent(id); exists {
+		// Already running - skip registration
+		return false, nil
+	}
+
+	thinkingAgent := NewThinkingAgent(id, 2*time.Second, a.Name, a.Think)
+	if err := want.AddBackgroundAgent(thinkingAgent); err != nil {
+		return false, fmt.Errorf("failed to add ThinkingAgent %s: %w", id, err)
+	}
+	return false, nil
 }
 
 // AgentSpec holds specification for state field validation

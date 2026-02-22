@@ -28,12 +28,6 @@ func executeBuffetReservation(ctx context.Context, want *Want) error {
 		return err
 	}
 
-	// Report cost to parent want for budget tracking
-	buffetCost := want.GetFloatParam("cost", 150.0)
-	want.MergeParentState(map[string]any{
-		"costs": map[string]any{want.Metadata.Name: buffetCost},
-	})
-
 	return nil
 }
 

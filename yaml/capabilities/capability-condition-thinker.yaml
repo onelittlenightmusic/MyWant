@@ -1,0 +1,43 @@
+capabilities:
+  - name: condition_thinking
+    gives:
+      - condition_thinking
+    description: "Registers want in itinerary, waits for budget allocation, then propagates cost to parent want."
+    stateAccess:
+      - name: good_to_reserve
+        type: boolean
+        description: Whether this want has been approved to proceed with reservation
+        accessType: update
+      - name: target_budget
+        type: float64
+        description: Allocated budget for this want from the coordinator
+        accessType: update
+      - name: cost
+        type: float64
+        description: Final cost of the reservation
+        accessType: read
+      - name: _thinker_itinerary_registered
+        type: boolean
+        description: Internal flag - itinerary entry has been registered
+        accessType: readUpdate
+      - name: _thinker_good_to_reserve_set
+        type: boolean
+        description: Internal flag - good_to_reserve has been set
+        accessType: readUpdate
+      - name: _thinker_last_reported_cost
+        type: float64
+        description: Internal tracker of last reported cost
+        accessType: readUpdate
+    parentStateAccess:
+      - name: itinerary
+        type: map
+        description: Map of want names to their type/name for budget planning
+        accessType: update
+      - name: target_budgets
+        type: map
+        description: Map of want names to their allocated budget entries
+        accessType: read
+      - name: costs
+        type: map
+        description: Parent want's costs aggregation map
+        accessType: update

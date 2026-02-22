@@ -222,6 +222,11 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 				r.setAgentMonitor(monitorAgent)
 				agent = monitorAgent
 			}
+		case "think":
+			baseAgent.Type = ThinkAgentType
+			thinkAgent := &ThinkAgent{BaseAgent: baseAgent}
+			r.setAgentThink(thinkAgent)
+			agent = thinkAgent
 		default:
 			return fmt.Errorf("unknown agent type: %s", agentDef.Type)
 		}
@@ -269,6 +274,17 @@ func (r *AgentRegistry) setAgentPoll(agent *PollAgent) {
 	}
 
 	// PollAgent doesn't have a generic fallback as it needs to return shouldStop
+}
+
+func (r *AgentRegistry) setAgentThink(agent *ThinkAgent) {
+	// Look up specific implementation from registry
+	if think, ok := thinkActionRegistry[agent.Name]; ok {
+		agent.Think = think
+		InfoLog("[AGENT] Linked agent '%s' to registered Go implementation (Think)", agent.Name)
+		return
+	}
+
+	// ThinkAgent doesn't have a generic fallback as it needs a think function to be useful
 }
 
 // genericDoAction is the default action for all DoAgents Agents don't need special implementations - state initialization is externalized to want types

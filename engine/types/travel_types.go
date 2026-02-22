@@ -8,6 +8,38 @@ import (
 	"time"
 )
 
+// startConditionThinker starts the ConditionThinker BackgroundAgent for a travel want.
+// Returns true if the ThinkingAgent was successfully started, false otherwise.
+// When false is returned the caller should set good_to_reserve=true as a fallback.
+func startConditionThinker(want *Want) bool {
+	thinkerID := "condition-thinker-" + want.Metadata.ID
+	if _, exists := want.GetBackgroundAgent(thinkerID); exists {
+		return true // Already running
+	}
+
+	reg := want.GetAgentRegistry()
+	if reg == nil {
+		return false
+	}
+
+	agent, ok := reg.GetAgent(conditionThinkerAgentName)
+	if !ok {
+		return false
+	}
+
+	thinkAgent, ok := agent.(*ThinkAgent)
+	if !ok {
+		return false
+	}
+
+	tAgent := NewThinkingAgent(thinkerID, 2*time.Second, "ConditionThinker", thinkAgent.Think)
+	if err := want.AddBackgroundAgent(tAgent); err != nil {
+		want.StoreLog("[ConditionThinker] Failed to start: %v", err)
+		return false
+	}
+	return true
+}
+
 func init() {
 	RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
 	RegisterWantImplementation[HotelWant, HotelWantLocals]("hotel")
@@ -76,7 +108,11 @@ type BaseTravelWant struct {
 
 // Initialize resets state before execution
 func (b *BaseTravelWant) Initialize() {
-	// Travel wants don't need state reset
+	// Start ConditionThinker to handle itinerary registration, budget approval, and cost propagation.
+	// If no ConditionThinker agent is available (e.g. no agent service), approve immediately.
+	if !startConditionThinker(&b.Want) {
+		b.StoreState("good_to_reserve", true)
+	}
 }
 
 // IsAchieved checks if the travel want has been achieved
@@ -87,6 +123,12 @@ func (b *BaseTravelWant) IsAchieved() bool {
 
 // Progress implements Progressable for all travel wants
 func (b *BaseTravelWant) Progress() {
+	// Wait for ConditionThinker to confirm budget allocation before reserving
+	goodToReserve, _ := b.GetStateBool("good_to_reserve", false)
+	if !goodToReserve {
+		return
+	}
+
 	b.StoreState("completed", true)
 
 	if b.executor == nil {
@@ -135,6 +177,7 @@ func (r *RestaurantWant) GetLocals() *RestaurantWantLocals {
 
 // Initialize prepares the restaurant want for execution
 func (r *RestaurantWant) Initialize() {
+	r.BaseTravelWant.Initialize()
 	r.BaseTravelWant.executor = r
 }
 
@@ -358,6 +401,7 @@ func (h *HotelWant) GetLocals() *HotelWantLocals {
 // NewHotelWant creates a new hotel reservation want
 // Initialize prepares the hotel want for execution
 func (h *HotelWant) Initialize() {
+	h.BaseTravelWant.Initialize()
 	h.BaseTravelWant.executor = h
 }
 
@@ -439,6 +483,7 @@ func (b *BuffetWant) GetLocals() *BuffetWantLocals {
 
 // Initialize prepares the buffet want for execution
 func (b *BuffetWant) Initialize() {
+	b.BaseTravelWant.Initialize()
 	b.BaseTravelWant.executor = b
 }
 
@@ -595,6 +640,7 @@ type FlightWant struct {
 
 // Initialize prepares the flight want for execution
 func (f *FlightWant) Initialize() {
+	f.BaseTravelWant.Initialize()
 	f.BaseTravelWant.executor = f
 
 	// Get locals (guaranteed to be initialized by framework)

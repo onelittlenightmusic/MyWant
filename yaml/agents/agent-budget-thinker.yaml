@@ -1,0 +1,6 @@
+agents:
+  - name: budget_thinker
+    type: think
+    capabilities:
+      - budget_thinking
+    description: "Reads costs from parent coordinator state and updates budget want with totals and summary."

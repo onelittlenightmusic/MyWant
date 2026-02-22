@@ -105,6 +105,10 @@ func (n *Want) bootAgent(ctx context.Context, agent Agent) error {
 			if a.Poll == nil {
 				return fmt.Errorf("localGo agent '%s' has no poll function registered", agent.GetName())
 			}
+		case *ThinkAgent:
+			if a.Think == nil {
+				return fmt.Errorf("localGo agent '%s' has no think function registered", agent.GetName())
+			}
 		}
 		n.StoreLog("[BOOT-AGENT] Agent '%s' (localGo) verified and ready", agent.GetName())
 
@@ -143,6 +147,8 @@ func (n *Want) executeAgent(agent Agent) error {
 	case *MonitorAgent:
 		execConfig = a.BaseAgent.ExecutionConfig
 	case *PollAgent:
+		execConfig = a.BaseAgent.ExecutionConfig
+	case *ThinkAgent:
 		execConfig = a.BaseAgent.ExecutionConfig
 	default:
 		execConfig = DefaultExecutionConfig()
@@ -263,11 +269,11 @@ func (n *Want) executeAgent(agent Agent) error {
 		return nil
 	}
 
-	// Execute synchronously for DO agents, asynchronously for MONITOR agents
-	if agent.GetType() == DoAgentType {
-		// DO agents execute synchronously to return results immediately
+	// Execute synchronously for DO and THINK agents, asynchronously for MONITOR agents
+	if agent.GetType() == DoAgentType || agent.GetType() == ThinkAgentType {
+		// DO and THINK agents execute synchronously to return results immediately
 		agentErr = executeFunc()
-		return agentErr // Propagate error from DoAgent
+		return agentErr // Propagate error from DoAgent/ThinkAgent
 	} else {
 		// MONITOR agents execute asynchronously to run in background
 		go executeFunc()
@@ -590,6 +596,22 @@ func (w *Want) GetBackgroundAgentCount() int {
 	defer w.backgroundMutex.RUnlock()
 
 	return len(w.backgroundAgents)
+}
+
+// FlushThinkingAgents runs all ThinkingAgents' think function once synchronously.
+// Called before StopAllBackgroundAgents() when a want achieves completion,
+// ensuring any pending state changes (e.g. cost propagation) are committed.
+func (w *Want) FlushThinkingAgents(ctx context.Context) {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	for agentID, agent := range w.backgroundAgents {
+		if ta, ok := agent.(*ThinkingAgent); ok {
+			if err := ta.Flush(ctx); err != nil {
+				w.StoreLog("[FlushThinkingAgents] Error flushing agent %q: %v", agentID, err)
+			}
+		}
+	}
 }
 
 // validateAgentStateKey validates a state key against the agent's specification
