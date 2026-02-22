@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -125,6 +126,25 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       console.error('[WantCard] start replay webhook failed:', err);
     }
   };
+
+  // Replay bubble state
+  const [showReplayBubble, setShowReplayBubble] = useState(false);
+  const [showScreenshotBubble, setShowScreenshotBubble] = useState(false);
+
+  // Auto-open replay bubble when replay becomes active
+  useEffect(() => {
+    if (replayActive && replayIframeUrl) {
+      setShowReplayBubble(true);
+    }
+  }, [replayActive, replayIframeUrl]);
+
+  // Auto-close replay bubble 1s after replay finishes
+  useEffect(() => {
+    if (!replayActive && showReplayBubble) {
+      const timer = setTimeout(() => setShowReplayBubble(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [replayActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Confirmation dialog state
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -482,31 +502,24 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       {/* Replay type: Replay button (shown after recording is done and replay_actions available) */}
-      {isReplay && hasReplayActions && !replayActive && replayWebhookId && (
+      {isReplay && hasReplayActions && replayWebhookId && (
         <div className={isChild ? "mt-2" : "mt-4"}>
           <button
-            onClick={(e) => { e.stopPropagation(); handleStartReplay(); }}
-            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs bg-green-600 text-white hover:bg-green-700 transition-colors"
-            title="Replay the recorded script in a new browser"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!replayActive) handleStartReplay();
+              setShowReplayBubble(true);
+            }}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
+              replayActive
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border border-green-300 dark:border-green-700'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
+            title={replayActive ? 'Show replay viewer' : 'Replay the recorded script in a new browser'}
           >
-            ▶ Replay
+            {replayActive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
+            ▶ {replayActive ? 'Replaying…' : 'Replay'}
           </button>
-        </div>
-      )}
-
-      {/* Replay type: iframe shown while replay is executing */}
-      {isReplay && replayActive && replayIframeUrl && (
-        <div className={isChild ? "mt-2" : "mt-4"}>
-          <div className="flex items-center gap-2 p-1 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 mb-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-            <span className="text-xs text-green-700 dark:text-green-300">Replaying…</span>
-          </div>
-          <iframe
-            src={replayIframeUrl}
-            className="w-full rounded border border-green-200 dark:border-green-800"
-            style={{ height: '400px' }}
-            title="Replay"
-          />
         </div>
       )}
 
@@ -514,22 +527,28 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {isReplay && replayResult && !replayActive && (
         <div className={isChild ? "mt-2" : "mt-4"}>
           <div className="p-2 rounded bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Replay result</p>
-            {replayResult.selected_text && (
-              <p className="text-xs text-green-800 dark:text-green-200 break-all">
-                Selected: <span className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">{replayResult.selected_text}</span>
-              </p>
-            )}
-            {replayResult.url && (
-              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 truncate">URL: {replayResult.url}</p>
-            )}
-            {replayScreenshotUrl && (
-              <img
-                src={replayScreenshotUrl}
-                alt="Replay screenshot"
-                className="mt-2 w-full rounded border border-green-200 dark:border-green-800"
-              />
-            )}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Replay result</p>
+                {replayResult.selected_text && (
+                  <p className="text-xs text-green-800 dark:text-green-200 break-all">
+                    Selected: <span className="font-mono bg-green-100 dark:bg-green-900 px-1 rounded">{replayResult.selected_text}</span>
+                  </p>
+                )}
+                {replayResult.url && (
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 truncate">URL: {replayResult.url}</p>
+                )}
+              </div>
+              {replayScreenshotUrl && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowScreenshotBubble(true); }}
+                  className="flex-shrink-0 p-1 rounded bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                  title="View replay screenshot"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -615,6 +634,83 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         loading={isSubmittingReaction}
         title="Confirm"
       />
+
+      {/* Floating Replay Bubble - portal outside card */}
+      {showReplayBubble && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={() => setShowReplayBubble(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            style={{ width: '90vw', maxWidth: '1100px', height: '85vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                {replayActive && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                  {replayActive ? 'Replaying…' : 'Replay'}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]">{wantName}</span>
+              </div>
+              <button
+                onClick={() => setShowReplayBubble(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Iframe */}
+            <div className="flex-1 min-h-0">
+              {replayIframeUrl ? (
+                <iframe
+                  src={replayIframeUrl}
+                  className="w-full h-full border-0"
+                  title="Replay viewer"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full gap-2 text-gray-400 dark:text-gray-500">
+                  <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse" />
+                  <span className="text-sm">Starting replay…</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Floating Screenshot Bubble - portal outside card */}
+      {showScreenshotBubble && replayScreenshotUrl && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={() => setShowScreenshotBubble(false)}>
+          <div className="absolute inset-0 bg-black/70" />
+          <div
+            className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Replay Screenshot</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]">{wantName}</span>
+              </div>
+              <button
+                onClick={() => setShowScreenshotBubble(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-200 dark:hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Image */}
+            <div className="overflow-auto">
+              <img src={replayScreenshotUrl} alt="Replay screenshot" className="block max-w-full" />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 };

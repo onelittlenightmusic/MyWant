@@ -323,6 +323,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, false);
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
+  const replayScreenshotUrl = want.state?.replay_screenshot_url as string | undefined;
 
   const whiteProgressBarStyle = {
     position: 'absolute' as const,
@@ -368,6 +369,19 @@ export const WantCard: React.FC<WantCardProps> = ({
     >
       <div style={whiteProgressBarStyle}></div>
       <div style={blackOverlayStyle}></div>
+
+      {/* Replay screenshot as subtle card background */}
+      {replayScreenshotUrl && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none rounded-[inherit]"
+          style={{
+            backgroundImage: `url(${replayScreenshotUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+            opacity: 0.12,
+          }}
+        />
+      )}
 
       <div className={classNames(
         "absolute inset-0 z-30 flex items-center justify-center bg-blue-700 dark:bg-blue-900 transition-all duration-400 ease-out pointer-events-none",
