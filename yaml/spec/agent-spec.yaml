@@ -26,6 +26,37 @@ components:
     CapabilityConfig:
       $ref: '#/components/schemas/CapabilityYAML'
 
+    # State access field definition (used by Capability)
+    StateAccessField:
+      type: object
+      description: Declares a state field that agents with this capability can access
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: State field name
+          minLength: 1
+          example: "agent_result"
+        type:
+          type: string
+          description: Data type of the field (string, integer, boolean, or custom type name)
+          example: "HotelSchedule"
+        description:
+          type: string
+          description: Human-readable description of the field
+          example: "Hotel reservation schedule with check-in/check-out times"
+        accessType:
+          type: string
+          description: How agents with this capability access the field (default readUpdate)
+          enum:
+            - read
+            - update
+            - readUpdate
+          default: readUpdate
+          example: "readUpdate"
+      additionalProperties: false
+
     # Individual capability definition
     Capability:
       type: object
@@ -58,6 +89,16 @@ components:
           description: Version of the capability
           pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
           example: "1.0.0"
+        stateAccess:
+          type: array
+          description: State fields that agents with this capability may read or write
+          items:
+            $ref: '#/components/schemas/StateAccessField'
+        parentStateAccess:
+          type: array
+          description: Parent want state fields that agents with this capability may access via StoreParentState/GetParentState
+          items:
+            $ref: '#/components/schemas/StateAccessField'
         metadata:
           type: object
           description: Additional metadata for the capability

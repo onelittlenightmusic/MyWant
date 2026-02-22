@@ -1,5 +1,9 @@
 capabilities:
   - name: buffet_agency
     gives:
-      -
       - buffet_reservation
+    stateAccess:
+      - name: agent_result
+        type: BuffetSchedule
+        description: Buffet reservation schedule with meal timing details
+        accessType: readUpdate

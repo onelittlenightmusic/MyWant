@@ -1,10 +1,69 @@
 capabilities:
   - name: flight_agency
     gives:
-      -
       - flight_booking
   - name: flight_api_agency
     gives:
-      -
       - create_flight
       - cancel_flight
+    stateAccess:
+      - name: flight_id
+        type: string
+        description: Unique flight reservation ID from server
+        accessType: readUpdate
+      - name: flight_status
+        type: string
+        description: Current flight status (created, canceled, etc.)
+        accessType: readUpdate
+      - name: flight_number
+        type: string
+        description: Flight number identifier
+        accessType: readUpdate
+      - name: from
+        type: string
+        description: Departure city
+        accessType: readUpdate
+      - name: to
+        type: string
+        description: Destination city
+        accessType: readUpdate
+      - name: departure_time
+        type: string
+        description: Scheduled departure time (RFC3339)
+        accessType: readUpdate
+      - name: arrival_time
+        type: string
+        description: Expected arrival time (RFC3339)
+        accessType: readUpdate
+      - name: status_message
+        type: string
+        description: Human-readable status message
+        accessType: readUpdate
+      - name: created_at
+        type: string
+        description: Reservation creation timestamp (RFC3339)
+        accessType: update
+      - name: updated_at
+        type: string
+        description: Last update timestamp from server (RFC3339)
+        accessType: readUpdate
+      - name: canceled_at
+        type: string
+        description: Cancellation timestamp (RFC3339)
+        accessType: update
+      - name: status_changed
+        type: boolean
+        description: Flag indicating status change occurred in this cycle
+        accessType: readUpdate
+      - name: status_changed_at
+        type: string
+        description: Timestamp when status change was recorded (RFC3339)
+        accessType: readUpdate
+      - name: status_change_history_count
+        type: integer
+        description: Total number of status changes recorded
+        accessType: readUpdate
+      - name: agent_result
+        type: FlightSchedule
+        description: Flight schedule summary object
+        accessType: readUpdate

@@ -22,10 +22,30 @@ const (
 	DockerRuntime  AgentRuntime = "docker"
 )
 
+// AccessType defines how an agent can access a state field.
+type AccessType string
+
+const (
+	AccessTypeUpdate     AccessType = "update"     // Agent may write to this field
+	AccessTypeRead       AccessType = "read"        // Agent may read from this field
+	AccessTypeReadUpdate AccessType = "readUpdate"  // Agent may read and write (default)
+)
+
+// StateAccessField declares a state field that an agent with this capability can access.
+type StateAccessField struct {
+	Name        string     `yaml:"name"`
+	Type        string     `yaml:"type"`
+	Description string     `yaml:"description"`
+	AccessType  AccessType `yaml:"accessType,omitempty"` // default: readUpdate
+}
+
 // Capability represents an agent's functional capability with its dependencies.
 type Capability struct {
-	Name  string   `yaml:"name"`
-	Gives []string `yaml:"gives"`
+	Name              string             `yaml:"name"`
+	Gives             []string           `yaml:"gives"`
+	Description       string             `yaml:"description,omitempty"`
+	StateAccess       []StateAccessField `yaml:"stateAccess,omitempty"`
+	ParentStateAccess []StateAccessField `yaml:"parentStateAccess,omitempty"`
 }
 
 // Agent defines the interface for all agent implementations.
@@ -138,8 +158,14 @@ func (a *PollAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 // AgentSpec holds specification for state field validation
 type AgentSpec struct {
 	Name             string
-	AllowedStateKeys map[string]bool   // O(1) lookup: key -> allowed
-	KeyDescriptions  map[string]string // For logging: key -> description
+	AllowedStateKeys map[string]bool    // O(1) lookup: key -> allowed
+	KeyDescriptions  map[string]string  // For logging: key -> description
+	StateAccessTypes map[string]AccessType // key -> access type
+
+	// Parent state access (for want.StoreParentState / GetParentState)
+	AllowedParentKeys     map[string]bool
+	ParentKeyDescriptions map[string]string
+	ParentAccessTypes     map[string]AccessType
 }
 
 // AgentRegistry manages agent registration and capability mapping.
@@ -230,27 +256,52 @@ func (r *AgentRegistry) GetCapability(name string) (Capability, bool) {
 	return cap, exists
 }
 
-// RegisterAgentSpec registers an agent's specification for state validation
-func (r *AgentRegistry) RegisterAgentSpec(agentName string, trackedFields []TrackedStatusField) {
+// BuildAgentSpecFromCapabilities builds an agent's state validation spec by aggregating
+// stateAccess and parentStateAccess declared in its capabilities.
+func (r *AgentRegistry) BuildAgentSpecFromCapabilities(agentName string, capabilityNames []string) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	spec := &AgentSpec{
-		Name:             agentName,
-		AllowedStateKeys: make(map[string]bool),
-		KeyDescriptions:  make(map[string]string),
+		Name:                  agentName,
+		AllowedStateKeys:      make(map[string]bool),
+		KeyDescriptions:       make(map[string]string),
+		StateAccessTypes:      make(map[string]AccessType),
+		AllowedParentKeys:     make(map[string]bool),
+		ParentKeyDescriptions: make(map[string]string),
+		ParentAccessTypes:     make(map[string]AccessType),
 	}
 
-	for _, field := range trackedFields {
-		spec.AllowedStateKeys[field.Name] = true
-		spec.KeyDescriptions[field.Name] = field.Description
+	for _, capName := range capabilityNames {
+		if cap, exists := r.capabilities[capName]; exists {
+			for _, field := range cap.StateAccess {
+				spec.AllowedStateKeys[field.Name] = true
+				spec.KeyDescriptions[field.Name] = field.Description
+				accessType := field.AccessType
+				if accessType == "" {
+					accessType = AccessTypeReadUpdate
+				}
+				spec.StateAccessTypes[field.Name] = accessType
+			}
+			for _, field := range cap.ParentStateAccess {
+				spec.AllowedParentKeys[field.Name] = true
+				spec.ParentKeyDescriptions[field.Name] = field.Description
+				accessType := field.AccessType
+				if accessType == "" {
+					accessType = AccessTypeReadUpdate
+				}
+				spec.ParentAccessTypes[field.Name] = accessType
+			}
+		}
 	}
 
 	r.agentSpecs[agentName] = spec
 
-	if len(trackedFields) > 0 {
-		InfoLog("[AGENT SPEC] Registered %d tracked fields for agent '%s'\n",
-			len(trackedFields), agentName)
+	stateCount := len(spec.AllowedStateKeys)
+	parentCount := len(spec.AllowedParentKeys)
+	if stateCount > 0 || parentCount > 0 {
+		InfoLog("[AGENT SPEC] Built spec for agent '%s': %d state fields, %d parent state fields\n",
+			agentName, stateCount, parentCount)
 	}
 }
 

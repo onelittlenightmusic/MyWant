@@ -6,10 +6,6 @@ agents:
       - buffet_agency
     uses:
       - xxx
-    tracked_status_fields:
-      - name: agent_result
-        type: BuffetSchedule
-        description: Buffet reservation schedule with meal timing details
 
   - name: buffet_monitor
     runtime: localGo
@@ -18,7 +14,3 @@ agents:
       - buffet_agency
     uses:
       - xxx
-    tracked_status_fields:
-      - name: agent_result
-        type: BuffetSchedule
-        description: Buffet schedule loaded from YAML files

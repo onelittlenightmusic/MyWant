@@ -618,7 +618,7 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	spec, exists := w.agentRegistry.GetAgentSpec(agentName)
 	if !exists || spec == nil {
 		// STRICT MODE: Agent has no specification - warn on all writes
-		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' has no tracked_status_fields specification, writing to field '%s'",
+		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' has no stateAccess specification, writing to field '%s'",
 			agentName, key)
 		return false
 	}
@@ -634,7 +634,7 @@ func (w *Want) validateAgentStateKey(key string) bool {
 		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (%s)",
 			agentName, key, description)
 	} else {
-		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (not in tracked_status_fields)",
+		w.StoreLog("⚠️ VALIDATION WARNING: Agent '%s' writing to undeclared field '%s' (not declared in capability stateAccess)",
 			agentName, key)
 	}
 

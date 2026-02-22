@@ -16,20 +16,13 @@ type CapabilityYAML struct {
 	Capabilities []Capability `yaml:"capabilities"`
 }
 
-type TrackedStatusField struct {
-	Name        string `yaml:"name"`
-	Type        string `yaml:"type"`
-	Description string `yaml:"description"`
-}
-
 type AgentYAML struct {
 	Agents []struct {
-		Name                string               `yaml:"name"`
-		Capabilities        []string             `yaml:"capabilities"`
-		Uses                []string             `yaml:"uses"`
-		Type                string               `yaml:"type"`
-		Runtime             string               `yaml:"runtime"`
-		TrackedStatusFields []TrackedStatusField `yaml:"tracked_status_fields,omitempty"`
+		Name         string   `yaml:"name"`
+		Capabilities []string `yaml:"capabilities"`
+		Uses         []string `yaml:"uses"`
+		Type         string   `yaml:"type"`
+		Runtime      string   `yaml:"runtime"`
 	} `yaml:"agents"`
 }
 
@@ -236,8 +229,8 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 		r.RegisterAgent(agent)
 		InfoLog("[AGENT] Registered agent '%s' with capabilities %v", agent.GetName(), agent.GetCapabilities())
 
-		// NEW: Register agent specification (Strict mode - register even if empty)
-		r.RegisterAgentSpec(agentDef.Name, agentDef.TrackedStatusFields)
+		// Build agent spec from capability stateAccess / parentStateAccess declarations
+		r.BuildAgentSpecFromCapabilities(agentDef.Name, agentDef.Capabilities)
 	}
 
 	return nil

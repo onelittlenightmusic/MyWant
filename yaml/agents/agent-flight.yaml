@@ -126,43 +126,6 @@ agents:
       check_interval: 10 seconds
       endpoints:
         - GET /api/flights/{flight_id}
-    tracked_status_fields:
-      - name: flight_status
-        type: string
-        description: Current flight status (read from AgentFlightAPI or updated from server)
-      - name: flight_id
-        type: string
-        description: Unique flight reservation ID from server
-      - name: flight_number
-        type: string
-        description: Flight number from server
-      - name: from
-        type: string
-        description: Departure city from server
-      - name: to
-        type: string
-        description: Destination city from server
-      - name: departure_time
-        type: string
-        description: Scheduled departure time from server (RFC3339)
-      - name: arrival_time
-        type: string
-        description: Expected arrival time from server (RFC3339)
-      - name: status_message
-        type: string
-        description: Status message details from server
-      - name: updated_at
-        type: string
-        description: Last update timestamp from server (RFC3339)
-      - name: status_changed
-        type: boolean
-        description: Flag indicating status change occurred in this cycle
-      - name: status_changed_at
-        type: string
-        description: Timestamp when status change was recorded (RFC3339)
-      - name: status_change_history_count
-        type: integer
-        description: Total number of status changes recorded
     state_management:
       last_known_status:
         description: Cached flight status for change detection

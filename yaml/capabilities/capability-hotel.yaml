@@ -1,5 +1,9 @@
 capabilities:
   - name: hotel_agency
     gives:
-      -
       - hotel_reservation
+    stateAccess:
+      - name: agent_result
+        type: HotelSchedule
+        description: Hotel reservation schedule with check-in/check-out times
+        accessType: readUpdate

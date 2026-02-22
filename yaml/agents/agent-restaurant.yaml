@@ -4,21 +4,9 @@ agents:
     type: do
     capabilities:
       - restaurant_agency
-    uses:
-      - xxx
-    tracked_status_fields:
-      - name: agent_result
-        type: RestaurantSchedule
-        description: Restaurant reservation schedule with timing details
 
   - name: restaurant_monitor
     runtime: localGo
     type: monitor
     capabilities:
       - restaurant_agency
-    uses:
-      - xxx
-    tracked_status_fields:
-      - name: agent_result
-        type: RestaurantSchedule
-        description: Restaurant schedule loaded from YAML files

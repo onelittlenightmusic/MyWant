@@ -1,5 +1,9 @@
 capabilities:
   - name: restaurant_agency
     gives:
-      -
       - restaurant_reservation
+    stateAccess:
+      - name: agent_result
+        type: RestaurantSchedule
+        description: Restaurant reservation schedule with timing details
+        accessType: readUpdate
