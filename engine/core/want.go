@@ -620,6 +620,10 @@ func (n *Want) StartProgressionLoop(
 		// Initialize the progressable before starting execution
 		// This resets state for fresh execution (especially important for restarts)
 		if n.progressable != nil {
+			// Start ThinkAgents declared in the want type definition before calling Initialize().
+			// This allows Initialize() to check whether ThinkAgents were successfully started
+			// (e.g., to set fallback state when no agent service is available).
+			n.StartThinkAgentsByType()
 			n.progressable.Initialize()
 		}
 

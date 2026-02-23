@@ -81,8 +81,18 @@ type OllamaResponse struct {
 
 // SaveRecipeFromWantRequest represents the request to create a recipe from an existing want
 type SaveRecipeFromWantRequest struct {
-	WantID   string                       `json:"wantId"`
-	Metadata mywant.GenericRecipeMetadata `json:"metadata"`
+	WantID     string                       `json:"wantId"`
+	Metadata   mywant.GenericRecipeMetadata `json:"metadata"`
+	State      []mywant.StateDef            `json:"state,omitempty"`
+	Parameters map[string]any               `json:"parameters,omitempty"`
+}
+
+// WantRecipeAnalysis represents the analysis result for recipe creation
+type WantRecipeAnalysis struct {
+	WantID            string                       `json:"wantId"`
+	ChildCount        int                          `json:"childCount"`
+	RecommendedState  []mywant.StateDef            `json:"recommendedState"`
+	SuggestedMetadata mywant.GenericRecipeMetadata `json:"suggestedMetadata"`
 }
 
 // ValidationResult represents the complete validation response

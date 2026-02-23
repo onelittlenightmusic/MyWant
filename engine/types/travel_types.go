@@ -8,37 +8,6 @@ import (
 	"time"
 )
 
-// startConditionThinker starts the ConditionThinker BackgroundAgent for a travel want.
-// Returns true if the ThinkingAgent was successfully started, false otherwise.
-// When false is returned the caller should set good_to_reserve=true as a fallback.
-func startConditionThinker(want *Want) bool {
-	thinkerID := "condition-thinker-" + want.Metadata.ID
-	if _, exists := want.GetBackgroundAgent(thinkerID); exists {
-		return true // Already running
-	}
-
-	reg := want.GetAgentRegistry()
-	if reg == nil {
-		return false
-	}
-
-	agent, ok := reg.GetAgent(conditionThinkerAgentName)
-	if !ok {
-		return false
-	}
-
-	thinkAgent, ok := agent.(*ThinkAgent)
-	if !ok {
-		return false
-	}
-
-	tAgent := NewThinkingAgent(thinkerID, 2*time.Second, "ConditionThinker", thinkAgent.Think)
-	if err := want.AddBackgroundAgent(tAgent); err != nil {
-		want.StoreLog("[ConditionThinker] Failed to start: %v", err)
-		return false
-	}
-	return true
-}
 
 func init() {
 	RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
@@ -106,11 +75,12 @@ type BaseTravelWant struct {
 	executor TravelWantInterface // Reference to concrete type for interface method dispatch
 }
 
-// Initialize resets state before execution
+// Initialize resets state before execution.
+// ConditionThinker is started automatically by the framework based on thinkCapabilities in YAML.
+// If no ConditionThinker was started (e.g. no agent service available), approve immediately.
 func (b *BaseTravelWant) Initialize() {
-	// Start ConditionThinker to handle itinerary registration, budget approval, and cost propagation.
-	// If no ConditionThinker agent is available (e.g. no agent service), approve immediately.
-	if !startConditionThinker(&b.Want) {
+	thinkerID := conditionThinkerAgentName + "-" + b.Want.Metadata.ID
+	if _, running := b.Want.GetBackgroundAgent(thinkerID); !running {
 		b.StoreState("good_to_reserve", true)
 	}
 }
@@ -876,16 +846,26 @@ func (f *FlightWant) tryAgentExecution() any {
 		if result, exists := f.GetState("agent_result"); exists && result != nil {
 			f.StoreState("execution_source", "agent")
 
-			// Start background monitoring for this flight using registered MonitorAgent
+			// Start background monitoring for this flight using a MonitorAgent derived
+			// from the want type's MonitorCapabilities (computed from flight.yaml requires field).
 			flightID, _ := f.GetStateString("flight_id", "")
 			agentName := "flight-monitor-" + flightID
-
-			if agent, ok := f.GetAgentRegistry().GetAgent(flightMonitorAgentName); ok {
-				if err := f.AddMonitoringAgent(agentName, 10*time.Second, agent.Exec); err != nil {
-					f.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+			registry := f.GetAgentRegistry()
+			typeDef := f.WantTypeDefinition
+			if registry != nil && typeDef != nil {
+				for _, monCap := range typeDef.MonitorCapabilities {
+					agents := registry.FindMonitorAgentsByCapabilityName(monCap.Capability)
+					if len(agents) == 0 {
+						f.StoreLog("ERROR: No MonitorAgent found for capability '%s'", monCap.Capability)
+						continue
+					}
+					if err := f.AddMonitoringAgent(agentName, 10*time.Second, agents[0].Exec); err != nil {
+						f.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+					}
+					break
 				}
 			} else {
-				f.StoreLog("ERROR: Monitor agent %s not found in registry", flightMonitorAgentName)
+				f.StoreLog("ERROR: Cannot start flight monitor - registry or type definition unavailable")
 			}
 
 			// Extract and return FlightSchedule

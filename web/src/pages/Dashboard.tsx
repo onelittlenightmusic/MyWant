@@ -17,6 +17,7 @@ import { generateUniqueWantName } from '@/utils/nameGenerator';
 import { apiClient } from '@/api/client';
 import { Recommendation, ConfigModifications } from '@/types/interact';
 import { DraftWant, wantToDraft, isDraftWant } from '@/types/draft';
+import { WantRecipeAnalysis, RecipeMetadata, StateDef } from '@/types/recipe';
 
 // Components
 import { Header } from '@/components/layout/Header';
@@ -30,6 +31,7 @@ import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPa
 import { Toast } from '@/components/notifications';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
+import { SaveAsRecipeModal } from '@/components/modals/SaveAsRecipeModal';
 
 
 export const Dashboard: React.FC = () => {
@@ -69,6 +71,10 @@ export const Dashboard: React.FC = () => {
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [deleteDraftState, setDeleteDraftState] = useState<DraftWant | null>(null);
   const [showDeleteDraftConfirmation, setShowDeleteDraftConfirmation] = useState(false);
+  const [showSaveRecipeModal, setShowSaveRecipeModal] = useState(false);
+  const [saveRecipeTarget, setSaveRecipeTarget] = useState<Want | null>(null);
+  const [saveRecipeAnalysis, setSaveRecipeAnalysis] = useState<WantRecipeAnalysis | null>(null);
+  const [saveRecipeLoading, setSaveRecipeLoading] = useState(false);
 
   // Global Drag and Drop state
   const [isGlobalDragOver, setIsGlobalDragOver] = useState(false);
@@ -352,11 +358,33 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleSaveRecipeFromWant = async (w: Want) => {
-    const id = w.metadata?.id || w.id; if (!id) return;
+    const id = w.metadata?.id || w.id;
+    if (!id) return;
+    setSaveRecipeLoading(true);
     try {
-      const r = await apiClient.saveRecipeFromWant(id, { name: `${w.metadata.name}-recipe`, description: `Saved from ${w.metadata.name}`, version: '1.0.0' });
+      const analysis = await apiClient.analyzeWantForRecipe(id);
+      setSaveRecipeTarget(w);
+      setSaveRecipeAnalysis(analysis);
+      setShowSaveRecipeModal(true);
+    } catch (e: any) {
+      showNotification(`✗ Failed to analyze want: ${e.message}`);
+    } finally {
+      setSaveRecipeLoading(false);
+    }
+  };
+
+  const handleSaveRecipeSubmit = async (metadata: RecipeMetadata, state: StateDef[]) => {
+    const id = saveRecipeTarget?.metadata?.id || saveRecipeTarget?.id;
+    if (!id) return;
+    try {
+      const r = await apiClient.saveRecipeFromWant(id, metadata, state);
       showNotification(`✓ Recipe '${r.id}' saved successfully`);
-    } catch (e: any) { showNotification(`✗ Failed: ${e.message}`); }
+      setShowSaveRecipeModal(false);
+      setSaveRecipeTarget(null);
+      setSaveRecipeAnalysis(null);
+    } catch (e: any) {
+      showNotification(`✗ Failed: ${e.message}`);
+    }
   };
 
   const handleUnparentWant = async (id: string) => {
@@ -783,6 +811,14 @@ export const Dashboard: React.FC = () => {
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />
+      <SaveAsRecipeModal
+        isOpen={showSaveRecipeModal}
+        want={saveRecipeTarget}
+        analysis={saveRecipeAnalysis}
+        onClose={() => { setShowSaveRecipeModal(false); setSaveRecipeTarget(null); setSaveRecipeAnalysis(null); }}
+        onSave={handleSaveRecipeSubmit}
+        loading={saveRecipeLoading}
+      />
       <input
         type="file"
         ref={fileInputRef}

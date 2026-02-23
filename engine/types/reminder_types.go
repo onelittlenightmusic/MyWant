@@ -189,9 +189,18 @@ func (r *ReminderWant) startMonitoringIfNeeded() {
 	if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
 		agentName := "reaction-monitor-" + r.Metadata.ID
 		if _, exists := r.GetBackgroundAgent(agentName); !exists {
-			if agent, ok := r.GetAgentRegistry().GetAgent(userReactionMonitorAgentName); ok {
-				if err := r.AddMonitoringAgent(agentName, 2*time.Second, agent.Exec); err != nil {
-					r.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+			registry := r.GetAgentRegistry()
+			typeDef := r.WantTypeDefinition
+			if registry != nil && typeDef != nil {
+				for _, monCap := range typeDef.MonitorCapabilities {
+					agents := registry.FindMonitorAgentsByCapabilityName(monCap.Capability)
+					if len(agents) == 0 {
+						continue
+					}
+					if err := r.AddMonitoringAgent(agentName, 2*time.Second, agents[0].Exec); err != nil {
+						r.StoreLog("ERROR: Failed to start background monitoring: %v", err)
+					}
+					break
 				}
 			}
 		}

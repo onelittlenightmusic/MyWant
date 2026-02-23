@@ -24,6 +24,8 @@ import {
   RecipeCreateResponse,
   RecipeUpdateResponse,
   RecipeMetadata,
+  StateDef,
+  WantRecipeAnalysis,
 } from '@/types/recipe';
 import {
   WantTypeListResponse,
@@ -333,8 +335,12 @@ class MyWantApiClient {
     await this.client.delete(`/api/v1/recipes/${id}`);
   }
 
-  async saveRecipeFromWant(wantId: string, metadata: RecipeMetadata): Promise<{id: string, message: string, file: string, wants: number}> {
-    const response = await this.client.post('/api/v1/recipes/from-want', { wantId, metadata });
+  async analyzeWantForRecipe(wantId: string): Promise<WantRecipeAnalysis> {
+    return this.deduplicatedGet<WantRecipeAnalysis>(`/api/v1/wants/${wantId}/recipe-analysis`);
+  }
+
+  async saveRecipeFromWant(wantId: string, metadata: RecipeMetadata, state?: StateDef[]): Promise<{id: string, message: string, file: string, wants: number}> {
+    const response = await this.client.post('/api/v1/recipes/from-want', { wantId, metadata, state });
     return response.data;
   }
 

@@ -60,6 +60,15 @@ components:
           items:
             type: string
           default: []
+        thinkCapabilities:
+          type: array
+          description: ThinkAgent capability names used by this want type (for parentStateAccess discovery)
+          items:
+            type: string
+          default: []
+        finalResultField:
+          type: string
+          description: Default state key for final_result
         agents:
           type: array
           description: Agent definitions

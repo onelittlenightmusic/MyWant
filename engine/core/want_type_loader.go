@@ -22,8 +22,10 @@ type WantTypeDefinition struct {
 	Connect          *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`                   // New connectivity requirement field
 	Require          *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`                   // Structured connectivity requirement (deprecated)
 	UsageLimit       *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`             // Deprecated: use connect instead
-	Requires         []string         `json:"requires,omitempty" yaml:"requires,omitempty"`                 // Agent capability requirements
-	FinalResultField string           `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"` // Default state key for final_result
+	Requires            []string                `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements
+	ThinkCapabilities   []string                `json:"thinkCapabilities,omitempty" yaml:"thinkCapabilities,omitempty"`     // ThinkAgent capability names (auto-started at want init)
+	MonitorCapabilities []MonitorCapabilityDef  `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
+	FinalResultField    string                  `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
 	Agents           []AgentDef       `json:"agents" yaml:"agents"`
 	Constraints      []ConstraintDef  `json:"constraints" yaml:"constraints"`
 	Examples         []ExampleDef     `json:"examples" yaml:"examples"`
@@ -69,6 +71,15 @@ type StateDef struct {
 	Persistent   bool   `json:"persistent" yaml:"persistent"`
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
+}
+
+// MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.
+// This struct is NOT manually written in YAML; it is computed at runtime by
+// WantTypeLoader.EnrichMonitorCapabilities(), which cross-references each want type's
+// Requires list against the AgentRegistry to find MonitorAgents.
+type MonitorCapabilityDef struct {
+	Capability      string `json:"capability" yaml:"capability"`
+	IntervalSeconds int    `json:"intervalSeconds,omitempty" yaml:"intervalSeconds,omitempty"`
 }
 
 // ConnectivityDef defines input/output patterns for a want type
@@ -468,6 +479,29 @@ func (w *WantTypeLoader) ValidateParameterValues(typeName string, params map[str
 	}
 
 	return nil
+}
+
+// EnrichMonitorCapabilities derives MonitorCapabilities for all loaded definitions
+// by cross-referencing each definition's Requires list against the AgentRegistry.
+// For each required capability name that is provided by at least one MonitorAgent,
+// a MonitorCapabilityDef entry is added to the definition's MonitorCapabilities field.
+// This is called once at server startup after all agents are registered.
+func (w *WantTypeLoader) EnrichMonitorCapabilities(registry *AgentRegistry) {
+	if registry == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	for _, def := range w.definitions {
+		var monCaps []MonitorCapabilityDef
+		for _, capName := range def.Requires {
+			if agents := registry.FindMonitorAgentsByCapabilityName(capName); len(agents) > 0 {
+				monCaps = append(monCaps, MonitorCapabilityDef{Capability: capName})
+			}
+		}
+		def.MonitorCapabilities = monCaps
+	}
 }
 
 // LoadWantTypeDefinition loads a single want type definition from a YAML file

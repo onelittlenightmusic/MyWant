@@ -24,33 +24,45 @@ func (r *ReplayWant) GetLocals() *ReplayLocals {
 	return CheckLocalsInitialized[ReplayLocals](&r.Want)
 }
 
-// Initialize starts the background playwright recording monitor agent
+// Initialize starts the background playwright recording monitor agent.
+// The agent is discovered generically via MonitorCapabilities (derived from replay.yaml requires field)
+// rather than by hardcoded agent name.
 func (r *ReplayWant) Initialize() {
 	r.StoreLog("[REPLAY] Initializing browser recording want: %s", r.Metadata.Name)
 
 	locals := r.GetLocals()
 	locals.MonitorStarted = false
 
-	agentName := "playwright-record-" + r.Metadata.ID
+	typeDef := r.WantTypeDefinition
+	if typeDef == nil || len(typeDef.MonitorCapabilities) == 0 {
+		r.StoreLog("[REPLAY] WARNING: no MonitorCapabilities found in type definition")
+		return
+	}
+
 	registry := r.GetAgentRegistry()
 	if registry == nil {
 		r.StoreLog("[REPLAY] WARNING: no agent registry available")
 		return
 	}
 
-	agent, ok := registry.GetAgent(playwrightRecordAgentName)
-	if !ok {
-		r.StoreLog("[REPLAY] WARNING: agent '%s' not found in registry", playwrightRecordAgentName)
-		return
+	for _, monCap := range typeDef.MonitorCapabilities {
+		agents := registry.FindMonitorAgentsByCapabilityName(monCap.Capability)
+		if len(agents) == 0 {
+			r.StoreLog("[REPLAY] WARNING: no MonitorAgent found for capability '%s'", monCap.Capability)
+			continue
+		}
+		agentName := monCap.Capability + "-" + r.Metadata.ID
+		interval := 3 * time.Second
+		if monCap.IntervalSeconds > 0 {
+			interval = time.Duration(monCap.IntervalSeconds) * time.Second
+		}
+		if err := r.AddMonitoringAgent(agentName, interval, agents[0].Exec); err != nil {
+			r.StoreLog("[REPLAY] ERROR: failed to start monitoring agent: %v", err)
+			continue
+		}
+		locals.MonitorStarted = true
+		r.StoreLog("[REPLAY] Monitoring agent started for capability '%s', waiting for webhook trigger", monCap.Capability)
 	}
-
-	if err := r.AddMonitoringAgent(agentName, 3*time.Second, agent.Exec); err != nil {
-		r.StoreLog("[REPLAY] ERROR: failed to start monitoring agent: %v", err)
-		return
-	}
-
-	locals.MonitorStarted = true
-	r.StoreLog("[REPLAY] Monitoring agent started, waiting for webhook trigger")
 }
 
 // IsAchieved returns true when a replay script has been recorded

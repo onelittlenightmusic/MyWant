@@ -47,13 +47,26 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	// ── Phase 2: Check for own target budget allocation ────────────────────
 	goodToReserveSet, _ := want.GetStateBool("_thinker_good_to_reserve_set", false)
 	if !goodToReserveSet {
-		targetBudgetsRaw, ok := want.GetParentState("target_budgets")
-		if ok {
+		targetBudgetsRaw, hasTB := want.GetParentState("target_budgets")
+		if hasTB {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
 				want.StoreState("target_budget", tb)
 				want.StoreState("good_to_reserve", true)
 				want.StoreState("_thinker_good_to_reserve_set", true)
 				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → good_to_reserve=true", tb)
+			}
+			// else: target_budgets exists but our entry not yet added — wait for next tick
+		} else {
+			// target_budgets key absent: parent may have no BudgetThinker (e.g. no budget want).
+			// Count ticks since itinerary registration; self-approve after a short wait so
+			// coordinators without budget tracking still allow agents to run.
+			ticksWaited, _ := want.GetStateInt("_thinker_ticks_waited", 0)
+			ticksWaited++
+			want.StoreState("_thinker_ticks_waited", ticksWaited)
+			if ticksWaited >= 3 {
+				want.StoreState("good_to_reserve", true)
+				want.StoreState("_thinker_good_to_reserve_set", true)
+				want.StoreLog("[ConditionThinker] No budget coordination after %d ticks → good_to_reserve=true", ticksWaited)
 			}
 		}
 	}

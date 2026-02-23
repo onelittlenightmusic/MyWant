@@ -19,6 +19,47 @@ func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
 
+// StartThinkAgentsByType starts all ThinkAgents declared in this want's type definition
+// via the thinkCapabilities field in the YAML. This removes the need for each want type's
+// Initialize() to hard-code specific agent startup calls.
+// Returns true if at least one ThinkAgent was started or was already running.
+func (n *Want) StartThinkAgentsByType() bool {
+	n.metadataMutex.RLock()
+	typeDef := n.WantTypeDefinition
+	n.metadataMutex.RUnlock()
+
+	if typeDef == nil || len(typeDef.ThinkCapabilities) == 0 {
+		return false
+	}
+	reg := n.GetAgentRegistry()
+	if reg == nil {
+		return false
+	}
+
+	startedAny := false
+	for _, capName := range typeDef.ThinkCapabilities {
+		agents := reg.FindAgentsByGives(capName)
+		for _, agent := range agents {
+			thinkAgent, ok := agent.(*ThinkAgent)
+			if !ok {
+				continue
+			}
+			thinkerID := thinkAgent.GetName() + "-" + n.Metadata.ID
+			if _, exists := n.GetBackgroundAgent(thinkerID); exists {
+				startedAny = true
+				continue // Already running
+			}
+			tAgent := NewThinkingAgent(thinkerID, 2*time.Second, thinkAgent.GetName(), thinkAgent.Think)
+			if err := n.AddBackgroundAgent(tAgent); err != nil {
+				n.StoreLog("[ThinkAgent] Failed to start %s: %v", thinkAgent.GetName(), err)
+			} else {
+				startedAny = true
+			}
+		}
+	}
+	return startedAny
+}
+
 // Example: "Flight reservation has been created" or "Hotel booking confirmed" Will find the last execution record for this agent and set the activity
 // regardless of current status (running, completed, or failed)
 func (n *Want) SetAgentActivity(agentName string, activity string) {

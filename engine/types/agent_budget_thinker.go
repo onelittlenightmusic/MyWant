@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	. "mywant/engine/core"
-	"time"
 )
 
 const budgetThinkerAgentName = "budget_thinker"
@@ -79,30 +78,3 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// startBudgetThinker starts the BudgetThinker BackgroundAgent for a budget want.
-func startBudgetThinker(want *Want) {
-	thinkerID := "budget-thinker-" + want.Metadata.ID
-	if _, exists := want.GetBackgroundAgent(thinkerID); exists {
-		return // Already running
-	}
-
-	reg := want.GetAgentRegistry()
-	if reg == nil {
-		return
-	}
-
-	agent, ok := reg.GetAgent(budgetThinkerAgentName)
-	if !ok {
-		return
-	}
-
-	thinkAgent, ok := agent.(*ThinkAgent)
-	if !ok {
-		return
-	}
-
-	tAgent := NewThinkingAgent(thinkerID, 2*time.Second, "BudgetThinker", thinkAgent.Think)
-	if err := want.AddBackgroundAgent(tAgent); err != nil {
-		want.StoreLog("[BudgetThinker] Failed to start: %v", err)
-	}
-}

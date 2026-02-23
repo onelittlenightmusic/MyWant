@@ -88,16 +88,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
 
-  // Identify if this want is a Target (can have children)
-  const wantType = want?.metadata?.type?.toLowerCase() || '';
-  const isTargetWant = wantType.includes('target') || 
-                       wantType === 'owner' ||
-                       wantType.includes('approval');
-
-  // Memoize wantId to avoid dependency array issues
-  const wantId = want?.metadata?.id || want?.id;
-
   const {
+    wants: allWants,
     selectedWantDetails,
     selectedWantResults,
     fetchWantDetails,
@@ -106,6 +98,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     updateWant,
     loading
   } = useWantStore();
+
+  // Identify if this want is a Target (can have children)
+  const wantType = want?.metadata?.type?.toLowerCase() || '';
+  const wantId = want?.metadata?.id || want?.id;
+  const hasChildren = allWants.some(w =>
+    w.metadata?.ownerReferences?.some(ref => ref.id === wantId)
+  );
+  const isTargetWant = wantType.includes('target') ||
+                       wantType === 'owner' ||
+                       wantType.includes('approval') ||
+                       hasChildren;
 
   const [activeTab, setActiveTab] = useState<TabType>('results');
   const [prevTabIndex, setPrevTabIndex] = useState(0);

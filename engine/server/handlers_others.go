@@ -179,6 +179,97 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	wantID := vars["id"]
+
+	// Find parent want
+	var parentWant *mywant.Want
+	var builder *mywant.ChainBuilder
+
+	for _, execution := range s.wants {
+		if execution.Builder != nil {
+			if wnt, _, found := execution.Builder.FindWantByID(wantID); found {
+				parentWant = wnt
+				builder = execution.Builder
+				break
+			}
+		}
+	}
+	if parentWant == nil && s.globalBuilder != nil {
+		if wnt, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			parentWant = wnt
+			builder = s.globalBuilder
+		}
+	}
+
+	if parentWant == nil {
+		http.Error(w, "Want not found", http.StatusNotFound)
+		return
+	}
+
+	// Collect child wants
+	allWants := builder.GetAllWantStates()
+	var childWants []*mywant.Want
+	for _, wnt := range allWants {
+		for _, ownerRef := range wnt.Metadata.OwnerReferences {
+			if ownerRef.ID == wantID || (ownerRef.Name == parentWant.Metadata.Name && ownerRef.Kind == "Want") {
+				childWants = append(childWants, wnt)
+				break
+			}
+		}
+	}
+
+	// Collect recommended state fields from parentStateAccess of child capabilities
+	stateMap := make(map[string]mywant.StateDef)
+	collectFromCapability := func(capName string) {
+		if cap, ok := s.agentRegistry.GetCapability(capName); ok {
+			for _, field := range cap.ParentStateAccess {
+				if _, exists := stateMap[field.Name]; !exists {
+					stateMap[field.Name] = mywant.StateDef{
+						Name:        field.Name,
+						Description: field.Description,
+						Type:        field.Type,
+					}
+				}
+			}
+		}
+	}
+	for _, child := range childWants {
+		// 1. Capabilities declared in spec.requires
+		for _, capName := range child.Spec.Requires {
+			collectFromCapability(capName)
+		}
+		// 2. ThinkAgent capabilities declared in the want type definition
+		if s.wantTypeLoader != nil && child.Metadata.Type != "" {
+			if typeDef := s.wantTypeLoader.GetDefinition(child.Metadata.Type); typeDef != nil {
+				for _, capName := range typeDef.ThinkCapabilities {
+					collectFromCapability(capName)
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	recommendedState := make([]mywant.StateDef, 0, len(stateMap))
+	for _, sd := range stateMap {
+		recommendedState = append(recommendedState, sd)
+	}
+
+	analysis := WantRecipeAnalysis{
+		WantID:     wantID,
+		ChildCount: len(childWants),
+		RecommendedState: recommendedState,
+		SuggestedMetadata: mywant.GenericRecipeMetadata{
+			Name:    parentWant.Metadata.Name + "-recipe",
+			Version: "1.0.0",
+		},
+	}
+
+	json.NewEncoder(w).Encode(analysis)
+}
+
 func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req SaveRecipeFromWantRequest
@@ -243,8 +334,10 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 
 	recipe := mywant.GenericRecipe{
 		Recipe: mywant.RecipeContent{
-			Metadata: recipeMeta,
-			Wants:    childWants,
+			Metadata:   recipeMeta,
+			Wants:      childWants,
+			State:      req.State,
+			Parameters: req.Parameters,
 		},
 	}
 

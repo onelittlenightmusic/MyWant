@@ -287,6 +287,29 @@ func (r *AgentRegistry) GetCapability(name string) (Capability, bool) {
 	return cap, exists
 }
 
+// FindMonitorAgentsByCapabilityName returns all MonitorAgents (or PollAgents) that
+// declare the given capability name in their Capabilities list.
+// Unlike FindAgentsByGives (which searches by capability gives values), this searches
+// by the capability name itself and filters to MonitorAgentType only.
+func (r *AgentRegistry) FindMonitorAgentsByCapabilityName(capName string) []Agent {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	var result []Agent
+	for _, agent := range r.agents {
+		if agent.GetType() != MonitorAgentType {
+			continue
+		}
+		for _, cap := range agent.GetCapabilities() {
+			if cap == capName {
+				result = append(result, agent)
+				break
+			}
+		}
+	}
+	return result
+}
+
 // BuildAgentSpecFromCapabilities builds an agent's state validation spec by aggregating
 // stateAccess and parentStateAccess declared in its capabilities.
 func (r *AgentRegistry) BuildAgentSpecFromCapabilities(agentName string, capabilityNames []string) {

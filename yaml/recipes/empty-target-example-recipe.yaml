@@ -1,0 +1,43 @@
+recipe:
+    metadata:
+        name: empty-target-example-recipe
+        description: ""
+        version: 1.0.0
+        category: general
+    wants:
+        - metadata:
+            name: budget-instance
+            type: budget
+            labels:
+                mywant.io/type: budget
+            orderKey: a0V
+          spec:
+            params:
+                budget: 5000
+                currency: USD
+            finalResultField: budget_summary
+        - metadata:
+            name: buffet-instance
+            type: buffet
+            labels:
+                mywant.io/type: buffet
+            orderKey: a2
+          spec:
+            params:
+                buffet_type: continental
+            requires:
+                - buffet_agency
+            finalResultField: reservation_name
+    state:
+        - name: target_budgets
+          description: Map of want names to their allocated budget (written by BudgetThinker)
+          type: map
+          persistent: false
+        - name: costs
+          description: Costs map aggregated from child wants via ConditionThinker
+          type: map
+          persistent: false
+        - name: itinerary
+          description: Map of want names to type/name entries registered by ConditionThinkers
+          type: map
+          persistent: false

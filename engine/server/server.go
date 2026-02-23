@@ -92,6 +92,12 @@ func New(config Config) *Server {
 	// Register all agent implementations (auto-registered via init() functions)
 	mywant.RegisterAllKnownAgentImplementations(agentRegistry)
 
+	// Derive MonitorCapabilities cache for all want type definitions by
+	// cross-referencing their requires list against the now-populated agent registry
+	if wantTypeLoader != nil {
+		wantTypeLoader.EnrichMonitorCapabilities(agentRegistry)
+	}
+
 	// Create reaction queue manager for reminders (multi-queue system)
 	reactionQueueManager := types.NewReactionQueueManager()
 

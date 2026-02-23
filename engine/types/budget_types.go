@@ -18,7 +18,8 @@ type BudgetWant struct {
 	Want
 }
 
-// Initialize sets up initial budget state and starts the BudgetThinker background agent.
+// Initialize sets up initial budget state.
+// BudgetThinker is started automatically by the framework based on thinkCapabilities in budget.yaml.
 func (b *BudgetWant) Initialize() {
 	budget := b.GetFloatParam("budget", 5000.0)
 	currency := b.GetStringParam("currency", "USD")
@@ -31,7 +32,6 @@ func (b *BudgetWant) Initialize() {
 		"budget_exceeded":      false,
 		"achieving_percentage": 0,
 	})
-	startBudgetThinker(&b.Want)
 }
 
 // Progress is a no-op: BudgetThinker handles all state updates asynchronously.

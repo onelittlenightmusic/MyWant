@@ -1,3 +1,18 @@
+export interface StateDef {
+  name: string;
+  description?: string;
+  type?: string;
+  persistent?: boolean;
+  initialValue?: any;
+}
+
+export interface WantRecipeAnalysis {
+  wantId: string;
+  childCount: number;
+  recommendedState: StateDef[];
+  suggestedMetadata: RecipeMetadata;
+}
+
 export interface RecipeMetadata {
   name: string;
   description?: string;
@@ -47,6 +62,7 @@ export interface RecipeContent {
   wants: RecipeWant[];
   result?: RecipeResultSpec[];
   example?: RecipeExample;
+  state?: StateDef[];
 }
 
 export interface GenericRecipe {
