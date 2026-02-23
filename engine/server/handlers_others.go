@@ -15,6 +15,7 @@ import (
 
 	mywant "mywant/engine/core"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
 )
@@ -123,8 +124,11 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid recipe format", http.StatusBadRequest)
 		return
 	}
-	recipeID := recipe.Recipe.Metadata.Name
-	if recipeID == "" {
+	// Always generate a dynamic GUID for the registry ID (non-persistent)
+	recipeID := uuid.New().String()
+	recipe.Recipe.Metadata.ID = recipeID
+
+	if recipe.Recipe.Metadata.Name == "" {
 		http.Error(w, "Recipe name required", http.StatusBadRequest)
 		return
 	}
@@ -132,6 +136,37 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+
+	// Save to file for persistence and to enable use as a custom target type
+	userRecipesDir := mywant.UserRecipesDir()
+	os.MkdirAll(userRecipesDir, 0755)
+	
+	// Determine a meaningful filename based on custom_type or name
+	fileBase := recipe.Recipe.Metadata.CustomType
+	if fileBase == "" {
+		fileBase = recipe.Recipe.Metadata.Name
+	}
+	fileBase = strings.ReplaceAll(fileBase, " ", "-")
+	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
+	
+	// Create a copy for saving to disk without the dynamic ID
+	saveRecipe := recipe
+	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
+	yamlData, _ := yaml.Marshal(saveRecipe)
+	os.WriteFile(filename, yamlData, 0644)
+
+	// Immediately register as custom target type if custom_type is provided
+	if recipe.Recipe.Metadata.CustomType != "" {
+		mywant.RegisterCustomTargetType(
+			s.recipeRegistry,
+			recipe.Recipe.Metadata.CustomType,
+			recipe.Recipe.Metadata.Description,
+			filename,
+			recipe.Recipe.Parameters,
+		)
+		log.Printf("[SERVER] 🎯 Registered custom target type '%s' from newly created recipe\n", recipe.Recipe.Metadata.CustomType)
+	}
+
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", recipeID, "success", http.StatusCreated, "", "Recipe created")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"id": recipeID, "message": "Recipe created"})
@@ -165,17 +200,73 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
+	// Persist changes to file
+	userRecipesDir := mywant.UserRecipesDir()
+	os.MkdirAll(userRecipesDir, 0755)
+	
+	// Determine filename based on custom_type or name
+	fileBase := recipe.Recipe.Metadata.CustomType
+	if fileBase == "" {
+		fileBase = recipe.Recipe.Metadata.Name
+	}
+	fileBase = strings.ReplaceAll(fileBase, " ", "-")
+	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
+	
+	// Create a copy for saving to disk without the dynamic ID
+	saveRecipe := recipe
+	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
+	yamlData, _ := yaml.Marshal(saveRecipe)
+	os.WriteFile(filename, yamlData, 0644)
+
+	// Re-register as custom target type if custom_type is provided
+	if recipe.Recipe.Metadata.CustomType != "" {
+		mywant.RegisterCustomTargetType(
+			s.recipeRegistry,
+			recipe.Recipe.Metadata.CustomType,
+			recipe.Recipe.Metadata.Description,
+			filename,
+			recipe.Recipe.Parameters,
+		)
+		log.Printf("[SERVER] 🎯 Updated custom target type '%s' registration\n", recipe.Recipe.Metadata.CustomType)
+	}
+
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/recipes/"+vars["id"], vars["id"], "success", http.StatusOK, "", "Recipe updated")
 	json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
 func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	if err := s.recipeRegistry.DeleteRecipe(vars["id"]); err != nil {
+	recipeID := vars["id"]
+
+	recipe, exists := s.recipeRegistry.GetRecipe(recipeID)
+	if !exists {
+		http.Error(w, "Recipe not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.recipeRegistry.DeleteRecipe(recipeID); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/recipes/"+vars["id"], vars["id"], "success", http.StatusNoContent, "", "Recipe deleted")
+
+	// Also delete the file if it's in the user recipes directory
+	userRecipesDir := mywant.UserRecipesDir()
+	
+	// Determine filename based on custom_type or name as saved
+	fileBase := recipe.Recipe.Metadata.CustomType
+	if fileBase == "" {
+		fileBase = recipe.Recipe.Metadata.Name
+	}
+	fileBase = strings.ReplaceAll(fileBase, " ", "-")
+	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
+	
+	if _, err := os.Stat(filename); err == nil {
+		os.Remove(filename)
+		log.Printf("[SERVER] 🗑️ Deleted recipe file: %s\n", filename)
+	}
+
+	s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/recipes/"+recipeID, recipeID, "success", http.StatusNoContent, "", "Recipe deleted")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -345,7 +436,10 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		recipe.Recipe.Metadata.Name = parentWant.Metadata.Name + "-recipe"
 	}
 
-	recipeID := recipe.Recipe.Metadata.Name
+	// Always generate a dynamic GUID for the registry ID (non-persistent)
+	recipeID := uuid.New().String()
+	recipe.Recipe.Metadata.ID = recipeID
+
 	if err := s.recipeRegistry.CreateRecipe(recipeID, &recipe); err != nil {
 		s.recipeRegistry.UpdateRecipe(recipeID, &recipe)
 	}
@@ -353,10 +447,33 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	// Save to file (~/.mywant/recipes/)
 	userRecipesDir := mywant.UserRecipesDir()
 	os.MkdirAll(userRecipesDir, 0755)
-	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, recipeID)
-	filename = strings.ReplaceAll(filename, " ", "-")
-	yamlData, _ := yaml.Marshal(recipe)
+	
+	// Determine a meaningful filename based on custom_type or name
+	fileBase := recipe.Recipe.Metadata.CustomType
+	if fileBase == "" {
+		fileBase = recipe.Recipe.Metadata.Name
+	}
+	fileBase = strings.ReplaceAll(fileBase, " ", "-")
+	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
+	
+	// Create a copy for saving to disk without the dynamic ID
+	saveRecipe := recipe
+	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
+	yamlData, _ := yaml.Marshal(saveRecipe)
 	os.WriteFile(filename, yamlData, 0644)
+
+	// Immediately register as custom target type if custom_type is provided
+	// This makes it available for use as a want type without restart
+	if recipe.Recipe.Metadata.CustomType != "" {
+		mywant.RegisterCustomTargetType(
+			s.recipeRegistry,
+			recipe.Recipe.Metadata.CustomType,
+			recipe.Recipe.Metadata.Description,
+			filename,
+			recipe.Recipe.Parameters,
+		)
+		log.Printf("[SERVER] 🎯 Registered custom target type '%s' from newly saved recipe\n", recipe.Recipe.Metadata.CustomType)
+	}
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "success", http.StatusCreated, "", "Recipe saved")
 	w.WriteHeader(http.StatusCreated)

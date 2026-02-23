@@ -97,6 +97,7 @@ func (rw RecipeWant) ConvertToWant() *Want {
 
 // GenericRecipeMetadata contains recipe information
 type GenericRecipeMetadata struct {
+	ID          string `yaml:"id,omitempty" json:"id,omitempty"`
 	Name        string `yaml:"name" json:"name"`
 	Description string `yaml:"description" json:"description"`
 	Version     string `yaml:"version" json:"version"`

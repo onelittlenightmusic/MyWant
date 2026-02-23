@@ -1,5 +1,0 @@
-recipe:
-    metadata:
-        name: test-target-recipe
-        description: Recipe saved from test-target
-        version: 1.0.0

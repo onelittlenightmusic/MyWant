@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
+	"github.com/google/uuid"
 	"mywant/engine/core"
 
 	"gopkg.in/yaml.v3"
@@ -195,18 +195,16 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 			continue
 		}
 
-		// Use recipe name as ID, fall back to filename without extension
-		recipeID := recipe.Recipe.Metadata.Name
-		if recipeID == "" {
-			recipeID = strings.TrimSuffix(relativePath, ".yaml")
-			recipeID = strings.TrimSuffix(recipeID, ".yml")
-		}
+		// Generate a dynamic GUID for the recipe ID (non-persistent)
+		recipeID := uuid.New().String()
+		recipe.Recipe.Metadata.ID = recipeID
+
 		if err := registry.CreateRecipe(recipeID, &recipe); err != nil {
 			log.Printf("[SERVER] Warning: Failed to register recipe %s: %v\n", recipeID, err)
 			continue
 		}
 
-		log.Printf("[SERVER] ✅ Loaded recipe: %s\n", recipeID)
+		log.Printf("[SERVER] ✅ Loaded recipe: %s (ID: %s)\n", recipe.Recipe.Metadata.Name, recipeID)
 		loadedCount++
 	}
 

@@ -1,5 +1,0 @@
-recipe:
-    metadata:
-        name: renamed-endpoint-test
-        description: Testing renamed endpoint
-        version: 1.0.0
