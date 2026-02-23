@@ -3,14 +3,7 @@ import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { SectionNavigationCallbacks } from '@/types/formSection';
 import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
-/**
- * Parameter definition from want type
- */
-export interface ParameterDefinition {
-  name: string;
-  required: boolean;
-  description?: string;
-}
+import { ParameterDef } from '@/types/wantType';
 
 /**
  * Props for ParametersSection
@@ -19,7 +12,7 @@ interface ParametersSectionProps {
   /** Current parameter values */
   parameters: Record<string, any>;
   /** Parameter definitions from want type (if available) */
-  parameterDefinitions?: ParameterDefinition[];
+  parameterDefinitions?: ParameterDef[];
   /** Callback when parameters change */
   onChange: (parameters: Record<string, any>) => void;
   /** Whether the section is collapsed */
@@ -78,13 +71,33 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   }, [isCollapsed]);
 
   /**
-   * Update a parameter value
+   * Update a parameter value, converting type if necessary
    */
-  const handleUpdateParam = useCallback((key: string, value: any) => {
-    onChange({
-      ...parameters,
-      [key]: value
-    });
+  const handleUpdateParam = useCallback((key: string, value: string, paramType: string) => {
+    let typedValue: any = value;
+    if (value === '') { // Treat empty string as undefined for optional params, or default
+      typedValue = undefined;
+    } else {
+      switch (paramType) {
+        case 'float64':
+        case 'int':
+          typedValue = parseFloat(value);
+          if (isNaN(typedValue)) typedValue = undefined; // Set to undefined if invalid number
+          break;
+        case 'bool':
+          typedValue = value.toLowerCase() === 'true';
+          break;
+        // Add other types as needed
+      }
+    }
+
+    const newParams = { ...parameters };
+    if (typedValue === undefined) {
+      delete newParams[key]; // Remove if value is empty/invalid for optional params
+    } else {
+      newParams[key] = typedValue;
+    }
+    onChange(newParams);
   }, [parameters, onChange]);
 
   /**
@@ -162,7 +175,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
    * Get filtered parameters based on optional params toggle
    */
   const filteredParams = parameterDefinitions?.filter(
-    param => param.required || showOptionalParams
+    param => param.required || showOptionalParams || (parameters[param.name] !== undefined) // Always show if already has a value
   ) || [];
 
   return (
@@ -255,44 +268,86 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
             <>
               {/* Parameters from want type definition */}
               <div className="space-y-1 sm:space-y-2">
-                {filteredParams.map((param, index) => (
-                  <div key={param.name} className="space-y-0.5 sm:space-y-1">
-                    <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-start sm:items-center">
-                      <div className="w-full sm:w-32 flex-shrink-0">
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 pt-1 sm:pt-2">
-                          {param.name}
-                          {param.required && <span className="text-red-600 ml-1">*</span>}
-                        </label>
+                {filteredParams.map((param, index) => {
+                  // Determine input type based on param.type
+                  let inputType: string = 'text';
+                  let inputValue: string | boolean = '';
+
+                  // Get current value, falling back to example, then default
+                  const currentValue = parameters[param.name];
+                  if (currentValue !== undefined) {
+                      inputValue = String(currentValue);
+                  } else if (param.example !== undefined) {
+                      inputValue = String(param.example);
+                  } else if (param.default !== undefined) {
+                      inputValue = String(param.default);
+                  }
+
+                  switch (param.type) {
+                    case 'float64':
+                    case 'int':
+                      inputType = 'number';
+                      break;
+                    case 'bool':
+                      inputType = 'checkbox';
+                      // For boolean, default to false if no value present
+                      if (currentValue === undefined && param.example === undefined && param.default === undefined) {
+                          inputValue = false;
+                      } else {
+                          inputValue = Boolean(currentValue ?? param.example ?? param.default);
+                      }
+                      break;
+                    // Add other types as needed
+                  }
+
+                  return (
+                    <div key={param.name} className="space-y-0.5 sm:space-y-1">
+                      <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-start sm:items-center">
+                        <div className="w-full sm:w-32 flex-shrink-0">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 pt-1 sm:pt-2">
+                            {param.name}
+                            {param.required && <span className="text-red-600 ml-1">*</span>}
+                          </label>
+                        </div>
+                        {inputType === 'checkbox' ? (
+                           <input
+                            type="checkbox"
+                            checked={inputValue as boolean}
+                            onChange={(e) => handleUpdateParam(param.name, String(e.target.checked), param.type)}
+                            className="flex-1 w-full h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        ) : (
+                          <CommitInput
+                            ref={index === 0 ? firstInputRef : undefined}
+                            type={inputType}
+                            value={inputValue as string}
+                            onChange={(val) => handleUpdateParam(param.name, val, param.type)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                e.preventDefault();
+                                headerRef.current?.focus();
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // フォーカスがセクション外に移った場合のみセクションを閉じる
+                              const relatedTarget = e.relatedTarget as Node;
+                              if (!relatedTarget || !sectionRef.current?.contains(relatedTarget)) {
+                                if (!isCollapsed) {
+                                  onToggleCollapse();
+                                }
+                              }
+                            }}
+                            className="flex-1 w-full"
+                            placeholder={param.description || 'Enter value'}
+                          />
+                        )}
                       </div>
-                      <CommitInput
-                        ref={index === 0 ? firstInputRef : undefined}
-                        type="text"
-                        value={String(parameters[param.name] || '')}
-                        onChange={(val) => handleUpdateParam(param.name, val)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            e.preventDefault();
-                            headerRef.current?.focus();
-                          }
-                        }}
-                        onBlur={(e) => {
-                          // フォーカスがセクション外に移った場合のみセクションを閉じる
-                          const relatedTarget = e.relatedTarget as Node;
-                          if (!relatedTarget || !sectionRef.current?.contains(relatedTarget)) {
-                            if (!isCollapsed) {
-                              onToggleCollapse();
-                            }
-                          }
-                        }}
-                        className="flex-1 w-full"
-                        placeholder={param.description || 'Enter value'}
-                      />
+                      {param.description && (
+                        <p className="text-[10px] sm:text-xs text-gray-600 sm:ml-32">{param.description}</p>
+                      )}
                     </div>
-                    {param.description && (
-                      <p className="text-[10px] sm:text-xs text-gray-600 sm:ml-32">{param.description}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Show Optional Parameters Toggle */}
@@ -327,7 +382,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                       ref={index === 0 ? firstInputRef : undefined}
                       type="text"
                       value={String(value)}
-                      onChange={(val) => handleUpdateParam(key, val)}
+                      onChange={(val) => handleUpdateParam(key, val, 'string')} // Default to string for recipe params
                       onKeyDown={(e) => {
                         if (e.key === 'Escape') {
                           e.preventDefault();
