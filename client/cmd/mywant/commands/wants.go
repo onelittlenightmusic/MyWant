@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"mywant/client"
@@ -127,13 +129,25 @@ var createWantCmd = &cobra.Command{
 	Use:     "create",
 	Aliases: []string{"c"},
 	Short:   "Create a new want",
+	Long: `Create a new want.
+
+Modes:
+  -f file.yaml          Create from YAML/JSON file
+  -t <type> [-e]        Create want of specific type, optionally with example parameters
+  -i                    Interactive mode: prompts for all inputs`,
 	Run: func(cmd *cobra.Command, args []string) {
+		interactive, _ := cmd.Flags().GetBool("interactive")
 		file, _ := cmd.Flags().GetString("file")
 		wantType, _ := cmd.Flags().GetString("type")
 		useExample, _ := cmd.Flags().GetBool("example")
 
+		if interactive {
+			runInteractiveCreateWant(cmd)
+			return
+		}
+
 		if file == "" && wantType == "" {
-			fmt.Println("Error: either --file or --type flag is required")
+			fmt.Println("Error: either --file, --type, or --interactive flag is required")
 			os.Exit(1)
 		}
 
@@ -265,6 +279,7 @@ func init() {
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
 	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")
+	createWantCmd.Flags().BoolP("interactive", "i", false, "Full interactive mode (prompts for all inputs)")
 	exportWantsCmd.Flags().StringP("output", "o", "", "Path to save exported YAML (stdout if not specified)")
 	importWantsCmd.Flags().StringP("file", "f", "", "Path to YAML file to import")
 
@@ -385,4 +400,225 @@ var importWantsCmd = &cobra.Command{
 		fmt.Printf("Successfully imported execution %s with %d wants\n", resp.ID, resp.Wants)
 		fmt.Println(resp.Message)
 	},
+}
+
+func runInteractiveCreateWant(cmd *cobra.Command) {
+	fmt.Println("--- Create New Want (Interactive Mode) ---")
+
+	c := client.NewClient(viper.GetString("server"))
+
+	// 1. Get Want Type
+	fmt.Println("\nFetching available Want Types...")
+	wantTypes, err := c.ListWantTypes()
+	if err != nil {
+		fmt.Printf("Error fetching want types: %v\n", err)
+		os.Exit(1)
+	}
+	if len(wantTypes) == 0 {
+		fmt.Println("No want types found. Cannot create a want interactively.")
+		os.Exit(1)
+	}
+
+	wantTypeLabels := make([]string, len(wantTypes))
+	for i, wt := range wantTypes {
+		wantTypeLabels[i] = fmt.Sprintf("%s (Category: %s, Version: %s)", wt.Name, wt.Category, wt.Version)
+	}
+	selectedTypeIdx := promptChoice("Select a Want Type", wantTypeLabels, 0)
+	selectedWantType := wantTypes[selectedTypeIdx].Name
+	fmt.Printf("Selected Want Type: %s\n", selectedWantType)
+
+	// 2. Get Want Name
+	wantName := promptInput("Enter Want Name", "new-"+selectedWantType)
+	for wantName == "" {
+		fmt.Print("Want Name cannot be empty. Enter Want Name: ")
+		wantName = readLine()
+	}
+
+	// 3. Get Want Labels (Optional)
+	labels := make(map[string]string)
+	for {
+		addLabel := promptInput("Add a label? (e.g., 'key=value') (press Enter to skip)", "")
+		if addLabel == "" {
+			break
+		}
+		parts := strings.SplitN(addLabel, "=", 2)
+		if len(parts) == 2 {
+			labels[parts[0]] = parts[1]
+		} else {
+			fmt.Println("Invalid label format. Please use 'key=value'.")
+		}
+	}
+
+	// 4. Get Want Parameters (Spec.Params) - enhanced interactive input
+	var params map[string]any
+
+	paramSourceChoices := []string{
+		"Start from an example",
+		"Start from scratch (empty parameters)",
+	}
+	paramSourceIdx := promptChoice("How do you want to define parameters?", paramSourceChoices, 1) // Default to scratch
+
+	if paramSourceIdx == 0 { // Start from an example
+		fmt.Printf("\nFetching example parameters for '%s'...\n", selectedWantType)
+		exResp, err := c.GetWantTypeExamples(selectedWantType)
+		if err != nil {
+			fmt.Printf("Error fetching example parameters: %v\n", err)
+			fmt.Println("Proceeding with empty parameters.")
+			params = make(map[string]any)
+		} else {
+			if examples, ok := (*exResp)["examples"].([]any); ok && len(examples) > 0 {
+				exampleBytes, _ := json.Marshal(examples[0])
+				var exampleWant client.Want
+				if err := json.Unmarshal(exampleBytes, &exampleWant); err == nil {
+					params = exampleWant.Spec.Params
+					fmt.Println("Example parameters loaded.")
+				} else {
+					fmt.Printf("Warning: Could not unmarshal example parameters: %v\n", err)
+					fmt.Println("Proceeding with empty parameters.")
+					params = make(map[string]any)
+				}
+			} else {
+				fmt.Println("No example parameters found for this Want Type. Proceeding with empty parameters.")
+				params = make(map[string]any)
+			}
+		}
+	} else { // Start from scratch
+		params = make(map[string]any)
+		fmt.Println("Starting with empty parameters.")
+	}
+
+	// Loop for parameter customization and validation
+	for {
+		fmt.Println("\n--- Current Parameters (YAML) ---")
+		if len(params) > 0 {
+			paramBytes, _ := yaml.Marshal(params)
+			fmt.Println(string(paramBytes))
+		} else {
+			fmt.Println("(No parameters defined yet)")
+		}
+
+		paramActionChoices := []string{
+			"Edit YAML directly",
+			"Proceed with these parameters",
+		}
+		paramActionIdx := promptChoice("Parameters are defined. What do you want to do?", paramActionChoices, 1)
+
+		if paramActionIdx == 0 { // Edit YAML
+			fmt.Println("\n--- Paste new YAML content for parameters ---")
+			fmt.Println("Press Ctrl+D (Unix) or Ctrl+Z (Windows) then Enter when done.")
+			paramReader := bufio.NewReader(os.Stdin)
+			var paramInput strings.Builder
+			for {
+				line, err := paramReader.ReadString('\n')
+				if err != nil { // EOF or other error
+					break
+				}
+				paramInput.WriteString(line)
+			}
+
+			newParamStr := strings.TrimSpace(paramInput.String())
+			if newParamStr != "" {
+				var tempParams map[string]any
+				if err := yaml.Unmarshal([]byte(newParamStr), &tempParams); err != nil {
+					fmt.Printf("Error: Could not parse YAML input: %v\n", err)
+					fmt.Println("Current parameters are unchanged.")
+				} else {
+					params = tempParams
+					fmt.Println("Parameters updated from input.")
+				}
+			} else {
+				fmt.Println("No input received. Parameters remain unchanged.")
+			}
+		} else { // Proceed with these parameters
+			// 5. Validation Step
+			newWant := client.Want{
+				Metadata: client.Metadata{
+					Name:   wantName,
+					Type:   selectedWantType,
+					Labels: labels,
+				},
+				Spec: client.WantSpec{
+					Params: params,
+				},
+			}
+			configForValidation := client.Config{Wants: []*client.Want{&newWant}}
+
+			fmt.Println("\n--- Validating Want Configuration ---")
+			validationResult, valErr := c.ValidateWantConfig(configForValidation)
+			if valErr != nil {
+				fmt.Printf("Error during validation: %v\n", valErr)
+				fmt.Println("Please review your parameters and try again.")
+				continue // Loop back to allow editing
+			}
+
+			if validationResult.Valid {
+				fmt.Println("Validation successful: Want configuration is valid.")
+				if len(validationResult.Warnings) > 0 {
+					fmt.Println("Warnings:")
+					for _, warn := range validationResult.Warnings {
+						fmt.Printf("  - [%s] %s: %s (Field: %s, Suggestion: %s)\n", warn.WarningType, warn.WantName, warn.Message, warn.Field, warn.Suggestion)
+					}
+					confirmProceed := promptInput("Proceed despite warnings? (y/N)", "n")
+					if strings.ToLower(confirmProceed) != "y" {
+						fmt.Println("Returning to parameter editing to address warnings.")
+						continue // Loop back to allow editing
+					}
+				}
+				break // Exit customization loop if valid and no fatal errors
+			} else {
+				fmt.Println("Validation failed!")
+				if len(validationResult.FatalErrors) > 0 {
+					fmt.Println("Fatal Errors:")
+					for _, errItem := range validationResult.FatalErrors {
+						fmt.Printf("  - [%s] %s: %s (Field: %s, Details: %s)\n", errItem.ErrorType, errItem.WantName, errItem.Message, errItem.Field, errItem.Details)
+					}
+				}
+				fmt.Println("Please review your parameters and try again.")
+				continue // Loop back to allow editing
+			}
+		}
+	}
+
+	// 6. Final Confirmation and Creation
+	fmt.Println("\n--- Final Review Before Creation ---")
+	fmt.Printf("Name: %s\n", wantName)
+	fmt.Printf("Type: %s\n", selectedWantType)
+	if len(labels) > 0 {
+		fmt.Printf("Labels: %v\n", labels)
+	}
+	if len(params) > 0 {
+		fmt.Println("Parameters:")
+		paramBytes, _ := yaml.Marshal(params)
+		fmt.Println(string(paramBytes))
+	}
+
+	confirm := promptInput("Create this Want? (y/N)", "n")
+	if strings.ToLower(confirm) != "y" {
+		fmt.Println("Want creation cancelled.")
+		return
+	}
+
+	finalWant := client.Want{
+		Metadata: client.Metadata{
+			Name:   wantName,
+			Type:   selectedWantType,
+			Labels: labels,
+		},
+		Spec: client.WantSpec{
+			Params: params,
+		},
+	}
+
+	finalConfig := client.Config{Wants: []*client.Want{&finalWant}}
+
+	resp, err := c.CreateWant(finalConfig)
+	if err != nil {
+		fmt.Printf("Error creating want: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("\nSuccessfully created want execution %s with %d wants\n", resp.ID, len(resp.WantIDs))
+	for _, id := range resp.WantIDs {
+		fmt.Printf("- %s\n", id)
+	}
 }

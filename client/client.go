@@ -36,6 +36,16 @@ func NewClientWithTimeout(baseURL string, timeout time.Duration) *Client {
 	}
 }
 
+// ValidateWantConfig sends a want configuration for validation
+func (c *Client) ValidateWantConfig(config Config) (*ValidationResult, error) {
+	var result ValidationResult
+	err := c.Request("POST", "/api/v1/wants/validate", config, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // Request performs an HTTP request and decodes JSON response
 func (c *Client) Request(method, path string, body any, result any) error {
 	resp, err := c.doRequest(method, path, body, "application/json")
