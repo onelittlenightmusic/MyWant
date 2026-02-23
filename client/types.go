@@ -114,11 +114,26 @@ type RecipeMetadata struct {
 	Description string `json:"description,omitempty"`
 	Version     string `json:"version,omitempty"`
 	CustomType  string `json:"custom_type,omitempty"`
+	Category    string `json:"category,omitempty"`
+}
+
+type StateDef struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type,omitempty"`
 }
 
 type SaveRecipeFromWantRequest struct {
 	WantID   string         `json:"wantId"`
 	Metadata RecipeMetadata `json:"metadata"`
+	State    []StateDef     `json:"state,omitempty"`
+}
+
+type WantRecipeAnalysis struct {
+	WantID            string         `json:"wantId"`
+	ChildCount        int            `json:"childCount"`
+	RecommendedState  []StateDef     `json:"recommendedState"`
+	SuggestedMetadata RecipeMetadata `json:"suggestedMetadata"`
 }
 
 type SaveRecipeResponse struct {

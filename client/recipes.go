@@ -4,6 +4,16 @@ import (
 	"fmt"
 )
 
+// AnalyzeWantForRecipe analyzes a want and returns recipe creation recommendations
+func (c *Client) AnalyzeWantForRecipe(wantID string) (*WantRecipeAnalysis, error) {
+	var result WantRecipeAnalysis
+	err := c.Request("GET", fmt.Sprintf("/api/v1/wants/%s/recipe-analysis", wantID), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // ListRecipes retrieves all recipes
 func (c *Client) ListRecipes() (map[string]GenericRecipe, error) {
 	var result map[string]GenericRecipe

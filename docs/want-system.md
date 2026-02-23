@@ -98,6 +98,72 @@ recipe:
       using: [{type: "data_reader"}]
 ```
 
+#### Recipe Storage Locations
+
+レシピファイルは2箇所から読み込まれます:
+
+| 場所 | パス | 用途 |
+|------|------|------|
+| ビルトイン | `yaml/recipes/` | リポジトリ同梱のサンプル・共有レシピ |
+| ユーザー保存 | `~/.mywant/recipes/` | "Save as Recipe" で保存したレシピ |
+
+サーバー起動時に両方のディレクトリを自動的にスキャンし、レシピレジストリに登録します。
+
+#### Save as Recipe
+
+デプロイ済みの Want を再利用可能なレシピとして保存できます。
+
+**ダッシュボード (UI) から保存:**
+
+1. Want の詳細サイドバーを開く（target want のみ有効）
+2. "Save Recipe" ボタンをクリック
+3. 名前・説明・バージョン・カテゴリを入力して保存
+
+保存先: `~/.mywant/recipes/{recipe-name}.yaml`
+
+**CLI から保存:**
+
+```bash
+./bin/mywant recipes from-want <WANT_ID> --name "my-recipe"
+# Short: ./bin/mywant r fw <WANT_ID> -n "my-recipe"
+```
+
+**保存されるYAML構造:**
+
+```yaml
+recipe:
+  metadata:
+    name: my-recipe
+    description: "Optional description"
+    version: "1.0.0"
+    category: general        # general / approval / travel / mathematics / queue
+    custom_type: ""          # オプション: カスタム型名
+  wants:
+    - metadata:
+        name: child-want-name
+        type: want-type
+        labels: {}
+      spec:
+        params: {...}
+        requires: [...]
+  state:
+    - name: field_name       # 子 Want の capabilities から自動検出
+      description: ""
+      type: ""
+  parameters: {}
+```
+
+**起動時の自動ロード:**
+
+サーバーは起動時に以下の順序でレシピをロードします:
+
+```
+1. yaml/recipes/          → ビルトインレシピ (ScanAndRegisterCustomTypes)
+2. ~/.mywant/recipes/     → ユーザー保存レシピ (ScanAndRegisterCustomTypes)
+```
+
+`~/.mywant/recipes/` が存在しない場合はスキップされます（エラーにはなりません）。
+
 ## Connection Patterns & State Management
 
 ### Label-Based Connection Patterns

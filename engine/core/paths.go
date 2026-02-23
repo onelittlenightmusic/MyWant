@@ -1,5 +1,20 @@
 package mywant
 
+import (
+	"os"
+	"path/filepath"
+)
+
+// UserRecipesDir returns the path to the user's recipe directory (~/.mywant/recipes).
+// This is where recipes saved via "Save as Recipe" are stored.
+func UserRecipesDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return RecipesDir
+	}
+	return filepath.Join(home, ".mywant", "recipes")
+}
+
 // YAML directory structure constants
 // These constants define the paths to all YAML configuration files
 // ensuring consistency across the application.

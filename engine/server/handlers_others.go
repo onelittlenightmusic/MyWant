@@ -350,8 +350,10 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		s.recipeRegistry.UpdateRecipe(recipeID, &recipe)
 	}
 
-	// Save to file
-	filename := fmt.Sprintf("%s/%s.yaml", mywant.RecipesDir, recipeID)
+	// Save to file (~/.mywant/recipes/)
+	userRecipesDir := mywant.UserRecipesDir()
+	os.MkdirAll(userRecipesDir, 0755)
+	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, recipeID)
 	filename = strings.ReplaceAll(filename, " ", "-")
 	yamlData, _ := yaml.Marshal(recipe)
 	os.WriteFile(filename, yamlData, 0644)

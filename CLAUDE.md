@@ -48,8 +48,10 @@ make release                                        # Build CLI
 ./bin/mywant wants get/delete/suspend/resume <ID>
 
 # Recipes
-./bin/mywant recipes list/create -f recipe.yaml
-./bin/mywant recipes from-want <ID> --name "my-recipe"
+./bin/mywant recipes list
+./bin/mywant recipes create -f recipe.yaml          # from file
+./bin/mywant recipes create --from-want <ID> --name "my-recipe"  # from want
+./bin/mywant recipes create -i                      # interactive
 
 # System
 ./bin/mywant types/agents/capabilities list

@@ -63,6 +63,11 @@ func New(config Config) *Server {
 	// Also load the recipe files themselves into the recipe registry
 	_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
 
+	// Load user-saved recipes from ~/.mywant/recipes/
+	userRecipesDir := mywant.UserRecipesDir()
+	_ = mywant.ScanAndRegisterCustomTypes(userRecipesDir, recipeRegistry)
+	_ = loadRecipeFilesIntoRegistry(userRecipesDir, recipeRegistry)
+
 	// Load want type definitions
 	wantTypeLoader := mywant.NewWantTypeLoader(mywant.WantTypesDir)
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
