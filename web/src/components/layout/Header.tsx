@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
@@ -210,7 +210,10 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onCreateWant}
               className="inline-flex items-center px-3 sm:px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
             >
-              <Plus className="h-4 w-4 sm:mr-2 flex-shrink-0" />
+              <span className="relative inline-flex sm:mr-2 flex-shrink-0">
+                <Heart className="h-4 w-4" />
+                <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
+              </span>
               <span className="hidden sm:inline">{createButtonLabel}</span>
             </button>
           )}

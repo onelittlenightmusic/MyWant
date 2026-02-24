@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, CheckSquare, Square, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
@@ -53,6 +53,7 @@ interface WantCardProps {
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
   isBeingProcessed?: boolean; // New prop for initializing/deleting states
+  onCreateWant?: (parentWant?: Want) => void;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -78,7 +79,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   index,
   isSelectMode = false,
   selectedWantIds,
-  isBeingProcessed = false // Default to false
+  isBeingProcessed = false, // Default to false
+  onCreateWant,
 }) => {
   const wantId = want.metadata?.id || want.id;
   const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId } = useWantStore();
@@ -555,6 +557,19 @@ export const WantCard: React.FC<WantCardProps> = ({
                 </div>
               );
             })}
+
+            {onCreateWant && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onCreateWant(want); }}
+                className="flex flex-col items-center justify-center p-3 rounded-md border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group min-h-[6rem]"
+              >
+                <span className="relative inline-flex flex-shrink-0 mb-1.5">
+                  <Heart className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+                  <Plus className="w-3 h-3 absolute -top-1.5 -right-1.5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
+              </button>
+            )}
           </div>
           </div>
         </div>

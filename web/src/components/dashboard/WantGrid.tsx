@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
 import { WantCard } from './WantCard';
@@ -34,7 +34,7 @@ interface WantGridProps {
   onGetFilteredWants?: (wants: Want[]) => void;
   expandedParents?: Set<string>;
   onToggleExpand?: (wantId: string) => void;
-  onCreateWant?: () => void;
+  onCreateWant?: (parentWant?: Want) => void;
   onLabelDropped?: (wantId: string) => void;
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
   isSelectMode?: boolean;
@@ -237,11 +237,12 @@ export const WantGrid: React.FC<WantGridProps> = ({
   if (!hasUserWants) {
     return (
       <div className="flex items-center justify-center py-16">
-        <button onClick={onCreateWant} className="flex flex-col items-center gap-4 p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group">
+        <button onClick={() => onCreateWant?.()} className="flex flex-col items-center gap-4 p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group">
           <div className="w-24 h-24 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors">
-            <svg className="w-12 h-12 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <span className="relative inline-flex flex-shrink-0">
+              <Heart className="w-12 h-12 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+              <Plus className="w-5 h-5 absolute -top-2 -right-2 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
+            </span>
           </div>
           <div className="text-center">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No wants yet</h3>
@@ -302,6 +303,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
               onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
               isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
+              onCreateWant={onCreateWant}
             />
 
             {/* Drop Indicator After (only for the last item) */}
@@ -326,8 +328,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
         </div>
       ))}
 
-      <button 
-        onClick={onCreateWant} 
+      <button
+        onClick={() => onCreateWant?.()}
         onDragOver={(e) => {
           const { draggingWant } = useWantStore.getState();
           if (draggingWant || e.dataTransfer.types.includes('application/mywant-id')) {
@@ -347,9 +349,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
         className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[8rem] sm:min-h-[12.5rem]"
       >
         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
-          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <span className="relative inline-flex flex-shrink-0">
+            <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
+          </span>
         </div>
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
       </button>

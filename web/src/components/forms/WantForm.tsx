@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, Plus, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen } from 'lucide-react';
+import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -29,6 +29,7 @@ interface WantFormProps {
   isOpen: boolean;
   onClose: () => void;
   editingWant?: Want | null;
+  ownerWant?: Want | null;
   mode?: 'create' | 'edit' | 'recommendation';
   recommendations?: Recommendation[];
   selectedRecommendation?: Recommendation | null;
@@ -41,6 +42,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   isOpen,
   onClose,
   editingWant,
+  ownerWant = null,
   mode = 'create',
   recommendations = [],
   selectedRecommendation = null,
@@ -202,15 +204,16 @@ export const WantForm: React.FC<WantFormProps> = ({
     // Filter out when entries with empty every
     const validWhen = when.filter(item => item.every?.trim());
 
+    const ownerReferences = ownerWant
+      ? [{ apiVersion: 'v1', kind: 'Want', name: ownerWant.metadata?.name || '', id: ownerWant.metadata?.id || ownerWant.id || '', controller: true, blockOwnerDeletion: true }]
+      : (isEditing && editingWant?.metadata?.ownerReferences ? editingWant.metadata.ownerReferences : undefined);
+
     return {
       metadata: {
         name: name.trim(),
         type: type.trim(),
         ...(Object.keys(labels).length > 0 && { labels }),
-        // PRESERVE parent relationship when editing
-        ...(isEditing && editingWant?.metadata?.ownerReferences && { 
-          ownerReferences: editingWant.metadata.ownerReferences 
-        })
+        ...(ownerReferences && { ownerReferences }),
       },
       spec: {
         ...(Object.keys(params).length > 0 && { params }),
@@ -474,7 +477,10 @@ export const WantForm: React.FC<WantFormProps> = ({
           <LoadingSpinner size="sm" />
         ) : (
           <>
-            <Save className="w-3.5 h-3.5" />
+            <span className="relative inline-flex flex-shrink-0">
+              <Heart className="w-3.5 h-3.5" />
+              <Plus className="w-2 h-2 absolute -top-1 -right-1" style={{ strokeWidth: 3 }} />
+            </span>
             {isRecommendationMode ? 'Deploy' : (isEditing ? 'Update' : 'Add')}
           </>
         )}
@@ -696,6 +702,15 @@ export const WantForm: React.FC<WantFormProps> = ({
                     onTab: handleFieldTab,
                   }}
                 />
+
+                {/* Owner Section */}
+                {ownerWant && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                    <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
+                    <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>
+                  </div>
+                )}
               </>
             )}
           </>
