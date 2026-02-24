@@ -77,17 +77,13 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 	cost := toFloat64(costRaw)
-	if cost == 0 {
-		return nil
-	}
-	lastRaw, _ := want.GetState("_thinker_last_reported_cost")
-	if last := toFloat64(lastRaw); last == cost {
-		return nil
-	}
+	// Always propagate the current cost to the parent on every tick.
+	// MergeParentState is idempotent so repeated writes of the same value are safe.
+	// Skipping when the value is unchanged would break re-propagation after a
+	// coordinator state reset (e.g. server restart), leaving costs permanently empty.
 	want.MergeParentState(map[string]any{
 		"costs": map[string]any{want.Metadata.Name: cost},
 	})
-	want.StoreState("_thinker_last_reported_cost", cost)
 	want.StoreLog("[ConditionThinker] Propagated cost %.2f to parent want", cost)
 	return nil
 }

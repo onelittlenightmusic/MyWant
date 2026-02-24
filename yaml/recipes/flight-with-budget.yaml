@@ -1,0 +1,82 @@
+recipe:
+  metadata:
+    name: "Flight With Budget"
+    description: "Flight booking with budget tracking - aggregates flight costs against a budget limit"
+    custom_type: "flight with budget system"
+    category: "travel"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "flight-budget"
+    budget: 3000.0
+    currency: USD
+    flight_type: "economy"
+    duration_hours: 10.0
+    departure_date: "2025-12-25"
+    flight_cost: 1200.0
+    server_url: "http://localhost:8090"
+
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    budget: "Total budget amount"
+    currency: "Currency code for budget tracking"
+    flight_type: "Flight class (economy, business, first)"
+    duration_hours: "Estimated flight duration in hours"
+    departure_date: "Departure date in YYYY-MM-DD format"
+    flight_cost: "Estimated flight cost for budget tracking (if no agent)"
+    server_url: "Mock flight server URL"
+
+  wants:
+    # Budget tracker - aggregates costs from child wants
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+          category: finance
+      spec:
+        params:
+          budget: budget
+          currency: currency
+
+    # Flight reservation with cost reporting
+    - metadata:
+        type: flight
+        labels:
+          role: scheduler
+          category: travel
+      spec:
+        params:
+          flight_type: flight_type
+          duration_hours: duration_hours
+          departure_date: departure_date
+          cost: flight_cost
+          server_url: server_url
+        requires:
+          - flight_api_agency
+
+  state:
+    - name: costs
+      description: "Map of child want names to their reported costs"
+      type: map
+    - name: total_cost
+      description: "Total aggregated cost"
+      type: float64
+    - name: remaining_budget
+      description: "Budget minus total cost"
+      type: float64
+    - name: budget_budget_summary
+      description: "Budget tracking summary from budget want"
+      type: string
+    - name: flight_final_result
+      description: "Flight booking result"
+      type: string
+
+  finalResultField: budget_budget_summary
+
+  result:
+    - want_name: "budget"
+      state_field: "budget_summary"
+      description: "Budget tracking summary"
+    - want_name: "flight"
+      state_field: "reservation_name"
+      description: "Flight booking result"

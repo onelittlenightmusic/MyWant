@@ -1,0 +1,10 @@
+wants:
+  - metadata:
+      name: flight with budget planner
+      type: flightwithbudget
+      labels:
+        role: flight-budget-planner
+    spec:
+      params:
+        budget: 3000.0
+        currency: USD

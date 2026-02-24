@@ -411,10 +411,15 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		if isChild {
 			meta := wnt.Metadata
 			meta.ID = ""
+			meta.Name = ""           // clear runtime name; recipe loader auto-generates on deploy
 			meta.OwnerReferences = nil
 			childWants = append(childWants, mywant.RecipeWant{Metadata: meta, Spec: wnt.Spec})
 		}
 	}
+
+	// Parameterize child want params: replace runtime-resolved values with
+	// recipe-level parameter references, filtered to only declared params per type.
+	generatedParams, parameterizedWants := buildParameterizedRecipe(childWants, s.wantTypeLoader)
 
 	// Assuming req.Metadata is compatible or needs mapping
 	// In types.go we defined Metadata as `any`, here we need to cast or marshal/unmarshal
@@ -426,9 +431,9 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	recipe := mywant.GenericRecipe{
 		Recipe: mywant.RecipeContent{
 			Metadata:   recipeMeta,
-			Wants:      childWants,
+			Wants:      parameterizedWants,
 			State:      req.State,
-			Parameters: req.Parameters,
+			Parameters: generatedParams,
 		},
 	}
 
@@ -480,6 +485,97 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"id": recipeID, "message": "Recipe saved", "file": filename, "wants": len(childWants),
 	})
+}
+
+// buildParameterizedRecipe converts child want params from runtime-resolved values
+// back into recipe-level parameter references. Only params declared in each want
+// type's definition are included; runtime-injected or undeclared keys are dropped.
+//
+// Naming rules for recipe-level parameter names:
+//   - Key appears in exactly one child → use key as-is (e.g. "budget")
+//   - Key appears in multiple children → prefix with want type (e.g. "restaurant_cost")
+//   - After prefixing, still conflicts (same type twice) → append _1, _2, …
+//
+// Returns:
+//   - parameters: map of recipe-level param name → current value (used as defaults)
+//   - wants: copy of childWants with Spec.Params replaced by parameter references
+func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.WantTypeLoader) (map[string]any, []mywant.RecipeWant) {
+	type entry struct {
+		wantIdx  int
+		wantType string
+		key      string
+		value    any
+	}
+
+	// Step 1: collect only declared params per child, counting cross-child key usage
+	var entries []entry
+	keyCount := map[string]int{}
+
+	for i, cw := range childWants {
+		var declaredKeys map[string]bool
+		if loader != nil {
+			if typeDef := loader.GetDefinition(cw.Metadata.Type); typeDef != nil {
+				declaredKeys = make(map[string]bool, len(typeDef.Parameters))
+				for _, p := range typeDef.Parameters {
+					declaredKeys[p.Name] = true
+				}
+			}
+		}
+		for key, value := range cw.Spec.Params {
+			if declaredKeys != nil && !declaredKeys[key] {
+				continue // skip params not declared in the want type definition
+			}
+			entries = append(entries, entry{i, cw.Metadata.Type, key, value})
+			keyCount[key]++
+		}
+	}
+
+	// Step 2: determine recipe-level parameter name for each entry
+	type namedEntry struct {
+		entry
+		paramName string
+	}
+	paramNameCount := map[string]int{}
+	var named []namedEntry
+	for _, e := range entries {
+		pName := e.key
+		if keyCount[e.key] > 1 {
+			pName = e.wantType + "_" + e.key
+		}
+		named = append(named, namedEntry{e, pName})
+		paramNameCount[pName]++
+	}
+
+	// Step 3: disambiguate still-conflicting names (same type appears twice)
+	paramNameSeen := map[string]int{}
+	parameters := map[string]any{}
+	childRefs := make([]map[string]string, len(childWants))
+	for i := range childWants {
+		childRefs[i] = map[string]string{}
+	}
+	for _, ne := range named {
+		pName := ne.paramName
+		if paramNameCount[ne.paramName] > 1 {
+			paramNameSeen[ne.paramName]++
+			pName = fmt.Sprintf("%s_%d", ne.paramName, paramNameSeen[ne.paramName])
+		}
+		parameters[pName] = ne.value
+		childRefs[ne.wantIdx][ne.key] = pName
+	}
+
+	// Step 4: rebuild child wants with parameter references instead of literal values
+	result := make([]mywant.RecipeWant, len(childWants))
+	for i, cw := range childWants {
+		newCW := cw
+		newParams := make(map[string]any, len(childRefs[i]))
+		for key, ref := range childRefs[i] {
+			newParams[key] = ref // string reference → substituted at deploy time
+		}
+		newCW.Spec.Params = newParams
+		result[i] = newCW
+	}
+
+	return parameters, result
 }
 
 // Agents
