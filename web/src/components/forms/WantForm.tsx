@@ -206,7 +206,7 @@ export const WantForm: React.FC<WantFormProps> = ({
 
     const ownerReferences = ownerWant
       ? [{ apiVersion: 'v1', kind: 'Want', name: ownerWant.metadata?.name || '', id: ownerWant.metadata?.id || ownerWant.id || '', controller: true, blockOwnerDeletion: true }]
-      : (isEditing && editingWant?.metadata?.ownerReferences ? editingWant.metadata.ownerReferences : undefined);
+      : (isEditing && editingWant?.metadata?.ownerReferences?.length ? editingWant.metadata.ownerReferences : undefined);
 
     return {
       metadata: {
@@ -240,7 +240,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       console.log('Updating YAML - wantObject:', wantObject, 'using state:', using);
       setYamlContent(stringifyYaml(wantObject));
     }
-  }, [name, type, labels, params, using, when, editMode]);
+  }, [name, type, labels, params, using, when, editMode, ownerWant]);
 
   // Initialize form when sidebar opens/closes
   useEffect(() => {
