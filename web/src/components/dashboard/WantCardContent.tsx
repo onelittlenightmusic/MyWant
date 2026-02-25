@@ -211,10 +211,35 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     e.stopPropagation();
     const value = want.state?.final_result;
     const text = typeof value === 'string' ? value : JSON.stringify(value);
-    navigator.clipboard.writeText(text).then(() => {
+    const onCopied = () => {
       setFinalResultCopied(true);
       setTimeout(() => setFinalResultCopied(false), 1500);
-    });
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(onCopied).catch(() => {
+        // fallback for iOS/older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); onCopied(); } catch (_) {}
+        document.body.removeChild(ta);
+      });
+    } else {
+      // fallback for iOS/older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); onCopied(); } catch (_) {}
+      document.body.removeChild(ta);
+    }
   };
 
   const isRunning = want.status === 'reaching' || want.status === 'waiting_user_action';
@@ -669,7 +694,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </button>
           <button
             onClick={handleCopyFinalResult}
-            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/40"
             title="Copy to clipboard"
           >
             {finalResultCopied
