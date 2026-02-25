@@ -37,14 +37,38 @@ func (b *BudgetWant) Initialize() {
 // Progress is a no-op: BudgetThinker handles all state updates asynchronously.
 func (b *BudgetWant) Progress() {}
 
-// IsAchieved returns true when costs exist and budget is not exceeded.
-// Reads already-aggregated state written by Progress() to avoid calling aggregate() twice.
+// IsAchieved returns true when all itinerary items have reported non-zero costs
+// and the budget has not been exceeded.
+//
+// Waiting for all items prevents premature termination of BudgetThinker:
+// if the budget want achieved as soon as any cost appeared, BudgetThinker would
+// be stopped before processing later cost updates (e.g. a hotel booking that
+// arrives after the restaurant has already reported its cost).
 func (b *BudgetWant) IsAchieved() bool {
 	costsRaw, _ := b.GetState("costs")
 	costs, _ := costsRaw.(map[string]any)
 	exceeded, _ := b.GetState("budget_exceeded")
 	budgetExceeded, _ := exceeded.(bool)
-	return len(costs) > 0 && !budgetExceeded
+	if len(costs) == 0 || budgetExceeded {
+		return false
+	}
+
+	// If this budget want has a parent coordinator, wait until every item in the
+	// coordinator's itinerary has reported a non-zero cost.  This ensures
+	// BudgetThinker stays alive long enough to aggregate all final costs.
+	itineraryRaw, hasItinerary := b.GetParentState("itinerary")
+	if hasItinerary {
+		if itinerary, ok := itineraryRaw.(map[string]any); ok && len(itinerary) > 0 {
+			parentCostsRaw, _ := b.GetParentState("costs")
+			parentCosts, _ := parentCostsRaw.(map[string]any)
+			if len(parentCosts) < len(itinerary) {
+				// Not all itinerary items have reported costs yet.
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // CalculateAchievingPercentage returns progress percentage

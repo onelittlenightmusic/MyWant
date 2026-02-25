@@ -77,6 +77,13 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 	cost := toFloat64(costRaw)
+	// Skip propagation of zero cost: the want type YAML may set initialValue: 0.0
+	// for the cost field, meaning cost=0 is present before the actual booking is made.
+	// Propagating 0 would cause BudgetThinker to aggregate a premature total, making
+	// the budget want achieve before all real costs are known.
+	if cost == 0 {
+		return nil
+	}
 	// Always propagate the current cost to the parent on every tick.
 	// MergeParentState is idempotent so repeated writes of the same value are safe.
 	// Skipping when the value is unchanged would break re-propagation after a
