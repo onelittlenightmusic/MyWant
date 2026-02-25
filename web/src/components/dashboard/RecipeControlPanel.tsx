@@ -185,10 +185,20 @@ export const RecipeControlPanel: React.FC<RecipeControlPanelProps> = ({
 };
 
 /**
- * Convert recipe wants to YAML format for deployment
+ * Convert recipe wants to YAML format for deployment.
+ * Strips ownerReferences entries that have empty name/id (template placeholders).
  */
 function convertWantsToYAML(wants: any[]): string {
-  const config = { wants };
+  const cleaned = wants.map(w => {
+    const ownerRefs = w?.metadata?.ownerReferences;
+    if (!Array.isArray(ownerRefs)) return w;
+    const validRefs = ownerRefs.filter((r: any) => r?.name && r?.id);
+    const metadata = validRefs.length > 0
+      ? { ...w.metadata, ownerReferences: validRefs }
+      : { ...w.metadata, ownerReferences: undefined };
+    return { ...w, metadata };
+  });
+  const config = { wants: cleaned };
   return convertToYAML(config);
 }
 

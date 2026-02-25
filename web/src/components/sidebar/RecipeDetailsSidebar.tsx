@@ -505,7 +505,16 @@ const ResultsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
 
 // Helper functions for recipe deployment and download
 function convertWantsToYAML(wants: any[]): string {
-  const config = { wants };
+  const cleaned = wants.map(w => {
+    const ownerRefs = w?.metadata?.ownerReferences;
+    if (!Array.isArray(ownerRefs)) return w;
+    const validRefs = ownerRefs.filter((r: any) => r?.name && r?.id);
+    const metadata = validRefs.length > 0
+      ? { ...w.metadata, ownerReferences: validRefs }
+      : { ...w.metadata, ownerReferences: undefined };
+    return { ...w, metadata };
+  });
+  const config = { wants: cleaned };
   return convertToYAML(config);
 }
 

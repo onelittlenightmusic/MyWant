@@ -203,6 +203,12 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 				setDefaultParam(spec.Params, key, value)
 			}
 
+			// Mark as recipe-based
+			if metadata.Labels == nil {
+				metadata.Labels = make(map[string]string)
+			}
+			metadata.Labels["recipe-based"] = "true"
+
 			target := NewTarget(metadata, spec)
 			target.Description = description
 			target.RecipePath = recipePath // Set the correct recipe path for this custom type

@@ -104,6 +104,8 @@ export const WantCard: React.FC<WantCardProps> = ({
                        wantType.includes('travel') ||
                        hasChildren;
 
+  const isRecipeBased = want.metadata?.labels?.['recipe-based'] === 'true';
+
   const [localIsExpanded, setLocalIsExpanded] = useState(false);
   const displayIsExpanded = expandedParents ? isExpanded : localIsExpanded;
 
@@ -405,7 +407,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
       <div className="relative z-10">
         <WantCardContent
-          want={want} isChild={false}
+          want={want} isChild={false} hasChildren={!!hasChildren}
           onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults}
           onEdit={onEdit} onDelete={onDelete}
           onSuspend={onSuspend} onResume={onResume}
@@ -413,7 +415,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         />
       </div>
 
-      {hasChildren && !displayIsExpanded && (
+      {(hasChildren || isRecipeBased) && !displayIsExpanded && (
         <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={(e) => {
@@ -425,17 +427,19 @@ export const WantCard: React.FC<WantCardProps> = ({
             disabled={isBeingProcessed}
           >
             <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
-            <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
-            <div className="flex items-center gap-1 sm:gap-1.5" title={`${children!.length} child want${children!.length !== 1 ? 's' : ''}`}>
-              {children!.map((child, idx) => (
-                <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
-              ))}
-            </div>
+            <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children?.length ?? 0} child want{(children?.length ?? 0) !== 1 ? 's' : ''}</span>
+            {children && children.length > 0 && (
+              <div className="flex items-center gap-1 sm:gap-1.5" title={`${children.length} child want${children.length !== 1 ? 's' : ''}`}>
+                {children.map((child, idx) => (
+                  <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusColor(child.status) }} title={child.status} />
+                ))}
+              </div>
+            )}
           </button>
         </div>
       )}
 
-      {hasChildren && displayIsExpanded && (
+      {(hasChildren || isRecipeBased) && displayIsExpanded && (
         <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 border-t border-gray-200 dark:border-gray-700 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
           <button
             onClick={(e) => {
@@ -447,11 +451,11 @@ export const WantCard: React.FC<WantCardProps> = ({
             disabled={isBeingProcessed}
           >
             <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
-            Child Wants ({children!.length})
+            Child Wants ({children?.length ?? 0})
           </button>
           <div className="pt-1 sm:pt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 transition-all duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0, transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)' } as React.CSSProperties}>
-            {children!.sort((a, b) => (a.metadata?.id || a.id || '').localeCompare(b.metadata?.id || b.id || '')).map((child, index) => {
+            {(children ?? []).sort((a, b) => (a.metadata?.id || a.id || '').localeCompare(b.metadata?.id || b.id || '')).map((child, index) => {
               const childId = child.metadata?.id || child.id || '';
               const isChildSelected = isSelectMode ? (selectedWantIds?.has(childId)) : (selectedWant && ((selectedWant.metadata?.id && selectedWant.metadata.id === child.metadata?.id) || (selectedWant.id && selectedWant.id === child.id)));
               const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);

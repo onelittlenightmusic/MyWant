@@ -218,7 +218,7 @@ restart-all:
 	@mkdir -p ~/.mywant
 	@$(MAKE) build-mock
 	@echo "🚀 Starting MyWant server via mywant..."
-	@nohup ./bin/mywant start -D --port 8080 > /dev/null 2>&1 &
+	@nohup ./bin/mywant start -D --port 8080 --host 0.0.0.0 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
 	@echo ""
@@ -227,7 +227,7 @@ restart-all:
 	@sleep 1
 	@echo "✅ Mock server started (PID: $$(pgrep -f './bin/flight-server'))"
 	@echo "✅ All processes started!"
-	@echo "🌐 URL: http://localhost:8080"
+	@echo "🌐 URL: http://0.0.0.0:8080"
 	@echo "✈️  Mock Server: http://localhost:8090"
 	@echo ""
 	@echo "📋 Server management:"

@@ -120,6 +120,44 @@ func (s *Server) validateWantSpec(config mywant.Config) error {
 				return fmt.Errorf("want '%s': labels has empty key", want.Metadata.Name)
 			}
 		}
+		if err := s.validateOwnerReferences(want); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateOwnerReferences checks that each ownerReference in a want is valid:
+//  1. Each reference must have a non-empty Name or ID to identify the owner.
+//  2. The referenced owner want must exist in the system (looked up by ID then by Name).
+func (s *Server) validateOwnerReferences(want *mywant.Want) error {
+	if len(want.Metadata.OwnerReferences) == 0 {
+		return nil
+	}
+	existingWants := s.globalBuilder.GetAllWantStates()
+	for i, ref := range want.Metadata.OwnerReferences {
+		if ref.Name == "" && ref.ID == "" {
+			return fmt.Errorf("want '%s': ownerReferences[%d] must have a non-empty 'name' or 'id'", want.Metadata.Name, i)
+		}
+		// Lookup by ID first, then fall back to Name
+		found := false
+		for _, existing := range existingWants {
+			if ref.ID != "" && existing.Metadata.ID == ref.ID {
+				found = true
+				break
+			}
+			if ref.Name != "" && existing.Metadata.Name == ref.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			identifier := ref.ID
+			if identifier == "" {
+				identifier = ref.Name
+			}
+			return fmt.Errorf("want '%s': ownerReferences[%d] references unknown want '%s' (not found by id or name)", want.Metadata.Name, i, identifier)
+		}
 	}
 	return nil
 }
@@ -175,6 +213,17 @@ func (s *Server) collectFatalErrors(config *mywant.Config, result *ValidationRes
 					result.FatalErrors = append(result.FatalErrors, err)
 				}
 			}
+		}
+
+		if err := s.validateOwnerReferences(want); err != nil {
+			result.Valid = false
+			result.FatalErrors = append(result.FatalErrors, ValidationError{
+				WantName:  wantName,
+				ErrorType: "owner_reference",
+				Field:     "metadata.ownerReferences",
+				Message:   "Invalid ownerReference",
+				Details:   err.Error(),
+			})
 		}
 	}
 }

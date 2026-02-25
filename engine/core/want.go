@@ -673,6 +673,17 @@ func (n *Want) StartProgressionLoop(
 			// 3.1. Check if want is achieved (before precondition check)
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
+				// CRITICAL: Even if already achieved, we must run one cycle to ensure 
+				// FinalResultField is processed and state is aggregated.
+				n.BeginProgressCycle()
+				n.EndProgressCycle()
+
+				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)
+				n.FlushThinkingAgents(context.Background())
+				// Stop all background agents when want is achieved
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
+				}
 				return
 			}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera } from 'lucide-react';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -8,9 +8,23 @@ import { BrowserFrame } from '@/components/replay/BrowserFrame';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import styles from './WantCard.module.css';
 
+const HeartInBottle: React.FC<{ className?: string }> = ({ className }) => (
+  <span className={`relative inline-flex items-center justify-center flex-shrink-0 ${className ?? ''}`}>
+    <span className="leading-none">🫙</span>
+    <Heart className="absolute w-[45%] h-[45%] bottom-[10%] text-pink-500 drop-shadow-sm" fill="currentColor" strokeWidth={0} />
+  </span>
+);
+
+const BottleOnly: React.FC<{ className?: string }> = ({ className }) => (
+  <span className={`inline-flex items-center justify-center flex-shrink-0 leading-none ${className ?? ''}`}>
+    🫙
+  </span>
+);
+
 interface WantCardContentProps {
   want: Want;
   isChild?: boolean;
+  hasChildren?: boolean;
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
   onViewResults?: (want: Want) => void;
@@ -24,6 +38,7 @@ interface WantCardContentProps {
 export const WantCardContent: React.FC<WantCardContentProps> = ({
   want,
   isChild = false,
+  hasChildren = false,
   onView,
   onViewAgents,
   onViewResults,
@@ -190,6 +205,18 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
 
+  // Copy state for final_result
+  const [finalResultCopied, setFinalResultCopied] = useState(false);
+  const handleCopyFinalResult = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const value = want.state?.final_result;
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    navigator.clipboard.writeText(text).then(() => {
+      setFinalResultCopied(true);
+      setTimeout(() => setFinalResultCopied(false), 1500);
+    });
+  };
+
   const isRunning = want.status === 'reaching' || want.status === 'waiting_user_action';
   const isFailed = want.status === 'failed';
   const hasError = Boolean(isFailed && want.state?.error);
@@ -327,7 +354,15 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             <h3
               className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}
             >
-              <Heart className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
+              {labels['recipe-based'] === 'true' ? (
+                hasChildren ? (
+                  <HeartInBottle className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
+                ) : (
+                  <BottleOnly className={sizes.iconSize} />
+                )
+              ) : (
+                <Heart className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
+              )}
               {wantType}
             </h3>
             <p className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}>
@@ -614,10 +649,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className={isChild ? "mt-2" : "mt-4"}>
+        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-purple-700 dark:text-purple-300 bg-purple-500/15 dark:bg-purple-900/30 border border-purple-400/40 dark:border-purple-800 rounded-full px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400`}
+            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-purple-700 dark:text-purple-300 bg-purple-500/15 dark:bg-purple-900/30 border border-purple-400/40 dark:border-purple-800 rounded-full px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 pr-7`}
             title="Click to view results"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className={isChild ? "h-3 w-3 shrink-0" : "h-4 w-4 shrink-0"} viewBox="0 0 20 20" fill="currentColor">
@@ -631,6 +666,16 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 isChild ? 40 : 50
               )}
             </span>
+          </button>
+          <button
+            onClick={handleCopyFinalResult}
+            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+            title="Copy to clipboard"
+          >
+            {finalResultCopied
+              ? <Check className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
+              : <Copy className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
+            }
           </button>
         </div>
       )}

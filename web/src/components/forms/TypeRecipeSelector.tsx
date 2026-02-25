@@ -50,10 +50,12 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   const collapsedButtonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Auto-expand when selectedId becomes null
+  // Sync expansion state with selectedId changes
   useEffect(() => {
     if (!selectedId) {
       setIsExpanded(true);
+    } else {
+      setIsExpanded(false);
     }
   }, [selectedId]);
 

@@ -30,6 +30,8 @@ interface WantFormProps {
   onClose: () => void;
   editingWant?: Want | null;
   ownerWant?: Want | null;
+  initialTypeId?: string;
+  initialItemType?: 'want-type' | 'recipe';
   mode?: 'create' | 'edit' | 'recommendation';
   recommendations?: Recommendation[];
   selectedRecommendation?: Recommendation | null;
@@ -43,6 +45,8 @@ export const WantForm: React.FC<WantFormProps> = ({
   onClose,
   editingWant,
   ownerWant = null,
+  initialTypeId,
+  initialItemType = 'want-type',
   mode = 'create',
   recommendations = [],
   selectedRecommendation = null,
@@ -204,8 +208,10 @@ export const WantForm: React.FC<WantFormProps> = ({
     // Filter out when entries with empty every
     const validWhen = when.filter(item => item.every?.trim());
 
-    const ownerReferences = ownerWant
-      ? [{ apiVersion: 'v1', kind: 'Want', name: ownerWant.metadata?.name || '', id: ownerWant.metadata?.id || ownerWant.id || '', controller: true, blockOwnerDeletion: true }]
+    const ownerName = ownerWant?.metadata?.name || '';
+    const ownerId = ownerWant?.metadata?.id || ownerWant?.id || '';
+    const ownerReferences = (ownerWant && ownerName && ownerId)
+      ? [{ apiVersion: 'v1', kind: 'Want', name: ownerName, id: ownerId, controller: true, blockOwnerDeletion: true }]
       : (isEditing && editingWant?.metadata?.ownerReferences?.length ? editingWant.metadata.ownerReferences : undefined);
 
     return {
@@ -246,8 +252,14 @@ export const WantForm: React.FC<WantFormProps> = ({
   useEffect(() => {
     if (!isOpen) {
       resetForm();
+    } else if (initialTypeId && !editingWant) {
+      setSelectedTypeId(initialTypeId);
+      setSelectedItemType(initialItemType);
+      setType(initialTypeId);
+      const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
+      setName(generateUniqueWantName(initialTypeId, initialItemType, existingNames, ''));
     }
-  }, [isOpen]);
+  }, [isOpen, initialTypeId]);
 
   // Initialize form when editing
   useEffect(() => {

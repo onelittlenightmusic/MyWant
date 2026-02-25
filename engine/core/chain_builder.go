@@ -1823,8 +1823,20 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		}
 	} else {
 		// Update the extracted Want with metadata and config info
+		// Preserve any labels added by CreateTargetFunc (e.g. recipe-based) that are not in wantConfig
 		wantPtr.metadataMutex.Lock()
+		preservedLabels := wantPtr.Metadata.Labels
 		wantPtr.Metadata = wantConfig.Metadata
+		if len(preservedLabels) > 0 {
+			if wantPtr.Metadata.Labels == nil {
+				wantPtr.Metadata.Labels = make(map[string]string)
+			}
+			for k, v := range preservedLabels {
+				if _, exists := wantPtr.Metadata.Labels[k]; !exists {
+					wantPtr.Metadata.Labels[k] = v
+				}
+			}
+		}
 		wantPtr.metadataMutex.Unlock()
 		wantPtr.Spec = wantConfig.Spec
 		wantPtr.SetStatus(WantStatusIdle)

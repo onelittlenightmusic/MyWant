@@ -7,6 +7,7 @@ import { useUIStore } from '@/stores/uiStore';
 
 interface HeaderProps {
   onCreateWant: () => void;
+  onCreateTargetWant?: () => void;
   title?: string;
   createButtonLabel?: string;
   itemCount?: number;
@@ -27,6 +28,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
+  onCreateTargetWant,
   title = 'MyWant',
   createButtonLabel = 'Add Want',
   itemCount,
@@ -215,6 +217,19 @@ export const Header: React.FC<HeaderProps> = ({
                 <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
               </span>
               <span className="hidden sm:inline">{createButtonLabel}</span>
+            </button>
+          )}
+
+          {!hideCreateButton && onCreateTargetWant && (
+            <button
+              onClick={onCreateTargetWant}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 focus:ring-offset-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
+              title="Add Target Want"
+            >
+              <span className="relative inline-flex flex-shrink-0">
+                <span className="text-sm leading-none">🫙</span>
+                <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-gray-500 dark:text-gray-400" style={{ strokeWidth: 3 }} />
+              </span>
             </button>
           )}
         </div>

@@ -63,8 +63,12 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.validateWantSpec(config); err != nil {
 		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "validation")
-		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
+		details := "validation"
+		if strings.Contains(err.Error(), "ownerReferences") {
+			details = "invalid_owner_reference"
+		}
+		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, details)
+		s.logError(r, http.StatusBadRequest, errorMsg, details, err.Error(), "")
 		http.Error(w, errorMsg, http.StatusBadRequest)
 		return
 	}

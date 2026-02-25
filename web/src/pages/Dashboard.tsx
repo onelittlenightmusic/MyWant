@@ -197,7 +197,10 @@ export const Dashboard: React.FC = () => {
   const handleDeleteDraftCancel = () => { setShowDeleteDraftConfirmation(false); setDeleteDraftState(null); };
   const handleReactionCancel = () => { setShowReactionConfirmation(false); setReactionWantState(null); setReactionAction(null); };
   const [ownerWant, setOwnerWant] = useState<Want | null>(null);
-  const handleCreateWant = (parentWant?: Want) => { setOwnerWant(parentWant || null); setEditingWant(null); sidebar.openForm(); };
+  const [initialFormTypeId, setInitialFormTypeId] = useState<string | undefined>(undefined);
+  const [initialFormItemType, setInitialFormItemType] = useState<'want-type' | 'recipe'>('want-type');
+  const handleCreateWant = (parentWant?: Want) => { setInitialFormTypeId(undefined); setInitialFormItemType('want-type'); setOwnerWant(parentWant || null); setEditingWant(null); sidebar.openForm(); };
+  const handleCreateTargetWant = () => { setInitialFormTypeId('empty-target'); setInitialFormItemType('recipe'); setOwnerWant(null); setEditingWant(null); sidebar.openForm(); };
   const handleEditWant = (w: Want) => { setEditingWant(w); sidebar.openForm(); };
 
   const handleViewWant = (want: Want | { id: string; parentId?: string }) => {
@@ -665,6 +668,7 @@ export const Dashboard: React.FC = () => {
     <>
       <Header
         onCreateWant={handleCreateWant}
+        onCreateTargetWant={handleCreateTargetWant}
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
         showSelectMode={isSelectMode}
@@ -808,7 +812,7 @@ export const Dashboard: React.FC = () => {
         onDraftClick={handleMinimapDraftClick}
         isOpen={minimapOpen}
       />
-      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
+      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />
