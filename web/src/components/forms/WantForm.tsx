@@ -439,19 +439,16 @@ export const WantForm: React.FC<WantFormProps> = ({
       } else {
         await createWant(wantRequest as CreateWantRequest);
 
-        // Immediately refresh want list to capture initial state
+        // Refresh at 500ms intervals for 10 seconds to capture status transitions quickly
         fetchWants().catch(console.error);
-
-        // Refresh again after short delay to capture status transition (Idle -> Reaching)
-        // This helps show the updated status faster than waiting for the 5-second polling interval
-        setTimeout(() => {
+        const fastRefreshEnd = Date.now() + 10000;
+        const fastRefreshInterval = setInterval(() => {
+          if (Date.now() >= fastRefreshEnd) {
+            clearInterval(fastRefreshInterval);
+            return;
+          }
           fetchWants().catch(console.error);
-        }, 300);
-
-        // One more refresh to ensure we catch the transition if backend was slow
-        setTimeout(() => {
-          fetchWants().catch(console.error);
-        }, 800);
+        }, 500);
       }
 
       onClose();

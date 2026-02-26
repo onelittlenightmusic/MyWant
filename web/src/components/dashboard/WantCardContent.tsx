@@ -674,10 +674,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative`}>
+        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-end`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-purple-700 dark:text-purple-300 bg-purple-500/15 dark:bg-purple-900/30 border border-purple-400/40 dark:border-purple-800 rounded-full px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 pr-7`}
+            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 max-w-[75%] text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
             title="Click to view results"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className={isChild ? "h-3 w-3 shrink-0" : "h-4 w-4 shrink-0"} viewBox="0 0 20 20" fill="currentColor">
@@ -694,7 +694,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </button>
           <button
             onClick={handleCopyFinalResult}
-            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-200 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-400 hover:text-green-300 hover:bg-gray-700/60"
             title="Copy to clipboard"
           >
             {finalResultCopied
