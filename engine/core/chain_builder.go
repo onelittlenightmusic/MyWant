@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -90,16 +91,10 @@ type ChainBuilder struct {
 	lastStatsHash      string               // Hash of last written stats for change detection
 
 	// Path and channel management
-	pathMap      map[string]Paths      // Want path mapping
-	channels     map[string]chain.Chan // Inter-want channels
-	channelMutex sync.RWMutex          // Protect channel access
+	pathMap map[string]Paths // Want path mapping
 
 	// Suspend/Resume control
-	suspended    bool         // Current suspension state
-	suspendChan  chan bool    // Channel to signal suspension
-	resumeChan   chan bool    // Channel to signal resume
-	controlMutex sync.RWMutex // Protect suspension state access
-	controlStop  chan bool    // Stop signal for control loop
+	suspended atomic.Bool // Current suspension state (atomic, no mutex needed)
 
 	// Connectivity warning tracking (to prevent duplicate logs in reconciliation loop)
 	warnedConnectionIssues map[string]bool // Track which wants have already logged connectivity warnings
@@ -127,8 +122,8 @@ type ChainBuilder struct {
 	pubsub pubsub.PubSub // PubSub system for asynchronous packet delivery via labels
 
 	// Managed PubSub adapter channels (topic + consumerID -> channel)
+	// Always accessed inside reconcileMutex, no separate lock needed.
 	pubsubChannels map[string]chain.Chan
-	pubsubMutex    sync.RWMutex
 
 	// Global Label Registry
 	labelRegistry      map[string]map[string]bool // key -> value -> true
@@ -193,16 +188,11 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		deleteWantsChan:        make(chan []string, 10),        // Buffered to allow concurrent deletion requests (DEPRECATED)
 		operationChan:          make(chan *WantOperation, 20),  // Unified channel for all operations
 		pathMap:                make(map[string]Paths),
-		channels:               make(map[string]chain.Chan),
 		running:                false,
 		warnedConnectionIssues: make(map[string]bool), // Track logged connectivity warnings
 		labelToUsers:           make(map[string][]string),
 		wantCompletedFlags:     make(map[string]bool),
 		waitGroup:              &sync.WaitGroup{},
-		suspended:              false,
-		suspendChan:            make(chan bool),
-		resumeChan:             make(chan bool),
-		controlStop:            make(chan bool),
 		apiLogs:                make([]APILogEntry, 0),
 		maxLogSize:             1000,
 		pubsubChannels:         make(map[string]chain.Chan),
@@ -291,10 +281,9 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 					topic := serializeLabels(providerWant.want.Metadata.Labels)
 					adapterKey := fmt.Sprintf("%s:%s", topic, wantName)
 
-					cb.pubsubMutex.RLock()
+					// reconcileMutex is already held by reconcileWants; no separate lock needed.
 					adaptedChan, exists := cb.pubsubChannels[adapterKey]
 					isSubscribed := cb.pubsub.IsSubscribed(topic, wantName)
-					cb.pubsubMutex.RUnlock()
 
 					if !exists || !isSubscribed {
 						// Create new subscription if it doesn't exist
@@ -307,9 +296,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 
 						// Create adapter channel that converts PubSub messages to TransportPackets
 						adaptedChan = cb.adaptPubSubChannel(sub.Chan())
-						cb.pubsubMutex.Lock()
 						cb.pubsubChannels[adapterKey] = adaptedChan
-						cb.pubsubMutex.Unlock()
 						log.Printf("[PubSub] Created NEW adapter channel for '%s' on topic '%s'", wantName, topic)
 					}
 
@@ -585,9 +572,6 @@ func (cb *ChainBuilder) connectPhase() error {
 	cb.buildLabelToUsersMapping()
 	cb.validateConnections(cb.pathMap)
 
-	// Store constructed channels for potential external access
-	cb.storeChannelsByPath()
-
 	return nil
 }
 
@@ -663,23 +647,6 @@ func (cb *ChainBuilder) synchronizePathsToWants() {
 	}
 }
 
-// storeChannelsByPath stores constructed channels for potential external access
-// The channels themselves were created in generatePathsFromConnections() and should NOT be recreated here
-func (cb *ChainBuilder) storeChannelsByPath() {
-	cb.channelMutex.Lock()
-	defer cb.channelMutex.Unlock()
-
-	cb.channels = make(map[string]chain.Chan)
-
-	// Map channels by their path names (from pathMap, which contains the original channels)
-	for _, paths := range cb.pathMap {
-		for _, outputPath := range paths.Out {
-			if outputPath.Active && outputPath.Channel != nil {
-				cb.channels[outputPath.Name] = outputPath.Channel
-			}
-		}
-	}
-}
 func (cb *ChainBuilder) buildTargetParameterSubscriptions(target *Target) error {
 	// Read and parse the recipe file
 	recipeData, err := os.ReadFile(target.RecipePath)
@@ -1506,9 +1473,6 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	cb.running = true
 	cb.reconcileMutex.Unlock()
 
-	// Start suspension control loop
-	cb.startControlLoop()
-
 	// Start reconcile loop in background - it will handle initial want creation
 	go cb.reconcileLoop()
 
@@ -1548,9 +1512,6 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 
 	// Stop reconcile loop
 	cb.reconcileStop <- true
-
-	// Stop suspension control loop
-	cb.controlStop <- true
 	cb.reconcileMutex.Lock()
 	cb.running = false
 	cb.reconcileMutex.Unlock()
@@ -1588,12 +1549,6 @@ func (cb *ChainBuilder) Shutdown() {
 	// Stop reconcile loop
 	select {
 	case cb.reconcileStop <- true:
-	default:
-	}
-
-	// Stop suspension control loop
-	select {
-	case cb.controlStop <- true:
 	default:
 	}
 
