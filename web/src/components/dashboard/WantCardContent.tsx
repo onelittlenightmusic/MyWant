@@ -381,7 +381,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             >
               {labels['recipe-based'] === 'true' ? (
                 hasChildren ? (
-                  <HeartInBottle className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
+                  <HeartInBottle className={`${isChild ? 'h-3 w-3 sm:h-3.5 sm:w-3.5' : 'h-3.5 w-3.5 sm:h-5 sm:w-5'} flex-shrink-0 text-pink-500`} />
                 ) : (
                   <BottleOnly className={sizes.iconSize} />
                 )
@@ -677,7 +677,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-end`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 max-w-[75%] text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
+            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 max-w-[75%] text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
             title="Click to view results"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className={isChild ? "h-3 w-3 shrink-0" : "h-4 w-4 shrink-0"} viewBox="0 0 20 20" fill="currentColor">
