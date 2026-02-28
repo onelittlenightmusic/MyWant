@@ -125,51 +125,19 @@ func (cb *ChainBuilder) initializeSystemScheduler() {
 
 // Suspend pauses the execution of all wants (deprecated - use SuspendWant instead)
 func (cb *ChainBuilder) Suspend() error {
-	cb.controlMutex.Lock()
-	defer cb.controlMutex.Unlock()
-
-	if cb.suspended {
-		return nil // Already suspended
-	}
-
-	cb.suspended = true
-
-	// Signal suspension to control loop
-	select {
-	case cb.suspendChan <- true:
-		return nil
-	default:
-		// Control loop not running, just mark as suspended
-		return nil
-	}
+	cb.suspended.Store(true)
+	return nil
 }
 
 // Resume resumes the execution of all wants (deprecated - use ResumeWant instead)
 func (cb *ChainBuilder) Resume() error {
-	cb.controlMutex.Lock()
-	defer cb.controlMutex.Unlock()
-
-	if !cb.suspended {
-		return nil // Not suspended
-	}
-
-	cb.suspended = false
-
-	// Signal resume to control loop
-	select {
-	case cb.resumeChan <- true:
-		return nil
-	default:
-		// Control loop not running, just mark as resumed
-		return nil
-	}
+	cb.suspended.Store(false)
+	return nil
 }
 
 // IsSuspended returns the current suspension state
 func (cb *ChainBuilder) IsSuspended() bool {
-	cb.controlMutex.RLock()
-	defer cb.controlMutex.RUnlock()
-	return cb.suspended
+	return cb.suspended.Load()
 }
 
 // distributeControlCommand distributes a control command to target want(s) and propagates to child wants if the target is a parent want
@@ -321,25 +289,4 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.reconcileMutex.Unlock()
 
 	return nil
-}
-
-// controlLoop handles suspend/resume signals in a separate goroutine
-func (cb *ChainBuilder) controlLoop() {
-	for {
-		select {
-		case <-cb.suspendChan:
-			// Suspend signal processed by Suspend() method
-
-		case <-cb.resumeChan:
-			// Resume signal processed by Resume() method
-
-		case <-cb.controlStop:
-			return
-		}
-	}
-}
-
-// startControlLoop starts the suspension control loop if not already running
-func (cb *ChainBuilder) startControlLoop() {
-	go cb.controlLoop()
 }
