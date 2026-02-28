@@ -166,8 +166,8 @@ func (t *Target) checkAllChildrenComplete() bool {
 
 	// For targets with children (recipe or dynamic), check both sync.Map AND actual Status
 	for _, child := range t.childWants {
-		_, inMap := t.completedChildren.Load(child.Metadata.Name)
-		completed := inMap || child.Status == WantStatusAchieved
+		val, inMap := t.completedChildren.Load(child.Metadata.Name)
+		completed := (inMap && val.(bool)) || child.Status == WantStatusAchieved
 		if !completed {
 			return false
 		}
@@ -452,11 +452,11 @@ drained:
 	if len(t.childWants) > 0 {
 		achievedCount := 0
 		for _, child := range t.childWants {
-			_, inMap := t.completedChildren.Load(child.Metadata.Name)
-			completed := inMap || child.Status == WantStatusAchieved
+			val, inMap := t.completedChildren.Load(child.Metadata.Name)
+			completed := (inMap && val.(bool)) || child.Status == WantStatusAchieved
 			if completed {
 				achievedCount++
-				if !inMap {
+				if !inMap || !val.(bool) {
 					t.completedChildren.Store(child.Metadata.Name, true)
 				}
 			}
