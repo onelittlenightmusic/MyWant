@@ -1,16 +1,102 @@
 package mywant
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 )
 
+// buildStateAccessIndex reconstructs the system-wide mapping of state fields to their accessors.
+// This "State Access Dictionary" is a structural representation of data dependencies,
+// moving beyond transient label-based correlation.
+// Called during reconcileWants() before correlationPhase().
+func (cb *ChainBuilder) buildStateAccessIndex() {
+	// 1. Clear existing index
+	cb.stateAccessIndex = make(map[string][]string)
+
+	// Helper to register an accessor to a specific field
+	register := func(providerID, fieldName, accessorID string) {
+		key := fmt.Sprintf("%s.%s", providerID, fieldName)
+		cb.stateAccessIndex[key] = append(cb.stateAccessIndex[key], accessorID)
+	}
+
+	for _, rw := range cb.wants {
+		want := rw.want
+		wantID := want.Metadata.ID
+
+		// A. Process Explicit StateSubscriptions (Reader side)
+		for _, sub := range want.Spec.StateSubscriptions {
+			// Find provider want ID by name
+			providerRW, ok := cb.wants[sub.WantName]
+			if !ok {
+				continue
+			}
+			providerID := providerRW.want.Metadata.ID
+
+			keys := sub.StateKeys
+			if len(keys) == 0 {
+				keys = []string{"*"}
+			}
+			for _, k := range keys {
+				register(providerID, k, wantID)
+			}
+		}
+
+		// B. Process ParentStateAccess (ThinkAgent capabilities)
+		if cb.agentRegistry != nil && len(want.Metadata.OwnerReferences) > 0 {
+			// Find parent ID
+			var parentID string
+			for _, ref := range want.Metadata.OwnerReferences {
+				if ref.Controller && ref.Kind == "Want" {
+					parentID = ref.ID
+					break
+				}
+			}
+
+			if parentID != "" {
+				// Check capabilities of this want (from its type definition)
+				if def := want.WantTypeDefinition; def != nil {
+					for _, capName := range def.Requires {
+						if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
+							for _, field := range cap.ParentStateAccess {
+								register(parentID, field.Name, wantID)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// C. Self-registration for provider (A provider is an accessor of its own state)
+		// This ensures the field exists in the dictionary even if there are no readers yet.
+		// Also helps correlate siblings who write to the same field.
+		if def := want.WantTypeDefinition; def != nil {
+			for _, state := range def.State {
+				register(wantID, state.Name, wantID)
+			}
+		}
+	}
+
+	// Post-processing: remove duplicates if any (e.g. multiple capabilities accessing same field)
+	for key, accessors := range cb.stateAccessIndex {
+		unique := make(map[string]struct{})
+		for _, a := range accessors {
+			unique[a] = struct{}{}
+		}
+		if len(unique) != len(accessors) {
+			newAccessors := make([]string, 0, len(unique))
+			for a := range unique {
+				newAccessors = append(newAccessors, a)
+			}
+			sort.Strings(newAccessors)
+			cb.stateAccessIndex[key] = newAccessors
+		}
+	}
+}
+
 // correlationPhase computes inter-Want Correlation for the Wants recorded in
-// dirtyWantIDs.  It runs after connectPhase() so that labelToUsers and
-// OwnerReferences are already up-to-date.
-//
-// Called inside reconcileWants(), which already holds reconcileMutex, so
-// cb.wants and cb.labelToUsers are safely accessible without additional locks.
+// dirtyWantIDs. It utilizes the stateAccessIndex dictionary for efficient
+// dependency discovery.
 func (cb *ChainBuilder) correlationPhase() {
 	if len(cb.dirtyWantIDs) == 0 {
 		return
@@ -25,171 +111,85 @@ func (cb *ChainBuilder) correlationPhase() {
 			continue
 		}
 		dirty := rw.want
+		dirtyID := dirty.Metadata.ID
 
-		// peerName → set of correlation labels (de-duplicated via map)
+		// peerID → set of correlation labels (de-duplicated via map)
 		peerLabels := make(map[string]map[string]struct{})
-		add := func(peerName, label string) {
-			if _, ok := peerLabels[peerName]; !ok {
-				peerLabels[peerName] = make(map[string]struct{})
+		add := func(peerID, label string) {
+			if peerID == dirtyID {
+				return
 			}
-			peerLabels[peerName][label] = struct{}{}
+			if _, ok := peerLabels[peerID]; !ok {
+				peerLabels[peerID] = make(map[string]struct{})
+			}
+			peerLabels[peerID][label] = struct{}{}
 		}
 
-		// ── 1. Wants that reference dirty via a using selector ────────────────
-		// labelToUsers["role:coordinator"] = ["want-A", "want-B"]
-		// This is an O(L) lookup using the pre-built inverted index from connectPhase.
+		// ── 1. Metadata Label Selectors (Inverted Index) ──────────────────────
+		// labelToUsers index covers Wants referencing dirty via selector.
 		for k, v := range dirty.Metadata.Labels {
 			key := cb.selectorToKey(map[string]string{k: v})
 			for _, userName := range cb.labelToUsers[key] {
-				if userName != dirty.Metadata.Name {
-					add(userName, k+"="+v)
+				// userName is a name, we need its ID for consistency.
+				if userRW, ok := cb.wants[userName]; ok {
+					add(userRW.want.Metadata.ID, k+"="+v)
 				}
 			}
 		}
 
 		// ── 2. Wants that dirty references via its own using selectors ────────
-		// labelToUsers only covers the "user side"; for the "provider side" we
-		// scan cb.wants once (O(n)) using the existing matchesSelector helper.
 		if spec := dirty.GetSpec(); spec != nil {
 			for _, sel := range spec.Using {
-				for peerName, peerRW := range cb.wants {
-					if peerName == dirty.Metadata.Name {
+				for _, peerRW := range cb.wants {
+					if peerRW.want.Metadata.ID == dirtyID {
 						continue
 					}
 					if cb.matchesSelector(peerRW.want.Metadata.Labels, sel) {
 						for k, v := range sel {
-							add(peerName, "using.select/"+k+"="+v)
+							add(peerRW.want.Metadata.ID, "using.select/"+k+"="+v)
 						}
 					}
 				}
 			}
 		}
 
-		// ── 3. State Subscriptions (Field-level data flow) ────────────────────
-		// Unified 'stateAccess' relationship indicating field-level coupling.
-		// Format: stateAccess/<provider_id>.<field>
-		for peerName, peerRW := range cb.wants {
-			if peerName == dirty.Metadata.Name {
-				continue
-			}
-
-			// A. Check if dirty subscribes to peer (peer is provider)
-			for _, sub := range dirty.Spec.StateSubscriptions {
-				if sub.WantName == peerName {
-					keys := sub.StateKeys
-					if len(keys) == 0 {
-						keys = []string{"*"}
-					}
-					peerID := peerRW.want.Metadata.ID
-					for _, k := range keys {
-						add(peerName, "stateAccess/"+peerID+"."+k)
-					}
+		// ── 3. State Access Dependencies (using the structural Dictionary) ────
+		// Find all fields accessed by dirty, then find other wants accessing the SAME fields.
+		for fieldPath, accessors := range cb.stateAccessIndex {
+			// fieldPath is "providerID.fieldName"
+			isDirtyAccessor := false
+			for _, a := range accessors {
+				if a == dirtyID {
+					isDirtyAccessor = true
+					break
 				}
 			}
 
-			// B. Check if peer subscribes to dirty (dirty is provider)
-			for _, sub := range peerRW.want.Spec.StateSubscriptions {
-				if sub.WantName == dirty.Metadata.Name {
-					keys := sub.StateKeys
-					if len(keys) == 0 {
-						keys = []string{"*"}
-					}
-					dirtyID := dirty.Metadata.ID
-					for _, k := range keys {
-						add(peerName, "stateAccess/"+dirtyID+"."+k)
+			if isDirtyAccessor {
+				// Dirty accesses this field. All other accessors are correlated peers.
+				providerID := strings.Split(fieldPath, ".")[0]
+				for _, peerID := range accessors {
+					if peerID != dirtyID {
+						add(peerID, "stateAccess/"+fieldPath)
 					}
 				}
-			}
-		}
-
-		// ── 4. Parent State Access (ThinkAgent capabilities) ──────────────────
-		// If a want accesses its parent's state, they share a stateAccess label.
-		// Also, siblings that access the same parent field are correlated.
-		if cb.agentRegistry != nil {
-			// Get fields accessed by dirty
-			dirtyParentFields := make(map[string][]string) // parentID -> []fieldNames
-			for _, ref := range dirty.Metadata.OwnerReferences {
-				if ref.Controller && ref.Kind == "Want" {
-					if def := dirty.WantTypeDefinition; def != nil {
-						for _, capName := range def.Requires {
-							if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
-								for _, field := range cap.ParentStateAccess {
-									dirtyParentFields[ref.ID] = append(dirtyParentFields[ref.ID], field.Name)
-								}
-							}
-						}
-					}
-				}
-			}
-
-			// Compare with all other wants
-			for peerName, peerRW := range cb.wants {
-				if peerName == dirty.Metadata.Name {
-					continue
-				}
-
-				peer := peerRW.want
-				peerID := peer.Metadata.ID
-
-				// A. If peer is a parent of dirty
-				for _, fields := range dirtyParentFields[peerID] {
-					add(peerName, "stateAccess/"+peerID+"."+fields)
-				}
-
-				// B. If dirty is a parent of peer
-				if def := peer.WantTypeDefinition; def != nil {
-					for _, ref := range peer.Metadata.OwnerReferences {
-						if ref.Controller && ref.Kind == "Want" && ref.ID == dirty.Metadata.ID {
-							for _, capName := range def.Requires {
-								if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
-									for _, field := range cap.ParentStateAccess {
-										add(peerName, "stateAccess/"+dirty.Metadata.ID+"."+field.Name)
-									}
-								}
-							}
-						}
-					}
-				}
-
-				// C. If dirty and peer share the same parent and same field access
-				for parentID, dirtyFields := range dirtyParentFields {
-					for _, ref := range peer.Metadata.OwnerReferences {
-						if ref.Controller && ref.Kind == "Want" && ref.ID == parentID {
-							// Shared parent! Check if peer accesses same fields.
-							if def := peer.WantTypeDefinition; def != nil {
-								for _, capName := range def.Requires {
-									if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
-										for _, field := range cap.ParentStateAccess {
-											// Check if dirty also accesses this field in this parent
-											for _, df := range dirtyFields {
-												if df == field.Name {
-													add(peerName, "stateAccess/"+parentID+"."+field.Name)
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+				// Also correlate dirty with the provider of the field (if not self)
+				if providerID != dirtyID {
+					add(providerID, "stateAccess/"+fieldPath)
 				}
 			}
 		}
 
 		// ── Build CorrelationEntry slice ──────────────────────────────────────
 		entries := make([]CorrelationEntry, 0, len(peerLabels))
-		for peerName, labelSet := range peerLabels {
-			peerRW, ok := cb.wants[peerName]
-			if !ok {
-				continue
-			}
+		for peerID, labelSet := range peerLabels {
 			labels := make([]string, 0, len(labelSet))
 			for l := range labelSet {
 				labels = append(labels, l)
 			}
 			sort.Strings(labels)
 			entries = append(entries, CorrelationEntry{
-				WantID: peerRW.want.Metadata.ID,
+				WantID: peerID,
 				Labels: labels,
 				Rate:   correlationRate(labels),
 			})
@@ -204,10 +204,6 @@ func (cb *ChainBuilder) correlationPhase() {
 
 // correlationRate returns the weighted coupling strength for a set of
 // correlation labels.
-//
-//   - "stateAccess/…"   : +2  (explicit field dependency)
-//   - "using.select/…"  : +1  (explicit data-flow dependency)
-//   - everything else   : +1  (shared metadata label)
 func correlationRate(labels []string) int {
 	rate := 0
 	for _, l := range labels {

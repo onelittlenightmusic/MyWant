@@ -131,6 +131,11 @@ type ChainBuilder struct {
 	// Populated by compilePhase, consumed and cleared by correlationPhase.
 	// Always accessed inside reconcileMutex, no separate lock needed.
 	dirtyWantIDs map[string]struct{}
+
+	// State Access Index: fieldPath (wantID.fieldName) -> list of wantIDs that access it.
+	// Used for efficient correlation calculation and dependency tracking.
+	// Always accessed inside reconcileMutex, no separate lock needed.
+	stateAccessIndex map[string][]string // "wantID.fieldName" -> []wantIDs
 }
 
 // runtimeWant holds the runtime state of a want
@@ -200,6 +205,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		pubsubChannels:         make(map[string]chain.Chan),
 		labelRegistry:          make(map[string]map[string]bool),
 		dirtyWantIDs:           make(map[string]struct{}),
+		stateAccessIndex:       make(map[string][]string),
 	}
 
 	// Register all types that have Go implementations
@@ -500,11 +506,11 @@ func (cb *ChainBuilder) reconcileWants() {
 	// Phase 3: START - Launch new/updated wants
 	cb.startPhase()
 
-	// Phase 4: CORRELATE - Annotate changed Wants with inter-Want correlation.
-	// Runs after startPhase because it only appends metadata and has no effect
-	// on want execution startup.
-	cb.correlationPhase()
+	// Phase 4: ACCESS - Build structural state access index (Dictionary)
+	cb.buildStateAccessIndex()
 
+	// Phase 5: CORRELATE - Annotate changed Wants with inter-Want correlation
+	cb.correlationPhase()
 }
 
 // compilePhase handles configuration loading and want creation/updates
