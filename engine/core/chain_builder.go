@@ -110,10 +110,8 @@ type ChainBuilder struct {
 	// Initial load tracking
 	hasInitialized bool // True after initial config load phase completes
 
-	// API logging
-	apiLogs      []APILogEntry // API operation logs
-	apiLogsMutex sync.RWMutex  // Protect concurrent access to logs
-	maxLogSize   int           // Maximum number of log entries to keep (default: 1000)
+	// API logging (lock-free ring buffer, fixed capacity)
+	apiLogs *ringBuffer[APILogEntry]
 
 	// HTTP client for internal API calls
 	httpClient *HTTPClient // HTTP client for agents to call internal APIs
@@ -193,8 +191,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		labelToUsers:           make(map[string][]string),
 		wantCompletedFlags:     make(map[string]bool),
 		waitGroup:              &sync.WaitGroup{},
-		apiLogs:                make([]APILogEntry, 0),
-		maxLogSize:             1000,
+		apiLogs:                newRingBuffer[APILogEntry](1000),
 		pubsubChannels:         make(map[string]chain.Chan),
 		labelRegistry:          make(map[string]map[string]bool),
 	}

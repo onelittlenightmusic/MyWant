@@ -33,11 +33,9 @@ type Target struct {
 	RecipeParams           map[string]any      // Parameters to pass to recipe (derived from spec.params)
 	parameterSubscriptions map[string][]string // Map of parameter names to child want names that subscribe to them
 	childWants             []*Want
-	completedChildren      map[string]bool      // Track which children have completed
-	childCompletionMutex   sync.Mutex           // Protect completedChildren map
+	completedChildren      sync.Map     // Track which children have completed (key: string name, value: bool)
 	builder                *ChainBuilder        // Reference to builder for dynamic want creation
 	recipeLoader           *GenericRecipeLoader // Reference to generic recipe loader
-	stateMutex             sync.RWMutex         // Mutex to protect concurrent state updates
 	childrenDone           chan bool            // Signal when all children complete
 	childrenCreated        bool                 // Track if child wants have been created
 	childCount             int                  // Count of child wants
@@ -57,10 +55,9 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 		MaxDisplay:   1000,
 		RecipePath:   filepath.Join(RecipesDir, "empty.yaml"), // Relative to project root
 		RecipeParams: make(map[string]any), parameterSubscriptions: make(map[string][]string),
-		childWants:        make([]*Want, 0),
-		completedChildren: make(map[string]bool),
-		childrenDone:      make(chan bool, 1), // Signal channel for subscription system
-		stateNotify:       make(chan struct{}, 64),
+		childWants:   make([]*Want, 0),
+		childrenDone: make(chan bool, 1), // Signal channel for subscription system
+		stateNotify:  make(chan struct{}, 64),
 	}
 
 	// Hook: whenever Want.MergeState is called on the embedded Want, signal stateNotify.
@@ -137,9 +134,7 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 	}
 
 	// Track child completion
-	tcs.target.childCompletionMutex.Lock()
-	tcs.target.completedChildren[completionEvent.ChildName] = true
-	tcs.target.childCompletionMutex.Unlock()
+	tcs.target.completedChildren.Store(completionEvent.ChildName, true)
 
 	allComplete := tcs.target.checkAllChildrenComplete()
 
@@ -169,13 +164,10 @@ func (t *Target) checkAllChildrenComplete() bool {
 		return true
 	}
 
-	// For targets with children (recipe or dynamic), check both map AND actual Status
-	// This matches the logic in Progress() and ensures consistency
+	// For targets with children (recipe or dynamic), check both sync.Map AND actual Status
 	for _, child := range t.childWants {
-		// A child is complete if either:
-		// 1. It's marked in completedChildren map, OR
-		// 2. Its actual Status is ACHIEVED
-		completed := t.completedChildren[child.Metadata.Name] || child.Status == WantStatusAchieved
+		_, inMap := t.completedChildren.Load(child.Metadata.Name)
+		completed := inMap || child.Status == WantStatusAchieved
 		if !completed {
 			return false
 		}
@@ -312,9 +304,6 @@ func (t *Target) IsAchieved() bool {
 
 // DisownChild removes a want from this target's tracking
 func (t *Target) DisownChild(wantID string) {
-	t.childCompletionMutex.Lock()
-	defer t.childCompletionMutex.Unlock()
-
 	newChildWants := make([]*Want, 0)
 	var removedName string
 	for _, child := range t.childWants {
@@ -327,7 +316,7 @@ func (t *Target) DisownChild(wantID string) {
 
 	if removedName != "" {
 		t.childWants = newChildWants
-		delete(t.completedChildren, removedName)
+		t.completedChildren.Delete(removedName)
 		t.StoreLog("[TARGET] Disowned child: %s\n", removedName)
 
 		// Update stats and check if status needs to change back from achieved
@@ -363,9 +352,7 @@ func (t *Target) AdoptChild(want *Want) {
 
 		// If the newly adopted child is already achieved, mark it as completed
 		if want.Status == WantStatusAchieved {
-			t.childCompletionMutex.Lock()
-			t.completedChildren[want.Metadata.Name] = true
-			t.childCompletionMutex.Unlock()
+			t.completedChildren.Store(want.Metadata.Name, true)
 		}
 
 		// Update stats
@@ -460,24 +447,17 @@ func (t *Target) Progress() {
 drained:
 
 	// Update achieving_percentage
-	t.childCompletionMutex.Lock()
 	allComplete := t.checkAllChildrenComplete()
-	completedSnapshot := make(map[string]bool)
-	for k, v := range t.completedChildren {
-		completedSnapshot[k] = v
-	}
-	t.childCompletionMutex.Unlock()
 
 	if len(t.childWants) > 0 {
 		achievedCount := 0
 		for _, child := range t.childWants {
-			completed := completedSnapshot[child.Metadata.Name] || child.Status == WantStatusAchieved
+			_, inMap := t.completedChildren.Load(child.Metadata.Name)
+			completed := inMap || child.Status == WantStatusAchieved
 			if completed {
 				achievedCount++
-				if !completedSnapshot[child.Metadata.Name] {
-					t.childCompletionMutex.Lock()
-					t.completedChildren[child.Metadata.Name] = true
-					t.childCompletionMutex.Unlock()
+				if !inMap {
+					t.completedChildren.Store(child.Metadata.Name, true)
 				}
 			}
 		}
@@ -634,28 +614,24 @@ func (t *Target) mapParameterNameForChild(targetParamName string, childWantType 
 
 // computeTemplateResult computes the result from child wants using recipe-defined result specs
 func (t *Target) computeTemplateResult() {
-	// Use mutex to prevent concurrent map access with state updates
-	t.stateMutex.Lock()
-	defer t.stateMutex.Unlock()
-
 	if t.recipeLoader == nil {
-		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
+		t.computeFallbackResult()
 		return
 	}
 	recipeResult, err := t.recipeLoader.GetRecipeResult(t.RecipePath)
 	if err != nil {
-		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
+		t.computeFallbackResult()
 		return
 	}
 
 	if recipeResult == nil {
-		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
+		t.computeFallbackResult()
 		return
 	}
 
 	// Check if builder is available (may be nil in test environments)
 	if t.builder == nil {
-		t.computeFallbackResultUnsafe() // Use unsafe version since we already have the mutex
+		t.computeFallbackResult()
 		return
 	}
 
@@ -1007,8 +983,8 @@ func (t *Target) toSnakeCase(str string) string {
 	return strings.ToLower(string(result))
 }
 
-// computeFallbackResultUnsafe provides simple aggregation without mutex protection (caller must hold mutex)
-func (t *Target) computeFallbackResultUnsafe() {
+// computeFallbackResult provides simple aggregation of child want states.
+func (t *Target) computeFallbackResult() {
 	// Check if builder is available (may be nil in test environments)
 	if t.builder == nil {
 		t.StoreLog("[TARGET] ⚠️  Target %s: No builder available for fallback result computation\n", t.Metadata.Name)
@@ -1061,14 +1037,26 @@ func (t *Target) SetChildWants(wants []*Want) {
 	t.childWants = wants
 }
 
-// GetCompletedChildren returns the completed children map (for testing purposes)
+// GetCompletedChildren returns a snapshot of the completed children map (for testing purposes)
 func (t *Target) GetCompletedChildren() map[string]bool {
-	return t.completedChildren
+	snapshot := make(map[string]bool)
+	t.completedChildren.Range(func(k, v any) bool {
+		snapshot[k.(string)] = v.(bool)
+		return true
+	})
+	return snapshot
 }
 
-// SetCompletedChildren sets the completed children map (for testing purposes)
+// SetCompletedChildren populates the completed children map (for testing purposes)
 func (t *Target) SetCompletedChildren(completed map[string]bool) {
-	t.completedChildren = completed
+	// Clear existing entries
+	t.completedChildren.Range(func(k, _ any) bool {
+		t.completedChildren.Delete(k)
+		return true
+	})
+	for k, v := range completed {
+		t.completedChildren.Store(k, v)
+	}
 }
 
 // SetChildrenCreated sets the childrenCreated flag (for testing purposes)

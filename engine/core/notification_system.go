@@ -10,12 +10,8 @@ var (
 	wantRegistry      = make(map[string]*Want)
 	wantRegistryMutex sync.RWMutex
 
-	// Notification history for debugging
-	notificationHistory = make([]StateNotification, 0, 1000)
-	historyMutex        sync.RWMutex
-
-	// Configuration
-	maxNotificationHistory = 1000
+	// Notification history ring buffer (lock-free, fixed capacity)
+	notificationRing = newRingBuffer[StateNotification](1000)
 )
 
 // RegisterWant registers a want for notification lookup
@@ -148,38 +144,16 @@ func emitOwnerChildStateEvent(notification StateNotification, ownerName string) 
 	want.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 func storeNotificationHistory(notification StateNotification) {
-	historyMutex.Lock()
-	defer historyMutex.Unlock()
-	notificationHistory = append(notificationHistory, notification)
-
-	// Trim history if too long
-	if len(notificationHistory) > maxNotificationHistory {
-		notificationHistory = notificationHistory[len(notificationHistory)-maxNotificationHistory:]
-	}
+	notificationRing.Append(notification)
 }
+
 func GetNotificationHistory(limit int) []StateNotification {
-	historyMutex.RLock()
-	defer historyMutex.RUnlock()
-
-	if limit <= 0 || limit > len(notificationHistory) {
-		limit = len(notificationHistory)
-	}
-
-	start := len(notificationHistory) - limit
-	if start < 0 {
-		start = 0
-	}
-
-	result := make([]StateNotification, limit)
-	copy(result, notificationHistory[start:])
-	return result
+	return notificationRing.Snapshot(limit)
 }
 
-// ClearNotificationHistory clears the notification history
+// ClearNotificationHistory clears the notification history.
 func ClearNotificationHistory() {
-	historyMutex.Lock()
-	defer historyMutex.Unlock()
-	notificationHistory = notificationHistory[:0]
+	notificationRing.Clear()
 }
 
 // GetRegisteredListeners returns the list of subscriber names currently registered

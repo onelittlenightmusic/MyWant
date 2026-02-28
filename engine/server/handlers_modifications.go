@@ -31,7 +31,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
 				Status:      want.GetStatus(),
-				History:     want.History,
+				History:     want.BuildHistory(),
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
@@ -46,7 +46,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
 				Status:      want.GetStatus(),
-				History:     want.History,
+				History:     want.BuildHistory(),
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}

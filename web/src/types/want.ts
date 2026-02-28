@@ -142,10 +142,12 @@ export interface WantStatusResponse {
 }
 
 export interface AgentExecution {
+  execution_id: string;
   agent_name: string;
-  agent_type: 'do' | 'monitor';
-  start_time: string;
-  end_time?: string;
-  status: 'reaching' | 'achieved' | 'failed' | 'terminated';
+  agent_type: 'do' | 'monitor' | 'think' | string;
+  timestamp: string;
+  status: 'running' | 'achieved' | 'failed' | 'terminated';
   error?: string;
+  activity?: string;
+  execution_mode?: string;
 }

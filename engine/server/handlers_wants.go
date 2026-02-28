@@ -212,7 +212,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
 					Status:      want.GetStatus(),
-					History:     want.History,
+					History:     want.BuildHistory(),
 					State:       want.GetExplicitState(),
 					HiddenState: want.GetHiddenState(),
 				}
@@ -229,7 +229,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
 				Status:      want.GetStatus(),
-				History:     want.History,
+				History:     want.BuildHistory(),
 				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
@@ -280,7 +280,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	wantID := vars["id"]
-	groupBy := r.URL.Query().Get("groupBy")
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 
 	log.Printf("[DEBUG] getWant: Looking for want ID: %s (includeConnectivity=%v)\n", wantID, includeConnectivity)
@@ -306,7 +305,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 						Metadata:             want.Metadata,
 						Spec:                 want.Spec,
 						Status:               want.GetStatus(),
-						History:              want.History,
+						History:              want.BuildHistory(),
 						State:                want.GetExplicitState(),
 						HiddenState:          want.GetHiddenState(),
 						ConnectivityMetadata: want.ConnectivityMetadata,
@@ -316,17 +315,12 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 						Metadata:    want.Metadata,
 						Spec:        want.Spec,
 						Status:      want.GetStatus(),
-						History:     want.History,
+						History:     want.BuildHistory(),
 						State:       want.GetExplicitState(),
 						HiddenState: want.GetHiddenState(),
 					}
 				}
 
-				if groupBy != "" {
-					response := buildWantResponse(wantCopy, groupBy)
-					json.NewEncoder(w).Encode(response)
-					return
-				}
 				json.NewEncoder(w).Encode(wantCopy)
 				return
 			}
@@ -336,12 +330,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 		for j, want := range execution.Config.Wants {
 			if want.Metadata.ID == wantID {
 				log.Printf("[DEBUG] getWant: Found %s in config at index %d\n", wantID, j)
-				// Return the config version (it's not running yet, so no status/history)
-				if groupBy != "" {
-					response := buildWantResponse(want, groupBy)
-					json.NewEncoder(w).Encode(response)
-					return
-				}
 				json.NewEncoder(w).Encode(want)
 				return
 			}
@@ -359,7 +347,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					Metadata:             want.Metadata,
 					Spec:                 want.Spec,
 					Status:               want.GetStatus(),
-					History:              want.History,
+					History:              want.BuildHistory(),
 					State:                want.GetExplicitState(),
 					HiddenState:          want.GetHiddenState(),
 					ConnectivityMetadata: want.ConnectivityMetadata,
@@ -369,17 +357,12 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
 					Status:      want.GetStatus(),
-					History:     want.History,
+					History:     want.BuildHistory(),
 					State:       want.GetExplicitState(),
 					HiddenState: want.GetHiddenState(),
 				}
 			}
 
-			if groupBy != "" {
-				response := buildWantResponse(wantCopy, groupBy)
-				json.NewEncoder(w).Encode(response)
-				return
-			}
 			json.NewEncoder(w).Encode(wantCopy)
 			return
 		}
@@ -722,32 +705,6 @@ func generateWantID() string {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
-// WantResponseWithGroupedAgents wraps a Want with grouped agent history
-type WantResponseWithGroupedAgents struct {
-	Metadata mywant.Metadata    `json:"metadata"`
-	Spec     mywant.WantSpec    `json:"spec"`
-	Status   mywant.WantStatus  `json:"status"`
-	History  mywant.WantHistory `json:"history"`
-	State    map[string]any     `json:"state"`
-}
-
-func buildWantResponse(want *mywant.Want, groupBy string) any {
-	response := &WantResponseWithGroupedAgents{
-		Metadata: want.Metadata,
-		Spec:     want.Spec,
-		Status:   want.Status,
-		History:  want.History,
-		State:    want.State,
-	}
-
-	if groupBy == "name" {
-		response.History.GroupedAgentHistory = want.GetAgentHistoryGroupedByName()
-	} else if groupBy == "type" {
-		response.History.GroupedAgentHistory = want.GetAgentHistoryGroupedByType()
-	}
-
-	return response
-}
 
 // updateWantOrder handles PUT /api/v1/wants/{id}/order - updates the order key of a want for drag-and-drop reordering
 func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {

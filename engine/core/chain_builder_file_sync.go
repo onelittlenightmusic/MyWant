@@ -98,7 +98,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			runtimeWant.want.stateMutex.RUnlock()
 
 			want.State = stateCopy
-			want.History = runtimeWant.want.History // Include history in stats writes
+			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
 	}
@@ -122,7 +122,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 				// Stats field removed - data now in State
 				Status:  runtimeWant.want.Status,
 				State:   stateCopy,
-				History: runtimeWant.want.History, // Include history in stats writes
+				History: runtimeWant.want.BuildHistory(), // Include history in stats writes
 			}
 			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
 		}
@@ -207,7 +207,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
 			State:   stateCopy,                // Use copy to avoid concurrent modification
-			History: runtimeWant.want.History, // Include history in memory dump
+			History: runtimeWant.want.BuildHistory(), // Include history in memory dump
 		}
 
 		wants = append(wants, want)

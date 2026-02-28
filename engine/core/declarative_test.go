@@ -86,7 +86,7 @@ func TestWantExecCycle(t *testing.T) {
 	}
 
 	// Verify history was created
-	if len(want.History.StateHistory) == 0 {
+	if len(want.BuildHistory().StateHistory) == 0 {
 		t.Error("Expected state history to be recorded")
 	}
 }

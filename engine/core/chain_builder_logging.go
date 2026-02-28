@@ -14,32 +14,15 @@ func (cb *ChainBuilder) LogAPIOperation(method, endpoint, resource, status strin
 		ErrorMsg:   errorMsg,
 		Details:    details,
 	}
-
-	cb.apiLogsMutex.Lock()
-	defer cb.apiLogsMutex.Unlock()
-
-	cb.apiLogs = append(cb.apiLogs, entry)
-
-	// Keep only the most recent maxLogSize entries
-	if len(cb.apiLogs) > cb.maxLogSize {
-		cb.apiLogs = cb.apiLogs[len(cb.apiLogs)-cb.maxLogSize:]
-	}
+	cb.apiLogs.Append(entry)
 }
 
-// GetAPILogs returns a copy of all API logs
+// GetAPILogs returns a snapshot of all API logs.
 func (cb *ChainBuilder) GetAPILogs() []APILogEntry {
-	cb.apiLogsMutex.RLock()
-	defer cb.apiLogsMutex.RUnlock()
-
-	// Return a copy to prevent external modification
-	logs := make([]APILogEntry, len(cb.apiLogs))
-	copy(logs, cb.apiLogs)
-	return logs
+	return cb.apiLogs.Snapshot(0)
 }
 
-// ClearAPILogs clears all API logs
+// ClearAPILogs clears all API logs.
 func (cb *ChainBuilder) ClearAPILogs() {
-	cb.apiLogsMutex.Lock()
-	defer cb.apiLogsMutex.Unlock()
-	cb.apiLogs = make([]APILogEntry, 0)
+	cb.apiLogs.Clear()
 }

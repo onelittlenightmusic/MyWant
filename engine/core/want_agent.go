@@ -60,18 +60,27 @@ func (n *Want) StartThinkAgentsByType() bool {
 	return startedAny
 }
 
-// Example: "Flight reservation has been created" or "Hotel booking confirmed" Will find the last execution record for this agent and set the activity
-// regardless of current status (running, completed, or failed)
+// SetAgentActivity appends an activity annotation event for the given agent.
+// This records a human-readable description of what the agent just did,
+// e.g. "Flight reservation has been created".
 func (n *Want) SetAgentActivity(agentName string, activity string) {
-	if n.History.AgentHistory == nil {
-		return
-	}
-	for i := len(n.History.AgentHistory) - 1; i >= 0; i-- {
-		if n.History.AgentHistory[i].AgentName == agentName {
-			n.History.AgentHistory[i].Activity = activity
+	n.initHistoryRings()
+	// Find the ExecutionID of the most recent event for this agent
+	execID := ""
+	snapshot := n.agentHistoryRing.Snapshot(0)
+	for i := len(snapshot) - 1; i >= 0; i-- {
+		if snapshot[i].AgentName == agentName {
+			execID = snapshot[i].ExecutionID
 			break
 		}
 	}
+	n.agentHistoryRing.Append(AgentExecution{
+		ExecutionID: execID,
+		AgentName:   agentName,
+		Timestamp:   time.Now(),
+		Status:      "running",
+		Activity:    activity,
+	})
 }
 
 func getAgentNames(agents []Agent) []string {
@@ -206,9 +215,8 @@ func (n *Want) executeAgent(agent Agent) error {
 	if n.RunningAgents == nil {
 		n.RunningAgents = make([]string, 0)
 	}
-	if n.History.AgentHistory == nil {
-		n.History.AgentHistory = make([]AgentExecution, 0)
-	}
+	n.initHistoryRings()
+	executionID := generateUUID()
 	n.RunningAgents = append(n.RunningAgents, agent.GetName())
 	n.CurrentAgent = agent.GetName()
 	{
@@ -220,30 +228,49 @@ func (n *Want) executeAgent(agent Agent) error {
 		// This ensures we record the "agent started" event immediately
 		n.AggregateChanges()
 	}
-	agentExec := AgentExecution{
+	// Append "running" start event
+	n.agentHistoryRing.Append(AgentExecution{
+		ExecutionID:   executionID,
 		AgentName:     agent.GetName(),
 		AgentType:     string(agent.GetType()),
-		StartTime:     time.Now(),
+		Timestamp:     time.Now(),
 		Status:        "running",
 		ExecutionMode: string(executor.GetMode()),
-	}
-	n.History.AgentHistory = append(n.History.AgentHistory, agentExec)
+	})
 
 	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
 	var agentErr error // Capture error from DoAgent execution
 
 	executeFunc := func() error {
+		agentGetName := agent.GetName()
+		capturedExecID := executionID
+		capturedAgentType := string(agent.GetType())
+		var finalStatus string
+		var finalError string
+
 		defer func() {
-			// Update agent execution record
-			for i := range n.History.AgentHistory {
-				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].EndTime == nil {
-					endTime := time.Now()
-					n.History.AgentHistory[i].EndTime = &endTime
-					break
-				}
+			// Determine final status from panic recovery if needed
+			if r := recover(); r != nil {
+				log.Printf("Agent %s panicked: %v\n", agentGetName, r)
+				finalStatus = "failed"
+				finalError = fmt.Sprintf("Panic: %v", r)
 			}
+			if finalStatus == "" {
+				finalStatus = "achieved"
+			}
+
+			// Append completion event (pure append, no mutation)
+			n.agentHistoryRing.Append(AgentExecution{
+				ExecutionID: capturedExecID,
+				AgentName:   agentGetName,
+				AgentType:   capturedAgentType,
+				Timestamp:   time.Now(),
+				Status:      finalStatus,
+				Error:       finalError,
+			})
+
 			for i, runningAgent := range n.RunningAgents {
-				if runningAgent == agent.GetName() {
+				if runningAgent == agentGetName {
 					n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
 					break
 				}
@@ -258,52 +285,20 @@ func (n *Want) executeAgent(agent Agent) error {
 			{
 				n.StoreStateForAgent("_current_agent", n.CurrentAgent)
 				n.StoreStateForAgent("_running_agents", n.RunningAgents)
-				n.DumpStateForAgent("DoAgent") // Mark as AgentExecution for history tracking
+				n.DumpStateForAgent("DoAgent")
 			}
 
-			if r := recover(); r != nil {
-				log.Printf("Agent %s panicked: %v\n", agent.GetName(), r)
-				// Update agent execution record with panic info
-				for i := range n.History.AgentHistory {
-					if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
-						n.History.AgentHistory[i].Status = "failed"
-						n.History.AgentHistory[i].Error = fmt.Sprintf("Panic: %v", r)
-						break
-					}
-				}
-				// AgentHistory is now managed separately from state
-			}
-			delete(n.runningAgents, agent.GetName())
+			delete(n.runningAgents, agentGetName)
 		}()
-
-		// FRAMEWORK-LEVEL: Wrap agent execution in exec cycle This ensures all agent state changes are batched into a single history entry
-		// Individual agents should NOT call BeginProgressCycle/EndProgressCycle themselves
 
 		// Execute through executor (supports local, webhook, rpc)
 		err := executor.Execute(ctx, agent, n)
-		shouldStop := false // Executor doesn't return shouldStop currently
 		if err != nil {
-			log.Printf("Agent %s failed: %v\n", agent.GetName(), err)
-			// Update agent execution record with error
-			for i := range n.History.AgentHistory {
-				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
-					n.History.AgentHistory[i].Status = "failed"
-					n.History.AgentHistory[i].Error = err.Error()
-					break
-				}
-			}
-			// AgentHistory is now managed separately from state
-			return err // Return error for propagation
-		} else {
-			for i := range n.History.AgentHistory {
-				if n.History.AgentHistory[i].AgentName == agent.GetName() && n.History.AgentHistory[i].Status == "running" {
-					n.History.AgentHistory[i].Status = "achieved"
-					break
-				}
-			}
-			// AgentHistory is now managed separately from state
+			log.Printf("Agent %s failed: %v\n", agentGetName, err)
+			finalStatus = "failed"
+			finalError = err.Error()
+			return err
 		}
-		_ = shouldStop // Currently unused at framework level, but available for future use
 
 		// FRAMEWORK-LEVEL: Commit all agent state changes
 		n.DumpStateForAgent("DoAgent")
@@ -351,17 +346,22 @@ func (n *Want) StopAllAgents() {
 		log.Printf("Stopping agent: %s\n", ac.name)
 		ac.cancel()
 
-		// Update agent execution records (these are protected by stateMutex usually, but history might need care)
-		n.stateMutex.Lock()
-		for i := range n.History.AgentHistory {
-			if n.History.AgentHistory[i].AgentName == ac.name && n.History.AgentHistory[i].Status == "running" {
-				endTime := time.Now()
-				n.History.AgentHistory[i].EndTime = &endTime
-				n.History.AgentHistory[i].Status = "terminated"
+		// Append termination event (pure append)
+		// Find the ExecutionID of the last running event for this agent
+		execID := ""
+		snapshot := n.agentHistoryRing.Snapshot(0)
+		for i := len(snapshot) - 1; i >= 0; i-- {
+			if snapshot[i].AgentName == ac.name && snapshot[i].Status == "running" {
+				execID = snapshot[i].ExecutionID
 				break
 			}
 		}
-		n.stateMutex.Unlock()
+		n.agentHistoryRing.Append(AgentExecution{
+			ExecutionID: execID,
+			AgentName:   ac.name,
+			Timestamp:   time.Now(),
+			Status:      "terminated",
+		})
 	}
 }
 
@@ -376,15 +376,21 @@ func (n *Want) StopAgent(agentName string) {
 		cancel()
 		delete(n.runningAgents, agentName)
 
-		// Update agent execution record
-		for i := range n.History.AgentHistory {
-			if n.History.AgentHistory[i].AgentName == agentName && n.History.AgentHistory[i].Status == "running" {
-				endTime := time.Now()
-				n.History.AgentHistory[i].EndTime = &endTime
-				n.History.AgentHistory[i].Status = "terminated"
+		// Append termination event (pure append)
+		execID := ""
+		snapshot := n.agentHistoryRing.Snapshot(0)
+		for i := len(snapshot) - 1; i >= 0; i-- {
+			if snapshot[i].AgentName == agentName && snapshot[i].Status == "running" {
+				execID = snapshot[i].ExecutionID
 				break
 			}
 		}
+		n.agentHistoryRing.Append(AgentExecution{
+			ExecutionID: execID,
+			AgentName:   agentName,
+			Timestamp:   time.Now(),
+			Status:      "terminated",
+		})
 		for i, runningAgent := range n.RunningAgents {
 			if runningAgent == agentName {
 				n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
@@ -479,7 +485,7 @@ func (n *Want) CommitStateChanges() {
 }
 func (n *Want) GetStagedChanges() map[string]any {
 	n.agentStateMutex.RLock()
-	defer n.agentStateMutex.Unlock()
+	defer n.agentStateMutex.RUnlock()
 
 	if n.agentStateChanges == nil {
 		return make(map[string]any)
@@ -492,52 +498,30 @@ func (n *Want) GetStagedChanges() map[string]any {
 	return staged
 }
 func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
-	if n.History.AgentHistory == nil {
-		return []AgentExecution{}
-	}
-
+	n.initHistoryRings()
 	var result []AgentExecution
-	for _, exec := range n.History.AgentHistory {
+	for _, exec := range n.agentHistoryRing.Snapshot(0) {
 		if exec.AgentName == agentName {
 			result = append(result, exec)
 		}
 	}
+	if result == nil {
+		return []AgentExecution{}
+	}
 	return result
 }
 func (n *Want) GetAgentHistoryByType(agentType string) []AgentExecution {
-	if n.History.AgentHistory == nil {
-		return []AgentExecution{}
-	}
-
+	n.initHistoryRings()
 	var result []AgentExecution
-	for _, exec := range n.History.AgentHistory {
+	for _, exec := range n.agentHistoryRing.Snapshot(0) {
 		if exec.AgentType == agentType {
 			result = append(result, exec)
 		}
 	}
+	if result == nil {
+		return []AgentExecution{}
+	}
 	return result
-}
-func (n *Want) GetAgentHistoryGroupedByName() map[string][]AgentExecution {
-	if n.History.AgentHistory == nil {
-		return make(map[string][]AgentExecution)
-	}
-
-	grouped := make(map[string][]AgentExecution)
-	for _, exec := range n.History.AgentHistory {
-		grouped[exec.AgentName] = append(grouped[exec.AgentName], exec)
-	}
-	return grouped
-}
-func (n *Want) GetAgentHistoryGroupedByType() map[string][]AgentExecution {
-	if n.History.AgentHistory == nil {
-		return make(map[string][]AgentExecution)
-	}
-
-	grouped := make(map[string][]AgentExecution)
-	for _, exec := range n.History.AgentHistory {
-		grouped[exec.AgentType] = append(grouped[exec.AgentType], exec)
-	}
-	return grouped
 }
 
 // ============================================================================
@@ -704,65 +688,53 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	return false // Validation failed, but write still allowed
 }
 
-// StoreStateForAgent stores state changes from background agents in a separate queue
-// These changes are tracked independently from the Want's Progress cycle
+// StoreStateForAgent stages a state change from a background agent.
+// Uses the shared agentStateMutex / agentStateChanges as StageStateChange.
 func (w *Want) StoreStateForAgent(key string, value any) {
-	// Validate key against agent specification
 	w.validateAgentStateKey(key)
 
-	w.agentStateChangesMutex.Lock()
-	defer w.agentStateChangesMutex.Unlock()
+	w.agentStateMutex.Lock()
+	defer w.agentStateMutex.Unlock()
 
-	if w.pendingAgentStateChanges == nil {
-		w.pendingAgentStateChanges = make(map[string]any)
+	if w.agentStateChanges == nil {
+		w.agentStateChanges = make(map[string]any)
 	}
-	w.pendingAgentStateChanges[key] = value
+	w.agentStateChanges[key] = value
 }
 
-// StoreStateMultiForAgent stores multiple state changes from background agents in a separate queue
-// This is a convenience method for storing multiple key-value pairs at once
+// StoreStateMultiForAgent stages multiple state changes from a background agent.
 func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
-	// Validate all keys against agent specification
 	for key := range updates {
 		w.validateAgentStateKey(key)
 	}
 
-	w.agentStateChangesMutex.Lock()
-	defer w.agentStateChangesMutex.Unlock()
+	w.agentStateMutex.Lock()
+	defer w.agentStateMutex.Unlock()
 
-	if w.pendingAgentStateChanges == nil {
-		w.pendingAgentStateChanges = make(map[string]any)
+	if w.agentStateChanges == nil {
+		w.agentStateChanges = make(map[string]any)
 	}
 	for key, value := range updates {
-		w.pendingAgentStateChanges[key] = value
+		w.agentStateChanges[key] = value
 	}
 }
 
-// DumpStateForAgent commits pending agent state changes to the Want's state
-// Agent state changes are applied to State and will be recorded in StateHistory
-// by the next Progress cycle's addAggregatedStateHistory() call
-// This consolidates all state history recording through addAggregatedStateHistory()
-// DumpStateForAgent applies pending agent state changes and stores the agent type
-// The agentType parameter identifies which agent (e.g., "MonitorAgent", "DoAgent") made the changes
+// DumpStateForAgent commits all staged agent state changes to the Want's state.
+// The agentType parameter identifies which agent (e.g., "MonitorAgent", "DoAgent") made the changes.
 func (w *Want) DumpStateForAgent(agentType string) {
-	w.agentStateChangesMutex.Lock()
-	if len(w.pendingAgentStateChanges) == 0 {
-		w.agentStateChangesMutex.Unlock()
+	w.agentStateMutex.Lock()
+	if len(w.agentStateChanges) == 0 {
+		w.agentStateMutex.Unlock()
 		return
 	}
 
-	// Copy pending changes
 	changesCopy := make(map[string]any)
-	for k, v := range w.pendingAgentStateChanges {
+	for k, v := range w.agentStateChanges {
 		changesCopy[k] = v
 	}
+	w.agentStateChanges = make(map[string]any)
+	w.agentStateMutex.Unlock()
 
-	// Clear pending changes
-	w.pendingAgentStateChanges = make(map[string]any)
-	w.agentStateChangesMutex.Unlock()
-
-	// Store the agent type for use in StateHistory recording
-	// Use StoreState for single value, then batch the rest
 	w.StoreState("action_by_agent", agentType)
 	for key, value := range changesCopy {
 		w.StoreState(key, value)
@@ -771,10 +743,10 @@ func (w *Want) DumpStateForAgent(agentType string) {
 	w.StoreLog("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
 }
 
-// HasPendingAgentStateChanges returns true if there are pending agent state changes to dump
+// HasPendingAgentStateChanges returns true if there are staged agent state changes.
 func (w *Want) HasPendingAgentStateChanges() bool {
-	w.agentStateChangesMutex.RLock()
-	defer w.agentStateChangesMutex.RUnlock()
+	w.agentStateMutex.RLock()
+	defer w.agentStateMutex.RUnlock()
 
-	return len(w.pendingAgentStateChanges) > 0
+	return len(w.agentStateChanges) > 0
 }

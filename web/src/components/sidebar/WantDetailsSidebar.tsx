@@ -1208,59 +1208,27 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
   );
 };
 
-interface AgentExecution {
-  agent_name: string;
-  agent_type: string;
-  start_time: string;
-  end_time?: string;
-  status: string;
-  error?: string;
-  activity?: string; // Description of agent action performed
-}
-
 const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
-  const [groupedAgents, setGroupedAgents] = useState<Record<string, AgentExecution[]> | null>(null);
-  const [groupBy, setGroupBy] = useState<'name' | 'type'>('name');
-  const [loadingGrouped, setLoadingGrouped] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const agentHistory = want.history?.agentHistory ?? [];
+  const hasActivity = want.current_agent ||
+    (want.running_agents && want.running_agents.length > 0) ||
+    agentHistory.length > 0;
 
-  // Fetch grouped agent history
-  useEffect(() => {
-    const fetchGroupedAgents = async () => {
-      if (want?.metadata?.id) {
-        setLoadingGrouped(true);
-        try {
-          const response = await fetch(
-            `/api/v1/wants/${want.metadata.id}?groupBy=${groupBy}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (data.history?.groupedAgentHistory) {
-              setGroupedAgents(data.history.groupedAgentHistory);
-              // Auto-expand first group
-              const groups = Object.keys(data.history.groupedAgentHistory);
-              if (groups.length > 0) {
-                setExpandedGroups({ [groups[0]]: true });
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Failed to fetch grouped agents:', error);
-        } finally {
-          setLoadingGrouped(false);
-        }
-      }
-    };
+  const statusDot = (status: string) => classNames(
+    'w-2 h-2 rounded-full flex-shrink-0',
+    status === 'achieved'   && 'bg-green-500',
+    status === 'failed'     && 'bg-red-500',
+    status === 'running'    && 'bg-blue-500 animate-pulse',
+    status === 'terminated' && 'bg-gray-500',
+  );
 
-    fetchGroupedAgents();
-  }, [want?.metadata?.id, groupBy]);
-
-  const toggleGroup = (groupName: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [groupName]: !prev[groupName]
-    }));
-  };
+  const agentTypeBadge = (type: string) => classNames(
+    'text-xs px-1.5 py-0.5 rounded font-medium',
+    type === 'do'      && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    type === 'monitor' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    type === 'think'   && 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    !['do', 'monitor', 'think'].includes(type) && 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  );
 
   return (
     <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
@@ -1274,7 +1242,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
               <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-400">{want.current_agent}</p>
             </div>
             <div className="ml-auto">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Reaching" />
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             </div>
           </div>
         </div>
@@ -1295,121 +1263,45 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
         </div>
       )}
 
-      {/* Grouped Agent History */}
-      {groupedAgents && Object.keys(groupedAgents).length > 0 && (
+      {/* Agent Event Log */}
+      {agentHistory.length > 0 && (
         <div className={SECTION_CONTAINER_CLASS}>
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Agent Execution History</h4>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setGroupBy('name')}
-                className={classNames(
-                  'px-3 py-1 text-xs rounded-md font-medium transition-colors',
-                  groupBy === 'name'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
-                )}
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Agent Execution Log</h4>
+          <div className="space-y-2">
+            {[...agentHistory].reverse().map((event, index) => (
+              <div
+                key={index}
+                className="p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 text-xs"
               >
-                By Name
-              </button>
-              <button
-                onClick={() => setGroupBy('type')}
-                className={classNames(
-                  'px-3 py-1 text-xs rounded-md font-medium transition-colors',
-                  groupBy === 'type'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{event.agent_name}</span>
+                  <div className="flex items-center space-x-2">
+                    {event.agent_type && (
+                      <span className={agentTypeBadge(event.agent_type)}>{event.agent_type}</span>
+                    )}
+                    <div className={statusDot(event.status)} title={event.status} />
+                  </div>
+                </div>
+                {event.activity && (
+                  <div className="mb-1">
+                    <span className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded font-medium">
+                      {event.activity}
+                    </span>
+                  </div>
                 )}
-              >
-                By Type
-              </button>
-            </div>
-          </div>
-
-          {loadingGrouped && (
-            <div className="flex items-center justify-center py-4">
-              <LoadingSpinner />
-            </div>
-          )}
-
-          {!loadingGrouped && (
-            <div className="space-y-3">
-              {Object.entries(groupedAgents).map(([groupName, executions]) => (
-                <div key={groupName} className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-                  {/* Group Header */}
-                  <button
-                    onClick={() => toggleGroup(groupName)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <div className="flex items-center space-x-2">
-                      {expandedGroups[groupName] ? (
-                        <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      )}
-                      <span className="font-medium text-sm text-gray-900 dark:text-white">{groupName}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">({executions.length})</span>
-                    </div>
-                  </button>
-
-                  {/* Group Content */}
-                  {expandedGroups[groupName] && (
-                    <div className="px-3 py-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                      {executions.map((execution, index) => (
-                        <div
-                          key={index}
-                          className="p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 text-xs"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{execution.agent_name}</span>
-                            <div className="flex items-center space-x-2">
-                              <span className={classNames(
-                                'text-xs px-1.5 py-0.5 rounded font-medium',
-                                execution.agent_type === 'do' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-                                execution.agent_type === 'monitor' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-                                execution.agent_type === 'think' && 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-                                !['do', 'monitor', 'think'].includes(execution.agent_type) && 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                              )}>{execution.agent_type}</span>
-                              <div className={classNames(
-                                'w-2 h-2 rounded-full',
-                                execution.status === 'achieved' && 'bg-green-500',
-                                execution.status === 'failed' && 'bg-red-500',
-                                execution.status === 'reaching' && 'bg-blue-500 animate-pulse',
-                                execution.status === 'terminated' && 'bg-gray-500'
-                              )} />
-                            </div>
-                          </div>
-
-                          {/* Activity Label */}
-                          {execution.activity && (
-                            <div className="mb-2">
-                              <span className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium">
-                                {execution.activity}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="text-gray-600 dark:text-gray-400 space-y-1">
-                            <div>Start: {formatDate(execution.start_time)}</div>
-                            {execution.end_time && (
-                              <div>End: {formatDate(execution.end_time)}</div>
-                            )}
-                            {execution.error && (
-                              <div className="text-red-600 dark:text-red-400">Error: {execution.error}</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                <div className="text-gray-500 dark:text-gray-400 space-y-0.5">
+                  <div>{event.status} · {formatDate(event.timestamp)}</div>
+                  {event.error && (
+                    <div className="text-red-600 dark:text-red-400">Error: {event.error}</div>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {!want.current_agent && (!want.running_agents || want.running_agents.length === 0) && (!groupedAgents || Object.keys(groupedAgents).length === 0) && (
+      {!hasActivity && (
         <div className="text-center py-8">
           <Bot className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500">No agent information available</p>

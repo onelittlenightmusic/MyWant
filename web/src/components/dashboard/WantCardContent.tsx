@@ -417,7 +417,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                     `${sizes.agentDotSize} rounded-full`,
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'achieved' && 'bg-green-500',
                     want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
-                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'reaching' && `bg-blue-500 ${styles.pulseGlow}`
+                    want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && `bg-blue-500 ${styles.pulseGlow}`
                   )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
                 )}
               </button>

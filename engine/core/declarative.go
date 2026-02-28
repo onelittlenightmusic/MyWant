@@ -81,17 +81,18 @@ type ParameterUpdate struct {
 }
 
 // AgentExecution represents information about an agent execution
+// AgentExecution represents a single immutable event in the agent execution log.
+// Each start/completion/failure/termination produces a separate append-only entry.
+// ExecutionID links related events (e.g., the "running" start and its "achieved" completion).
 type AgentExecution struct {
-	AgentName string     `json:"agent_name" yaml:"agent_name"`
-	AgentType string     `json:"agent_type" yaml:"agent_type"`
-	StartTime time.Time  `json:"start_time" yaml:"start_time"`
-	EndTime   *time.Time `json:"end_time,omitempty" yaml:"end_time,omitempty"`
-	Status    string     `json:"status" yaml:"status"` // "running", "achieved", "failed"
-	Error     string     `json:"error,omitempty" yaml:"error,omitempty"`
-	Activity  string     `json:"activity,omitempty" yaml:"activity,omitempty"` // Description of agent action like "flight reservation has been created"
-
-	// Execution mode information
-	ExecutionMode string `json:"execution_mode,omitempty" yaml:"execution_mode,omitempty"` // local, webhook, rpc
+	ExecutionID   string    `json:"execution_id" yaml:"execution_id"`               // UUID linking related events for the same run
+	AgentName     string    `json:"agent_name" yaml:"agent_name"`
+	AgentType     string    `json:"agent_type" yaml:"agent_type"`
+	Timestamp     time.Time `json:"timestamp" yaml:"timestamp"`                     // Time this event occurred
+	Status        string    `json:"status" yaml:"status"`                           // "running", "achieved", "failed", "terminated"
+	Error         string    `json:"error,omitempty" yaml:"error,omitempty"`
+	Activity      string    `json:"activity,omitempty" yaml:"activity,omitempty"`   // Human-readable description of agent action
+	ExecutionMode string    `json:"execution_mode,omitempty" yaml:"execution_mode,omitempty"` // local, webhook, rpc
 }
 
 // ParameterUpdateListener represents a want that can receive parameter updates
