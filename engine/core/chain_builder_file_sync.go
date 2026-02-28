@@ -173,8 +173,12 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	return states
 }
 
-// dumpWantMemoryToYAML dumps all want information to a timestamped YAML file in memory directory
+// dumpWantMemoryToYAML is disabled — memory-*.yaml dumps are no longer written.
 func (cb *ChainBuilder) dumpWantMemoryToYAML() error {
+	return nil
+}
+
+func (cb *ChainBuilder) dumpWantMemoryToYAML_disabled() error {
 	timestamp := time.Now().Format("20060102-150405")
 
 	// Use memory directory if available
