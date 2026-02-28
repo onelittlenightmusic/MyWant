@@ -56,13 +56,7 @@ components:
           description: Deprecated, use connect instead
         requires:
           type: array
-          description: Agent capability requirements (must be at wantType level)
-          items:
-            type: string
-          default: []
-        thinkCapabilities:
-          type: array
-          description: ThinkAgent capability names used by this want type (for parentStateAccess discovery)
+          description: Agent capability requirements including ThinkAgent capabilities (must be at wantType level)
           items:
             type: string
           default: []

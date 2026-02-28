@@ -231,5 +231,4 @@ wantType:
 
   requires:
     - buffet_agency
-  thinkCapabilities:
     - condition_thinking

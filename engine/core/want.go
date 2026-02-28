@@ -644,6 +644,9 @@ func (n *Want) StartProgressionLoop(
 			select {
 			case <-n.stopChannel:
 				n.SetStatus(WantStatusTerminated)
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents on stop: %v", err)
+				}
 				return
 			default:
 				// Continue execution
@@ -699,7 +702,10 @@ func (n *Want) StartProgressionLoop(
 			// 3.2. Check if want is in error or terminal state
 			status := n.GetStatus()
 			if status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError {
-				// Terminal error states - exit goroutine
+				// Terminal error states - stop background agents and exit goroutine
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents on terminal state: %v", err)
+				}
 				return
 			}
 			if status == WantStatusConfigError {
@@ -748,6 +754,9 @@ func (n *Want) StartProgressionLoop(
 			case <-n.stopChannel:
 				n.EndProgressCycle()
 				n.SetStatus(WantStatusTerminated)
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents on stop: %v", err)
+				}
 				return
 			default:
 				// Continue with execution
@@ -758,6 +767,13 @@ func (n *Want) StartProgressionLoop(
 				// No progressable set, mark as failed
 				n.SetStatus(WantStatusFailed)
 				return
+			}
+
+			// Auto-start persistent agents (ThinkAgent, MonitorAgent, PollAgent) from Requires.
+			// This is idempotent: already-running agents are skipped.
+			// DoAgents are excluded here and must be called explicitly from Progress().
+			if err := n.StartBackgroundAgents(); err != nil {
+				n.StoreLog("ERROR: Failed to start background agents: %v", err)
 			}
 
 			// Execute Progress() with panic/recover to handle immediate termination
@@ -1661,8 +1677,12 @@ func (n *Want) OnProcessEnd(finalState map[string]any) {
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
 
-	// Stop all running agents
+	// Stop all running agents (synchronous DoAgents)
 	n.StopAllAgents()
+	// Stop all background agents (ThinkAgent, MonitorAgent, PollAgent)
+	if err := n.StopAllBackgroundAgents(); err != nil {
+		n.StoreLog("ERROR: Failed to stop background agents on process end: %v", err)
+	}
 
 	// Emit ProcessEnd event (Group B - synchronous control)
 	event := &ProcessEndEvent{
@@ -1691,8 +1711,12 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
 
-	// Stop all running agents
+	// Stop all running agents (synchronous DoAgents)
 	n.StopAllAgents()
+	// Stop all background agents (ThinkAgent, MonitorAgent, PollAgent)
+	if err := n.StopAllBackgroundAgents(); err != nil {
+		n.StoreLog("ERROR: Failed to stop background agents on process fail: %v", err)
+	}
 
 	// Emit ProcessEnd event with failure (Group B - synchronous control)
 	event := &ProcessEndEvent{

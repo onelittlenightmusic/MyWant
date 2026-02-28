@@ -328,17 +328,9 @@ func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, child := range childWants {
-		// 1. Capabilities declared in spec.requires
+		// Collect from all capabilities declared in spec.requires (includes ThinkAgent capabilities)
 		for _, capName := range child.Spec.Requires {
 			collectFromCapability(capName)
-		}
-		// 2. ThinkAgent capabilities declared in the want type definition
-		if s.wantTypeLoader != nil && child.Metadata.Type != "" {
-			if typeDef := s.wantTypeLoader.GetDefinition(child.Metadata.Type); typeDef != nil {
-				for _, capName := range typeDef.ThinkCapabilities {
-					collectFromCapability(capName)
-				}
-			}
 		}
 	}
 

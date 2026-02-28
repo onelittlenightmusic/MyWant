@@ -1315,6 +1315,10 @@ func (cb *ChainBuilder) deleteWantByID(wantID string) {
 				deletable.OnDelete()
 			}
 
+			// Stop background agents before closing the stop channel
+			if err := rw.want.StopAllBackgroundAgents(); err != nil {
+				log.Printf("[DELETE-WANT] Failed to stop background agents for '%s': %v\n", rw.want.Metadata.Name, err)
+			}
 			if rw.want.stopChannel == nil {
 				rw.want.stopChannel = make(chan struct{})
 			}

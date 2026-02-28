@@ -79,8 +79,6 @@ wantType:
     type: none
   requires:
     - budget_thinking
-  thinkCapabilities:
-    - budget_thinking
   relatedTypes:
   - restaurant
   - hotel

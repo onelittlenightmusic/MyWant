@@ -50,38 +50,47 @@ func getAgentNames(agents []Agent) []string {
 	return names
 }
 
+// StartBackgroundAgents starts persistent agents (ThinkAgent, MonitorAgent, PollAgent)
+// declared in Spec.Requires. Called automatically in the ProgressionLoop before each
+// Progress() invocation. Idempotent: already-running agents are skipped.
+// DoAgents are intentionally excluded — call ExecuteAgents() explicitly from Progress().
+func (n *Want) StartBackgroundAgents() error {
+	if n.agentRegistry == nil || len(n.Spec.Requires) == 0 {
+		return nil
+	}
+
+	for _, requirement := range n.Spec.Requires {
+		agents := n.agentRegistry.FindAgentsByGives(requirement)
+		if len(agents) == 0 {
+			if cap, exists := n.agentRegistry.GetCapability(requirement); exists {
+				for _, givesValue := range cap.Gives {
+					agents = append(agents, n.agentRegistry.FindAgentsByGives(givesValue)...)
+				}
+			}
+		}
+		for _, agent := range agents {
+			if agent.GetType() == DoAgentType {
+				continue // DoAgents are run explicitly from Progress()
+			}
+			if err := n.executeAgent(agent); err != nil {
+				return fmt.Errorf("failed to start background agent %s: %w", agent.GetName(), err)
+			}
+		}
+	}
+	return nil
+}
+
 // ExecuteAgents finds and executes agents based on want requirements
 func (n *Want) ExecuteAgents() error {
 	if n.agentRegistry == nil {
 		return nil
 	}
 
-	// 1. Resolve explicit requirements from Spec.Requires
-	requirements := make([]string, len(n.Spec.Requires))
-	copy(requirements, n.Spec.Requires)
-
-	// 2. Add implicit think-agent requirements from want type definition
-	// This ensures that core 'thinking' logic always runs even if not explicitly listed in Requires
-	if def := n.WantTypeDefinition; def != nil {
-		for _, capName := range def.ThinkCapabilities {
-			found := false
-			for _, r := range requirements {
-				if r == capName {
-					found = true
-					break
-				}
-			}
-			if !found {
-				requirements = append(requirements, capName)
-			}
-		}
-	}
-
-	if len(requirements) == 0 {
+	if len(n.Spec.Requires) == 0 {
 		return nil
 	}
 
-	for _, requirement := range requirements {
+	for _, requirement := range n.Spec.Requires {
 		var agents []Agent
 		// n.StoreLog("🔍 Resolving requirement: '%s'", requirement)
 

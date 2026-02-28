@@ -298,5 +298,3 @@ wantType:
   requires:
     - restaurant_agency
     - condition_thinking
-  thinkCapabilities:
-    - condition_thinking

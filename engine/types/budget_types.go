@@ -33,7 +33,9 @@ func (b *BudgetWant) Initialize() {
 	})
 }
 
-// Progress is a no-op: BudgetThinker handles all state updates asynchronously.
+// Progress is a no-op: BudgetThinker (ThinkAgent) is started automatically
+// by the ProgressionLoop via StartBackgroundAgents() using the budget_thinking
+// capability declared in Requires.
 func (b *BudgetWant) Progress() {}
 
 // IsAchieved returns true when all itinerary items have reported non-zero costs

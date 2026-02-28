@@ -22,8 +22,7 @@ type WantTypeDefinition struct {
 	Connect          *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`                   // New connectivity requirement field
 	Require          *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`                   // Structured connectivity requirement (deprecated)
 	UsageLimit       *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`             // Deprecated: use connect instead
-	Requires            []string                `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements
-	ThinkCapabilities   []string                `json:"thinkCapabilities,omitempty" yaml:"thinkCapabilities,omitempty"`     // ThinkAgent capability names (auto-started at want init)
+	Requires            []string                `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements (includes ThinkAgent capabilities)
 	MonitorCapabilities []MonitorCapabilityDef  `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
 	FinalResultField    string                  `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
 	Agents           []AgentDef       `json:"agents" yaml:"agents"`

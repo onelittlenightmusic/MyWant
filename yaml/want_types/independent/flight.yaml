@@ -197,5 +197,4 @@ wantType:
 
   requires:
     - flight_api_agency
-  thinkCapabilities:
     - condition_thinking

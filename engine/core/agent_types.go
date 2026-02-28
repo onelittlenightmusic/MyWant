@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 )
 
 // AgentType defines the type of agent for execution strategies.
@@ -168,22 +167,11 @@ type ThinkAgent struct {
 	Think ThinkFunc
 }
 
+// Exec must not be called directly for ThinkAgent.
+// ThinkAgents are started automatically by the ProgressionLoop via StartBackgroundAgents()
+// using the Requires field. Direct invocation bypasses lifecycle management.
 func (a *ThinkAgent) Exec(ctx context.Context, want *Want) (bool, error) {
-	if a.Think == nil {
-		return false, fmt.Errorf("no think function defined for ThinkAgent %s", a.Name)
-	}
-
-	id := "think-" + a.Name + "-" + want.Metadata.ID
-	if _, exists := want.GetBackgroundAgent(id); exists {
-		// Already running - skip registration
-		return false, nil
-	}
-
-	thinkingAgent := NewThinkingAgent(id, 2*time.Second, a.Name, a.Think)
-	if err := want.AddBackgroundAgent(thinkingAgent); err != nil {
-		return false, fmt.Errorf("failed to add ThinkingAgent %s: %w", id, err)
-	}
-	return false, nil
+	return false, fmt.Errorf("ThinkAgent.Exec() must not be called directly: use Requires to declare '%s' and it will be started automatically", a.Name)
 }
 
 // AgentSpec holds specification for state field validation
