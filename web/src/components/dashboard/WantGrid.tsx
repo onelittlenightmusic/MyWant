@@ -307,6 +307,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
               onCreateWant={onCreateWant}
               correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
+              correlationHighlights={correlationHighlights}
             />
 
             {/* Drop Indicator After (only for the last item) */}
