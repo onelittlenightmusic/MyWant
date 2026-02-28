@@ -6,6 +6,7 @@ import (
 	"mywant/engine/core/chain"
 	"mywant/engine/core/pubsub"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -136,6 +137,11 @@ type ChainBuilder struct {
 	// Used for efficient correlation calculation and dependency tracking.
 	// Always accessed inside reconcileMutex, no separate lock needed.
 	stateAccessIndex map[string][]string // "wantID.fieldName" -> []wantIDs
+
+	// Global state (shared across all wants, persisted to disk)
+	globalState     sync.Map // key(string) -> value(any), key-level concurrency
+	globalStatePath string   // ~/.mywant/global_state.yaml
+	lastGlobalStateHash string // Hash of last written global state for change detection
 }
 
 // runtimeWant holds the runtime state of a want
@@ -206,6 +212,13 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		labelRegistry:          make(map[string]map[string]bool),
 		dirtyWantIDs:           make(map[string]struct{}),
 		stateAccessIndex:       make(map[string][]string),
+	}
+
+	// Derive globalStatePath from memoryPath directory
+	if memoryPath != "" {
+		dir := filepath.Dir(memoryPath)
+		builder.globalStatePath = filepath.Join(dir, "global_state.yaml")
+		builder.loadGlobalStateFromFile() // Load persisted global state on startup
 	}
 
 	// Register all types that have Go implementations

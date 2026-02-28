@@ -1095,7 +1095,7 @@ func (n *Want) HasParent() bool {
 func (n *Want) GetParentState(key string) (any, bool) {
 	parent := n.getParentWant()
 	if parent == nil {
-		return nil, false
+		return GetGlobalState(key) // fallback to globalState for top-level wants
 	}
 	return parent.GetState(key)
 }
@@ -1103,7 +1103,7 @@ func (n *Want) GetParentState(key string) (any, bool) {
 func (n *Want) StoreParentState(key string, value any) {
 	parent := n.getParentWant()
 	if parent == nil {
-		log.Printf("[WARN] Want '%s' has no parent, cannot store parent state '%s'", n.Metadata.Name, key)
+		StoreGlobalState(key, value) // fallback to globalState for top-level wants
 		return
 	}
 	parent.StoreState(key, value)
@@ -1112,7 +1112,7 @@ func (n *Want) StoreParentState(key string, value any) {
 func (n *Want) MergeParentState(updates map[string]any) {
 	parent := n.getParentWant()
 	if parent == nil {
-		log.Printf("[WARN] Want '%s' has no parent, cannot merge parent state", n.Metadata.Name)
+		MergeGlobalState(updates) // fallback to globalState for top-level wants
 		return
 	}
 	parent.MergeState(updates)
