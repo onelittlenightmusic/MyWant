@@ -19,47 +19,6 @@ func (n *Want) GetAgentRegistry() *AgentRegistry {
 	return n.agentRegistry
 }
 
-// StartThinkAgentsByType starts all ThinkAgents declared in this want's type definition
-// via the thinkCapabilities field in the YAML. This removes the need for each want type's
-// Initialize() to hard-code specific agent startup calls.
-// Returns true if at least one ThinkAgent was started or was already running.
-func (n *Want) StartThinkAgentsByType() bool {
-	n.metadataMutex.RLock()
-	typeDef := n.WantTypeDefinition
-	n.metadataMutex.RUnlock()
-
-	if typeDef == nil || len(typeDef.ThinkCapabilities) == 0 {
-		return false
-	}
-	reg := n.GetAgentRegistry()
-	if reg == nil {
-		return false
-	}
-
-	startedAny := false
-	for _, capName := range typeDef.ThinkCapabilities {
-		agents := reg.FindAgentsByGives(capName)
-		for _, agent := range agents {
-			thinkAgent, ok := agent.(*ThinkAgent)
-			if !ok {
-				continue
-			}
-			thinkerID := thinkAgent.GetName() + "-" + n.Metadata.ID
-			if _, exists := n.GetBackgroundAgent(thinkerID); exists {
-				startedAny = true
-				continue // Already running
-			}
-			tAgent := NewThinkingAgent(thinkerID, 2*time.Second, thinkAgent.GetName(), thinkAgent.Think)
-			if err := n.AddBackgroundAgent(tAgent); err != nil {
-				n.StoreLog("[ThinkAgent] Failed to start %s: %v", thinkAgent.GetName(), err)
-			} else {
-				startedAny = true
-			}
-		}
-	}
-	return startedAny
-}
-
 // SetAgentActivity appends an activity annotation event for the given agent.
 // This records a human-readable description of what the agent just did,
 // e.g. "Flight reservation has been created".
@@ -239,6 +198,27 @@ func (n *Want) executeAgent(agent Agent) error {
 	})
 
 	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
+	if agent.GetType() == ThinkAgentType {
+		// THINK agents are persistent background agents.
+		// Wrap them in a ThinkingAgent and start as BackgroundAgent.
+		thinkAgent, ok := agent.(*ThinkAgent)
+		if !ok {
+			return fmt.Errorf("agent %s is not a ThinkAgent", agent.GetName())
+		}
+
+		thinkerID := thinkAgent.GetName() + "-" + n.Metadata.ID
+		if _, exists := n.GetBackgroundAgent(thinkerID); exists {
+			return nil // Already running
+		}
+
+		// Use standard interval for thinking agents (2s)
+		tAgent := NewThinkingAgent(thinkerID, 2*time.Second, thinkAgent.GetName(), thinkAgent.Think)
+		if err := n.AddBackgroundAgent(tAgent); err != nil {
+			return fmt.Errorf("failed to start background thinking agent %s: %w", agent.GetName(), err)
+		}
+		return nil
+	}
+
 	var agentErr error // Capture error from DoAgent execution
 
 	executeFunc := func() error {
@@ -305,11 +285,11 @@ func (n *Want) executeAgent(agent Agent) error {
 		return nil
 	}
 
-	// Execute synchronously for DO and THINK agents, asynchronously for MONITOR agents
-	if agent.GetType() == DoAgentType || agent.GetType() == ThinkAgentType {
-		// DO and THINK agents execute synchronously to return results immediately
+	// Execute synchronously for DO agents, asynchronously for MONITOR agents
+	if agent.GetType() == DoAgentType {
+		// DO agents execute synchronously to return results immediately
 		agentErr = executeFunc()
-		return agentErr // Propagate error from DoAgent/ThinkAgent
+		return agentErr // Propagate error from DoAgent
 	} else {
 		// MONITOR agents execute asynchronously to run in background
 		go executeFunc()
