@@ -36,9 +36,9 @@ function buildCorrelationStyle(_rate: number): React.CSSProperties {
 }
 
 function buildCorrelationOverlayVars(rate: number): React.CSSProperties {
-  // Static blue overlay with opacity based on rate
+  // Static orange overlay with opacity based on rate
   const alpha = Math.min(0.12 + rate * 0.1, 0.45);
-  return { backgroundColor: `rgba(59, 130, 246, ${alpha})` } as React.CSSProperties;
+  return { backgroundColor: `rgba(249, 115, 22, ${alpha})` } as React.CSSProperties;
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────────────

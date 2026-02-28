@@ -188,7 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={classNames(
                 "p-2 rounded-md transition-colors",
                 showRadarMode
-                  ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400 dark:ring-blue-500"
+                  ? "text-orange-600 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-400 dark:ring-orange-500"
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               )}
               title={showRadarMode ? "Radar mode ON — click a want card to see correlations (x)" : "Correlation Radar (x)"}
