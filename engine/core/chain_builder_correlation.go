@@ -64,16 +64,8 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 			if parentID != "" {
 				// Check capabilities of this want (from its type definition)
 				if def, ok := cb.wantTypeDefinitions[want.Metadata.Type]; ok {
-					// 1. Check regular agent requirements
+					// Check regular agent requirements (now includes think-agent capabilities)
 					for _, capName := range def.Requires {
-						if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
-							for _, field := range cap.ParentStateAccess {
-								register(parentID, field.Name, wantID)
-							}
-						}
-					}
-					// 2. Check think-agent capabilities
-					for _, capName := range def.ThinkCapabilities {
 						if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
 							for _, field := range cap.ParentStateAccess {
 								register(parentID, field.Name, wantID)

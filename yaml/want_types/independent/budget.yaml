@@ -77,7 +77,8 @@ wantType:
   agents: []
   connect:
     type: none
-  requires: []
+  requires:
+    - budget_thinking
   thinkCapabilities:
     - budget_thinking
   relatedTypes:

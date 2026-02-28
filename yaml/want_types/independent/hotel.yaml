@@ -228,5 +228,6 @@ wantType:
 
   requires:
     - hotel_agency
+    - condition_thinking
   thinkCapabilities:
     - condition_thinking
