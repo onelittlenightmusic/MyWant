@@ -53,16 +53,37 @@ func getAgentNames(agents []Agent) []string {
 // ExecuteAgents finds and executes agents based on want requirements
 func (n *Want) ExecuteAgents() error {
 	if n.agentRegistry == nil {
-		return nil // No agent registry configured, skip agent execution
+		return nil
 	}
 
-	if len(n.Spec.Requires) == 0 {
-		return nil // No requirements specified, skip agent execution
+	// 1. Resolve explicit requirements from Spec.Requires
+	requirements := make([]string, len(n.Spec.Requires))
+	copy(requirements, n.Spec.Requires)
+
+	// 2. Add implicit think-agent requirements from want type definition
+	// This ensures that core 'thinking' logic always runs even if not explicitly listed in Requires
+	if def := n.WantTypeDefinition; def != nil {
+		for _, capName := range def.ThinkCapabilities {
+			found := false
+			for _, r := range requirements {
+				if r == capName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				requirements = append(requirements, capName)
+			}
+		}
 	}
 
-	for _, requirement := range n.Spec.Requires {
+	if len(requirements) == 0 {
+		return nil
+	}
+
+	for _, requirement := range requirements {
 		var agents []Agent
-		n.StoreLog("🔍 Resolving requirement: '%s'", requirement)
+		// n.StoreLog("🔍 Resolving requirement: '%s'", requirement)
 
 		// First, try to find agents by the requirement directly (if it's a "gives" value)
 		agents = n.agentRegistry.FindAgentsByGives(requirement)
@@ -136,24 +157,27 @@ func (n *Want) bootAgent(ctx context.Context, agent Agent) error {
 
 // executeAgent executes a single agent using the appropriate executor
 func (n *Want) executeAgent(agent Agent) error {
+	agentName := agent.GetName()
+	agentType := agent.GetType()
+
 	// PrepareAgent phase
 	n.SetStatus(WantStatusPrepareAgent)
 
 	if err := n.bootAgent(context.Background(), agent); err != nil {
-		// On failure, return to Reaching (or previous state) but the error will be propagated
 		n.SetStatus(WantStatusReaching)
-		return fmt.Errorf("failed to boot agent %s: %w", agent.GetName(), err)
+		return fmt.Errorf("failed to boot agent %s: %w", agentName, err)
 	}
 
-	// Back to Reaching status as requested
 	n.SetStatus(WantStatusReaching)
 
 	// A. Persistent Agents (Think, Monitor, Poll) - Integrated background management
-	if agent.GetType() != DoAgentType {
+	if agentType != DoAgentType {
+		n.StoreLog("[AGENT-START] Starting persistent %s agent: %s", agentType, agentName)
 		return n.startPersistentAgent(agent)
 	}
 
 	// B. One-off Agents (Do) - Synchronous execution with result tracking
+	n.StoreLog("[AGENT-START] Running one-off %s agent: %s", agentType, agentName)
 	return n.runDoAgent(agent)
 }
 

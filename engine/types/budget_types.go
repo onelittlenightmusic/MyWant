@@ -19,7 +19,6 @@ type BudgetWant struct {
 }
 
 // Initialize sets up initial budget state.
-// BudgetThinker is started automatically by the framework based on thinkCapabilities in budget.yaml.
 func (b *BudgetWant) Initialize() {
 	budget := b.GetFloatParam("budget", 5000.0)
 	currency := b.GetStringParam("currency", "USD")

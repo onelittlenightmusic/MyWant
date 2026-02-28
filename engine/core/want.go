@@ -633,8 +633,11 @@ func (n *Want) StartProgressionLoop(
 			n.progressable.Initialize()
 		}
 
-		// REMOVED: Draining here can cause valid new packets (like rebooked flights) to be lost if they arrive exactly during restart
-		// initialPaths := getPathsFunc()
+		// Phase 0: Initial agent execution
+		// Ensure background agents are started BEFORE entering the loop where achievement is checked.
+		if err := n.ExecuteAgents(); err != nil {
+			n.StoreLog("ERROR: Failed to execute agents during loop startup: %v", err)
+		}
 
 		for {
 			// 1. Check stop channel
@@ -729,6 +732,13 @@ func (n *Want) StartProgressionLoop(
 
 			// 4. Synchronize paths before execution (preconditions: providers + users)
 			n.SetPaths(currentPaths.In, currentPaths.Out)
+
+			// 4.5. Execute required agents (if not already running)
+			// This ensures persistent agents like ThinkAgents are always kept running
+			// and handles any dynamic requirement changes.
+			if err := n.ExecuteAgents(); err != nil {
+				n.StoreLog("ERROR: Failed to execute agents: %v", err)
+			}
 
 			// 5. Begin execution cycle (batching mode)
 			n.BeginProgressCycle()
