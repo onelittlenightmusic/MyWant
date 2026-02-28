@@ -94,29 +94,23 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 	}
 }
 
-// correlationPhase computes inter-Want Correlation for the Wants recorded in
-// dirtyWantIDs. It utilizes the stateAccessIndex dictionary for efficient
-// dependency discovery.
+// correlationPhase computes inter-Want Correlation for ALL Wants.
+// It utilizes the stateAccessIndex dictionary for efficient dependency discovery.
+// We recompute for all wants because correlation is a reciprocal relationship;
+// adding or updating one Want can affect the correlation metadata of its peers.
 func (cb *ChainBuilder) correlationPhase() {
-	if len(cb.dirtyWantIDs) == 0 {
-		return
-	}
-	// Always clear dirty set on exit, even if we return early.
+	// Always clear dirty set on exit.
 	defer func() { cb.dirtyWantIDs = make(map[string]struct{}) }()
 
-	// cb.wants is keyed by name; dirtyWantIDs stores names accordingly.
-	for dirtyName := range cb.dirtyWantIDs {
-		rw, ok := cb.wants[dirtyName]
-		if !ok {
-			continue
-		}
+	// Process all runtime wants to ensure reciprocal consistency.
+	for _, rw := range cb.wants {
 		dirty := rw.want
 		dirtyID := dirty.Metadata.ID
 
 		// peerID → set of correlation labels (de-duplicated via map)
 		peerLabels := make(map[string]map[string]struct{})
 		add := func(peerID, label string) {
-			if peerID == dirtyID {
+			if peerID == dirtyID || peerID == "" {
 				return
 			}
 			if _, ok := peerLabels[peerID]; !ok {
@@ -167,7 +161,8 @@ func (cb *ChainBuilder) correlationPhase() {
 
 			if isDirtyAccessor {
 				// Dirty accesses this field. All other accessors are correlated peers.
-				providerID := strings.Split(fieldPath, ".")[0]
+				parts := strings.Split(fieldPath, ".")
+				providerID := parts[0]
 				for _, peerID := range accessors {
 					if peerID != dirtyID {
 						add(peerID, "stateAccess/"+fieldPath)
