@@ -126,6 +126,11 @@ type ChainBuilder struct {
 	// Global Label Registry
 	labelRegistry      map[string]map[string]bool // key -> value -> true
 	labelRegistryMutex sync.RWMutex               // Protects labelRegistry
+
+	// Correlation phase: set of Want IDs whose Correlation must be recomputed.
+	// Populated by compilePhase, consumed and cleared by correlationPhase.
+	// Always accessed inside reconcileMutex, no separate lock needed.
+	dirtyWantIDs map[string]struct{}
 }
 
 // runtimeWant holds the runtime state of a want
@@ -194,6 +199,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		apiLogs:                newRingBuffer[APILogEntry](1000),
 		pubsubChannels:         make(map[string]chain.Chan),
 		labelRegistry:          make(map[string]map[string]bool),
+		dirtyWantIDs:           make(map[string]struct{}),
 	}
 
 	// Register all types that have Go implementations
@@ -494,6 +500,11 @@ func (cb *ChainBuilder) reconcileWants() {
 	// Phase 3: START - Launch new/updated wants
 	cb.startPhase()
 
+	// Phase 4: CORRELATE - Annotate changed Wants with inter-Want correlation.
+	// Runs after startPhase because it only appends metadata and has no effect
+	// on want execution startup.
+	cb.correlationPhase()
+
 }
 
 // compilePhase handles configuration loading and want creation/updates
@@ -519,6 +530,12 @@ func (cb *ChainBuilder) compilePhase() error {
 
 		// Mark initial load as complete
 		cb.hasInitialized = true
+
+		// All wants are new on initial load — mark all as dirty for correlationPhase.
+		// cb.wants is keyed by name, so store names (not IDs) in dirtyWantIDs.
+		for name := range cb.wants {
+			cb.dirtyWantIDs[name] = struct{}{}
+		}
 	} else {
 		// Detect changes for ongoing updates
 		changes := cb.detectConfigChanges(cb.lastConfig, newConfig)
@@ -527,6 +544,15 @@ func (cb *ChainBuilder) compilePhase() error {
 		if len(changes) > 0 {
 			// Apply changes in reverse dependency order (sink to generator)
 			cb.applyWantChanges(changes)
+
+			// Mark changed (added/updated) wants as dirty for correlationPhase.
+			// cb.wants is keyed by name; change.Want.Metadata.Name is the name.
+			// Deleted wants are removed from cb.wants so correlationPhase ignores them.
+			for _, change := range changes {
+				if change.Type != ChangeEventDelete && change.Want != nil {
+					cb.dirtyWantIDs[change.Want.Metadata.Name] = struct{}{}
+				}
+			}
 		}
 
 		// CRITICAL FIX: Ensure all wants in newConfig.Wants exist in cb.wants
@@ -542,6 +568,7 @@ func (cb *ChainBuilder) compilePhase() error {
 			}
 			if !exists {
 				cb.addWant(wantConfig)
+				cb.dirtyWantIDs[wantConfig.Metadata.Name] = struct{}{}
 			}
 		}
 	}

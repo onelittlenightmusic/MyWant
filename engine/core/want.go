@@ -73,16 +73,30 @@ type OwnerReference struct {
 	BlockOwnerDeletion bool   `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
 }
 
+// CorrelationEntry represents the correlation relationship between two Wants.
+// Labels uses a unified label space:
+//   - "key=value"               : shared metadata label
+//   - "using.select/key=value"  : one Want references the other via a using selector
+//   - "state.sibling/parent=id" : both Wants share the same parent Want (sibling relationship)
+//
+// Rate is the weighted sum of Labels (higher = stronger coupling).
+type CorrelationEntry struct {
+	WantID string   `json:"wantID" yaml:"wantID"`
+	Labels []string `json:"labels" yaml:"labels"`
+	Rate   int      `json:"rate"   yaml:"rate"`
+}
+
 // Metadata contains want identification and classification info
 type Metadata struct {
-	ID              string            `json:"id,omitempty" yaml:"id,omitempty"`
-	Name            string            `json:"name" yaml:"name"`
-	Type            string            `json:"type" yaml:"type"`
-	Labels          map[string]string `json:"labels" yaml:"labels"`
-	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	UpdatedAt       int64             `json:"updatedAt" yaml:"-"`                                   // Server-managed timestamp, ignored on load
-	IsSystemWant    bool              `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
-	OrderKey        string            `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
+	ID              string             `json:"id,omitempty" yaml:"id,omitempty"`
+	Name            string             `json:"name" yaml:"name"`
+	Type            string             `json:"type" yaml:"type"`
+	Labels          map[string]string  `json:"labels" yaml:"labels"`
+	OwnerReferences []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	UpdatedAt       int64              `json:"updatedAt" yaml:"-"`                                   // Server-managed timestamp, ignored on load
+	IsSystemWant    bool               `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
+	OrderKey        string             `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
+	Correlation     []CorrelationEntry `json:"correlation,omitempty" yaml:"correlation,omitempty"`   // Inter-Want correlation (computed by correlationPhase, read-only at runtime)
 }
 
 // WantSpec contains the desired state configuration for a want
