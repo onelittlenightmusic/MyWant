@@ -148,156 +148,171 @@ func (n *Want) executeAgent(agent Agent) error {
 	// Back to Reaching status as requested
 	n.SetStatus(WantStatusReaching)
 
+	// A. Persistent Agents (Think, Monitor, Poll) - Integrated background management
+	if agent.GetType() != DoAgentType {
+		return n.startPersistentAgent(agent)
+	}
+
+	// B. One-off Agents (Do) - Synchronous execution with result tracking
+	return n.runDoAgent(agent)
+}
+
+// startPersistentAgent registers and starts an agent as a BackgroundAgent.
+// This unifies ThinkAgent, MonitorAgent, and PollAgent lifecycle management.
+func (n *Want) startPersistentAgent(agent Agent) error {
+	agentName := agent.GetName()
+	agentType := agent.GetType()
+	bgID := fmt.Sprintf("%s-%s-%s", strings.ToLower(string(agentType)), agentName, n.Metadata.ID)
+
+	// Check if already running
+	if _, exists := n.GetBackgroundAgent(bgID); exists {
+		return nil
+	}
+
+	n.StoreLog("[PERSISTENT-AGENT] Starting background %s agent: %s", agentType, agentName)
+
+	var bgAgent BackgroundAgent
+	switch a := agent.(type) {
+	case *ThinkAgent:
+		// ThinkAgents use 2s interval by default
+		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
+	case *MonitorAgent:
+		// Wrap MonitorFunc into ThinkFunc signature (no return value)
+		thinkWrapper := func(ctx context.Context, w *Want) error {
+			return a.Monitor(ctx, w)
+		}
+		// MonitorAgents use 5s interval for checking
+		bgAgent = NewThinkingAgent(bgID, 5*time.Second, agentName, thinkWrapper)
+	case *PollAgent:
+		// PollAgents use 5s interval and check for shouldStop
+		bgAgent = NewPollingAgent(bgID, 5*time.Second, agentName, a.Poll)
+	default:
+		return fmt.Errorf("agent %s has persistent type %s but is not a persistent agent implementation", agentName, agentType)
+	}
+
+	// Record start in history
+	n.initHistoryRings()
+	execID := generateUUID()
+	n.agentHistoryRing.Append(AgentExecution{
+		ExecutionID: execID,
+		AgentName:   agentName,
+		AgentType:   string(agentType),
+		Timestamp:   time.Now(),
+		Status:      "running",
+	})
+
+	if err := n.AddBackgroundAgent(bgAgent); err != nil {
+		return fmt.Errorf("failed to start persistent agent %s: %w", agentName, err)
+	}
+
+	return nil
+}
+
+// runDoAgent executes a DoAgent synchronously and records its result.
+// This encapsulates the complex executor and history logic from the original executeAgent.
+func (n *Want) runDoAgent(agent Agent) error {
+	agentName := agent.GetName()
+	
 	// Get BaseAgent to access ExecutionConfig
 	var execConfig ExecutionConfig
-	switch a := agent.(type) {
-	case *DoAgent:
+	if a, ok := agent.(*DoAgent); ok {
 		execConfig = a.BaseAgent.ExecutionConfig
-	case *MonitorAgent:
-		execConfig = a.BaseAgent.ExecutionConfig
-	case *PollAgent:
-		execConfig = a.BaseAgent.ExecutionConfig
-	case *ThinkAgent:
-		execConfig = a.BaseAgent.ExecutionConfig
-	default:
+	} else {
 		execConfig = DefaultExecutionConfig()
 	}
 
 	// Create executor
 	executor, err := NewExecutor(execConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create executor for agent %s: %w", agent.GetName(), err)
+		return fmt.Errorf("failed to create executor for agent %s: %w", agentName, err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	n.runningAgents[agent.GetName()] = cancel
+	if n.runningAgents == nil {
+		n.runningAgents = make(map[string]context.CancelFunc)
+	}
+	n.runningAgents[agentName] = cancel
 	if n.RunningAgents == nil {
 		n.RunningAgents = make([]string, 0)
 	}
 	n.initHistoryRings()
 	executionID := generateUUID()
-	n.RunningAgents = append(n.RunningAgents, agent.GetName())
-	n.CurrentAgent = agent.GetName()
+	n.RunningAgents = append(n.RunningAgents, agentName)
+	n.CurrentAgent = agentName
 	{
 		// Store current agent state
-		n.StoreState("_current_agent", agent.GetName())
+		n.StoreState("_current_agent", agentName)
 		n.StoreState("_running_agents", n.RunningAgents)
-
-		// Commit these changes to history as a distinct entry without ending the cycle
-		// This ensures we record the "agent started" event immediately
 		n.AggregateChanges()
 	}
 	// Append "running" start event
 	n.agentHistoryRing.Append(AgentExecution{
 		ExecutionID:   executionID,
-		AgentName:     agent.GetName(),
+		AgentName:     agentName,
 		AgentType:     string(agent.GetType()),
 		Timestamp:     time.Now(),
 		Status:        "running",
 		ExecutionMode: string(executor.GetMode()),
 	})
 
-	// Execute agent - synchronously for DO agents, asynchronously for MONITOR agents
-	if agent.GetType() == ThinkAgentType {
-		// THINK agents are persistent background agents.
-		// Wrap them in a ThinkingAgent and start as BackgroundAgent.
-		thinkAgent, ok := agent.(*ThinkAgent)
-		if !ok {
-			return fmt.Errorf("agent %s is not a ThinkAgent", agent.GetName())
-		}
+	var agentErr error
+	var finalStatus string = "achieved"
+	var finalError string
 
-		thinkerID := thinkAgent.GetName() + "-" + n.Metadata.ID
-		if _, exists := n.GetBackgroundAgent(thinkerID); exists {
-			return nil // Already running
-		}
-
-		// Use standard interval for thinking agents (2s)
-		tAgent := NewThinkingAgent(thinkerID, 2*time.Second, thinkAgent.GetName(), thinkAgent.Think)
-		if err := n.AddBackgroundAgent(tAgent); err != nil {
-			return fmt.Errorf("failed to start background thinking agent %s: %w", agent.GetName(), err)
-		}
-		return nil
-	}
-
-	var agentErr error // Capture error from DoAgent execution
-
-	executeFunc := func() error {
-		agentGetName := agent.GetName()
-		capturedExecID := executionID
-		capturedAgentType := string(agent.GetType())
-		var finalStatus string
-		var finalError string
-
-		defer func() {
-			// Determine final status from panic recovery if needed
-			if r := recover(); r != nil {
-				log.Printf("Agent %s panicked: %v\n", agentGetName, r)
-				finalStatus = "failed"
-				finalError = fmt.Sprintf("Panic: %v", r)
-			}
-			if finalStatus == "" {
-				finalStatus = "achieved"
-			}
-
-			// Append completion event (pure append, no mutation)
-			n.agentHistoryRing.Append(AgentExecution{
-				ExecutionID: capturedExecID,
-				AgentName:   agentGetName,
-				AgentType:   capturedAgentType,
-				Timestamp:   time.Now(),
-				Status:      finalStatus,
-				Error:       finalError,
-			})
-
-			for i, runningAgent := range n.RunningAgents {
-				if runningAgent == agentGetName {
-					n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
-					break
-				}
-			}
-
-			// Update current agent (set to empty if no more agents running)
-			if len(n.RunningAgents) == 0 {
-				n.CurrentAgent = ""
-			} else {
-				n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
-			}
-			{
-				n.StoreStateForAgent("_current_agent", n.CurrentAgent)
-				n.StoreStateForAgent("_running_agents", n.RunningAgents)
-				n.DumpStateForAgent("DoAgent")
-			}
-
-			delete(n.runningAgents, agentGetName)
-		}()
-
-		// Execute through executor (supports local, webhook, rpc)
-		err := executor.Execute(ctx, agent, n)
-		if err != nil {
-			log.Printf("Agent %s failed: %v\n", agentGetName, err)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Agent %s panicked: %v\n", agentName, r)
 			finalStatus = "failed"
-			finalError = err.Error()
-			return err
+			finalError = fmt.Sprintf("Panic: %v", r)
 		}
 
-		// FRAMEWORK-LEVEL: Commit all agent state changes
+		// Append completion event
+		n.agentHistoryRing.Append(AgentExecution{
+			ExecutionID: executionID,
+			AgentName:   agentName,
+			AgentType:   string(agent.GetType()),
+			Timestamp:   time.Now(),
+			Status:      finalStatus,
+			Error:       finalError,
+		})
+
+		for i, runningAgent := range n.RunningAgents {
+			if runningAgent == agentName {
+				n.RunningAgents = append(n.RunningAgents[:i], n.RunningAgents[i+1:]...)
+				break
+			}
+		}
+
+		// Update current agent
+		if len(n.RunningAgents) == 0 {
+			n.CurrentAgent = ""
+		} else {
+			n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
+		}
+		{
+			n.StoreStateForAgent("_current_agent", n.CurrentAgent)
+			n.StoreStateForAgent("_running_agents", n.RunningAgents)
+			n.DumpStateForAgent("DoAgent")
+		}
+
+		delete(n.runningAgents, agentName)
+	}()
+
+	// Execute through executor
+	err = executor.Execute(ctx, agent, n)
+	if err != nil {
+		log.Printf("Agent %s failed: %v\n", agentName, err)
+		finalStatus = "failed"
+		finalError = err.Error()
+		agentErr = err
+	} else {
 		n.DumpStateForAgent("DoAgent")
-		return nil
 	}
 
-	// Execute synchronously for DO agents, asynchronously for MONITOR agents
-	if agent.GetType() == DoAgentType {
-		// DO agents execute synchronously to return results immediately
-		agentErr = executeFunc()
-		return agentErr // Propagate error from DoAgent
-	} else {
-		// MONITOR agents execute asynchronously to run in background
-		go executeFunc()
-		return nil // MonitorAgents run in background, can't return their errors
-	}
+	return agentErr
 }
 
-// StopAllAgents stops all running agents for this want
+// StopAllAgents stops all running (synchronous) agents for this want
 func (n *Want) StopAllAgents() {
 	n.agentStateMutex.Lock()
 	if n.runningAgents == nil || len(n.runningAgents) == 0 {
@@ -345,7 +360,7 @@ func (n *Want) StopAllAgents() {
 	}
 }
 
-// StopAgent stops a specific running agent
+// StopAgent stops a specific running (synchronous) agent
 func (n *Want) StopAgent(agentName string) {
 	if n.runningAgents == nil {
 		return
