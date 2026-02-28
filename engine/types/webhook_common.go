@@ -75,7 +75,6 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 		stateMap["channel_filter"] = locals.ChannelFilter
 	}
 	want.StoreStateMulti(stateMap)
-	want.Locals = locals
 
 	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
@@ -123,7 +122,6 @@ func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 		}
 
 		locals.LastProcessedCount = currentCount
-		want.Locals = locals
 	}
 
 	want.StoreState("achieving_percentage", CalcWebhookPercentage(want, cfg))
