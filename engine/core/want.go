@@ -633,10 +633,10 @@ func (n *Want) StartProgressionLoop(
 			n.progressable.Initialize()
 		}
 
-		// Phase 0: Initial agent execution
-		// Ensure background agents are started BEFORE entering the loop where achievement is checked.
-		if err := n.ExecuteAgents(); err != nil {
-			n.StoreLog("ERROR: Failed to execute agents during loop startup: %v", err)
+		// Phase 0: Start persistent background agents (Monitor/Poll/Think) before the loop.
+		// DoAgents are excluded here — they run from Progress() via ExecuteAgents().
+		if err := n.StartBackgroundAgents(); err != nil {
+			n.StoreLog("ERROR: Failed to start background agents during loop startup: %v", err)
 		}
 
 		for {
@@ -739,11 +739,10 @@ func (n *Want) StartProgressionLoop(
 			// 4. Synchronize paths before execution (preconditions: providers + users)
 			n.SetPaths(currentPaths.In, currentPaths.Out)
 
-			// 4.5. Execute required agents (if not already running)
-			// This ensures persistent agents like ThinkAgents are always kept running
-			// and handles any dynamic requirement changes.
-			if err := n.ExecuteAgents(); err != nil {
-				n.StoreLog("ERROR: Failed to execute agents: %v", err)
+			// 4.5. Keep persistent background agents running (Monitor/Poll/Think).
+			// DoAgents are excluded — they run from Progress() via ExecuteAgents().
+			if err := n.StartBackgroundAgents(); err != nil {
+				n.StoreLog("ERROR: Failed to start background agents: %v", err)
 			}
 
 			// 5. Begin execution cycle (batching mode)

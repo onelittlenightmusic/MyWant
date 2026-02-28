@@ -1207,11 +1207,8 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		want:     wantPtr,
 	}
 
-	// Initial execution of required agents (Think, Monitor, Do)
-	// This ensures background agents are started as soon as the want is created.
-	if err := wantPtr.ExecuteAgents(); err != nil {
-		wantPtr.StoreLog("ERROR: Failed to execute agents on add: %v", err)
-	}
+	// Persistent background agents (Monitor/Poll/Think) are started by StartProgressionLoop.
+	// DoAgents must NOT run here — Initialize() has not been called yet.
 
 	// Safely add to wants map, avoiding accidental overwrites of existing wants with same name but different ID
 	// Use unique name if necessary, but ideally we should transition cb.wants to use ID as key
