@@ -82,6 +82,7 @@ export const Dashboard: React.FC = () => {
 
   // Minimap state
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
+  const [radarMode, setRadarMode] = useState(false);
 
   const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
   const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
@@ -106,6 +107,21 @@ export const Dashboard: React.FC = () => {
   const flattenedWants = filteredWants.flatMap((pw: any) => [pw, ...(pw.children || [])]);
   const hierarchicalWants = flattenedWants.map(w => ({ id: w.metadata?.id || w.id || '', parentId: w.metadata?.ownerReferences?.[0]?.id }));
   const currentHierarchicalWant = selectedWant ? { id: selectedWant.metadata?.id || selectedWant.id || '', parentId: selectedWant.metadata?.ownerReferences?.[0]?.id } : null;
+
+  // Map of wantID -> rate for correlation highlighting (only populated when radarMode is active and a want is selected).
+  // Prefer the polled `selectedWant` (has latest correlation) but fall back to sidebar.selectedItem.
+  const correlationHighlights = useMemo<Map<string, number>>(() => {
+    if (!radarMode) return new Map();
+    const source = selectedWant ?? sidebar.selectedItem;
+    if (!source) return new Map();
+    const entries = source.metadata?.correlation;
+    if (!entries?.length) return new Map();
+    const map = new Map<string, number>();
+    for (const entry of entries) {
+      map.set(entry.wantID, entry.rate);
+    }
+    return map;
+  }, [radarMode, selectedWant, sidebar.selectedItem]);
   const [headerState, setHeaderState] = useState<{ autoRefresh: boolean; loading: boolean; status: WantExecutionStatus } | null>(null);
 
   const fetchLabels = async () => {
@@ -646,6 +662,9 @@ export const Dashboard: React.FC = () => {
             console.warn('[Dashboard] Interact input not found in DOM');
           }
         });
+      } else if (e.key === 'x' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setRadarMode(prev => !prev);
       }
     };
 
@@ -679,6 +698,8 @@ export const Dashboard: React.FC = () => {
         onProviderChange={setGooseProvider}
         showMinimap={minimapOpen}
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
+        showRadarMode={radarMode}
+        onRadarModeToggle={() => setRadarMode(prev => !prev)}
       />
       <main
         className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0 relative"
@@ -735,7 +756,7 @@ export const Dashboard: React.FC = () => {
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">
                 <WantGrid
-                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleShowDeleteConfirmation} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant}
+                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleShowDeleteConfirmation} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
                 />
               </div>
             </React.Fragment>

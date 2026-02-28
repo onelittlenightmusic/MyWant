@@ -76,6 +76,26 @@
   animation: minimapBlink 2s ease-out forwards;
 }
 
+/* Correlation Radar overlay — absolutely covers the card and pulses blue.
+   Uses --corr-peak CSS custom property (set per-card) for rate-dependent peak intensity. */
+@keyframes correlationPulse {
+  0%, 100% {
+    background-color: rgba(59, 130, 246, 0.06);
+  }
+  50% {
+    background-color: rgba(59, 130, 246, var(--corr-peak, 0.32));
+  }
+}
+
+.correlationOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: correlationPulse 1.6s ease-in-out infinite;
+}
+
 .dropIndicator {
   position: absolute;
   background-color: #3b82f6; /* blue-500 */

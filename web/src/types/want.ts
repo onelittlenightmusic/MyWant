@@ -35,6 +35,12 @@ export interface OwnerReference {
   blockOwnerDeletion?: boolean;
 }
 
+export interface CorrelationEntry {
+  wantID: string;
+  labels: string[];
+  rate: number;
+}
+
 export interface WantMetadata {
   id?: string;
   name: string;
@@ -44,6 +50,7 @@ export interface WantMetadata {
   updatedAt?: number; // Server-managed timestamp for detecting metadata changes
   isSystemWant?: boolean; // true for system-managed wants (e.g., system-scheduler)
   orderKey?: string; // Fractional index for custom ordering (supports drag-and-drop reordering)
+  correlation?: CorrelationEntry[]; // Inter-Want correlation (computed by correlationPhase, read-only)
 }
 
 export interface WhenSpec {

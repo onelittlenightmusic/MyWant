@@ -40,6 +40,7 @@ interface WantGridProps {
   isSelectMode?: boolean;
   selectedWantIds?: Set<string>;
   onSelectWant?: (wantId: string) => void;
+  correlationHighlights?: Map<string, number>; // wantID -> rate, populated when radar mode is active
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -68,7 +69,8 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onShowReactionConfirmation,
   isSelectMode = false,
   selectedWantIds = new Set(),
-  onSelectWant
+  onSelectWant,
+  correlationHighlights = new Map()
 }) => {
   const { reorderWant, draggingWant } = useWantStore();
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
@@ -304,6 +306,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
               isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
               onCreateWant={onCreateWant}
+              correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
             />
 
             {/* Drop Indicator After (only for the last item) */}

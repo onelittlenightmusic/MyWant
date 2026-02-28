@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
@@ -24,6 +24,8 @@ interface HeaderProps {
   onProviderChange?: (provider: string) => void;
   showMinimap?: boolean;
   onMinimapToggle?: () => void;
+  showRadarMode?: boolean;
+  onRadarModeToggle?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,7 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
   gooseProvider = 'claude-code',
   onProviderChange,
   showMinimap = false,
-  onMinimapToggle
+  onMinimapToggle,
+  showRadarMode = false,
+  onRadarModeToggle
 }) => {
   const config = useConfigStore(state => state.config);
   const { sidebarMinimized: storeMinimized } = useUIStore();
@@ -174,6 +178,22 @@ export const Header: React.FC<HeaderProps> = ({
               title={showMinimap ? "Hide minimap" : "Show minimap"}
             >
               <Map className="h-5 w-5" />
+            </button>
+          )}
+
+          {/* Correlation Radar toggle button */}
+          {onRadarModeToggle && (
+            <button
+              onClick={onRadarModeToggle}
+              className={classNames(
+                "p-2 rounded-md transition-colors",
+                showRadarMode
+                  ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400 dark:ring-blue-500"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              )}
+              title={showRadarMode ? "Radar mode ON — click a want card to see correlations (x)" : "Correlation Radar (x)"}
+            >
+              <Radar className="h-5 w-5" />
             </button>
           )}
 

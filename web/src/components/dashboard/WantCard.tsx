@@ -54,6 +54,7 @@ interface WantCardProps {
   selectedWantIds?: Set<string>;
   isBeingProcessed?: boolean; // New prop for initializing/deleting states
   onCreateWant?: (parentWant?: Want) => void;
+  correlationRate?: number; // When set (radar mode active), highlight this card with blue intensity based on rate
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -79,8 +80,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   index,
   isSelectMode = false,
   selectedWantIds,
-  isBeingProcessed = false, // Default to false
+  isBeingProcessed = false,
   onCreateWant,
+  correlationRate,
 }) => {
   const wantId = want.metadata?.id || want.id;
   const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId } = useWantStore();
@@ -94,6 +96,22 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   // Check if this want is blinking from minimap click
   const isBlinking = blinkingWantId === wantId;
+
+  // Correlation radar highlight: blue emboss based on rate (1=light, 2=medium, 3+=strong)
+  // backgroundColor is intentionally NOT in inline style — it's handled by the overlay div animation.
+  const isCorrelated = correlationRate !== undefined && correlationRate > 0;
+  const correlationStyle = isCorrelated ? (() => {
+    const rate = correlationRate!;
+    const alpha = Math.min(0.3 + rate * 0.15, 0.75);
+    const glowAlpha = Math.min(0.15 + rate * 0.1, 0.45);
+    return {
+      boxShadow: `inset 0 1px 2px rgba(255,255,255,0.35), 0 0 0 2px rgba(59,130,246,${alpha}), 0 4px 16px rgba(59,130,246,${glowAlpha})`,
+    };
+  })() : undefined;
+  // CSS custom property for the overlay animation peak opacity (rate-dependent)
+  const correlationOverlayVars = isCorrelated
+    ? ({ '--corr-peak': String(Math.min(0.12 + correlationRate! * 0.1, 0.45)) } as React.CSSProperties)
+    : undefined;
 
   // Identify if this want is a Target (can have children)
   const wantType = want.metadata?.type?.toLowerCase() || '';
@@ -369,10 +387,17 @@ export const WantCard: React.FC<WantCardProps> = ({
         parentBackgroundStyle.className,
         className || ''
       )}
-      style={parentBackgroundStyle.style}
+      style={{ ...parentBackgroundStyle.style, ...correlationStyle }}
     >
       <div style={whiteProgressBarStyle}></div>
       <div style={blackOverlayStyle}></div>
+      {/* Correlation radar overlay: pulses blue transparent over the whole card */}
+      {isCorrelated && (
+        <div
+          className={styles.correlationOverlay}
+          style={correlationOverlayVars}
+        />
+      )}
 
       {/* Replay screenshot as subtle card background */}
       {replayScreenshotUrl && (
