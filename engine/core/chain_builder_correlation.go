@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 )
@@ -18,11 +19,15 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 	register := func(providerID, fieldName, accessorID string) {
 		key := fmt.Sprintf("%s.%s", providerID, fieldName)
 		cb.stateAccessIndex[key] = append(cb.stateAccessIndex[key], accessorID)
+		// log.Printf("[ACCESS-INDEX] Registered: field %s accessed by %s\n", key, accessorID)
 	}
 
 	for _, rw := range cb.wants {
 		want := rw.want
 		wantID := want.Metadata.ID
+		if wantID == "" {
+			continue
+		}
 
 		// A. Process Explicit StateSubscriptions (Reader side)
 		for _, sub := range want.Spec.StateSubscriptions {
@@ -32,6 +37,9 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 				continue
 			}
 			providerID := providerRW.want.Metadata.ID
+			if providerID == "" {
+				continue
+			}
 
 			keys := sub.StateKeys
 			if len(keys) == 0 {
@@ -55,8 +63,17 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 
 			if parentID != "" {
 				// Check capabilities of this want (from its type definition)
-				if def := want.WantTypeDefinition; def != nil {
+				if def, ok := cb.wantTypeDefinitions[want.Metadata.Type]; ok {
+					// 1. Check regular agent requirements
 					for _, capName := range def.Requires {
+						if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
+							for _, field := range cap.ParentStateAccess {
+								register(parentID, field.Name, wantID)
+							}
+						}
+					}
+					// 2. Check think-agent capabilities
+					for _, capName := range def.ThinkCapabilities {
 						if cap, ok := cb.agentRegistry.GetCapability(capName); ok {
 							for _, field := range cap.ParentStateAccess {
 								register(parentID, field.Name, wantID)
@@ -68,9 +85,7 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 		}
 
 		// C. Self-registration for provider (A provider is an accessor of its own state)
-		// This ensures the field exists in the dictionary even if there are no readers yet.
-		// Also helps correlate siblings who write to the same field.
-		if def := want.WantTypeDefinition; def != nil {
+		if def, ok := cb.wantTypeDefinitions[want.Metadata.Type]; ok {
 			for _, state := range def.State {
 				register(wantID, state.Name, wantID)
 			}
@@ -91,6 +106,10 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 			sort.Strings(newAccessors)
 			cb.stateAccessIndex[key] = newAccessors
 		}
+	}
+
+	if len(cb.stateAccessIndex) > 0 {
+		log.Printf("[ACCESS-INDEX] Built state access index with %d fields\n", len(cb.stateAccessIndex))
 	}
 }
 
