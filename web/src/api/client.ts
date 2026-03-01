@@ -454,6 +454,11 @@ class MyWantApiClient {
   async deleteDraftWant(id: string): Promise<void> {
     await this.client.delete(`/api/v1/wants/${id}`);
   }
+
+  // Global State
+  async getGlobalState(): Promise<{ state: Record<string, unknown>; timestamp: string }> {
+    return this.deduplicatedGet<{ state: Record<string, unknown>; timestamp: string }>('/api/v1/global-state');
+  }
 }
 
 // Export singleton instance

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Heart } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart, Globe } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -26,6 +26,7 @@ import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantMinimap } from '@/components/dashboard/WantMinimap';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
+import { GlobalStateSidebar } from '@/components/sidebar/GlobalStateSidebar';
 import { SummarySidebarContent } from '@/components/sidebar/SummarySidebarContent';
 import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
 import { Toast } from '@/components/notifications';
@@ -83,6 +84,7 @@ export const Dashboard: React.FC = () => {
   // Minimap state
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
+  const [showGlobalState, setShowGlobalState] = useState(false);
 
   const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
   const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
@@ -153,6 +155,7 @@ export const Dashboard: React.FC = () => {
     if (sidebar.selectedItem) {
       const wantId = sidebar.selectedItem.metadata?.id || sidebar.selectedItem.id;
       if (!wants.some(w => (w.metadata?.id === wantId) || (w.id === wantId))) sidebar.clearSelection();
+      else setShowGlobalState(false); // Close global state panel when a want is selected
     }
   }, [wants, sidebar.selectedItem]);
 
@@ -665,6 +668,14 @@ export const Dashboard: React.FC = () => {
       } else if (e.key === 'x' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setRadarMode(prev => !prev);
+      } else if (e.key === 'g' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShowGlobalState(prev => {
+          if (!prev) {
+            sidebar.clearSelection();
+          }
+          return !prev;
+        });
       }
     };
 
@@ -700,6 +711,11 @@ export const Dashboard: React.FC = () => {
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
         showRadarMode={radarMode}
         onRadarModeToggle={() => setRadarMode(prev => !prev)}
+        showGlobalState={showGlobalState}
+        onGlobalStateToggle={() => setShowGlobalState(prev => {
+          if (!prev) sidebar.clearSelection();
+          return !prev;
+        })}
       />
       <main
         className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0 relative"
@@ -763,27 +779,30 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </main>
-      <RightSidebar 
-        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showBatch} 
-        onClose={() => { 
+      <RightSidebar
+        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showBatch || showGlobalState}
+        onClose={() => {
+          if (showGlobalState) { setShowGlobalState(false); return; }
           if (sidebar.showSummary) sidebar.closeSummary();
-          else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); } 
-          else { sidebar.clearSelection(); } 
-        }} 
-        title={isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
-        titleIcon={!isSelectMode && selectedWant ? Heart : undefined}
-        titleIconClassName={!isSelectMode && selectedWant ? 'text-pink-500' : undefined}
-        backgroundStyle={!isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined} 
-        headerActions={!isSelectMode && selectedWant ? headerActions : undefined}
+          else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); }
+          else { sidebar.clearSelection(); }
+        }}
+        title={showGlobalState ? 'Global State' : (isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary'))}
+        titleIcon={showGlobalState ? Globe : (!isSelectMode && selectedWant ? Heart : undefined)}
+        titleIconClassName={showGlobalState ? 'text-green-500' : (!isSelectMode && selectedWant ? 'text-pink-500' : undefined)}
+        backgroundStyle={!showGlobalState && !isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
+        headerActions={!showGlobalState && !isSelectMode && selectedWant ? headerActions : undefined}
       >
-        {isSelectMode ? (
-          <WantBatchControlPanel 
-            selectedCount={selectedWantIds.size} 
-            onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }} 
-            onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }} 
-            onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }} 
-            onBatchCancel={handleToggleSelectMode} 
-            loading={isBatchProcessing} 
+        {showGlobalState ? (
+          <GlobalStateSidebar />
+        ) : isSelectMode ? (
+          <WantBatchControlPanel
+            selectedCount={selectedWantIds.size}
+            onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }}
+            onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }}
+            onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }}
+            onBatchCancel={handleToggleSelectMode}
+            loading={isBatchProcessing}
           />
         ) : (
           <WantDetailsSidebar

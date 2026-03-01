@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, Globe } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
@@ -26,6 +26,8 @@ interface HeaderProps {
   onMinimapToggle?: () => void;
   showRadarMode?: boolean;
   onRadarModeToggle?: () => void;
+  showGlobalState?: boolean;
+  onGlobalStateToggle?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -48,7 +50,9 @@ export const Header: React.FC<HeaderProps> = ({
   showMinimap = false,
   onMinimapToggle,
   showRadarMode = false,
-  onRadarModeToggle
+  onRadarModeToggle,
+  showGlobalState = false,
+  onGlobalStateToggle
 }) => {
   const config = useConfigStore(state => state.config);
   const { sidebarMinimized: storeMinimized } = useUIStore();
@@ -178,6 +182,22 @@ export const Header: React.FC<HeaderProps> = ({
               title={showMinimap ? "Hide minimap" : "Show minimap"}
             >
               <Map className="h-5 w-5" />
+            </button>
+          )}
+
+          {/* Global State toggle button - left of Radar */}
+          {onGlobalStateToggle && (
+            <button
+              onClick={onGlobalStateToggle}
+              className={classNames(
+                "p-2 rounded-md transition-colors",
+                showGlobalState
+                  ? "text-green-600 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400 dark:ring-green-500"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              )}
+              title={showGlobalState ? "Global State panel ON (g)" : "Global State (g)"}
+            >
+              <Globe className="h-5 w-5" />
             </button>
           )}
 

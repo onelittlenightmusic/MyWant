@@ -1048,6 +1048,22 @@ func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// GlobalState
+func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var stateMap map[string]any
+	if s.globalBuilder != nil {
+		stateMap = s.globalBuilder.GetGlobalStateAll()
+	}
+	if stateMap == nil {
+		stateMap = make(map[string]any)
+	}
+	json.NewEncoder(w).Encode(map[string]any{
+		"state":     stateMap,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
 // Error Logging Helper
 func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData any) {
 	entry := ErrorHistoryEntry{
