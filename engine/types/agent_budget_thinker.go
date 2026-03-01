@@ -77,4 +77,3 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	want.StoreLog("[BudgetThinker] Updated: total=%.2f, remaining=%.2f, %d costs", totalCost, remaining, len(costs))
 	return nil
 }
-

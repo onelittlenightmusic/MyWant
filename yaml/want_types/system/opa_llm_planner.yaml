@@ -15,6 +15,26 @@ wantType:
     pattern: coordinator
 
   parameters:
+  - name: goal
+    description: |
+      Initial goal state as a JSON object or YAML map.
+      Copied to the "goal" state field on initialization.
+      If the goal state is already set (e.g. resumed from memory), this param is ignored.
+    type: object
+    default: {}
+    required: false
+    example: '{"require_hotel": true, "require_dinner": true}'
+
+  - name: current
+    description: |
+      Initial current state as a JSON object or YAML map.
+      Copied to the "current" state field on initialization.
+      If the current state is already set (e.g. resumed from memory), this param is ignored.
+    type: object
+    default: {}
+    required: false
+    example: '{"hotel_reserved": false, "dinner_reserved": false}'
+
   - name: opa_llm_planner_command
     description: Path or name of the opa-llm-planner binary
     type: string

@@ -17,7 +17,7 @@ const opaLLMThinkerAgentName = "opa_llm_thinker"
 func init() {
 	RegisterWantImplementation[OpaLLMPlannerWant, OpaLLMPlannerLocals]("opa_llm_planner")
 	RegisterThinkAgentType(opaLLMThinkerAgentName, []Capability{
-		{Name: "opa_llm_planning", Description: "Plans actions using OPA policy engine and LLM reasoning"},
+		{Name: "opa_llm_planning", Gives: []string{"opa_llm_planning"}, Description: "Plans actions using OPA policy engine and LLM reasoning"},
 	}, opaLLMThinkerThink)
 }
 
@@ -34,8 +34,16 @@ func (o *OpaLLMPlannerWant) GetLocals() *OpaLLMPlannerLocals {
 	return CheckLocalsInitialized[OpaLLMPlannerLocals](&o.Want)
 }
 
-// Initialize is a no-op; all initial state comes from the YAML definition.
-func (o *OpaLLMPlannerWant) Initialize() {}
+// Initialize copies goal/current from params to state.
+// Always overwrites because initialValue: {} from YAML is a non-nil empty map.
+func (o *OpaLLMPlannerWant) Initialize() {
+	if goal, ok := o.Spec.Params["goal"]; ok && goal != nil {
+		o.StoreState("goal", goal)
+	}
+	if current, ok := o.Spec.Params["current"]; ok && current != nil {
+		o.StoreState("current", current)
+	}
+}
 
 // IsAchieved always returns false — the planner runs indefinitely.
 func (o *OpaLLMPlannerWant) IsAchieved() bool { return false }
@@ -58,12 +66,12 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// Step 2: Change detection via MD5 hash of serialized inputs
 	goalBytes, err := json.Marshal(goalRaw)
 	if err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR marshalling goal: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR marshalling goal: %v", err)
 		return nil
 	}
 	currentBytes, err := json.Marshal(currentRaw)
 	if err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR marshalling current: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR marshalling current: %v", err)
 		return nil
 	}
 
@@ -80,7 +88,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// Step 3: Write inputs to temp files
 	tmpDir, err := os.MkdirTemp("", "opa-llm-thinker-*")
 	if err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)
 		return nil
 	}
 	defer os.RemoveAll(tmpDir)
@@ -89,11 +97,11 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	currentPath := filepath.Join(tmpDir, "current.json")
 
 	if err := os.WriteFile(goalPath, goalBytes, 0600); err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR writing goal.json: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR writing goal.json: %v", err)
 		return nil
 	}
 	if err := os.WriteFile(currentPath, currentBytes, 0600); err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR writing current.json: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR writing current.json: %v", err)
 		return nil
 	}
 
@@ -112,25 +120,41 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		args = append(args, "--llm", "--llm-provider", provider)
 	}
 
-	// Step 5: Execute the planner command
+	want.DirectLog("[OPA-LLM-THINKER] Running: %s %v", command, args)
+
+	// Step 5: Execute the planner command, inheriting the current process environment
+	// so that env vars like ANTHROPIC_API_KEY are available to the planner.
 	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Env = os.Environ()
 	stdout, err := cmd.Output()
 	if err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR running planner: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR running planner: %v", err)
 		return nil
 	}
 
-	// Step 6: Parse output and store actions
+	// Step 6: Parse output and extract action type names as strings.
+	// OPA output format: {"actions": [{"type": "reserve_hotel", "status": "pending"}, ...]}
 	var planResult map[string]any
 	if err := json.Unmarshal(stdout, &planResult); err != nil {
-		want.StoreLog("[OPA-LLM-THINKER] ERROR parsing planner output: %v", err)
+		want.DirectLog("[OPA-LLM-THINKER] ERROR parsing planner output: %v", err)
 		return nil
 	}
 
-	actions := planResult["actions"]
-	want.StoreState("actions", actions)
+	rawActions, _ := planResult["actions"].([]any)
+	actionTypes := make([]any, 0, len(rawActions))
+	for _, a := range rawActions {
+		if aMap, ok := a.(map[string]any); ok {
+			if t, ok := aMap["type"].(string); ok {
+				actionTypes = append(actionTypes, t)
+			}
+		} else if s, ok := a.(string); ok {
+			actionTypes = append(actionTypes, s)
+		}
+	}
+
+	want.StoreState("actions", actionTypes)
 	want.StoreState("_opa_input_hash", inputHash)
-	want.StoreLog("[OPA-LLM-THINKER] Plan updated")
+	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d actions: %v", len(actionTypes), actionTypes)
 
 	return nil
 }

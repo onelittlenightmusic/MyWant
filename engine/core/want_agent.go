@@ -245,7 +245,7 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 // This encapsulates the complex executor and history logic from the original executeAgent.
 func (n *Want) runDoAgent(agent Agent) error {
 	agentName := agent.GetName()
-	
+
 	// Get BaseAgent to access ExecutionConfig
 	var execConfig ExecutionConfig
 	if a, ok := agent.(*DoAgent); ok {

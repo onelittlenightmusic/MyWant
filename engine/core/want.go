@@ -521,6 +521,7 @@ func (n *Want) AggregateChanges() {
 	}
 }
 
+
 // SetProgressable sets the concrete progressable implementation for this want
 func (n *Want) SetProgressable(progressable Progressable) {
 	n.progressable = progressable
@@ -687,7 +688,7 @@ func (n *Want) StartProgressionLoop(
 			// 3.1. Check if want is achieved (before precondition check)
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
-				// CRITICAL: Even if already achieved, we must run one cycle to ensure 
+				// CRITICAL: Even if already achieved, we must run one cycle to ensure
 				// FinalResultField is processed and state is aggregated.
 				n.BeginProgressCycle()
 				n.EndProgressCycle()
@@ -1170,6 +1171,20 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 // 	}
 // 	n.pendingLogs = append(n.pendingLogs, message)
 // }
+
+// DirectLog writes a log entry immediately to both the server log and the log
+// history ring, bypassing pendingLogs. Safe to call from background goroutines
+// (ThinkAgent, MonitorAgent, PollAgent) that run outside the want's Progress cycle.
+func (n *Want) DirectLog(message string, args ...any) {
+	formatted := fmt.Sprintf(message, args...)
+	InfoLog("[%s] %s", n.Metadata.Name, formatted)
+	n.initHistoryRings()
+	entry := LogHistoryEntry{
+		Timestamp: time.Now(),
+		Logs:      formatted,
+	}
+	n.logHistoryRing.Append(entry)
+}
 
 func (n *Want) StoreLog(message string, args ...any) {
 	// Only buffer logs if we're in an Exec cycle
@@ -2187,6 +2202,22 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 				n.State = make(map[string]any)
 			}
 			n.State[stateDef.Name] = stateDef.InitialValue
+		}
+	}
+
+	// Merge type definition's Requires into Spec.Requires (deduplicated).
+	// This ensures ThinkAgent / MonitorAgent declared in the type YAML are started
+	// even when the spec doesn't explicitly list them.
+	if len(typeDef.Requires) > 0 {
+		existing := make(map[string]bool, len(n.Spec.Requires))
+		for _, r := range n.Spec.Requires {
+			existing[r] = true
+		}
+		for _, r := range typeDef.Requires {
+			if !existing[r] {
+				n.Spec.Requires = append(n.Spec.Requires, r)
+				existing[r] = true
+			}
 		}
 	}
 

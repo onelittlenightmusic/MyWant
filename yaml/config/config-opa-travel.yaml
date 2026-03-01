@@ -1,0 +1,33 @@
+wants:
+  - metadata:
+      name: opa-travel-itinerary
+      type: itinerary
+      labels:
+        role: planner
+    spec:
+      params:
+        goal:
+          id: "goal-001"
+          trip:
+            destination: "Tokyo"
+            require_hotel: true
+            require_dinner: true
+            require_transport: false
+        current:
+          hotel_reserved: false
+          dinner_reserved: false
+          transport_booked: false
+        use_llm: false
+        action_map: >-
+          {
+            "reserve_hotel": {
+              "type": "hotel",
+              "params": {"hotel_type": "standard"},
+              "sets": {"hotel_reserved": true}
+            },
+            "reserve_dinner": {
+              "type": "restaurant",
+              "params": {"restaurant_type": "fine dining"},
+              "sets": {"dinner_reserved": true}
+            }
+          }

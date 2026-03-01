@@ -104,9 +104,10 @@ func (t *ThinkingAgent) BeginProgressCycle() {
 	}
 }
 
-// EndProgressCycle dumps agent state changes to the want.
+// EndProgressCycle commits state and log changes accumulated during the think cycle.
 func (t *ThinkingAgent) EndProgressCycle() {
 	if t.want != nil {
 		t.want.DumpStateForAgent(t.name)
+		t.want.AggregateChanges()
 	}
 }
