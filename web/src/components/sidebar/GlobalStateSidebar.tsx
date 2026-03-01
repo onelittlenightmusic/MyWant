@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Globe, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { DetailsSidebar } from './DetailsSidebar';
+import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 
 // --- Shared state renderers (mirrors WantDetailsSidebar) ---
 
@@ -162,12 +163,13 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 
 const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
 
-const TABS = [{ id: 'results', label: 'Results', icon: Globe }];
+const TABS = [{ id: 'results', label: 'Results', icon: StickyNote }];
 
 export const GlobalStateSidebar: React.FC = () => {
   const [globalState, setGlobalState] = useState<Record<string, unknown>>({});
   const [timestamp, setTimestamp] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   const fetchGlobalState = useCallback(async () => {
     try {
@@ -187,41 +189,77 @@ export const GlobalStateSidebar: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchGlobalState]);
 
+  const handleClearGlobalState = async () => {
+    try {
+      await apiClient.deleteGlobalState();
+      await fetchGlobalState();
+    } catch (e) {
+      console.error('Failed to clear global state:', e);
+    } finally {
+      setShowClearConfirmation(false);
+    }
+  };
+
   const hasState = Object.keys(globalState).length > 0;
   const subtitleText = timestamp
     ? `Updated: ${new Date(timestamp).toLocaleTimeString()}`
     : undefined;
 
   return (
-    <DetailsSidebar
-      title="Global State"
-      subtitle={subtitleText}
-      badge={<Globe className="h-5 w-5 text-green-500" />}
-      tabs={TABS}
-      defaultTab="results"
-    >
-      <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
-        {loading ? (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading global state...</div>
-        ) : hasState ? (
-          <div className="space-y-2">
-            <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Global State</h4>
-              <div className="space-y-3 sm:space-y-4">
-                {renderKeyValuePairs(globalState)}
+    <>
+      <DetailsSidebar
+        title="Memo"
+        subtitle={subtitleText}
+        badge={
+          <div className="flex items-center justify-between w-full">
+            <StickyNote className="h-5 w-5 text-green-500" />
+            {hasState && (
+              <button
+                onClick={() => setShowClearConfirmation(true)}
+                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                title="Clear all memo data"
+              >
+                <Eraser className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        }
+        tabs={TABS}
+        defaultTab="results"
+      >
+        <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading memo...</div>
+          ) : hasState ? (
+            <div className="space-y-2">
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Memo</h4>
+                <div className="space-y-3 sm:space-y-4">
+                  {renderKeyValuePairs(globalState)}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">No global state data</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-              Global state will appear here once wants store values via StoreGlobalState
-            </p>
-          </div>
-        )}
-      </div>
-    </DetailsSidebar>
+          ) : (
+            <div className="text-center py-12">
+              <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">No memo data</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                Memo will appear here once wants store values via StoreGlobalState
+              </p>
+            </div>
+          )}
+        </div>
+      </DetailsSidebar>
+
+      <ConfirmationBubble
+        isVisible={showClearConfirmation}
+        onConfirm={handleClearGlobalState}
+        onCancel={() => setShowClearConfirmation(false)}
+        onDismiss={() => setShowClearConfirmation(false)}
+        title="Clear Memo"
+        message="Are you sure you want to clear all memo data? This action cannot be undone."
+        layout="dashboard-right"
+      />
+    </>
   );
 };

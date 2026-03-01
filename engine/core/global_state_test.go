@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestGlobalState_StoreAndGet(t *testing.T) {
@@ -73,6 +75,44 @@ func TestGlobalState_GetAll(t *testing.T) {
 	}
 	if all["x"] != 1 || all["y"] != 2 {
 		t.Errorf("Unexpected values: %v", all)
+	}
+}
+
+func TestGlobalState_Clear(t *testing.T) {
+	cb := &ChainBuilder{}
+	cb.StoreGlobalState("k1", "v1")
+	cb.StoreGlobalState("k2", "v2")
+
+	if len(cb.GetGlobalStateAll()) != 2 {
+		t.Fatal("Expected 2 keys before clear")
+	}
+
+	cb.ClearGlobalState()
+
+	if len(cb.GetGlobalStateAll()) != 0 {
+		t.Errorf("Expected 0 keys after clear, got %d", len(cb.GetGlobalStateAll()))
+	}
+
+	// Test persistence of clear
+	tmpDir := t.TempDir()
+	globalPath := filepath.Join(tmpDir, "global_state.yaml")
+	cb.globalStatePath = globalPath
+
+	cb.StoreGlobalState("k3", "v3")
+	if _, err := os.Stat(globalPath); err != nil {
+		t.Fatal("File should exist after store")
+	}
+
+	cb.ClearGlobalState()
+	data, err := os.ReadFile(globalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// YAML of empty map might be "{}\n" or "" depending on marshaler
+	var m map[string]any
+	yaml.Unmarshal(data, &m)
+	if len(m) != 0 {
+		t.Errorf("File should be empty map after clear, got %v", m)
 	}
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Heart, Globe } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart, StickyNote } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -787,8 +787,8 @@ export const Dashboard: React.FC = () => {
           else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); }
           else { sidebar.clearSelection(); }
         }}
-        title={showGlobalState ? 'Global State' : (isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary'))}
-        titleIcon={showGlobalState ? Globe : (!isSelectMode && selectedWant ? Heart : undefined)}
+        title={showGlobalState ? 'Memo' : (isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary'))}
+        titleIcon={showGlobalState ? StickyNote : (!isSelectMode && selectedWant ? Heart : undefined)}
         titleIconClassName={showGlobalState ? 'text-green-500' : (!isSelectMode && selectedWant ? 'text-pink-500' : undefined)}
         backgroundStyle={!showGlobalState && !isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
         headerActions={!showGlobalState && !isSelectMode && selectedWant ? headerActions : undefined}

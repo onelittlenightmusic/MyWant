@@ -58,6 +58,15 @@ func (cb *ChainBuilder) GetGlobalStateAll() map[string]any {
 	return result
 }
 
+// ClearGlobalState removes all keys from the global state and persists the empty state.
+func (cb *ChainBuilder) ClearGlobalState() {
+	cb.globalState.Range(func(key, value any) bool {
+		cb.globalState.Delete(key)
+		return true
+	})
+	cb.saveGlobalStateToFile()
+}
+
 // loadGlobalStateFromFile loads persisted global state from disk at startup.
 func (cb *ChainBuilder) loadGlobalStateFromFile() {
 	if cb.globalStatePath == "" {
@@ -158,6 +167,15 @@ func GetAllGlobalState() map[string]any {
 	return cb.GetGlobalStateAll()
 }
 
+// ClearGlobalState removes all keys from the global state.
+func ClearGlobalState() {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return
+	}
+	cb.ClearGlobalState()
+}
+
 // --- Want convenience methods ---
 
 // GetGlobalState is callable from any Want instance.
@@ -173,4 +191,9 @@ func (n *Want) StoreGlobalState(key string, value any) {
 // MergeGlobalState is callable from any Want instance.
 func (n *Want) MergeGlobalState(updates map[string]any) {
 	MergeGlobalState(updates)
+}
+
+// ClearGlobalState is callable from any Want instance.
+func (n *Want) ClearGlobalState() {
+	ClearGlobalState()
 }

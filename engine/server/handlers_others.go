@@ -1064,6 +1064,14 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) deleteGlobalState(w http.ResponseWriter, r *http.Request) {
+	if s.globalBuilder != nil {
+		s.globalBuilder.ClearGlobalState()
+		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/global-state", "", "success", http.StatusNoContent, "", "Global state cleared")
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // Error Logging Helper
 func (s *Server) logError(r *http.Request, status int, message, errorType, details string, requestData any) {
 	entry := ErrorHistoryEntry{
