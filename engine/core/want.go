@@ -2189,6 +2189,28 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 			n.State[stateDef.Name] = stateDef.InitialValue
 		}
 	}
+
+	// Apply parameter defaults: spec.params (highest) > default > defaultGlobalParameter (lowest)
+	if n.Spec.Params == nil {
+		n.Spec.Params = make(map[string]any)
+	}
+	for _, paramDef := range typeDef.Parameters {
+		if _, exists := n.Spec.Params[paramDef.Name]; exists {
+			// Explicitly provided in spec.params — highest priority, keep as-is
+			continue
+		}
+		if paramDef.Default != nil {
+			// YAML default — second priority
+			n.Spec.Params[paramDef.Name] = paramDef.Default
+			continue
+		}
+		if paramDef.DefaultGlobalParameter != "" {
+			// Global parameter fallback — lowest priority
+			if v, ok := GetGlobalParameter(paramDef.DefaultGlobalParameter); ok {
+				n.Spec.Params[paramDef.Name] = v
+			}
+		}
+	}
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {

@@ -10,11 +10,13 @@ import (
 var (
 	globalParamsMu   sync.RWMutex
 	globalParameters map[string]any
+	globalParamsPath string
 )
 
 // LoadGlobalParameters reads <configDir>/parameters.yaml into memory.
 // Absent file is silently ignored (not an error).
 func LoadGlobalParameters(path string) error {
+	globalParamsPath = path
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -30,6 +32,22 @@ func LoadGlobalParameters(path string) error {
 	globalParameters = params
 	globalParamsMu.Unlock()
 	return nil
+}
+
+// SetAllGlobalParameters replaces all parameters in memory and persists to disk.
+func SetAllGlobalParameters(params map[string]any) error {
+	globalParamsMu.Lock()
+	globalParameters = params
+	path := globalParamsPath
+	globalParamsMu.Unlock()
+	if path == "" {
+		return nil
+	}
+	data, err := yaml.Marshal(params)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
 // GetGlobalParameter returns (value, true) if key exists, or (nil, false).

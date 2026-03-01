@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser } from 'lucide-react';
+import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { DetailsSidebar } from './DetailsSidebar';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
@@ -159,13 +159,173 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
   return items;
 };
 
+// --- Settings (Global Parameters) tab ---
+
+interface ParamRow {
+  key: string;
+  value: string;
+}
+
+const SettingsTab: React.FC = () => {
+  const [rows, setRows] = useState<ParamRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchParams = useCallback(async () => {
+    try {
+      const res = await apiClient.getGlobalParameters();
+      const params = res.parameters || {};
+      setRows(
+        Object.entries(params).map(([key, value]) => ({
+          key,
+          value: typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''),
+        }))
+      );
+    } catch (e) {
+      console.error('Failed to fetch global parameters:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchParams();
+  }, [fetchParams]);
+
+  const handleKeyChange = (index: number, newKey: string) => {
+    setRows(prev => prev.map((r, i) => i === index ? { ...r, key: newKey } : r));
+  };
+
+  const handleValueChange = (index: number, newValue: string) => {
+    setRows(prev => prev.map((r, i) => i === index ? { ...r, value: newValue } : r));
+  };
+
+  const handleAddRow = () => {
+    setRows(prev => [...prev, { key: '', value: '' }]);
+  };
+
+  const handleDeleteRow = (index: number) => {
+    setRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const parameters: Record<string, unknown> = {};
+      for (const row of rows) {
+        const k = row.key.trim();
+        if (!k) continue;
+        // Try to parse as JSON for structured values, otherwise keep as string
+        try {
+          parameters[k] = JSON.parse(row.value);
+        } catch {
+          parameters[k] = row.value;
+        }
+      }
+      await apiClient.updateGlobalParameters(parameters);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save parameters');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading parameters...</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">Global Parameters</h4>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleAddRow}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Add parameter"
+            >
+              <Plus className="h-3 w-3" />
+              Add
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+              title="Save parameters"
+            >
+              {saved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+              {saved ? 'Saved' : saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-2 px-2 py-1.5 rounded bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs">
+            {error}
+          </div>
+        )}
+
+        {rows.length === 0 ? (
+          <div className="text-center py-6">
+            <Settings className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">No parameters yet</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Click "Add" to create a parameter</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={row.key}
+                  onChange={e => handleKeyChange(index, e.target.value)}
+                  placeholder="key"
+                  className="w-2/5 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <input
+                  type="text"
+                  value={row.value}
+                  onChange={e => handleValueChange(index, e.target.value)}
+                  placeholder="value"
+                  className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button
+                  onClick={() => handleDeleteRow(index)}
+                  className="flex-shrink-0 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="mt-3 text-[10px] text-gray-400 dark:text-gray-500">
+          Saved to ~/.mywant/parameters.yaml · JSON values are parsed automatically
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // --- GlobalStateSidebar component ---
 
 const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
 
-const TABS = [{ id: 'results', label: 'Results', icon: StickyNote }];
+const TABS = [
+  { id: 'results', label: 'Results', icon: StickyNote },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
 
 export const GlobalStateSidebar: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('results');
   const [globalState, setGlobalState] = useState<Record<string, unknown>>({});
   const [timestamp, setTimestamp] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -213,7 +373,7 @@ export const GlobalStateSidebar: React.FC = () => {
         badge={
           <div className="flex items-center justify-between w-full">
             <StickyNote className="h-5 w-5 text-green-500" />
-            {hasState && (
+            {activeTab === 'results' && hasState && (
               <button
                 onClick={() => setShowClearConfirmation(true)}
                 className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -226,28 +386,33 @@ export const GlobalStateSidebar: React.FC = () => {
         }
         tabs={TABS}
         defaultTab="results"
+        onTabChange={setActiveTab}
       >
         <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
-          {loading ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading memo...</div>
-          ) : hasState ? (
-            <div className="space-y-2">
-              <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Memo</h4>
-                <div className="space-y-3 sm:space-y-4">
-                  {renderKeyValuePairs(globalState)}
+          {activeTab === 'results' && (
+            loading ? (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading memo...</div>
+            ) : hasState ? (
+              <div className="space-y-2">
+                <div className={SECTION_CONTAINER_CLASS}>
+                  <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Memo</h4>
+                  <div className="space-y-3 sm:space-y-4">
+                    {renderKeyValuePairs(globalState)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">No memo data</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                Memo will appear here once wants store values via StoreGlobalState
-              </p>
-            </div>
+            ) : (
+              <div className="text-center py-12">
+                <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400">No memo data</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                  Memo will appear here once wants store values via StoreGlobalState
+                </p>
+              </div>
+            )
           )}
+
+          {activeTab === 'settings' && <SettingsTab />}
         </div>
       </DetailsSidebar>
 

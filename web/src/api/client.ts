@@ -463,6 +463,16 @@ class MyWantApiClient {
   async deleteGlobalState(): Promise<void> {
     await this.client.delete('/api/v1/global-state');
   }
+
+  // Global Parameters
+  async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number }> {
+    return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters');
+  }
+
+  async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number }> {
+    const response = await this.client.put<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', { parameters });
+    return response.data;
+  }
 }
 
 // Export singleton instance

@@ -161,6 +161,10 @@ components:
           description: Go type (int, float64, string, bool, []string, map[string]any)
         default:
           description: Default value
+        defaultGlobalParameter:
+          type: string
+          description: Global parameter key to use as fallback when neither spec.params nor default is set
+          pattern: '^[a-z][a-z0-9_]*$'
         required:
           type: boolean
           description: Whether parameter is required

@@ -136,8 +136,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/global-state", s.getGlobalState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/global-state", s.deleteGlobalState).Methods("DELETE", "OPTIONS")
 
-	// Global Parameters endpoint (read-only, loaded from ~/.mywant/parameters.yaml)
+	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")
+	api.HandleFunc("/global-parameters", s.updateGlobalParameters).Methods("PUT", "OPTIONS")
 
 	// Reactions endpoints
 	reactions := api.PathPrefix("/reactions").Subrouter()
