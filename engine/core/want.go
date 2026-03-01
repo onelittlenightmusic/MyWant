@@ -451,9 +451,11 @@ func (n *Want) EndProgressCycle() {
 		n.stateMutex.Unlock()
 	}
 
-	// Auto-override final_result from FinalResultField if configured
+	// Auto-override final_result from FinalResultField if configured.
+	// Supports dot-notation for nested fields, e.g. "slack_latest_message.text".
 	if field := n.Spec.FinalResultField; field != "" {
-		if val, ok := n.GetState(field); ok && val != nil {
+		val, ok := resolveNestedStateField(n, field)
+		if ok && val != nil {
 			// Skip zero values to avoid overwriting with initial defaults
 			skip := false
 			switch v := val.(type) {
@@ -2619,6 +2621,54 @@ func (w *Want) GetHTTPClient() *HTTPClient {
 }
 
 // Contains checks if a string slice contains a specific string value
+// resolveNestedStateField resolves a dot-notation field path from Want state.
+// For example, "slack_latest_message.text" first fetches the "slack_latest_message"
+// state key (expected to be a map) and then navigates to the "text" sub-field.
+// A plain key with no dots falls back to a normal GetState call.
+func resolveNestedStateField(n *Want, field string) (any, bool) {
+	parts := splitFirst(field, '.')
+	top, ok := n.GetState(parts[0])
+	if !ok || top == nil {
+		return nil, false
+	}
+	if len(parts) == 1 {
+		return top, true
+	}
+	// Navigate nested map(s)
+	cur := top
+	for _, part := range parts[1:] {
+		switch m := cur.(type) {
+		case map[string]any:
+			v, exists := m[part]
+			if !exists {
+				return nil, false
+			}
+			cur = v
+		case map[any]any:
+			v, exists := m[part]
+			if !exists {
+				return nil, false
+			}
+			cur = v
+		default:
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
+// splitFirst splits s on the first occurrence of sep and returns all parts.
+func splitFirst(s string, sep byte) []string {
+	for i := 0; i < len(s); i++ {
+		if s[i] == sep {
+			rest := s[i+1:]
+			// recursively split remainder to support multi-level nesting
+			return append([]string{s[:i]}, splitFirst(rest, sep)...)
+		}
+	}
+	return []string{s}
+}
+
 func Contains(slice []string, item string) bool {
 	for _, v := range slice {
 		if v == item {

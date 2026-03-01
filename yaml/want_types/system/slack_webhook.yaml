@@ -85,6 +85,8 @@ wantType:
     initialValue: 0
     example: 50
 
+  finalResultField: slack_latest_message.text
+
   connectivity:
     outputs:
     - name: slack_messages

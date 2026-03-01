@@ -263,6 +263,73 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	}
 }
 
+// TestFinalResultFieldNestedDotNotation tests dot-notation support for FinalResultField
+func TestFinalResultFieldNestedDotNotation(t *testing.T) {
+	// Test 1: single-level nesting — "slack_latest_message.text"
+	want := NewWantWithLocals(
+		Metadata{Name: "test-nested-1"},
+		WantSpec{FinalResultField: "slack_latest_message.text"},
+		nil,
+		"base",
+	)
+
+	want.BeginProgressCycle()
+	want.StoreState("slack_latest_message", map[string]any{
+		"sender": "U01ABC",
+		"text":   "hello world",
+	})
+	want.EndProgressCycle()
+
+	val, exists := want.GetState("final_result")
+	if !exists {
+		t.Fatal("Expected final_result to exist for nested dot-notation field")
+	}
+	if val != "hello world" {
+		t.Errorf("Expected final_result='hello world', got %v", val)
+	}
+
+	// Test 2: two-level nesting — "outer.inner.value"
+	want2 := NewWantWithLocals(
+		Metadata{Name: "test-nested-2"},
+		WantSpec{FinalResultField: "outer.inner.value"},
+		nil,
+		"base",
+	)
+
+	want2.BeginProgressCycle()
+	want2.StoreState("outer", map[string]any{
+		"inner": map[string]any{
+			"value": "deep",
+		},
+	})
+	want2.EndProgressCycle()
+
+	val, exists = want2.GetState("final_result")
+	if !exists {
+		t.Fatal("Expected final_result for two-level nesting")
+	}
+	if val != "deep" {
+		t.Errorf("Expected final_result='deep', got %v", val)
+	}
+
+	// Test 3: nested field is missing — final_result should not be set
+	want3 := NewWantWithLocals(
+		Metadata{Name: "test-nested-3"},
+		WantSpec{FinalResultField: "msg.nonexistent"},
+		nil,
+		"base",
+	)
+
+	want3.BeginProgressCycle()
+	want3.StoreState("msg", map[string]any{"text": "hi"})
+	want3.EndProgressCycle()
+
+	_, exists = want3.GetState("final_result")
+	if exists {
+		t.Error("Expected final_result NOT to be set when nested key is missing")
+	}
+}
+
 // TestGetPendingStateChangesIsolation tests that returned map is a copy
 func TestGetPendingStateChangesIsolation(t *testing.T) {
 	want := NewWantWithLocals(
