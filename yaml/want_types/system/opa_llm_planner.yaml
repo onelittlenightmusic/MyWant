@@ -19,8 +19,9 @@ wantType:
     description: Path or name of the opa-llm-planner binary
     type: string
     default: "opa-llm-planner"
+    defaultGlobalParameter: opa_llm_planner_command
     required: false
-    example: "opa-llm-planner"
+    example: "/usr/local/bin/opa-llm-planner"
 
   - name: policy_dir
     description: |
@@ -29,6 +30,7 @@ wantType:
       Omit or leave empty to use the planner's built-in policies.
     type: string
     default: ""
+    defaultGlobalParameter: opa_llm_policy_dir
     required: false
     example: "/etc/opa/policies"
 
@@ -38,6 +40,7 @@ wantType:
       Set to false to run pure OPA policy evaluation without LLM assistance.
     type: bool
     default: true
+    defaultGlobalParameter: opa_llm_use_llm
     required: false
     example: true
 
@@ -45,6 +48,7 @@ wantType:
     description: LLM provider name passed to --llm-provider (e.g. anthropic, openai)
     type: string
     default: "anthropic"
+    defaultGlobalParameter: llm_provider
     required: false
     example: "anthropic"
 

@@ -417,6 +417,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/CapabilityAgentsResponse'
 
+  /api/v1/global-state:
+    get:
+      summary: Get global state
+      description: Returns all key-value pairs stored via StoreGlobalState, along with a last-updated timestamp.
+      operationId: getGlobalState
+      tags:
+        - GlobalState
+      responses:
+        '200':
+          description: Current global state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalStateResponse'
+    delete:
+      summary: Clear global state
+      description: Removes all key-value pairs from global state.
+      operationId: deleteGlobalState
+      tags:
+        - GlobalState
+      responses:
+        '204':
+          description: Global state cleared
+
+  /api/v1/global-parameters:
+    get:
+      summary: Get global parameters
+      description: Returns all global parameters loaded from ~/.mywant/parameters.yaml.
+      operationId: getGlobalParameters
+      tags:
+        - GlobalParameters
+      responses:
+        '200':
+          description: Current global parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalParametersResponse'
+    put:
+      summary: Update global parameters
+      description: Replaces all global parameters and persists to ~/.mywant/parameters.yaml.
+      operationId: updateGlobalParameters
+      tags:
+        - GlobalParameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGlobalParametersRequest'
+      responses:
+        '200':
+          description: Updated global parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalParametersResponse'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to persist parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   parameters:
     WantId:
@@ -803,6 +873,47 @@ components:
           additionalProperties: true
           description: Additional error details
 
+    GlobalStateResponse:
+      type: object
+      description: Current global state with timestamp
+      properties:
+        state:
+          type: object
+          additionalProperties: true
+          description: All key-value pairs stored via StoreGlobalState
+        timestamp:
+          type: string
+          format: date-time
+          description: Time of last update (RFC3339)
+          example: "2026-03-01T12:00:00Z"
+
+    GlobalParametersResponse:
+      type: object
+      description: Current global parameters
+      properties:
+        parameters:
+          type: object
+          additionalProperties: true
+          description: All parameter key-value pairs from ~/.mywant/parameters.yaml
+        count:
+          type: integer
+          description: Number of parameters
+          example: 4
+
+    UpdateGlobalParametersRequest:
+      type: object
+      description: New set of global parameters (replaces existing)
+      required:
+        - parameters
+      properties:
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Full replacement parameter map
+          example:
+            llm_provider: anthropic
+            opa_llm_planner_command: /usr/local/bin/opa-llm-planner
+
 tags:
   - name: Health
     description: Server health and status
@@ -812,6 +923,10 @@ tags:
     description: Agent management and registration
   - name: Capabilities
     description: Capability definition and querying
+  - name: GlobalState
+    description: Persistent global state shared across all wants (memo)
+  - name: GlobalParameters
+    description: Global parameters loaded from ~/.mywant/parameters.yaml
 
 externalDocs:
   description: MyWant Project Documentation
