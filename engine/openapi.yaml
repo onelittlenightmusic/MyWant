@@ -1307,19 +1307,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-tags:
-  - name: Health
-    description: Server health monitoring endpoints
-  - name: Wants
-    description: Want configuration management (creation automatically triggers execution)
-  - name: Recipes
-    description: Recipe template management for reusable want configurations
-  - name: Monitoring
-    description: Want execution status and results monitoring
-  - name: Webhooks
-    description: Webhook endpoint management
-  - name: System
-    description: System administration and configuration
+  /api/v1/global-state:
+    get:
+      summary: Get global state
+      description: |
+        Returns the process-wide global key-value state shared across all wants,
+        persisted to `~/.mywant/global_state.yaml`.
+
+        Wants can write to global state via `StoreGlobalState(key, value)` or
+        `MergeGlobalState(updates)`. Top-level wants with no owner also fall back
+        to this store when calling `StoreParentState` / `GetParentState`.
+      operationId: getGlobalState
+      tags:
+        - System
+      responses:
+        '200':
+          description: Global state retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: object
+                    additionalProperties: true
+                    description: Current global key-value pairs
+                    example:
+                      some_key: some_value
+                      numeric_key: 42
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: Server time when the snapshot was taken
+                    example: "2026-03-01T12:34:56Z"
+                required:
+                  - state
+                  - timestamp
+    delete:
+      summary: Clear global state
+      description: |
+        Removes all key-value pairs from the process-wide global state.
+        This action is irreversible and persists to the `global_state.yaml` file.
+      operationId: deleteGlobalState
+      tags:
+        - System
+      responses:
+        '204':
+          description: Global state cleared successfully
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/webhooks:
     get:
@@ -2359,10 +2399,9 @@ tags:
     description: Want configuration management (creation automatically triggers execution)
   - name: Recipes
     description: Recipe template management for reusable want configurations
-      - name: Monitoring
-        description: Want execution status and results monitoring
-      - name: System
-        description: System administration and configuration
-      - name: Webhooks
-        description: Webhook endpoint management
-    
+  - name: Monitoring
+    description: Want execution status and results monitoring
+  - name: Webhooks
+    description: Webhook endpoint management
+  - name: System
+    description: System administration and configuration
