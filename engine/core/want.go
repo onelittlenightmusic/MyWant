@@ -2230,6 +2230,15 @@ func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
+// GetGlobalParameter returns the value from parameters.yaml for the given key,
+// or defaultValue if the key is absent.
+func (n *Want) GetGlobalParameter(key string, defaultValue any) any {
+	if v, ok := GetGlobalParameter(key); ok {
+		return v
+	}
+	return defaultValue
+}
+
 // count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
 	var newValue int

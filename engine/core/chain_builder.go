@@ -219,6 +219,12 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		dir := filepath.Dir(memoryPath)
 		builder.globalStatePath = filepath.Join(dir, "global_state.yaml")
 		builder.loadGlobalStateFromFile() // Load persisted global state on startup
+
+		// Load global parameters from <configDir>/parameters.yaml
+		paramsPath := filepath.Join(dir, "parameters.yaml")
+		if err := LoadGlobalParameters(paramsPath); err != nil {
+			log.Printf("[ChainBuilder] Warning: failed to load global parameters from %s: %v", paramsPath, err)
+		}
 	}
 
 	// Register all types that have Go implementations

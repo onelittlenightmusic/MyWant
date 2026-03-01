@@ -30,7 +30,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
           'router': ['react-router-dom'],
           'ui': ['@headlessui/react', '@heroicons/react', 'lucide-react'],
           'editor': ['codemirror', '@codemirror/state', '@codemirror/view', '@codemirror/lang-yaml', '@codemirror/theme-one-dark'],

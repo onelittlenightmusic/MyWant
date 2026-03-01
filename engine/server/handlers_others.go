@@ -1064,6 +1064,15 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	params := mywant.GetAllGlobalParameters()
+	json.NewEncoder(w).Encode(map[string]any{
+		"parameters": params,
+		"count":      len(params),
+	})
+}
+
 func (s *Server) deleteGlobalState(w http.ResponseWriter, r *http.Request) {
 	if s.globalBuilder != nil {
 		s.globalBuilder.ClearGlobalState()
