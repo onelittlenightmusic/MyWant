@@ -54,6 +54,15 @@ Most commands have short versions for convenience.
 | | `deploy` | `d` | Deploy recommendation |
 | | `end` | `e` | End session |
 | | `shell` | `sh` | Interactive shell |
+| `memo` | - | `m` | Manage global state (memo) |
+| | `get` | `g` | Display current global state |
+| | `clear` | - | Clear all global state |
+| `params` | - | `p` | Manage global parameters |
+| | `get` | `g` | List all parameters |
+| | `set` | - | Set a parameter |
+| | `delete` | `del`, `rm` | Delete a parameter |
+| | `import` | - | Import parameters from YAML/JSON file |
+| | `export` | - | Export parameters to stdout or file |
 
 ## Core Commands
 
@@ -219,6 +228,106 @@ Explore available types and agents.
 ./bin/mywant logs
 # Short version:
 ./bin/mywant l
+```
+
+### Global State (Memo)
+
+Wants can persist key-value pairs via `StoreGlobalState`. The `memo` command lets you inspect and clear that data from the CLI.
+
+```bash
+# Display all current global state
+./bin/mywant memo get
+# Short version:
+./bin/mywant m g
+
+# Output as JSON
+./bin/mywant memo get --json
+
+# Clear all global state (prompts for confirmation)
+./bin/mywant memo clear
+# Skip confirmation
+./bin/mywant memo clear -y
+```
+
+### Global Parameters
+
+Global parameters are stored in `~/.mywant/parameters.yaml` and can be referenced by want type definitions via `defaultGlobalParameter`. They act as a last-resort default when neither `spec.params` nor the YAML `default` is set.
+
+```bash
+# List all parameters
+./bin/mywant params get
+# Short version:
+./bin/mywant p g
+
+# Output as JSON
+./bin/mywant params get --json
+
+# Set a single parameter (value is parsed as JSON if possible)
+./bin/mywant params set llm_provider anthropic
+./bin/mywant params set opa_llm_use_llm true
+./bin/mywant params set opa_llm_planner_command /usr/local/bin/opa-llm-planner
+
+# Delete a parameter
+./bin/mywant params delete llm_provider
+# Short versions:
+./bin/mywant p del llm_provider
+./bin/mywant p rm llm_provider
+
+# Import parameters from a YAML file (replaces all existing)
+./bin/mywant params import -f ~/.mywant/parameters.yaml
+
+# Merge parameters from a file with existing ones
+./bin/mywant params import -f extra.yaml --merge
+
+# Export current parameters to stdout (YAML)
+./bin/mywant params export
+
+# Export to a file
+./bin/mywant params export -f backup.yaml
+```
+
+**`params import` フラグ一覧:**
+
+| フラグ | 短縮 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `--file` | `-f` | — | YAML または JSON ファイルパス（必須） |
+| `--merge` | — | `false` | 既存パラメーターに追記（省略時は全置換） |
+
+**`params export` フラグ一覧:**
+
+| フラグ | 短縮 | デフォルト | 説明 |
+| :--- | :--- | :--- | :--- |
+| `--file` | `-f` | — | 出力先ファイルパス（省略時は stdout） |
+
+#### want type YAML での `defaultGlobalParameter` の使い方
+
+want type の YAML 定義でパラメーターに `defaultGlobalParameter` を指定すると、
+`spec.params` にも YAML `default` にも値がないときに global parameters から値が取得されます。
+
+**優先順位:** `spec.params` > `default`（YAML定義） > `defaultGlobalParameter`（global params） > `GetXxxParam` のハードコード値
+
+```yaml
+# yaml/want_types/system/opa_llm_planner.yaml (抜粋)
+parameters:
+- name: opa_llm_planner_command
+  type: string
+  default: "opa-llm-planner"
+  defaultGlobalParameter: opa_llm_planner_command   # ~/.mywant/parameters.yaml の同名キー
+  required: false
+
+- name: llm_provider
+  type: string
+  default: "anthropic"
+  defaultGlobalParameter: llm_provider
+  required: false
+```
+
+```bash
+# 対応する global parameters の設定例
+./bin/mywant params set opa_llm_planner_command /Users/me/bin/opa-llm-planner
+./bin/mywant params set opa_llm_policy_dir /etc/opa/policies
+./bin/mywant params set opa_llm_use_llm true
+./bin/mywant params set llm_provider anthropic
 ```
 
 ## Shell Completion
