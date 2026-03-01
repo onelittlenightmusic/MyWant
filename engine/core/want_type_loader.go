@@ -133,6 +133,7 @@ type WantTypeLoader struct {
 	mu              sync.RWMutex
 	validPatterns   []string
 	validCategories map[string]bool
+	loadWarnings    []string
 }
 
 // NewWantTypeLoader creates a new want type loader
@@ -142,7 +143,7 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		definitions:     make(map[string]*WantTypeDefinition),
 		byCategory:      make(map[string][]*WantTypeDefinition),
 		byPattern:       make(map[string][]*WantTypeDefinition),
-		validPatterns:   []string{"generator", "processor", "sink", "independent"},
+		validPatterns:   []string{"generator", "processor", "sink", "independent", "coordinator"},
 		validCategories: make(map[string]bool),
 	}
 }
@@ -208,8 +209,11 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 
 	if len(loadErrors) > 0 {
 		// Log errors but don't fail if at least some files loaded
+		w.loadWarnings = make([]string, 0, len(loadErrors))
 		for _, err := range loadErrors {
-			log.Printf("Warning: %v\n", err)
+			msg := fmt.Sprintf("Warning: %v", err)
+			log.Printf("%s\n", msg)
+			w.loadWarnings = append(w.loadWarnings, msg)
 		}
 	}
 
@@ -363,6 +367,19 @@ func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {
 
 	return w.definitions[name]
 }
+// GetLoadWarnings returns warning messages collected during the last LoadAllWantTypes call.
+// Each entry describes a YAML file that failed to load and the reason why.
+func (w *WantTypeLoader) GetLoadWarnings() []string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if len(w.loadWarnings) == 0 {
+		return nil
+	}
+	result := make([]string, len(w.loadWarnings))
+	copy(result, w.loadWarnings)
+	return result
+}
+
 func (w *WantTypeLoader) GetAll() []*WantTypeDefinition {
 	w.mu.RLock()
 	defer w.mu.RUnlock()

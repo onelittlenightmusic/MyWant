@@ -103,6 +103,14 @@ func New(config Config) *Server {
 		wantTypeLoader.EnrichMonitorCapabilities(agentRegistry)
 	}
 
+	// Record want type load warnings into the API log so they are visible via
+	// GET /api/v1/logs and `./bin/mywant logs`.
+	if wantTypeLoader != nil {
+		for _, w := range wantTypeLoader.GetLoadWarnings() {
+			globalBuilder.LogAPIOperation("STARTUP", "/want-types/load", "", "warning", 0, w, "")
+		}
+	}
+
 	// Create reaction queue manager for reminders (multi-queue system)
 	reactionQueueManager := types.NewReactionQueueManager()
 

@@ -1,0 +1,80 @@
+wantType:
+  metadata:
+    name: opa_llm_planner
+    title: OPA LLM Planner
+    description: |
+      Plans actions using OPA (Open Policy Agent) policy engine combined with LLM reasoning.
+
+      Accepts a goal state and a current state as JSON objects, then invokes the
+      `opa-llm-planner plan` CLI to produce a list of actions that bridge the gap.
+
+      The agent runs on every tick but only calls the CLI when goal or current state
+      has actually changed (detected via MD5 hash comparison), avoiding redundant planning.
+    version: '1.0'
+    category: system
+    pattern: coordinator
+
+  parameters:
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary
+    type: string
+    default: "opa-llm-planner"
+    required: false
+    example: "opa-llm-planner"
+
+  - name: policy_dir
+    description: |
+      Directory containing OPA policy files (.rego).
+      When set, passes --policy <dir> to the planner.
+      Omit or leave empty to use the planner's built-in policies.
+    type: string
+    default: ""
+    required: false
+    example: "/etc/opa/policies"
+
+  - name: use_llm
+    description: |
+      If true (default), passes --llm and --llm-provider flags to enable LLM-augmented planning.
+      Set to false to run pure OPA policy evaluation without LLM assistance.
+    type: bool
+    default: true
+    required: false
+    example: true
+
+  - name: llm_provider
+    description: LLM provider name passed to --llm-provider (e.g. anthropic, openai)
+    type: string
+    default: "anthropic"
+    required: false
+    example: "anthropic"
+
+  state:
+  - name: goal
+    description: |
+      Target desired state expressed as a JSON object.
+      Written by the caller; read by the OPA LLM Planner on each tick.
+    type: object
+    persistent: true
+    initialValue: {}
+    example: '{"service": "deployed", "replicas": 3}'
+
+  - name: current
+    description: |
+      Current observed state expressed as a JSON object.
+      Written by the caller (e.g. a monitoring want); read by the OPA LLM Planner on each tick.
+    type: object
+    persistent: true
+    initialValue: {}
+    example: '{"service": "stopped", "replicas": 0}'
+
+  - name: actions
+    description: |
+      Planned actions produced by opa-llm-planner, stored as an array of action objects.
+      Updated whenever goal or current state changes.
+    type: object
+    persistent: true
+    initialValue: []
+    example: '[{"action": "start_service", "target": "my-app"}]'
+
+  requires:
+    - opa_llm_planning
