@@ -80,7 +80,7 @@ var memoClearCmd = &cobra.Command{
 
 var ParamsCmd = &cobra.Command{
 	Use:     "params",
-	Aliases: []string{"p"},
+	Aliases: []string{"pa"},
 	Short:   "Manage global parameters",
 	Long:    `View and edit global parameters stored in ~/.mywant/parameters.yaml.`,
 }

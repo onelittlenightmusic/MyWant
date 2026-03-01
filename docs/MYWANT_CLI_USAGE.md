@@ -57,7 +57,7 @@ Most commands have short versions for convenience.
 | `memo` | - | `m` | Manage global state (memo) |
 | | `get` | `g` | Display current global state |
 | | `clear` | - | Clear all global state |
-| `params` | - | `p` | Manage global parameters |
+| `params` | - | `pa` | Manage global parameters |
 | | `get` | `g` | List all parameters |
 | | `set` | - | Set a parameter |
 | | `delete` | `del`, `rm` | Delete a parameter |
@@ -257,7 +257,7 @@ Global parameters are stored in `~/.mywant/parameters.yaml` and can be reference
 # List all parameters
 ./bin/mywant params get
 # Short version:
-./bin/mywant p g
+./bin/mywant pa g
 
 # Output as JSON
 ./bin/mywant params get --json
@@ -270,8 +270,8 @@ Global parameters are stored in `~/.mywant/parameters.yaml` and can be reference
 # Delete a parameter
 ./bin/mywant params delete llm_provider
 # Short versions:
-./bin/mywant p del llm_provider
-./bin/mywant p rm llm_provider
+./bin/mywant pa del llm_provider
+./bin/mywant pa rm llm_provider
 
 # Import parameters from a YAML file (replaces all existing)
 ./bin/mywant params import -f ~/.mywant/parameters.yaml
