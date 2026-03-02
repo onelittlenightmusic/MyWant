@@ -676,6 +676,10 @@ func (n *Want) StartProgressionLoop(
 					if n.progressable != nil {
 						n.progressable.Initialize()
 					}
+					// Re-start background agents that were stopped for restart
+					if err := n.StartBackgroundAgents(); err != nil {
+						n.StoreLog("ERROR: Failed to re-start background agents on restart: %v", err)
+					}
 				}
 			}
 
@@ -742,12 +746,6 @@ func (n *Want) StartProgressionLoop(
 			// 4. Synchronize paths before execution (preconditions: providers + users)
 			n.SetPaths(currentPaths.In, currentPaths.Out)
 
-			// 4.5. Keep persistent background agents running (Monitor/Poll/Think).
-			// DoAgents are excluded — they run from Progress() via ExecuteAgents().
-			if err := n.StartBackgroundAgents(); err != nil {
-				n.StoreLog("ERROR: Failed to start background agents: %v", err)
-			}
-
 			// 5. Begin execution cycle (batching mode)
 			n.BeginProgressCycle()
 
@@ -769,13 +767,6 @@ func (n *Want) StartProgressionLoop(
 				// No progressable set, mark as failed
 				n.SetStatus(WantStatusFailed)
 				return
-			}
-
-			// Auto-start persistent agents (ThinkAgent, MonitorAgent, PollAgent) from Requires.
-			// This is idempotent: already-running agents are skipped.
-			// DoAgents are excluded here and must be called explicitly from Progress().
-			if err := n.StartBackgroundAgents(); err != nil {
-				n.StoreLog("ERROR: Failed to start background agents: %v", err)
 			}
 
 			// Execute Progress() with panic/recover to handle immediate termination

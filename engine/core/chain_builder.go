@@ -26,8 +26,10 @@ const (
 	ChangeEventUpdate ChangeEventType = "UPDATE"
 	ChangeEventDelete ChangeEventType = "DELETE"
 
-	// GlobalExecutionInterval defines the sleep interval between goroutine execution cycles This prevents CPU spinning in tight execution loops for want execution goroutines Set to 100ms to reduce CPU usage during concurrent want execution
-	GlobalExecutionInterval = 10 * time.Millisecond
+	// GlobalExecutionInterval defines the sleep interval between want progression loop cycles.
+	// This throttles how often Progress() is called per want goroutine.
+	// ThinkAgent/MonitorAgent/PollAgent have their own internal timers and are unaffected.
+	GlobalExecutionInterval = 500 * time.Millisecond
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
 	GlobalReconcileInterval = 100 * time.Millisecond
@@ -139,9 +141,9 @@ type ChainBuilder struct {
 	stateAccessIndex map[string][]string // "wantID.fieldName" -> []wantIDs
 
 	// Global state (shared across all wants, persisted to disk)
-	globalState     sync.Map // key(string) -> value(any), key-level concurrency
-	globalStatePath string   // ~/.mywant/global_state.yaml
-	lastGlobalStateHash string // Hash of last written global state for change detection
+	globalState         sync.Map // key(string) -> value(any), key-level concurrency
+	globalStatePath     string   // ~/.mywant/global_state.yaml
+	lastGlobalStateHash string   // Hash of last written global state for change detection
 }
 
 // runtimeWant holds the runtime state of a want
