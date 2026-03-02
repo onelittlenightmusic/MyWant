@@ -15,16 +15,11 @@ func init() {
 	RegisterDoAgent(agentPremiumName, executeHotelReservation)
 }
 
-// executeHotelReservation performs a hotel reservation, handling cancel+rebook when needed.
+// executeHotelReservation performs a hotel reservation.
+// Cancel + rebook handling (prev_want_id) is delegated to executeReservation.
 func executeHotelReservation(ctx context.Context, want *Want) error {
-	// Cancel the previous booking if this is a rebooking (cost-reduction) action.
-	if prevWantID := want.GetStringParam("prev_want_id", ""); prevWantID != "" {
-		cancelPreviousWant(want, prevWantID, "hotel")
-	}
-
 	schedule := generateHotelSchedule(want)
-	isRebooking := want.GetStringParam("prev_want_id", "") != ""
-	err := executeReservation(want, agentPremiumName, schedule, func(s interface{}) (string, string) {
+	return executeReservation(want, agentPremiumName, schedule, func(s interface{}, isRebooking bool) (string, string) {
 		sch := s.(HotelSchedule)
 		verb := "confirmed"
 		if isRebooking {
@@ -40,7 +35,6 @@ func executeHotelReservation(ctx context.Context, want *Want) error {
 			sch.CheckOutTime.Format("15:04 Jan 2"))
 		return activity, logMsg
 	})
-	return err
 }
 
 // generateHotelCost returns a realistic per-night cost based on hotel type

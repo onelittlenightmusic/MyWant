@@ -15,22 +15,22 @@ func init() {
 	RegisterDoAgent(agentBuffetName, executeBuffetReservation)
 }
 
-// executeBuffetReservation performs a premium buffet reservation
+// executeBuffetReservation performs a buffet reservation.
+// Cancel + rebook handling (prev_want_id) is delegated to executeReservation.
 func executeBuffetReservation(ctx context.Context, want *Want) error {
 	schedule := generateBuffetSchedule(want)
-	err := executeReservation(want, agentBuffetName, schedule, func(s interface{}) (string, string) {
+	return executeReservation(want, agentBuffetName, schedule, func(s interface{}, isRebooking bool) (string, string) {
 		sch := s.(BuffetSchedule)
-		activity := fmt.Sprintf("Buffet reservation has been confirmed for %s buffet at %s for %.1f hours",
-			sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
-		logMsg := fmt.Sprintf("Buffet reservation completed: %s at %s for %.1f hours",
-			sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
+		verb := "confirmed"
+		if isRebooking {
+			verb = "rebooked at lower cost"
+		}
+		activity := fmt.Sprintf("Buffet reservation has been %s for %s buffet at %s for %.1f hours",
+			verb, sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
+		logMsg := fmt.Sprintf("Buffet reservation %s: %s at %s for %.1f hours",
+			verb, sch.BuffetType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
 		return activity, logMsg
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // generateBuffetCost returns a realistic cost based on buffet type

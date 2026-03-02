@@ -15,16 +15,11 @@ func init() {
 	RegisterDoAgent(agentRestaurantName, executeRestaurantReservation)
 }
 
-// executeRestaurantReservation performs a restaurant reservation, handling cancel+rebook when needed.
+// executeRestaurantReservation performs a restaurant reservation.
+// Cancel + rebook handling (prev_want_id) is delegated to executeReservation.
 func executeRestaurantReservation(ctx context.Context, want *Want) error {
-	// Cancel the previous booking if this is a rebooking (cost-reduction) action.
-	if prevWantID := want.GetStringParam("prev_want_id", ""); prevWantID != "" {
-		cancelPreviousWant(want, prevWantID, "restaurant")
-	}
-
 	schedule := generateRestaurantSchedule(want)
-	isRebooking := want.GetStringParam("prev_want_id", "") != ""
-	err := executeReservation(want, agentRestaurantName, schedule, func(s interface{}) (string, string) {
+	return executeReservation(want, agentRestaurantName, schedule, func(s interface{}, isRebooking bool) (string, string) {
 		sch := s.(RestaurantSchedule)
 		verb := "booked"
 		if isRebooking {
@@ -36,7 +31,6 @@ func executeRestaurantReservation(ctx context.Context, want *Want) error {
 			verb, sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
 		return activity, logMsg
 	})
-	return err
 }
 
 // generateRestaurantSchedule creates a restaurant reservation schedule
