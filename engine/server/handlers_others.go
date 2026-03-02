@@ -140,7 +140,7 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	// Save to file for persistence and to enable use as a custom target type
 	userRecipesDir := mywant.UserRecipesDir()
 	os.MkdirAll(userRecipesDir, 0755)
-	
+
 	// Determine a meaningful filename based on custom_type or name
 	fileBase := recipe.Recipe.Metadata.CustomType
 	if fileBase == "" {
@@ -148,7 +148,7 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 	fileBase = strings.ReplaceAll(fileBase, " ", "-")
 	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
-	
+
 	// Create a copy for saving to disk without the dynamic ID
 	saveRecipe := recipe
 	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
@@ -204,7 +204,7 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	// Persist changes to file
 	userRecipesDir := mywant.UserRecipesDir()
 	os.MkdirAll(userRecipesDir, 0755)
-	
+
 	// Determine filename based on custom_type or name
 	fileBase := recipe.Recipe.Metadata.CustomType
 	if fileBase == "" {
@@ -212,7 +212,7 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 	fileBase = strings.ReplaceAll(fileBase, " ", "-")
 	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
-	
+
 	// Create a copy for saving to disk without the dynamic ID
 	saveRecipe := recipe
 	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
@@ -252,7 +252,7 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 
 	// Also delete the file if it's in the user recipes directory
 	userRecipesDir := mywant.UserRecipesDir()
-	
+
 	// Determine filename based on custom_type or name as saved
 	fileBase := recipe.Recipe.Metadata.CustomType
 	if fileBase == "" {
@@ -260,7 +260,7 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 	fileBase = strings.ReplaceAll(fileBase, " ", "-")
 	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
-	
+
 	if _, err := os.Stat(filename); err == nil {
 		os.Remove(filename)
 		log.Printf("[SERVER] 🗑️ Deleted recipe file: %s\n", filename)
@@ -341,8 +341,8 @@ func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	analysis := WantRecipeAnalysis{
-		WantID:     wantID,
-		ChildCount: len(childWants),
+		WantID:           wantID,
+		ChildCount:       len(childWants),
 		RecommendedState: recommendedState,
 		SuggestedMetadata: mywant.GenericRecipeMetadata{
 			Name:    parentWant.Metadata.Name + "-recipe",
@@ -403,7 +403,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		if isChild {
 			meta := wnt.Metadata
 			meta.ID = ""
-			meta.Name = ""           // clear runtime name; recipe loader auto-generates on deploy
+			meta.Name = "" // clear runtime name; recipe loader auto-generates on deploy
 			meta.OwnerReferences = nil
 			childWants = append(childWants, mywant.RecipeWant{Metadata: meta, Spec: wnt.Spec})
 		}
@@ -444,7 +444,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	// Save to file (~/.mywant/recipes/)
 	userRecipesDir := mywant.UserRecipesDir()
 	os.MkdirAll(userRecipesDir, 0755)
-	
+
 	// Determine a meaningful filename based on custom_type or name
 	fileBase := recipe.Recipe.Metadata.CustomType
 	if fileBase == "" {
@@ -452,7 +452,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 	fileBase = strings.ReplaceAll(fileBase, " ", "-")
 	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
-	
+
 	// Create a copy for saving to disk without the dynamic ID
 	saveRecipe := recipe
 	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID

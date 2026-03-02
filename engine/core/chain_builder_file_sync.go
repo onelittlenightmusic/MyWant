@@ -210,7 +210,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML_disabled() error {
 			Spec:     *runtimeWant.GetSpec(), // This preserves using
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
-			State:   stateCopy,                // Use copy to avoid concurrent modification
+			State:   stateCopy,                       // Use copy to avoid concurrent modification
 			History: runtimeWant.want.BuildHistory(), // Include history in memory dump
 		}
 

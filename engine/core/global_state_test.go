@@ -180,7 +180,7 @@ func TestGlobalState_PackageLevelFunctions_NilBuilder(t *testing.T) {
 	SetGlobalChainBuilder(nil)
 	defer SetGlobalChainBuilder(prev)
 
-	StoreGlobalState("key", "value") // should not panic
+	StoreGlobalState("key", "value")                 // should not panic
 	MergeGlobalState(map[string]any{"key": "value"}) // should not panic
 	val, ok := GetGlobalState("key")
 	if ok || val != nil {

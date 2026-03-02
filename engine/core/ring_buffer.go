@@ -96,7 +96,6 @@ func (r *ringBuffer[T]) UpdateLast(fn func(*T)) bool {
 	return true
 }
 
-
 // Clear resets the ring buffer. Not safe to call concurrently with Append.
 func (r *ringBuffer[T]) Clear() {
 	r.head.Store(0)

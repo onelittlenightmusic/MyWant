@@ -329,10 +329,10 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording started: session=%s cdp=%s", sessionID, cdpURL)
 	want.StoreStateMultiForAgent(map[string]any{
-		"debug_recording_session_id":   sessionID,
-		"debug_recording_active":       true,
+		"debug_recording_session_id":      sessionID,
+		"debug_recording_active":          true,
 		"start_debug_recording_requested": false,
-		"action_by_agent":              playwrightRecordAgentName,
+		"action_by_agent":                 playwrightRecordAgentName,
 	})
 	return nil
 }
@@ -419,11 +419,11 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Replay started: session=%s ui=%s", sessionID, uiURL)
 	want.StoreStateMultiForAgent(map[string]any{
-		"replay_session_id":     sessionID,
-		"replay_iframe_url":     uiURL,
-		"replay_active":         true,
+		"replay_session_id":      sessionID,
+		"replay_iframe_url":      uiURL,
+		"replay_active":          true,
 		"start_replay_requested": false,
-		"action_by_agent":       playwrightRecordAgentName,
+		"action_by_agent":        playwrightRecordAgentName,
 	})
 	return nil
 }

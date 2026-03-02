@@ -32,8 +32,8 @@ type AccessType string
 
 const (
 	AccessTypeUpdate     AccessType = "update"     // Agent may write to this field
-	AccessTypeRead       AccessType = "read"        // Agent may read from this field
-	AccessTypeReadUpdate AccessType = "readUpdate"  // Agent may read and write (default)
+	AccessTypeRead       AccessType = "read"       // Agent may read from this field
+	AccessTypeReadUpdate AccessType = "readUpdate" // Agent may read and write (default)
 )
 
 // StateAccessField declares a state field that an agent with this capability can access.
@@ -177,8 +177,8 @@ func (a *ThinkAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 // AgentSpec holds specification for state field validation
 type AgentSpec struct {
 	Name             string
-	AllowedStateKeys map[string]bool    // O(1) lookup: key -> allowed
-	KeyDescriptions  map[string]string  // For logging: key -> description
+	AllowedStateKeys map[string]bool       // O(1) lookup: key -> allowed
+	KeyDescriptions  map[string]string     // For logging: key -> description
 	StateAccessTypes map[string]AccessType // key -> access type
 
 	// Parent state access (for want.StoreParentState / GetParentState)

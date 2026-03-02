@@ -85,13 +85,13 @@ type ParameterUpdate struct {
 // Each start/completion/failure/termination produces a separate append-only entry.
 // ExecutionID links related events (e.g., the "running" start and its "achieved" completion).
 type AgentExecution struct {
-	ExecutionID   string    `json:"execution_id" yaml:"execution_id"`               // UUID linking related events for the same run
+	ExecutionID   string    `json:"execution_id" yaml:"execution_id"` // UUID linking related events for the same run
 	AgentName     string    `json:"agent_name" yaml:"agent_name"`
 	AgentType     string    `json:"agent_type" yaml:"agent_type"`
-	Timestamp     time.Time `json:"timestamp" yaml:"timestamp"`                     // Time this event occurred
-	Status        string    `json:"status" yaml:"status"`                           // "running", "achieved", "failed", "terminated"
+	Timestamp     time.Time `json:"timestamp" yaml:"timestamp"` // Time this event occurred
+	Status        string    `json:"status" yaml:"status"`       // "running", "achieved", "failed", "terminated"
 	Error         string    `json:"error,omitempty" yaml:"error,omitempty"`
-	Activity      string    `json:"activity,omitempty" yaml:"activity,omitempty"`   // Human-readable description of agent action
+	Activity      string    `json:"activity,omitempty" yaml:"activity,omitempty"`             // Human-readable description of agent action
 	ExecutionMode string    `json:"execution_mode,omitempty" yaml:"execution_mode,omitempty"` // local, webhook, rpc
 }
 

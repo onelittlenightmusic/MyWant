@@ -33,7 +33,7 @@ type Target struct {
 	RecipeParams           map[string]any      // Parameters to pass to recipe (derived from spec.params)
 	parameterSubscriptions map[string][]string // Map of parameter names to child want names that subscribe to them
 	childWants             []*Want
-	completedChildren      sync.Map     // Track which children have completed (key: string name, value: bool)
+	completedChildren      sync.Map             // Track which children have completed (key: string name, value: bool)
 	builder                *ChainBuilder        // Reference to builder for dynamic want creation
 	recipeLoader           *GenericRecipeLoader // Reference to generic recipe loader
 	childrenDone           chan bool            // Signal when all children complete

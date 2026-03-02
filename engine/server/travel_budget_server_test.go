@@ -13,7 +13,7 @@ import (
 )
 
 // TestTravelBudgetSystem_Integration verifies that deploying a travel budget system
-// through the real server router correctly results in child want generation and 
+// through the real server router correctly results in child want generation and
 // proper field-level correlation (stateAccess).
 func TestTravelBudgetSystem_Integration(t *testing.T) {
 	// Change working directory to project root so 'yaml/' paths work
@@ -43,7 +43,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 
 	// 1. Create Server instance (loads all YAMLs automatically)
 	s := New(config)
-	
+
 	// Manually start the global builder reconcile loop for the test
 	// Normally s.Start() would do this.
 	go s.globalBuilder.ExecuteWithMode(true)
@@ -53,7 +53,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	mywant.RegisterMonitorWantTypes(s.globalBuilder)
 	mywant.RegisterOwnerWantTypes(s.globalBuilder)
 	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
-	
+
 	// Transfer loaded want type definitions (normally done in s.Start())
 	if s.wantTypeLoader != nil {
 		allDefs := s.wantTypeLoader.GetAll()
@@ -85,7 +85,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	body, _ := json.Marshal(deployment)
 	req, _ := http.NewRequest("POST", "/api/v1/wants", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Setup routes
 	s.setupRoutes()
 	rr := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	t.Logf("Total wants found in system: %d", len(wants))
 
 	var parentWant, budgetWant, hotelWant *mywant.Want
-	
+
 	for _, w := range wants {
 		if w.Metadata.Name == "integration-test-planner" {
 			parentWant = w
@@ -150,7 +150,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("Want %s (%s): Correlation with %s via %s not found. Current entries: %v", 
+			t.Errorf("Want %s (%s): Correlation with %s via %s not found. Current entries: %v",
 				w.Metadata.Name, w.Metadata.ID, peerID, label, w.Metadata.Correlation)
 		} else {
 			t.Logf("✅ Want %s has correlation with %s via %s", w.Metadata.Name, peerID, label)
@@ -166,7 +166,7 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 		verifyCorrelation(t, budgetWant, parentID, expectedLabel)
 		verifyCorrelation(t, hotelWant, parentID, expectedLabel)
 	})
-	
+
 	if !t.Failed() {
 		t.Log("✅ Integration test passed: travel-budget system successfully deployed with correct structural correlations.")
 	}

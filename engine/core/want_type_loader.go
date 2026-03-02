@@ -15,21 +15,21 @@ import (
 
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition struct {
-	Metadata         WantTypeMetadata `json:"metadata" yaml:"metadata"`
-	Parameters       []ParameterDef   `json:"parameters" yaml:"parameters"`
-	State            []StateDef       `json:"state" yaml:"state"`
-	Connectivity     ConnectivityDef  `json:"connectivity" yaml:"connectivity"`
-	Connect          *RequireSpec     `json:"connect,omitempty" yaml:"connect,omitempty"`                   // New connectivity requirement field
-	Require          *RequireSpec     `json:"require,omitempty" yaml:"require,omitempty"`                   // Structured connectivity requirement (deprecated)
-	UsageLimit       *UsageLimitSpec  `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`             // Deprecated: use connect instead
-	Requires            []string                `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements (includes ThinkAgent capabilities)
-	MonitorCapabilities []MonitorCapabilityDef  `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
-	FinalResultField    string                  `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
-	Agents           []AgentDef       `json:"agents" yaml:"agents"`
-	Constraints      []ConstraintDef  `json:"constraints" yaml:"constraints"`
-	Examples         []ExampleDef     `json:"examples" yaml:"examples"`
-	RelatedTypes     []string         `json:"relatedTypes" yaml:"relatedTypes"`
-	SeeAlso          []string         `json:"seeAlso" yaml:"seeAlso"`
+	Metadata            WantTypeMetadata       `json:"metadata" yaml:"metadata"`
+	Parameters          []ParameterDef         `json:"parameters" yaml:"parameters"`
+	State               []StateDef             `json:"state" yaml:"state"`
+	Connectivity        ConnectivityDef        `json:"connectivity" yaml:"connectivity"`
+	Connect             *RequireSpec           `json:"connect,omitempty" yaml:"connect,omitempty"`                         // New connectivity requirement field
+	Require             *RequireSpec           `json:"require,omitempty" yaml:"require,omitempty"`                         // Structured connectivity requirement (deprecated)
+	UsageLimit          *UsageLimitSpec        `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`                   // Deprecated: use connect instead
+	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements (includes ThinkAgent capabilities)
+	MonitorCapabilities []MonitorCapabilityDef `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
+	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
+	Agents              []AgentDef             `json:"agents" yaml:"agents"`
+	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
+	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
+	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`
+	SeeAlso             []string               `json:"seeAlso" yaml:"seeAlso"`
 }
 
 // WantTypeMetadata contains want type identity and classification
@@ -368,6 +368,7 @@ func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {
 
 	return w.definitions[name]
 }
+
 // GetLoadWarnings returns warning messages collected during the last LoadAllWantTypes call.
 // Each entry describes a YAML file that failed to load and the reason why.
 func (w *WantTypeLoader) GetLoadWarnings() []string {
