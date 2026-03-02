@@ -24,6 +24,11 @@ func cancelPreviousWant(want *Want, prevWantID string, wantTypeName string) {
 		}
 		w.StoreState("_cancelled", true)
 		w.StoreState("cancelled", true)
+		// Zero out this want's cost contribution in the parent's "costs" map so
+		// BudgetThinker does not count the cancelled booking alongside the rebook.
+		w.MergeParentState(map[string]any{
+			"costs": map[string]any{w.Metadata.Name: 0.0},
+		})
 		w.AggregateChanges()
 		want.StoreLog("[CANCEL] Cancelled previous %s reservation (want: %s)", wantTypeName, prevWantID)
 		return

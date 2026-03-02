@@ -72,6 +72,12 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	// ── Phase 3: Cost propagation ──────────────────────────────────────────
+	// Skip propagation for cancelled wants: their cost should not be counted
+	// in the parent's totals (BudgetThinker would otherwise double-count
+	// the original booking alongside the cheaper rebook).
+	if cancelled, _ := want.GetStateBool("_cancelled", false); cancelled {
+		return nil
+	}
 	costRaw, exists := want.GetState("cost")
 	if !exists || costRaw == nil {
 		return nil
