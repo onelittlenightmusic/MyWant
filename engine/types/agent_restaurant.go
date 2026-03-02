@@ -15,22 +15,28 @@ func init() {
 	RegisterDoAgent(agentRestaurantName, executeRestaurantReservation)
 }
 
-// executeRestaurantReservation performs a premium restaurant reservation
+// executeRestaurantReservation performs a restaurant reservation, handling cancel+rebook when needed.
 func executeRestaurantReservation(ctx context.Context, want *Want) error {
-	schedule := generateRestaurantSchedule(want)
-	err := executeReservation(want, agentRestaurantName, schedule, func(s interface{}) (string, string) {
-		sch := s.(RestaurantSchedule)
-		activity := fmt.Sprintf("Restaurant reservation has been booked at %s %s for %.1f hours",
-			sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
-		logMsg := fmt.Sprintf("Restaurant reservation completed: %s at %s for %.1f hours",
-			sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
-		return activity, logMsg
-	})
-	if err != nil {
-		return err
+	// Cancel the previous booking if this is a rebooking (cost-reduction) action.
+	if prevWantID := want.GetStringParam("prev_want_id", ""); prevWantID != "" {
+		cancelPreviousWant(want, prevWantID, "restaurant")
 	}
 
-	return nil
+	schedule := generateRestaurantSchedule(want)
+	isRebooking := want.GetStringParam("prev_want_id", "") != ""
+	err := executeReservation(want, agentRestaurantName, schedule, func(s interface{}) (string, string) {
+		sch := s.(RestaurantSchedule)
+		verb := "booked"
+		if isRebooking {
+			verb = "rebooked at lower cost"
+		}
+		activity := fmt.Sprintf("Restaurant reservation has been %s at %s %s for %.1f hours",
+			verb, sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
+		logMsg := fmt.Sprintf("Restaurant reservation %s: %s at %s for %.1f hours",
+			verb, sch.RestaurantType, sch.ReservationTime.Format("15:04 Jan 2"), sch.DurationHours)
+		return activity, logMsg
+	})
+	return err
 }
 
 // generateRestaurantSchedule creates a restaurant reservation schedule

@@ -15,25 +15,32 @@ func init() {
 	RegisterDoAgent(agentPremiumName, executeHotelReservation)
 }
 
-// executeHotelReservation performs a premium hotel reservation
+// executeHotelReservation performs a hotel reservation, handling cancel+rebook when needed.
 func executeHotelReservation(ctx context.Context, want *Want) error {
-	schedule := generateHotelSchedule(want)
-	err := executeReservation(want, agentPremiumName, schedule, func(s interface{}) (string, string) {
-		sch := s.(HotelSchedule)
-		activity := fmt.Sprintf("Hotel reservation has been confirmed for %s from %s to %s (%s premium)",
-			sch.HotelType,
-			sch.CheckInTime.Format("15:04 Jan 2"),
-			sch.CheckOutTime.Format("15:04 Jan 2"),
-			sch.PremiumLevel)
-		logMsg := fmt.Sprintf("Premium hotel booking completed: %s from %s to %s",
-			sch.HotelType, sch.CheckInTime.Format("15:04 Jan 2"), sch.CheckOutTime.Format("15:04 Jan 2"))
-		return activity, logMsg
-	})
-	if err != nil {
-		return err
+	// Cancel the previous booking if this is a rebooking (cost-reduction) action.
+	if prevWantID := want.GetStringParam("prev_want_id", ""); prevWantID != "" {
+		cancelPreviousWant(want, prevWantID, "hotel")
 	}
 
-	return nil
+	schedule := generateHotelSchedule(want)
+	isRebooking := want.GetStringParam("prev_want_id", "") != ""
+	err := executeReservation(want, agentPremiumName, schedule, func(s interface{}) (string, string) {
+		sch := s.(HotelSchedule)
+		verb := "confirmed"
+		if isRebooking {
+			verb = "rebooked at lower cost"
+		}
+		activity := fmt.Sprintf("Hotel reservation has been %s for %s from %s to %s",
+			verb, sch.HotelType,
+			sch.CheckInTime.Format("15:04 Jan 2"),
+			sch.CheckOutTime.Format("15:04 Jan 2"))
+		logMsg := fmt.Sprintf("Hotel booking %s: %s from %s to %s",
+			verb, sch.HotelType,
+			sch.CheckInTime.Format("15:04 Jan 2"),
+			sch.CheckOutTime.Format("15:04 Jan 2"))
+		return activity, logMsg
+	})
+	return err
 }
 
 // generateHotelCost returns a realistic per-night cost based on hotel type

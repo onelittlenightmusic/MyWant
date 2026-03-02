@@ -28,6 +28,11 @@ type ItineraryAction struct {
 	// and writes it into own "current" state under this key.
 	// This allows OPA policies to reason about actual booking costs.
 	CostField string `json:"cost_field,omitempty"`
+	// CancelsAction, if set, looks up the previously completed want for that
+	// action and passes its ID as "prev_want_id" param to the new want.
+	// The new want's DoAgent is responsible for cancelling the old booking
+	// before creating a replacement (cancel + rebook pattern).
+	CancelsAction string `json:"cancels_action,omitempty"`
 }
 
 // ItineraryWant combines OPA planning with dynamic want dispatch.
@@ -126,6 +131,8 @@ func (o *ItineraryWant) Progress() {
 	// 5. Check completion of already-dispatched wants.
 	// On completion, mark as "done" (not deleted) so subsequent Progress cycles
 	// skip re-dispatch until the ThinkAgent produces a new plan.
+	// Also save the completed want's ID so reduce actions can pass it to agents.
+	completedIDs := itineraryLoadCompletedIDs(&o.Want)
 	for action, wantID := range dispatched {
 		if wantID == doneMarker {
 			continue // Already completed and marked
@@ -152,11 +159,13 @@ func (o *ItineraryWant) Progress() {
 					}
 				}
 			}
+			completedIDs[action] = wantID // Remember ID for potential future cancel
 			dispatched[action] = doneMarker // Mark as done, not deleted
-			o.StoreLog("[ITINERARY] Action '%s' completed", action)
+			o.StoreLog("[ITINERARY] Action '%s' completed (want: %s)", action, wantID)
 			break
 		}
 	}
+	itinerarySaveCompletedIDs(&o.Want, completedIDs)
 
 	// 6. Dispatch new wants for actions not yet in-flight (or already done).
 	for _, action := range actions {
@@ -171,9 +180,18 @@ func (o *ItineraryWant) Progress() {
 			o.StoreLog("[ITINERARY] WARNING: no mapping for action '%s'", action)
 			continue
 		}
-		params := cfg.Params
-		if params == nil {
-			params = make(map[string]any)
+		// Copy params so we can inject prev_want_id without mutating action_map config.
+		params := make(map[string]any, len(cfg.Params))
+		for k, v := range cfg.Params {
+			params[k] = v
+		}
+		// If this action cancels a previous one, pass the old want's ID to the agent.
+		// The DoAgent is responsible for cancelling the old booking before rebooking.
+		if cfg.CancelsAction != "" {
+			if oldWantID, ok := completedIDs[cfg.CancelsAction]; ok && oldWantID != "" {
+				params["prev_want_id"] = oldWantID
+				o.StoreLog("[ITINERARY] Action '%s' will cancel previous want '%s'", action, oldWantID)
+			}
 		}
 		wantID := fmt.Sprintf("itinerary-%s-%d", action, time.Now().UnixNano())
 		// Use the itinerary's own controller (target) as the owner of dispatched wants,
@@ -290,4 +308,33 @@ func itinerarySaveDispatched(w *Want, dispatched map[string]string) {
 		asAny[k] = v
 	}
 	w.StoreState("dispatched_actions", asAny)
+}
+
+// itineraryLoadCompletedIDs loads the action→wantID map for already-completed actions.
+// This allows reduce/cancel actions to locate the old want and pass its ID to agents.
+func itineraryLoadCompletedIDs(w *Want) map[string]string {
+	result := map[string]string{}
+	raw, ok := w.GetState("_completed_want_ids")
+	if !ok || raw == nil {
+		return result
+	}
+	switch v := raw.(type) {
+	case map[string]string:
+		return v
+	case map[string]any:
+		for k, val := range v {
+			if s, ok2 := val.(string); ok2 {
+				result[k] = s
+			}
+		}
+	}
+	return result
+}
+
+func itinerarySaveCompletedIDs(w *Want, completedIDs map[string]string) {
+	asAny := make(map[string]any, len(completedIDs))
+	for k, v := range completedIDs {
+		asAny[k] = v
+	}
+	w.StoreState("_completed_want_ids", asAny)
 }

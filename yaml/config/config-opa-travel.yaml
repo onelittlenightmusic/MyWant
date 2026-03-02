@@ -39,13 +39,15 @@ wants:
             },
             "reduce_hotel_cost": {
               "type": "hotel",
-              "params": {"hotel_type": "budget"},
+              "params": {"hotel_type": "budget", "is_rebooking": true},
+              "cancels_action": "reserve_hotel",
               "sets": {"hotel_reduced": true},
               "cost_field": "hotel_cost"
             },
             "reduce_dinner_cost": {
               "type": "restaurant",
-              "params": {"restaurant_type": "casual", "party_size": 2},
+              "params": {"restaurant_type": "casual", "party_size": 2, "is_rebooking": true},
+              "cancels_action": "reserve_dinner",
               "sets": {"dinner_reduced": true},
               "cost_field": "dinner_cost"
             }
