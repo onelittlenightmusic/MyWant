@@ -13,7 +13,7 @@ wants:
             require_hotel: true
             require_dinner: true
             require_transport: false
-          budget_target: 1000
+          budget_target: 400
         current:
           hotel_reserved: false
           dinner_reserved: false
@@ -60,5 +60,5 @@ wants:
         role: tracker
     spec:
       params:
-        budget: 1000
+        budget: 400
         currency: USD
