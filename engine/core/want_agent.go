@@ -169,23 +169,32 @@ func (n *Want) executeAgent(agent Agent) error {
 	agentName := agent.GetName()
 	agentType := agent.GetType()
 
-	// PrepareAgent phase
-	n.SetStatus(WantStatusPrepareAgent)
-
-	if err := n.bootAgent(context.Background(), agent); err != nil {
-		n.SetStatus(WantStatusReaching)
-		return fmt.Errorf("failed to boot agent %s: %w", agentName, err)
-	}
-
-	n.SetStatus(WantStatusReaching)
-
 	// A. Persistent Agents (Think, Monitor, Poll) - Integrated background management
 	if agentType != DoAgentType {
+		// Skip boot + start entirely if already running (idempotent).
+		// This prevents repeated BOOT-AGENT/AGENT-START logs on every tick.
+		bgID := fmt.Sprintf("%s-%s-%s", strings.ToLower(string(agentType)), agentName, n.Metadata.ID)
+		if _, exists := n.GetBackgroundAgent(bgID); exists {
+			return nil
+		}
+
+		n.SetStatus(WantStatusPrepareAgent)
+		if err := n.bootAgent(context.Background(), agent); err != nil {
+			n.SetStatus(WantStatusReaching)
+			return fmt.Errorf("failed to boot agent %s: %w", agentName, err)
+		}
+		n.SetStatus(WantStatusReaching)
 		n.StoreLog("[AGENT-START] Starting persistent %s agent: %s", agentType, agentName)
 		return n.startPersistentAgent(agent)
 	}
 
 	// B. One-off Agents (Do) - Synchronous execution with result tracking
+	n.SetStatus(WantStatusPrepareAgent)
+	if err := n.bootAgent(context.Background(), agent); err != nil {
+		n.SetStatus(WantStatusReaching)
+		return fmt.Errorf("failed to boot agent %s: %w", agentName, err)
+	}
+	n.SetStatus(WantStatusReaching)
 	n.StoreLog("[AGENT-START] Running one-off %s agent: %s", agentType, agentName)
 	return n.runDoAgent(agent)
 }
