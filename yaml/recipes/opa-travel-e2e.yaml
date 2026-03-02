@@ -1,0 +1,86 @@
+recipe:
+  metadata:
+    name: "OPA Travel E2E"
+    description: |
+      End-to-end travel planning driven by OPA LLM policy evaluation.
+
+      The Itinerary want runs the OPA LLM ThinkAgent to evaluate goal vs current
+      state and dynamically spawns hotel/restaurant wants based on the action list.
+      When each travel want completes, current state is updated and the plan is
+      re-evaluated. The recipe completes when no more actions are needed.
+    custom_type: "opa travel e2e"
+    category: "travel"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "opa-travel"
+    goal:
+      id: "goal-001"
+      trip:
+        destination: "Tokyo"
+        require_hotel: true
+        require_dinner: true
+        require_transport: false
+    current:
+      hotel_reserved: false
+      dinner_reserved: false
+      transport_booked: false
+    action_map: >-
+      {
+        "reserve_hotel": {
+          "type": "hotel",
+          "params": {"hotel_type": "standard"},
+          "sets": {"hotel_reserved": true}
+        },
+        "reserve_dinner": {
+          "type": "restaurant",
+          "params": {"restaurant_type": "fine dining"},
+          "sets": {"dinner_reserved": true}
+        }
+      }
+
+  wants:
+    - metadata:
+        type: itinerary
+        labels:
+          role: planner
+      spec:
+        params:
+          goal: goal
+          current: current
+          action_map: action_map
+
+  example:
+    wants:
+      - metadata:
+          name: "opa-travel-demo"
+          type: "opa travel e2e"
+          labels:
+            recipe: "OPA Travel E2E"
+        spec:
+          params:
+            goal:
+              id: "goal-001"
+              trip:
+                destination: "Tokyo"
+                require_hotel: true
+                require_dinner: true
+                require_transport: false
+            current:
+              hotel_reserved: false
+              dinner_reserved: false
+              transport_booked: false
+            use_llm: false
+            action_map: >-
+              {
+                "reserve_hotel": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "standard"},
+                  "sets": {"hotel_reserved": true}
+                },
+                "reserve_dinner": {
+                  "type": "restaurant",
+                  "params": {"restaurant_type": "fine dining"},
+                  "sets": {"dinner_reserved": true}
+                }
+              }

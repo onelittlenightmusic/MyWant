@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-
 func init() {
 	RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
 	RegisterWantImplementation[HotelWant, HotelWantLocals]("hotel")
@@ -207,7 +206,6 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		"reservation_end_time":       newEvent.End.Format("15:04"),
 		"reservation_duration_hours": restaurantLocals.Duration.Hours(),
 		"reservation_name":           newEvent.Name,
-		"cost":                       r.GetFloatParam("cost", 0.0),
 		"schedule_date":              baseDate.Format("2006-01-02"),
 		"achieving_percentage":       100,
 	})
@@ -435,7 +433,6 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
 		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
 		"reservation_name":     newEvent.Name,
-		"cost":                 h.GetFloatParam("cost", 0.0),
 		"achieving_percentage": 100,
 	})
 	h.StoreLog("📦 Hotel reservation created: %s", newEvent.Name)
@@ -514,7 +511,6 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
 		"buffet_duration_hours": buffetLocals.Duration.Hours(),
 		"reservation_name":      newEvent.Name,
-		"cost":                  b.GetFloatParam("cost", 0.0),
 		"achieving_percentage":  100,
 	})
 	b.StoreLog("📦 Buffet reservation created: %s", newEvent.Name)

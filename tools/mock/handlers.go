@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -35,6 +37,19 @@ type CreateFlightRequest struct {
 	To            string    `json:"to"`
 	DepartureTime time.Time `json:"departure_time"`
 	ArrivalTime   time.Time `json:"arrival_time"`
+	FlightClass   string    `json:"flight_class"`
+}
+
+// flightClassCost returns a randomized cost for the given flight class
+func flightClassCost(class string) float64 {
+	switch class {
+	case "business":
+		return math.Round((1200.0+rand.Float64()*1300.0)*100) / 100
+	case "first":
+		return math.Round((3000.0+rand.Float64()*5000.0)*100) / 100
+	default: // economy
+		return math.Round((300.0+rand.Float64()*500.0)*100) / 100
+	}
 }
 
 // CreateFlight handles POST /api/flights
@@ -51,6 +66,10 @@ func (s *Server) CreateFlight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	flightClass := req.FlightClass
+	if flightClass == "" {
+		flightClass = "economy"
+	}
 	now := time.Now()
 	reservation := &FlightReservation{
 		ID:            uuid.New().String(),
@@ -59,6 +78,8 @@ func (s *Server) CreateFlight(w http.ResponseWriter, r *http.Request) {
 		To:            req.To,
 		DepartureTime: req.DepartureTime,
 		ArrivalTime:   req.ArrivalTime,
+		FlightClass:   flightClass,
+		Cost:          flightClassCost(flightClass),
 		Status:        StatusConfirmed,
 		StatusMessage: "Flight reservation confirmed",
 		CreatedAt:     now,

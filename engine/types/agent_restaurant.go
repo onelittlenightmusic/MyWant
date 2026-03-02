@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	. "mywant/engine/core"
 	"time"
@@ -46,7 +47,7 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 
 	restaurantName := generateRealisticRestaurantName(restaurantType)
 	partySize := want.GetIntParam("party_size", 2)
-	restaurantCost := want.GetFloatParam("cost", 300.0)
+	restaurantCost := generateRestaurantCost(restaurantType, partySize)
 	reservationReference := generateReservationReference()
 	formattedReservationName := fmt.Sprintf("%s - Party of %d (%s)", restaurantName, partySize, reservationReference)
 
@@ -60,6 +61,32 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 		ServiceTier:      serviceTier,
 		PremiumAmenities: []string{"wine_pairing", "chef_special", "priority_seating"},
 	}
+}
+
+// generateRestaurantCost generates a realistic per-person cost based on restaurant type and party size
+func generateRestaurantCost(restaurantType string, partySize int) float64 {
+	var perPersonMin, perPersonMax float64
+	switch restaurantType {
+	case "fine dining":
+		perPersonMin, perPersonMax = 120.0, 300.0
+	case "steakhouse":
+		perPersonMin, perPersonMax = 80.0, 200.0
+	case "seafood":
+		perPersonMin, perPersonMax = 70.0, 180.0
+	case "casual":
+		perPersonMin, perPersonMax = 25.0, 60.0
+	case "fast food":
+		perPersonMin, perPersonMax = 10.0, 25.0
+	case "buffet":
+		perPersonMin, perPersonMax = 30.0, 80.0
+	case "vegan":
+		perPersonMin, perPersonMax = 30.0, 80.0
+	default:
+		perPersonMin, perPersonMax = 50.0, 150.0
+	}
+	perPerson := perPersonMin + rand.Float64()*(perPersonMax-perPersonMin)
+	total := perPerson * float64(partySize)
+	return math.Round(total*100) / 100
 }
 
 // generateReservationReference generates a realistic reservation reference code

@@ -27,17 +27,21 @@ type FlightReservation struct {
 	To            string    `json:"to"`
 	DepartureTime time.Time `json:"departure_time"`
 	ArrivalTime   time.Time `json:"arrival_time"`
+	FlightClass   string    `json:"flight_class"`
+	Cost          float64   `json:"cost"`
 	Status        string    `json:"status"`
 	StatusMessage string    `json:"status_message"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
+
 type CreateFlightRequest struct {
 	FlightNumber  string    `json:"flight_number"`
 	From          string    `json:"from"`
 	To            string    `json:"to"`
 	DepartureTime time.Time `json:"departure_time"`
 	ArrivalTime   time.Time `json:"arrival_time"`
+	FlightClass   string    `json:"flight_class"`
 }
 
 // executeFlightAction handles both create_flight and cancel_flight actions
@@ -84,6 +88,7 @@ func createFlight(ctx context.Context, want *Want) error {
 
 	from := extractor.String("from", "New York")
 	to := extractor.String("to", "Los Angeles")
+	flightClass := extractor.String("flight_type", "economy")
 	// Generate flight timing (handles both departure_date and departure_time parameters)
 	departureDate := extractor.String("departure_date", "")
 	departureTimeStr := extractor.String("departure_time", "")
@@ -123,6 +128,7 @@ func createFlight(ctx context.Context, want *Want) error {
 		To:            to,
 		DepartureTime: departureTime,
 		ArrivalTime:   arrivalTime,
+		FlightClass:   flightClass,
 	}
 
 	// Marshal to JSON
@@ -146,8 +152,6 @@ func createFlight(ctx context.Context, want *Want) error {
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-	flightCost := want.GetFloatParam("cost", 1200.0)
-
 	want.StoreStateMultiForAgent(map[string]any{
 		"flight_id":      reservation.ID,
 		"flight_status":  "created",
@@ -162,10 +166,10 @@ func createFlight(ctx context.Context, want *Want) error {
 		"agent_result": FlightSchedule{
 			DepartureTime:   reservation.DepartureTime,
 			ArrivalTime:     reservation.ArrivalTime,
-			FlightType:      "api",
+			FlightType:      reservation.FlightClass,
 			FlightNumber:    reservation.FlightNumber,
 			ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
-			Cost:            flightCost,
+			Cost:            reservation.Cost,
 		},
 	})
 

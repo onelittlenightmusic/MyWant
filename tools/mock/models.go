@@ -23,6 +23,8 @@ type FlightReservation struct {
 	To            string       `json:"to"`
 	DepartureTime time.Time    `json:"departure_time"`
 	ArrivalTime   time.Time    `json:"arrival_time"`
+	FlightClass   string       `json:"flight_class"`
+	Cost          float64      `json:"cost"`
 	Status        FlightStatus `json:"status"`
 	StatusMessage string       `json:"status_message"`
 	CreatedAt     time.Time    `json:"created_at"`

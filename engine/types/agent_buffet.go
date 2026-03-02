@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
 	. "mywant/engine/core"
 	"time"
 )
@@ -31,6 +33,25 @@ func executeBuffetReservation(ctx context.Context, want *Want) error {
 	return nil
 }
 
+// generateBuffetCost returns a realistic cost based on buffet type
+func generateBuffetCost(buffetType string) float64 {
+	var minCost, maxCost float64
+	switch buffetType {
+	case "continental":
+		minCost, maxCost = 20.0, 45.0
+	case "full":
+		minCost, maxCost = 35.0, 70.0
+	case "asian":
+		minCost, maxCost = 30.0, 65.0
+	case "vegetarian":
+		minCost, maxCost = 25.0, 55.0
+	default: // international
+		minCost, maxCost = 40.0, 90.0
+	}
+	cost := minCost + rand.Float64()*(maxCost-minCost)
+	return math.Round(cost*100) / 100
+}
+
 // generateBuffetSchedule creates a buffet reservation schedule
 func generateBuffetSchedule(want *Want) BuffetSchedule {
 	want.StoreLog("Processing buffet reservation for %s with premium service", want.Metadata.Name)
@@ -40,7 +61,7 @@ func generateBuffetSchedule(want *Want) BuffetSchedule {
 	durationHours := GenerateRandomDuration(2.0, 4.0)
 
 	buffetType := want.GetStringParam("buffet_type", "international")
-	buffetCost := want.GetFloatParam("cost", 150.0)
+	buffetCost := generateBuffetCost(buffetType)
 	premiumLevel := want.GetStringParam("premium_level", "premium")
 	serviceTier := want.GetStringParam("service_tier", "premium")
 

@@ -3,6 +3,8 @@ package types
 import (
 	"context"
 	"fmt"
+	"math"
+	"math/rand"
 	. "mywant/engine/core"
 	"time"
 )
@@ -34,6 +36,25 @@ func executeHotelReservation(ctx context.Context, want *Want) error {
 	return nil
 }
 
+// generateHotelCost returns a realistic per-night cost based on hotel type
+func generateHotelCost(hotelType string) float64 {
+	var minCost, maxCost float64
+	switch hotelType {
+	case "luxury", "5-star":
+		minCost, maxCost = 500.0, 1500.0
+	case "boutique":
+		minCost, maxCost = 200.0, 600.0
+	case "business":
+		minCost, maxCost = 100.0, 300.0
+	case "budget":
+		minCost, maxCost = 50.0, 120.0
+	default:
+		minCost, maxCost = 150.0, 500.0
+	}
+	cost := minCost + rand.Float64()*(maxCost-minCost)
+	return math.Round(cost*100) / 100
+}
+
 // generateHotelSchedule creates a premium hotel schedule
 func generateHotelSchedule(want *Want) HotelSchedule {
 	want.StoreLog("Processing hotel reservation for %s with premium service", want.Metadata.Name)
@@ -45,7 +66,7 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 	checkOutTime := GenerateRandomTimeInRange(nextDay, CheckOutRange)
 
 	hotelType := want.GetStringParam("hotel_type", "luxury")
-	hotelCost := want.GetFloatParam("cost", 800.0)
+	hotelCost := generateHotelCost(hotelType)
 	premiumLevel := want.GetStringParam("premium_level", "platinum")
 	serviceTier := want.GetStringParam("service_tier", "premium")
 

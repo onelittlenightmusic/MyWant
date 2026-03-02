@@ -68,12 +68,6 @@ wantType:
       - moderate
       - expensive
       - luxury
-  - name: cost
-    description: Estimated or actual cost of the restaurant
-    type: float64
-    default: 0.0
-    required: false
-    example: 150.0
   state:
   - name: completed
     description: Whether reservation has been completed
