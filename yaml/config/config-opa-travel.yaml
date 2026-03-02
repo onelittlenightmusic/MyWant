@@ -13,21 +13,50 @@ wants:
             require_hotel: true
             require_dinner: true
             require_transport: false
+          budget_target: 1000
         current:
           hotel_reserved: false
           dinner_reserved: false
           transport_booked: false
+          hotel_cost: 0
+          dinner_cost: 0
         use_llm: false
+        # Path to OPA policy directory (relative to server working directory)
+        policy_dir: "yaml/policies"
         action_map: >-
           {
             "reserve_hotel": {
               "type": "hotel",
-              "params": {"hotel_type": "standard"},
-              "sets": {"hotel_reserved": true}
+              "params": {"hotel_type": "luxury"},
+              "sets": {"hotel_reserved": true},
+              "cost_field": "hotel_cost"
             },
             "reserve_dinner": {
               "type": "restaurant",
-              "params": {"restaurant_type": "fine dining"},
-              "sets": {"dinner_reserved": true}
+              "params": {"restaurant_type": "fine dining", "party_size": 2},
+              "sets": {"dinner_reserved": true},
+              "cost_field": "dinner_cost"
+            },
+            "reduce_hotel_cost": {
+              "type": "hotel",
+              "params": {"hotel_type": "budget"},
+              "sets": {"hotel_reduced": true},
+              "cost_field": "hotel_cost"
+            },
+            "reduce_dinner_cost": {
+              "type": "restaurant",
+              "params": {"restaurant_type": "casual", "party_size": 2},
+              "sets": {"dinner_reduced": true},
+              "cost_field": "dinner_cost"
             }
           }
+
+  - metadata:
+      name: opa-travel-budget
+      type: budget
+      labels:
+        role: tracker
+    spec:
+      params:
+        budget: 1000
+        currency: USD

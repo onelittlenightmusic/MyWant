@@ -2,15 +2,19 @@ recipe:
   metadata:
     name: "OPA Travel E2E"
     description: |
-      End-to-end travel planning driven by OPA LLM policy evaluation.
+      End-to-end travel planning driven by OPA policy evaluation with budget enforcement.
 
       The Itinerary want runs the OPA LLM ThinkAgent to evaluate goal vs current
       state and dynamically spawns hotel/restaurant wants based on the action list.
-      When each travel want completes, current state is updated and the plan is
-      re-evaluated. The recipe completes when no more actions are needed.
+      When each travel want completes, its cost flows back into the current state.
+      The OPA policy then checks whether the total cost exceeds the budget target.
+      If it does, the policy generates cost-reduction actions (rebook cheaper options).
+      The cycle repeats until all bookings are within the budget.
+
+      A companion Budget want tracks total costs and reports remaining budget.
     custom_type: "opa travel e2e"
     category: "travel"
-    version: "1.0.0"
+    version: "1.1.0"
 
   parameters:
     prefix: "opa-travel"
@@ -21,21 +25,39 @@ recipe:
         require_hotel: true
         require_dinner: true
         require_transport: false
+      budget_target: 1000
     current:
       hotel_reserved: false
       dinner_reserved: false
       transport_booked: false
+      hotel_cost: 0
+      dinner_cost: 0
+    policy_dir: "yaml/policies"
     action_map: >-
       {
         "reserve_hotel": {
           "type": "hotel",
-          "params": {"hotel_type": "standard"},
-          "sets": {"hotel_reserved": true}
+          "params": {"hotel_type": "luxury"},
+          "sets": {"hotel_reserved": true},
+          "cost_field": "hotel_cost"
         },
         "reserve_dinner": {
           "type": "restaurant",
-          "params": {"restaurant_type": "fine dining"},
-          "sets": {"dinner_reserved": true}
+          "params": {"restaurant_type": "fine dining", "party_size": 2},
+          "sets": {"dinner_reserved": true},
+          "cost_field": "dinner_cost"
+        },
+        "reduce_hotel_cost": {
+          "type": "hotel",
+          "params": {"hotel_type": "budget"},
+          "sets": {"hotel_reduced": true},
+          "cost_field": "hotel_cost"
+        },
+        "reduce_dinner_cost": {
+          "type": "restaurant",
+          "params": {"restaurant_type": "casual", "party_size": 2},
+          "sets": {"dinner_reduced": true},
+          "cost_field": "dinner_cost"
         }
       }
 
@@ -48,7 +70,17 @@ recipe:
         params:
           goal: goal
           current: current
+          policy_dir: policy_dir
           action_map: action_map
+
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+      spec:
+        params:
+          budget: 1000
+          currency: USD
 
   example:
     wants:
@@ -66,21 +98,39 @@ recipe:
                 require_hotel: true
                 require_dinner: true
                 require_transport: false
+              budget_target: 1000
             current:
               hotel_reserved: false
               dinner_reserved: false
               transport_booked: false
+              hotel_cost: 0
+              dinner_cost: 0
             use_llm: false
+            policy_dir: "yaml/policies"
             action_map: >-
               {
                 "reserve_hotel": {
                   "type": "hotel",
-                  "params": {"hotel_type": "standard"},
-                  "sets": {"hotel_reserved": true}
+                  "params": {"hotel_type": "luxury"},
+                  "sets": {"hotel_reserved": true},
+                  "cost_field": "hotel_cost"
                 },
                 "reserve_dinner": {
                   "type": "restaurant",
-                  "params": {"restaurant_type": "fine dining"},
-                  "sets": {"dinner_reserved": true}
+                  "params": {"restaurant_type": "fine dining", "party_size": 2},
+                  "sets": {"dinner_reserved": true},
+                  "cost_field": "dinner_cost"
+                },
+                "reduce_hotel_cost": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "budget"},
+                  "sets": {"hotel_reduced": true},
+                  "cost_field": "hotel_cost"
+                },
+                "reduce_dinner_cost": {
+                  "type": "restaurant",
+                  "params": {"restaurant_type": "casual", "party_size": 2},
+                  "sets": {"dinner_reduced": true},
+                  "cost_field": "dinner_cost"
                 }
               }

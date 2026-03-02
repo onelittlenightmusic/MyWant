@@ -24,6 +24,10 @@ type ItineraryAction struct {
 	// Sets are applied to own "current" state when the want completes,
 	// causing the OPA ThinkAgent to replan against the updated state.
 	Sets map[string]any `json:"sets,omitempty"`
+	// CostField, if set, reads the "cost" field from the completed want's state
+	// and writes it into own "current" state under this key.
+	// This allows OPA policies to reason about actual booking costs.
+	CostField string `json:"cost_field,omitempty"`
 }
 
 // ItineraryWant combines OPA planning with dynamic want dispatch.
@@ -137,6 +141,16 @@ func (o *ItineraryWant) Progress() {
 			// Apply completion state updates so the ThinkAgent can replan
 			if cfg, exists := actionMap[action]; exists {
 				o.mergeCurrent(cfg.Sets)
+				// If cost_field is configured, read the actual cost from the completed
+				// want's state and store it in own "current" so OPA can see it.
+				if cfg.CostField != "" {
+					if costRaw, ok := w.GetState("cost"); ok {
+						if cost := toFloat64(costRaw); cost > 0 {
+							o.mergeCurrent(map[string]any{cfg.CostField: cost})
+							o.StoreLog("[ITINERARY] Action '%s' cost %.2f → current.%s", action, cost, cfg.CostField)
+						}
+					}
+				}
 			}
 			dispatched[action] = doneMarker // Mark as done, not deleted
 			o.StoreLog("[ITINERARY] Action '%s' completed", action)
@@ -162,15 +176,36 @@ func (o *ItineraryWant) Progress() {
 			params = make(map[string]any)
 		}
 		wantID := fmt.Sprintf("itinerary-%s-%d", action, time.Now().UnixNano())
+		// Use the itinerary's own controller (target) as the owner of dispatched wants,
+		// so they appear as siblings under the same target in the UI.
+		// Fall back to the itinerary itself if no parent controller exists.
+		ownerRef := OwnerReference{
+			APIVersion:         "mywant/v1",
+			Kind:               "Want",
+			Name:               o.Metadata.Name,
+			ID:                 o.Metadata.ID,
+			Controller:         true,
+			BlockOwnerDeletion: true,
+		}
+		for _, ref := range o.Metadata.OwnerReferences {
+			if ref.Controller && ref.Kind == "Want" {
+				ownerRef = ref
+				break
+			}
+		}
+		ownerInstanceID := fmt.Sprintf("%s-%s", ownerRef.Name, ownerRef.ID)
 		newWant := &Want{
 			Metadata: Metadata{
 				ID:   wantID,
 				Name: fmt.Sprintf("%s-%s", action, o.Metadata.Name),
 				Type: cfg.Type,
 				Labels: map[string]string{
-					"itinerary": o.Metadata.ID,
-					"action":    action,
+					"itinerary":  o.Metadata.ID,
+					"action":     action,
+					"owner":      "child",
+					"owner-name": ownerInstanceID,
 				},
+				OwnerReferences: []OwnerReference{ownerRef},
 			},
 			Spec: WantSpec{Params: params},
 		}
