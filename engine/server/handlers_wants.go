@@ -171,6 +171,11 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
 	}
 
+	includeCancelled := false
+	if v := r.URL.Query().Get("includeCancelled"); v != "" {
+		includeCancelled = strings.ToLower(v) == "true"
+	}
+
 	// Build filters from query parameters
 	filters := mywant.WantFilters{
 		Type:         r.URL.Query().Get("type"),
@@ -239,6 +244,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
 	for _, want := range wantsByID {
 		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		if !includeCancelled && want.Status == mywant.WantStatusCancelled {
 			continue
 		}
 		// Apply filters using common filtering function
@@ -704,7 +712,6 @@ func generateWantID() string {
 	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
-
 
 // updateWantOrder handles PUT /api/v1/wants/{id}/order - updates the order key of a want for drag-and-drop reordering
 func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {

@@ -134,6 +134,7 @@ const (
 	WantStatusReaching          WantStatus = "reaching"
 	WantStatusSuspended         WantStatus = "suspended"
 	WantStatusAchieved          WantStatus = "achieved"
+	WantStatusCancelled         WantStatus = "cancelled"           // Superseded by a rebook; no longer the active booking
 	WantStatusFailed            WantStatus = "failed"
 	WantStatusTerminated        WantStatus = "terminated"
 	WantStatusDeleting          WantStatus = "deleting"

@@ -187,7 +187,7 @@ func runInteractiveCreate(cmd *cobra.Command) {
 	if sourceIdx == 0 {
 		// --- From existing Want ---
 		fmt.Println("\nFetching wants...")
-		resp, err := c.ListWants("", []string{}, []string{})
+		resp, err := c.ListWants("", []string{}, []string{}, false)
 		if err != nil {
 			fmt.Printf("Error fetching wants: %v\n", err)
 			os.Exit(1)

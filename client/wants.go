@@ -5,8 +5,9 @@ import (
 	"fmt"
 )
 
-// ListWants retrieves all wants from the server, optionally filtered by type, labels, and using selectors
-func (c *Client) ListWants(wantType string, labels []string, using []string) (*APIDumpResponse, error) {
+// ListWants retrieves all wants from the server, optionally filtered by type, labels, and using selectors.
+// Pass includeCancelled=true to also show wants that were superseded by rebook actions.
+func (c *Client) ListWants(wantType string, labels []string, using []string, includeCancelled bool) (*APIDumpResponse, error) {
 	var result APIDumpResponse
 	path := "/api/v1/wants"
 
@@ -20,6 +21,9 @@ func (c *Client) ListWants(wantType string, labels []string, using []string) (*A
 	}
 	for _, u := range using {
 		params = append(params, fmt.Sprintf("using=%s", u))
+	}
+	if includeCancelled {
+		params = append(params, "includeCancelled=true")
 	}
 
 	if len(params) > 0 {

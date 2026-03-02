@@ -24,6 +24,9 @@ func cancelPreviousWant(want *Want, prevWantID string, wantTypeName string) {
 		}
 		w.StoreState("_cancelled", true)
 		w.StoreState("cancelled", true)
+		// Update the Status to "cancelled" so it is visually distinct in the UI/CLI
+		// and can be filtered from the default wants list.
+		w.SetStatus(WantStatusCancelled)
 		// Zero out this want's cost contribution in the parent's "costs" map so
 		// BudgetThinker does not count the cancelled booking alongside the rebook.
 		w.MergeParentState(map[string]any{
