@@ -144,16 +144,11 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 							// 2. Sync cost
 							if cfg.CostField != "" {
 								if cost, ok := child.GetStateFloat64("cost", 0); ok {
-									// Get current costs map
-									costs := make(map[string]any)
-									if raw, ok := w.GetState("costs"); ok {
-										if m, ok := raw.(map[string]any); ok {
-											for k, v := range m { costs[k] = v }
-										}
-									}
-									costs[cfg.CostField] = cost
-									w.StoreState("costs", costs)
-									// Also write directly to parent state
+									// DO NOT add to "costs" map here, as ConditionThinker 
+									// already adds the individual want cost to that map.
+									// Adding it here with cfg.CostField name causes double-counting.
+									
+									// Just write directly to parent state for Itinerary to see
 									w.StoreState(cfg.CostField, cost)
 									w.StoreLog("[%s] Propagated cost %.2f to %s", DispatchThinkerName, cost, cfg.CostField)
 								}

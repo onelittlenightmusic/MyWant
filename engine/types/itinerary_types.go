@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"reflect"
 
 	. "mywant/engine/core"
@@ -46,17 +47,31 @@ func (o *ItineraryWant) IsAchieved() bool {
 
 // Progress orchestrates the planning-to-parent sync.
 func (o *ItineraryWant) Progress() {
-	// 1. Collect aggregated costs and sets from parent Target
-	// The parent's DispatchThinker flattens these into parent's state for us.
-	if rawSets, ok := o.GetParentState("sets"); ok {
-		if sets, ok := rawSets.(map[string]any); ok {
-			o.mergeCurrent(sets)
+	// 1. Collect aggregated results from parent Target
+	// The parent's DispatchThinker flattens costs and sets into parent's state.
+	// We read the fields we care about based on our action_map.
+	actionMapStr := o.GetStringParam("action_map", "{}")
+	var actionMap map[string]ActionConfig
+	json.Unmarshal([]byte(actionMapStr), &actionMap)
+
+	updates := make(map[string]any)
+	for _, cfg := range actionMap {
+		// Sync CostField if defined
+		if cfg.CostField != "" {
+			if val, ok := o.GetParentState(cfg.CostField); ok {
+				updates[cfg.CostField] = val
+			}
+		}
+		// Sync Sets flags
+		for k := range cfg.Sets {
+			if val, ok := o.GetParentState(k); ok {
+				updates[k] = val
+			}
 		}
 	}
-	if rawCosts, ok := o.GetParentState("costs"); ok {
-		if costs, ok := rawCosts.(map[string]any); ok {
-			o.mergeCurrent(costs)
-		}
+	
+	if len(updates) > 0 {
+		o.mergeCurrent(updates)
 	}
 
 	// 2. Read planned actions written by our own OPA LLM ThinkAgent

@@ -29,7 +29,7 @@ const (
 	// GlobalExecutionInterval defines the sleep interval between want progression loop cycles.
 	// This throttles how often Progress() is called per want goroutine.
 	// ThinkAgent/MonitorAgent/PollAgent have their own internal timers and are unaffected.
-	GlobalExecutionInterval = 100 * time.Millisecond
+	GlobalExecutionInterval = 20 * time.Millisecond
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
 	GlobalReconcileInterval = 100 * time.Millisecond
