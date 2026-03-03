@@ -3,6 +3,7 @@ package mywant
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -97,6 +98,18 @@ type Metadata struct {
 	IsSystemWant    bool               `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
 	OrderKey        string             `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
 	Correlation     []CorrelationEntry `json:"correlation,omitempty" yaml:"correlation,omitempty"`   // Inter-Want correlation (computed by correlationPhase, read-only at runtime)
+	Series          string             `json:"series,omitempty" yaml:"series,omitempty"`             // Stable lineage ID shared across cancel+rebook cycles; auto-assigned on creation
+	Version         int                `json:"version,omitempty" yaml:"version,omitempty"`            // 1-based counter; incremented each time a want replaces a cancelled predecessor in the same series
+}
+
+// newSeriesID generates a new random UUID-format series identifier.
+// Used to stamp the Metadata.Series field on every freshly created want.
+func newSeriesID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant bits
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
 // WantSpec contains the desired state configuration for a want
@@ -318,6 +331,18 @@ type Want struct {
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
 }
 
+// SetStatus sets the status of this want.
+//
+// STATE OWNERSHIP RULE: A want must only call SetStatus on itself.
+// It is illegal for an Agent — or any code running on behalf of Want A — to call
+// SetStatus on a different Want B.  Each want is the sole owner of its own status
+// field.  Violating this rule causes data races and breaks the execution model
+// because every want runs in its own goroutine.
+//
+// To trigger a status change in another want, use an indirect signal:
+//   - Write a flag to the target want's state (e.g. StoreState(_cancel_requested, true))
+//     and call cb.RestartWant(targetID) so the target's own goroutine picks it up.
+//   - Never reach into cb.GetWants() and call w.SetStatus() on a foreign want.
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
@@ -709,7 +734,7 @@ func (n *Want) StartProgressionLoop(
 
 			// 3.2. Check if want is in error or terminal state
 			status := n.GetStatus()
-			if status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError {
+			if status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError || status == WantStatusCancelled {
 				// Terminal error states - stop background agents and exit goroutine
 				if err := n.StopAllBackgroundAgents(); err != nil {
 					n.StoreLog("ERROR: Failed to stop background agents on terminal state: %v", err)
@@ -810,6 +835,13 @@ func (n *Want) StartProgressionLoop(
 				// Module error - unrecoverable, exit goroutine
 				if err := n.StopAllBackgroundAgents(); err != nil {
 					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
+				}
+				return
+			}
+			if currentStatus == WantStatusCancelled {
+				// Self-cancelled by Progress() — stop agents and exit goroutine
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents on cancel: %v", err)
 				}
 				return
 			}
@@ -947,6 +979,18 @@ func (n *Want) IsSuspended() bool {
 func (n *Want) SetSuspended(suspended bool) {
 	n.suspended.Store(suspended)
 }
+// StoreState writes a key-value pair directly into this want's State and stages it
+// for history recording in the next EndProgressCycle() call.
+//
+// STATE OWNERSHIP RULE: Only call StoreState on the want that owns the state.
+//   - In Progress() / Initialize(): call on receiver (b.StoreState / o.StoreState).
+//   - In a DoAgent / MonitorAgent Exec: use want.StoreStateForAgent() instead, which
+//     goes through the agent-side staging buffer and is committed atomically.
+//   - NEVER call want_A.StoreState(...) from code that runs on behalf of want_B.
+//     Cross-want state writes bypass locking assumptions and can corrupt state history.
+//
+// For cross-want coordination use MergeParentState() (ThinkAgent only) or signal
+// the target want via a flag + RestartWant().
 func (n *Want) StoreState(key string, value any) {
 	// CRITICAL: Always use mutex to protect both State and pendingStateChanges Agent goroutines can call StoreState concurrently, so we must synchronize access
 	n.stateMutex.Lock()
@@ -1112,7 +1156,12 @@ func (n *Want) MergeParentState(updates map[string]any) {
 	parent.MergeState(updates)
 }
 
-// "description_received": true, "description_text": "some text", "description_provided": true, })
+// StoreStateMulti is the batch variant of StoreState: it writes all key-value pairs
+// in updates into this want's State in a single mutex-protected pass and stages
+// them all for history recording.
+//
+// STATE OWNERSHIP RULE: Same as StoreState — only call on the receiver want.
+// From an Agent Exec function use StoreStateMultiForAgent() instead.
 func (n *Want) StoreStateMulti(updates map[string]any) {
 	// CRITICAL: Use mutex to protect both State and pendingStateChanges
 	n.stateMutex.Lock()

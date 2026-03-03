@@ -38,6 +38,49 @@ IsAchieved() bool
 EndProgressCycle()
 ```
 
+## 状態所有権ルール（CRITICAL）
+
+> **各WantはそのStateとStatusの唯一の所有者です。**
+> Want Aのために動くAgent（またはあらゆるコード）が、別のWant BのStateやStatusを直接変更することは違反です。
+
+### なぜこのルールがあるか
+
+すべてのWantは独自のgoroutineで実行されます。外部goroutineから別WantのStateに書き込むと、ロック機構が機能せずデータ競合・ステータス不整合・履歴破損が発生します。
+
+### 具体的なルール
+
+| コンテキスト | 許可 | 禁止 |
+|:------------|:-----|:-----|
+| `Progress()` / `Initialize()` | `b.StoreState(...)`, `b.SetStatus(...)` をレシーバに対して呼ぶ | `otherWant.StoreState(...)`, `otherWant.SetStatus(...)` |
+| Agent `Exec(ctx, want)` | `want.StoreStateForAgent(...)` を渡された`want`に対して呼ぶ | `cb.GetWants()`で別のwantを取得してそのstateに書く |
+| ThinkAgent `ThinkFunc` | `want.StoreState(...)`（自分自身）と `want.MergeParentState(...)` | 兄弟WantやChildWantのstateに直接書く |
+
+### 他Wantのキャンセルが必要な場合の正しいパターン
+
+WantのStatusを外から変えたい場合は**間接シグナル**を使います：
+
+```go
+// ✅ 正しい: フラグを書いてRestartWantで相手goroutineに処理させる
+for _, w := range cb.GetWants() {
+    if w.Metadata.ID == targetID {
+        w.StoreState("_cancel_requested", true) // フラグ書き込みのみ
+        break
+    }
+}
+cb.RestartWant(targetID) // 相手のgoroutineを起こす → 相手自身がSetStatus(Cancelled)を呼ぶ
+```
+
+```go
+// ❌ 禁止: 外部goroutineから直接Statusを変更する
+for _, w := range cb.GetWants() {
+    if w.Metadata.ID == targetID {
+        w.SetStatus(WantStatusCancelled) // データ競合・所有権違反
+    }
+}
+```
+
+---
+
 ## 状態管理API
 
 Want内の状態は以下のメソッドで管理します。**これらのメソッドの選択は重要です。**
@@ -281,6 +324,9 @@ coordinator.Provide(someData)
 - [ ] OnEvent ハンドラでは確定値のみを設定（또는 SetStatus() に任せる）
 - [ ] ロギングを適切に追加した（StoreLog()）
 - [ ] exec cycle 外での状態更新を避けている
+- [ ] **【所有権】自Wantのみ StoreState()/SetStatus() を呼んでいる（他Wantのstateを直接変更していない）**
+- [ ] **【所有権】Agent Exec内では want.StoreStateForAgent() を使っている（渡された want のみに書く）**
+- [ ] **【所有権】他Wantへのキャンセル指示は _cancel_requested フラグ + RestartWant() 経由にしている**
 
 ## 参考資料
 

@@ -29,9 +29,9 @@ type ItineraryAction struct {
 	// This allows OPA policies to reason about actual booking costs.
 	CostField string `json:"cost_field,omitempty"`
 	// CancelsAction, if set, looks up the previously completed want for that
-	// action and passes its ID as "prev_want_id" param to the new want.
-	// The new want's DoAgent is responsible for cancelling the old booking
-	// before creating a replacement (cancel + rebook pattern).
+	// action and signals it to self-cancel before the new want is dispatched.
+	// The itinerary waits until the old want's status is WantStatusCancelled,
+	// then dispatches the new (reduce) want.
 	CancelsAction string `json:"cancels_action,omitempty"`
 }
 
@@ -180,17 +180,68 @@ func (o *ItineraryWant) Progress() {
 			o.StoreLog("[ITINERARY] WARNING: no mapping for action '%s'", action)
 			continue
 		}
-		// Copy params so we can inject prev_want_id without mutating action_map config.
+		// Copy params without mutating action_map config.
 		params := make(map[string]any, len(cfg.Params))
 		for k, v := range cfg.Params {
 			params[k] = v
 		}
-		// If this action cancels a previous one, pass the old want's ID to the agent.
-		// The DoAgent is responsible for cancelling the old booking before rebooking.
+		// inheritedSeries/inheritedVersion are set when this action replaces a cancelled want.
+		// Non-replacement wants leave them zero, and addWant() will assign fresh values.
+		var inheritedSeries string
+		var inheritedVersion int
+		// If this action cancels a previous one, ensure the old want self-cancels first.
 		if cfg.CancelsAction != "" {
 			if oldWantID, ok := completedIDs[cfg.CancelsAction]; ok && oldWantID != "" {
-				params["prev_want_id"] = oldWantID
-				o.StoreLog("[ITINERARY] Action '%s' will cancel previous want '%s'", action, oldWantID)
+				cancelKey := "_cancel_pending_" + action
+				cancelPendingID, _ := o.GetStateString(cancelKey, "")
+
+				if cancelPendingID == "" {
+					// First time: write _cancel_requested to old want's state and restart it.
+					for _, w := range cb.GetWants() {
+						if w.Metadata.ID == oldWantID {
+							w.StoreState("_cancel_requested", true)
+							break
+						}
+					}
+					if err := cb.RestartWant(oldWantID); err != nil {
+						o.StoreLog("[ITINERARY] ERROR triggering cancel for '%s': %v", oldWantID, err)
+					} else {
+						o.StoreState(cancelKey, oldWantID)
+						o.StoreLog("[ITINERARY] Requested self-cancel for action '%s' (want: %s)", action, oldWantID)
+					}
+					itinerarySaveDispatched(&o.Want, dispatched)
+					itinerarySaveCompletedIDs(&o.Want, completedIDs)
+					continue // Skip dispatch this tick; check cancel status next tick
+				}
+
+				// Cancel is in progress: check if old want has self-cancelled.
+				oldCancelled := false
+				for _, w := range cb.GetWants() {
+					if w.Metadata.ID == cancelPendingID {
+						if w.GetStatus() == WantStatusCancelled {
+							oldCancelled = true
+						}
+						break
+					}
+				}
+				if !oldCancelled {
+					o.StoreLog("[ITINERARY] Waiting for want '%s' to self-cancel (action: %s)...", cancelPendingID, action)
+					itinerarySaveDispatched(&o.Want, dispatched)
+					itinerarySaveCompletedIDs(&o.Want, completedIDs)
+					continue // Still waiting; skip dispatch
+				}
+
+				// Old want has self-cancelled — clear the pending marker and fall through to dispatch.
+				o.StoreState(cancelKey, "")
+				o.StoreLog("[ITINERARY] Old want '%s' cancelled; dispatching new want for action '%s'", cancelPendingID, action)
+				// Inherit series and bump version so the new want is visibly linked to its predecessor.
+				for _, w := range cb.GetWants() {
+					if w.Metadata.ID == cancelPendingID {
+						inheritedSeries = w.Metadata.Series
+						inheritedVersion = w.Metadata.Version
+						break
+					}
+				}
 			}
 		}
 		wantID := fmt.Sprintf("itinerary-%s-%d", action, time.Now().UnixNano())
@@ -224,6 +275,10 @@ func (o *ItineraryWant) Progress() {
 					"owner-name": ownerInstanceID,
 				},
 				OwnerReferences: []OwnerReference{ownerRef},
+				// Replacement wants inherit Series and get Version+1; fresh wants get zero
+				// values here and addWant() assigns a new Series with Version=1.
+				Series:  inheritedSeries,
+				Version: inheritedVersion + 1,
 			},
 			Spec: WantSpec{Params: params},
 		}

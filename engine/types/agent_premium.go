@@ -16,7 +16,7 @@ func init() {
 }
 
 // executeHotelReservation performs a hotel reservation.
-// Cancel + rebook handling (prev_want_id) is delegated to executeReservation.
+
 func executeHotelReservation(ctx context.Context, want *Want) error {
 	schedule := generateHotelSchedule(want)
 	return executeReservation(want, agentPremiumName, schedule, func(s interface{}, isRebooking bool) (string, string) {

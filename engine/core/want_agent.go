@@ -725,8 +725,18 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	return false // Validation failed, but write still allowed
 }
 
-// StoreStateForAgent stages a state change from a background agent.
-// Uses the shared agentStateMutex / agentStateChanges as StageStateChange.
+// StoreStateForAgent stages a state change from a background (DoAgent / MonitorAgent) goroutine.
+// The change is buffered in agentStateChanges and committed atomically into State at the
+// end of the next Progress cycle via CommitPendingAgentState().
+//
+// STATE OWNERSHIP RULE: Always call StoreStateForAgent on the want passed into the
+// Agent's Exec(ctx, want) function — i.e. the want that owns the agent.
+// It is illegal to obtain a foreign want from cb.GetWants() and call
+// StoreStateForAgent on it.  Each want is the sole owner of its own State.
+//
+// For cross-want coordination, write a signal flag to the target want's state via
+// the target want's own goroutine (Progress / Initialize), or use MergeParentState()
+// from a ThinkAgent registered on that want.
 func (w *Want) StoreStateForAgent(key string, value any) {
 	w.validateAgentStateKey(key)
 
@@ -739,7 +749,11 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 	w.agentStateChanges[key] = value
 }
 
-// StoreStateMultiForAgent stages multiple state changes from a background agent.
+// StoreStateMultiForAgent is the batch variant of StoreStateForAgent.
+// All entries in updates are staged in a single mutex-protected pass.
+//
+// STATE OWNERSHIP RULE: Same as StoreStateForAgent — only call on the want that
+// owns the agent (the want argument of Exec).
 func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
 	for key := range updates {
 		w.validateAgentStateKey(key)

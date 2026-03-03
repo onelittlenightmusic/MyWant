@@ -81,6 +81,9 @@ demo-restart.sh
 !mcp/playwright-app/tsconfig.json
 demo_*.yaml
 
+# Mock server binaries
+tools/mock/mock-flight-server
+
 # Demo binaries
 engine/cmd/demos/*/demo_*
 mywant-server

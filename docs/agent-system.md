@@ -477,6 +477,68 @@ Hotel reservation monitor checking status for want: luxury-hotel-booking
 - Implement graceful degradation for agent failures
 - Log detailed information for debugging
 
+### 5. State Ownership Rule (CRITICAL)
+
+> **Each want is the sole owner of its own State and Status.**
+> No Agent — and no code running on behalf of Want A — may read into another
+> Want B and directly mutate B's state or status.
+
+#### Why this rule exists
+
+Every want runs in its own goroutine. Writing to a foreign want's `State` or calling a foreign want's `SetStatus()` from outside that goroutine bypasses all locking assumptions and causes data races, broken status transitions, and corrupted history.
+
+#### The rule, concretely
+
+| Context | Allowed | Forbidden |
+|:--------|:--------|:----------|
+| `Progress()` / `Initialize()` | `b.StoreState(...)`, `b.SetStatus(...)` on receiver | `otherWant.StoreState(...)`, `otherWant.SetStatus(...)` |
+| Agent `Exec(ctx, want)` | `want.StoreStateForAgent(...)` on the passed-in `want` | fetching a different want from `cb.GetWants()` and writing its state |
+| ThinkAgent `ThinkFunc` | `want.StoreState(...)` on own want, `want.MergeParentState(...)` | writing state on any sibling or child want directly |
+
+#### Correct pattern for cross-want coordination (cancel + rebook)
+
+When one want needs to trigger a status change in another, use an **indirect signal**:
+
+```
+Itinerary (want A)                     reserve_hotel (want B)
+      │                                       │
+      │  w.StoreState("_cancel_requested",    │
+      │               true)                   │
+      │  cb.RestartWant(wantB.ID)  ──────────►│  goroutine restarts
+      │                                       │
+      │                                       │  Initialize(): detects _cancel_requested
+      │                                       │  Progress():   calls b.SetStatus(WantStatusCancelled)
+      │                                       │               ← owns its own status ✅
+      │◄── status == WantStatusCancelled ─────┘
+      │
+      │  (now safe to dispatch replacement want)
+```
+
+**Never do this:**
+
+```go
+// ❌ ILLEGAL — writing a foreign want's state from outside its goroutine
+for _, w := range cb.GetWants() {
+    if w.Metadata.ID == targetID {
+        w.SetStatus(WantStatusCancelled)   // race condition, ownership violation
+        w.StoreState("cancelled", true)    // same violation
+    }
+}
+```
+
+**Always do this instead:**
+
+```go
+// ✅ Signal the target; let it cancel itself
+for _, w := range cb.GetWants() {
+    if w.Metadata.ID == targetID {
+        w.StoreState("_cancel_requested", true)  // only a flag write — safe
+        break
+    }
+}
+cb.RestartWant(targetID)  // wake the target's goroutine to process the flag
+```
+
 ## Troubleshooting
 
 ### Common Issues

@@ -1210,6 +1210,16 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		}
 	}
 
+	// Auto-assign Series and Version if not already set.
+	// Series is a stable lineage UUID; Version starts at 1 and is incremented by the
+	// caller (e.g. itinerary dispatch) when creating a replacement for a cancelled want.
+	if wantPtr.Metadata.Series == "" {
+		wantPtr.Metadata.Series = newSeriesID()
+	}
+	if wantPtr.Metadata.Version == 0 {
+		wantPtr.Metadata.Version = 1
+	}
+
 	runtimeWant := &runtimeWant{
 		function: wantFunction,
 		want:     wantPtr,

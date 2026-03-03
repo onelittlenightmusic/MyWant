@@ -78,6 +78,12 @@ type BaseTravelWant struct {
 // ConditionThinker is started automatically by the framework based on thinkCapabilities in YAML.
 // If no ConditionThinker was started (e.g. no agent service available), approve immediately.
 func (b *BaseTravelWant) Initialize() {
+	// If self-cancel was requested by the itinerary, reset completed so IsAchieved returns
+	// false, then let Progress() handle the actual cancellation.
+	if cancelReq, _ := b.GetStateBool("_cancel_requested", false); cancelReq {
+		b.StoreState("completed", false)
+		return
+	}
 	thinkerID := conditionThinkerAgentName + "-" + b.Want.Metadata.ID
 	if _, running := b.Want.GetBackgroundAgent(thinkerID); !running {
 		b.StoreState("good_to_reserve", true)
@@ -92,6 +98,19 @@ func (b *BaseTravelWant) IsAchieved() bool {
 
 // Progress implements Progressable for all travel wants
 func (b *BaseTravelWant) Progress() {
+	// Self-cancel: itinerary requested cancel+rebook; we cancel ourselves.
+	if cancelReq, _ := b.GetStateBool("_cancel_requested", false); cancelReq {
+		// Zero out our cost contribution in parent's "costs" map.
+		b.Want.MergeParentState(map[string]any{
+			"costs": map[string]any{b.Want.Metadata.Name: 0.0},
+		})
+		b.StoreState("_cancel_requested", false)
+		b.StoreState("cancelled", true)
+		b.StoreLog("[CANCEL] Self-cancelling as requested by itinerary")
+		b.Want.SetStatus(WantStatusCancelled)
+		return
+	}
+
 	// Wait for ConditionThinker to confirm budget allocation before reserving
 	goodToReserve, _ := b.GetStateBool("good_to_reserve", false)
 	if !goodToReserve {
