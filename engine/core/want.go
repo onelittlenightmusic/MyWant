@@ -1125,6 +1125,16 @@ func (n *Want) getParentWant() *Want {
 
 func (n *Want) GetParentWant() *Want { return n.getParentWant() }
 
+// isOwnerOf returns true if this want is a controller owner of the target want.
+func (n *Want) isOwnerOf(target *Want) bool {
+	for _, ref := range target.Metadata.OwnerReferences {
+		if ref.Controller && ref.ID == n.Metadata.ID {
+			return true
+		}
+	}
+	return false
+}
+
 // AddChildWant adds a new child want to the system, automatically setting
 // this want as the owner (parent).
 //

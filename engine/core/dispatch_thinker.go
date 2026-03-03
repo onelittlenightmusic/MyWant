@@ -2,98 +2,259 @@ package mywant
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 )
 
 // DispatchThinkerName is the identifier for the dispatching think agent.
 const DispatchThinkerName = "dispatch-thinker"
 
-// DispatchRequest represents a request to create a new child want.
-// It is stored in the want's state under the "_dispatch_queue" key.
-type DispatchRequest struct {
-	Action string         `json:"action"`
-	Type   string         `json:"type"`
-	Name   string         `json:"name"`
-	Params map[string]any `json:"params"`
-	Series string         `json:"series,omitempty"`
-	Version int           `json:"version,omitempty"`
-	RequesterID string    `json:"requester_id,omitempty"`
+// ActionConfig defines how a logical action maps to a Want.
+type ActionConfig struct {
+	Type           string         `json:"type"`
+	Params         map[string]any `json:"params"`
+	Sets           map[string]any `json:"sets"`
+	CostField      string         `json:"cost_field"`
+	CancelsAction  string         `json:"cancels_action,omitempty"`
 }
 
-// NewDispatchThinker creates a ThinkingAgent that monitors the want's state
-// for "_dispatch_queue" and dispatches new child wants accordingly.
+// DispatchRequest represents a low-level request to create a new child want.
+// (Keeping this for internal use by DispatchThinker if needed, or for backward compatibility)
+type DispatchRequest struct {
+	Action      string         `json:"action"`
+	Type        string         `json:"type"`
+	Name        string         `json:"name"`
+	Params      map[string]any `json:"params"`
+	Series      string         `json:"series,omitempty"`
+	Version     int           `json:"version,omitempty"`
+	RequesterID string         `json:"requester_id,omitempty"`
+}
+
+// NewDispatchThinker creates a ThinkingAgent that monitors the want's "actions" state
+// and dispatches/manages child wants based on the "action_map".
 func NewDispatchThinker(id string) *ThinkingAgent {
 	return NewThinkingAgent(id, 1*time.Second, DispatchThinkerName, func(ctx context.Context, w *Want) error {
-		// 1. Check for pending dispatch requests in state
-		var queue []DispatchRequest
-		queueRaw, exists := w.GetState("_dispatch_queue")
-		if !exists || queueRaw == nil {
-			return nil
-		}
-
-		// Convert from interface{} to []DispatchRequest
-		// In a real system, use json.Marshal/Unmarshal or a type-safe map conversion
-		switch v := queueRaw.(type) {
-		case []DispatchRequest:
-			queue = v
-		case []any:
-			for _, item := range v {
-				if m, ok := item.(map[string]any); ok {
-					req := DispatchRequest{
-						Action: m["action"].(string),
-						Type:   m["type"].(string),
-						Name:   m["name"].(string),
-						Params: m["params"].(map[string]any),
+		// 1. Get desired actions from state (set by Itinerary or other planners)
+		var desiredActions []string
+		if raw, ok := w.GetState("actions"); ok {
+			if slice, ok := raw.([]string); ok {
+				desiredActions = slice
+			} else if slice, ok := raw.([]any); ok {
+				for _, item := range slice {
+					if s, ok := item.(string); ok {
+						desiredActions = append(desiredActions, s)
 					}
-					if s, ok := m["series"].(string); ok { req.Series = s }
-					if ver, ok := m["version"].(float64); ok { req.Version = int(ver) }
-					if rID, ok := m["requester_id"].(string); ok { req.RequesterID = rID }
-					queue = append(queue, req)
 				}
 			}
-		default:
+		}
+
+		if len(desiredActions) == 0 {
 			return nil
 		}
 
-		if len(queue) == 0 {
+		// 2. Get action_map from params
+		actionMap := make(map[string]ActionConfig)
+		if rawMap, ok := w.Spec.Params["action_map"]; ok {
+			// Handle both map[string]any and JSON string
+			switch v := rawMap.(type) {
+			case string:
+				json.Unmarshal([]byte(v), &actionMap)
+			case map[string]any:
+				bytes, _ := json.Marshal(v)
+				json.Unmarshal(bytes, &actionMap)
+			}
+		}
+
+		if len(actionMap) == 0 {
 			return nil
 		}
 
-		// 2. Process each request
-		for _, req := range queue {
-			w.StoreLog("[%s] Dispatching new child want for action '%s' (type: %s)", DispatchThinkerName, req.Action, req.Type)
+		// 3. Load tracking state
+		dispatched := make(map[string]string)
+		if raw, ok := w.GetState("_dispatched_actions"); ok {
+			if m, ok := raw.(map[string]string); ok {
+				dispatched = m
+			} else if m, ok := raw.(map[string]any); ok {
+				for k, v := range m {
+					if s, ok := v.(string); ok { dispatched[k] = s }
+				}
+			}
+		}
+		
+		completedIDs := make(map[string]string)
+		if raw, ok := w.GetState("_completed_action_ids"); ok {
+			if m, ok := raw.(map[string]string); ok {
+				completedIDs = m
+			} else if m, ok := raw.(map[string]any); ok {
+				for k, v := range m {
+					if s, ok := v.(string); ok { completedIDs[k] = s }
+				}
+			}
+		}
 
-			childID := GenerateUUID()
-			child := &Want{
-				Metadata: Metadata{
-					ID:   childID,
-					Name: req.Name,
-					Type: req.Type,
-					Labels: map[string]string{
-						"action":     req.Action,
-						"owner-name": w.Metadata.Name,
-					},
-					Series:  req.Series,
-					Version: req.Version,
-				},
-				Spec: WantSpec{
-					Params: req.Params,
-				},
+		const doneMarker = "DONE"
+		cb := GetGlobalChainBuilder()
+
+		// 4. Resolve IDs and check completion
+		for action, wantID := range dispatched {
+			if wantID == doneMarker { continue }
+
+			// Resolve pending IDs if any
+			if strings.HasPrefix(wantID, "pending-") {
+				for _, child := range cb.GetWants() {
+					if child.Metadata.Labels["action"] == action && w.isOwnerOf(child) {
+						wantID = child.Metadata.ID
+						dispatched[action] = wantID
+						w.StoreLog("[%s] Resolved pending action '%s' to want '%s'", DispatchThinkerName, action, wantID)
+						break
+					}
+				}
 			}
 
-			// If the requester provided their ID, add it as a label for easier resolution
-			if req.RequesterID != "" {
-				child.Metadata.Labels["itinerary"] = req.RequesterID
+			// Check completion
+			for _, child := range cb.GetWants() {
+				if child.Metadata.ID == wantID {
+					if child.Status == WantStatusAchieved {
+						completedIDs[action] = wantID
+						dispatched[action] = doneMarker
+						w.StoreLog("[%s] Action '%s' completed", DispatchThinkerName, action)
+
+						// APPLY FEEDBACK: Sync results back to parent state
+						if cfg, ok := actionMap[action]; ok {
+							// 1. Sync sets (flags like hotel_reserved)
+							if len(cfg.Sets) > 0 {
+								// Get current sets from parent
+								sets := make(map[string]any)
+								if raw, ok := w.GetState("sets"); ok {
+									if m, ok := raw.(map[string]any); ok {
+										for k, v := range m { sets[k] = v }
+									}
+								}
+								// Apply updates
+								for k, v := range cfg.Sets {
+									sets[k] = v
+									// Also write directly to parent state for convenience
+									w.StoreState(k, v) 
+								}
+								w.StoreState("sets", sets)
+							}
+
+							// 2. Sync cost
+							if cfg.CostField != "" {
+								if cost, ok := child.GetStateFloat64("cost", 0); ok {
+									// Get current costs map
+									costs := make(map[string]any)
+									if raw, ok := w.GetState("costs"); ok {
+										if m, ok := raw.(map[string]any); ok {
+											for k, v := range m { costs[k] = v }
+										}
+									}
+									costs[cfg.CostField] = cost
+									w.StoreState("costs", costs)
+									// Also write directly to parent state
+									w.StoreState(cfg.CostField, cost)
+									w.StoreLog("[%s] Propagated cost %.2f to %s", DispatchThinkerName, cost, cfg.CostField)
+								}
+							}
+						}
+					} else if child.Status == WantStatusCancelled || child.Status == WantStatusFailed {
+						// If failed or cancelled without being requested, allow re-dispatch
+						delete(dispatched, action)
+					}
+					break
+				}
+			}
+		}
+
+		// 5. Process desired actions
+		changed := false
+		for _, action := range desiredActions {
+			if v, already := dispatched[action]; already && v != "" {
+				continue // In-flight or Done
+			}
+
+			cfg, exists := actionMap[action]
+			if !exists {
+				w.StoreLog("[%s] WARNING: No mapping for action '%s'", DispatchThinkerName, action)
+				continue
+			}
+
+			// Handle Replacement Orchestration
+			var inheritedSeries string
+			var inheritedVersion int
+			if cfg.CancelsAction != "" {
+				if oldWantID, ok := completedIDs[cfg.CancelsAction]; ok && oldWantID != "" {
+					cancelKey := "_cancel_pending_" + action
+					cancelPendingID, _ := w.GetStateString(cancelKey, "")
+
+					if cancelPendingID == "" {
+						// Send cancel signal
+						for _, target := range cb.GetWants() {
+							if target.Metadata.ID == oldWantID {
+								target.StoreState("_cancel_requested", true)
+								cb.RestartWant(oldWantID)
+								w.StoreState(cancelKey, oldWantID)
+								w.StoreLog("[%s] Requested cancel for old action '%s' (want: %s)", DispatchThinkerName, cfg.CancelsAction, oldWantID)
+								break
+							}
+						}
+						continue 
+					}
+
+					// Wait for cancel to complete
+					oldCancelled := false
+					for _, target := range cb.GetWants() {
+						if target.Metadata.ID == cancelPendingID {
+							if target.Status == WantStatusCancelled {
+								oldCancelled = true
+								inheritedSeries = target.Metadata.Series
+								inheritedVersion = target.Metadata.Version
+							}
+							break
+						}
+					}
+					if !oldCancelled {
+						continue // Still waiting
+					}
+					w.StoreState(cancelKey, "") // Clear marker
+				}
+			}
+
+			// Dispatch New Want
+			w.StoreLog("[%s] Realizing action '%s' (type: %s)", DispatchThinkerName, action, cfg.Type)
+			
+			child := &Want{
+				Metadata: Metadata{
+					ID:      GenerateUUID(),
+					Name:    fmt.Sprintf("%s-%s", action, w.Metadata.Name),
+					Type:    cfg.Type,
+					Labels: map[string]string{
+						"action": action,
+					},
+					Series:  inheritedSeries,
+					Version: inheritedVersion + 1,
+				},
+				Spec: WantSpec{
+					Params: cfg.Params,
+				},
 			}
 
 			if err := w.AddChildWant(child); err != nil {
-				w.StoreLog("[%s] ERROR dispatching child: %v", DispatchThinkerName, err)
+				w.StoreLog("[%s] ERROR dispatching: %v", DispatchThinkerName, err)
 				continue
 			}
+
+			dispatched[action] = child.Metadata.ID
+			changed = true
 		}
 
-		// 3. Clear the queue
-		w.StoreState("_dispatch_queue", []DispatchRequest{})
+		if changed || true { // Always save to ensure sync
+			w.StoreState("_dispatched_actions", dispatched)
+			w.StoreState("_completed_action_ids", completedIDs)
+		}
+
 		return nil
 	})
 }

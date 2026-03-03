@@ -76,6 +76,18 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	// in the parent's totals (BudgetThinker would otherwise double-count
 	// the original booking alongside the cheaper rebook).
 	if cancelled, _ := want.GetStateBool("_cancelled", false); cancelled {
+		// Zero out our cost contribution in parent's "costs" map before stopping.
+		want.MergeParentState(map[string]any{
+			"costs": map[string]any{want.Metadata.Name: 0.0},
+		})
+		return nil
+	}
+	
+	// Also handle the system-level Cancelled status
+	if want.Status == WantStatusCancelled {
+		want.MergeParentState(map[string]any{
+			"costs": map[string]any{want.Metadata.Name: 0.0},
+		})
 		return nil
 	}
 	costRaw, exists := want.GetState("cost")

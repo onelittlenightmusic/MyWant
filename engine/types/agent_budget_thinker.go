@@ -13,36 +13,45 @@ func init() {
 }
 
 // budgetThinkerThink runs in two phases on each tick:
-//
-//  1. Target budget allocation: reads "itinerary" from the parent coordinator state,
-//     divides total budget evenly, and writes "target_budgets" back to the parent so
-//     each travel want's ConditionThinker can pick up its allocation.
-//
-//  2. Cost aggregation: reads "costs" from the parent coordinator state and updates
-//     the budget want's own state (total_cost, remaining_budget, budget_summary).
 func budgetThinkerThink(ctx context.Context, want *Want) error {
 	budget, _ := want.GetStateFloat64("budget", 5000.0)
+	cb := GetGlobalChainBuilder()
+	if cb == nil { return nil }
 
 	// ── Phase 1: Compute and propagate per-want target budgets ──────────────
 	itineraryRaw, hasItinerary := want.GetParentState("itinerary")
 	if hasItinerary {
 		itinerary, ok := itineraryRaw.(map[string]any)
 		if ok && len(itinerary) > 0 {
-			perWant := budget / float64(len(itinerary))
-			targetBudgets := make(map[string]any, len(itinerary))
+			// Filter to only include active (non-cancelled) wants
+			activeItems := make(map[string]any)
 			for wantName, entry := range itinerary {
-				wantType := ""
-				if entryMap, ok := entry.(map[string]any); ok {
-					wantType, _ = entryMap["want_type"].(string)
+				// Find the actual want to check its status
+				w, found := cb.FindWantByName(wantName)
+				if found && (w.Status == WantStatusCancelled || w.Status == WantStatusFailed) {
+					continue // Skip inactive wants
 				}
-				targetBudgets[wantName] = map[string]any{
-					"want_type":     wantType,
-					"want_name":     wantName,
-					"target_budget": perWant,
-				}
+				activeItems[wantName] = entry
 			}
-			want.MergeParentState(map[string]any{"target_budgets": targetBudgets})
-			want.StoreLog("[BudgetThinker] Allocated %.2f per want across %d itinerary items", perWant, len(itinerary))
+
+			if len(activeItems) > 0 {
+				perWant := budget / float64(len(activeItems))
+				targetBudgets := make(map[string]any, len(activeItems))
+				for wantName, entry := range activeItems {
+					wantType := ""
+					if entryMap, ok := entry.(map[string]any); ok {
+						wantType, _ = entryMap["want_type"].(string)
+					}
+					targetBudgets[wantName] = map[string]any{
+						"want_type":     wantType,
+						"want_name":     wantName,
+						"target_budget": perWant,
+					}
+				}
+				want.MergeParentState(map[string]any{"target_budgets": targetBudgets})
+				want.StoreLog("[BudgetThinker] Allocated %.2f per want across %d active itinerary items (out of %d total)", 
+					perWant, len(activeItems), len(itinerary))
+			}
 		}
 	}
 
@@ -51,7 +60,14 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	costs := map[string]any{}
 	if hasCosts {
 		if m, ok := costsRaw.(map[string]any); ok {
-			costs = m
+			// Filter costs: skip entries from cancelled wants
+			for wantName, cost := range m {
+				w, found := cb.FindWantByName(wantName)
+				if found && (w.Status == WantStatusCancelled || w.Status == WantStatusFailed) {
+					continue
+				}
+				costs[wantName] = cost
+			}
 		}
 	}
 	if len(costs) == 0 {
