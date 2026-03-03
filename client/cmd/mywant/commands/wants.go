@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"mywant/client"
 
@@ -49,28 +50,44 @@ var listWantsCmd = &cobra.Command{
 		labels, _ := cmd.Flags().GetStringSlice("label")
 		using, _ := cmd.Flags().GetStringSlice("using")
 		all, _ := cmd.Flags().GetBool("all")
-		resp, err := c.ListWants(wantType, labels, using, all)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
+		watch, _ := cmd.Flags().GetBool("watch")
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "ID\tName\tType\tStatus")
-
-		for _, want := range resp.Wants {
-			status := want.Status
-			if status == "" {
-				status = "unknown"
+		fetchAndPrint := func() {
+			resp, err := c.ListWants(wantType, labels, using, all)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-				want.Metadata.ID,
-				want.Metadata.Name,
-				want.Metadata.Type,
-				status,
-			)
+
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintln(w, "ID\tName\tType\tStatus")
+
+			for _, want := range resp.Wants {
+				status := want.Status
+				if status == "" {
+					status = "unknown"
+				}
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+					want.Metadata.ID,
+					want.Metadata.Name,
+					want.Metadata.Type,
+					status,
+				)
+			}
+			w.Flush()
 		}
-		w.Flush()
+
+		if watch {
+			for {
+				// Clear screen (ANSI escape code)
+				fmt.Print("\033[H\033[2J")
+				fmt.Printf("Watching wants... (at %s, press Ctrl+C to stop)\n\n", time.Now().Format("15:04:05"))
+				fetchAndPrint()
+				time.Sleep(2 * time.Second)
+			}
+		} else {
+			fetchAndPrint()
+		}
 	},
 }
 
@@ -278,6 +295,7 @@ func init() {
 	listWantsCmd.Flags().StringSliceP("label", "l", []string{}, "Filter wants by labels (format: key=value, can be specified multiple times)")
 	listWantsCmd.Flags().StringSliceP("using", "u", []string{}, "Filter wants by using selectors (format: key=value, can be specified multiple times)")
 	listWantsCmd.Flags().BoolP("all", "a", false, "Include cancelled wants (superseded by rebook actions)")
+	listWantsCmd.Flags().BoolP("watch", "w", false, "Watch wants list for changes")
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
 	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")
