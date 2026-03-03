@@ -1198,6 +1198,13 @@ func (n *Want) MergeParentState(updates map[string]any) {
 	parent.MergeState(updates)
 }
 
+// SuggestParent suggests a set of directions to the parent want (or global state).
+// This is typically used by planning wants (like Itinerary) to request the 
+// parent's DispatchThinker to realize new child wants.
+func (n *Want) SuggestParent(directions []string) {
+	n.StoreParentState("directions", directions)
+}
+
 // StoreStateMulti is the batch variant of StoreState: it writes all key-value pairs
 // in updates into this want's State in a single mutex-protected pass and stages
 // them all for history recording.

@@ -128,19 +128,19 @@ func startMCPServer(ctx context.Context, want *mywant.Want) error {
 }
 
 // monitorMCPServer (MonitorAgent Poll) プロセスの生存確認を行う
-func monitorMCPServer(ctx context.Context, want *mywant.Want) error {
+func monitorMCPServer(ctx context.Context, want *mywant.Want) (bool, error) {
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	registry := GetMCPServerRegistry()
 
 	proc, ok := registry.Get(serverName)
 	if !ok {
 		want.StoreState("mcp_server_status", "stopped")
-		return nil
+		return false, nil
 	}
 
 	if proc.Cmd.Process == nil {
 		want.StoreState("mcp_server_status", "stopped")
-		return nil
+		return false, nil
 	}
 
 	// プロセスの生存確認 (Waitせずに状態だけチェック)
@@ -152,5 +152,5 @@ func monitorMCPServer(ctx context.Context, want *mywant.Want) error {
 		want.StoreState("mcp_server_status", "running")
 	}
 
-	return nil
+	return false, nil
 }

@@ -11,19 +11,19 @@ import (
 // DispatchThinkerName is the identifier for the dispatching think agent.
 const DispatchThinkerName = "dispatch-thinker"
 
-// ActionConfig defines how a logical action maps to a Want.
-type ActionConfig struct {
+// DirectionConfig defines how a logical direction maps to a Want.
+type DirectionConfig struct {
 	Type           string         `json:"type"`
 	Params         map[string]any `json:"params"`
 	Sets           map[string]any `json:"sets"`
 	CostField      string         `json:"cost_field"`
-	CancelsAction  string         `json:"cancels_action,omitempty"`
+	CancelsDirection string       `json:"cancels_direction,omitempty"`
 }
 
-// DispatchRequest represents a low-level request to create a new child want.
+// DirectionRequest represents a low-level request to create a new child want.
 // (Keeping this for internal use by DispatchThinker if needed, or for backward compatibility)
-type DispatchRequest struct {
-	Action      string         `json:"action"`
+type DirectionRequest struct {
+	Direction   string         `json:"direction"`
 	Type        string         `json:"type"`
 	Name        string         `json:"name"`
 	Params      map[string]any `json:"params"`
@@ -32,48 +32,48 @@ type DispatchRequest struct {
 	RequesterID string         `json:"requester_id,omitempty"`
 }
 
-// NewDispatchThinker creates a ThinkingAgent that monitors the want's "actions" state
-// and dispatches/manages child wants based on the "action_map".
+// NewDispatchThinker creates a ThinkingAgent that monitors the want's "directions" state
+// and dispatches/manages child wants based on the "direction_map".
 func NewDispatchThinker(id string) *ThinkingAgent {
 	return NewThinkingAgent(id, 1*time.Second, DispatchThinkerName, func(ctx context.Context, w *Want) error {
-		// 1. Get desired actions from state (set by Itinerary or other planners)
-		var desiredActions []string
-		if raw, ok := w.GetState("actions"); ok {
+		// 1. Get desired directions from state (set by Itinerary or other planners)
+		var desiredDirections []string
+		if raw, ok := w.GetState("directions"); ok {
 			if slice, ok := raw.([]string); ok {
-				desiredActions = slice
+				desiredDirections = slice
 			} else if slice, ok := raw.([]any); ok {
 				for _, item := range slice {
 					if s, ok := item.(string); ok {
-						desiredActions = append(desiredActions, s)
+						desiredDirections = append(desiredDirections, s)
 					}
 				}
 			}
 		}
 
-		if len(desiredActions) == 0 {
+		if len(desiredDirections) == 0 {
 			return nil
 		}
 
-		// 2. Get action_map from params
-		actionMap := make(map[string]ActionConfig)
-		if rawMap, ok := w.Spec.Params["action_map"]; ok {
+		// 2. Get direction_map from params
+		directionMap := make(map[string]DirectionConfig)
+		if rawMap, ok := w.Spec.Params["direction_map"]; ok {
 			// Handle both map[string]any and JSON string
 			switch v := rawMap.(type) {
 			case string:
-				json.Unmarshal([]byte(v), &actionMap)
+				json.Unmarshal([]byte(v), &directionMap)
 			case map[string]any:
 				bytes, _ := json.Marshal(v)
-				json.Unmarshal(bytes, &actionMap)
+				json.Unmarshal(bytes, &directionMap)
 			}
 		}
 
-		if len(actionMap) == 0 {
+		if len(directionMap) == 0 {
 			return nil
 		}
 
 		// 3. Load tracking state
 		dispatched := make(map[string]string)
-		if raw, ok := w.GetState("_dispatched_actions"); ok {
+		if raw, ok := w.GetState("_dispatched_directions"); ok {
 			if m, ok := raw.(map[string]string); ok {
 				dispatched = m
 			} else if m, ok := raw.(map[string]any); ok {
@@ -84,7 +84,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 		}
 		
 		completedIDs := make(map[string]string)
-		if raw, ok := w.GetState("_completed_action_ids"); ok {
+		if raw, ok := w.GetState("_completed_direction_ids"); ok {
 			if m, ok := raw.(map[string]string); ok {
 				completedIDs = m
 			} else if m, ok := raw.(map[string]any); ok {
@@ -98,16 +98,16 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 		cb := GetGlobalChainBuilder()
 
 		// 4. Resolve IDs and check completion
-		for action, wantID := range dispatched {
+		for direction, wantID := range dispatched {
 			if wantID == doneMarker { continue }
 
 			// Resolve pending IDs if any
 			if strings.HasPrefix(wantID, "pending-") {
 				for _, child := range cb.GetWants() {
-					if child.Metadata.Labels["action"] == action && w.isOwnerOf(child) {
+					if child.Metadata.Labels["direction"] == direction && w.isOwnerOf(child) {
 						wantID = child.Metadata.ID
-						dispatched[action] = wantID
-						w.StoreLog("[%s] Resolved pending action '%s' to want '%s'", DispatchThinkerName, action, wantID)
+						dispatched[direction] = wantID
+						w.StoreLog("[%s] Resolved pending direction '%s' to want '%s'", DispatchThinkerName, direction, wantID)
 						break
 					}
 				}
@@ -117,12 +117,12 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 			for _, child := range cb.GetWants() {
 				if child.Metadata.ID == wantID {
 					if child.Status == WantStatusAchieved {
-						completedIDs[action] = wantID
-						dispatched[action] = doneMarker
-						w.StoreLog("[%s] Action '%s' completed", DispatchThinkerName, action)
+						completedIDs[direction] = wantID
+						dispatched[direction] = doneMarker
+						w.StoreLog("[%s] Direction '%s' completed", DispatchThinkerName, direction)
 
 						// APPLY FEEDBACK: Sync results back to parent state
-						if cfg, ok := actionMap[action]; ok {
+						if cfg, ok := directionMap[direction]; ok {
 							// 1. Sync sets (flags like hotel_reserved)
 							if len(cfg.Sets) > 0 {
 								// Get current sets from parent
@@ -156,32 +156,32 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 						}
 					} else if child.Status == WantStatusCancelled || child.Status == WantStatusFailed {
 						// If failed or cancelled without being requested, allow re-dispatch
-						delete(dispatched, action)
+						delete(dispatched, direction)
 					}
 					break
 				}
 			}
 		}
 
-		// 5. Process desired actions
+		// 5. Process desired directions
 		changed := false
-		for _, action := range desiredActions {
-			if v, already := dispatched[action]; already && v != "" {
+		for _, direction := range desiredDirections {
+			if v, already := dispatched[direction]; already && v != "" {
 				continue // In-flight or Done
 			}
 
-			cfg, exists := actionMap[action]
+			cfg, exists := directionMap[direction]
 			if !exists {
-				w.StoreLog("[%s] WARNING: No mapping for action '%s'", DispatchThinkerName, action)
+				w.StoreLog("[%s] WARNING: No mapping for direction '%s'", DispatchThinkerName, direction)
 				continue
 			}
 
 			// Handle Replacement Orchestration
 			var inheritedSeries string
 			var inheritedVersion int
-			if cfg.CancelsAction != "" {
-				if oldWantID, ok := completedIDs[cfg.CancelsAction]; ok && oldWantID != "" {
-					cancelKey := "_cancel_pending_" + action
+			if cfg.CancelsDirection != "" {
+				if oldWantID, ok := completedIDs[cfg.CancelsDirection]; ok && oldWantID != "" {
+					cancelKey := "_cancel_pending_" + direction
 					cancelPendingID, _ := w.GetStateString(cancelKey, "")
 
 					if cancelPendingID == "" {
@@ -191,7 +191,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 								target.StoreState("_cancel_requested", true)
 								cb.RestartWant(oldWantID)
 								w.StoreState(cancelKey, oldWantID)
-								w.StoreLog("[%s] Requested cancel for old action '%s' (want: %s)", DispatchThinkerName, cfg.CancelsAction, oldWantID)
+								w.StoreLog("[%s] Requested cancel for old direction '%s' (want: %s)", DispatchThinkerName, cfg.CancelsDirection, oldWantID)
 								break
 							}
 						}
@@ -218,15 +218,15 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 			}
 
 			// Dispatch New Want
-			w.StoreLog("[%s] Realizing action '%s' (type: %s)", DispatchThinkerName, action, cfg.Type)
+			w.StoreLog("[%s] Realizing direction '%s' (type: %s)", DispatchThinkerName, direction, cfg.Type)
 			
 			child := &Want{
 				Metadata: Metadata{
 					ID:      GenerateUUID(),
-					Name:    fmt.Sprintf("%s-%s", action, w.Metadata.Name),
+					Name:    fmt.Sprintf("%s-%s", direction, w.Metadata.Name),
 					Type:    cfg.Type,
 					Labels: map[string]string{
-						"action": action,
+						"direction": direction,
 					},
 					Series:  inheritedSeries,
 					Version: inheritedVersion + 1,
@@ -241,13 +241,13 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 				continue
 			}
 
-			dispatched[action] = child.Metadata.ID
+			dispatched[direction] = child.Metadata.ID
 			changed = true
 		}
 
 		if changed || true { // Always save to ensure sync
-			w.StoreState("_dispatched_actions", dispatched)
-			w.StoreState("_completed_action_ids", completedIDs)
+			w.StoreState("_dispatched_directions", dispatched)
+			w.StoreState("_completed_direction_ids", completedIDs)
 		}
 
 		return nil

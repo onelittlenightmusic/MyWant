@@ -10,10 +10,10 @@ import (
 const userReactionMonitorAgentName = "user_reaction_monitor"
 
 func init() {
-	RegisterPollAgent(userReactionMonitorAgentName, pollUserReactions)
+	RegisterMonitorAgent(userReactionMonitorAgentName, pollUserReactions)
 }
 
-// pollUserReactions is a PollFunc — includes stop logic
+// pollUserReactions is a MonitorFunc
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 	// Check if want is still active (waiting or reaching)
 	phase, _ := want.GetStateString("reminder_phase", "")

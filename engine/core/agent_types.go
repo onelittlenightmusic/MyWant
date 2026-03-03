@@ -130,34 +130,18 @@ func (a *DoAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 // MonitorAgent implements an agent that monitors want execution and state.
 type MonitorAgent struct {
 	BaseAgent
-	Monitor func(ctx context.Context, want *Want) error
+	Monitor func(ctx context.Context, want *Want) (bool, error)
 }
 
 func (a *MonitorAgent) Exec(ctx context.Context, want *Want) (bool, error) {
 	if a.Monitor != nil {
-		err := a.Monitor(ctx, want)
+		shouldStop, err := a.Monitor(ctx, want)
 
 		// Commit agent state changes
 		want.CommitStateChanges()
-		return false, err // Default: continue monitoring
-	}
-	return false, fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
-}
-
-// PollAgent implements an agent that polls with stop-signal support.
-// Unlike MonitorAgent (always continues), PollAgent can signal termination via shouldStop.
-type PollAgent struct {
-	BaseAgent
-	Poll PollFunc
-}
-
-func (a *PollAgent) Exec(ctx context.Context, want *Want) (bool, error) {
-	if a.Poll != nil {
-		shouldStop, err := a.Poll(ctx, want)
-		want.CommitStateChanges()
 		return shouldStop, err
 	}
-	return false, fmt.Errorf("no poll function defined for PollAgent %s", a.Name)
+	return false, fmt.Errorf("no monitor function defined for MonitorAgent %s", a.Name)
 }
 
 // ThinkAgent implements an agent that reacts to state changes by running a ThinkFunc.

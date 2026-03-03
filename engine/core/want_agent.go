@@ -140,10 +140,6 @@ func (n *Want) bootAgent(ctx context.Context, agent Agent) error {
 			if a.Monitor == nil {
 				return fmt.Errorf("localGo agent '%s' has no monitor function registered", agent.GetName())
 			}
-		case *PollAgent:
-			if a.Poll == nil {
-				return fmt.Errorf("localGo agent '%s' has no poll function registered", agent.GetName())
-			}
 		case *ThinkAgent:
 			if a.Think == nil {
 				return fmt.Errorf("localGo agent '%s' has no think function registered", agent.GetName())
@@ -219,15 +215,8 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 		// ThinkAgents use 2s interval by default
 		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
 	case *MonitorAgent:
-		// Wrap MonitorFunc into ThinkFunc signature (no return value)
-		thinkWrapper := func(ctx context.Context, w *Want) error {
-			return a.Monitor(ctx, w)
-		}
-		// MonitorAgents use 5s interval for checking
-		bgAgent = NewThinkingAgent(bgID, 5*time.Second, agentName, thinkWrapper)
-	case *PollAgent:
-		// PollAgents use 5s interval and check for shouldStop
-		bgAgent = NewPollingAgent(bgID, 5*time.Second, agentName, a.Poll)
+		// MonitorAgents now use PollingAgent to support the (bool, error) signature
+		bgAgent = NewPollingAgent(bgID, 5*time.Second, agentName, a.Monitor)
 	default:
 		return fmt.Errorf("agent %s has persistent type %s but is not a persistent agent implementation", agentName, agentType)
 	}

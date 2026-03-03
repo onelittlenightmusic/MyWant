@@ -14,8 +14,7 @@ var (
 // Global registries for agent implementation functions
 var (
 	doActionRegistry      = make(map[string]func(context.Context, *Want) error)
-	monitorActionRegistry = make(map[string]func(context.Context, *Want) error)
-	pollActionRegistry    = make(map[string]PollFunc)
+	monitorActionRegistry = make(map[string]func(context.Context, *Want) (bool, error))
 	thinkActionRegistry   = make(map[string]ThinkFunc)
 )
 
@@ -25,13 +24,9 @@ func RegisterDoAgent(agentName string, action func(context.Context, *Want) error
 }
 
 // RegisterMonitorAgent registers a MonitorAgent implementation logic by agent name.
-func RegisterMonitorAgent(agentName string, monitor func(context.Context, *Want) error) {
+// It can return true for the first return value to signal that monitoring should stop.
+func RegisterMonitorAgent(agentName string, monitor func(context.Context, *Want) (bool, error)) {
 	monitorActionRegistry[agentName] = monitor
-}
-
-// RegisterPollAgent registers a PollAgent implementation logic by agent name.
-func RegisterPollAgent(agentName string, poll PollFunc) {
-	pollActionRegistry[agentName] = poll
 }
 
 // RegisterThinkAgent registers a ThinkAgent implementation logic by agent name.
@@ -76,8 +71,8 @@ func RegisterDoAgentType(name string, capabilities []Capability, action func(con
 }
 
 // RegisterMonitorAgentType is a declarative API that registers a MonitorAgent in one call.
-// It registers capabilities, creates the MonitorAgent, and wires it into the agent factory registry.
-func RegisterMonitorAgentType(name string, capabilities []Capability, monitor func(context.Context, *Want) error) {
+// It can return true for the first return value to signal that monitoring should stop.
+func RegisterMonitorAgentType(name string, capabilities []Capability, monitor func(context.Context, *Want) (bool, error)) {
 	RegisterMonitorAgent(name, monitor)
 
 	capNames := make([]string, len(capabilities))
@@ -91,27 +86,6 @@ func RegisterMonitorAgentType(name string, capabilities []Capability, monitor fu
 		agent := &MonitorAgent{
 			BaseAgent: *NewBaseAgent(name, capNames, MonitorAgentType),
 			Monitor:   monitor,
-		}
-		registry.RegisterAgent(agent)
-	})
-}
-
-// RegisterPollAgentType is a declarative API that registers a poll-based MonitorAgent in one call.
-// Unlike RegisterMonitorAgentType, the poll function can signal stop via shouldStop=true.
-func RegisterPollAgentType(name string, capabilities []Capability, poll PollFunc) {
-	RegisterPollAgent(name, poll)
-
-	capNames := make([]string, len(capabilities))
-	for i, c := range capabilities {
-		capNames[i] = c.Name
-	}
-	RegisterAgentImplementation(name, func(registry *AgentRegistry) {
-		for _, c := range capabilities {
-			registry.RegisterCapability(c)
-		}
-		agent := &PollAgent{
-			BaseAgent: *NewBaseAgent(name, capNames, MonitorAgentType),
-			Poll:      poll,
 		}
 		registry.RegisterAgent(agent)
 	})

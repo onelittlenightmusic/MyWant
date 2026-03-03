@@ -210,18 +210,11 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 			doAgent := &DoAgent{BaseAgent: baseAgent}
 			r.setAgentAction(doAgent)
 			agent = doAgent
-		case "monitor":
+		case "monitor", "poll":
 			baseAgent.Type = MonitorAgentType
-			// Check if it's actually a PollAgent (has a registered poll function)
-			if _, isPoll := pollActionRegistry[baseAgent.Name]; isPoll {
-				pollAgent := &PollAgent{BaseAgent: baseAgent}
-				r.setAgentPoll(pollAgent)
-				agent = pollAgent
-			} else {
-				monitorAgent := &MonitorAgent{BaseAgent: baseAgent}
-				r.setAgentMonitor(monitorAgent)
-				agent = monitorAgent
-			}
+			monitorAgent := &MonitorAgent{BaseAgent: baseAgent}
+			r.setAgentMonitor(monitorAgent)
+			agent = monitorAgent
 		case "think":
 			baseAgent.Type = ThinkAgentType
 			thinkAgent := &ThinkAgent{BaseAgent: baseAgent}
@@ -265,17 +258,6 @@ func (r *AgentRegistry) setAgentMonitor(agent *MonitorAgent) {
 	agent.Monitor = r.genericMonitorAction
 }
 
-func (r *AgentRegistry) setAgentPoll(agent *PollAgent) {
-	// Look up specific implementation from registry
-	if poll, ok := pollActionRegistry[agent.Name]; ok {
-		agent.Poll = poll
-		InfoLog("[AGENT] Linked agent '%s' to registered Go implementation (Poll)", agent.Name)
-		return
-	}
-
-	// PollAgent doesn't have a generic fallback as it needs to return shouldStop
-}
-
 func (r *AgentRegistry) setAgentThink(agent *ThinkAgent) {
 	// Look up specific implementation from registry
 	if think, ok := thinkActionRegistry[agent.Name]; ok {
@@ -295,8 +277,8 @@ func (r *AgentRegistry) genericDoAction(ctx context.Context, want *Want) error {
 }
 
 // genericMonitorAction is the default monitor for all MonitorAgents Agents don't need special implementations - monitoring logic is externalized to want types
-func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) error {
+func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) (bool, error) {
 	InfoLog("[AGENT] MonitorAgent monitoring for want: %s\n", want.Metadata.Name)
 	// Monitoring logic happens in the want type's agent execution logic This is just a placeholder that confirms the monitor executed
-	return nil
+	return false, nil
 }

@@ -36,7 +36,7 @@ func init() {
 
 // monitorPlaywrightRecording is the MonitorAgent poll function for browser recording.
 // It watches for start/stop signals via webhook state and controls the Playwright MCP App Server.
-func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
+func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) (bool, error) {
 	// First run: register webhook IDs in state so the frontend can use them.
 	// Check value emptiness (not just key existence) because YAML initializes the key to "" at creation.
 	startID, _ := want.GetStateString("startWebhookId", "")
@@ -51,7 +51,7 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 		})
 		want.StoreLog("[PLAYWRIGHT-RECORD] Registered webhook IDs: %s-start / %s-stop / %s-debug-start / %s-debug-stop / %s-replay",
 			want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID)
-		return nil
+		return false, nil
 	}
 
 	active, _ := want.GetState("recording_active")
@@ -68,52 +68,56 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 		startReq, _ := want.GetState("start_recording_requested")
 		if req, ok := startReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_recording_requested=true, starting Playwright recording...")
-			return startPlaywrightRecording(ctx, want)
+			return false, startPlaywrightRecording(ctx, want)
 		}
 		// Waiting for debug start signal
 		debugStartReq, _ := want.GetState("start_debug_recording_requested")
 		if req, ok := debugStartReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_debug_recording_requested=true, starting debug recording...")
-			return startDebugRecording(ctx, want)
+			return false, startDebugRecording(ctx, want)
 		}
+
 		// Waiting for replay signal
 		replayReq, _ := want.GetState("start_replay_requested")
 		if req, ok := replayReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_replay_requested=true, starting replay...")
-			return startReplay(ctx, want)
+			return false, startReplay(ctx, want)
 		}
 		// Idle - nothing to do
-		return nil
-	}
+		return false, nil
+		}
+
 
 	if isActive {
 		// Normal recording active - check for stop signal
 		stopReq, _ := want.GetState("stop_recording_requested")
 		if req, ok := stopReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] stop_recording_requested=true, stopping Playwright recording...")
-			return stopPlaywrightRecording(ctx, want)
+			return false, stopPlaywrightRecording(ctx, want)
 		}
 		want.StoreLog("[PLAYWRIGHT-RECORD] Recording active, waiting for stop signal...")
-		return nil
-	}
+		return false, nil
+		}
+
 
 	if isDebugActive {
 		// Debug recording active - check for stop signal
 		stopReq, _ := want.GetState("stop_debug_recording_requested")
 		if req, ok := stopReq.(bool); ok && req {
 			want.StoreLog("[PLAYWRIGHT-RECORD] stop_debug_recording_requested=true, stopping debug recording...")
-			return stopDebugRecording(ctx, want)
+			return false, stopDebugRecording(ctx, want)
 		}
 		want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording active, waiting for finish signal...")
-		return nil
-	}
+		return false, nil
+		}
+
 
 	if isReplayActive {
 		// Replay in progress - poll for completion
 		return pollReplay(ctx, want)
 	}
 
-	return nil
+	return false, nil
 }
 
 // ensurePlaywrightServer ensures the playwright-app MCP server is running with live pipes.
@@ -429,11 +433,11 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 }
 
 // pollReplay checks the replay status via check_replay MCP tool.
-func pollReplay(ctx context.Context, want *mywant.Want) error {
+func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 	sessionID, _ := want.GetStateString("replay_session_id", "")
 	if sessionID == "" {
 		want.StoreStateMultiForAgent(map[string]any{"replay_active": false, "action_by_agent": playwrightRecordAgentName})
-		return nil
+		return true, nil
 	}
 
 	serverPath := resolvePlaywrightServerPath()
@@ -445,7 +449,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) error {
 		"check_replay", map[string]any{"session_id": sessionID})
 	if err != nil {
 		want.StoreLog("[PLAYWRIGHT-RECORD] check_replay error: %v", err)
-		return nil
+		return false, nil
 	}
 
 	texts := flattenMCPContent(result.Content)
@@ -458,7 +462,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) error {
 		if err := json.Unmarshal([]byte(text), &inner); err == nil {
 			if !inner.Done {
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay in progress...")
-				return nil
+				return false, nil
 			}
 			// Replay complete
 			replayResultJSON, _ := json.Marshal(inner.Result)
@@ -488,11 +492,13 @@ func pollReplay(ctx context.Context, want *mywant.Want) error {
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay complete: result=%s", string(replayResultJSON))
 			}
 			want.StoreStateMultiForAgent(stateUpdate)
-			return nil
+			return true, nil
 		}
 	}
-	return nil
+
+	return false, nil
 }
+
 
 // moveReplayScreenshot moves the MCP-written screenshot to ~/.mywant/screenshots/<wantID>.png.
 // Returns the API URL path for serving the image.

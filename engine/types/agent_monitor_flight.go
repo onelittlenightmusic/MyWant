@@ -22,10 +22,10 @@ func init() {
 // monitorFlightStatus polls the mock server for flight status updates.
 // All state is read from/written to want state — no struct fields needed.
 // Polling interval is managed by AddMonitoringAgent; this function runs once per cycle.
-func monitorFlightStatus(ctx context.Context, want *Want) error {
+func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 	flightID, ok := want.GetStateString("flight_id", "")
 	if !ok || flightID == "" {
-		return fmt.Errorf("no flight_id found in state - flight not created yet")
+		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
 	}
 
 	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
@@ -60,16 +60,16 @@ func monitorFlightStatus(ctx context.Context, want *Want) error {
 	url := fmt.Sprintf("%s/api/flights/%s", serverURL, flightID)
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("failed to get flight status: %v", err)
+		return false, fmt.Errorf("failed to get flight status: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
+		return false, fmt.Errorf("failed to get flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
 	var reservation FlightReservation
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
-		return fmt.Errorf("failed to decode response: %v", err)
+		return false, fmt.Errorf("failed to decode response: %v", err)
 	}
 	newStatus := reservation.Status
 	oldStatus := lastKnownStatus
@@ -148,9 +148,14 @@ func monitorFlightStatus(ctx context.Context, want *Want) error {
 		// Mark this as MonitorAgent for history tracking
 		updates["action_by_agent"] = "MonitorAgent"
 		want.StoreStateMultiForAgent(updates)
+
+		// Stop monitoring if confirmed or cancelled
+		if newStatus == "confirmed" || newStatus == "cancelled" {
+			return true, nil
+		}
 	}
 
-	return nil
+	return false, nil
 }
 
 // parseStatusHistoryEntry parses a status history entry string

@@ -125,10 +125,14 @@ func (mw *MonitorWant) Progress() {
 				mw.Want.SetStatus(WantStatusAchieved) // Mark as completed when stopped
 				return
 			case <-ticker.C:
-				err := monitorAgent.Monitor(context.Background(), mw.Want)
+				shouldStop, err := monitorAgent.Monitor(context.Background(), mw.Want)
 				if err != nil {
 					log.Printf("❌ Monitor %s agent execution failed: %v", mw.Want.Metadata.Name, err)
-					// Optionally set want status to failed, but continue monitoring mw.Want.SetStatus(WantStatusFailed)
+				}
+				if shouldStop {
+					log.Printf("🛑 Monitor %s agent signaled stop", mw.Want.Metadata.Name)
+					mw.Want.SetStatus(WantStatusAchieved)
+					return
 				}
 			}
 		}

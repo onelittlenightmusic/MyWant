@@ -17,9 +17,9 @@ type ItineraryLocals struct{}
 // ItineraryWant implements the core travel planning logic using OPA and LLM.
 //
 // New Simplified Design:
-//  1. The OPA LLM ThinkAgent runs locally and writes "actions" to this want's state.
-//  2. Progress() syncs these "actions" to the parent Target's state.
-//  3. The parent's DispatchThinkerAgent realizes these actions into sibling Wants.
+//  1. The OPA LLM ThinkAgent runs locally and writes "directions" to this want's state.
+//  2. Progress() syncs these "directions" to the parent Target's state.
+//  3. The parent's DispatchThinkerAgent realizes these directions into sibling Wants.
 //  4. Progress() collects aggregated costs from the parent to feed back into planning.
 type ItineraryWant struct {
 	Want
@@ -39,7 +39,7 @@ func (o *ItineraryWant) Initialize() {
 	}
 }
 
-// IsAchieved returns true when the OPA planner reports no more actions.
+// IsAchieved returns true when the OPA planner reports no more directions.
 func (o *ItineraryWant) IsAchieved() bool {
 	achieved, _ := o.GetStateBool("goal_achieved", false)
 	return achieved
@@ -49,13 +49,13 @@ func (o *ItineraryWant) IsAchieved() bool {
 func (o *ItineraryWant) Progress() {
 	// 1. Collect aggregated results from parent Target
 	// The parent's DispatchThinker flattens costs and sets into parent's state.
-	// We read the fields we care about based on our action_map.
-	actionMapStr := o.GetStringParam("action_map", "{}")
-	var actionMap map[string]ActionConfig
-	json.Unmarshal([]byte(actionMapStr), &actionMap)
+	// We read the fields we care about based on our direction_map.
+	directionMapStr := o.GetStringParam("direction_map", "{}")
+	var directionMap map[string]DirectionConfig
+	json.Unmarshal([]byte(directionMapStr), &directionMap)
 
 	updates := make(map[string]any)
-	for _, cfg := range actionMap {
+	for _, cfg := range directionMap {
 		// Sync CostField if defined
 		if cfg.CostField != "" {
 			if val, ok := o.GetParentState(cfg.CostField); ok {
@@ -74,38 +74,38 @@ func (o *ItineraryWant) Progress() {
 		o.mergeCurrent(updates)
 	}
 
-	// 2. Read planned actions written by our own OPA LLM ThinkAgent
-	var actions []string
-	if raw, ok := o.GetState("actions"); ok {
+	// 2. Read planned directions written by our own OPA LLM ThinkAgent
+	var directions []string
+	if raw, ok := o.GetState("directions"); ok {
 		if slice, ok := raw.([]string); ok {
-			actions = slice
+			directions = slice
 		} else if slice, ok := raw.([]any); ok {
 			for _, item := range slice {
 				if s, ok := item.(string); ok {
-					actions = append(actions, s)
+					directions = append(directions, s)
 				}
 			}
 		}
 	}
 
-	// 3. Propagate planned actions to parent (Target)
-	// The Target's DispatchThinkerAgent will realize these actions into actual Wants.
-	if len(actions) > 0 {
-		o.StoreParentState("actions", actions)
+	// 3. Propagate planned directions to parent (Target)
+	// The Target's DispatchThinkerAgent will realize these directions into actual Wants.
+	if len(directions) > 0 {
+		o.SuggestParent(directions)
 		// Also record planned count for achievement check
-		o.StoreState("planned_count", len(actions))
+		o.StoreState("planned_count", len(directions))
 	}
 
 	// 4. Update goal achievement status
-	// If ThinkAgent has run (hash exists) and no more actions are planned, we are done.
+	// If ThinkAgent has run (hash exists) and no more directions are planned, we are done.
 	if hash, _ := o.GetStateString("_opa_input_hash", ""); hash != "" {
-		if len(actions) == 0 {
+		if len(directions) == 0 {
 			if achieved, _ := o.GetStateBool("goal_achieved", false); !achieved {
 				o.StoreState("goal_achieved", true)
-				o.StoreLog("[ITINERARY] All goals achieved (no further actions planned)")
+				o.StoreLog("[ITINERARY] All goals achieved (no further directions planned)")
 			}
 		} else {
-			// Reset if new actions appear (e.g. after a manual change)
+			// Reset if new directions appear (e.g. after a manual change)
 			o.StoreState("goal_achieved", false)
 		}
 	}

@@ -97,6 +97,11 @@ List, view, and manage lifecycle of wants.
 # Short version:
 ./bin/mywant w l
 
+# Watch wants list for real-time updates (auto-refresh every 2 seconds)
+./bin/mywant wants list --watch
+# Short version:
+./bin/mywant w l -w
+
 # Get detailed status of a specific want
 ./bin/mywant wants get <WANT_ID>
 # Short version:
