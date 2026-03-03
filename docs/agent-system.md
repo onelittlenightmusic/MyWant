@@ -529,7 +529,7 @@ for _, w := range cb.GetWants() {
 **Always do this instead:**
 
 ```go
-// ✅ Signal the target; let it cancel itself
+// signal the target; let it cancel itself
 for _, w := range cb.GetWants() {
     if w.Metadata.ID == targetID {
         w.StoreState("_cancel_requested", true)  // only a flag write — safe
@@ -539,9 +539,23 @@ for _, w := range cb.GetWants() {
 cb.RestartWant(targetID)  // wake the target's goroutine to process the flag
 ```
 
-## Troubleshooting
++### 6. Hierarchy Rule for Want Dispatch
++
++> **Sub-wants are forbidden from creating other sub-wants directly.**
++> A want should never call `cb.AddWant` or similar methods to spawn siblings or children.
++
++#### Correct implementation for dynamic dispatch (e.g. Itinerary)
++
++1. **The Sub-want (Itinerary)** writes a dispatch request to the **Parent (Target)** state using `StoreParentState("_dispatch_queue", requests)`.
++2. **The Parent (Target)** has a `DispatchThinkerAgent` running.
++3. **DispatchThinkerAgent** monitors the queue and calls `parent.AddChildWant(newWant)` to perform the actual dispatch.
++
++This ensures that the responsibility for execution graph expansion always resides with the upper hierarchy (Target/Recipe).
++
+ ## Troubleshooting
 
-### Common Issues
+ ### Common Issues
+
 
 1. **Agent Not Found**
    - Check that capability `gives` matches want `requires`

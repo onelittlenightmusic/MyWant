@@ -205,7 +205,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 
 			// Generate ID if missing
 			if want.Metadata.ID == "" {
-				want.Metadata.ID = generateUUID()
+				want.Metadata.ID = GenerateUUID()
 				DebugLog("[RECIPE-LOADER] Generated want ID: %s\n", want.Metadata.ID)
 			}
 

@@ -250,7 +250,7 @@ func (t *Target) CreateChildWants() []*Want {
 	for i := range config.Wants {
 		// Ensure ID is generated if not present
 		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = generateUUID()
+			config.Wants[i].Metadata.ID = GenerateUUID()
 		}
 
 		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
@@ -294,7 +294,15 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Initialize resets state before execution begins
 func (t *Target) Initialize() {
-	// No state reset needed for target wants
+	// Start DispatchThinkerAgent to handle child want dispatch requests from Itinerary
+	// Target is allowed to register this system agent in code.
+	dispatchThinkerID := DispatchThinkerName + "-" + t.Metadata.ID
+	if _, running := t.GetBackgroundAgent(dispatchThinkerID); !running {
+		agent := NewDispatchThinker(dispatchThinkerID)
+		if err := t.AddBackgroundAgent(agent); err != nil {
+			t.StoreLog("ERROR: Failed to start DispatchThinkerAgent: %v", err)
+		}
+	}
 }
 
 // IsAchieved reports true only after Progress() has set Status to Achieved.

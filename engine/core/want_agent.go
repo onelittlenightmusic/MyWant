@@ -234,7 +234,7 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 
 	// Record start in history
 	n.initHistoryRings()
-	execID := generateUUID()
+	execID := GenerateUUID()
 	n.agentHistoryRing.Append(AgentExecution{
 		ExecutionID: execID,
 		AgentName:   agentName,
@@ -278,7 +278,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		n.RunningAgents = make([]string, 0)
 	}
 	n.initHistoryRings()
-	executionID := generateUUID()
+	executionID := GenerateUUID()
 	n.RunningAgents = append(n.RunningAgents, agentName)
 	n.CurrentAgent = agentName
 	{

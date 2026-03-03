@@ -49,12 +49,38 @@ EndProgressCycle()
 
 ### 具体的なルール
 
-| コンテキスト | 許可 | 禁止 |
-|:------------|:-----|:-----|
-| `Progress()` / `Initialize()` | `b.StoreState(...)`, `b.SetStatus(...)` をレシーバに対して呼ぶ | `otherWant.StoreState(...)`, `otherWant.SetStatus(...)` |
-| Agent `Exec(ctx, want)` | `want.StoreStateForAgent(...)` を渡された`want`に対して呼ぶ | `cb.GetWants()`で別のwantを取得してそのstateに書く |
-| ThinkAgent `ThinkFunc` | `want.StoreState(...)`（自分自身）と `want.MergeParentState(...)` | 兄弟WantやChildWantのstateに直接書く |
+ | コンテキスト | 許可 | 禁止 |
+ |:------------|:-----|:-----|
+ | `Progress()` / `Initialize()` | `b.StoreState(...)`, `b.SetStatus(...)` をレシーバに対して呼ぶ | `otherWant.StoreState(...)`, `otherWant.SetStatus(...)` |
+| `Progress()` / `Initialize()` | `b.AddChildWant(...)` (Parentとして自分を登録) | `cb.AddWant(...)` を直接呼んで子を増やす行為 |
+ | Agent `Exec(ctx, want)` | `want.StoreStateForAgent(...)` を渡された`want`に対して呼ぶ | `cb.GetWants()`で別のwantを取得してそのstateに書く |
+ | ThinkAgent `ThinkFunc` | `want.StoreState(...)`（自分自身）と `want.MergeParentState(...)` | 兄弟WantやChildWantのstateに直接書く |
 
++## エージェント登録ルール
++
++**`Initialize()` などのコード内で `AddThinkingAgent()` や `AddMonitoringAgent()` を直接呼び出すことは原則禁止です。**
++
++### 正しい実装パターン
++
++*   **YAMLの `requires` を使用**: 必要なCapabilityを `requires` に記載することで、フレームワークが適切にエージェントをアサイン・起動します。
++*   **Targetの例外**: `Target` 型（およびそれを拡張した型）のように、動的に子Wantを管理するコア実装において、YAMLで定義できない特殊なシステムエージェント（`DispatchThinkerAgent` など）が必要な場合に限り、`Initialize()` での直接登録を許可します。
++
+ ## 子Want作成の階層ルール
+
+ **子Want（葉ノードや中間ノード）が直接別の子Wantを作成することは禁止されています。**
+
++
++### 正しい実装パターン
++
++1.  **中間Want (e.g. Itinerary)** は、次に実行すべきアクション（スペック）を自身のステート、または `MergeParentState()` を通じて親（Target）のステートに書き込みます。
++2.  **親Want (Target)** に登録された `DispatchThinkerAgent` が、そのステートを監視します。
++3.  **DispatchThinkerAgent** が、親に対して `AddChildWant()` を呼び出し、新しい子Wantを作成します。
++
++これにより、Wantの生成責任が常に上位の階層（Target/Recipe）に集約され、実行グラフの複雑化と管理不能な拡散を防ぎます。
++
+ ---
+
+ ## 状態管理API
 ### 他Wantのキャンセルが必要な場合の正しいパターン
 
 WantのStatusを外から変えたい場合は**間接シグナル**を使います：

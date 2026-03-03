@@ -1125,8 +1125,40 @@ func (n *Want) getParentWant() *Want {
 
 func (n *Want) GetParentWant() *Want { return n.getParentWant() }
 
+// AddChildWant adds a new child want to the system, automatically setting
+// this want as the owner (parent).
+//
+// HIERARCHY RULE: Sub-wants are forbidden from calling cb.AddWant directly.
+// They must instead use AddChildWant on their parent, or request the parent
+// to dispatch via a ThinkAgent (DispatchThinkerAgent).
+func (n *Want) AddChildWant(child *Want) error {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return fmt.Errorf("ChainBuilder unavailable")
+	}
+
+	// Ensure child has a valid ID
+	if child.Metadata.ID == "" {
+		child.Metadata.ID = GenerateUUID()
+	}
+
+	// Set owner reference to this want
+	ownerRef := OwnerReference{
+		APIVersion: "mywant/v1",
+		Kind:       "Want",
+		Name:       n.Metadata.Name,
+		ID:         n.Metadata.ID,
+		Controller: true,
+	}
+	child.Metadata.OwnerReferences = append(child.Metadata.OwnerReferences, ownerRef)
+
+	// Add to system asynchronously
+	return cb.AddWantsAsync([]*Want{child})
+}
+
 // HasParent returns true if this want has a parent coordinator.
-func (n *Want) HasParent() bool {
+ func (n *Want) HasParent() bool {
+
 	return n.getParentWant() != nil
 }
 

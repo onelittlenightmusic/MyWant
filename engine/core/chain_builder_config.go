@@ -56,8 +56,8 @@ func loadConfigFromYAML(filename string) (Config, error) {
 	return config, nil
 }
 
-// generateUUID generates a UUID v4 for want IDs
-func generateUUID() string {
+// GenerateUUID generates a UUID v4 for want IDs
+func GenerateUUID() string {
 	uuid := make([]byte, 16)
 	rand.Read(uuid)
 	uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
@@ -70,7 +70,7 @@ func generateUUID() string {
 func assignWantIDs(config *Config) {
 	for i := range config.Wants {
 		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = generateUUID()
+			config.Wants[i].Metadata.ID = GenerateUUID()
 		}
 	}
 }

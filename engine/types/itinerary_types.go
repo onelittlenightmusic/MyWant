@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"time"
+	"strings"
 
 	. "mywant/engine/core"
 )
@@ -137,6 +137,25 @@ func (o *ItineraryWant) Progress() {
 		if wantID == doneMarker {
 			continue // Already completed and marked
 		}
+
+		// 5a. Resolve pending IDs to real IDs by looking at sibling wants that identify us as requester
+		if strings.HasPrefix(wantID, "pending-") {
+			resolved := false
+			for _, w := range cb.GetWants() {
+				// Match by action and our ID in their "itinerary" label
+				if w.Metadata.Labels["action"] == action && w.Metadata.Labels["itinerary"] == o.Metadata.ID {
+					wantID = w.Metadata.ID
+					dispatched[action] = wantID
+					resolved = true
+					o.StoreLog("[ITINERARY] Resolved pending action '%s' to real want ID '%s'", action, wantID)
+					break
+				}
+			}
+			if !resolved {
+				continue // Still waiting for parent to dispatch
+			}
+		}
+
 		for _, w := range cb.GetWants() {
 			if w.Metadata.ID != wantID {
 				continue
@@ -233,7 +252,7 @@ func (o *ItineraryWant) Progress() {
 
 				// Old want has self-cancelled — clear the pending marker and fall through to dispatch.
 				o.StoreState(cancelKey, "")
-				o.StoreLog("[ITINERARY] Old want '%s' cancelled; dispatching new want for action '%s'", cancelPendingID, action)
+				o.StoreLog("[ITINERARY] Old want '%s' cancelled; requesting new want for action '%s'", cancelPendingID, action)
 				// Inherit series and bump version so the new want is visibly linked to its predecessor.
 				for _, w := range cb.GetWants() {
 					if w.Metadata.ID == cancelPendingID {
@@ -244,50 +263,50 @@ func (o *ItineraryWant) Progress() {
 				}
 			}
 		}
-		wantID := fmt.Sprintf("itinerary-%s-%d", action, time.Now().UnixNano())
-		// Use the itinerary's own controller (target) as the owner of dispatched wants,
-		// so they appear as siblings under the same target in the UI.
-		// Fall back to the itinerary itself if no parent controller exists.
-		ownerRef := OwnerReference{
-			APIVersion:         "mywant/v1",
-			Kind:               "Want",
-			Name:               o.Metadata.Name,
-			ID:                 o.Metadata.ID,
-			Controller:         true,
-			BlockOwnerDeletion: true,
+
+		// Instead of direct dispatch, we now request the parent (Target) to dispatch
+		// by adding to its _dispatch_queue state. This follows the new Hierarchy Rule.
+		dispatchReq := DispatchRequest{
+			Action:      action,
+			Type:        cfg.Type,
+			Name:        fmt.Sprintf("%s-%s", action, o.Metadata.Name),
+			Params:      params,
+			Series:      inheritedSeries,
+			Version:     inheritedVersion + 1,
+			RequesterID: o.Metadata.ID, // 👈 Identify who requested this
 		}
-		for _, ref := range o.Metadata.OwnerReferences {
-			if ref.Controller && ref.Kind == "Want" {
-				ownerRef = ref
-				break
+
+		// Get current queue from parent
+		var queue []DispatchRequest
+		if raw, ok := o.GetParentState("_dispatch_queue"); ok && raw != nil {
+			if q, ok := raw.([]DispatchRequest); ok {
+				queue = q
+			} else if q, ok := raw.([]any); ok {
+				// Convert from []any to []DispatchRequest if needed (JSON deserialization case)
+				for _, item := range q {
+					if m, ok := item.(map[string]any); ok {
+						req := DispatchRequest{
+							Action: m["action"].(string),
+							Type:   m["type"].(string),
+							Name:   m["name"].(string),
+							Params: m["params"].(map[string]any),
+						}
+						if s, ok := m["series"].(string); ok { req.Series = s }
+						if v, ok := m["version"].(float64); ok { req.Version = int(v) }
+						if rID, ok := m["requester_id"].(string); ok { req.RequesterID = rID }
+						queue = append(queue, req)
+					}
+				}
 			}
 		}
-		ownerInstanceID := fmt.Sprintf("%s-%s", ownerRef.Name, ownerRef.ID)
-		newWant := &Want{
-			Metadata: Metadata{
-				ID:   wantID,
-				Name: fmt.Sprintf("%s-%s", action, o.Metadata.Name),
-				Type: cfg.Type,
-				Labels: map[string]string{
-					"itinerary":  o.Metadata.ID,
-					"action":     action,
-					"owner":      "child",
-					"owner-name": ownerInstanceID,
-				},
-				OwnerReferences: []OwnerReference{ownerRef},
-				// Replacement wants inherit Series and get Version+1; fresh wants get zero
-				// values here and addWant() assigns a new Series with Version=1.
-				Series:  inheritedSeries,
-				Version: inheritedVersion + 1,
-			},
-			Spec: WantSpec{Params: params},
-		}
-		if err := cb.QueueWantAdd([]*Want{newWant}); err != nil {
-			o.StoreLog("[ITINERARY] ERROR queuing want for '%s': %v", action, err)
-			continue
-		}
-		dispatched[action] = wantID
-		o.StoreLog("[ITINERARY] Dispatched '%s' (type: %s) for action '%s'", wantID, cfg.Type, action)
+		queue = append(queue, dispatchReq)
+		o.StoreParentState("_dispatch_queue", queue)
+
+		// Record that we've requested this action (mark as in-flight)
+		// We use a temporary ID for tracking until the DispatchThinker generates the real one.
+		pendingID := fmt.Sprintf("pending-%s", action)
+		dispatched[action] = pendingID
+		o.StoreLog("[ITINERARY] Requested dispatch for '%s' (type: %s) via parent", action, cfg.Type)
 	}
 
 	itinerarySaveDispatched(&o.Want, dispatched)
@@ -319,6 +338,15 @@ func (o *ItineraryWant) mergeCurrent(sets map[string]any) {
 	}
 	o.StoreState("current", current)
 	o.StoreLog("[ITINERARY] Updated current: %v", sets)
+}
+
+func (o *ItineraryWant) isOwnerOf(w *Want) bool {
+	for _, ref := range w.Metadata.OwnerReferences {
+		if ref.ID == o.Metadata.ID {
+			return true
+		}
+	}
+	return false
 }
 
 // anyToStringSlice converts []any or []string to []string.
