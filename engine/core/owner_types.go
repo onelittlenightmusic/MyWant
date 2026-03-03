@@ -303,11 +303,18 @@ func (t *Target) Initialize() {
 			t.StoreLog("ERROR: Failed to start DispatchThinkerAgent: %v", err)
 		}
 	}
+
+	// Initialize directions state if direction_map is present to prevent premature achievement
+	if dm, hasMap := t.Spec.Params["direction_map"]; hasMap && dm != nil {
+		if _, exists := t.GetState("directions"); !exists {
+			t.StoreState("directions", []string{})
+		}
+	}
 }
 
 // IsAchieved reports true only after Progress() has set Status to Achieved.
 func (t *Target) IsAchieved() bool {
-	return t.Status == WantStatusAchieved
+	return t.GetStatus() == WantStatusAchieved
 }
 
 // DisownChild removes a want from this target's tracking
@@ -472,8 +479,43 @@ drained:
 		achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
 		t.StoreState("achieving_percentage", achievingPercentage)
 	} else {
-		t.StoreState("achieving_percentage", 100.0)
-		allComplete = true
+		// Even if no childWants exist yet, we might have directions being realized
+		// by DispatchThinker. Stay reaching if there's evidence of ongoing work.
+		directions, directionsFound := t.GetState("directions")
+		plannedCount, _ := t.GetStateInt("planned_count", 0)
+		goalAchieved, _ := t.GetStateBool("goal_achieved", false)
+		
+		// If we have directions or a non-zero planned count, we are not done
+		// unless goal_achieved is explicitly true.
+		// For dynamic targets (direction_map present), we also wait until 
+		// directions state is at least initialized.
+		_, hasDirectionMap := t.Spec.Params["direction_map"]
+		
+		if hasDirectionMap && !directionsFound && !goalAchieved {
+			t.StoreState("achieving_percentage", 10.0)
+			allComplete = false
+		} else if (directions != nil || plannedCount > 0) && !goalAchieved {
+			t.StoreState("achieving_percentage", 50.0)
+			allComplete = false
+		} else {
+			t.StoreState("achieving_percentage", 100.0)
+			allComplete = true
+		}
+	}
+
+	// Dynamic Dispatch Check: check if all actions dispatched by DispatchThinker are done
+	if allComplete {
+		if dispatched, ok := t.GetState("_dispatched_directions"); ok {
+			if m, ok := dispatched.(map[string]any); ok {
+				for _, v := range m {
+					if id, ok := v.(string); ok && id != "DONE" {
+						allComplete = false
+						t.StoreState("achieving_percentage", 90.0)
+						break
+					}
+				}
+			}
+		}
 	}
 
 	if allComplete {

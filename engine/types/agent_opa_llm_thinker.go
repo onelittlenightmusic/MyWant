@@ -132,7 +132,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	// Step 6: Parse output and extract action type names as strings.
+	// Step 6: Parse output and extract direction type names as strings.
 	// OPA output format: {"actions": [{"type": "reserve_hotel", "status": "pending"}, ...]}
 	var planResult map[string]any
 	if err := json.Unmarshal(stdout, &planResult); err != nil {
@@ -141,20 +141,20 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	rawActions, _ := planResult["actions"].([]any)
-	actionTypes := make([]any, 0, len(rawActions))
+	directionTypes := make([]any, 0, len(rawActions))
 	for _, a := range rawActions {
 		if aMap, ok := a.(map[string]any); ok {
 			if t, ok := aMap["type"].(string); ok {
-				actionTypes = append(actionTypes, t)
+				directionTypes = append(directionTypes, t)
 			}
 		} else if s, ok := a.(string); ok {
-			actionTypes = append(actionTypes, s)
+			directionTypes = append(directionTypes, s)
 		}
 	}
 
-	want.StoreState("actions", actionTypes)
+	want.StoreState("directions", directionTypes)
 	want.StoreState("_opa_input_hash", inputHash)
-	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d actions: %v", len(actionTypes), actionTypes)
+	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 
 	return nil
 }

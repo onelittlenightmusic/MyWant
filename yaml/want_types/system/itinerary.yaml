@@ -34,9 +34,9 @@ wantType:
     required: false
     example: '{"hotel_reserved": false, "dinner_reserved": false}'
 
-  - name: action_map
+  - name: direction_map
     description: |
-      JSON string mapping OPA action names to want configuration.
+      JSON string mapping OPA direction names to want configuration.
       Each entry specifies the want type to create, optional params, and
       optional "sets" to merge into current state when the want completes.
 
@@ -87,32 +87,32 @@ wantType:
     persistent: true
     initialValue: {}
 
-  - name: actions
-    description: Action list produced by ThinkAgent on each replan
+  - name: directions
+    description: Direction list produced by ThinkAgent on each replan
     type: object
     persistent: true
     initialValue: []
 
   - name: goal_achieved
-    description: True when ThinkAgent returns an empty actions list
+    description: True when ThinkAgent returns an empty directions list
     type: bool
     persistent: true
     initialValue: false
 
   - name: planned_count
-    description: Number of actions in the current plan
+    description: Number of directions in the current plan
     type: int
     persistent: true
     initialValue: 0
 
   - name: dispatched_count
-    description: Number of actions currently in-flight
+    description: Number of directions currently in-flight
     type: int
     persistent: true
     initialValue: 0
 
-  - name: dispatched_actions
-    description: Internal map of action name → dispatched want ID
+  - name: dispatched_directions
+    description: Internal map of direction name → dispatched want ID
     type: object
     persistent: true
     initialValue: {}

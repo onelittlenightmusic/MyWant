@@ -33,7 +33,7 @@ recipe:
       hotel_cost: 0
       dinner_cost: 0
     policy_dir: "yaml/policies"
-    action_map: >-
+    direction_map: >-
       {
         "reserve_hotel": {
           "type": "hotel",
@@ -50,14 +50,14 @@ recipe:
         "reduce_hotel_cost": {
           "type": "hotel",
           "params": {"hotel_type": "budget", "is_rebooking": true},
-          "cancels_action": "reserve_hotel",
+          "cancels_direction": "reserve_hotel",
           "sets": {"hotel_reduced": true},
           "cost_field": "hotel_cost"
         },
         "reduce_dinner_cost": {
           "type": "restaurant",
           "params": {"restaurant_type": "casual", "party_size": 2, "is_rebooking": true},
-          "cancels_action": "reserve_dinner",
+          "cancels_direction": "reserve_dinner",
           "sets": {"dinner_reduced": true},
           "cost_field": "dinner_cost"
         }
@@ -73,7 +73,7 @@ recipe:
           goal: goal
           current: current
           policy_dir: policy_dir
-          action_map: action_map
+          direction_map: direction_map
 
     - metadata:
         type: budget
@@ -109,7 +109,7 @@ recipe:
               dinner_cost: 0
             use_llm: false
             policy_dir: "yaml/policies"
-            action_map: >-
+            direction_map: >-
               {
                 "reserve_hotel": {
                   "type": "hotel",
@@ -126,14 +126,14 @@ recipe:
                 "reduce_hotel_cost": {
                   "type": "hotel",
                   "params": {"hotel_type": "budget", "is_rebooking": true},
-                  "cancels_action": "reserve_hotel",
+                  "cancels_direction": "reserve_hotel",
                   "sets": {"hotel_reduced": true},
                   "cost_field": "hotel_cost"
                 },
                 "reduce_dinner_cost": {
                   "type": "restaurant",
                   "params": {"restaurant_type": "casual", "party_size": 2, "is_rebooking": true},
-                  "cancels_action": "reserve_dinner",
+                  "cancels_direction": "reserve_dinner",
                   "sets": {"dinner_reduced": true},
                   "cost_field": "dinner_cost"
                 }

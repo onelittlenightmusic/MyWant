@@ -91,14 +91,14 @@ wantType:
     initialValue: {}
     example: '{"service": "stopped", "replicas": 0}'
 
-  - name: actions
+  - name: directions
     description: |
-      Planned actions produced by opa-llm-planner, stored as an array of action objects.
+      Planned directions produced by opa-llm-planner, stored as an array of direction objects.
       Updated whenever goal or current state changes.
     type: object
     persistent: true
     initialValue: []
-    example: '[{"action": "start_service", "target": "my-app"}]'
+    example: '[{"type": "start_service", "target": "my-app"}]'
 
   requires:
     - opa_llm_planning
