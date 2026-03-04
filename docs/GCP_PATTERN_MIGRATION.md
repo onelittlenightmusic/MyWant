@@ -48,16 +48,48 @@ Do Agents execute based on the plans provided by Think Agents.
 
 ---
 
-## 3. Case Study: Travel Reservation
+## 3. Case Studies: Comprehensive Mappings
 
-How the keys change for a Hotel booking:
+How legacy keys transform into the GCP pattern across different agent types:
 
-| Legacy Key | New GCP Key | Responsible Agent |
+### A. Think Agent Case Study: `condition_thinker`
+The Think Agent is responsible for the transition from "what we want" (Goal) to "what we should do" (Plan).
+
+| Legacy / Source | New GCP Key | Responsibility |
 | :--- | :--- | :--- |
-| `hotel_type` | `goal.hotel_type` | Think |
-| `status` | `current.res_status` | Monitor |
-| `good_to_reserve` | `plan.reserve` | Think |
-| `reservation_id` | `current.res_id` | Do (initial) / Monitor |
+| `spec.params["hotel_type"]` | `goal.hotel_type` | **Think**: Initialize goal from parameters. |
+| `parent.state["target_budgets"]`| `current.budget_limit` | **Think**: Fetch context from parent and store as current fact. |
+| `good_to_reserve` | `plan.execute_booking` | **Think**: Set plan when goal != current and budget is OK. |
+| `_thinker_itinerary_registered` | `_thinker.itinerary_done` | **Internal**: Use underscore for internal tracking flags. |
+
+### B. Monitor Agent Case Study: `monitor_flight_api`
+The Monitor Agent focuses purely on updating the `current.*` state based on external reality.
+
+| Legacy Key | New GCP Key | Responsibility |
+| :--- | :--- | :--- |
+| `flight_status` | `current.status` | **Monitor**: Update with latest observation (e.g., "delayed"). |
+| `departure_time` | `current.departure_time` | **Monitor**: Reflect actual time from API. |
+| `status_message` | `current.message` | **Monitor**: Provide details about the current status. |
+| `_monitor_state_hash` | `_monitor.last_hash` | **Internal**: Tracking for differential updates. |
+
+### C. Do Agent Case Study: `agent_premium` (Reservation)
+The Do Agent acts on the `plan.*` and provides initial feedback to `current.*`.
+
+| Plan / Trigger Key | Action & Result Key | Responsibility |
+| :--- | :--- | :--- |
+| `plan.execute_booking` | (Read Trigger) | **Do**: Start execution if this is true. |
+| `reservation_id` | `current.res_id` | **Do**: Store the ID immediately after API success. |
+| `status` | `current.res_status` | **Do**: Update to "confirmed" upon completion. |
+| (Post-Execution) | `plan.execute_booking` | **Do**: Set to `nil` or `false` to mark plan as handled. |
+
+### D. Orchestration Case Study: `dispatch_thinker`
+For complex parent wants managing children.
+
+| Legacy Key | New GCP Key | Responsibility |
+| :--- | :--- | :--- |
+| `directions` | `goal.directions` | **Think**: The sequence of sub-wants to achieve. |
+| `_dispatched_directions` | `current.dispatched` | **Monitor/Think**: Tracking what has actually been created. |
+| (New Dispatch Request) | `plan.dispatch_child` | **Think**: Signal to the system to create a new sub-want. |
 
 ---
 
