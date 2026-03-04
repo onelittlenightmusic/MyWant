@@ -6,6 +6,77 @@ The MyWant Agent System provides capability-based, autonomous agents that can ex
 
 ## Architecture
 
+### Conceptual Overview
+
+The MyWant Agent System operates on a reactive, state-centric architecture where specialized agents collaborate through a central **State**.
+
+#### Agent Control Loop
+
+```mermaid
+flowchart TD
+    %% Top: Human/Parent
+    Parent([Human / Parent Want])
+
+    subgraph Want [Want]
+        direction TB
+        
+        %% Center: State
+        State[(State)]
+        
+        %% Top of State: Think
+        Think[Think Agent]
+        
+        %% Bottom of State: Monitor and Do side-by-side
+        subgraph Agents [ ]
+            direction LR
+            Monitor[Monitor Agent]
+            Do[Do Agent]
+        end
+
+        %% Connections: Think reads/writes State
+        Think <--> State
+        
+        %% Connections: Monitor writes to State
+        Monitor --> State
+        
+        %% Connections: Do reads from State to act
+        State --> Do
+    end
+
+    %% Bottom: World
+    World[/World / External Systems/]
+
+    %% External Connections
+    Parent <--> Think
+    World --- Monitor
+    Do --- World
+```
+
+#### State-Agent Interaction Pattern
+
+```text
+       [ Human / Parent Want ]
+                 ▲
+                 | (read/write parent state)
+                 ▼
++----------------|-------------------+
+| Want           |                   |
+|        [  Think Agent  ]           |
+|                ▲                   |
+|                | (read/write)      |
+|                ▼                   |
+|          [   State   ]             |
+|             /     \                |
+|    (write) /       \ (read)        |
+|           /         \              |
+| [ Monitor Agent ]  [   Do Agent   ] |
++-------▲------------------|---------+
+        |                  |
+        | (observe)        | (action)
+        |                  ▼
+       [      World / External      ]
+```
+
 ### Core Components
 
 1. **Capabilities** - Define what services are available
@@ -15,32 +86,42 @@ The MyWant Agent System provides capability-based, autonomous agents that can ex
 3. **Agent Registry** - Manages capability-to-agent mapping
 4. **Want Integration** - Wants specify requirements and execute matching agents
 
-### Agent Types
+### Agent Types (Standard Operational Principles)
 
-#### DoAgent
-- **Purpose**: Perform actions that change external state
-- **Examples**: Make hotel reservations, process payments, send notifications
-- **Execution Characteristic**: **Synchronous**. Triggered via `ExecuteAgents()`, it blocks the progression loop until the action completes.
-- **State Updates**: Typically updates state once upon completion.
+The MyWant system follows the **Agent-State Interaction Rule (GCP Pattern)** to coordinate agent activities through a structured state flow.
+
+#### ThinkAgent
+- **Purpose**: React to state changes and propagate computed values across want boundaries.
+- **Operational Principles**:
+  - **Goal Setting**: If `goal.*` is missing in the state, initialize it (Trigger: absence of `goal.*`).
+  - **Wait for Context**: Wait until `current.*` is populated by Monitor Agents.
+  - **Planning**: Compare `goal.*` with `current.*` to generate a `plan.*` (Trigger: presence of both `goal.*` and `current.*`).
+- **Examples**: Register in coordinator itinerary, await budget allocation, propagate reservation costs.
+- **Execution Characteristic**: **Background Ticker** (default 2s).
+- **State Access**: Reads/writes own State and ParentState.
 
 #### MonitorAgent
-- **Purpose**: Monitor and validate state
-- **Examples**: Check reservation status, validate payments, monitor resources
-- **Execution Characteristic**: **Asynchronous**. Triggered via `ExecuteAgents()`, it runs in a background goroutine and continues monitoring until the want achieves its goal or fails.
-- **State Updates**: Updates state periodically as external conditions change.
+- **Purpose**: Monitor and validate state by observing the external world.
+- **Operational Principles**:
+  - **Observation**: Continuously observe external systems or resources.
+  - **State Update**: Write the observed external information into `current.*` fields.
+- **Examples**: Check reservation status, validate payments, monitor resources.
+- **Execution Characteristic**: **Asynchronous**.
+
+#### DoAgent
+- **Purpose**: Perform actions that change external state based on generated plans.
+- **Operational Principles**:
+  - **Execution**: Read the `plan.*` fields and execute the corresponding actions in the external world.
+  - **Flexibility**: **DoAgents can be executed even if no `plan.*` is present** (e.g., direct invocation via `ExecuteAgents()`).
+  - **Cleanup/Feedback**: Overwrite or remove `plan.*` upon successful execution to prevent redundant actions.
+- **Examples**: Make hotel reservations, process payments, send notifications.
+- **Execution Characteristic**: **Synchronous**.
 
 #### PollAgent / BackgroundAgent
 - **Purpose**: Long-running or system-level background operations.
 - **Examples**: Task scheduling, continuous health checks, user reaction polling.
 - **Execution Characteristic**: **Persistent**. Registered via `AddBackgroundAgent()`, these agents are initialized when the want starts and remain active throughout the entire lifecycle of the want.
 - **Management**: Managed by the want's internal background registry with explicit `Start`/`Stop` signals.
-
-#### ThinkAgent
-- **Purpose**: React to state changes and propagate computed values across want boundaries.
-- **Examples**: Register in coordinator itinerary, await budget allocation, propagate reservation costs to parent want.
-- **Execution Characteristic**: **Background Ticker**. Registered via `AddBackgroundAgent()`, it runs a `ThinkFunc` on a configurable interval (default 2s). Unlike PollAgent, it has no explicit stop signal — it runs until the want terminates.
-- **State Access**: Reads and writes own State *and* reads/writes **ParentState** via `GetParentState()` / `MergeParentState()`, enabling cross-want coordination.
-- **Flush on Completion**: When a want achieves its goal, all ThinkAgents are **flushed** (run once synchronously) before being stopped — ensuring in-flight state updates are not lost even for wants that complete in a single Progress cycle.
 
 ### State-Centric Architecture
 
@@ -577,3 +658,23 @@ cb.RestartWant(targetID)  // wake the target's goroutine to process the flag
 - Check agent execution logs for runtime errors
 - Monitor state history for unexpected changes
 - Verify capability-to-agent mappings are correct
+
+---
+
+## Implementation Plan for GCP Pattern
+
+To fully adopt the Agent-State Interaction Rule, the following phases are planned:
+
+### Phase 1: Foundation (Core Helpers)
+- Add dedicated helper methods to the `Want` struct in `engine/core/want.go`:
+  - `SetGoal(key, val)`, `GetCurrent(key)`, `SetPlan(key, val)`, `ClearPlan(key)`
+- These helpers will automatically handle the `goal.`, `current.`, and `plan.` prefixes.
+
+### Phase 2: Migration (Agent Refactoring)
+- Update `ThinkAgent` implementations (e.g., `condition_thinker`) to use GCP prefixes for goal and plan management.
+- Update `MonitorAgent` implementations (e.g., `monitor_flight_api`) to write results to `current.*`.
+- Update `DoAgent` logic to check for `plan.*` before execution, while maintaining backward compatibility for direct calls.
+
+### Phase 3: Visibility & Validation
+- Update the Dashboard (UI) to group state fields by GCP categories for better observability.
+- Add E2E tests specifically verifying the GCP loop (Think -> Plan -> Do -> Monitor -> Current -> Think).
